@@ -8,6 +8,33 @@ use pgp_mobile::decrypt;
 use pgp_mobile::sign;
 use pgp_mobile::verify;
 use pgp_mobile::decrypt::SignatureStatus;
+use sequoia_openpgp as openpgp;
+use openpgp::parse::Parse;
+
+/// Helper: detect whether binary ciphertext uses SEIPDv1 or SEIPDv2.
+/// Uses PacketParser to inspect packet headers without fully decrypting.
+/// Returns (has_seipd_v1, has_seipd_v2).
+fn detect_message_format(ciphertext: &[u8]) -> (bool, bool) {
+    let mut has_v1 = false;
+    let mut has_v2 = false;
+    let mut ppr = openpgp::parse::PacketParser::from_bytes(ciphertext)
+        .expect("Should parse ciphertext");
+    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
+        match &pp.packet {
+            openpgp::Packet::SEIP(seip) => {
+                if seip.version() == 1 {
+                    has_v1 = true;
+                } else if seip.version() == 2 {
+                    has_v2 = true;
+                }
+            }
+            _ => {}
+        }
+        let (_, next) = pp.next().expect("Should advance");
+        ppr = next;
+    }
+    (has_v1, has_v2)
+}
 
 /// C2X.1: Profile A encrypts to Profile B recipient (v6 key).
 /// Pass: message format is SEIPDv2. Recipient decrypts.
@@ -289,6 +316,90 @@ fn test_cross_profile_signed_encrypted_round_trip() {
         result.signer_fingerprint,
         Some(sender_a.fingerprint.clone())
     );
+}
+
+/// Verify that encrypting to v4 recipient produces SEIPDv1.
+/// This directly validates PRD Section 3.4 format auto-selection rule.
+#[test]
+fn test_format_selection_v4_recipient_produces_seipd_v1() {
+    let recipient_a = keys::generate_key_with_profile(
+        "Bob (A)".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"Format check v4",
+        &[recipient_a.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let (has_v1, has_v2) = detect_message_format(&ciphertext);
+    assert!(has_v1, "v4 recipient should produce SEIPDv1");
+    assert!(!has_v2, "v4 recipient should NOT produce SEIPDv2");
+}
+
+/// Verify that encrypting to v6 recipient produces SEIPDv2 (AEAD).
+#[test]
+fn test_format_selection_v6_recipient_produces_seipd_v2() {
+    let recipient_b = keys::generate_key_with_profile(
+        "Bob (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"Format check v6",
+        &[recipient_b.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let (has_v1, has_v2) = detect_message_format(&ciphertext);
+    assert!(!has_v1, "v6 recipient should NOT produce SEIPDv1");
+    assert!(has_v2, "v6 recipient should produce SEIPDv2 (AEAD)");
+}
+
+/// Verify that mixed v4+v6 recipients produce SEIPDv1 (lowest common denominator).
+#[test]
+fn test_format_selection_mixed_recipients_produces_seipd_v1() {
+    let recipient_a = keys::generate_key_with_profile(
+        "Bob (A)".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let recipient_b = keys::generate_key_with_profile(
+        "Charlie (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"Format check mixed",
+        &[
+            recipient_a.public_key_data.clone(),
+            recipient_b.public_key_data.clone(),
+        ],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let (has_v1, has_v2) = detect_message_format(&ciphertext);
+    assert!(has_v1, "Mixed v4+v6 recipients should produce SEIPDv1");
+    assert!(!has_v2, "Mixed v4+v6 recipients should NOT produce SEIPDv2");
 }
 
 /// Revocation cert from Profile A key should not verify against Profile B key (and vice versa).

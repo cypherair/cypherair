@@ -15,7 +15,7 @@ pub mod verify;
 use crate::armor::ArmorKind;
 use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
-use crate::keys::{GeneratedKey, KeyInfo, KeyProfile};
+use crate::keys::{GeneratedKey, KeyInfo, KeyProfile, S2kInfo};
 use crate::verify::VerifyResult;
 
 uniffi::setup_scaffolding!();
@@ -179,6 +179,16 @@ impl PgpEngine {
         keys::export_secret_key(&cert_data, &passphrase, profile)
     }
 
+    /// Parse S2K parameters from a passphrase-protected key without importing it.
+    /// Use this to check Argon2id memory requirements before calling import_secret_key.
+    /// Returns S2K type, memory requirement (KiB), parallelism, and time passes.
+    pub fn parse_s2k_params(
+        &self,
+        armored_data: Vec<u8>,
+    ) -> Result<S2kInfo, PgpError> {
+        keys::parse_s2k_params(&armored_data)
+    }
+
     /// Import a passphrase-protected secret key.
     /// Auto-detects S2K mode (Iterated+Salted or Argon2id).
     pub fn import_secret_key(
@@ -230,10 +240,12 @@ impl PgpEngine {
     }
 
     /// Decode a QR code URL and extract the public key.
-    /// Validates the URL format and parses the key.
+    /// Validates the URL format, parses the key, and rejects secret key material.
+    /// Only public keys should be exchanged via QR codes.
     pub fn decode_qr_url(&self, url: String) -> Result<Vec<u8>, PgpError> {
         use base64::engine::general_purpose::URL_SAFE_NO_PAD;
         use base64::Engine;
+        use sequoia_openpgp::parse::Parse;
 
         let prefix = "cypherair://import/v1/";
         if !url.starts_with(prefix) {
@@ -249,8 +261,21 @@ impl PgpEngine {
             }
         })?;
 
-        // Validate that it's a valid OpenPGP public key
+        // Validate that it's a valid OpenPGP key
         let _key_info = keys::parse_key_info(&key_bytes)?;
+
+        // Reject secret key material — QR exchange should only contain public keys.
+        // This prevents accidental secret key leakage via QR codes.
+        let cert = sequoia_openpgp::Cert::from_bytes(&key_bytes).map_err(|e| {
+            PgpError::InvalidKeyData {
+                reason: format!("Invalid key data: {e}"),
+            }
+        })?;
+        if cert.is_tsk() {
+            return Err(PgpError::InvalidKeyData {
+                reason: "QR code contains secret key material. Only public keys should be shared via QR.".to_string(),
+            });
+        }
 
         Ok(key_bytes)
     }

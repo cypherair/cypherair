@@ -86,8 +86,22 @@ pub fn generate_key_with_profile(
     // Set cipher suite and profile based on KeyProfile
     match profile {
         KeyProfile::Universal => {
-            builder = builder.set_cipher_suite(CipherSuite::Cv25519);
-            // RFC4880 is the default profile — no explicit set needed
+            // Explicitly set RFC4880 profile and strip SEIPDv2 feature.
+            // Sequoia 2.2.0 defaults to advertising SEIPDv2 support in the
+            // Features subpacket (because the library itself supports it).
+            // For Profile A (GnuPG-compatible), we must advertise only SEIPDv1
+            // so that other implementations send SEIPDv1 messages to this key.
+            // Without this, GnuPG users cannot decrypt messages sent to Profile A keys.
+            builder = builder
+                .set_cipher_suite(CipherSuite::Cv25519)
+                .set_profile(openpgp::Profile::RFC4880)
+                .map_err(|e| PgpError::KeyGenerationFailed {
+                    reason: format!("Failed to set profile: {e}"),
+                })?
+                .set_features(openpgp::types::Features::empty().set_seipdv1())
+                .map_err(|e| PgpError::KeyGenerationFailed {
+                    reason: format!("Failed to set features: {e}"),
+                })?;
         }
         KeyProfile::Advanced => {
             builder = builder
@@ -226,9 +240,42 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
     })
 }
 
+/// Encrypt a secret key using Argon2id S2K (Profile B).
+/// Uses explicit Argon2id parameters per PRD: encoded_m=19 (512 MB), p=4, t=3.
+fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
+    key: openpgp::packet::Key<openpgp::packet::key::SecretParts, R>,
+    password: &openpgp::crypto::Password,
+) -> openpgp::Result<openpgp::packet::Key<openpgp::packet::key::SecretParts, R>> {
+    use openpgp::types::{AEADAlgorithm, SymmetricAlgorithm};
+
+    // Generate random 16-byte salt for Argon2id
+    let mut salt = [0u8; 16];
+    openpgp::crypto::random(&mut salt)?;
+
+    // PRD parameters: 512 MB (m=19, meaning 2^19 KiB), p=4, t=3
+    let s2k = openpgp::crypto::S2K::Argon2 {
+        salt,
+        t: 3,   // time passes
+        p: 4,   // parallelism lanes
+        m: 19,  // memory exponent: 2^19 KiB = 512 MB
+    };
+
+    let (key_pub, mut secret) = key.take_secret();
+
+    secret.encrypt_in_place_with(
+        &key_pub,
+        s2k,
+        SymmetricAlgorithm::AES256,
+        Some(AEADAlgorithm::OCB),
+        password,
+    )?;
+
+    Ok(key_pub.add_secret(secret).0)
+}
+
 /// Export a secret key protected with a passphrase.
-/// - Profile A (Universal): Iterated+Salted S2K (mode 3) — selected automatically by Sequoia for v4/RFC4880 keys.
-/// - Profile B (Advanced): Argon2id S2K — selected automatically by Sequoia for v6/RFC9580 keys.
+/// - Profile A (Universal): Iterated+Salted S2K (mode 3) — GnuPG compatible.
+/// - Profile B (Advanced): Argon2id S2K (512 MB / p=4 / t=3) — RFC 9580.
 ///
 /// Returns ASCII-armored key data with passphrase-encrypted secret key material.
 pub fn export_secret_key(
@@ -260,8 +307,10 @@ pub fn export_secret_key(
     let password = openpgp::crypto::Password::from(passphrase);
 
     // Encrypt each secret key component with the passphrase.
-    // Sequoia's encrypt_secret() automatically selects the S2K mode based on
-    // the key's profile: RFC4880 keys → Iterated+Salted, RFC9580 keys → Argon2id.
+    // For Profile A: Sequoia's default S2K (Iterated+Salted) is appropriate.
+    // For Profile B: We must explicitly use Argon2id S2K, because Sequoia's
+    // S2K::default() returns Iterated+Salted for all key versions.
+    // PRD requires Argon2id (512 MB / p=4 / ~3s) for Profile B exports.
     let mut encrypted_packets: Vec<openpgp::Packet> = Vec::new();
 
     // Encrypt primary key
@@ -271,20 +320,32 @@ pub fn export_secret_key(
             .map_err(|e| PgpError::S2kError {
                 reason: format!("Primary key has no secret parts: {e}"),
             })?;
-        let encrypted = primary.encrypt_secret(&password)
-            .map_err(|e| PgpError::S2kError {
-                reason: format!("Failed to encrypt primary key: {e}"),
-            })?;
+        let encrypted = match profile {
+            KeyProfile::Universal => {
+                primary.encrypt_secret(&password)
+            }
+            KeyProfile::Advanced => {
+                encrypt_key_argon2id(primary, &password)
+            }
+        }.map_err(|e| PgpError::S2kError {
+            reason: format!("Failed to encrypt primary key: {e}"),
+        })?;
         encrypted_packets.push(encrypted.role_into_primary().into());
     }
 
     // Encrypt subkeys
     for ka in cert.keys().subkeys().secret() {
         let key = ka.key().clone();
-        let encrypted = key.encrypt_secret(&password)
-            .map_err(|e| PgpError::S2kError {
-                reason: format!("Failed to encrypt subkey: {e}"),
-            })?;
+        let encrypted = match profile {
+            KeyProfile::Universal => {
+                key.encrypt_secret(&password)
+            }
+            KeyProfile::Advanced => {
+                encrypt_key_argon2id(key, &password)
+            }
+        }.map_err(|e| PgpError::S2kError {
+            reason: format!("Failed to encrypt subkey: {e}"),
+        })?;
         encrypted_packets.push(encrypted.role_into_subordinate().into());
     }
 
@@ -439,4 +500,71 @@ pub fn detect_profile(cert_data: &[u8]) -> Result<KeyProfile, PgpError> {
     } else {
         KeyProfile::Universal
     })
+}
+
+/// S2K (String-to-Key) parameters extracted from a passphrase-protected key.
+/// Used by Swift side to check memory requirements before importing.
+#[derive(Debug, uniffi::Record)]
+pub struct S2kInfo {
+    /// S2K type: "iterated-salted" for Profile A, "argon2id" for Profile B, or "unknown".
+    pub s2k_type: String,
+    /// For Argon2id: memory requirement in KiB (2^encoded_m). 0 for non-Argon2id.
+    pub memory_kib: u64,
+    /// For Argon2id: parallelism lanes. 0 for non-Argon2id.
+    pub parallelism: u32,
+    /// For Argon2id: time passes. 0 for non-Argon2id.
+    pub time_passes: u32,
+}
+
+/// Parse S2K parameters from a passphrase-protected key file.
+/// This allows the Swift side to check memory requirements (e.g., Argon2id 512 MB)
+/// before calling `import_secret_key`, preventing iOS Jetsam kills.
+///
+/// Only inspects the primary key's S2K specifier.
+pub fn parse_s2k_params(armored_data: &[u8]) -> Result<S2kInfo, PgpError> {
+    let cert =
+        openpgp::Cert::from_bytes(armored_data).map_err(|e| PgpError::InvalidKeyData {
+            reason: e.to_string(),
+        })?;
+
+    let primary = cert.primary_key().key().clone();
+    let secret = primary.optional_secret();
+
+    match secret {
+        Some(openpgp::packet::key::SecretKeyMaterial::Encrypted(encrypted)) => {
+            let s2k = encrypted.s2k();
+            match s2k {
+                openpgp::crypto::S2K::Argon2 { t, p, m, .. } => {
+                    // memory = 2^m KiB (RFC 9580 encoding)
+                    let memory_kib: u64 = 1u64 << (*m as u64);
+                    Ok(S2kInfo {
+                        s2k_type: "argon2id".to_string(),
+                        memory_kib,
+                        parallelism: *p as u32,
+                        time_passes: *t as u32,
+                    })
+                }
+                openpgp::crypto::S2K::Iterated { .. } => Ok(S2kInfo {
+                    s2k_type: "iterated-salted".to_string(),
+                    memory_kib: 0,
+                    parallelism: 0,
+                    time_passes: 0,
+                }),
+                _ => Ok(S2kInfo {
+                    s2k_type: "unknown".to_string(),
+                    memory_kib: 0,
+                    parallelism: 0,
+                    time_passes: 0,
+                }),
+            }
+        }
+        Some(openpgp::packet::key::SecretKeyMaterial::Unencrypted(_)) => {
+            Err(PgpError::InvalidKeyData {
+                reason: "Key is not passphrase-protected (unencrypted secret key)".to_string(),
+            })
+        }
+        None => Err(PgpError::InvalidKeyData {
+            reason: "No secret key material found (public key only)".to_string(),
+        }),
+    }
 }
