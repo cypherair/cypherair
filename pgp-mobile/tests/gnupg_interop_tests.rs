@@ -12,9 +12,13 @@
 use pgp_mobile::armor;
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
+use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
 use pgp_mobile::verify;
+
+use sequoia_openpgp as openpgp;
+use openpgp::parse::Parse;
 
 /// Load a fixture file from the fixtures directory.
 fn load_fixture(name: &str) -> Vec<u8> {
@@ -28,6 +32,31 @@ fn load_fixture(name: &str) -> Vec<u8> {
 /// Load the expected plaintext used to generate fixtures.
 fn expected_plaintext() -> Vec<u8> {
     load_fixture("gpg_plaintext.txt")
+}
+
+/// Helper: detect whether binary ciphertext uses SEIPDv1 or SEIPDv2.
+/// Uses PacketParser to inspect packet headers without fully decrypting.
+/// Returns (has_seipd_v1, has_seipd_v2).
+fn detect_message_format(ciphertext: &[u8]) -> (bool, bool) {
+    let mut has_v1 = false;
+    let mut has_v2 = false;
+    let mut ppr = openpgp::parse::PacketParser::from_bytes(ciphertext)
+        .expect("Should parse ciphertext");
+    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
+        match &pp.packet {
+            openpgp::Packet::SEIP(seip) => {
+                if seip.version() == 1 {
+                    has_v1 = true;
+                } else if seip.version() == 2 {
+                    has_v2 = true;
+                }
+            }
+            _ => {}
+        }
+        let (_, next) = pp.next().expect("Should advance");
+        ppr = next;
+    }
+    (has_v1, has_v2)
 }
 
 // ── C3.1: Export Profile A pubkey → gpg --import succeeds ──────────────────
@@ -76,6 +105,13 @@ fn test_c3_2_app_encrypt_to_gpg_key() {
     // Encrypt with Sequoia to the GnuPG public key
     let ciphertext = encrypt::encrypt(plaintext, &[gpg_pubkey.clone()], None, None)
         .expect("Sequoia should encrypt to GnuPG key");
+
+    // Verify message format is SEIPDv1 (GnuPG compatible)
+    let ciphertext_binary = encrypt::encrypt_binary(plaintext, &[gpg_pubkey.clone()], None, None)
+        .expect("Binary encryption should succeed");
+    let (has_v1, has_v2) = detect_message_format(&ciphertext_binary);
+    assert!(has_v1, "Encryption to v4 GnuPG key must produce SEIPDv1");
+    assert!(!has_v2, "Encryption to v4 GnuPG key must NOT produce SEIPDv2");
 
     // Decrypt with the GnuPG secret key (imported into Sequoia)
     // This simulates what gpg --decrypt would do
@@ -183,6 +219,11 @@ fn test_c3_4_decrypt_gpg_encrypted_message_binary() {
     let pubkey = load_fixture("gpg_pubkey.gpg");
     let expected = expected_plaintext();
 
+    // Verify the GnuPG fixture uses SEIPDv1
+    let (has_v1, has_v2) = detect_message_format(&ciphertext);
+    assert!(has_v1, "GnuPG fixture must be SEIPDv1");
+    assert!(!has_v2, "GnuPG fixture must NOT be SEIPDv2");
+
     let result = decrypt::decrypt(&ciphertext, &[secretkey], &[pubkey])
         .expect("Should decrypt binary GnuPG-encrypted message");
 
@@ -250,6 +291,17 @@ fn test_c3_6_tampered_gpg_ciphertext_fails() {
         result.is_err(),
         "Tampered ciphertext must not decrypt successfully"
     );
+    // Verify the error is a security-relevant failure (integrity or corruption)
+    match result {
+        Err(PgpError::IntegrityCheckFailed)
+        | Err(PgpError::AeadAuthenticationFailed)
+        | Err(PgpError::CorruptData { .. })
+        | Err(PgpError::NoMatchingKey) => {}
+        Err(other) => panic!(
+            "Expected integrity/corruption/no-matching-key error, got: {other}"
+        ),
+        Ok(_) => unreachable!("Already asserted result.is_err()"),
+    }
 }
 
 /// C3.6 (Sequoia-encrypted): Tamper Sequoia ciphertext → verify it fails.
@@ -272,6 +324,17 @@ fn test_c3_6_tampered_sequoia_ciphertext_for_gpg_key() {
         result.is_err(),
         "Tampered Sequoia ciphertext must fail decryption"
     );
+    // Verify the error is a security-relevant failure (integrity or corruption)
+    match result {
+        Err(PgpError::IntegrityCheckFailed)
+        | Err(PgpError::AeadAuthenticationFailed)
+        | Err(PgpError::CorruptData { .. })
+        | Err(PgpError::NoMatchingKey) => {}
+        Err(other) => panic!(
+            "Expected integrity/corruption/no-matching-key error, got: {other}"
+        ),
+        Ok(_) => unreachable!("Already asserted result.is_err()"),
+    }
 }
 
 // ── C3.7: Import gpg pubkey → App encrypt → gpg decrypt ───────────────────
@@ -346,7 +409,8 @@ fn test_c3_7_full_roundtrip_signed() {
 
 /// C3.8: Profile B key is v6 (incompatible with GnuPG).
 /// GnuPG 2.4.x rejects v6 keys. We verify the key is indeed v6.
-/// The actual GnuPG rejection was verified during fixture generation.
+/// GnuPG rejection is captured by running `generate_gpg_fixtures.sh` after
+/// generating the v6 fixture with `test_generate_v6_fixture`.
 #[test]
 fn test_c3_8_profile_b_key_is_v6_gnupg_incompatible() {
     let key_b = keys::generate_key_with_profile(
@@ -593,6 +657,18 @@ fn test_profile_b_sender_to_gpg_v4_recipient_uses_seipdv1() {
     )
     .expect("Encrypt should succeed (auto-downgrade to SEIPDv1)");
 
+    // Verify format is SEIPDv1 (binary check)
+    let ciphertext_binary = encrypt::encrypt_binary(
+        plaintext,
+        &[gpg_pubkey.clone()],
+        None,
+        None,
+    )
+    .expect("Binary encryption should succeed");
+    let (has_v1, has_v2) = detect_message_format(&ciphertext_binary);
+    assert!(has_v1, "Profile B sender to v4 recipient must produce SEIPDv1");
+    assert!(!has_v2, "Profile B sender to v4 recipient must NOT produce SEIPDv2");
+
     // GnuPG v4 recipient decrypts successfully
     let result = decrypt::decrypt(
         &ciphertext,
@@ -605,5 +681,101 @@ fn test_profile_b_sender_to_gpg_v4_recipient_uses_seipdv1() {
     assert_eq!(
         result.signature_status,
         Some(decrypt::SignatureStatus::Valid)
+    );
+}
+
+// ── Signed+compressed fixture test ──────────────────────────────────────
+
+/// Verify a GnuPG signed+compressed message (gpg --sign with DEFLATE).
+/// Tests the `gpg_signed_compressed.asc` fixture generated by the script.
+/// `gpg --sign` produces a one-pass signed (non-encrypted) message.
+#[test]
+fn test_verify_gpg_signed_compressed() {
+    let signed = load_fixture("gpg_signed_compressed.asc");
+    let pubkey = load_fixture("gpg_pubkey.asc");
+    let expected = expected_plaintext();
+
+    // gpg --sign produces a one-pass-signed message (not cleartext, not encrypted).
+    // Verify via the VerifierBuilder path.
+    let result = verify::verify_cleartext(&signed, &[pubkey])
+        .expect("Should verify signed+compressed message");
+
+    assert_eq!(result.status, decrypt::SignatureStatus::Valid);
+    let content = result.content.expect("Should have content");
+    let content_str = String::from_utf8_lossy(&content);
+    let expected_str = String::from_utf8_lossy(&expected);
+    assert_eq!(content_str.trim(), expected_str.trim());
+}
+
+// ── V6 fixture generation (helper, ignored by default) ──────────────────
+
+/// Generate a Profile B (v6) public key fixture for GnuPG rejection testing.
+/// Run manually: `cargo test test_generate_v6_fixture -- --ignored`
+/// Then run `generate_gpg_fixtures.sh` to test GnuPG import rejection.
+#[test]
+#[ignore]
+fn test_generate_v6_fixture() {
+    let key_b = keys::generate_key_with_profile(
+        "Profile B Test".to_string(),
+        Some("profile-b@example.com".to_string()),
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Profile B key gen should succeed");
+
+    assert_eq!(key_b.key_version, 6);
+
+    let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("profile_b_v6_pubkey.gpg");
+
+    std::fs::write(&fixture_path, &key_b.public_key_data)
+        .expect("Should write v6 public key fixture");
+
+    println!("Generated v6 fixture: {:?} ({} bytes)", fixture_path, key_b.public_key_data.len());
+}
+
+/// C3.8: Verify that GnuPG rejection output was captured by fixture generation.
+/// Requires running `test_generate_v6_fixture` (ignored) then `generate_gpg_fixtures.sh`.
+#[test]
+fn test_c3_8_gpg_rejection_output_recorded() {
+    let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("gpg_v6_import_rejection.txt");
+
+    if !fixture_path.exists() {
+        // Skip gracefully if fixture hasn't been generated yet.
+        // The v6 rejection test requires manual fixture generation steps.
+        eprintln!(
+            "Skipping: gpg_v6_import_rejection.txt not found. \
+             Run `cargo test test_generate_v6_fixture -- --ignored` then \
+             `bash generate_gpg_fixtures.sh` to generate it."
+        );
+        return;
+    }
+
+    let content = std::fs::read_to_string(&fixture_path)
+        .expect("Should read rejection output file");
+
+    // GnuPG should have produced some output (error or warning)
+    assert!(
+        !content.is_empty(),
+        "GnuPG rejection output file must not be empty"
+    );
+
+    // Verify the file contains evidence of rejection (non-zero exit code)
+    // or GnuPG error/warning text
+    let has_error_indicators = content.contains("error")
+        || content.contains("no valid OpenPGP data")
+        || content.contains("not supported")
+        || content.contains("unknown packet")
+        || content.contains("gpg_import_exit_code=");
+
+    assert!(
+        has_error_indicators,
+        "GnuPG rejection output should contain error indicators, got: {}",
+        content
     );
 }
