@@ -420,6 +420,131 @@ fn test_armor_roundtrip_profile_a() {
     assert_eq!(original_info.fingerprint, dearmored_info.fingerprint);
 }
 
+/// Fix #1 verification: exported key is truly passphrase-protected.
+/// After export, the key should not be usable without decryption (import).
+#[test]
+fn test_export_produces_encrypted_key_profile_a() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let passphrase = "test-passphrase-a";
+
+    let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Universal)
+        .expect("Export should succeed");
+
+    // The exported data should be armored and contain encrypted secret key material.
+    // Trying to directly use the exported cert for signing (without import/decrypt)
+    // should fail because the secret keys are encrypted.
+    let sign_result = sign::sign_cleartext(b"test", &exported);
+    assert!(
+        sign_result.is_err(),
+        "Exported key with encrypted secrets should not be directly usable for signing"
+    );
+}
+
+/// Fix #1+#2 verification: full export → import → decrypt message round-trip.
+#[test]
+fn test_export_import_decrypt_roundtrip_profile_a() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        Some("alice@example.com".to_string()),
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let plaintext = b"Message to verify export/import chain.";
+
+    // Encrypt a message with the original key
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[key.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    // Export with passphrase
+    let passphrase = "roundtrip-test-passphrase";
+    let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Universal)
+        .expect("Export should succeed");
+
+    // Import with correct passphrase
+    let imported = keys::import_secret_key(&exported, passphrase)
+        .expect("Import should succeed");
+
+    // Decrypt the message with the imported key
+    let result = decrypt::decrypt(&ciphertext, &[imported], &[])
+        .expect("Decryption with imported key should succeed");
+
+    assert_eq!(result.plaintext, plaintext);
+}
+
+/// Fix #3 verification: expired key detected by parse_key_info.
+#[test]
+fn test_expired_key_detected_profile_a() {
+    // Generate a key with 1-second expiry
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        Some(1), // 1 second expiry
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    // Wait for the key to expire (3 seconds to avoid timing flakiness)
+    std::thread::sleep(std::time::Duration::from_secs(3));
+
+    let info = keys::parse_key_info(&key.cert_data).expect("Parse should succeed");
+    assert!(info.is_expired, "Key with 1-second expiry should be expired after 2 seconds");
+    assert!(!info.is_revoked, "Expired key should not be marked as revoked");
+}
+
+/// Fix #4 verification: encrypt_binary rejects recipient without encryption subkey.
+/// This test creates a signing-only cert and verifies that encrypt_binary produces
+/// the same error as encrypt.
+#[test]
+fn test_encrypt_binary_rejects_no_encryption_subkey() {
+    use sequoia_openpgp as openpgp;
+    use openpgp::cert::prelude::*;
+    use openpgp::serialize::Serialize;
+
+    // Create a cert with ONLY signing capability, no encryption subkey
+    let (cert, _rev) = CertBuilder::new()
+        .add_userid("SignOnly")
+        .add_signing_subkey()
+        // No add_transport_encryption_subkey()
+        .generate()
+        .expect("Cert gen should succeed");
+
+    let mut pubkey_data = Vec::new();
+    cert.serialize(&mut pubkey_data).expect("Serialize should succeed");
+
+    let plaintext = b"Test message";
+
+    // Both encrypt and encrypt_binary should fail with the same kind of error
+    let result_armored = encrypt::encrypt(
+        plaintext,
+        &[pubkey_data.clone()],
+        None,
+        None,
+    );
+    assert!(result_armored.is_err(), "encrypt should reject recipient without encryption subkey");
+
+    let result_binary = encrypt::encrypt_binary(
+        plaintext,
+        &[pubkey_data.clone()],
+        None,
+        None,
+    );
+    assert!(result_binary.is_err(), "encrypt_binary should reject recipient without encryption subkey");
+}
+
 /// Wrong key decryption: decrypt with wrong key → NoMatchingKey error.
 #[test]
 fn test_decrypt_wrong_key_profile_a() {

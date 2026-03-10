@@ -370,6 +370,84 @@ fn test_detached_signature_profile_b() {
     assert_eq!(result.status, SignatureStatus::Valid);
 }
 
+/// Fix #1 verification: exported Profile B key is truly passphrase-protected.
+#[test]
+fn test_export_produces_encrypted_key_profile_b() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let passphrase = "test-passphrase-b";
+
+    let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Advanced)
+        .expect("Export should succeed");
+
+    // Exported key should not be directly usable for signing (secrets are encrypted)
+    let sign_result = sign::sign_cleartext(b"test", &exported);
+    assert!(
+        sign_result.is_err(),
+        "Exported key with encrypted secrets should not be directly usable for signing"
+    );
+}
+
+/// Fix #1+#2 verification: full export → import → decrypt round-trip (Profile B).
+#[test]
+fn test_export_import_decrypt_roundtrip_profile_b() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let plaintext = b"Profile B export/import chain test.";
+
+    // Encrypt with original key
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[key.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    // Export → import
+    let passphrase = "roundtrip-profile-b";
+    let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Advanced)
+        .expect("Export should succeed");
+    let imported = keys::import_secret_key(&exported, passphrase)
+        .expect("Import should succeed");
+
+    // Decrypt with imported key
+    let result = decrypt::decrypt(&ciphertext, &[imported], &[])
+        .expect("Decryption with imported key should succeed");
+
+    assert_eq!(result.plaintext, plaintext);
+}
+
+/// Fix #3 verification: expired Profile B key detected.
+#[test]
+fn test_expired_key_detected_profile_b() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        Some(1), // 1 second expiry
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
+    let info = keys::parse_key_info(&key.cert_data).expect("Parse should succeed");
+    assert!(info.is_expired, "Key with 1-second expiry should be expired after 2 seconds");
+    assert!(!info.is_revoked);
+}
+
 /// Unicode User ID (Profile B).
 #[test]
 fn test_unicode_user_id_profile_b() {

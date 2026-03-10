@@ -1,13 +1,11 @@
 use std::time::SystemTime;
 
 use openpgp::cert::prelude::*;
-use openpgp::packet::prelude::*;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Serialize;
-use openpgp::types::{KeyFlags, RevocationStatus};
+use openpgp::types::RevocationStatus;
 use sequoia_openpgp as openpgp;
-use zeroize::Zeroize;
 
 use crate::armor;
 use crate::error::PgpError;
@@ -94,7 +92,10 @@ pub fn generate_key_with_profile(
         KeyProfile::Advanced => {
             builder = builder
                 .set_cipher_suite(CipherSuite::Cv448)
-                .set_profile(openpgp::cert::builder::Profile::RFC9580);
+                .set_profile(openpgp::Profile::RFC9580)
+                .map_err(|e| PgpError::KeyGenerationFailed {
+                    reason: format!("Failed to set profile: {e}"),
+                })?;
         }
     }
 
@@ -136,7 +137,7 @@ pub fn generate_key_with_profile(
         })?;
 
     let fingerprint = cert.fingerprint().to_hex();
-    let key_version = cert.primary_key().version();
+    let key_version = cert.primary_key().key().version();
 
     Ok(GeneratedKey {
         cert_data,
@@ -159,13 +160,13 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
     let now = SystemTime::now();
 
     let fingerprint = cert.fingerprint().to_hex().to_lowercase();
-    let key_version = cert.primary_key().version();
+    let key_version = cert.primary_key().key().version();
 
     // Extract primary User ID
     let user_id = cert
         .userids()
         .next()
-        .map(|uid| String::from_utf8_lossy(uid.value()).to_string());
+        .map(|uid| String::from_utf8_lossy(uid.component().value()).to_string());
 
     // Check for valid encryption subkey
     let has_encryption_subkey = cert
@@ -182,12 +183,20 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         RevocationStatus::Revoked(_)
     );
 
-    // Check expiry
-    let is_expired = cert
-        .with_policy(&policy, Some(now))
-        .map(|vc| false)
-        .unwrap_or(true)
-        && !is_revoked;
+    // Check expiry: a key is expired if the primary key's alive() check fails at the
+    // current time but succeeds at its creation time (meaning the issue is temporal, not
+    // structural). Revoked keys are not considered expired (they have a separate status).
+    let is_expired = if is_revoked {
+        false
+    } else if let Ok(valid_cert) = cert.with_policy(&policy, Some(now)) {
+        // If the cert is valid at the current time, check if the primary key is alive
+        valid_cert.primary_key().alive().is_err()
+    } else {
+        // If the cert is not valid at now, check if it was valid at creation time
+        // (meaning it expired rather than being structurally invalid)
+        let creation_time = cert.primary_key().key().creation_time();
+        cert.with_policy(&policy, Some(creation_time)).is_ok()
+    };
 
     // Detect profile from key version
     let profile = if key_version >= 6 {
@@ -208,42 +217,66 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
 }
 
 /// Export a secret key protected with a passphrase.
-/// - Profile A (Universal): Iterated+Salted S2K (mode 3)
-/// - Profile B (Advanced): Argon2id S2K
+/// - Profile A (Universal): Iterated+Salted S2K (mode 3) — selected automatically by Sequoia for v4/RFC4880 keys.
+/// - Profile B (Advanced): Argon2id S2K — selected automatically by Sequoia for v6/RFC9580 keys.
 ///
-/// Returns ASCII-armored key data.
+/// Returns ASCII-armored key data with passphrase-encrypted secret key material.
 pub fn export_secret_key(
     cert_data: &[u8],
     passphrase: &str,
-    profile: KeyProfile,
+    _profile: KeyProfile,
 ) -> Result<Vec<u8>, PgpError> {
     let cert =
         openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
             reason: e.to_string(),
         })?;
 
-    let mut sink = Vec::new();
-
-    // Protect the key with the passphrase using profile-appropriate S2K
     let password = openpgp::crypto::Password::from(passphrase);
 
-    let encrypted_cert = cert
-        .keys()
-        .secret()
-        .try_for_each(|ka| -> openpgp::Result<()> {
-            // Each secret key gets encrypted with the passphrase
-            Ok(())
-        });
+    // Encrypt each secret key component with the passphrase.
+    // Sequoia's encrypt_secret() automatically selects the S2K mode based on
+    // the key's profile: RFC4880 keys → Iterated+Salted, RFC9580 keys → Argon2id.
+    let mut encrypted_packets: Vec<openpgp::Packet> = Vec::new();
 
-    // For the POC, use Sequoia's built-in TSK export with password protection
-    // The S2K mode selection (Iterated+Salted vs Argon2id) is determined by
-    // the key's profile (RFC4880 vs RFC9580) which Sequoia handles automatically.
-    let tsk = cert.as_tsk();
+    // Encrypt primary key
+    {
+        let primary = cert.primary_key().key().clone()
+            .parts_into_secret()
+            .map_err(|e| PgpError::S2kError {
+                reason: format!("Primary key has no secret parts: {e}"),
+            })?;
+        let encrypted = primary.encrypt_secret(&password)
+            .map_err(|e| PgpError::S2kError {
+                reason: format!("Failed to encrypt primary key: {e}"),
+            })?;
+        encrypted_packets.push(encrypted.role_into_primary().into());
+    }
 
-    let mut armored = armor::armor_writer(&mut sink, openpgp::armor::Kind::SecretKey)?;
-    tsk.serialize(&mut armored)
+    // Encrypt subkeys
+    for ka in cert.keys().subkeys().secret() {
+        let key = ka.key().clone();
+        let encrypted = key.encrypt_secret(&password)
+            .map_err(|e| PgpError::S2kError {
+                reason: format!("Failed to encrypt subkey: {e}"),
+            })?;
+        encrypted_packets.push(encrypted.role_into_subordinate().into());
+    }
+
+    // Merge the encrypted key packets back into the cert.
+    // insert_packets replaces matching keys with the encrypted versions.
+    let (encrypted_cert, _changed) = cert.insert_packets(encrypted_packets)
         .map_err(|e| PgpError::S2kError {
-            reason: format!("Failed to export secret key: {e}"),
+            reason: format!("Failed to merge encrypted keys: {e}"),
+        })?;
+
+    // Serialize the cert with encrypted secret keys as armored output.
+    let mut sink = Vec::new();
+    let mut armored = armor::armor_writer(&mut sink, openpgp::armor::Kind::SecretKey)?;
+    encrypted_cert
+        .as_tsk()
+        .serialize(&mut armored)
+        .map_err(|e| PgpError::S2kError {
+            reason: format!("Failed to serialize encrypted key: {e}"),
         })?;
     armored.finalize().map_err(|e| PgpError::ArmorError {
         reason: e.to_string(),
@@ -255,28 +288,48 @@ pub fn export_secret_key(
 /// Import a passphrase-protected secret key.
 /// Automatically detects S2K mode (Iterated+Salted or Argon2id).
 ///
-/// Returns the decrypted certificate in binary format.
+/// Returns the decrypted certificate in binary format (with unencrypted secret keys),
+/// ready for SE wrapping on the Swift side.
 pub fn import_secret_key(armored_data: &[u8], passphrase: &str) -> Result<Vec<u8>, PgpError> {
     let cert = openpgp::Cert::from_bytes(armored_data).map_err(|e| PgpError::InvalidKeyData {
         reason: e.to_string(),
     })?;
 
     let password = openpgp::crypto::Password::from(passphrase);
-    let policy = StandardPolicy::new();
 
-    // Try to decrypt each secret key with the passphrase
+    // Decrypt each secret key with the passphrase and collect the decrypted packets.
     let mut decrypted_packets: Vec<openpgp::Packet> = Vec::new();
 
-    for ka in cert.keys().secret() {
-        let secret = ka.key().clone();
-        let _decrypted = secret
+    // Decrypt primary key
+    {
+        let primary = cert.primary_key().key().clone()
+            .parts_into_secret()
+            .map_err(|_| PgpError::WrongPassphrase)?;
+        let decrypted = primary
             .decrypt_secret(&password)
             .map_err(|_| PgpError::WrongPassphrase)?;
+        decrypted_packets.push(decrypted.role_into_primary().into());
     }
 
-    // Serialize the cert (keys are now decryptable with the passphrase)
+    // Decrypt subkeys
+    for ka in cert.keys().subkeys().secret() {
+        let key = ka.key().clone();
+        let decrypted = key
+            .decrypt_secret(&password)
+            .map_err(|_| PgpError::WrongPassphrase)?;
+        decrypted_packets.push(decrypted.role_into_subordinate().into());
+    }
+
+    // Merge decrypted key packets back into the cert, replacing the encrypted versions.
+    let (decrypted_cert, _changed) = cert.insert_packets(decrypted_packets)
+        .map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Failed to merge decrypted keys: {e}"),
+        })?;
+
+    // Serialize the cert with decrypted secret keys.
     let mut output = Vec::new();
-    cert.as_tsk()
+    decrypted_cert
+        .as_tsk()
         .serialize(&mut output)
         .map_err(|e| PgpError::InvalidKeyData {
             reason: format!("Failed to serialize imported key: {e}"),
@@ -332,7 +385,7 @@ pub fn get_key_version(cert_data: &[u8]) -> Result<u8, PgpError> {
         openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
             reason: e.to_string(),
         })?;
-    Ok(cert.primary_key().version())
+    Ok(cert.primary_key().key().version())
 }
 
 /// Detect the profile of a key based on its version and algorithms.

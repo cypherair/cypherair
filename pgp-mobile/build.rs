@@ -1,3 +1,4 @@
 fn main() {
-    uniffi::generate_scaffolding("src/pgp_mobile.udl").unwrap();
+    // UniFFI scaffolding is generated via proc-macros (#[derive(uniffi::...)]).
+    // No UDL file needed.
 }
