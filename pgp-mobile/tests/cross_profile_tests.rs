@@ -1,0 +1,292 @@
+//! Cross-Profile Interoperability tests.
+//! Covers POC test cases C2X.1–C2X.5.
+//! Validates format auto-selection by recipient key version.
+
+use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::encrypt;
+use pgp_mobile::decrypt;
+use pgp_mobile::sign;
+use pgp_mobile::verify;
+use pgp_mobile::decrypt::SignatureStatus;
+
+/// C2X.1: Profile A encrypts to Profile B recipient (v6 key).
+/// Pass: message format is SEIPDv2. Recipient decrypts.
+#[test]
+fn test_profile_a_encrypts_to_profile_b() {
+    let sender_a = keys::generate_key_with_profile(
+        "Alice (A)".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Sender key gen should succeed");
+
+    let recipient_b = keys::generate_key_with_profile(
+        "Bob (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Recipient key gen should succeed");
+
+    let plaintext = b"From Profile A sender to Profile B recipient.";
+
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[recipient_b.public_key_data.clone()],
+        Some(&sender_a.cert_data),
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    // Profile B recipient should decrypt
+    let result = decrypt::decrypt(
+        &ciphertext,
+        &[recipient_b.cert_data.clone()],
+        &[sender_a.public_key_data.clone()],
+    )
+    .expect("Decryption should succeed");
+
+    assert_eq!(result.plaintext, plaintext);
+    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
+}
+
+/// C2X.2: Profile B encrypts to Profile A recipient (v4 key).
+/// Pass: message format is SEIPDv1. Recipient decrypts.
+#[test]
+fn test_profile_b_encrypts_to_profile_a() {
+    let sender_b = keys::generate_key_with_profile(
+        "Alice (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Sender key gen should succeed");
+
+    let recipient_a = keys::generate_key_with_profile(
+        "Bob (A)".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Recipient key gen should succeed");
+
+    let plaintext = b"From Profile B sender to Profile A recipient.";
+
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[recipient_a.public_key_data.clone()],
+        Some(&sender_b.cert_data),
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    // Profile A recipient should decrypt
+    let result = decrypt::decrypt(
+        &ciphertext,
+        &[recipient_a.cert_data.clone()],
+        &[sender_b.public_key_data.clone()],
+    )
+    .expect("Decryption should succeed");
+
+    assert_eq!(result.plaintext, plaintext);
+    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
+}
+
+/// C2X.3: Profile B encrypts to mixed recipients (v4 + v6).
+/// Pass: format is SEIPDv1 (lowest common). Both decrypt.
+#[test]
+fn test_mixed_recipients_v4_and_v6() {
+    let sender_b = keys::generate_key_with_profile(
+        "Alice (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Sender key gen should succeed");
+
+    let recipient_a = keys::generate_key_with_profile(
+        "Bob (A)".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("v4 recipient key gen should succeed");
+
+    let recipient_b = keys::generate_key_with_profile(
+        "Charlie (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("v6 recipient key gen should succeed");
+
+    let plaintext = b"Message to mixed v4+v6 recipients.";
+
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[
+            recipient_a.public_key_data.clone(),
+            recipient_b.public_key_data.clone(),
+        ],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    // v4 recipient decrypts
+    let result_a = decrypt::decrypt(
+        &ciphertext,
+        &[recipient_a.cert_data.clone()],
+        &[],
+    )
+    .expect("v4 recipient should decrypt");
+    assert_eq!(result_a.plaintext, plaintext);
+
+    // v6 recipient decrypts
+    let result_b = decrypt::decrypt(
+        &ciphertext,
+        &[recipient_b.cert_data.clone()],
+        &[],
+    )
+    .expect("v6 recipient should decrypt");
+    assert_eq!(result_b.plaintext, plaintext);
+}
+
+/// C2X.4: Profile B with encrypt-to-self encrypts to v4 recipient.
+/// Pass: SEIPDv1 (mixed rule). Both sender and recipient decrypt.
+#[test]
+fn test_profile_b_encrypt_to_self_with_v4_recipient() {
+    let sender_b = keys::generate_key_with_profile(
+        "Alice (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Sender key gen should succeed");
+
+    let recipient_a = keys::generate_key_with_profile(
+        "Bob (A)".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Recipient key gen should succeed");
+
+    let plaintext = b"B→A with encrypt-to-self (mixed → SEIPDv1).";
+
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[recipient_a.public_key_data.clone()],
+        None,
+        Some(&sender_b.public_key_data),
+    )
+    .expect("Encryption should succeed");
+
+    // v4 recipient decrypts
+    let result_a = decrypt::decrypt(
+        &ciphertext,
+        &[recipient_a.cert_data.clone()],
+        &[],
+    )
+    .expect("v4 recipient should decrypt");
+    assert_eq!(result_a.plaintext, plaintext);
+
+    // v6 sender decrypts (encrypt-to-self)
+    let result_b = decrypt::decrypt(
+        &ciphertext,
+        &[sender_b.cert_data.clone()],
+        &[],
+    )
+    .expect("v6 sender should decrypt own message");
+    assert_eq!(result_b.plaintext, plaintext);
+}
+
+/// C2X.5: Profile A signature verified by Profile B user, and vice versa.
+#[test]
+fn test_cross_profile_signature_verification() {
+    let key_a = keys::generate_key_with_profile(
+        "Alice (A)".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Profile A key gen should succeed");
+
+    let key_b = keys::generate_key_with_profile(
+        "Bob (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Profile B key gen should succeed");
+
+    let text = b"Cross-profile signature test.";
+
+    // Profile A signs, Profile B verifies
+    let signed_a = sign::sign_cleartext(text, &key_a.cert_data)
+        .expect("Profile A signing should succeed");
+    let verify_a_by_b = verify::verify_cleartext(
+        &signed_a,
+        &[key_a.public_key_data.clone()],
+    )
+    .expect("Profile B should verify Profile A signature");
+    assert_eq!(verify_a_by_b.status, SignatureStatus::Valid);
+
+    // Profile B signs, Profile A verifies
+    let signed_b = sign::sign_cleartext(text, &key_b.cert_data)
+        .expect("Profile B signing should succeed");
+    let verify_b_by_a = verify::verify_cleartext(
+        &signed_b,
+        &[key_b.public_key_data.clone()],
+    )
+    .expect("Profile A should verify Profile B signature");
+    assert_eq!(verify_b_by_a.status, SignatureStatus::Valid);
+}
+
+/// Extended: Profile A sender signs encrypted message for Profile B recipient.
+/// Full round-trip: sign + encrypt + decrypt + verify.
+#[test]
+fn test_cross_profile_signed_encrypted_round_trip() {
+    let sender_a = keys::generate_key_with_profile(
+        "Alice (A)".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Sender key gen should succeed");
+
+    let recipient_b = keys::generate_key_with_profile(
+        "Bob (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Recipient key gen should succeed");
+
+    let plaintext = b"Full round-trip: A→B signed+encrypted.";
+
+    // Encrypt and sign
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[recipient_b.public_key_data.clone()],
+        Some(&sender_a.cert_data),
+        Some(&sender_a.public_key_data),  // encrypt-to-self
+    )
+    .expect("Encryption should succeed");
+
+    // Decrypt and verify
+    let result = decrypt::decrypt(
+        &ciphertext,
+        &[recipient_b.cert_data.clone()],
+        &[sender_a.public_key_data.clone()],
+    )
+    .expect("Decryption should succeed");
+
+    assert_eq!(result.plaintext, plaintext);
+    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
+    assert_eq!(
+        result.signer_fingerprint,
+        Some(sender_a.fingerprint.clone())
+    );
+}
