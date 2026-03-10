@@ -635,3 +635,120 @@ fn test_decrypt_wrong_key_profile_a() {
     let result = decrypt::decrypt(&ciphertext, &[bob.cert_data.clone()], &[]);
     assert!(result.is_err(), "Wrong key should fail");
 }
+
+/// Empty plaintext encrypt/decrypt round-trip (Profile A).
+#[test]
+fn test_encrypt_decrypt_empty_plaintext_profile_a() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let plaintext = b"";
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[key.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encrypting empty plaintext should succeed");
+
+    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+        .expect("Decrypting empty plaintext should succeed");
+
+    assert_eq!(result.plaintext, plaintext.to_vec(), "Empty plaintext round-trip failed");
+}
+
+/// C2A.5 (extended): 50 MB file encrypt/decrypt (Profile A).
+#[test]
+#[ignore] // Large file test — run with `cargo test -- --ignored`
+fn test_file_encrypt_decrypt_50mb_profile_a() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let plaintext = vec![0xABu8; 50 * 1024 * 1024]; // 50 MB
+    let ciphertext = encrypt::encrypt_binary(
+        &plaintext,
+        &[key.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("50 MB encryption should succeed");
+
+    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+        .expect("50 MB decryption should succeed");
+
+    assert_eq!(result.plaintext.len(), plaintext.len(), "50 MB round-trip size mismatch");
+    assert_eq!(result.plaintext, plaintext, "50 MB round-trip content mismatch");
+}
+
+/// C2A.5 (extended): 100 MB file encrypt/decrypt (Profile A).
+#[test]
+#[ignore] // Large file test — run with `cargo test -- --ignored`
+fn test_file_encrypt_decrypt_100mb_profile_a() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let plaintext = vec![0xCDu8; 100 * 1024 * 1024]; // 100 MB
+    let ciphertext = encrypt::encrypt_binary(
+        &plaintext,
+        &[key.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("100 MB encryption should succeed");
+
+    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+        .expect("100 MB decryption should succeed");
+
+    assert_eq!(result.plaintext.len(), plaintext.len(), "100 MB round-trip size mismatch");
+}
+
+/// C5.6: Concurrent encrypt from 2 threads (Profile A, different key pairs).
+#[test]
+fn test_concurrent_encrypt_profile_a() {
+    let key1 = keys::generate_key_with_profile(
+        "Alice".to_string(), None, None, KeyProfile::Universal,
+    ).expect("Key gen should succeed");
+
+    let key2 = keys::generate_key_with_profile(
+        "Bob".to_string(), None, None, KeyProfile::Universal,
+    ).expect("Key gen should succeed");
+
+    let k1_pub = key1.public_key_data.clone();
+    let k2_pub = key2.public_key_data.clone();
+    let k1_cert = key1.cert_data.clone();
+    let k2_cert = key2.cert_data.clone();
+
+    let handle1 = std::thread::spawn(move || {
+        let ct = encrypt::encrypt(b"msg1", &[k1_pub], None, None)
+            .expect("Concurrent encrypt 1 should succeed");
+        let result = decrypt::decrypt(&ct, &[k1_cert], &[])
+            .expect("Concurrent decrypt 1 should succeed");
+        assert_eq!(result.plaintext, b"msg1");
+    });
+
+    let handle2 = std::thread::spawn(move || {
+        let ct = encrypt::encrypt(b"msg2", &[k2_pub], None, None)
+            .expect("Concurrent encrypt 2 should succeed");
+        let result = decrypt::decrypt(&ct, &[k2_cert], &[])
+            .expect("Concurrent decrypt 2 should succeed");
+        assert_eq!(result.plaintext, b"msg2");
+    });
+
+    handle1.join().expect("Thread 1 should complete without panic");
+    handle2.join().expect("Thread 2 should complete without panic");
+}
