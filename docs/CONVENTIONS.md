@@ -1,0 +1,230 @@
+# Coding Conventions
+
+> Purpose: Swift coding standards, SwiftUI patterns, and project-wide conventions for Cypher Air.
+> Audience: Human developers and AI coding tools.
+
+## 1. Swift Style
+
+### Naming
+
+Follow the [Swift API Design Guidelines](https://www.swift.org/documentation/api-design-guidelines/). Clarity at the point of use is the overriding goal.
+
+- Types and protocols: `UpperCamelCase` — `EncryptionService`, `KeychainManageable`.
+- Functions, properties, variables: `lowerCamelCase` — `encryptMessage(for:)`, `publicKeyData`.
+- Boolean properties read as assertions: `isEmpty`, `isBackedUp`, `canDecrypt`. Not `backed`, `empty`.
+- Verb phrases for mutating methods: `sort()`, `zeroize()`. Past participle or `-ing` for non-mutating: `sorted()`, `removing(_:)`.
+- Acronyms follow Apple convention: all-caps when standalone (`QR`, `SE`, `FFI`), all-lowercase when prefix of a longer word (`url`, `pgp`). In camelCase: `qrCodeImage`, `seKeyHandle`, `pgpEncrypt`.
+
+### General Rules
+
+- `guard let` / `guard else` for early exits. Never force-unwrap (`!`) in production code. `fatalError()` only in genuinely impossible paths (e.g., a `switch` default that is logically unreachable).
+- `async/await` for all asynchronous work. No Combine in new code. No completion handler callbacks.
+- Prefer value types (`struct`, `enum`) over `class` unless identity semantics or reference sharing is needed. Services that hold state use `@Observable class`.
+- `let` over `var` wherever possible. Mutable state requires explicit justification.
+- Access control: mark everything as restrictive as possible. `private` by default, `internal` if needed within the module, `public` only for the module's external API.
+- No `// MARK: -` comments for sections shorter than 50 lines. Use them for clear logical sections in larger files.
+
+### Error Handling
+
+- Use typed errors that conform to `Error`. The primary error type is `PGPError`, mapped 1:1 from Rust's `PgpError` via UniFFI.
+- Each `PGPError` case has an associated user-facing message defined in the String Catalog, per PRD Section 4.7.
+- Never `try!` in production. Never `catch` an error and silently ignore it. Always propagate or handle meaningfully.
+- Use `do { } catch { }` at the call site that can present the error to the user. Services throw; views catch and display.
+
+### Imports
+
+- Group imports: Foundation/Swift standard library first, then Apple frameworks (CryptoKit, Security, Vision, CoreImage), then project modules, then third-party. Alphabetical within each group.
+- Import only what is needed. Prefer `import CryptoKit` over `@_exported import CryptoKit`.
+
+## 2. SwiftUI Patterns
+
+### State Management
+
+Use the iOS 26 / Swift 6.2 state management model:
+
+| Old Pattern | New Pattern | Usage |
+|------------|------------|-------|
+| `ObservableObject` + `@Published` | `@Observable class` | All view models and services |
+| `@StateObject` | `@State` | Owning reference to an `@Observable` in a view |
+| `@ObservedObject` | Direct property (no wrapper) | Non-owning reference to an `@Observable` |
+| `@EnvironmentObject` | `@Environment` | Injecting shared dependencies |
+| `@Binding` | `@Bindable` | Creating bindings to `@Observable` properties |
+
+### Navigation
+
+Use `NavigationStack` with a typed path. Never use the deprecated `NavigationView`.
+
+```swift
+enum AppRoute: Hashable {
+    case keyDetail(fingerprint: String)
+    case encrypt
+    case decrypt
+    case contacts
+    case settings
+    // ...
+}
+
+struct ContentView: View {
+    @State private var path = NavigationPath()
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            HomeView()
+                .navigationDestination(for: AppRoute.self) { route in
+                    switch route {
+                    case .keyDetail(let fp): KeyDetailView(fingerprint: fp)
+                    case .encrypt: EncryptView()
+                    // ...
+                    }
+                }
+        }
+    }
+}
+```
+
+### View Structure
+
+- Views are thin. No business logic in `body`. No network calls, no Keychain access, no crypto operations in views.
+- Views observe `@Observable` services injected via `@Environment` or `@State`.
+- Extract complex subviews into separate files when `body` exceeds ~50 lines.
+- Use `ViewModifier` for reusable styling (e.g., the privacy screen blur overlay).
+
+### Liquid Glass
+
+Cypher Air targets iOS 26 exclusively and fully adopts Liquid Glass. See `docs/LIQUID_GLASS.md` for the full guide. Key rules:
+
+- Standard components (TabView, NavigationStack, toolbars, sheets) get Liquid Glass automatically. Do not override their backgrounds.
+- Custom floating controls: apply `.glassEffect()` as the last modifier. Remove any `.background()` modifiers first.
+- Never apply glass to content views (lists, key details, message display).
+- Use `.tint()` on glass only for semantic meaning (blue = primary action, red = destructive). Never decorative tinting.
+
+## 3. Concurrency
+
+Swift 6.2 defaults to main-actor isolation for new Xcode 26 projects (SE-0466).
+
+- `@MainActor` is implicit for views and view models. Do not annotate explicitly unless needed for clarity.
+- Use `@concurrent` to opt into the cooperative thread pool for CPU-intensive work (Argon2id calibration, file encryption progress).
+- All types that cross actor boundaries must conform to `Sendable`. `@Observable` classes are implicitly `@MainActor`; use `nonisolated` for properties/methods that need to be accessed from other actors.
+- Use `actor` for shared mutable state that is not UI-bound (e.g., a cache or in-progress operation tracker).
+- Perform PGP operations (encrypt, decrypt, sign, verify) on a background actor or `@concurrent` function to avoid blocking the UI. Return results to the main actor for display.
+
+```swift
+@concurrent
+func encryptFile(data: Data, recipients: [PublicKey]) async throws -> Data {
+    // Runs off main actor — safe for long operations
+    return try pgpBridge.encrypt(data: data, recipients: recipients)
+}
+```
+
+### UniFFI Generated Code and Swift 6.2 Concurrency
+
+UniFFI-generated Swift bindings may not fully conform to Swift 6.2's strict concurrency model. If the generated `pgp_mobile.swift` file produces `Sendable` or actor-isolation warnings:
+
+1. Add `@preconcurrency import PgpMobile` at call sites that import the generated module.
+2. If warnings persist, set `SWIFT_STRICT_CONCURRENCY = targeted` (not `complete`) for the generated bindings file only via per-file build settings, or wrap the generated types in `@unchecked Sendable` conformances in an extension file (not in the generated file itself — it will be overwritten on regeneration).
+3. Do NOT modify the generated `pgp_mobile.swift` directly. It is overwritten by `uniffi-bindgen`.
+
+## 4. File Organization
+
+### One Type Per File
+
+Each Swift file contains exactly one primary type (struct, class, enum, protocol). Small, tightly-related helper types may live in the same file if they are used exclusively by the primary type.
+
+File name matches the type name: `EncryptionService.swift`, `PGPError.swift`, `KeyDetailView.swift`.
+
+### Group by Feature, Not by Layer
+
+```
+Sources/
+├── App/
+│   ├── CypherAirApp.swift
+│   ├── ContentView.swift
+│   ├── HomeView.swift
+│   ├── Onboarding/
+│   │   ├── OnboardingView.swift
+│   │   ├── OnboardingPageOne.swift
+│   │   └── ...
+│   ├── Encrypt/
+│   │   ├── EncryptView.swift
+│   │   └── RecipientPickerView.swift
+│   ├── Decrypt/
+│   │   └── DecryptView.swift
+│   ├── Keys/
+│   │   ├── MyKeysView.swift
+│   │   ├── KeyDetailView.swift
+│   │   └── KeyGenerationView.swift
+│   ├── Contacts/
+│   │   ├── ContactsView.swift
+│   │   └── ImportKeyView.swift
+│   └── Settings/
+│       ├── SettingsView.swift
+│       └── AuthModeSettingView.swift
+├── Services/
+│   ├── EncryptionService.swift
+│   ├── DecryptionService.swift
+│   ├── SigningService.swift
+│   ├── KeyManagementService.swift
+│   ├── ContactService.swift
+│   ├── QRService.swift
+│   └── SelfTestService.swift
+├── Security/
+│   ├── SecureEnclaveManager.swift
+│   ├── KeychainManager.swift
+│   ├── AuthenticationManager.swift
+│   └── MemoryZeroingUtility.swift
+├── Models/
+│   ├── PGPKey.swift
+│   ├── PGPError.swift
+│   ├── Contact.swift
+│   ├── DecryptionResult.swift
+│   ├── VerificationResult.swift
+│   └── AppConfiguration.swift
+├── Extensions/
+│   ├── Data+Hex.swift
+│   ├── Data+Zeroing.swift
+│   └── String+Localized.swift
+└── Resources/
+    ├── Assets.xcassets
+    ├── Localizable.xcstrings
+    └── Info.plist
+```
+
+## 5. Localization
+
+- All user-facing strings go in the String Catalog (`Localizable.xcstrings`). Use `String(localized:)` in code.
+- Never hardcode user-visible strings in Swift files.
+- Supported languages: English (`en`) and Simplified Chinese (`zh-Hans`).
+- Error messages per PRD Section 4.7 are defined as localized strings mapped from `PGPError` cases.
+- VoiceOver labels: always localized. Fingerprints use segment-by-segment readout (4-character groups).
+
+```swift
+// Correct
+Text(String(localized: "encrypt.button.title"))
+
+// Wrong
+Text("Encrypt")
+```
+
+## 6. Accessibility
+
+All interactive elements must meet these requirements:
+
+- **VoiceOver:** Every button, toggle, and interactive element has a meaningful `.accessibilityLabel`. Status indicators have text equivalents (not color/icon only).
+- **Dynamic Type:** All text respects the user's preferred text size. Use system text styles (`.body`, `.headline`, `.caption`) rather than fixed font sizes.
+- **Touch targets:** Minimum 44×44pt for all interactive elements.
+- **Fingerprint display:** Support segment-by-segment VoiceOver readout. Group fingerprint characters into 4-character segments, each with its own accessibility element.
+
+```swift
+// Fingerprint accessibility example
+ForEach(fingerprintSegments, id: \.self) { segment in
+    Text(segment)
+        .accessibilityLabel(segment.map { String($0) }.joined(separator: " "))
+}
+```
+
+## 7. Git Conventions
+
+- **Branch names:** `feature/<description>`, `fix/<description>`, `refactor/<description>`.
+- **Commit messages:** Conventional format — `feat: add encrypt-to-self toggle`, `fix: AEAD hard-fail not triggered on empty ciphertext`, `test: add tamper detection round-trip`, `docs: update SE wrapping diagram`.
+- **PR scope:** One logical change per PR. Do not bundle unrelated changes.
+- **Never commit to `main` directly.** Always use feature branches and PRs.
