@@ -22,13 +22,21 @@ pub enum KeyProfile {
 }
 
 /// Result of key generation, containing the key pair and revocation certificate.
+///
+/// SECURITY: `cert_data` contains unencrypted secret key material. The Swift caller must:
+/// 1. SE-wrap the secret key immediately after receiving this struct.
+/// 2. Zeroize `cert_data` (via `resetBytes(in:)`) after wrapping is confirmed.
+/// 3. Store `revocation_cert` securely and zeroize the in-memory copy.
+/// `public_key_data` does not contain sensitive material and does not need zeroizing.
 #[derive(uniffi::Record)]
 pub struct GeneratedKey {
     /// Full certificate (public + secret) in binary OpenPGP format.
+    /// MUST be zeroized by the caller after SE wrapping.
     pub cert_data: Vec<u8>,
     /// Public key only in binary OpenPGP format.
     pub public_key_data: Vec<u8>,
     /// Revocation certificate in binary OpenPGP format.
+    /// Should be zeroized after secure storage.
     pub revocation_cert: Vec<u8>,
     /// Key fingerprint as lowercase hex string.
     pub fingerprint: String,
@@ -253,9 +261,13 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
     openpgp::crypto::random(&mut salt)?;
 
     // PRD parameters: 512 MB (m=19, meaning 2^19 KiB), p=4, t=3
+    // TODO(calibrate): PRD says "Time: Calibrated (~3s)" and TDD says "t = calibrated".
+    // Currently hardcoded to t=3. Actual wall-clock time depends on device CPU speed.
+    // For production, calibrate `t` on the target device during first export to achieve ~3s.
+    // Verify actual timing in POC test C10.8 on physical device.
     let s2k = openpgp::crypto::S2K::Argon2 {
         salt,
-        t: 3,   // time passes
+        t: 3,   // time passes — TODO: calibrate on device for ~3s target
         p: 4,   // parallelism lanes
         m: 19,  // memory exponent: 2^19 KiB = 512 MB
     };
@@ -369,6 +381,9 @@ pub fn export_secret_key(
         reason: e.to_string(),
     })?;
 
+    // Note: `password` (openpgp::crypto::Password) is zeroized on drop by Sequoia.
+    // The encrypted_packets Vec contains only encrypted key material (safe).
+
     Ok(sink)
 }
 
@@ -414,6 +429,8 @@ pub fn import_secret_key(armored_data: &[u8], passphrase: &str) -> Result<Vec<u8
         })?;
 
     // Serialize the cert with decrypted secret keys.
+    // SECURITY: output contains unencrypted secret key material. The caller (Swift side)
+    // must SE-wrap this data and zeroize it immediately after wrapping.
     let mut output = Vec::new();
     decrypted_cert
         .as_tsk()
@@ -422,12 +439,19 @@ pub fn import_secret_key(armored_data: &[u8], passphrase: &str) -> Result<Vec<u8
             reason: format!("Failed to serialize imported key: {e}"),
         })?;
 
+    // Note: `password` (openpgp::crypto::Password) is zeroized on drop by Sequoia.
+
     Ok(output)
 }
 
 /// Extract the secret key bytes from a certificate for SE wrapping.
 /// The returned bytes should be immediately wrapped by the Secure Enclave
 /// and then zeroized from memory.
+///
+/// NOTE: This function is not yet exposed via UniFFI. It will be used by the Swift
+/// KeyManagementService when implementing SE wrapping during key generation and import.
+/// See ARCHITECTURE.md Section 3 "SE Key Wrapping" data flow.
+#[allow(dead_code)]
 pub fn extract_secret_key_bytes(cert_data: &[u8]) -> Result<Vec<u8>, PgpError> {
     let cert =
         openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {

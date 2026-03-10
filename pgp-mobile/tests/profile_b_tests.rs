@@ -510,18 +510,23 @@ fn test_export_profile_b_uses_argon2id() {
         .expect("S2K params should parse");
 
     assert_eq!(s2k_info.s2k_type, "argon2id", "Profile B export must use Argon2id S2K");
-    // Sequoia's default for RFC9580 should use substantial memory.
-    // The PRD specifies 512 MB (524288 KiB = 2^19 KiB), but Sequoia may use its own defaults.
-    // At minimum, verify Argon2id is used and memory is non-trivial.
-    assert!(
-        s2k_info.memory_kib >= 1024,
-        "Argon2id memory should be non-trivial, got {} KiB",
+    // PRD specifies exact Argon2id parameters: 512 MB (2^19 KiB = 524288 KiB), p=4, t=3.
+    // These are hardcoded in keys.rs:encrypt_key_argon2id(). Verify the exact values
+    // to catch accidental parameter changes that would weaken the key derivation.
+    assert_eq!(
+        s2k_info.memory_kib, 524288,
+        "Argon2id memory must be 512 MB (524288 KiB = 2^19 KiB per PRD), got {} KiB",
         s2k_info.memory_kib
     );
-    assert!(
-        s2k_info.parallelism >= 1,
-        "Argon2id parallelism should be at least 1, got {}",
+    assert_eq!(
+        s2k_info.parallelism, 4,
+        "Argon2id parallelism must be 4 per PRD, got {}",
         s2k_info.parallelism
+    );
+    assert_eq!(
+        s2k_info.time_passes, 3,
+        "Argon2id time passes must be 3 per PRD, got {}",
+        s2k_info.time_passes
     );
 }
 
@@ -563,10 +568,11 @@ fn test_expired_key_detected_profile_b() {
     )
     .expect("Key gen should succeed");
 
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    // Wait 3 seconds (not 2) to avoid timing flakiness in slow CI environments
+    std::thread::sleep(std::time::Duration::from_secs(3));
 
     let info = keys::parse_key_info(&key.cert_data).expect("Parse should succeed");
-    assert!(info.is_expired, "Key with 1-second expiry should be expired after 2 seconds");
+    assert!(info.is_expired, "Key with 1-second expiry should be expired after 3 seconds");
     assert!(!info.is_revoked);
 }
 
@@ -583,4 +589,123 @@ fn test_unicode_user_id_profile_b() {
 
     let info = keys::parse_key_info(&key.cert_data).expect("Parse should succeed");
     assert!(info.user_id.unwrap().contains("李四"));
+}
+
+/// Empty plaintext encrypt/decrypt round-trip (Profile B).
+#[test]
+fn test_encrypt_decrypt_empty_plaintext_profile_b() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let plaintext = b"";
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[key.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encrypting empty plaintext should succeed");
+
+    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+        .expect("Decrypting empty plaintext should succeed");
+
+    assert_eq!(result.plaintext, plaintext.to_vec(), "Empty plaintext round-trip failed");
+}
+
+/// C2B.5 (extended): 50 MB file encrypt/decrypt (Profile B).
+#[test]
+#[ignore] // Large file test — run with `cargo test -- --ignored`
+fn test_file_encrypt_decrypt_50mb_profile_b() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let plaintext = vec![0xABu8; 50 * 1024 * 1024]; // 50 MB
+    let ciphertext = encrypt::encrypt_binary(
+        &plaintext,
+        &[key.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("50 MB encryption should succeed");
+
+    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+        .expect("50 MB decryption should succeed");
+
+    assert_eq!(result.plaintext.len(), plaintext.len(), "50 MB round-trip size mismatch");
+    assert_eq!(result.plaintext, plaintext, "50 MB round-trip content mismatch");
+}
+
+/// C2B.5 (extended): 100 MB file encrypt/decrypt (Profile B).
+#[test]
+#[ignore] // Large file test — run with `cargo test -- --ignored`
+fn test_file_encrypt_decrypt_100mb_profile_b() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let plaintext = vec![0xCDu8; 100 * 1024 * 1024]; // 100 MB
+    let ciphertext = encrypt::encrypt_binary(
+        &plaintext,
+        &[key.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("100 MB encryption should succeed");
+
+    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+        .expect("100 MB decryption should succeed");
+
+    assert_eq!(result.plaintext.len(), plaintext.len(), "100 MB round-trip size mismatch");
+}
+
+/// C5.7: Concurrent encrypt + decrypt on separate key pairs (Profile B).
+#[test]
+fn test_concurrent_encrypt_decrypt_profile_b() {
+    let key1 = keys::generate_key_with_profile(
+        "Alice".to_string(), None, None, KeyProfile::Advanced,
+    ).expect("Key gen should succeed");
+
+    let key2 = keys::generate_key_with_profile(
+        "Bob".to_string(), None, None, KeyProfile::Advanced,
+    ).expect("Key gen should succeed");
+
+    let k1_pub = key1.public_key_data.clone();
+    let k2_pub = key2.public_key_data.clone();
+    let k1_cert = key1.cert_data.clone();
+    let k2_cert = key2.cert_data.clone();
+
+    // Thread 1: encrypt with key1
+    let handle1 = std::thread::spawn(move || {
+        let ct = encrypt::encrypt(b"concurrent-msg-1", &[k1_pub], None, None)
+            .expect("Concurrent encrypt should succeed");
+        let result = decrypt::decrypt(&ct, &[k1_cert], &[])
+            .expect("Concurrent decrypt should succeed");
+        assert_eq!(result.plaintext, b"concurrent-msg-1");
+    });
+
+    // Thread 2: encrypt with key2
+    let handle2 = std::thread::spawn(move || {
+        let ct = encrypt::encrypt(b"concurrent-msg-2", &[k2_pub], None, None)
+            .expect("Concurrent encrypt should succeed");
+        let result = decrypt::decrypt(&ct, &[k2_cert], &[])
+            .expect("Concurrent decrypt should succeed");
+        assert_eq!(result.plaintext, b"concurrent-msg-2");
+    });
+
+    handle1.join().expect("Thread 1 should not panic");
+    handle2.join().expect("Thread 2 should not panic");
 }
