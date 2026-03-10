@@ -365,6 +365,8 @@ fn test_revocation_cert_wrong_key_profile_a() {
 }
 
 /// Tamper test: 1-bit flip → decryption fails (MDC check).
+/// Verifies that the integrity protection mechanism (MDC for SEIPDv1) is working,
+/// not just that decryption happens to fail for some other reason.
 #[test]
 fn test_tamper_detection_profile_a() {
     let key = keys::generate_key_with_profile(
@@ -389,9 +391,18 @@ fn test_tamper_detection_profile_a() {
     let midpoint = ciphertext.len() / 2;
     ciphertext[midpoint] ^= 0x01;
 
-    // Decryption should fail
+    // Decryption should fail with an integrity-related error (MDC or CorruptData).
+    // For SEIPDv1, the expected error is IntegrityCheckFailed (MDC verification failure).
+    // CorruptData is also acceptable if the tamper corrupts the packet structure itself.
     let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[]);
-    assert!(result.is_err(), "Tampered ciphertext should fail to decrypt");
+    match &result {
+        Err(pgp_mobile::error::PgpError::IntegrityCheckFailed) => {} // expected: MDC failure
+        Err(pgp_mobile::error::PgpError::CorruptData { .. }) => {} // acceptable: packet-level corruption
+        Err(other) => panic!(
+            "Expected IntegrityCheckFailed or CorruptData for tampered SEIPDv1, got: {other:?}"
+        ),
+        Ok(_) => panic!("Tampered ciphertext must never decrypt successfully"),
+    }
 }
 
 /// Unicode round-trip: Chinese + emoji User IDs survive.

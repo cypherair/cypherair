@@ -1,4 +1,5 @@
 import Foundation
+import Security
 #if canImport(CryptoKit)
 import CryptoKit
 #endif
@@ -38,8 +39,12 @@ final class MockSecureEnclave: SecureEnclaveManageable {
         keys[mockKey.dataRepresentation] = mockKey
         return mockKey
         #else
-        // Fallback for environments without CryptoKit
-        let keyData = Data((0..<32).map { _ in UInt8.random(in: 0...255) })
+        // Fallback for environments without CryptoKit.
+        // Use SecRandomCopyBytes for consistency with project's secure-random-only constraint.
+        var keyData = Data(count: 32)
+        keyData.withUnsafeMutableBytes { ptr in
+            _ = SecRandomCopyBytes(kSecRandomDefault, 32, ptr.baseAddress!)
+        }
         let mockKey = MockSEKeySimple(keyData: keyData)
         return mockKey
         #endif
@@ -86,8 +91,12 @@ final class MockSecureEnclave: SecureEnclaveManageable {
             sealedBox: sealedBox.combined!
         )
         #else
-        // Simple XOR-based mock for environments without CryptoKit
-        let salt = Data((0..<32).map { _ in UInt8.random(in: 0...255) })
+        // Simple XOR-based mock for environments without CryptoKit.
+        // Use SecRandomCopyBytes for consistency with project's secure-random-only constraint.
+        var salt = Data(count: 32)
+        salt.withUnsafeMutableBytes { ptr in
+            _ = SecRandomCopyBytes(kSecRandomDefault, 32, ptr.baseAddress!)
+        }
         var sealed = privateKey
         for i in 0..<sealed.count {
             sealed[i] ^= handle.dataRepresentation[i % handle.dataRepresentation.count]
