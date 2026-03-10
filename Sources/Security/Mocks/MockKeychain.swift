@@ -49,7 +49,10 @@ final class MockKeychain: KeychainManageable {
         deleteCallCount += 1
         lastDeletedService = service
         let key = storageKey(service: service, account: account)
-        storage.removeValue(forKey: key)
+        // Match real Keychain behavior: throw if item doesn't exist (errSecItemNotFound)
+        guard storage.removeValue(forKey: key) != nil else {
+            throw MockKeychainError.itemNotFound
+        }
     }
 
     func exists(service: String, account: String) -> Bool {

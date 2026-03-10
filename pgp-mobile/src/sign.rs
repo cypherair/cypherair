@@ -5,6 +5,10 @@ use sequoia_openpgp as openpgp;
 
 use crate::error::PgpError;
 
+// Note: `zeroize` is not explicitly used here because Sequoia's `KeyPair` type manages
+// its own secret key material lifecycle. The `into_keypair()` call extracts the secret
+// from the Cert, and the KeyPair is consumed by the Signer, which handles cleanup.
+
 /// Create a cleartext signature for text content.
 /// Produces a cleartext-signed message (text + inline signature).
 pub fn sign_cleartext(text: &[u8], signer_cert_data: &[u8]) -> Result<Vec<u8>, PgpError> {

@@ -232,9 +232,28 @@ impl PgpEngine {
 
     /// Encode a public key for QR code URL scheme.
     /// Format: cypherair://import/v1/<base64url, no padding>
+    ///
+    /// SECURITY: Validates that the input is a valid OpenPGP public key and rejects
+    /// secret key material to prevent accidental private key leakage via QR codes.
     pub fn encode_qr_url(&self, public_key_data: Vec<u8>) -> Result<String, PgpError> {
         use base64::engine::general_purpose::URL_SAFE_NO_PAD;
         use base64::Engine;
+        use sequoia_openpgp::parse::Parse;
+
+        // Validate input is a valid OpenPGP certificate
+        let cert = sequoia_openpgp::Cert::from_bytes(&public_key_data).map_err(|e| {
+            PgpError::InvalidKeyData {
+                reason: format!("Invalid key data for QR encoding: {e}"),
+            }
+        })?;
+
+        // Reject secret key material — only public keys should be shared via QR
+        if cert.is_tsk() {
+            return Err(PgpError::InvalidKeyData {
+                reason: "Cannot encode secret key material in QR code. Only public keys should be shared via QR.".to_string(),
+            });
+        }
+
         let encoded = URL_SAFE_NO_PAD.encode(&public_key_data);
         Ok(format!("cypherair://import/v1/{encoded}"))
     }
@@ -261,16 +280,15 @@ impl PgpEngine {
             }
         })?;
 
-        // Validate that it's a valid OpenPGP key
-        let _key_info = keys::parse_key_info(&key_bytes)?;
-
-        // Reject secret key material — QR exchange should only contain public keys.
-        // This prevents accidental secret key leakage via QR codes.
+        // Single parse: validate it's a valid OpenPGP key and check for secret material.
+        // (Previously this parsed the key twice — once in parse_key_info and again for is_tsk.)
         let cert = sequoia_openpgp::Cert::from_bytes(&key_bytes).map_err(|e| {
             PgpError::InvalidKeyData {
                 reason: format!("Invalid key data: {e}"),
             }
         })?;
+
+        // Reject secret key material — QR exchange should only contain public keys.
         if cert.is_tsk() {
             return Err(PgpError::InvalidKeyData {
                 reason: "QR code contains secret key material. Only public keys should be shared via QR.".to_string(),
