@@ -156,7 +156,7 @@ echo "Exported: gpg_encrypted_compressed_zlib.asc"
 
 # ── 6. GnuPG cleartext signed + compressed (for completeness) ──
 echo "--- Generating compressed signed message ---"
-gpg --sign --armor --recipient gnupg-test@example.com \
+gpg --sign --armor --local-user gnupg-test@example.com \
     --compress-algo 1 --compress-level 6 \
     --output "$SCRIPT_DIR/gpg_signed_compressed.asc" \
     "$GNUPGHOME/plaintext.txt"
