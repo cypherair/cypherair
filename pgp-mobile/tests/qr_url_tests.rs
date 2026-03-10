@@ -85,6 +85,37 @@ fn test_qr_url_malformed_data() {
     assert!(result.is_err(), "Missing version prefix should fail");
 }
 
+/// Secret key material in QR URL should be rejected.
+/// Only public keys should be exchanged via QR codes.
+#[test]
+fn test_qr_url_rejects_secret_key() {
+    let engine = PgpEngine::new();
+
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    // Encode the FULL cert (with secret keys) as a QR URL — this should be rejected on decode
+    let url = engine
+        .encode_qr_url(key.cert_data.clone())
+        .expect("URL encoding should succeed (it's just base64url)");
+
+    // decode_qr_url should reject secret key material
+    let result = engine.decode_qr_url(url);
+    assert!(result.is_err(), "QR URL containing secret key should be rejected");
+    let err = result.unwrap_err();
+    match err {
+        pgp_mobile::error::PgpError::InvalidKeyData { reason } => {
+            assert!(reason.contains("secret key"), "Error should mention secret key: {reason}");
+        }
+        other => panic!("Expected InvalidKeyData, got: {other:?}"),
+    }
+}
+
 /// QR URL length check — should be reasonable for QR encoding.
 #[test]
 fn test_qr_url_length_reasonable() {
