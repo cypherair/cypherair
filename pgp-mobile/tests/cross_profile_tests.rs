@@ -290,3 +290,31 @@ fn test_cross_profile_signed_encrypted_round_trip() {
         Some(sender_a.fingerprint.clone())
     );
 }
+
+/// Revocation cert from Profile A key should not verify against Profile B key (and vice versa).
+#[test]
+fn test_revocation_cert_cross_profile_mismatch() {
+    let key_a = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Profile A key gen should succeed");
+
+    let key_b = keys::generate_key_with_profile(
+        "Bob".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Profile B key gen should succeed");
+
+    // Profile A revocation cert vs Profile B cert
+    let result = keys::parse_revocation_cert(&key_a.revocation_cert, &key_b.cert_data);
+    assert!(result.is_err(), "Profile A revocation cert should not verify against Profile B key");
+
+    // Profile B revocation cert vs Profile A cert
+    let result = keys::parse_revocation_cert(&key_b.revocation_cert, &key_a.cert_data);
+    assert!(result.is_err(), "Profile B revocation cert should not verify against Profile A key");
+}

@@ -298,6 +298,28 @@ fn test_import_wrong_passphrase_profile_b() {
     assert!(result.is_err(), "Wrong passphrase should fail");
 }
 
+/// Export with wrong profile should fail.
+#[test]
+fn test_export_wrong_profile_profile_b() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let result = keys::export_secret_key(&key.cert_data, "passphrase", KeyProfile::Universal);
+    assert!(result.is_err(), "Exporting v6 key with Universal profile should fail");
+    let err = result.unwrap_err();
+    match err {
+        pgp_mobile::error::PgpError::S2kError { reason } => {
+            assert!(reason.contains("Profile mismatch"), "Error should mention profile mismatch: {reason}");
+        }
+        other => panic!("Expected S2kError, got: {other:?}"),
+    }
+}
+
 /// C2B.9: Generate + parse revocation cert.
 #[test]
 fn test_revocation_cert_profile_b() {
@@ -309,9 +331,33 @@ fn test_revocation_cert_profile_b() {
     )
     .expect("Key gen should succeed");
 
-    let result = keys::parse_revocation_cert(&key.revocation_cert)
-        .expect("Revocation cert should parse");
+    let result = keys::parse_revocation_cert(&key.revocation_cert, &key.cert_data)
+        .expect("Revocation cert should parse and verify");
     assert!(result.contains("revocation"));
+}
+
+/// Revocation cert for key A should not verify against key B.
+#[test]
+fn test_revocation_cert_wrong_key_profile_b() {
+    let key_a = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key A gen should succeed");
+
+    let key_b = keys::generate_key_with_profile(
+        "Bob".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key B gen should succeed");
+
+    // Key A's revocation cert should fail verification against Key B
+    let result = keys::parse_revocation_cert(&key_a.revocation_cert, &key_b.cert_data);
+    assert!(result.is_err(), "Revocation cert should not verify against wrong key");
 }
 
 /// Tamper test: 1-bit flip → AEAD authentication failure.
