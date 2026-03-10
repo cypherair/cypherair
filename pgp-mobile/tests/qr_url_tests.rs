@@ -85,10 +85,10 @@ fn test_qr_url_malformed_data() {
     assert!(result.is_err(), "Missing version prefix should fail");
 }
 
-/// Secret key material in QR URL should be rejected.
+/// Secret key material in QR URL should be rejected at both encode AND decode.
 /// Only public keys should be exchanged via QR codes.
 #[test]
-fn test_qr_url_rejects_secret_key() {
+fn test_qr_url_rejects_secret_key_on_encode() {
     let engine = PgpEngine::new();
 
     let key = keys::generate_key_with_profile(
@@ -99,14 +99,43 @@ fn test_qr_url_rejects_secret_key() {
     )
     .expect("Key gen should succeed");
 
-    // Encode the FULL cert (with secret keys) as a QR URL — this should be rejected on decode
-    let url = engine
-        .encode_qr_url(key.cert_data.clone())
-        .expect("URL encoding should succeed (it's just base64url)");
+    // encode_qr_url should reject secret key material (defense in depth)
+    let result = engine.encode_qr_url(key.cert_data.clone());
+    assert!(result.is_err(), "QR URL encoding should reject secret key material");
+    let err = result.unwrap_err();
+    match err {
+        pgp_mobile::error::PgpError::InvalidKeyData { reason } => {
+            assert!(
+                reason.contains("secret key") || reason.contains("Secret key"),
+                "Error should mention secret key: {reason}"
+            );
+        }
+        other => panic!("Expected InvalidKeyData, got: {other:?}"),
+    }
+}
 
-    // decode_qr_url should reject secret key material
+/// Secret key material smuggled into a QR URL (bypassing encode) should be rejected on decode.
+#[test]
+fn test_qr_url_rejects_secret_key_on_decode() {
+    let engine = PgpEngine::new();
+
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    // Manually construct a URL with secret key data (bypassing encode_qr_url validation)
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use base64::Engine;
+    let encoded = URL_SAFE_NO_PAD.encode(&key.cert_data);
+    let url = format!("cypherair://import/v1/{encoded}");
+
+    // decode_qr_url should also reject secret key material
     let result = engine.decode_qr_url(url);
-    assert!(result.is_err(), "QR URL containing secret key should be rejected");
+    assert!(result.is_err(), "QR URL containing secret key should be rejected on decode");
     let err = result.unwrap_err();
     match err {
         pgp_mobile::error::PgpError::InvalidKeyData { reason } => {

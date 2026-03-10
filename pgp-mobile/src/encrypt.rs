@@ -6,7 +6,7 @@ use sequoia_openpgp as openpgp;
 use crate::error::PgpError;
 
 /// Parse recipient certificates, validate each has at least one encryption-capable
-/// subkey, and return the parsed certs.
+/// subkey, deduplicate by fingerprint, and return the parsed certs.
 fn collect_recipients(
     recipient_certs: &[Vec<u8>],
     encrypt_to_self: Option<&[u8]>,
@@ -19,13 +19,18 @@ fn collect_recipients(
     }
 
     let mut certs = Vec::new();
+    let mut seen_fingerprints = std::collections::HashSet::new();
+
     for cert_data in recipient_certs {
         let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| {
             PgpError::InvalidKeyData {
                 reason: format!("Invalid recipient key: {e}"),
             }
         })?;
-        certs.push(cert);
+        let fp = cert.fingerprint().to_hex();
+        if seen_fingerprints.insert(fp) {
+            certs.push(cert);
+        }
     }
 
     if let Some(self_cert_data) = encrypt_to_self {
@@ -34,7 +39,11 @@ fn collect_recipients(
                 reason: format!("Invalid self key: {e}"),
             }
         })?;
-        certs.push(self_cert);
+        // Deduplicate: skip if already in recipients (e.g., encrypt-to-self with own key as recipient)
+        let fp = self_cert.fingerprint().to_hex();
+        if seen_fingerprints.insert(fp) {
+            certs.push(self_cert);
+        }
     }
 
     // Validate each cert has at least one encryption-capable subkey

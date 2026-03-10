@@ -6,13 +6,17 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::SymmetricAlgorithm;
 use sequoia_openpgp as openpgp;
+use zeroize::Zeroize;
 
 use crate::error::PgpError;
 
 /// Result of a decryption operation.
+///
+/// SECURITY: `plaintext` contains sensitive decrypted content. The Swift caller must
+/// zeroize this data (via `resetBytes(in:)`) when it is no longer needed.
 #[derive(uniffi::Record)]
 pub struct DecryptResult {
-    /// The decrypted plaintext.
+    /// The decrypted plaintext. MUST be zeroized by the caller after use.
     pub plaintext: Vec<u8>,
     /// Signature verification result, if the message was signed.
     pub signature_status: Option<SignatureStatus>,
@@ -133,9 +137,12 @@ pub fn decrypt(
         .map_err(|e| classify_decrypt_error(e))?;
 
     let mut plaintext = Vec::new();
-    decryptor
-        .read_to_end(&mut plaintext)
-        .map_err(|e| classify_decrypt_error(e.into()))?;
+    if let Err(e) = decryptor.read_to_end(&mut plaintext) {
+        // SECURITY: Zeroize partial plaintext on error to prevent leaking fragments.
+        // This enforces the AEAD hard-fail requirement: no partial plaintext on auth failure.
+        plaintext.zeroize();
+        return Err(classify_decrypt_error(e.into()));
+    }
 
     let helper = decryptor.into_helper();
 
@@ -166,6 +173,16 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
         Ok(all_certs)
     }
 
+    /// Check signature verification results during decryption.
+    ///
+    /// DESIGN NOTE: Unlike `VerifyHelper::check()` (in verify.rs) which returns `Err(...)` for
+    /// bad signatures, this implementation returns `Ok(())` even for bad signatures. This is
+    /// intentional — during decryption, a bad signature should not prevent the user from seeing
+    /// the plaintext. Instead, the signature status is reported as a "graded result" (per PRD
+    /// Section 4.5) alongside the decrypted content. The UI shows a warning but still displays
+    /// the message. In contrast, standalone signature verification (`verify_cleartext`,
+    /// `verify_detached`) hard-fails on bad signatures because the content is already visible
+    /// and the sole purpose is to validate the signature.
     fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
         for layer in structure {
             match layer {
