@@ -150,6 +150,31 @@ ALL items must pass on physical device. Upon success: full development begins.
 
 ## 4. Implementation Status
 
+### Summary by Blocker Category
+
+| Category | Count | Items |
+|----------|-------|-------|
+| ✅ Implemented + tested (Rust) | 25 | C2A.1–8, C2B.1–9, C2X.1–5, C9.1–3 |
+| ✅ Definition only | 2 | C5.3, C5.5 |
+| ⬜ Needs macOS build env | 5 | C1.2–C1.6 |
+| ⬜ Needs GnuPG fixtures | 10 | C2A.9, C2B.10, C3.1–C3.8 |
+| ⬜ Needs Swift + XCFramework | 4 | C5.1–C5.2, C5.6–C5.7 |
+| ⬜ Needs iOS device (SE/Auth) | 11 | C6.1–C6.6, C7.1–C7.5 |
+| ⬜ Needs A19 device (MIE) | 4 | C8.1–C8.4 |
+| ⬜ Needs device (Argon2id) | 5 | C4.1–C4.5 |
+| ⬜ Manual only (Instruments) | 1 | C5.4 |
+| ⬜ Performance (soft-fail) | 8 | C10.1–C10.8 |
+
+### Blocker Classification (per Section 3)
+
+| Classification | Items | Rationale |
+|---------------|-------|-----------|
+| **Blocking** | C1.2–C1.3, C1.5 | Cross-compile + XCFramework gates all Swift integration |
+| **Non-blocking** | C2A.9, C2B.10, C5.4 | Fixture/manual tests — workarounds exist |
+| **Deferred** | C4.x, C6.x, C7.x, C8.x, C10.x | Require physical device hardware |
+
+### Detailed Status
+
 | Test ID | Status | Code / Test Location | Notes |
 |---------|--------|---------------------|-------|
 | C1.1 | ✅ Crate created | `pgp-mobile/Cargo.toml` | Needs macOS build verification |

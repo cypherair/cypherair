@@ -162,11 +162,21 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
     let fingerprint = cert.fingerprint().to_hex().to_lowercase();
     let key_version = cert.primary_key().key().version();
 
-    // Extract primary User ID
+    // Extract primary User ID — prefer policy-validated UID, fall back to raw for
+    // expired/revoked certs that still need to display a UID.
     let user_id = cert
-        .userids()
-        .next()
-        .map(|uid| String::from_utf8_lossy(uid.component().value()).to_string());
+        .with_policy(&policy, Some(now))
+        .ok()
+        .and_then(|valid_cert| {
+            valid_cert.userids().next().map(|uid| {
+                String::from_utf8_lossy(uid.component().value()).to_string()
+            })
+        })
+        .or_else(|| {
+            cert.userids().next().map(|uid| {
+                String::from_utf8_lossy(uid.component().value()).to_string()
+            })
+        });
 
     // Check for valid encryption subkey
     let has_encryption_subkey = cert
@@ -224,12 +234,28 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
 pub fn export_secret_key(
     cert_data: &[u8],
     passphrase: &str,
-    _profile: KeyProfile,
+    profile: KeyProfile,
 ) -> Result<Vec<u8>, PgpError> {
     let cert =
         openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
             reason: e.to_string(),
         })?;
+
+    // Validate that the provided profile matches the key's actual version.
+    let key_version = cert.primary_key().key().version();
+    let expected_profile = if key_version >= 6 {
+        KeyProfile::Advanced
+    } else {
+        KeyProfile::Universal
+    };
+    if profile != expected_profile {
+        return Err(PgpError::S2kError {
+            reason: format!(
+                "Profile mismatch: requested {:?} but key is v{} ({:?})",
+                profile, key_version, expected_profile
+            ),
+        });
+    }
 
     let password = openpgp::crypto::Password::from(passphrase);
 
@@ -357,26 +383,43 @@ pub fn extract_secret_key_bytes(cert_data: &[u8]) -> Result<Vec<u8>, PgpError> {
     Ok(secret_bytes)
 }
 
-/// Parse a revocation certificate and verify it's valid.
-pub fn parse_revocation_cert(rev_data: &[u8]) -> Result<String, PgpError> {
+/// Parse a revocation certificate and cryptographically verify it against the target key.
+pub fn parse_revocation_cert(rev_data: &[u8], cert_data: &[u8]) -> Result<String, PgpError> {
     let pkt = openpgp::Packet::from_bytes(rev_data).map_err(|e| PgpError::RevocationError {
         reason: format!("Failed to parse revocation cert: {e}"),
     })?;
 
-    match pkt {
+    let sig = match pkt {
         openpgp::Packet::Signature(sig) => {
             if sig.typ() == openpgp::types::SignatureType::KeyRevocation {
-                Ok(format!("Valid key revocation signature"))
+                sig
             } else {
-                Err(PgpError::RevocationError {
+                return Err(PgpError::RevocationError {
                     reason: format!("Not a key revocation signature: {:?}", sig.typ()),
-                })
+                });
             }
         }
-        _ => Err(PgpError::RevocationError {
-            reason: "Not a signature packet".to_string(),
-        }),
-    }
+        _ => {
+            return Err(PgpError::RevocationError {
+                reason: "Not a signature packet".to_string(),
+            });
+        }
+    };
+
+    let cert =
+        openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
+            reason: e.to_string(),
+        })?;
+
+    // Cryptographically verify the revocation signature against the target key.
+    let primary_key = cert.primary_key().key();
+    sig.verify_primary_key_revocation(primary_key, primary_key)
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Revocation signature is not valid for this key: {e}"),
+        })?;
+
+    let fingerprint = cert.fingerprint().to_hex().to_lowercase();
+    Ok(format!("Valid key revocation signature for {fingerprint}"))
 }
 
 /// Get the key version from binary certificate data.

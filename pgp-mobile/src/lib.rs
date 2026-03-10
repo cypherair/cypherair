@@ -191,12 +191,13 @@ impl PgpEngine {
 
     // ── Revocation ──────────────────────────────────────────────────
 
-    /// Parse and validate a revocation certificate.
+    /// Parse and cryptographically verify a revocation certificate against the target key.
     pub fn parse_revocation_cert(
         &self,
         rev_data: Vec<u8>,
+        cert_data: Vec<u8>,
     ) -> Result<String, PgpError> {
-        keys::parse_revocation_cert(&rev_data)
+        keys::parse_revocation_cert(&rev_data, &cert_data)
     }
 
     // ── Armor ───────────────────────────────────────────────────────
