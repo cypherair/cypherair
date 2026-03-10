@@ -1,0 +1,18 @@
+# Rust build artifacts
+pgp-mobile/target/
+
+# macOS
+.DS_Store
+
+# Xcode
+*.xcuserdata
+DerivedData/
+build/
+*.xcworkspace/xcuserdata/
+
+# Swift Package Manager
+.build/
+Packages/
+
+# XCFramework (built artifact, not source)
+*.xcframework/
