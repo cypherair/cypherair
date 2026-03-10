@@ -13,7 +13,7 @@ pub mod sign;
 pub mod verify;
 
 use crate::armor::ArmorKind;
-use crate::decrypt::{DecryptResult, SignatureStatus};
+use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
 use crate::keys::{GeneratedKey, KeyInfo, KeyProfile};
 use crate::verify::VerifyResult;

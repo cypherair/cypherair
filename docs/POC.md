@@ -148,7 +148,56 @@ ALL items must pass on physical device. Upon success: full development begins.
 - **Non-blocking:** Workaround available. Document and proceed.
 - **Deferred:** Edge case, not MVP-affecting. Document for v1.1.
 
-## 4. Time Estimate
+## 4. Implementation Status
+
+| Test ID | Status | Code / Test Location | Notes |
+|---------|--------|---------------------|-------|
+| C1.1 | ✅ Crate created | `pgp-mobile/Cargo.toml` | Needs macOS build verification |
+| C1.2 | ⬜ Not tested | — | Requires macOS + Rust iOS targets |
+| C1.3 | ⬜ Not tested | — | Requires macOS + simulator |
+| C1.4 | ⬜ Not tested | `pgp-mobile/build.rs`, `pgp-mobile/uniffi-bindgen.rs` | Requires macOS dylib |
+| C1.5 | ⬜ Not tested | `build-xcframework.sh` | Script written, needs macOS |
+| C1.6 | ⬜ Not tested | — | Measured during C1.5 |
+| C2A.1 | ✅ Implemented + tested | `pgp-mobile/src/keys.rs`, `tests/profile_a_tests.rs` | v4 key gen verified |
+| C2A.2 | ✅ Implemented + tested | `pgp-mobile/src/sign.rs`, `tests/profile_a_tests.rs` | Cleartext + detached |
+| C2A.3 | ✅ Implemented + tested | `pgp-mobile/src/encrypt.rs`, `tests/profile_a_tests.rs` | SEIPDv1, signed + unsigned |
+| C2A.4 | ✅ Implemented + tested | `tests/profile_a_tests.rs` | Encrypt-to-self verified |
+| C2A.5 | ✅ Implemented + tested | `tests/profile_a_tests.rs` | 1 MB + 10 MB tested |
+| C2A.6 | ✅ Implemented + tested | `pgp-mobile/src/keys.rs:export_secret_key`, `tests/profile_a_tests.rs` | S2K export/import |
+| C2A.7 | ✅ Implemented + tested | `tests/profile_a_tests.rs` | Wrong passphrase → error |
+| C2A.8 | ✅ Implemented + tested | `tests/profile_a_tests.rs` | Revocation cert parse |
+| C2A.9 | ⬜ Not implemented | — | Needs GnuPG DEFLATE fixture |
+| C2B.1 | ✅ Implemented + tested | `pgp-mobile/src/keys.rs`, `tests/profile_b_tests.rs` | v6 key gen verified |
+| C2B.2 | ✅ Implemented + tested | `tests/profile_b_tests.rs` | Sign + verify |
+| C2B.3 | ✅ Implemented + tested | `tests/profile_b_tests.rs` | SEIPDv2 AEAD OCB |
+| C2B.4 | ✅ Implemented + tested | `tests/profile_b_tests.rs` | Encrypt-to-self |
+| C2B.5 | ✅ Implemented + tested | `tests/profile_b_tests.rs` | 1 MB + 10 MB |
+| C2B.6 | ✅ Implemented + tested | `tests/profile_b_tests.rs` | Export with Argon2id |
+| C2B.7 | ✅ Implemented + tested | `tests/profile_b_tests.rs` | Correct passphrase import |
+| C2B.8 | ✅ Implemented + tested | `tests/profile_b_tests.rs` | Wrong passphrase → error |
+| C2B.9 | ✅ Implemented + tested | `tests/profile_b_tests.rs` | Revocation cert parse |
+| C2B.10 | ⬜ Not implemented | — | Needs compressed SEIPDv2 fixture |
+| C2X.1 | ✅ Implemented + tested | `tests/cross_profile_tests.rs` | A→B, SEIPDv2 |
+| C2X.2 | ✅ Implemented + tested | `tests/cross_profile_tests.rs` | B→A, SEIPDv1 |
+| C2X.3 | ✅ Implemented + tested | `tests/cross_profile_tests.rs` | Mixed → SEIPDv1 |
+| C2X.4 | ✅ Implemented + tested | `tests/cross_profile_tests.rs` | Encrypt-to-self mixed |
+| C2X.5 | ✅ Implemented + tested | `tests/cross_profile_tests.rs` | Cross-profile sig verify |
+| C3.1–C3.8 | ⬜ Not implemented | — | Needs GnuPG fixtures on macOS |
+| C4.1–C4.5 | ⬜ Not implemented | — | Needs iOS device for memory tests |
+| C5.1–C5.2 | ⬜ Not tested | — | Needs Swift + XCFramework |
+| C5.3 | ✅ Error enum defined | `pgp-mobile/src/error.rs` | Needs Swift-side mapping test |
+| C5.4 | ⬜ Not tested | — | Manual Instruments test |
+| C5.5 | ✅ Enum defined | `pgp-mobile/src/keys.rs:KeyProfile` | Needs FFI crossing test |
+| C5.6–C5.7 | ⬜ Not tested | — | Needs Swift concurrency test |
+| C6.1–C6.6 | ⬜ Device only | `Sources/Security/Mocks/MockSecureEnclave.swift` | Mock implemented; device tests pending |
+| C7.1–C7.5 | ⬜ Device only | `Sources/Security/Mocks/MockAuthenticator.swift` | Mock implemented; device tests pending |
+| C8.1–C8.4 | ⬜ Device only | — | Requires iPhone 17 / iPhone Air |
+| C9.1 | ✅ Implemented + tested | `pgp-mobile/src/lib.rs`, `tests/qr_url_tests.rs` | v4 QR round-trip |
+| C9.2 | ✅ Implemented + tested | `tests/qr_url_tests.rs` | v6 QR round-trip |
+| C9.3 | ✅ Implemented + tested | `tests/qr_url_tests.rs` | Malformed data → error |
+| C10.1–C10.8 | ⬜ Not measured | — | Measured during other tests on device |
+
+## 5. Time Estimate
 
 | Category | Time | Notes |
 |----------|------|-------|

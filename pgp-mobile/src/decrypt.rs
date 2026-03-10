@@ -1,8 +1,6 @@
-use std::io::{self, Read};
+use std::io::Read;
 
-use openpgp::cert::prelude::*;
-use openpgp::crypto::{KeyPair, SessionKey};
-use openpgp::packet::prelude::*;
+use openpgp::crypto::SessionKey;
 use openpgp::parse::stream::*;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
@@ -58,7 +56,7 @@ pub fn parse_recipients(ciphertext: &[u8]) -> Result<Vec<String>, PgpError> {
                 }
             }
             // Stop after we've seen all PKESKs (they come before the encrypted data)
-            openpgp::Packet::SEIP(_) | openpgp::Packet::AED(_) => {
+            openpgp::Packet::SEIP(_) => {
                 break;
             }
             _ => {}
@@ -238,46 +236,36 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
 }
 
 impl<'a> DecryptionHelper for DecryptHelper<'a> {
-    fn decrypt<D>(
+    fn decrypt(
         &mut self,
         pkesks: &[openpgp::packet::PKESK],
         _skesks: &[openpgp::packet::SKESK],
         sym_algo: Option<SymmetricAlgorithm>,
-        mut decrypt: D,
-    ) -> openpgp::Result<Option<openpgp::Fingerprint>>
-    where
-        D: FnMut(SymmetricAlgorithm, &SessionKey) -> bool,
-    {
+        decrypt: &mut dyn FnMut(Option<SymmetricAlgorithm>, &SessionKey) -> bool,
+    ) -> openpgp::Result<Option<openpgp::Cert>> {
         // Try each PKESK against each of our secret keys
         for pkesk in pkesks {
             for cert in self.secret_certs {
-                for key in cert
+                for ka in cert
                     .keys()
                     .with_policy(self.policy, None)
                     .supported()
                     .unencrypted_secret()
+                    .key_handles(pkesk.recipient())
                     .for_transport_encryption()
                 {
-                    if let Some(rid) = pkesk.recipient() {
-                        if key.key_handle() != *rid
-                            && !rid.is_wildcard()
-                        {
-                            continue;
-                        }
-                    }
-
-                    let mut keypair = key.key().clone().into_keypair()?;
-                    if pkesk
-                        .decrypt(&mut keypair, sym_algo)
-                        .map(|(algo, session_key)| decrypt(algo, &session_key))
-                        .unwrap_or(false)
+                    if let Some((algo, session_key)) =
+                        ka.key().clone().into_keypair().ok()
+                            .and_then(|mut kp| pkesk.decrypt(&mut kp, sym_algo))
                     {
-                        return Ok(Some(cert.fingerprint()));
+                        if decrypt(algo, &session_key) {
+                            return Ok(None);
+                        }
                     }
                 }
             }
         }
 
-        Err(anyhow::anyhow!("No key to decrypt message"))
+        Err(openpgp::anyhow::anyhow!("No key to decrypt message"))
     }
 }

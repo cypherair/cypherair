@@ -173,7 +173,7 @@ fn test_profile_b_encrypt_to_self_with_v4_recipient() {
     )
     .expect("Recipient key gen should succeed");
 
-    let plaintext = b"B→A with encrypt-to-self (mixed → SEIPDv1).";
+    let plaintext = b"B->A with encrypt-to-self (mixed -> SEIPDv1).";
 
     let ciphertext = encrypt::encrypt(
         plaintext,
@@ -264,7 +264,7 @@ fn test_cross_profile_signed_encrypted_round_trip() {
     )
     .expect("Recipient key gen should succeed");
 
-    let plaintext = b"Full round-trip: A→B signed+encrypted.";
+    let plaintext = b"Full round-trip: A->B signed+encrypted.";
 
     // Encrypt and sign
     let ciphertext = encrypt::encrypt(

@@ -88,8 +88,8 @@ pub enum PgpError {
 }
 
 /// Convert anyhow::Error to PgpError for Sequoia operations.
-impl From<anyhow::Error> for PgpError {
-    fn from(e: anyhow::Error) -> Self {
+impl From<sequoia_openpgp::anyhow::Error> for PgpError {
+    fn from(e: sequoia_openpgp::anyhow::Error) -> Self {
         PgpError::InternalError {
             reason: e.to_string(),
         }

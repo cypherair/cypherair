@@ -1,4 +1,3 @@
-use openpgp::cert::prelude::*;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::stream::*;
@@ -37,35 +36,28 @@ pub fn sign_cleartext(text: &[u8], signer_cert_data: &[u8]) -> Result<Vec<u8>, P
     let mut sink = Vec::new();
     let message = Message::new(&mut sink);
 
-    let message = Armorer::new(message)
-        .kind(openpgp::armor::Kind::Message)
-        .build()
-        .map_err(|e| PgpError::SigningFailed {
-            reason: format!("Armor setup failed: {e}"),
-        })?;
-
-    let message = Signer::with_template(
+    // Cleartext signatures handle their own ASCII formatting — no Armorer needed.
+    // The Signer with .cleartext() produces the -----BEGIN PGP SIGNED MESSAGE----- format.
+    let mut signer = Signer::with_template(
         message,
         signing_keypair,
-        openpgp::types::SignatureBuilder::new(openpgp::types::SignatureType::Text),
+        openpgp::packet::signature::SignatureBuilder::new(openpgp::types::SignatureType::Text),
     )
+    .map_err(|e| PgpError::SigningFailed {
+        reason: format!("Signer setup failed: {e}"),
+    })?
     .cleartext()
     .build()
     .map_err(|e| PgpError::SigningFailed {
         reason: format!("Signer setup failed: {e}"),
     })?;
 
-    let mut literal = LiteralWriter::new(message)
-        .build()
-        .map_err(|e| PgpError::SigningFailed {
-            reason: format!("Literal writer setup failed: {e}"),
-        })?;
-
-    std::io::copy(&mut &text[..], &mut literal).map_err(|e| PgpError::SigningFailed {
+    // Write text directly to the signer (no LiteralWriter for cleartext sigs).
+    std::io::Write::write_all(&mut signer, text).map_err(|e| PgpError::SigningFailed {
         reason: format!("Write failed: {e}"),
     })?;
 
-    literal.finalize().map_err(|e| PgpError::SigningFailed {
+    signer.finalize().map_err(|e| PgpError::SigningFailed {
         reason: format!("Finalize failed: {e}"),
     })?;
 
@@ -111,6 +103,9 @@ pub fn sign_detached(data: &[u8], signer_cert_data: &[u8]) -> Result<Vec<u8>, Pg
         })?;
 
     let mut signer = Signer::new(message, signing_keypair)
+        .map_err(|e| PgpError::SigningFailed {
+            reason: format!("Signer setup failed: {e}"),
+        })?
         .detached()
         .build()
         .map_err(|e| PgpError::SigningFailed {

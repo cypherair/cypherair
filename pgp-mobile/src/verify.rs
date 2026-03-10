@@ -1,4 +1,3 @@
-use openpgp::cert::prelude::*;
 use openpgp::parse::stream::*;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
@@ -47,7 +46,7 @@ pub fn verify_cleartext(
             reason: format!("Failed to parse signed message: {e}"),
         })?
         .with_policy(&policy, None, helper)
-        .map_err(|e| PgpError::BadSignature)?;
+        .map_err(|_e| PgpError::BadSignature)?;
 
     let mut content = Vec::new();
     std::io::Read::read_to_end(&mut verifier, &mut content).map_err(|e| {
@@ -94,7 +93,7 @@ pub fn verify_detached(
             reason: format!("Failed to parse signature: {e}"),
         })?
         .with_policy(&policy, None, helper)
-        .map_err(|e| PgpError::BadSignature)?;
+        .map_err(|_e| PgpError::BadSignature)?;
 
     verifier.verify_bytes(data).map_err(|_| PgpError::BadSignature)?;
 
@@ -140,7 +139,7 @@ impl<'a> VerificationHelper for VerifyHelper<'a> {
                             }
                             Err(_) => {
                                 self.status = SignatureStatus::Bad;
-                                return Err(anyhow::anyhow!("Bad signature"));
+                                return Err(openpgp::anyhow::anyhow!("Bad signature"));
                             }
                         }
                     }
