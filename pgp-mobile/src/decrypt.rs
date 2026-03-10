@@ -55,7 +55,8 @@ pub fn parse_recipients(ciphertext: &[u8]) -> Result<Vec<String>, PgpError> {
                     recipients.push(rid.to_hex());
                 }
             }
-            // Stop after we've seen all PKESKs (they come before the encrypted data)
+            // Stop after we've seen all PKESKs (they come before the encrypted data).
+            // In Sequoia 2.x, both SEIPDv1 and SEIPDv2 are under Packet::SEIP.
             openpgp::Packet::SEIP(_) => {
                 break;
             }
@@ -129,47 +130,12 @@ pub fn decrypt(
             reason: format!("Failed to parse message: {e}"),
         })?
         .with_policy(&policy, None, helper)
-        .map_err(|e| {
-            let err_str = e.to_string();
-            if err_str.contains("authentication")
-                || err_str.contains("AEAD")
-                || err_str.contains("tag")
-            {
-                PgpError::AeadAuthenticationFailed
-            } else if err_str.contains("MDC")
-                || err_str.contains("modification detection")
-                || err_str.contains("integrity")
-            {
-                PgpError::IntegrityCheckFailed
-            } else if err_str.contains("no matching key")
-                || err_str.contains("No key to decrypt")
-            {
-                PgpError::NoMatchingKey
-            } else {
-                PgpError::CorruptData {
-                    reason: format!("Decryption failed: {e}"),
-                }
-            }
-        })?;
+        .map_err(|e| classify_decrypt_error(e))?;
 
     let mut plaintext = Vec::new();
     decryptor
         .read_to_end(&mut plaintext)
-        .map_err(|e| {
-            let err_str = e.to_string();
-            if err_str.contains("authentication")
-                || err_str.contains("AEAD")
-                || err_str.contains("tag")
-            {
-                PgpError::AeadAuthenticationFailed
-            } else if err_str.contains("MDC") || err_str.contains("integrity") {
-                PgpError::IntegrityCheckFailed
-            } else {
-                PgpError::CorruptData {
-                    reason: format!("Read failed: {e}"),
-                }
-            }
-        })?;
+        .map_err(|e| classify_decrypt_error(e.into()))?;
 
     let helper = decryptor.into_helper();
 
@@ -232,6 +198,49 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
         }
 
         Ok(())
+    }
+}
+
+/// Classify a Sequoia decryption error into the appropriate PgpError variant.
+///
+/// SECURITY NOTE: This function uses string matching on Sequoia error messages because
+/// Sequoia returns `anyhow::Error` without structured error types for decryption failures.
+/// The fallback is always `CorruptData`, which is safe — the decryption hard-fails regardless
+/// of classification, so no plaintext is ever leaked. The classification only affects which
+/// user-facing error message is shown ("tampered" vs "damaged").
+///
+/// MAINTENANCE: If Sequoia upgrades change error message text, this classification may
+/// degrade (more errors classified as CorruptData). Review this function after any Sequoia
+/// version bump. Check if Sequoia exposes structured error types (e.g., `openpgp::Error`)
+/// that could replace string matching.
+fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
+    let err_str = e.to_string();
+
+    // Check the entire error chain for more specific error types.
+    // Sequoia wraps errors in anyhow, so we walk the chain.
+    for cause in e.chain() {
+        let cause_str = cause.to_string();
+        if cause_str.contains("authentication")
+            || cause_str.contains("AEAD")
+            || cause_str.contains("tag mismatch")
+        {
+            return PgpError::AeadAuthenticationFailed;
+        }
+        if cause_str.contains("MDC")
+            || cause_str.contains("modification detection")
+            || cause_str.contains("integrity")
+        {
+            return PgpError::IntegrityCheckFailed;
+        }
+    }
+
+    // Fall back to top-level error string
+    if err_str.contains("no matching key") || err_str.contains("No key to decrypt") {
+        PgpError::NoMatchingKey
+    } else {
+        PgpError::CorruptData {
+            reason: format!("Decryption failed: {e}"),
+        }
     }
 }
 
