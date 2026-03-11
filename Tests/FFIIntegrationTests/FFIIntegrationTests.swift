@@ -235,13 +235,53 @@ final class FFIIntegrationTests: XCTestCase {
             guard let pgpError = error as? PgpError else {
                 return XCTFail("Expected PgpError, got \(type(of: error))")
             }
-            // Profile A: MDC check → IntegrityCheckFailed or CorruptData
+            // Profile A (SEIPDv1): bit-flip in armored ciphertext may corrupt
+            // the encrypted payload (→ IntegrityCheckFailed), the armor framing
+            // (→ CorruptData), or the recipient key ID (→ NoMatchingKey).
             switch pgpError {
-            case .IntegrityCheckFailed, .CorruptData:
-                break // expected for SEIPDv1 tamper
+            case .IntegrityCheckFailed, .CorruptData, .NoMatchingKey:
+                break // all acceptable for armored ciphertext bit-flip
             default:
-                // Armor corruption might cause CorruptData instead
-                break
+                XCTFail("Expected IntegrityCheckFailed, CorruptData, or NoMatchingKey, got \(pgpError)")
+            }
+        }
+    }
+
+    /// C5.3: AeadAuthenticationFailed on tampered Profile B (SEIPDv2) ciphertext.
+    func test_errorMapping_aeadAuthenticationFailed_profileB() throws {
+        let key = try engine.generateKey(
+            name: "Tamper B", email: nil, expirySeconds: nil, profile: .advanced
+        )
+
+        var ciphertext = try engine.encrypt(
+            plaintext: Data("tamper test AEAD".utf8),
+            recipients: [key.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        // Flip a bit in the middle of the ciphertext
+        let midpoint = ciphertext.count / 2
+        ciphertext[midpoint] ^= 0x01
+
+        XCTAssertThrowsError(
+            try engine.decrypt(
+                ciphertext: ciphertext,
+                secretKeys: [key.certData],
+                verificationKeys: []
+            )
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            // Profile B (SEIPDv2 AEAD): bit-flip may corrupt the AEAD payload
+            // (→ AeadAuthenticationFailed), the armor framing (→ CorruptData),
+            // or the recipient key ID (→ NoMatchingKey).
+            switch pgpError {
+            case .AeadAuthenticationFailed, .IntegrityCheckFailed, .CorruptData, .NoMatchingKey:
+                break // all acceptable for armored ciphertext bit-flip
+            default:
+                XCTFail("Expected AeadAuthenticationFailed, IntegrityCheckFailed, CorruptData, or NoMatchingKey, got \(pgpError)")
             }
         }
     }
@@ -371,8 +411,9 @@ final class FFIIntegrationTests: XCTestCase {
         try await withThrowingTaskGroup(of: Data.self) { group in
             for i in 0..<10 {
                 group.addTask { [engine] in
+                    guard let engine else { throw ConcurrentTestError.engineDeallocated }
                     let plaintext = Data("Message \(i) for concurrent test".utf8)
-                    return try engine!.encrypt(
+                    return try engine.encrypt(
                         plaintext: plaintext,
                         recipients: [key.publicKeyData],
                         signingKey: nil,
@@ -415,8 +456,9 @@ final class FFIIntegrationTests: XCTestCase {
             // 5 encrypt tasks
             for i in 0..<5 {
                 group.addTask { [engine] in
+                    guard let engine else { throw ConcurrentTestError.engineDeallocated }
                     let plaintext = Data("Encrypt task \(i)".utf8)
-                    let ct = try engine!.encrypt(
+                    let ct = try engine.encrypt(
                         plaintext: plaintext,
                         recipients: [key.publicKeyData],
                         signingKey: nil,
@@ -430,7 +472,8 @@ final class FFIIntegrationTests: XCTestCase {
             for i in 0..<5 {
                 let ct = preCiphertexts[i]
                 group.addTask { [engine] in
-                    let result = try engine!.decrypt(
+                    guard let engine else { throw ConcurrentTestError.engineDeallocated }
+                    let result = try engine.decrypt(
                         ciphertext: ct,
                         secretKeys: [key.certData],
                         verificationKeys: []
@@ -467,7 +510,8 @@ final class FFIIntegrationTests: XCTestCase {
             for i in 0..<10 {
                 if i % 2 == 0 {
                     group.addTask { [engine] in
-                        let ct = try engine!.encrypt(
+                        guard let engine else { throw ConcurrentTestError.engineDeallocated }
+                        let ct = try engine.encrypt(
                             plaintext: Data("B-\(i)".utf8),
                             recipients: [key.publicKeyData],
                             signingKey: nil,
@@ -477,7 +521,8 @@ final class FFIIntegrationTests: XCTestCase {
                     }
                 } else {
                     group.addTask { [engine] in
-                        let result = try engine!.decrypt(
+                        guard let engine else { throw ConcurrentTestError.engineDeallocated }
+                        let result = try engine.decrypt(
                             ciphertext: preCiphertext,
                             secretKeys: [key.certData],
                             verificationKeys: []
@@ -495,4 +540,9 @@ final class FFIIntegrationTests: XCTestCase {
             XCTAssertEqual(count, 10)
         }
     }
+}
+
+/// Error thrown when PgpEngine is unexpectedly nil in concurrent test closures.
+private enum ConcurrentTestError: Error {
+    case engineDeallocated
 }
