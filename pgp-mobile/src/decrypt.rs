@@ -14,6 +14,11 @@ use crate::error::PgpError;
 ///
 /// SECURITY: `plaintext` contains sensitive decrypted content. The Swift caller must
 /// zeroize this data (via `resetBytes(in:)`) when it is no longer needed.
+///
+/// NOTE: A custom `Drop` impl cannot be added because `uniffi::Record` derives move
+/// fields out of the struct, which is incompatible with `Drop`. Zeroization on the
+/// error path is handled explicitly in `decrypt()` (line 143). On the success path,
+/// the Swift caller is responsible for zeroization after use.
 #[derive(uniffi::Record)]
 pub struct DecryptResult {
     /// The decrypted plaintext. MUST be zeroized by the caller after use.
@@ -231,19 +236,21 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
 /// version bump. Check if Sequoia exposes structured error types (e.g., `openpgp::Error`)
 /// that could replace string matching.
 fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
-    let err_str = e.to_string();
+    let err_str = e.to_string().to_lowercase();
 
     // Check the entire error chain for more specific error types.
     // Sequoia wraps errors in anyhow, so we walk the chain.
+    // All comparisons are case-insensitive to guard against Sequoia rewording
+    // error messages across versions.
     for cause in e.chain() {
-        let cause_str = cause.to_string();
+        let cause_str = cause.to_string().to_lowercase();
         if cause_str.contains("authentication")
-            || cause_str.contains("AEAD")
+            || cause_str.contains("aead")
             || cause_str.contains("tag mismatch")
         {
             return PgpError::AeadAuthenticationFailed;
         }
-        if cause_str.contains("MDC")
+        if cause_str.contains("mdc")
             || cause_str.contains("modification detection")
             || cause_str.contains("integrity")
         {
@@ -252,7 +259,7 @@ fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
     }
 
     // Fall back to top-level error string
-    if err_str.contains("no matching key") || err_str.contains("No key to decrypt") {
+    if err_str.contains("no matching key") || err_str.contains("no key to decrypt") {
         PgpError::NoMatchingKey
     } else {
         PgpError::CorruptData {
@@ -269,7 +276,10 @@ impl<'a> DecryptionHelper for DecryptHelper<'a> {
         sym_algo: Option<SymmetricAlgorithm>,
         decrypt: &mut dyn FnMut(Option<SymmetricAlgorithm>, &SessionKey) -> bool,
     ) -> openpgp::Result<Option<openpgp::Cert>> {
-        // Try each PKESK against each of our secret keys
+        // Try each PKESK against each of our secret keys.
+        // SECURITY: `into_keypair()` extracts secret material from the key; the KeyPair
+        // is consumed by `pkesk.decrypt()`. `session_key` (SessionKey type) is zeroized
+        // by Sequoia's Drop impl when it goes out of scope. See sign.rs for similar rationale.
         for pkesk in pkesks {
             for cert in self.secret_certs {
                 for ka in cert
