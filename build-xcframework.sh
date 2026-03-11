@@ -77,10 +77,25 @@ ls -lh "$SIM_LIB"
 # ── Step 4: Build host dylib for UniFFI bindgen ──────────────────
 echo ""
 echo "[4/7] Building host dylib for UniFFI bindgen..."
+# Temporarily add cdylib to crate-type so cargo produces a .dylib for bindgen.
+# The dylib is only needed on the macOS host for uniffi-bindgen — it is never
+# shipped to iOS.  We restore the original Cargo.toml afterwards.
+CARGO_TOML="$SCRIPT_DIR/pgp-mobile/Cargo.toml"
+cp "$CARGO_TOML" "$CARGO_TOML.bak"
+sed -i '' 's/crate-type = \["lib", "staticlib"\]/crate-type = ["lib", "staticlib", "cdylib"]/' "$CARGO_TOML"
+
 cargo build $CARGO_FLAGS --manifest-path "$MANIFEST"
+
+# Restore original Cargo.toml
+mv "$CARGO_TOML.bak" "$CARGO_TOML"
+
 HOST_DYLIB="$SCRIPT_DIR/pgp-mobile/target/$BUILD_DIR/libpgp_mobile.dylib"
 if [ ! -f "$HOST_DYLIB" ]; then
     HOST_DYLIB="$SCRIPT_DIR/target/$BUILD_DIR/libpgp_mobile.dylib"
+fi
+if [ ! -f "$HOST_DYLIB" ]; then
+    echo "  ✗ ERROR: Host dylib not found. Cannot generate bindings."
+    exit 1
 fi
 echo "  ✓ Host dylib: $HOST_DYLIB"
 
@@ -89,8 +104,8 @@ echo ""
 echo "[5/7] Generating UniFFI Swift bindings..."
 rm -rf "$BINDINGS_DIR"
 mkdir -p "$BINDINGS_DIR"
-cargo run $CARGO_FLAGS --manifest-path "$MANIFEST" --bin uniffi-bindgen \
-    generate --library "$HOST_DYLIB" --language swift --out-dir "$BINDINGS_DIR"
+(cd "$SCRIPT_DIR/pgp-mobile" && cargo run $CARGO_FLAGS --bin uniffi-bindgen \
+    generate --library "$HOST_DYLIB" --language swift --out-dir "$BINDINGS_DIR")
 echo "  ✓ Bindings generated in $BINDINGS_DIR"
 ls -la "$BINDINGS_DIR"
 
@@ -118,7 +133,7 @@ echo "  ✓ XCFramework created: $XCFRAMEWORK_OUTPUT"
 
 # ── Step 7: Check binary size ────────────────────────────────────
 echo ""
-echo "[7/7] Binary size check..."
+echo "[7/8] Binary size check..."
 DEVICE_SIZE=$(stat -f%z "$DEVICE_LIB" 2>/dev/null || stat --printf="%s" "$DEVICE_LIB" 2>/dev/null || echo "unknown")
 SIM_SIZE=$(stat -f%z "$SIM_LIB" 2>/dev/null || stat --printf="%s" "$SIM_LIB" 2>/dev/null || echo "unknown")
 echo "  Device library: $DEVICE_SIZE bytes"
@@ -131,12 +146,23 @@ else
     echo "  ✓ Device library within 10 MB threshold"
 fi
 
+# ── Step 8: Sync Swift bindings to Xcode source tree ─────────────
+echo ""
+echo "[8/8] Syncing generated bindings to Sources/PgpMobile/..."
+SWIFT_BINDING_SRC="$BINDINGS_DIR/pgp_mobile.swift"
+SWIFT_BINDING_DST="$SCRIPT_DIR/Sources/PgpMobile/pgp_mobile.swift"
+if [ -f "$SWIFT_BINDING_SRC" ]; then
+    cp "$SWIFT_BINDING_SRC" "$SWIFT_BINDING_DST"
+    echo "  ✓ pgp_mobile.swift synced"
+else
+    echo "  ⚠️ WARNING: pgp_mobile.swift not found in bindings — skipped"
+fi
+
 echo ""
 echo "=== Build Complete ==="
 echo ""
 echo "Next steps:"
-echo "  1. Copy $BINDINGS_DIR/pgp_mobile.swift to your Xcode project"
-echo "  2. Add $XCFRAMEWORK_OUTPUT to your Xcode project"
-echo "  3. If Swift 6.2 concurrency warnings occur:"
+echo "  1. Add $XCFRAMEWORK_OUTPUT to your Xcode project (if not already added)"
+echo "  2. If Swift 6.2 concurrency warnings occur:"
 echo "     - Use @preconcurrency import PgpMobile"
 echo "     - Or add @unchecked Sendable conformances in an extension file"
