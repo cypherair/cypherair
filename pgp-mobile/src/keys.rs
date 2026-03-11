@@ -64,6 +64,10 @@ pub struct KeyInfo {
     pub is_expired: bool,
     /// Detected profile based on key version and algorithms.
     pub profile: KeyProfile,
+    /// Primary key algorithm name (e.g., "Ed25519", "Ed448").
+    pub primary_algo: String,
+    /// Encryption subkey algorithm name (e.g., "X25519", "X448"), if present.
+    pub subkey_algo: Option<String>,
 }
 
 /// Generate a new key pair with the specified profile.
@@ -240,6 +244,22 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         KeyProfile::Universal
     };
 
+    // Extract primary key algorithm name (Display gives human-readable names like "EdDSA", "Ed448")
+    let primary_algo = cert.primary_key().key().pk_algo().to_string();
+
+    // Extract encryption subkey algorithm name (first encryption-capable subkey)
+    let subkey_algo = cert
+        .keys()
+        .subkeys()
+        .with_policy(&policy, Some(now))
+        .for_transport_encryption()
+        .next()
+        .map(|ka| ka.key().pk_algo().to_string())
+        .or_else(|| {
+            // Fallback: first subkey regardless of policy/capability
+            cert.keys().subkeys().next().map(|ka| ka.key().pk_algo().to_string())
+        });
+
     Ok(KeyInfo {
         fingerprint,
         key_version,
@@ -248,6 +268,8 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         is_revoked,
         is_expired,
         profile,
+        primary_algo,
+        subkey_algo,
     })
 }
 
