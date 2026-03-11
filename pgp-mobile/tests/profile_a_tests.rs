@@ -51,6 +51,19 @@ fn test_generate_key_profile_a_algorithms() {
         info.user_id,
         Some("Alice <alice@example.com>".to_string())
     );
+
+    // Verify actual cryptographic algorithms (not just version/profile)
+    assert!(
+        info.primary_algo.contains("EdDSA"),
+        "Profile A primary key must use EdDSA (Ed25519), got: {}",
+        info.primary_algo
+    );
+    let subkey_algo = info.subkey_algo.expect("Must have subkey algorithm");
+    assert!(
+        subkey_algo.contains("ECDH"),
+        "Profile A subkey must use ECDH (X25519), got: {}",
+        subkey_algo
+    );
 }
 
 /// C2A.2: Sign + verify text (Profile A).
@@ -297,9 +310,53 @@ fn test_import_wrong_passphrase_profile_a() {
     let exported = keys::export_secret_key(&key.cert_data, "correct-passphrase", KeyProfile::Universal)
         .expect("Export should succeed");
 
-    // Import with wrong passphrase should fail gracefully
+    // Import with wrong passphrase should fail with WrongPassphrase error
     let result = keys::import_secret_key(&exported, "wrong-passphrase");
-    assert!(result.is_err(), "Wrong passphrase should fail");
+    match result {
+        Err(pgp_mobile::error::PgpError::WrongPassphrase) => {} // expected
+        Err(other) => panic!("Expected WrongPassphrase, got: {other:?}"),
+        Ok(_) => panic!("Wrong passphrase should not succeed"),
+    }
+}
+
+/// Unicode passphrase round-trip for S2K export/import (Profile A, Iterated+Salted).
+#[test]
+fn test_unicode_passphrase_export_import_profile_a() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    // Test with Chinese, emoji, and mixed Unicode passphrase
+    let passphrases = [
+        "密码短语🔐安全",
+        "パスワード",
+        "🔒🗝️🔑",
+        "mïxéd-ünïcödé-pässwörd",
+    ];
+
+    for passphrase in &passphrases {
+        let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Universal)
+            .expect(&format!("Export with passphrase '{passphrase}' should succeed"));
+
+        let imported = keys::import_secret_key(&exported, passphrase)
+            .expect(&format!("Import with passphrase '{passphrase}' should succeed"));
+
+        // Verify round-trip: imported key should decrypt
+        let ciphertext = encrypt::encrypt(
+            b"test",
+            &[key.public_key_data.clone()],
+            None,
+            None,
+        )
+        .expect("Encrypt should succeed");
+
+        let result = decrypt::decrypt(&ciphertext, &[imported.clone()], &[]);
+        assert!(result.is_ok(), "Decrypt with imported key (passphrase '{passphrase}') should succeed");
+    }
 }
 
 /// Export with wrong profile should fail.
@@ -379,7 +436,7 @@ fn test_tamper_detection_profile_a() {
 
     let plaintext = b"Secret message that must not be tampered with.";
 
-    let mut ciphertext = encrypt::encrypt_binary(
+    let ciphertext = encrypt::encrypt_binary(
         plaintext,
         &[key.public_key_data.clone()],
         None,
@@ -387,22 +444,40 @@ fn test_tamper_detection_profile_a() {
     )
     .expect("Encryption should succeed");
 
-    // Flip one bit near the middle
-    let midpoint = ciphertext.len() / 2;
-    ciphertext[midpoint] ^= 0x01;
+    // Test tamper detection at multiple positions to exercise different code paths:
+    // - Early: PKESK packet header region (may cause NoMatchingKey or CorruptData)
+    // - Middle: encrypted data body (should trigger IntegrityCheckFailed / MDC failure)
+    // - Late: near end, close to MDC authentication tag
+    let positions = [
+        ("early (byte 15)", 15.min(ciphertext.len() - 1)),
+        ("middle", ciphertext.len() / 2),
+        ("late (near end)", ciphertext.len() - 10.min(ciphertext.len())),
+    ];
 
-    // Decryption should fail with an integrity-related error (MDC or CorruptData).
-    // For SEIPDv1, the expected error is IntegrityCheckFailed (MDC verification failure).
-    // CorruptData is also acceptable if the tamper corrupts the packet structure itself.
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[]);
-    match &result {
-        Err(pgp_mobile::error::PgpError::IntegrityCheckFailed) => {} // expected: MDC failure
-        Err(pgp_mobile::error::PgpError::CorruptData { .. }) => {} // acceptable: packet-level corruption
-        Err(other) => panic!(
-            "Expected IntegrityCheckFailed or CorruptData for tampered SEIPDv1, got: {other:?}"
-        ),
-        Ok(_) => panic!("Tampered ciphertext must never decrypt successfully"),
+    let mut got_integrity_error = false;
+    for (label, pos) in &positions {
+        let mut tampered = ciphertext.clone();
+        tampered[*pos] ^= 0x01;
+
+        let result = decrypt::decrypt(&tampered, &[key.cert_data.clone()], &[]);
+        match &result {
+            Err(pgp_mobile::error::PgpError::IntegrityCheckFailed) => {
+                got_integrity_error = true;
+            }
+            Err(pgp_mobile::error::PgpError::CorruptData { .. }) => {}
+            Err(pgp_mobile::error::PgpError::NoMatchingKey) => {} // PKESK header corrupted
+            Err(other) => panic!(
+                "Tamper at {label} (offset {pos}): expected integrity/corruption/no-matching-key error, got: {other:?}"
+            ),
+            Ok(_) => panic!("Tamper at {label} (offset {pos}): tampered ciphertext must never decrypt successfully"),
+        }
     }
+
+    assert!(
+        got_integrity_error,
+        "At least one tamper position should trigger IntegrityCheckFailed (MDC), \
+         but all produced NoMatchingKey or CorruptData — MDC check may not be exercised"
+    );
 }
 
 /// Unicode round-trip: Chinese + emoji User IDs survive.
