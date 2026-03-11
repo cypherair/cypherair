@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Protocol for Keychain operations.
 /// Production: Security.framework (kSecClassGenericPassword).
@@ -14,7 +15,7 @@ protocol KeychainManageable {
     ///   - service: The Keychain service identifier (e.g., "com.cypherair.v1.se-key.{fingerprint}").
     ///   - account: The Keychain account identifier.
     ///   - accessControl: Optional SecAccessControl for biometric/passcode protection.
-    func save(_ data: Data, service: String, account: String, accessControl: Any?) throws
+    func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws
 
     /// Load data from the Keychain.
     ///

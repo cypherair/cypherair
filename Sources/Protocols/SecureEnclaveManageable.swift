@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Result of wrapping a private key with the Secure Enclave.
 /// Contains the three Keychain items that must be stored together.
@@ -31,7 +32,7 @@ protocol SecureEnclaveManageable {
     ///
     /// - Parameter accessControl: SecAccessControl with appropriate flags for the auth mode.
     /// - Returns: A handle to the SE key.
-    func generateWrappingKey(accessControl: Any) throws -> any SEKeyHandle
+    func generateWrappingKey(accessControl: SecAccessControl?) throws -> any SEKeyHandle
 
     /// Wrap a private key using the SE wrapping scheme:
     /// self-ECDH → HKDF(SHA-256, salt, info="CypherAir-SE-Wrap-v1:"+fingerprint) → AES-GCM seal.
