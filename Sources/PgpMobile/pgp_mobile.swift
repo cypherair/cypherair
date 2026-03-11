@@ -1064,6 +1064,11 @@ public func FfiConverterTypePgpEngine_lower(_ value: PgpEngine) -> UnsafeMutable
  *
  * SECURITY: `plaintext` contains sensitive decrypted content. The Swift caller must
  * zeroize this data (via `resetBytes(in:)`) when it is no longer needed.
+ *
+ * NOTE: A custom `Drop` impl cannot be added because `uniffi::Record` derives move
+ * fields out of the struct, which is incompatible with `Drop`. Zeroization on the
+ * error path is handled explicitly in `decrypt()` (line 143). On the success path,
+ * the Swift caller is responsible for zeroization after use.
  */
 public struct DecryptResult {
     /**
@@ -1344,6 +1349,14 @@ public struct KeyInfo {
      * Detected profile based on key version and algorithms.
      */
     public var profile: KeyProfile
+    /**
+     * Primary key algorithm name (e.g., "Ed25519", "Ed448").
+     */
+    public var primaryAlgo: String
+    /**
+     * Encryption subkey algorithm name (e.g., "X25519", "X448"), if present.
+     */
+    public var subkeyAlgo: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1368,7 +1381,13 @@ public struct KeyInfo {
          */isExpired: Bool, 
         /**
          * Detected profile based on key version and algorithms.
-         */profile: KeyProfile) {
+         */profile: KeyProfile, 
+        /**
+         * Primary key algorithm name (e.g., "Ed25519", "Ed448").
+         */primaryAlgo: String, 
+        /**
+         * Encryption subkey algorithm name (e.g., "X25519", "X448"), if present.
+         */subkeyAlgo: String?) {
         self.fingerprint = fingerprint
         self.keyVersion = keyVersion
         self.userId = userId
@@ -1376,6 +1395,8 @@ public struct KeyInfo {
         self.isRevoked = isRevoked
         self.isExpired = isExpired
         self.profile = profile
+        self.primaryAlgo = primaryAlgo
+        self.subkeyAlgo = subkeyAlgo
     }
 }
 
@@ -1407,6 +1428,12 @@ extension KeyInfo: Equatable, Hashable {
         if lhs.profile != rhs.profile {
             return false
         }
+        if lhs.primaryAlgo != rhs.primaryAlgo {
+            return false
+        }
+        if lhs.subkeyAlgo != rhs.subkeyAlgo {
+            return false
+        }
         return true
     }
 
@@ -1418,6 +1445,8 @@ extension KeyInfo: Equatable, Hashable {
         hasher.combine(isRevoked)
         hasher.combine(isExpired)
         hasher.combine(profile)
+        hasher.combine(primaryAlgo)
+        hasher.combine(subkeyAlgo)
     }
 }
 
@@ -1436,7 +1465,9 @@ public struct FfiConverterTypeKeyInfo: FfiConverterRustBuffer {
                 hasEncryptionSubkey: FfiConverterBool.read(from: &buf), 
                 isRevoked: FfiConverterBool.read(from: &buf), 
                 isExpired: FfiConverterBool.read(from: &buf), 
-                profile: FfiConverterTypeKeyProfile.read(from: &buf)
+                profile: FfiConverterTypeKeyProfile.read(from: &buf), 
+                primaryAlgo: FfiConverterString.read(from: &buf), 
+                subkeyAlgo: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1448,6 +1479,8 @@ public struct FfiConverterTypeKeyInfo: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isRevoked, into: &buf)
         FfiConverterBool.write(value.isExpired, into: &buf)
         FfiConverterTypeKeyProfile.write(value.profile, into: &buf)
+        FfiConverterString.write(value.primaryAlgo, into: &buf)
+        FfiConverterOptionString.write(value.subkeyAlgo, into: &buf)
     }
 }
 
