@@ -1,0 +1,547 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		07BB58075398DDDF1125EDB2 /* AuthenticationEvaluable.swift in Sources */ = {isa = PBXBuildFile; fileRef = A444291AB7231CBA07E9C8CD /* AuthenticationEvaluable.swift */; };
+		1550A8234C0473B09F20716F /* MockSecureEnclave.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FB40F8BED05EDFD21D30FC0 /* MockSecureEnclave.swift */; };
+		174304A352D9A283F7CB3E53 /* KeychainManageable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDCB1737386048EAADF9840 /* KeychainManageable.swift */; };
+		6F25017F340541D84E52FB11 /* MockAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 837DC6C22137DFF68E868353 /* MockAuthenticator.swift */; };
+		91742FB968D0385CEB2081B7 /* MockKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7990845AB81240EF6E852FF4 /* MockKeychain.swift */; };
+		9247AAEC4846E2A9C01931EA /* pgp_mobile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D02D77EE3905A586485B4F /* pgp_mobile.swift */; };
+		9F4284F9BEE858C4C9110D9B /* CypherAirApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 560911E5832C74A71A2E6BEB /* CypherAirApp.swift */; };
+		B8462A44F4C7F182FE942E78 /* FFIIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6640F8252CB178C778859069 /* FFIIntegrationTests.swift */; };
+		F0260E1FA58DA39B13A0AEDA /* SecureEnclaveManageable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D527A8404F04C0FE814B11 /* SecureEnclaveManageable.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		32C730DD6EFCF294DA3EC493 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 987D9FF41AF85DBF5445FC9C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8054D4FD1FA30AED22F9BF1B;
+			remoteInfo = CypherAir;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0FB40F8BED05EDFD21D30FC0 /* MockSecureEnclave.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockSecureEnclave.swift; sourceTree = "<group>"; };
+		108F8485D41E1065D3C9268A /* CypherAirTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CypherAirTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		28D527A8404F04C0FE814B11 /* SecureEnclaveManageable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureEnclaveManageable.swift; sourceTree = "<group>"; };
+		46D02D77EE3905A586485B4F /* pgp_mobile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = pgp_mobile.swift; sourceTree = "<group>"; };
+		560911E5832C74A71A2E6BEB /* CypherAirApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CypherAirApp.swift; sourceTree = "<group>"; };
+		6640F8252CB178C778859069 /* FFIIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFIIntegrationTests.swift; sourceTree = "<group>"; };
+		7990845AB81240EF6E852FF4 /* MockKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockKeychain.swift; sourceTree = "<group>"; };
+		837DC6C22137DFF68E868353 /* MockAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockAuthenticator.swift; sourceTree = "<group>"; };
+		9379668011500E781695A4AC /* CypherAir.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CypherAir.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9BDCB1737386048EAADF9840 /* KeychainManageable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManageable.swift; sourceTree = "<group>"; };
+		A444291AB7231CBA07E9C8CD /* AuthenticationEvaluable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationEvaluable.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		7C5ACE182F45D1FBDBBA47F9 /* PgpMobile */ = {
+			isa = PBXGroup;
+			children = (
+				46D02D77EE3905A586485B4F /* pgp_mobile.swift */,
+			);
+			path = PgpMobile;
+			sourceTree = "<group>";
+		};
+		7C9F769E62E925ECA46373E6 = {
+			isa = PBXGroup;
+			children = (
+				F3EC8935DF44293B377AB6CB /* Sources */,
+				A1C9AAA2B5ED04BDA656105D /* Tests */,
+				87A0C373A5702D60FD4DC48F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		87A0C373A5702D60FD4DC48F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9379668011500E781695A4AC /* CypherAir.app */,
+				108F8485D41E1065D3C9268A /* CypherAirTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		88575B810543423FEB67AE78 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				560911E5832C74A71A2E6BEB /* CypherAirApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A1C9AAA2B5ED04BDA656105D /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				EB25CBF841620099B863C9EF /* FFIIntegrationTests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		A781A821CF8EAECAAECABD0B /* Protocols */ = {
+			isa = PBXGroup;
+			children = (
+				A444291AB7231CBA07E9C8CD /* AuthenticationEvaluable.swift */,
+				9BDCB1737386048EAADF9840 /* KeychainManageable.swift */,
+				28D527A8404F04C0FE814B11 /* SecureEnclaveManageable.swift */,
+			);
+			path = Protocols;
+			sourceTree = "<group>";
+		};
+		CB69DE072B594667995CB9C9 /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				D2A79E1E7BD6672E1EA9B80D /* Mocks */,
+			);
+			path = Security;
+			sourceTree = "<group>";
+		};
+		D2A79E1E7BD6672E1EA9B80D /* Mocks */ = {
+			isa = PBXGroup;
+			children = (
+				837DC6C22137DFF68E868353 /* MockAuthenticator.swift */,
+				7990845AB81240EF6E852FF4 /* MockKeychain.swift */,
+				0FB40F8BED05EDFD21D30FC0 /* MockSecureEnclave.swift */,
+			);
+			path = Mocks;
+			sourceTree = "<group>";
+		};
+		EB25CBF841620099B863C9EF /* FFIIntegrationTests */ = {
+			isa = PBXGroup;
+			children = (
+				6640F8252CB178C778859069 /* FFIIntegrationTests.swift */,
+			);
+			path = FFIIntegrationTests;
+			sourceTree = "<group>";
+		};
+		F3EC8935DF44293B377AB6CB /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				88575B810543423FEB67AE78 /* App */,
+				7C5ACE182F45D1FBDBBA47F9 /* PgpMobile */,
+				A781A821CF8EAECAAECABD0B /* Protocols */,
+				CB69DE072B594667995CB9C9 /* Security */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8054D4FD1FA30AED22F9BF1B /* CypherAir */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 04FFA0AC2AEDE901A06224E1 /* Build configuration list for PBXNativeTarget "CypherAir" */;
+			buildPhases = (
+				C1FB1E6897EF4454B406EDAF /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CypherAir;
+			packageProductDependencies = (
+			);
+			productName = CypherAir;
+			productReference = 9379668011500E781695A4AC /* CypherAir.app */;
+			productType = "com.apple.product-type.application";
+		};
+		8561964DF0A7E2575A3799D6 /* CypherAirTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5587EF2BB001B4E86E85C261 /* Build configuration list for PBXNativeTarget "CypherAirTests" */;
+			buildPhases = (
+				1242D2BD7FB363D9F6CBAB8A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B51F50D442CECA0DC382B0B8 /* PBXTargetDependency */,
+			);
+			name = CypherAirTests;
+			packageProductDependencies = (
+			);
+			productName = CypherAirTests;
+			productReference = 108F8485D41E1065D3C9268A /* CypherAirTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		987D9FF41AF85DBF5445FC9C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 55F48F6BE6300530916BF414 /* Build configuration list for PBXProject "CypherAir" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7C9F769E62E925ECA46373E6;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 87A0C373A5702D60FD4DC48F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8054D4FD1FA30AED22F9BF1B /* CypherAir */,
+				8561964DF0A7E2575A3799D6 /* CypherAirTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1242D2BD7FB363D9F6CBAB8A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B8462A44F4C7F182FE942E78 /* FFIIntegrationTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1FB1E6897EF4454B406EDAF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				07BB58075398DDDF1125EDB2 /* AuthenticationEvaluable.swift in Sources */,
+				9F4284F9BEE858C4C9110D9B /* CypherAirApp.swift in Sources */,
+				174304A352D9A283F7CB3E53 /* KeychainManageable.swift in Sources */,
+				6F25017F340541D84E52FB11 /* MockAuthenticator.swift in Sources */,
+				91742FB968D0385CEB2081B7 /* MockKeychain.swift in Sources */,
+				1550A8234C0473B09F20716F /* MockSecureEnclave.swift in Sources */,
+				F0260E1FA58DA39B13A0AEDA /* SecureEnclaveManageable.swift in Sources */,
+				9247AAEC4846E2A9C01931EA /* pgp_mobile.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B51F50D442CECA0DC382B0B8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8054D4FD1FA30AED22F9BF1B /* CypherAir */;
+			targetProxy = 32C730DD6EFCF294DA3EC493 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		318728F63CA0892A26F32057 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/bindings",
+				);
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+				);
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.tests;
+				SDKROOT = iphoneos;
+				SWIFT_INCLUDE_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/bindings",
+				);
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CypherAir.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CypherAir";
+			};
+			name = Debug;
+		};
+		7238E936CABAED3287ACA9BE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/bindings",
+				);
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+				);
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.tests;
+				SDKROOT = iphoneos;
+				SWIFT_INCLUDE_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/bindings",
+				);
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CypherAir.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CypherAir";
+			};
+			name = Release;
+		};
+		9CFBA2EC9EDDA475993AE930 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/bindings",
+				);
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lpgp_mobile",
+				);
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.app;
+				SDKROOT = iphoneos;
+				SWIFT_INCLUDE_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/bindings",
+				);
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AA45A02A118F55C4CF92A72A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		C323F444EE97F048F7C4938B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		C4095C3642D041F59C91EDF2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/bindings",
+				);
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lpgp_mobile",
+				);
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.app;
+				SDKROOT = iphoneos;
+				SWIFT_INCLUDE_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/bindings",
+				);
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		04FFA0AC2AEDE901A06224E1 /* Build configuration list for PBXNativeTarget "CypherAir" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4095C3642D041F59C91EDF2 /* Debug */,
+				9CFBA2EC9EDDA475993AE930 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5587EF2BB001B4E86E85C261 /* Build configuration list for PBXNativeTarget "CypherAirTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				318728F63CA0892A26F32057 /* Debug */,
+				7238E936CABAED3287ACA9BE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		55F48F6BE6300530916BF414 /* Build configuration list for PBXProject "CypherAir" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C323F444EE97F048F7C4938B /* Debug */,
+				AA45A02A118F55C4CF92A72A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 987D9FF41AF85DBF5445FC9C /* Project object */;
+}
