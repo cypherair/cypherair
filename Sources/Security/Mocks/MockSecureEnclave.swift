@@ -25,7 +25,7 @@ final class MockSecureEnclave: SecureEnclaveManageable {
 
     static var isAvailable: Bool { true }
 
-    func generateWrappingKey(accessControl: Any) throws -> any SEKeyHandle {
+    func generateWrappingKey(accessControl: SecAccessControl?) throws -> any SEKeyHandle {
         if let error = nextError {
             nextError = nil
             throw error
@@ -39,14 +39,7 @@ final class MockSecureEnclave: SecureEnclaveManageable {
         keys[mockKey.dataRepresentation] = mockKey
         return mockKey
         #else
-        // Fallback for environments without CryptoKit.
-        // Use SecRandomCopyBytes for consistency with project's secure-random-only constraint.
-        var keyData = Data(count: 32)
-        keyData.withUnsafeMutableBytes { ptr in
-            _ = SecRandomCopyBytes(kSecRandomDefault, 32, ptr.baseAddress!)
-        }
-        let mockKey = MockSEKeySimple(keyData: keyData)
-        return mockKey
+        fatalError("CryptoKit is required for MockSecureEnclave. This fallback should never execute on iOS.")
         #endif
     }
 
@@ -91,17 +84,7 @@ final class MockSecureEnclave: SecureEnclaveManageable {
             sealedBox: sealedBox.combined!
         )
         #else
-        // Simple XOR-based mock for environments without CryptoKit.
-        // Use SecRandomCopyBytes for consistency with project's secure-random-only constraint.
-        var salt = Data(count: 32)
-        salt.withUnsafeMutableBytes { ptr in
-            _ = SecRandomCopyBytes(kSecRandomDefault, 32, ptr.baseAddress!)
-        }
-        var sealed = privateKey
-        for i in 0..<sealed.count {
-            sealed[i] ^= handle.dataRepresentation[i % handle.dataRepresentation.count]
-        }
-        return WrappedKeyBundle(seKeyData: handle.dataRepresentation, salt: salt, sealedBox: sealed)
+        fatalError("CryptoKit is required for MockSecureEnclave. This fallback should never execute on iOS.")
         #endif
     }
 
@@ -136,12 +119,7 @@ final class MockSecureEnclave: SecureEnclaveManageable {
         let plaintext = try AES.GCM.open(sealedBox, using: symmetricKey)
         return plaintext
         #else
-        // Simple XOR-based mock unwrap
-        var unsealed = bundle.sealedBox
-        for i in 0..<unsealed.count {
-            unsealed[i] ^= handle.dataRepresentation[i % handle.dataRepresentation.count]
-        }
-        return unsealed
+        fatalError("CryptoKit is required for MockSecureEnclave. This fallback should never execute on iOS.")
         #endif
     }
 
@@ -159,7 +137,7 @@ final class MockSecureEnclave: SecureEnclaveManageable {
         let privateKey = try P256.KeyAgreement.PrivateKey(rawRepresentation: data)
         return MockSEKey(privateKey: privateKey)
         #else
-        return MockSEKeySimple(keyData: data)
+        fatalError("CryptoKit is required for MockSecureEnclave. This fallback should never execute on iOS.")
         #endif
     }
 
@@ -188,17 +166,6 @@ final class MockSEKey: SEKeyHandle {
     }
 }
 #endif
-
-/// Simplified mock SE key for non-CryptoKit environments.
-final class MockSEKeySimple: SEKeyHandle {
-    let keyData: Data
-
-    var dataRepresentation: Data { keyData }
-
-    init(keyData: Data) {
-        self.keyData = keyData
-    }
-}
 
 enum MockSEError: Error {
     case invalidKeyHandle

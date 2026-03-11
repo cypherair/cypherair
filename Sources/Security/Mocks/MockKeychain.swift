@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// In-memory mock Keychain for testing.
 /// Records all operations for verification in tests.
@@ -18,18 +19,27 @@ final class MockKeychain: KeychainManageable {
     /// If set, the next load operation will throw this error.
     var loadError: Error?
 
+    /// When true (default), saving to an existing key throws `duplicateItem`,
+    /// matching real Keychain behavior (`errSecDuplicateItem`).
+    /// Set to false only when testing code that intentionally overwrites.
+    var throwOnDuplicate = true
+
     private func storageKey(service: String, account: String) -> String {
         "\(service):\(account)"
     }
 
-    func save(_ data: Data, service: String, account: String, accessControl: Any?) throws {
+    func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws {
         if let error = saveError {
             saveError = nil
             throw error
         }
+        let key = storageKey(service: service, account: account)
+        if throwOnDuplicate && storage[key] != nil {
+            throw MockKeychainError.duplicateItem
+        }
         saveCallCount += 1
         lastSavedService = service
-        storage[storageKey(service: service, account: account)] = data
+        storage[key] = data
     }
 
     func load(service: String, account: String) throws -> Data {
@@ -69,9 +79,11 @@ final class MockKeychain: KeychainManageable {
         lastDeletedService = nil
         saveError = nil
         loadError = nil
+        throwOnDuplicate = true
     }
 }
 
 enum MockKeychainError: Error {
     case itemNotFound
+    case duplicateItem
 }
