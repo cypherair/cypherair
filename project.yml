@@ -18,6 +18,14 @@ targets:
       - path: Sources
         excludes:
           - "**/.DS_Store"
+    info:
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: "com.cypherair.import"
+            CFBundleURLSchemes:
+              - cypherair
+    entitlements:
+      path: CypherAir.entitlements
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cypherair.app
@@ -27,6 +35,7 @@ targets:
         SWIFT_OBJC_BRIDGING_HEADER: ""
         LIBRARY_SEARCH_PATHS:
           - "$(inherited)"
+          - "$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios/release"
           - "$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release"
         OTHER_LDFLAGS:
           - "$(inherited)"
@@ -60,6 +69,13 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/CypherAir.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CypherAir"
         BUNDLE_LOADER: "$(TEST_HOST)"
+        LIBRARY_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios/release"
+          - "$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-lpgp_mobile"
         HEADER_SEARCH_PATHS:
           - "$(inherited)"
           - "$(PROJECT_DIR)/bindings"
