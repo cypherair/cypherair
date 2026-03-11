@@ -76,15 +76,15 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertEqual(result.plaintext, plaintext)
     }
 
-    /// C5.1: Large data round-trip (1 MB) to stress the RustBuffer transfer.
-    func test_binaryRoundTrip_largeData_1MB() throws {
+    /// C5.1: Large data round-trip (1 MB) Profile A to stress the RustBuffer transfer.
+    func test_binaryRoundTrip_largeData_1MB_profileA() throws {
         var plaintext = Data(count: 1_000_000)
         for i in 0..<plaintext.count {
             plaintext[i] = UInt8(i % 256)
         }
 
         let generated = try engine.generateKey(
-            name: "Large Data",
+            name: "Large Data A",
             email: nil,
             expirySeconds: nil,
             profile: .universal
@@ -103,7 +103,37 @@ final class FFIIntegrationTests: XCTestCase {
             verificationKeys: []
         )
 
-        XCTAssertEqual(result.plaintext, plaintext, "1 MB data must survive FFI round-trip")
+        XCTAssertEqual(result.plaintext, plaintext, "1 MB data must survive FFI round-trip (Profile A)")
+    }
+
+    /// C5.1: Large data round-trip (1 MB) Profile B (SEIPDv2 AEAD).
+    func test_binaryRoundTrip_largeData_1MB_profileB() throws {
+        var plaintext = Data(count: 1_000_000)
+        for i in 0..<plaintext.count {
+            plaintext[i] = UInt8(i % 256)
+        }
+
+        let generated = try engine.generateKey(
+            name: "Large Data B",
+            email: nil,
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        let ciphertext = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [generated.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        let result = try engine.decrypt(
+            ciphertext: ciphertext,
+            secretKeys: [generated.certData],
+            verificationKeys: []
+        )
+
+        XCTAssertEqual(result.plaintext, plaintext, "1 MB data must survive FFI round-trip (Profile B)")
     }
 
     // MARK: - C5.2 Unicode Round-Trip
@@ -349,6 +379,215 @@ final class FFIIntegrationTests: XCTestCase {
                 return XCTFail("Expected PgpError, got \(type(of: error))")
             }
         }
+    }
+
+    /// C5.3: BadSignature when verifying a tampered cleartext signature.
+    func test_errorMapping_badSignature_cleartextVerify() throws {
+        let key = try engine.generateKey(
+            name: "Signer", email: nil, expirySeconds: nil, profile: .universal
+        )
+
+        let signed = try engine.signCleartext(
+            text: Data("original message".utf8),
+            signerCert: key.certData
+        )
+
+        // Convert to string, tamper with the message body, convert back.
+        // Cleartext signatures have the text before the PGP signature block.
+        guard var signedString = String(data: signed, encoding: .utf8) else {
+            return XCTFail("Cleartext signature is not valid UTF-8")
+        }
+        signedString = signedString.replacingOccurrences(
+            of: "original message",
+            with: "tampered message"
+        )
+        let tamperedData = Data(signedString.utf8)
+
+        let result = try engine.verifyCleartext(
+            signedMessage: tamperedData,
+            verificationKeys: [key.publicKeyData]
+        )
+
+        XCTAssertEqual(
+            result.status, .bad,
+            "Tampered cleartext signature must produce Bad status"
+        )
+    }
+
+    /// C5.3: UnknownSigner status when signer key not in verification keys.
+    func test_errorMapping_unknownSigner_viaCleartextVerify() throws {
+        let signerKey = try engine.generateKey(
+            name: "Unknown Signer", email: nil, expirySeconds: nil, profile: .universal
+        )
+        let otherKey = try engine.generateKey(
+            name: "Other", email: nil, expirySeconds: nil, profile: .universal
+        )
+
+        let signed = try engine.signCleartext(
+            text: Data("signed by unknown".utf8),
+            signerCert: signerKey.certData
+        )
+
+        // Verify with a different key — signer is unknown
+        let result = try engine.verifyCleartext(
+            signedMessage: signed,
+            verificationKeys: [otherKey.publicKeyData]
+        )
+
+        XCTAssertEqual(
+            result.status, .unknownSigner,
+            "Signer not in verification_keys must produce UnknownSigner status"
+        )
+    }
+
+    /// C5.3: ArmorError on malformed armor input.
+    func test_errorMapping_armorError() throws {
+        let malformedArmor = Data("""
+        -----BEGIN PGP MESSAGE-----
+
+        not-valid-base64-!!!@@@###
+        -----END PGP MESSAGE-----
+        """.utf8)
+
+        XCTAssertThrowsError(
+            try engine.dearmor(armored: malformedArmor)
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            switch pgpError {
+            case .ArmorError, .CorruptData:
+                break // either is acceptable for malformed armor
+            default:
+                XCTFail("Expected ArmorError or CorruptData, got \(pgpError)")
+            }
+        }
+    }
+
+    /// C5.3: SigningFailed with garbage signing key data.
+    func test_errorMapping_signingFailed_invalidKey() throws {
+        let garbage = Data("not a secret key".utf8)
+
+        XCTAssertThrowsError(
+            try engine.signCleartext(
+                text: Data("hello".utf8),
+                signerCert: garbage
+            )
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            switch pgpError {
+            case .SigningFailed, .InvalidKeyData, .InternalError:
+                break // all acceptable for invalid signing key
+            default:
+                XCTFail("Expected SigningFailed, InvalidKeyData, or InternalError, got \(pgpError)")
+            }
+        }
+    }
+
+    /// C5.3: EncryptionFailed with empty recipients list.
+    func test_errorMapping_encryptionFailed_noRecipients() throws {
+        XCTAssertThrowsError(
+            try engine.encrypt(
+                plaintext: Data("hello".utf8),
+                recipients: [],
+                signingKey: nil,
+                encryptToSelf: nil
+            )
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            switch pgpError {
+            case .EncryptionFailed, .InvalidKeyData, .InternalError:
+                break // acceptable errors for no recipients
+            default:
+                XCTFail("Expected EncryptionFailed, InvalidKeyData, or InternalError, got \(pgpError)")
+            }
+        }
+    }
+
+    /// C5.3: RevocationError with garbage revocation cert data.
+    func test_errorMapping_revocationError_invalidData() throws {
+        let key = try engine.generateKey(
+            name: "RevTest", email: nil, expirySeconds: nil, profile: .universal
+        )
+        let garbage = Data("not a revocation cert".utf8)
+
+        XCTAssertThrowsError(
+            try engine.parseRevocationCert(
+                revData: garbage,
+                certData: key.certData
+            )
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            switch pgpError {
+            case .RevocationError, .InvalidKeyData, .CorruptData, .InternalError:
+                break // acceptable for garbage revocation data
+            default:
+                XCTFail("Expected RevocationError, InvalidKeyData, CorruptData, or InternalError, got \(pgpError)")
+            }
+        }
+    }
+
+    /// C5.3: S2kError / WrongPassphrase on Profile B export-import with wrong passphrase.
+    func test_errorMapping_s2kError_profileB_wrongPassphrase() throws {
+        let key = try engine.generateKey(
+            name: "S2K Test", email: nil, expirySeconds: nil, profile: .advanced
+        )
+
+        let exported = try engine.exportSecretKey(
+            certData: key.certData,
+            passphrase: "correct-argon2id-pass",
+            profile: .advanced
+        )
+
+        XCTAssertThrowsError(
+            try engine.importSecretKey(
+                armoredData: exported,
+                passphrase: "wrong-argon2id-pass"
+            )
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            switch pgpError {
+            case .WrongPassphrase, .S2kError:
+                break // either acceptable
+            default:
+                XCTFail("Expected WrongPassphrase or S2kError, got \(pgpError)")
+            }
+        }
+    }
+
+    /// C5.3: BadSignature via detached signature verification with tampered data.
+    func test_errorMapping_badSignature_detachedVerify() throws {
+        let key = try engine.generateKey(
+            name: "DetachedSig", email: nil, expirySeconds: nil, profile: .universal
+        )
+
+        let originalData = Data("original data for detached sig".utf8)
+        let signature = try engine.signDetached(
+            data: originalData,
+            signerCert: key.certData
+        )
+
+        // Verify with tampered data
+        let tamperedData = Data("tampered data for detached sig".utf8)
+
+        let result = try engine.verifyDetached(
+            data: tamperedData,
+            signature: signature,
+            verificationKeys: [key.publicKeyData]
+        )
+
+        XCTAssertEqual(
+            result.status, .bad,
+            "Detached signature on tampered data must produce Bad status"
+        )
     }
 
     // MARK: - C5.5 KeyProfile Enum
