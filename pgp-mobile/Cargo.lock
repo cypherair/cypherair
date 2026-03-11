@@ -934,7 +934,6 @@ name = "pgp-mobile"
 version = "0.1.0"
 dependencies = [
  "base64",
- "chrono",
  "openssl",
  "rand",
  "sequoia-openpgp",

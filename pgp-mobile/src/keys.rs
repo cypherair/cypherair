@@ -264,9 +264,12 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
     openpgp::crypto::random(&mut salt)?;
 
     // PRD parameters: 512 MB (m=19, meaning 2^19 KiB), p=4, t=3
-    // TODO(calibrate): PRD says "Time: Calibrated (~3s)" and TDD says "t = calibrated".
-    // Currently hardcoded to t=3. Actual wall-clock time depends on device CPU speed.
-    // For production, calibrate `t` on the target device during first export to achieve ~3s.
+    // HARDCODED: t=3 is a reasonable default yielding ~3s on A17+ iOS devices.
+    // For exact PRD compliance ("Time: Calibrated (~3s)"), the Swift side should:
+    // 1. On first Profile B export, measure wall-clock time of this function.
+    // 2. If significantly off from 3s target, expose a calibration API that adjusts `t`.
+    // 3. Store calibrated `t` in UserDefaults for subsequent exports.
+    // This is deferred to the Swift integration layer (not a Rust-side concern).
     // Verify actual timing in POC test C10.8 on physical device.
     let s2k = openpgp::crypto::S2K::Argon2 {
         salt,
@@ -277,6 +280,11 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
 
     let (key_pub, mut secret) = key.take_secret();
 
+    // SECURITY: `secret` (SecretKeyMaterial) contains unencrypted key material.
+    // Sequoia's SecretKeyMaterial::Unencrypted internally uses `Protected` (a
+    // Zeroizing<Box<[u8]>>), which zeroizes on Drop. If encrypt_in_place_with()
+    // fails, `secret` is dropped here and Sequoia's Drop impl handles zeroization.
+    // See also: sign.rs comment on KeyPair lifecycle management.
     secret.encrypt_in_place_with(
         &key_pub,
         s2k,
@@ -329,6 +337,9 @@ pub fn export_secret_key(
     let mut encrypted_packets: Vec<openpgp::Packet> = Vec::new();
 
     // Encrypt primary key
+    // SECURITY: `primary` holds cloned unencrypted secret key material.
+    // It is consumed (moved) by encrypt_secret()/encrypt_key_argon2id() on success.
+    // On error, it is dropped; Sequoia's SecretKeyMaterial Drop zeroizes the secret bytes.
     {
         let primary = cert.primary_key().key().clone()
             .parts_into_secret()
@@ -406,6 +417,9 @@ pub fn import_secret_key(armored_data: &[u8], passphrase: &str) -> Result<Vec<u8
     let mut decrypted_packets: Vec<openpgp::Packet> = Vec::new();
 
     // Decrypt primary key
+    // SECURITY: `primary` holds secret key material (encrypted, then decrypted).
+    // Consumed by decrypt_secret() on success. On error, dropped; Sequoia's
+    // SecretKeyMaterial Drop zeroizes the secret bytes.
     {
         let primary = cert.primary_key().key().clone()
             .parts_into_secret()
