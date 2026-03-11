@@ -304,9 +304,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_engine_creation() {
+    fn test_engine_smoke() {
         let engine = PgpEngine::new();
-        // Engine is stateless, just verify it can be created
-        assert!(true);
+        // Verify engine can perform a basic operation (not just construction)
+        let result = engine.decode_qr_url("cypherair://import/v1/invalid".to_string());
+        assert!(result.is_err(), "Invalid QR data should produce an error");
     }
 }

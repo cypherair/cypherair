@@ -6,6 +6,7 @@ use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Serialize;
 use openpgp::types::RevocationStatus;
 use sequoia_openpgp as openpgp;
+use zeroize::Zeroizing;
 
 use crate::armor;
 use crate::error::PgpError;
@@ -135,10 +136,12 @@ pub fn generate_key_with_profile(
         reason: e.to_string(),
     })?;
 
-    // Serialize full cert (public + secret)
-    let mut cert_data = Vec::new();
+    // Serialize full cert (public + secret).
+    // SECURITY: cert_data contains unencrypted secret key material. Wrapped in Zeroizing<>
+    // so it is automatically zeroized on error paths (dropped without reaching the caller).
+    let mut cert_data = Zeroizing::new(Vec::new());
     cert.as_tsk()
-        .serialize(&mut cert_data)
+        .serialize(&mut *cert_data)
         .map_err(|e| PgpError::KeyGenerationFailed {
             reason: format!("Failed to serialize cert: {e}"),
         })?;
@@ -162,7 +165,7 @@ pub fn generate_key_with_profile(
     let key_version = cert.primary_key().key().version();
 
     Ok(GeneratedKey {
-        cert_data,
+        cert_data: std::mem::take(&mut *cert_data),
         public_key_data,
         revocation_cert,
         fingerprint: fingerprint.to_lowercase(),
@@ -429,19 +432,22 @@ pub fn import_secret_key(armored_data: &[u8], passphrase: &str) -> Result<Vec<u8
         })?;
 
     // Serialize the cert with decrypted secret keys.
-    // SECURITY: output contains unencrypted secret key material. The caller (Swift side)
-    // must SE-wrap this data and zeroize it immediately after wrapping.
-    let mut output = Vec::new();
+    // SECURITY: output contains unencrypted secret key material. Wrapped in Zeroizing<>
+    // so it is automatically zeroized if dropped before crossing the FFI boundary.
+    // The caller (Swift side) must SE-wrap this data and zeroize it immediately after wrapping.
+    let mut output = Zeroizing::new(Vec::new());
     decrypted_cert
         .as_tsk()
-        .serialize(&mut output)
+        .serialize(&mut *output)
         .map_err(|e| PgpError::InvalidKeyData {
             reason: format!("Failed to serialize imported key: {e}"),
         })?;
 
     // Note: `password` (openpgp::crypto::Password) is zeroized on drop by Sequoia.
+    // `output` is Zeroizing<Vec<u8>> — zeroized on drop if an error occurs after this point.
+    // std::mem::take extracts the Vec, leaving an empty Vec in the Zeroizing wrapper (nothing to zeroize).
 
-    Ok(output)
+    Ok(std::mem::take(&mut *output))
 }
 
 /// Extract the secret key bytes from a certificate for SE wrapping.
@@ -458,14 +464,16 @@ pub fn extract_secret_key_bytes(cert_data: &[u8]) -> Result<Vec<u8>, PgpError> {
             reason: e.to_string(),
         })?;
 
-    let mut secret_bytes = Vec::new();
+    // SECURITY: Wrapped in Zeroizing<> so secret bytes are zeroized on drop
+    // if an error occurs or the caller drops the result without explicit cleanup.
+    let mut secret_bytes = Zeroizing::new(Vec::new());
     cert.as_tsk()
-        .serialize(&mut secret_bytes)
+        .serialize(&mut *secret_bytes)
         .map_err(|e| PgpError::InvalidKeyData {
             reason: format!("Failed to extract secret key: {e}"),
         })?;
 
-    Ok(secret_bytes)
+    Ok(std::mem::take(&mut *secret_bytes))
 }
 
 /// Parse a revocation certificate and cryptographically verify it against the target key.
