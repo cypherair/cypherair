@@ -138,8 +138,12 @@ impl<'a> VerificationHelper for VerifyHelper<'a> {
                                 self.status = SignatureStatus::UnknownSigner;
                             }
                             Err(_) => {
+                                // Graded result: set status but return Ok so the caller
+                                // can inspect helper.status. This is consistent with
+                                // DecryptHelper::check() which also returns Ok for all
+                                // verification outcomes to support graded results.
                                 self.status = SignatureStatus::Bad;
-                                return Err(openpgp::anyhow::anyhow!("Bad signature"));
+                                return Ok(());
                             }
                         }
                     }
