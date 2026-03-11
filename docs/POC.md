@@ -86,9 +86,9 @@ Validate Sequoia PGP 2.2.0 + crypto-openssl + UniFFI + Secure Enclave + dual Pro
 
 ### 2.7 FFI Boundary
 
-- [x] C5.1: Binary round-trip (both profiles): key bytes Rust → Swift → Rust = identical. ✅ Profile A + B round-trip, 1 MB large data round-trip. All pass.
+- [x] C5.1: Binary round-trip (both profiles): key bytes Rust → Swift → Rust = identical. ✅ Profile A + B round-trip, 1 MB large data round-trip (both profiles). All pass.
 - [x] C5.2: Unicode round-trip: Chinese + emoji User IDs survive. ✅ 9 Unicode strings tested (CJK, emoji sequences, zero-width, combining, Arabic, mixed). User ID with Chinese name preserved.
-- [x] C5.3: Each PgpError variant → correct Swift enum case. ✅ NoMatchingKey, IntegrityCheckFailed, CorruptData, WrongPassphrase, InvalidKeyData all verified.
+- [x] C5.3: Each PgpError variant → correct Swift enum case. ✅ 14/18 variants verified across FFI: NoMatchingKey, IntegrityCheckFailed, AeadAuthenticationFailed, CorruptData, WrongPassphrase, InvalidKeyData, BadSignature (cleartext + detached), UnknownSigner (graded result), ArmorError, SigningFailed, EncryptionFailed, RevocationError, S2kError. Remaining 4 (KeyGenerationFailed, KeyExpired, UnsupportedAlgorithm, Argon2idMemoryExceeded) require synthetic errors or device-only conditions.
 - [ ] C5.4: 100 encrypt/decrypt cycles (per profile). No memory leak (Instruments — manual).
 - [x] C5.5: KeyProfile enum passes correctly across FFI boundary. ✅ `.universal`→v4, `.advanced`→v6. Both profiles generate complete keys with encryption subkeys.
 - [x] C5.6: Concurrent encrypt from 2 Tasks (different key pairs). *Pass: no data race, no crash.* ✅ 10 concurrent encryption tasks, all succeed.
