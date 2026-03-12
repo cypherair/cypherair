@@ -496,13 +496,14 @@ final class DeviceSecurityTests: XCTestCase {
     // MARK: - C7.4: Mode Switch with Mock SE (Logic Test)
 
     func test_switchMode_noIdentities_throwsNoIdentities() async throws {
+        let mockAuth = MockAuthenticator()
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain
         )
 
         do {
-            try await authManager.switchMode(to: .highSecurity, fingerprints: [], hasBackup: true)
+            try await authManager.switchMode(to: .highSecurity, fingerprints: [], hasBackup: true, authenticator: mockAuth)
             XCTFail("Should have thrown noIdentities error")
         } catch let error as AuthenticationError {
             if case .noIdentities = error {
@@ -526,7 +527,8 @@ final class DeviceSecurityTests: XCTestCase {
         )
 
         // Switching to the same mode should return immediately without error.
-        try await authManager.switchMode(to: .standard, fingerprints: ["abc123"], hasBackup: true)
+        let mockAuth = MockAuthenticator()
+        try await authManager.switchMode(to: .standard, fingerprints: ["abc123"], hasBackup: true, authenticator: mockAuth)
     }
 
     // MARK: - C7.5: Full Mode Switch on Device (SE + Keychain)
@@ -552,12 +554,13 @@ final class DeviceSecurityTests: XCTestCase {
         try keychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
 
         // 2. Switch mode.
+        let mockAuth = MockAuthenticator()
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
             defaults: testDefaults
         )
-        try await authManager.switchMode(to: .highSecurity, fingerprints: [fingerprint], hasBackup: true)
+        try await authManager.switchMode(to: .highSecurity, fingerprints: [fingerprint], hasBackup: true, authenticator: mockAuth)
 
         // 3. Verify: mode persisted.
         XCTAssertEqual(
@@ -581,6 +584,140 @@ final class DeviceSecurityTests: XCTestCase {
 
         // 6. Verify: no pending items left.
         XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
+    }
+
+    // MARK: - C7.6: Mode Switch Rollback on Failure (Mock-based)
+
+    /// Verifies that when a Keychain save fails mid-way through mode switch,
+    /// the original keys remain intact and all temporary items are cleaned up.
+    /// Uses MockKeychain + MockSecureEnclave so this can also run in the simulator.
+    func test_switchMode_keychainSaveFailsMidway_rollsBackAndKeepsOriginalKeys() async throws {
+        let mockKeychain = MockKeychain()
+        let mockSE = MockSecureEnclave()
+        let mockAuth = MockAuthenticator()
+
+        let testDefaults = UserDefaults(suiteName: "com.cypherair.test.rollback")!
+        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.rollback") }
+        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
+
+        let fp1 = uniqueFingerprint()
+        let fp2 = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+
+        let fakeKey1 = Data(repeating: 0xAA, count: 32)
+        let fakeKey2 = Data(repeating: 0xBB, count: 57)
+
+        // Wrap and store keys for both fingerprints.
+        let handle1 = try mockSE.generateWrappingKey(accessControl: nil)
+        let bundle1 = try mockSE.wrap(privateKey: fakeKey1, using: handle1, fingerprint: fp1)
+        try mockKeychain.save(bundle1.seKeyData, service: KeychainConstants.seKeyService(fingerprint: fp1), account: account, accessControl: nil)
+        try mockKeychain.save(bundle1.salt, service: KeychainConstants.saltService(fingerprint: fp1), account: account, accessControl: nil)
+        try mockKeychain.save(bundle1.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fp1), account: account, accessControl: nil)
+
+        let handle2 = try mockSE.generateWrappingKey(accessControl: nil)
+        let bundle2 = try mockSE.wrap(privateKey: fakeKey2, using: handle2, fingerprint: fp2)
+        try mockKeychain.save(bundle2.seKeyData, service: KeychainConstants.seKeyService(fingerprint: fp2), account: account, accessControl: nil)
+        try mockKeychain.save(bundle2.salt, service: KeychainConstants.saltService(fingerprint: fp2), account: account, accessControl: nil)
+        try mockKeychain.save(bundle2.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fp2), account: account, accessControl: nil)
+
+        // 6 saves so far. Next saves are pending items during switchMode.
+        // Fail on the 10th save (the 4th pending item save, i.e., first save of fp2's pending items).
+        // This means fp1's 3 pending items succeed, but fp2's first pending save fails.
+        mockKeychain.failOnSaveNumber = 10
+
+        let authManager = AuthenticationManager(
+            secureEnclave: mockSE,
+            keychain: mockKeychain,
+            defaults: testDefaults
+        )
+
+        // Attempt mode switch — should fail and roll back.
+        do {
+            try await authManager.switchMode(
+                to: .highSecurity,
+                fingerprints: [fp1, fp2],
+                hasBackup: true,
+                authenticator: mockAuth
+            )
+            XCTFail("switchMode should have thrown due to Keychain save failure")
+        } catch let error as AuthenticationError {
+            if case .modeSwitchFailed = error {
+                // Expected
+            } else {
+                XCTFail("Expected .modeSwitchFailed, got \(error)")
+            }
+        }
+
+        // Verify: original keys for BOTH fingerprints are still intact.
+        let loaded1 = try mockKeychain.load(service: KeychainConstants.seKeyService(fingerprint: fp1), account: account)
+        XCTAssertEqual(loaded1, bundle1.seKeyData, "Original SE key for fp1 must be intact after rollback")
+
+        let loaded2 = try mockKeychain.load(service: KeychainConstants.seKeyService(fingerprint: fp2), account: account)
+        XCTAssertEqual(loaded2, bundle2.seKeyData, "Original SE key for fp2 must be intact after rollback")
+
+        // Verify: NO pending items remain for either fingerprint.
+        XCTAssertFalse(mockKeychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp1), account: account),
+                       "Pending items for fp1 must be cleaned up after rollback")
+        XCTAssertFalse(mockKeychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp2), account: account),
+                       "Pending items for fp2 must be cleaned up after rollback")
+
+        // Verify: rewrap flag is cleared.
+        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey),
+                       "rewrapInProgress flag must be cleared after rollback")
+
+        // Verify: mode did NOT change.
+        XCTAssertEqual(testDefaults.string(forKey: AuthPreferences.authModeKey),
+                       AuthenticationMode.standard.rawValue,
+                       "Mode must remain standard after failed switch")
+    }
+
+    /// Verifies that switchMode fails when the authenticator rejects the user.
+    func test_switchMode_authenticationFails_throwsError() async throws {
+        let mockKeychain = MockKeychain()
+        let mockSE = MockSecureEnclave()
+        let mockAuth = MockAuthenticator()
+        mockAuth.shouldSucceed = false
+
+        let testDefaults = UserDefaults(suiteName: "com.cypherair.test.authfail")!
+        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.authfail") }
+        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
+
+        let fp = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+
+        // Set up a key so we have a valid fingerprint.
+        let handle = try mockSE.generateWrappingKey(accessControl: nil)
+        let bundle = try mockSE.wrap(privateKey: Data(repeating: 0xCC, count: 32), using: handle, fingerprint: fp)
+        try mockKeychain.save(bundle.seKeyData, service: KeychainConstants.seKeyService(fingerprint: fp), account: account, accessControl: nil)
+        try mockKeychain.save(bundle.salt, service: KeychainConstants.saltService(fingerprint: fp), account: account, accessControl: nil)
+        try mockKeychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account, accessControl: nil)
+
+        let authManager = AuthenticationManager(
+            secureEnclave: mockSE,
+            keychain: mockKeychain,
+            defaults: testDefaults
+        )
+
+        // Authentication should fail, so switchMode should throw before touching any keys.
+        do {
+            try await authManager.switchMode(
+                to: .highSecurity,
+                fingerprints: [fp],
+                hasBackup: true,
+                authenticator: mockAuth
+            )
+            XCTFail("switchMode should have thrown due to authentication failure")
+        } catch {
+            // Expected — authentication failed before any Keychain modification.
+        }
+
+        // Verify: original keys untouched, no pending items, no rewrap flag.
+        XCTAssertTrue(mockKeychain.exists(service: KeychainConstants.seKeyService(fingerprint: fp), account: account),
+                      "Original key must be untouched when auth fails")
+        XCTAssertFalse(mockKeychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp), account: account),
+                       "No pending items should exist when auth fails")
+        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey),
+                       "rewrapInProgress flag must not be set when auth fails")
     }
 
     // MARK: - C8: MIE Smoke Tests

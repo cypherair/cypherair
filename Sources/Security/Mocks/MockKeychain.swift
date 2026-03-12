@@ -14,10 +14,14 @@ final class MockKeychain: KeychainManageable {
     private(set) var lastSavedService: String?
     private(set) var lastDeletedService: String?
 
-    /// If set, the next save operation will throw this error.
+    /// If set, the next save operation will throw this error (one-shot).
     var saveError: Error?
-    /// If set, the next load operation will throw this error.
+    /// If set, the next load operation will throw this error (one-shot).
     var loadError: Error?
+
+    /// If non-zero, the save at this call count (1-based) will throw `saveError ?? MockKeychainError.saveFailed`.
+    /// Example: `failOnSaveNumber = 4` means the 4th save call will fail.
+    var failOnSaveNumber: Int = 0
 
     /// When true (default), saving to an existing key throws `duplicateItem`,
     /// matching real Keychain behavior (`errSecDuplicateItem`).
@@ -38,6 +42,10 @@ final class MockKeychain: KeychainManageable {
             throw MockKeychainError.duplicateItem
         }
         saveCallCount += 1
+        // Fail on specific save call number (1-based).
+        if failOnSaveNumber > 0 && saveCallCount == failOnSaveNumber {
+            throw MockKeychainError.saveFailed
+        }
         lastSavedService = service
         storage[key] = data
     }
@@ -80,10 +88,12 @@ final class MockKeychain: KeychainManageable {
         saveError = nil
         loadError = nil
         throwOnDuplicate = true
+        failOnSaveNumber = 0
     }
 }
 
 enum MockKeychainError: Error {
     case itemNotFound
     case duplicateItem
+    case saveFailed
 }
