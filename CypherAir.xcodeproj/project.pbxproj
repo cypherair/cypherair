@@ -21,6 +21,9 @@
 		A8B4434FA49C1E1C1D83AB0D /* Data+Zeroing.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */; };
 		B8462A44F4C7F182FE942E78 /* FFIIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6640F8252CB178C778859069 /* FFIIntegrationTests.swift */; };
 		CB6546CBB702B1311AFEDEB3 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31AB481CBDFEDEA9D2D492D4 /* KeychainManager.swift */; };
+		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
+		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
+		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
 		F0260E1FA58DA39B13A0AEDA /* SecureEnclaveManageable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D527A8404F04C0FE814B11 /* SecureEnclaveManageable.swift */; };
 /* End PBXBuildFile section */
 
@@ -50,6 +53,9 @@
 		9379668011500E781695A4AC /* CypherAir.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CypherAir.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9BDCB1737386048EAADF9840 /* KeychainManageable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManageable.swift; sourceTree = "<group>"; };
 		A444291AB7231CBA07E9C8CD /* AuthenticationEvaluable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationEvaluable.swift; sourceTree = "<group>"; };
+		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
+		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
+		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
 		D35F4B8C8B4CAB4FB248E04F /* SecureEnclaveManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SecureEnclaveManager.swift; path = Sources/Security/SecureEnclaveManager.swift; sourceTree = SOURCE_ROOT; };
 		F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Data+Zeroing.swift"; path = "Sources/Extensions/Data+Zeroing.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
@@ -75,6 +81,7 @@
 				20424B6FAFC1A2F0D749144D /* MemoryZeroingUtility.swift */,
 				F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */,
 				6F3D4980908222124A478FD8 /* DeviceSecurityTests.swift */,
+				CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -109,6 +116,7 @@
 				A444291AB7231CBA07E9C8CD /* AuthenticationEvaluable.swift */,
 				9BDCB1737386048EAADF9840 /* KeychainManageable.swift */,
 				28D527A8404F04C0FE814B11 /* SecureEnclaveManageable.swift */,
+				CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */,
 			);
 			path = Protocols;
 			sourceTree = "<group>";
@@ -127,6 +135,7 @@
 				837DC6C22137DFF68E868353 /* MockAuthenticator.swift */,
 				7990845AB81240EF6E852FF4 /* MockKeychain.swift */,
 				0FB40F8BED05EDFD21D30FC0 /* MockSecureEnclave.swift */,
+				CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */,
 			);
 			path = Mocks;
 			sourceTree = "<group>";
@@ -237,9 +246,12 @@
 				6F25017F340541D84E52FB11 /* MockAuthenticator.swift in Sources */,
 				91742FB968D0385CEB2081B7 /* MockKeychain.swift in Sources */,
 				1550A8234C0473B09F20716F /* MockSecureEnclave.swift in Sources */,
+				CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */,
+				CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */,
 				F0260E1FA58DA39B13A0AEDA /* SecureEnclaveManageable.swift in Sources */,
 				9247AAEC4846E2A9C01931EA /* pgp_mobile.swift in Sources */,
 				091B4000887E8EB8CEEC9995 /* AuthenticationManager.swift in Sources */,
+				CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */,
 				CB6546CBB702B1311AFEDEB3 /* KeychainManager.swift in Sources */,
 				0CE34DAE946FF6FC9777163E /* SecureEnclaveManager.swift in Sources */,
 				4DA245F5A994CBE9EAA3DE75 /* MemoryZeroingUtility.swift in Sources */,
