@@ -17,8 +17,8 @@ use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
 use pgp_mobile::verify;
 
-use sequoia_openpgp as openpgp;
-use openpgp::parse::Parse;
+mod common;
+use common::detect_message_format;
 
 /// Load a fixture file from the fixtures directory.
 fn load_fixture(name: &str) -> Vec<u8> {
@@ -32,31 +32,6 @@ fn load_fixture(name: &str) -> Vec<u8> {
 /// Load the expected plaintext used to generate fixtures.
 fn expected_plaintext() -> Vec<u8> {
     load_fixture("gpg_plaintext.txt")
-}
-
-/// Helper: detect whether binary ciphertext uses SEIPDv1 or SEIPDv2.
-/// Uses PacketParser to inspect packet headers without fully decrypting.
-/// Returns (has_seipd_v1, has_seipd_v2).
-fn detect_message_format(ciphertext: &[u8]) -> (bool, bool) {
-    let mut has_v1 = false;
-    let mut has_v2 = false;
-    let mut ppr = openpgp::parse::PacketParser::from_bytes(ciphertext)
-        .expect("Should parse ciphertext");
-    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
-        match &pp.packet {
-            openpgp::Packet::SEIP(seip) => {
-                if seip.version() == 1 {
-                    has_v1 = true;
-                } else if seip.version() == 2 {
-                    has_v2 = true;
-                }
-            }
-            _ => {}
-        }
-        let (_, next) = pp.next().expect("Should advance");
-        ppr = next;
-    }
-    (has_v1, has_v2)
 }
 
 // ── C3.1: Export Profile A pubkey → gpg --import succeeds ──────────────────

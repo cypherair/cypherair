@@ -7,7 +7,6 @@ use pgp_mobile::encrypt;
 use pgp_mobile::decrypt;
 use pgp_mobile::sign;
 use pgp_mobile::verify;
-use pgp_mobile::armor;
 use pgp_mobile::decrypt::SignatureStatus;
 
 /// C2B.1: Generate Ed448+X448 v6 key pair.
@@ -48,16 +47,18 @@ fn test_generate_key_profile_b_algorithms() {
     assert!(!info.is_revoked);
     assert!(!info.is_expired);
 
-    // T2: Verify algorithms are Ed448 and X448 (not Ed25519/X25519)
+    // T2: Verify algorithms are Ed448 and X448 (not Ed25519/X25519).
+    // Require specific algorithm names — generic "EdDSA"/"ECDH" would also match
+    // Profile A (Ed25519/X25519) and would fail to catch a cipher suite misconfiguration.
     assert!(
-        info.primary_algo.contains("Ed448") || info.primary_algo.contains("EdDSA"),
-        "Profile B primary key must use Ed448, got: {}",
+        info.primary_algo.contains("Ed448"),
+        "Profile B primary key must use Ed448 (not generic EdDSA), got: {}",
         info.primary_algo
     );
     let subkey_algo = info.subkey_algo.expect("Must have subkey algorithm");
     assert!(
-        subkey_algo.contains("X448") || subkey_algo.contains("ECDH"),
-        "Profile B subkey must use X448, got: {}",
+        subkey_algo.contains("X448"),
+        "Profile B subkey must use X448 (not generic ECDH), got: {}",
         subkey_algo
     );
 }
@@ -420,11 +421,16 @@ fn test_tamper_detection_aead_profile_b() {
         ("second-to-last byte", len.saturating_sub(2).max(1)),
     ];
 
-    // Verify that EVERY tampered position produces an error (hard-fail).
-    // For SEIPDv2, Sequoia may report AEAD errors as CorruptData due to error message
-    // string matching (see classify_decrypt_error in decrypt.rs). The critical security
-    // property is that NO tampered ciphertext ever decrypts successfully.
-    let mut all_failed = true;
+    // DESIGN NOTE: For SEIPDv2 with v6 PKESK (Profile B), Sequoia uses AEAD-protected
+    // session key transport. Corrupting any byte — even in the SEIP body — causes the
+    // PKESK v6 session key decryption to fail, producing NoMatchingKey rather than
+    // AeadAuthenticationFailed. This is correct and expected: the AEAD protection covers
+    // the entire session key recovery path, so ANY corruption is caught before the
+    // symmetric AEAD decryption stage is even reached.
+    //
+    // The critical security property is that NO tampered ciphertext ever decrypts
+    // successfully (hard-fail). The specific error variant is less important than the
+    // guarantee that decryption always fails.
     for (label, pos) in &positions {
         let mut tampered = ciphertext.clone();
         tampered[*pos] ^= 0x01;
@@ -434,18 +440,15 @@ fn test_tamper_detection_aead_profile_b() {
             Err(pgp_mobile::error::PgpError::AeadAuthenticationFailed) => {}
             Err(pgp_mobile::error::PgpError::IntegrityCheckFailed) => {}
             Err(pgp_mobile::error::PgpError::CorruptData { .. }) => {}
-            Err(pgp_mobile::error::PgpError::NoMatchingKey) => {} // PKESK header corrupted
+            Err(pgp_mobile::error::PgpError::NoMatchingKey) => {} // PKESK v6 AEAD failure
             Err(other) => panic!(
                 "Tamper at {label} (offset {pos}): unexpected error type: {other:?}"
             ),
-            Ok(_) => {
-                all_failed = false;
-                panic!("Tamper at {label} (offset {pos}): tampered AEAD ciphertext must NEVER decrypt successfully");
-            }
+            Ok(_) => panic!(
+                "Tamper at {label} (offset {pos}): tampered AEAD ciphertext must NEVER decrypt successfully"
+            ),
         }
     }
-
-    assert!(all_failed, "All tampered positions must fail decryption (AEAD hard-fail)");
 }
 
 /// Detached signature (Profile B).
@@ -634,6 +637,53 @@ fn test_unicode_user_id_profile_b() {
 
     let info = keys::parse_key_info(&key.cert_data).expect("Parse should succeed");
     assert!(info.user_id.unwrap().contains("李四"));
+}
+
+/// Unicode passphrase export/import round-trip (Profile B, Argon2id).
+/// Verifies that passphrases containing CJK, Japanese, and emoji characters
+/// survive the Argon2id S2K derivation and produce a usable key.
+#[test]
+fn test_unicode_passphrase_export_import_profile_b() {
+    let key = keys::generate_key_with_profile(
+        "Unicode Test".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let passphrases = vec![
+        "密码短语测试",
+        "パスフレーズ",
+        "\u{1F510}\u{1F511}\u{1F6E1}\u{FE0F}\u{1F5DD}\u{FE0F}",
+        "Mïxëd Ünîcödé & 中文 \u{1F510}",
+    ];
+
+    for passphrase in &passphrases {
+        let exported = keys::export_secret_key(&key.cert_data, passphrase, KeyProfile::Advanced)
+            .unwrap_or_else(|e| panic!("Export with passphrase '{passphrase}' should succeed: {e}"));
+
+        let imported = keys::import_secret_key(&exported, passphrase)
+            .unwrap_or_else(|e| panic!("Import with passphrase '{passphrase}' should succeed: {e}"));
+
+        // Verify the reimported key can decrypt
+        let plaintext = b"Unicode passphrase round-trip test.";
+        let ciphertext = encrypt::encrypt_binary(
+            plaintext,
+            &[key.public_key_data.clone()],
+            None,
+            None,
+        )
+        .expect("Encrypt should succeed");
+
+        let result = decrypt::decrypt(&ciphertext, &[imported.clone()], &[])
+            .unwrap_or_else(|e| panic!("Decrypt with reimported key (passphrase '{passphrase}') should succeed: {e}"));
+
+        assert_eq!(
+            result.plaintext, plaintext,
+            "Plaintext mismatch after Unicode passphrase round-trip with '{passphrase}'"
+        );
+    }
 }
 
 /// Empty plaintext encrypt/decrypt round-trip (Profile B).

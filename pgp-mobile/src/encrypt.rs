@@ -1,6 +1,7 @@
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::stream::*;
+use openpgp::types::RevocationStatus;
 use sequoia_openpgp as openpgp;
 
 use crate::error::PgpError;
@@ -46,12 +47,26 @@ fn collect_recipients(
         }
     }
 
-    // Validate each cert has at least one encryption-capable subkey
+    // Validate each cert: not revoked, and has at least one live encryption-capable subkey
     for cert in &certs {
+        // Reject revoked certificates (key-level revocation)
+        if matches!(
+            cert.revocation_status(policy, None),
+            RevocationStatus::Revoked(_)
+        ) {
+            return Err(PgpError::EncryptionFailed {
+                reason: format!(
+                    "Recipient {} key is revoked",
+                    cert.fingerprint()
+                ),
+            });
+        }
+
         let found = cert
             .keys()
             .with_policy(policy, None)
             .supported()
+            .alive()
             .for_transport_encryption()
             .next()
             .is_some();
@@ -80,6 +95,7 @@ fn build_recipients<'a>(
             .keys()
             .with_policy(policy, None)
             .supported()
+            .alive()
             .for_transport_encryption()
         {
             recipient_keys.push(ka.into());
