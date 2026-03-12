@@ -225,28 +225,53 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
 
 /// Classify a Sequoia decryption error into the appropriate PgpError variant.
 ///
-/// SECURITY NOTE: This function uses string matching on Sequoia error messages because
-/// Sequoia returns `anyhow::Error` without structured error types for decryption failures.
-/// The fallback is always `CorruptData`, which is safe — the decryption hard-fails regardless
-/// of classification, so no plaintext is ever leaked. The classification only affects which
-/// user-facing error message is shown ("tampered" vs "damaged").
+/// SECURITY NOTE: The fallback is always `CorruptData`, which is safe — the decryption
+/// hard-fails regardless of classification, so no plaintext is ever leaked. The classification
+/// only affects which user-facing error message is shown ("tampered" vs "damaged").
 ///
-/// MAINTENANCE: If Sequoia upgrades change error message text, this classification may
-/// degrade (more errors classified as CorruptData). Review this function after any Sequoia
-/// version bump. Check if Sequoia exposes structured error types (e.g., `openpgp::Error`)
-/// that could replace string matching.
+/// STRATEGY: Uses a hybrid approach — structured downcast first, string matching fallback.
+///
+/// 1. **Structured downcast** (`openpgp::Error` variants): Covers most Sequoia errors and is
+///    resilient to error message rewording across Sequoia versions. Handles two wrapping layers:
+///    - Direct `anyhow::Error` (from `DecryptorBuilder::with_policy()`)
+///    - `io::Error`-wrapped errors (from `Decryptor::read_to_end()` via the `Read` trait)
+///
+/// 2. **String matching fallback**: Required because the `crypto-openssl` backend returns
+///    `openssl::error::ErrorStack` (not `openpgp::Error::ManipulatedMessage`) when an AEAD
+///    tag verification fails. OpenSSL's `cipher_final` produces its own error type that cannot
+///    be downcast to `openpgp::Error`. String matching catches these and any other unstructured
+///    errors in the chain.
+///
+/// MAINTENANCE: After Sequoia version bumps, verify that `openpgp::Error` variants still cover
+/// the expected cases. The string fallback provides defense-in-depth if new error paths appear.
 fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
-    let err_str = e.to_string().to_lowercase();
+    // Strategy 1: Structured downcast — try direct anyhow → openpgp::Error
+    // This path handles errors from DecryptorBuilder::with_policy().
+    if let Some(openpgp_err) = e.downcast_ref::<openpgp::Error>() {
+        return map_openpgp_error(openpgp_err, &e);
+    }
 
-    // Check the entire error chain for more specific error types.
-    // Sequoia wraps errors in anyhow, so we walk the chain.
-    // All comparisons are case-insensitive to guard against Sequoia rewording
-    // error messages across versions.
+    // Strategy 1b: Unwrap io::Error layer — errors from Decryptor::read_to_end().
+    // Sequoia's Decryptor implements io::Read; its read() wraps non-IO errors in
+    // io::Error::new(ErrorKind::Other, anyhow_error). We unwrap this layer.
+    if let Some(io_err) = e.downcast_ref::<std::io::Error>() {
+        if let Some(inner) = io_err.get_ref() {
+            if let Some(openpgp_err) = inner.downcast_ref::<openpgp::Error>() {
+                return map_openpgp_error(openpgp_err, &e);
+            }
+        }
+    }
+
+    // Strategy 2: String matching fallback — walk the entire error chain.
+    // Required for OpenSSL AEAD tag mismatch errors (openssl::error::ErrorStack)
+    // and any other errors that don't downcast to openpgp::Error.
+    // All comparisons are case-insensitive to guard against rewording across versions.
     for cause in e.chain() {
         let cause_str = cause.to_string().to_lowercase();
         if cause_str.contains("authentication")
             || cause_str.contains("aead")
             || cause_str.contains("tag mismatch")
+            || cause_str.contains("manipulated")
         {
             return PgpError::AeadAuthenticationFailed;
         }
@@ -258,13 +283,45 @@ fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
         }
     }
 
-    // Fall back to top-level error string
-    if err_str.contains("no matching key") || err_str.contains("no key to decrypt") {
+    // Final fallback: check top-level message for "no key" patterns
+    let err_str = e.to_string().to_lowercase();
+    if err_str.contains("no matching key")
+        || err_str.contains("no key to decrypt")
+        || err_str.contains("no session key")
+    {
         PgpError::NoMatchingKey
     } else {
         PgpError::CorruptData {
             reason: format!("Decryption failed: {e}"),
         }
+    }
+}
+
+/// Map a structured `openpgp::Error` variant to the appropriate `PgpError`.
+/// Called from `classify_decrypt_error` after successful downcast.
+fn map_openpgp_error(err: &openpgp::Error, original: &openpgp::anyhow::Error) -> PgpError {
+    match err {
+        // ManipulatedMessage covers both MDC failure (SEIPDv1) and AEAD structural
+        // failures (missing/short chunks). Map to IntegrityCheckFailed as a general
+        // "tampered" indicator — both AEAD and MDC are integrity mechanisms.
+        openpgp::Error::ManipulatedMessage => PgpError::IntegrityCheckFailed,
+
+        openpgp::Error::MissingSessionKey(_) => PgpError::NoMatchingKey,
+
+        openpgp::Error::InvalidPassword => PgpError::WrongPassphrase,
+
+        openpgp::Error::UnsupportedAEADAlgorithm(a) => PgpError::UnsupportedAlgorithm {
+            algo: a.to_string(),
+        },
+
+        openpgp::Error::UnsupportedSymmetricAlgorithm(a) => PgpError::UnsupportedAlgorithm {
+            algo: a.to_string(),
+        },
+
+        // Non-exhaustive enum — safe fallback for any future Sequoia variants.
+        _ => PgpError::CorruptData {
+            reason: format!("Decryption failed: {original}"),
+        },
     }
 }
 
