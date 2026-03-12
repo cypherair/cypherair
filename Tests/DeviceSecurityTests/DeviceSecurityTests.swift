@@ -1771,4 +1771,243 @@ final class DeviceSecurityTests: XCTestCase {
             )
         }
     }
+
+    // MARK: - High Security → Standard Reverse Mode Switch (Device)
+
+    /// Verify full-stack mode switch from High Security back to Standard.
+    /// This is the reverse direction of test_switchMode_standardToHighSecurity_fullStack.
+    /// Uses real SE + real Keychain on device.
+    func test_switchMode_highSecurityToStandard_fullStack() async throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let fingerprint = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+        let fakePrivateKey = Data(repeating: 0x88, count: 57) // Ed448 size
+
+        let testDefaults = UserDefaults(suiteName: "com.cypherair.test.hs2std")!
+        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.hs2std") }
+        testDefaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.authModeKey)
+
+        // 1. Initial wrap under High Security mode.
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
+
+        try keychain.save(bundle.seKeyData, service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+        try keychain.save(bundle.salt, service: KeychainConstants.saltService(fingerprint: fingerprint), account: account, accessControl: nil)
+        try keychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+
+        // 2. Switch mode: High Security → Standard.
+        let mockAuth = MockAuthenticator()
+        let authManager = AuthenticationManager(
+            secureEnclave: secureEnclave,
+            keychain: keychain,
+            defaults: testDefaults
+        )
+        try await authManager.switchMode(to: .standard, fingerprints: [fingerprint], hasBackup: true, authenticator: mockAuth)
+
+        // 3. Verify: mode persisted as standard.
+        XCTAssertEqual(
+            testDefaults.string(forKey: AuthPreferences.authModeKey),
+            AuthenticationMode.standard.rawValue
+        )
+
+        // 4. Verify: rewrap flag cleared.
+        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+
+        // 5. Verify: can still unwrap the key.
+        let newSEKeyData = try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
+        let newSalt = try keychain.load(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account)
+        let newSealed = try keychain.load(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account)
+
+        let newHandle = try secureEnclave.reconstructKey(from: newSEKeyData)
+        let newBundle = WrappedKeyBundle(seKeyData: newSEKeyData, salt: newSalt, sealedBox: newSealed)
+        let unwrapped = try secureEnclave.unwrap(bundle: newBundle, using: newHandle, fingerprint: fingerprint)
+
+        XCTAssertEqual(unwrapped, fakePrivateKey, "Key must be accessible after HS→Standard switch")
+
+        // 6. Verify: no pending items left.
+        XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
+    }
+
+    // MARK: - Keychain Full Lifecycle Loop
+
+    /// Run 10 iterations of the full Keychain lifecycle: generate SE key → wrap → store →
+    /// load → unwrap → verify → delete → verify deletion. Alternates between 32-byte
+    /// (Ed25519) and 57-byte (Ed448) key sizes. Catches state leaks between iterations.
+    func test_keychainFullLifecycleLoop_10x_noStateLeaks() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let account = KeychainConstants.defaultAccount
+
+        for i in 0..<10 {
+            let fingerprint = uniqueFingerprint()
+            let keySize = (i % 2 == 0) ? 32 : 57
+            let fakeKey = Data(repeating: UInt8(i + 1), count: keySize)
+
+            // Generate SE key and wrap
+            let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+            let bundle = try secureEnclave.wrap(privateKey: fakeKey, using: handle, fingerprint: fingerprint)
+
+            // Store 3 items
+            try keychain.save(bundle.seKeyData, service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+            try keychain.save(bundle.salt, service: KeychainConstants.saltService(fingerprint: fingerprint), account: account, accessControl: nil)
+            try keychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+
+            // Load, reconstruct, unwrap, verify
+            let loadedSE = try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
+            let loadedSalt = try keychain.load(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account)
+            let loadedSealed = try keychain.load(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account)
+
+            let reconstructed = try secureEnclave.reconstructKey(from: loadedSE)
+            let loadedBundle = WrappedKeyBundle(seKeyData: loadedSE, salt: loadedSalt, sealedBox: loadedSealed)
+            let unwrapped = try secureEnclave.unwrap(bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint)
+
+            XCTAssertEqual(unwrapped, fakeKey, "Iteration \(i): unwrapped key must match original")
+
+            // Delete all 3 items
+            try keychain.delete(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
+            try keychain.delete(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account)
+            try keychain.delete(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account)
+
+            // Verify deletion
+            XCTAssertFalse(keychain.exists(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account),
+                           "Iteration \(i): SE key must be deleted")
+        }
+    }
+
+    // MARK: - 12-Key Mode Switch Stress Tests (Mock-Based)
+
+    /// Stress test: switch mode with 12 identities. All should be re-wrapped successfully.
+    func test_switchMode_12Keys_allRewrappedSuccessfully() async throws {
+        let mockKeychain = MockKeychain()
+        let mockSE = MockSecureEnclave()
+        let mockAuth = MockAuthenticator()
+
+        let testDefaults = UserDefaults(suiteName: "com.cypherair.test.12keys")!
+        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.12keys") }
+        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
+
+        let account = KeychainConstants.defaultAccount
+        var fingerprints: [String] = []
+        var originalKeys: [String: Data] = [:]
+
+        // Create 12 identities with alternating key sizes
+        for i in 0..<12 {
+            let fp = uniqueFingerprint()
+            fingerprints.append(fp)
+            let keySize = (i % 2 == 0) ? 32 : 57
+            let fakeKey = Data(repeating: UInt8(i + 0x10), count: keySize)
+            originalKeys[fp] = fakeKey
+
+            let handle = try mockSE.generateWrappingKey(accessControl: nil)
+            let bundle = try mockSE.wrap(privateKey: fakeKey, using: handle, fingerprint: fp)
+            try mockKeychain.save(bundle.seKeyData, service: KeychainConstants.seKeyService(fingerprint: fp), account: account, accessControl: nil)
+            try mockKeychain.save(bundle.salt, service: KeychainConstants.saltService(fingerprint: fp), account: account, accessControl: nil)
+            try mockKeychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account, accessControl: nil)
+        }
+
+        // Switch mode Standard → High Security
+        let authManager = AuthenticationManager(
+            secureEnclave: mockSE,
+            keychain: mockKeychain,
+            defaults: testDefaults
+        )
+        try await authManager.switchMode(to: .highSecurity, fingerprints: fingerprints, hasBackup: true, authenticator: mockAuth)
+
+        // Verify: mode persisted
+        XCTAssertEqual(testDefaults.string(forKey: AuthPreferences.authModeKey),
+                       AuthenticationMode.highSecurity.rawValue)
+        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+
+        // Verify: all 12 keys are accessible after re-wrap
+        for fp in fingerprints {
+            let seData = try mockKeychain.load(service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
+            let salt = try mockKeychain.load(service: KeychainConstants.saltService(fingerprint: fp), account: account)
+            let sealed = try mockKeychain.load(service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
+
+            let handle = try mockSE.reconstructKey(from: seData)
+            let bundle = WrappedKeyBundle(seKeyData: seData, salt: salt, sealedBox: sealed)
+            let unwrapped = try mockSE.unwrap(bundle: bundle, using: handle, fingerprint: fp)
+            XCTAssertEqual(unwrapped, originalKeys[fp], "Key for \(fp) must match after 12-key mode switch")
+
+            // No pending items
+            XCTAssertFalse(mockKeychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp), account: account))
+        }
+    }
+
+    /// Stress test: 12 identities, fail on key #8's first pending save. All original keys should remain intact.
+    func test_switchMode_12Keys_failOnKey8_rollsBackAll() async throws {
+        let mockKeychain = MockKeychain()
+        let mockSE = MockSecureEnclave()
+        let mockAuth = MockAuthenticator()
+
+        let testDefaults = UserDefaults(suiteName: "com.cypherair.test.12fail")!
+        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.12fail") }
+        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
+
+        let account = KeychainConstants.defaultAccount
+        var fingerprints: [String] = []
+        var originalBundles: [String: WrappedKeyBundle] = [:]
+
+        // Create 12 identities
+        for i in 0..<12 {
+            let fp = uniqueFingerprint()
+            fingerprints.append(fp)
+            let keySize = (i % 2 == 0) ? 32 : 57
+            let fakeKey = Data(repeating: UInt8(i + 0x20), count: keySize)
+
+            let handle = try mockSE.generateWrappingKey(accessControl: nil)
+            let bundle = try mockSE.wrap(privateKey: fakeKey, using: handle, fingerprint: fp)
+            try mockKeychain.save(bundle.seKeyData, service: KeychainConstants.seKeyService(fingerprint: fp), account: account, accessControl: nil)
+            try mockKeychain.save(bundle.salt, service: KeychainConstants.saltService(fingerprint: fp), account: account, accessControl: nil)
+            try mockKeychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account, accessControl: nil)
+            originalBundles[fp] = bundle
+        }
+
+        // 36 saves so far (12 keys × 3 items). Pending saves start at 37.
+        // Key #8 (0-indexed: key 7) starts pending saves at save 37 + (7 × 3) = 58.
+        // Fail on save 58 = first pending item of key #8.
+        mockKeychain.failOnSaveNumber = 58
+
+        let authManager = AuthenticationManager(
+            secureEnclave: mockSE,
+            keychain: mockKeychain,
+            defaults: testDefaults
+        )
+
+        // Attempt mode switch — should fail and roll back
+        do {
+            try await authManager.switchMode(
+                to: .highSecurity,
+                fingerprints: fingerprints,
+                hasBackup: true,
+                authenticator: mockAuth
+            )
+            XCTFail("switchMode should have thrown due to Keychain save failure at key #8")
+        } catch let error as AuthenticationError {
+            if case .modeSwitchFailed = error {
+                // Expected
+            } else {
+                XCTFail("Expected .modeSwitchFailed, got \(error)")
+            }
+        }
+
+        // Verify: all 12 original keys are intact
+        for fp in fingerprints {
+            let loaded = try mockKeychain.load(service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
+            XCTAssertEqual(loaded, originalBundles[fp]!.seKeyData,
+                           "Original SE key for \(fp) must be intact after rollback")
+        }
+
+        // Verify: no pending items for any fingerprint
+        for fp in fingerprints {
+            XCTAssertFalse(mockKeychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp), account: account),
+                           "Pending items for \(fp) must be cleaned up after rollback")
+        }
+
+        // Verify: rewrap flag cleared, mode unchanged
+        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertEqual(testDefaults.string(forKey: AuthPreferences.authModeKey),
+                       AuthenticationMode.standard.rawValue)
+    }
 }
