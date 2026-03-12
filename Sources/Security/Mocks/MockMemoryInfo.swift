@@ -2,6 +2,10 @@ import Foundation
 
 /// Mock memory info provider for testing Argon2id memory guard logic.
 /// Allows tests to simulate different device memory conditions.
+///
+/// Marked `@unchecked Sendable` because `MemoryInfoProvidable` requires `Sendable`.
+/// The mutable state (`availableBytes`, `callCount`) is not thread-safe.
+/// Only use from test methods on a single actor.
 final class MockMemoryInfo: MemoryInfoProvidable, @unchecked Sendable {
     /// The value to return from availableMemoryBytes().
     /// Default: 4 GB (simulates a typical device under moderate load).

@@ -3,7 +3,16 @@ import Security
 
 /// In-memory mock Keychain for testing.
 /// Records all operations for verification in tests.
-final class MockKeychain: KeychainManageable {
+///
+/// **Note on error types:** This mock throws `MockKeychainError`, which is a
+/// different type from the production `KeychainError`. If consuming code uses
+/// `catch let error as KeychainError` to distinguish error cases, mock errors
+/// will not match. Currently `AuthenticationManager.switchMode` catches generic
+/// `Error` and wraps it, so this is not a problem — but keep this in mind if
+/// adding typed error handling in consuming code.
+///
+/// - Warning: Not thread-safe. Only use from test methods on a single actor.
+final class MockKeychain: KeychainManageable, @unchecked Sendable {
     /// In-memory storage: key = "service:account"
     private var storage: [String: Data] = [:]
 
@@ -33,6 +42,10 @@ final class MockKeychain: KeychainManageable {
     }
 
     func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws {
+        // Increment FIRST so saveCallCount reflects every save attempt,
+        // including those that throw (duplicate, saveError, failOnSaveNumber).
+        // This matches real Keychain semantics where a duplicate is still an API call.
+        saveCallCount += 1
         if let error = saveError {
             saveError = nil
             throw error
@@ -41,7 +54,6 @@ final class MockKeychain: KeychainManageable {
         if throwOnDuplicate && storage[key] != nil {
             throw MockKeychainError.duplicateItem
         }
-        saveCallCount += 1
         // Fail on specific save call number (1-based).
         if failOnSaveNumber > 0 && saveCallCount == failOnSaveNumber {
             throw MockKeychainError.saveFailed

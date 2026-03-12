@@ -8,9 +8,20 @@ import CryptoKit
 /// Uses the same P-256 + HKDF + AES-GCM algorithm as the real SE,
 /// but without hardware binding.
 ///
+/// **Known limitation:** `MockSEKey.dataRepresentation` returns
+/// `P256.KeyAgreement.PrivateKey.rawRepresentation` (32-byte scalar),
+/// whereas production `HardwareSEKey.dataRepresentation` returns
+/// `SecureEnclave.P256.KeyAgreement.PrivateKey.dataRepresentation`
+/// (SE-specific serialization, ~100+ bytes). The mock's wrapping/unwrapping
+/// path is internally consistent but cannot expose bugs related to the
+/// SE-specific serialization format. This is an inherent limitation of
+/// running without SE hardware.
+///
 /// This mock allows testing the wrapping/unwrapping logic without
 /// requiring a physical device with Secure Enclave hardware.
-final class MockSecureEnclave: SecureEnclaveManageable {
+///
+/// - Warning: Not thread-safe. Only use from test methods on a single actor.
+final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
     /// Track operations for test verification.
     private(set) var generateCallCount = 0
     private(set) var wrapCallCount = 0
@@ -80,11 +91,14 @@ final class MockSecureEnclave: SecureEnclaveManageable {
 
         // AES-GCM seal
         let sealedBox = try AES.GCM.seal(privateKey, using: symmetricKey)
+        guard let combined = sealedBox.combined else {
+            throw MockSEError.sealFailed
+        }
 
         return WrappedKeyBundle(
             seKeyData: handle.dataRepresentation,
             salt: salt,
-            sealedBox: sealedBox.combined!
+            sealedBox: combined
         )
         #else
         fatalError("CryptoKit is required for MockSecureEnclave. This fallback should never execute on iOS.")
@@ -175,4 +189,5 @@ enum MockSEError: Error {
     case keyNotFound
     case authenticationFailed
     case randomGenerationFailed
+    case sealFailed
 }
