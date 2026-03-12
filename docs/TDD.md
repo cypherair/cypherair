@@ -338,7 +338,7 @@ In Xcode 26:
 2. Add Capability → Enhanced Security.
 3. Enable Hardware Memory Tagging.
 
-Xcode manages Enhanced Security via the `ENABLE_ENHANCED_SECURITY = YES` build setting and automatically injects the correct entitlements at build time. The `CypherAir.entitlements` file should contain an empty `<dict/>` — do not manually add entitlement keys. No code changes are required.
+Xcode manages Enhanced Security via the `ENABLE_ENHANCED_SECURITY = YES` build setting and writes the required entitlement keys (Hardened Process, Hardware Memory Tagging, etc.) into `CypherAir.entitlements`. These entitlement keys must be committed to source control — Xcode reads them to determine which protections are enabled. No code changes are required.
 
 ### 8.4 Compatibility
 
