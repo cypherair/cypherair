@@ -331,6 +331,269 @@ final class DeviceSecurityTests: XCTestCase {
         XCTAssertEqual(unwrapped, fakePrivateKey, "Full Keychain round-trip must preserve key data")
     }
 
+    // MARK: - C6.4: SE Unwrap → FFI Decrypt (End-to-End)
+
+    /// C6.4: Full pipeline — generate key via FFI, SE wrap certData, store in Keychain,
+    /// load + SE unwrap, then decrypt via FFI. Profile A (v4, SEIPDv1).
+    func test_seUnwrapThenDecrypt_profileA_succeeds() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+        let fingerprint = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+        let plaintext = Data("C6.4 Profile A: SE → FFI decrypt test".utf8)
+
+        // 1. Generate Profile A key via FFI.
+        let generated = try engine.generateKey(
+            name: "C6.4 Test A", email: nil, expirySeconds: nil, profile: .universal
+        )
+
+        // 2. Encrypt a message using the public key (signed).
+        let ciphertext = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [generated.publicKeyData],
+            signingKey: generated.certData,
+            encryptToSelf: nil
+        )
+
+        // 3. SE wrap the certData (full cert with private key).
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let bundle = try secureEnclave.wrap(
+            privateKey: generated.certData,
+            using: handle,
+            fingerprint: fingerprint
+        )
+
+        // 4. Store in Keychain (3 items).
+        try keychain.save(bundle.seKeyData,
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+        try keychain.save(bundle.salt,
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+        try keychain.save(bundle.sealedBox,
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+
+        // 5. Load from Keychain and SE unwrap (simulates app restart + decrypt flow).
+        let loadedSEKey = try keychain.load(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account)
+        let loadedSalt = try keychain.load(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account)
+        let loadedSealed = try keychain.load(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account)
+
+        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey)
+        let loadedBundle = WrappedKeyBundle(
+            seKeyData: loadedSEKey, salt: loadedSalt, sealedBox: loadedSealed)
+        let recoveredCertData = try secureEnclave.unwrap(
+            bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint)
+
+        // 6. Decrypt using the recovered certData via FFI.
+        let result = try engine.decrypt(
+            ciphertext: ciphertext,
+            secretKeys: [recoveredCertData],
+            verificationKeys: [generated.publicKeyData]
+        )
+
+        // 7. Verify plaintext and signature.
+        XCTAssertEqual(result.plaintext, plaintext,
+            "Decrypted plaintext must match original after SE round-trip")
+        XCTAssertEqual(result.signatureStatus, .valid,
+            "Signature must verify after SE round-trip")
+    }
+
+    /// C6.4: Same end-to-end pipeline for Profile B (v6, Ed448+X448, SEIPDv2 AEAD OCB).
+    func test_seUnwrapThenDecrypt_profileB_succeeds() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+        let fingerprint = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+        let plaintext = Data("C6.4 Profile B: SE → FFI decrypt test (AEAD OCB)".utf8)
+
+        // 1. Generate Profile B key via FFI.
+        let generated = try engine.generateKey(
+            name: "C6.4 Test B", email: nil, expirySeconds: nil, profile: .advanced
+        )
+
+        // 2. Encrypt a message (SEIPDv2 AEAD for v6 recipient).
+        let ciphertext = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [generated.publicKeyData],
+            signingKey: generated.certData,
+            encryptToSelf: nil
+        )
+
+        // 3. SE wrap the certData.
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let bundle = try secureEnclave.wrap(
+            privateKey: generated.certData,
+            using: handle,
+            fingerprint: fingerprint
+        )
+
+        // 4. Store in Keychain.
+        try keychain.save(bundle.seKeyData,
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+        try keychain.save(bundle.salt,
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+        try keychain.save(bundle.sealedBox,
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+
+        // 5. Load from Keychain and SE unwrap.
+        let loadedSEKey = try keychain.load(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account)
+        let loadedSalt = try keychain.load(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account)
+        let loadedSealed = try keychain.load(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account)
+
+        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey)
+        let loadedBundle = WrappedKeyBundle(
+            seKeyData: loadedSEKey, salt: loadedSalt, sealedBox: loadedSealed)
+        let recoveredCertData = try secureEnclave.unwrap(
+            bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint)
+
+        // 6. Decrypt using the recovered certData via FFI.
+        let result = try engine.decrypt(
+            ciphertext: ciphertext,
+            secretKeys: [recoveredCertData],
+            verificationKeys: [generated.publicKeyData]
+        )
+
+        // 7. Verify plaintext and signature.
+        XCTAssertEqual(result.plaintext, plaintext,
+            "Profile B decrypted plaintext must match original after SE round-trip")
+        XCTAssertEqual(result.signatureStatus, .valid,
+            "Profile B signature must verify after SE round-trip")
+    }
+
+    // MARK: - C6.5: SE Key Deletion → Unwrap Fails
+
+    /// C6.5: After deleting all 3 Keychain items for an identity,
+    /// attempting to load the SE key data should fail with .itemNotFound.
+    func test_seKeyDeletion_thenLoadFails_withItemNotFound() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let fingerprint = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+        let fakePrivateKey = Data(repeating: 0xDE, count: 32)
+
+        // 1. Generate SE key, wrap, store in Keychain.
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let bundle = try secureEnclave.wrap(
+            privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
+
+        try keychain.save(bundle.seKeyData,
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+        try keychain.save(bundle.salt,
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+        try keychain.save(bundle.sealedBox,
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+
+        // Verify items exist before deletion.
+        XCTAssertTrue(keychain.exists(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account))
+
+        // 2. Delete all 3 Keychain items (simulates key deletion).
+        try keychain.delete(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account)
+        try keychain.delete(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account)
+        try keychain.delete(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account)
+
+        // 3. Attempting to load SE key data should fail with .itemNotFound.
+        XCTAssertThrowsError(
+            try keychain.load(
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: account)
+        ) { error in
+            guard let keychainError = error as? KeychainError,
+                  case .itemNotFound = keychainError else {
+                return XCTFail("Expected .itemNotFound after deletion, got \(error)")
+            }
+        }
+
+        // 4. Verify all 3 items are gone.
+        XCTAssertFalse(keychain.exists(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account), "SE key must not exist after deletion")
+        XCTAssertFalse(keychain.exists(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account), "Salt must not exist after deletion")
+        XCTAssertFalse(keychain.exists(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account), "Sealed box must not exist after deletion")
+    }
+
+    /// C6.5: Partial deletion — sealed box removed but SE key and salt remain.
+    /// Loading the sealed box should fail, blocking the unwrap path.
+    func test_seKeyPartialDeletion_sealedBoxMissing_throwsClearError() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let fingerprint = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+        let fakePrivateKey = Data(repeating: 0xEF, count: 57)
+
+        // 1. Generate SE key, wrap, store in Keychain.
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let bundle = try secureEnclave.wrap(
+            privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
+
+        try keychain.save(bundle.seKeyData,
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+        try keychain.save(bundle.salt,
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+        try keychain.save(bundle.sealedBox,
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account, accessControl: nil)
+
+        // 2. Delete ONLY the sealed box (simulates partial data corruption).
+        try keychain.delete(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account)
+
+        // 3. SE key and salt still exist.
+        XCTAssertTrue(keychain.exists(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account), "SE key should still exist")
+        XCTAssertTrue(keychain.exists(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account), "Salt should still exist")
+
+        // 4. Loading sealed box fails — blocks the unwrap path.
+        XCTAssertThrowsError(
+            try keychain.load(
+                service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+                account: account)
+        ) { error in
+            guard let keychainError = error as? KeychainError,
+                  case .itemNotFound = keychainError else {
+                return XCTFail("Expected .itemNotFound for missing sealed box, got \(error)")
+            }
+        }
+    }
+
     // MARK: - C7.1: Authentication Manager — Access Control
 
     func test_createAccessControl_standard_succeeds() throws {
@@ -720,7 +983,7 @@ final class DeviceSecurityTests: XCTestCase {
                        "rewrapInProgress flag must not be set when auth fails")
     }
 
-    // MARK: - C8: MIE Smoke Tests
+    // MARK: - C8.1: MIE Smoke Tests (SE Wrap/Unwrap)
 
     func test_mie_singleWrapUnwrapCycle_noTagMismatch() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
@@ -757,6 +1020,523 @@ final class DeviceSecurityTests: XCTestCase {
             let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
 
             XCTAssertEqual(unwrapped, keyData, "Iteration \(i): wrap/unwrap mismatch")
+        }
+    }
+
+    // MARK: - C8.2: Full PGP Workflow Under MIE (Both Profiles)
+
+    /// C8.2: Complete Profile A (v4, Ed25519+X25519, SEIPDv1) workflow on device.
+    /// Exercises OpenSSL: AES-256, X25519 key agreement, Ed25519 signing, SHA-512 hashing.
+    /// Pass: all operations complete without EXC_GUARD / GUARD_EXC_MTE_SYNC_FAULT.
+    func test_mie_fullPGPWorkflow_profileA_noTagMismatch() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+        let plaintext = Data("C8.2 Profile A MIE: full workflow — 你好世界 🔐".utf8)
+
+        // 1. Key generation (Ed25519+X25519, v4).
+        let key = try engine.generateKey(
+            name: "C8.2 MIE Test A", email: "mie-a@test.local",
+            expirySeconds: nil, profile: .universal
+        )
+        XCTAssertFalse(key.certData.isEmpty, "Profile A key generation must succeed")
+        XCTAssertFalse(key.fingerprint.isEmpty, "Profile A fingerprint must not be empty")
+
+        // 2. Encrypt with signing (AES-256 via SEIPDv1, X25519 key agreement).
+        let ciphertext = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [key.publicKeyData],
+            signingKey: key.certData,
+            encryptToSelf: nil
+        )
+        XCTAssertFalse(ciphertext.isEmpty, "Profile A ciphertext must not be empty")
+
+        // 3. Decrypt (AES-256 decryption, Ed25519 signature verification).
+        let decrypted = try engine.decrypt(
+            ciphertext: ciphertext,
+            secretKeys: [key.certData],
+            verificationKeys: [key.publicKeyData]
+        )
+        XCTAssertEqual(decrypted.plaintext, plaintext,
+            "Profile A decrypted plaintext must match original")
+        XCTAssertEqual(decrypted.signatureStatus, .valid,
+            "Profile A signature must verify")
+
+        // 4. Cleartext sign (Ed25519 + SHA-512).
+        let signed = try engine.signCleartext(
+            text: plaintext, signerCert: key.certData
+        )
+        XCTAssertFalse(signed.isEmpty, "Cleartext signature must not be empty")
+
+        // 5. Verify cleartext signature.
+        let verifyResult = try engine.verifyCleartext(
+            signedMessage: signed,
+            verificationKeys: [key.publicKeyData]
+        )
+        XCTAssertEqual(verifyResult.status, .valid,
+            "Profile A cleartext signature must verify")
+
+        // 6. Detached sign.
+        let detachedSig = try engine.signDetached(
+            data: plaintext, signerCert: key.certData
+        )
+        XCTAssertFalse(detachedSig.isEmpty, "Detached signature must not be empty")
+
+        // 7. Verify detached signature.
+        let detachedVerify = try engine.verifyDetached(
+            data: plaintext,
+            signature: detachedSig,
+            verificationKeys: [key.publicKeyData]
+        )
+        XCTAssertEqual(detachedVerify.status, .valid,
+            "Profile A detached signature must verify")
+    }
+
+    /// C8.2: Complete Profile B (v6, Ed448+X448, SEIPDv2 AEAD OCB) workflow on device.
+    /// Exercises OpenSSL: AES-256-OCB AEAD, X448 key agreement, Ed448 signing, SHA-512.
+    /// Pass: all operations complete without tag mismatch crashes.
+    func test_mie_fullPGPWorkflow_profileB_noTagMismatch() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+        let plaintext = Data("C8.2 Profile B MIE: full workflow — AEAD OCB 🛡️".utf8)
+
+        // 1. Key generation (Ed448+X448, v6).
+        let key = try engine.generateKey(
+            name: "C8.2 MIE Test B", email: "mie-b@test.local",
+            expirySeconds: nil, profile: .advanced
+        )
+        XCTAssertFalse(key.certData.isEmpty, "Profile B key generation must succeed")
+
+        // 2. Encrypt with signing (AES-256-OCB AEAD via SEIPDv2, X448).
+        let ciphertext = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [key.publicKeyData],
+            signingKey: key.certData,
+            encryptToSelf: nil
+        )
+        XCTAssertFalse(ciphertext.isEmpty, "Profile B ciphertext must not be empty")
+
+        // 3. Decrypt (AEAD OCB decryption, Ed448 signature verification).
+        let decrypted = try engine.decrypt(
+            ciphertext: ciphertext,
+            secretKeys: [key.certData],
+            verificationKeys: [key.publicKeyData]
+        )
+        XCTAssertEqual(decrypted.plaintext, plaintext,
+            "Profile B decrypted plaintext must match original")
+        XCTAssertEqual(decrypted.signatureStatus, .valid,
+            "Profile B signature must verify")
+
+        // 4. Cleartext sign (Ed448 + SHA-512).
+        let signed = try engine.signCleartext(
+            text: plaintext, signerCert: key.certData
+        )
+        XCTAssertFalse(signed.isEmpty, "Profile B cleartext signature must not be empty")
+
+        // 5. Verify cleartext signature.
+        let verifyResult = try engine.verifyCleartext(
+            signedMessage: signed,
+            verificationKeys: [key.publicKeyData]
+        )
+        XCTAssertEqual(verifyResult.status, .valid,
+            "Profile B cleartext signature must verify")
+
+        // 6. Detached sign.
+        let detachedSig = try engine.signDetached(
+            data: plaintext, signerCert: key.certData
+        )
+        XCTAssertFalse(detachedSig.isEmpty, "Profile B detached signature must not be empty")
+
+        // 7. Verify detached signature.
+        let detachedVerify = try engine.verifyDetached(
+            data: plaintext,
+            signature: detachedSig,
+            verificationKeys: [key.publicKeyData]
+        )
+        XCTAssertEqual(detachedVerify.status, .valid,
+            "Profile B detached signature must verify")
+    }
+
+    /// C8.2: Cross-profile encryption format auto-selection under MIE.
+    /// Tests: B→A (SEIPDv1), A→B (SEIPDv2), mixed A+B recipients (SEIPDv1).
+    func test_mie_crossProfileEncrypt_noTagMismatch() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+        let plaintext = Data("C8.2 Cross-profile MIE test".utf8)
+
+        let keyA = try engine.generateKey(
+            name: "Cross A", email: nil, expirySeconds: nil, profile: .universal
+        )
+        let keyB = try engine.generateKey(
+            name: "Cross B", email: nil, expirySeconds: nil, profile: .advanced
+        )
+
+        // B sender → A recipient: should auto-select SEIPDv1.
+        let ciphertextBA = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [keyA.publicKeyData],
+            signingKey: keyB.certData,
+            encryptToSelf: nil
+        )
+        let resultBA = try engine.decrypt(
+            ciphertext: ciphertextBA,
+            secretKeys: [keyA.certData],
+            verificationKeys: [keyB.publicKeyData]
+        )
+        XCTAssertEqual(resultBA.plaintext, plaintext, "B→A decrypt must succeed")
+        XCTAssertEqual(resultBA.signatureStatus, .valid, "B→A signature must verify")
+
+        // A sender → B recipient: should auto-select SEIPDv2.
+        let ciphertextAB = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [keyB.publicKeyData],
+            signingKey: keyA.certData,
+            encryptToSelf: nil
+        )
+        let resultAB = try engine.decrypt(
+            ciphertext: ciphertextAB,
+            secretKeys: [keyB.certData],
+            verificationKeys: [keyA.publicKeyData]
+        )
+        XCTAssertEqual(resultAB.plaintext, plaintext, "A→B decrypt must succeed")
+        XCTAssertEqual(resultAB.signatureStatus, .valid, "A→B signature must verify")
+
+        // Mixed recipients (A + B): should produce SEIPDv1.
+        let ciphertextMixed = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [keyA.publicKeyData, keyB.publicKeyData],
+            signingKey: keyA.certData,
+            encryptToSelf: nil
+        )
+        // Both recipients must be able to decrypt.
+        let resultMixedA = try engine.decrypt(
+            ciphertext: ciphertextMixed,
+            secretKeys: [keyA.certData],
+            verificationKeys: [keyA.publicKeyData]
+        )
+        XCTAssertEqual(resultMixedA.plaintext, plaintext, "Mixed→A decrypt must succeed")
+
+        let resultMixedB = try engine.decrypt(
+            ciphertext: ciphertextMixed,
+            secretKeys: [keyB.certData],
+            verificationKeys: [keyA.publicKeyData]
+        )
+        XCTAssertEqual(resultMixedB.plaintext, plaintext, "Mixed→B decrypt must succeed")
+    }
+
+    /// C8.2: Key export/import round-trip under MIE.
+    /// Profile A: Iterated+Salted S2K. Profile B: Argon2id S2K (512 MB).
+    func test_mie_keyExportImport_bothProfiles_noTagMismatch() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+        let passphrase = "mie-export-test-passphrase"
+        let plaintext = Data("C8.2 export/import round-trip test".utf8)
+
+        // Profile A: export with Iterated+Salted S2K, then import.
+        let keyA = try engine.generateKey(
+            name: "Export A", email: nil, expirySeconds: nil, profile: .universal
+        )
+        let ciphertextA = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [keyA.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        let exportedA = try engine.exportSecretKey(
+            certData: keyA.certData, passphrase: passphrase, profile: .universal
+        )
+        XCTAssertFalse(exportedA.isEmpty, "Profile A export must produce data")
+
+        let importedA = try engine.importSecretKey(
+            armoredData: exportedA, passphrase: passphrase
+        )
+        XCTAssertFalse(importedA.isEmpty, "Profile A import must succeed")
+
+        // Decrypt with the imported key to verify round-trip.
+        let decryptedA = try engine.decrypt(
+            ciphertext: ciphertextA,
+            secretKeys: [importedA],
+            verificationKeys: []
+        )
+        XCTAssertEqual(decryptedA.plaintext, plaintext,
+            "Profile A: imported key must decrypt correctly")
+
+        // Profile B: export with Argon2id S2K, then import.
+        let keyB = try engine.generateKey(
+            name: "Export B", email: nil, expirySeconds: nil, profile: .advanced
+        )
+        let ciphertextB = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [keyB.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        let exportedB = try engine.exportSecretKey(
+            certData: keyB.certData, passphrase: passphrase, profile: .advanced
+        )
+        XCTAssertFalse(exportedB.isEmpty, "Profile B export must produce data")
+
+        let importedB = try engine.importSecretKey(
+            armoredData: exportedB, passphrase: passphrase
+        )
+        XCTAssertFalse(importedB.isEmpty, "Profile B import must succeed")
+
+        let decryptedB = try engine.decrypt(
+            ciphertext: ciphertextB,
+            secretKeys: [importedB],
+            verificationKeys: []
+        )
+        XCTAssertEqual(decryptedB.plaintext, plaintext,
+            "Profile B: imported key must decrypt correctly")
+    }
+
+    // MARK: - C8.3: OpenSSL Crypto Operations Under MIE
+
+    /// C8.3: Explicitly exercise every OpenSSL code path used by Sequoia.
+    /// Covers: AES-256, SHA-512, Ed25519, X25519, Ed448, X448, AES-256-OCB AEAD, Argon2id.
+    /// Pass: all crypto operations succeed with no memory tagging violations.
+    func test_mie_opensslCryptoPaths_allAlgorithms_noTagViolations() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+        let plaintext = Data("C8.3 OpenSSL paths MIE validation".utf8)
+
+        // --- Generate keys for both profiles ---
+        let keyA = try engine.generateKey(
+            name: "OpenSSL A", email: nil, expirySeconds: nil, profile: .universal
+        )
+        let keyB = try engine.generateKey(
+            name: "OpenSSL B", email: nil, expirySeconds: nil, profile: .advanced
+        )
+
+        // 1. AES-256 via SEIPDv1 (Profile A encrypt + decrypt).
+        //    OpenSSL path: AES-256-CFB encryption + MDC (SHA-1 hash).
+        let ciphertextA = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [keyA.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+        let resultA = try engine.decrypt(
+            ciphertext: ciphertextA,
+            secretKeys: [keyA.certData],
+            verificationKeys: []
+        )
+        XCTAssertEqual(resultA.plaintext, plaintext, "AES-256 SEIPDv1 round-trip failed")
+
+        // 2. SHA-512 via signing (both profiles).
+        //    OpenSSL path: SHA-512 hash for signature computation.
+        let signedA = try engine.signCleartext(text: plaintext, signerCert: keyA.certData)
+        let verifyA = try engine.verifyCleartext(
+            signedMessage: signedA, verificationKeys: [keyA.publicKeyData]
+        )
+        XCTAssertEqual(verifyA.status, .valid, "SHA-512 + Ed25519 sign/verify failed")
+
+        let signedB = try engine.signCleartext(text: plaintext, signerCert: keyB.certData)
+        let verifyB = try engine.verifyCleartext(
+            signedMessage: signedB, verificationKeys: [keyB.publicKeyData]
+        )
+        XCTAssertEqual(verifyB.status, .valid, "SHA-512 + Ed448 sign/verify failed")
+
+        // 3. Ed25519 via Profile A sign + verify (covered above in step 2).
+
+        // 4. X25519 via Profile A encrypt (covered above in step 1).
+        //    OpenSSL path: X25519 ECDH key agreement for session key.
+
+        // 5. Ed448 via Profile B sign + verify (covered above in step 2).
+
+        // 6. X448 via Profile B encrypt.
+        //    OpenSSL path: X448 ECDH key agreement for session key.
+        let ciphertextB = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [keyB.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+        let resultB = try engine.decrypt(
+            ciphertext: ciphertextB,
+            secretKeys: [keyB.certData],
+            verificationKeys: []
+        )
+        XCTAssertEqual(resultB.plaintext, plaintext, "AES-256-OCB AEAD + X448 round-trip failed")
+
+        // 7. AES-256-OCB AEAD via SEIPDv2 (Profile B, covered above in step 6).
+
+        // 8. Argon2id via Profile B key export.
+        //    OpenSSL path: Argon2id KDF (512 MB memory, 4 lanes).
+        let exported = try engine.exportSecretKey(
+            certData: keyB.certData, passphrase: "openssltest", profile: .advanced
+        )
+        XCTAssertFalse(exported.isEmpty, "Argon2id S2K export must succeed")
+
+        let imported = try engine.importSecretKey(
+            armoredData: exported, passphrase: "openssltest"
+        )
+        XCTAssertFalse(imported.isEmpty, "Argon2id S2K import must succeed")
+
+        // 9. Detached signatures (exercises Ed25519/Ed448 + SHA-512 in detached mode).
+        let detSigA = try engine.signDetached(data: plaintext, signerCert: keyA.certData)
+        let detVerifyA = try engine.verifyDetached(
+            data: plaintext, signature: detSigA, verificationKeys: [keyA.publicKeyData]
+        )
+        XCTAssertEqual(detVerifyA.status, .valid, "Ed25519 detached sign/verify failed")
+
+        let detSigB = try engine.signDetached(data: plaintext, signerCert: keyB.certData)
+        let detVerifyB = try engine.verifyDetached(
+            data: plaintext, signature: detSigB, verificationKeys: [keyB.publicKeyData]
+        )
+        XCTAssertEqual(detVerifyB.status, .valid, "Ed448 detached sign/verify failed")
+    }
+
+    /// C8.3: Armor/dearmor exercises OpenSSL Base64 and binary parsing paths.
+    func test_mie_armorDearmor_bothProfiles_noTagViolations() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+
+        let keyA = try engine.generateKey(
+            name: "Armor A", email: nil, expirySeconds: nil, profile: .universal
+        )
+        let keyB = try engine.generateKey(
+            name: "Armor B", email: nil, expirySeconds: nil, profile: .advanced
+        )
+
+        // Armor public keys and round-trip.
+        let armoredA = try engine.armorPublicKey(certData: keyA.publicKeyData)
+        XCTAssertFalse(armoredA.isEmpty, "Profile A armored public key must not be empty")
+        let dearmoredA = try engine.dearmor(armored: armoredA)
+        XCTAssertEqual(dearmoredA, keyA.publicKeyData,
+            "Profile A armor/dearmor must round-trip")
+
+        let armoredB = try engine.armorPublicKey(certData: keyB.publicKeyData)
+        XCTAssertFalse(armoredB.isEmpty, "Profile B armored public key must not be empty")
+        let dearmoredB = try engine.dearmor(armored: armoredB)
+        XCTAssertEqual(dearmoredB, keyB.publicKeyData,
+            "Profile B armor/dearmor must round-trip")
+
+        // Armor ciphertext and round-trip decrypt.
+        let plaintext = Data("Armor round-trip test".utf8)
+        let binaryCiphertext = try engine.encryptBinary(
+            plaintext: plaintext,
+            recipients: [keyA.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+        let armoredMsg = try engine.armor(data: binaryCiphertext, kind: .message)
+        XCTAssertFalse(armoredMsg.isEmpty, "Armored message must not be empty")
+        let dearmoredMsg = try engine.dearmor(armored: armoredMsg)
+        XCTAssertEqual(dearmoredMsg, binaryCiphertext,
+            "Message armor/dearmor must preserve binary content")
+    }
+
+    // MARK: - C8.4: 100× Encrypt/Decrypt Cycles Under MIE
+
+    /// C8.4: 100 encrypt/decrypt cycles for Profile A (SEIPDv1) under MIE.
+    /// Detects intermittent tag mismatches that single-cycle tests might miss.
+    /// Monitor: `log stream --predicate 'eventMessage contains "MTE"'`
+    /// Pass: zero tag violations across 100 cycles.
+    func test_mie_100xEncryptDecryptCycles_profileA_noIntermittentCrashes() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+        let key = try engine.generateKey(
+            name: "100x A", email: nil, expirySeconds: nil, profile: .universal
+        )
+
+        for i in 0..<100 {
+            let plaintext = Data("C8.4 Profile A iteration \(i) — \(UUID().uuidString)".utf8)
+
+            let ciphertext = try engine.encrypt(
+                plaintext: plaintext,
+                recipients: [key.publicKeyData],
+                signingKey: key.certData,
+                encryptToSelf: nil
+            )
+
+            let result = try engine.decrypt(
+                ciphertext: ciphertext,
+                secretKeys: [key.certData],
+                verificationKeys: [key.publicKeyData]
+            )
+
+            XCTAssertEqual(result.plaintext, plaintext,
+                "Profile A iteration \(i): plaintext mismatch")
+            XCTAssertEqual(result.signatureStatus, .valid,
+                "Profile A iteration \(i): signature invalid")
+        }
+    }
+
+    /// C8.4: 100 encrypt/decrypt cycles for Profile B (SEIPDv2 AEAD OCB) under MIE.
+    /// Exercises OpenSSL AES-256-OCB + X448 + Ed448 100 times.
+    /// Pass: zero tag violations across 100 cycles.
+    func test_mie_100xEncryptDecryptCycles_profileB_noIntermittentCrashes() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+        let key = try engine.generateKey(
+            name: "100x B", email: nil, expirySeconds: nil, profile: .advanced
+        )
+
+        for i in 0..<100 {
+            let plaintext = Data("C8.4 Profile B iteration \(i) — \(UUID().uuidString)".utf8)
+
+            let ciphertext = try engine.encrypt(
+                plaintext: plaintext,
+                recipients: [key.publicKeyData],
+                signingKey: key.certData,
+                encryptToSelf: nil
+            )
+
+            let result = try engine.decrypt(
+                ciphertext: ciphertext,
+                secretKeys: [key.certData],
+                verificationKeys: [key.publicKeyData]
+            )
+
+            XCTAssertEqual(result.plaintext, plaintext,
+                "Profile B iteration \(i): plaintext mismatch")
+            XCTAssertEqual(result.signatureStatus, .valid,
+                "Profile B iteration \(i): signature invalid")
+        }
+    }
+
+    /// C8.4: 100 sign/verify cycles for both profiles under MIE.
+    /// Exercises Ed25519 + Ed448 + SHA-512 hashing 200 times total.
+    /// Pass: zero tag violations across all cycles.
+    func test_mie_100xSignVerifyCycles_bothProfiles_noIntermittentCrashes() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let engine = PgpEngine()
+        let keyA = try engine.generateKey(
+            name: "100x Sign A", email: nil, expirySeconds: nil, profile: .universal
+        )
+        let keyB = try engine.generateKey(
+            name: "100x Sign B", email: nil, expirySeconds: nil, profile: .advanced
+        )
+
+        for i in 0..<100 {
+            let text = Data("C8.4 sign/verify iteration \(i) — \(UUID().uuidString)".utf8)
+
+            // Profile A: Ed25519 cleartext sign + verify.
+            let signedA = try engine.signCleartext(text: text, signerCert: keyA.certData)
+            let verifyA = try engine.verifyCleartext(
+                signedMessage: signedA, verificationKeys: [keyA.publicKeyData]
+            )
+            XCTAssertEqual(verifyA.status, .valid,
+                "Profile A sign/verify iteration \(i) failed")
+
+            // Profile B: Ed448 cleartext sign + verify.
+            let signedB = try engine.signCleartext(text: text, signerCert: keyB.certData)
+            let verifyB = try engine.verifyCleartext(
+                signedMessage: signedB, verificationKeys: [keyB.publicKeyData]
+            )
+            XCTAssertEqual(verifyB.status, .valid,
+                "Profile B sign/verify iteration \(i) failed")
         }
     }
 
@@ -805,5 +1585,190 @@ final class DeviceSecurityTests: XCTestCase {
             passphrase: "device-test-pass"
         )
         XCTAssertFalse(imported.isEmpty, "Imported key data must not be empty")
+    }
+
+    // MARK: - C10: Performance Benchmarks
+
+    /// C10.1: Text encryption latency (1 KB) — Profile A (Ed25519+X25519, SEIPDv1).
+    /// Threshold: < 50ms. Soft-fail: record and document.
+    func test_perf_textEncrypt1KB_profileA_latencyUnder50ms() throws {
+        let engine = PgpEngine()
+        let key = try engine.generateKey(
+            name: "Perf C10.1 A", email: nil, expirySeconds: nil, profile: .universal
+        )
+        let plaintext = Data(repeating: 0x41, count: 1024) // 1 KB
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 10
+
+        measure(metrics: [XCTClockMetric()], options: options) {
+            _ = try! engine.encrypt(
+                plaintext: plaintext,
+                recipients: [key.publicKeyData],
+                signingKey: key.certData,
+                encryptToSelf: nil
+            )
+        }
+    }
+
+    /// C10.1: Text encryption latency (1 KB) — Profile B (Ed448+X448, SEIPDv2 AEAD OCB).
+    /// Threshold: < 50ms. Soft-fail: record and document.
+    func test_perf_textEncrypt1KB_profileB_latencyUnder50ms() throws {
+        let engine = PgpEngine()
+        let key = try engine.generateKey(
+            name: "Perf C10.1 B", email: nil, expirySeconds: nil, profile: .advanced
+        )
+        let plaintext = Data(repeating: 0x41, count: 1024) // 1 KB
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 10
+
+        measure(metrics: [XCTClockMetric()], options: options) {
+            _ = try! engine.encrypt(
+                plaintext: plaintext,
+                recipients: [key.publicKeyData],
+                signingKey: key.certData,
+                encryptToSelf: nil
+            )
+        }
+    }
+
+    /// C10.2: 100 MB file encryption — Profile A (X25519, SEIPDv1).
+    /// Threshold: < 10s. Soft-fail: record and document.
+    /// Uses encryptBinary() (.gpg format) — matches real file encryption workflow.
+    func test_perf_fileEncrypt100MB_profileA_latencyUnder10s() throws {
+        let engine = PgpEngine()
+        let key = try engine.generateKey(
+            name: "Perf C10.2", email: nil, expirySeconds: nil, profile: .universal
+        )
+        let fileData = Data(count: 100 * 1024 * 1024) // 100 MB zero-filled
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 3
+
+        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()], options: options) {
+            _ = try! engine.encryptBinary(
+                plaintext: fileData,
+                recipients: [key.publicKeyData],
+                signingKey: nil,
+                encryptToSelf: nil
+            )
+        }
+    }
+
+    /// C10.3: 100 MB file encryption — Profile B (X448, SEIPDv2 AEAD OCB).
+    /// Threshold: < 15s. Soft-fail: record and document.
+    /// Uses encryptBinary() (.gpg format) — matches real file encryption workflow.
+    func test_perf_fileEncrypt100MB_profileB_latencyUnder15s() throws {
+        let engine = PgpEngine()
+        let key = try engine.generateKey(
+            name: "Perf C10.3", email: nil, expirySeconds: nil, profile: .advanced
+        )
+        let fileData = Data(count: 100 * 1024 * 1024) // 100 MB zero-filled
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 3
+
+        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()], options: options) {
+            _ = try! engine.encryptBinary(
+                plaintext: fileData,
+                recipients: [key.publicKeyData],
+                signingKey: nil,
+                encryptToSelf: nil
+            )
+        }
+    }
+
+    /// C10.4: Key generation latency — Profile A (Ed25519+X25519).
+    /// No hard threshold. Record value.
+    func test_perf_keyGeneration_profileA_recordLatency() throws {
+        let engine = PgpEngine()
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 10
+
+        measure(metrics: [XCTClockMetric()], options: options) {
+            _ = try! engine.generateKey(
+                name: "Perf C10.4", email: nil, expirySeconds: nil, profile: .universal
+            )
+        }
+    }
+
+    /// C10.5: Key generation latency — Profile B (Ed448+X448).
+    /// No hard threshold. Record value.
+    /// Note: Ed448 key generation is expected to be significantly slower than Ed25519.
+    func test_perf_keyGeneration_profileB_recordLatency() throws {
+        let engine = PgpEngine()
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 10
+
+        measure(metrics: [XCTClockMetric()], options: options) {
+            _ = try! engine.generateKey(
+                name: "Perf C10.5", email: nil, expirySeconds: nil, profile: .advanced
+            )
+        }
+    }
+
+    /// C10.6: SE key reconstruction from dataRepresentation.
+    /// Threshold: < 10ms. ARCHITECTURE.md documents 2–5ms.
+    func test_perf_seKeyReconstruction_latencyUnder10ms() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        // Generate SE key and extract its dataRepresentation for reconstruction.
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let keyData = handle.dataRepresentation
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 20
+
+        measure(metrics: [XCTClockMetric()], options: options) {
+            _ = try! secureEnclave.reconstructKey(from: keyData)
+        }
+    }
+
+    /// C10.7: SE wrap/unwrap end-to-end (excluding biometric prompt).
+    /// Threshold: < 100ms. Soft-fail: record and document.
+    /// Measures: SE P-256 key gen + self-ECDH + HKDF + AES-GCM seal + unwrap cycle.
+    func test_perf_seWrapUnwrap_endToEnd_latencyUnder100ms() throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let fakePrivateKey = Data(repeating: 0xAB, count: 57) // Ed448 size (worst case)
+        let fingerprint = uniqueFingerprint()
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 10
+
+        measure(metrics: [XCTClockMetric()], options: options) {
+            let handle = try! secureEnclave.generateWrappingKey(accessControl: nil)
+            let bundle = try! secureEnclave.wrap(
+                privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint
+            )
+            let unwrapped = try! secureEnclave.unwrap(
+                bundle: bundle, using: handle, fingerprint: fingerprint
+            )
+            assert(unwrapped == fakePrivateKey)
+        }
+    }
+
+    /// C10.8: Argon2id calibration time (512 MB / p=4).
+    /// Target: ~3s. Soft-fail: record actual value.
+    /// Measures exportSecretKey with Profile B, which triggers Argon2id S2K.
+    func test_perf_argon2id_512MB_calibrationTime_target3s() throws {
+        let engine = PgpEngine()
+        let key = try engine.generateKey(
+            name: "Perf C10.8", email: nil, expirySeconds: nil, profile: .advanced
+        )
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 3
+
+        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()], options: options) {
+            _ = try! engine.exportSecretKey(
+                certData: key.certData,
+                passphrase: "benchmark-passphrase",
+                profile: .advanced
+            )
+        }
     }
 }
