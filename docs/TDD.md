@@ -332,15 +332,13 @@ Memory Integrity Enforcement is Apple's hardware-level memory safety system, bui
 
 ### 8.3 Enablement
 
-In Xcode:
+In Xcode 26:
 
 1. Open Signing & Capabilities for the app target.
 2. Add Capability → Enhanced Security.
 3. Enable Hardware Memory Tagging.
-4. Optionally enable "Memory Tag Pure Data" for wider protection coverage.
-5. Ensure "Soft Mode" is disabled for production builds (soft mode logs but does not terminate on mismatch).
 
-No code changes are required. The system allocator and hardware handle tagging automatically.
+Xcode manages Enhanced Security via the `ENABLE_ENHANCED_SECURITY = YES` build setting and automatically injects the correct entitlements at build time. The `CypherAir.entitlements` file should contain an empty `<dict/>` — do not manually add entitlement keys. No code changes are required.
 
 ### 8.4 Compatibility
 
