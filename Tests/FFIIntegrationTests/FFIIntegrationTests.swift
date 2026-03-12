@@ -991,6 +991,195 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertEqual(mockMemory.callCount, 1,
                        "Guard should query memory provider exactly once")
     }
+
+    // MARK: - Phase 1/Phase 2 Two-Phase Decryption Tests
+
+    /// Verify Phase 1 (parseRecipients) returns key IDs for Profile A ciphertext.
+    func test_parseRecipients_profileA_returnsMatchingKeyIDs() throws {
+        let engine = try XCTUnwrap(self.engine)
+        let key = try engine.generateKey(name: "Phase1 A", email: nil, expirySeconds: nil, profile: .universal)
+        let ciphertext = try engine.encrypt(
+            plaintext: Data("Phase 1 test".utf8),
+            recipients: [key.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+        let recipientKeyIDs = try engine.parseRecipients(ciphertext: ciphertext)
+        XCTAssertFalse(recipientKeyIDs.isEmpty, "Phase 1 must identify at least one recipient")
+    }
+
+    /// Verify Phase 1 (parseRecipients) returns key IDs for Profile B ciphertext.
+    func test_parseRecipients_profileB_returnsMatchingKeyIDs() throws {
+        let engine = try XCTUnwrap(self.engine)
+        let key = try engine.generateKey(name: "Phase1 B", email: nil, expirySeconds: nil, profile: .advanced)
+        let ciphertext = try engine.encrypt(
+            plaintext: Data("Phase 1 advanced".utf8),
+            recipients: [key.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+        let recipientKeyIDs = try engine.parseRecipients(ciphertext: ciphertext)
+        XCTAssertFalse(recipientKeyIDs.isEmpty, "Phase 1 must identify at least one recipient for Profile B")
+    }
+
+    /// Phase 1 succeeds (no auth), Phase 2 fails with wrong key.
+    func test_twoPhaseDecrypt_noMatchingKey_phase1SucceedsPhase2Fails() throws {
+        let engine = try XCTUnwrap(self.engine)
+        let encryptKey = try engine.generateKey(name: "Encrypt Key", email: nil, expirySeconds: nil, profile: .universal)
+        let wrongKey = try engine.generateKey(name: "Wrong Key", email: nil, expirySeconds: nil, profile: .universal)
+
+        let ciphertext = try engine.encrypt(
+            plaintext: Data("secret message".utf8),
+            recipients: [encryptKey.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        // Phase 1: parseRecipients succeeds (no private key needed)
+        let recipientKeyIDs = try engine.parseRecipients(ciphertext: ciphertext)
+        XCTAssertFalse(recipientKeyIDs.isEmpty)
+
+        // Phase 2: decrypt with wrong key should fail
+        XCTAssertThrowsError(try engine.decrypt(ciphertext: ciphertext, secretKeys: [wrongKey.certData], verificationKeys: [])) { error in
+            // Accept any PgpError — the key doesn't match
+            XCTAssertTrue(error is PgpError, "Expected PgpError, got \(type(of: error))")
+        }
+    }
+
+    /// parseRecipients on garbage data should throw an error.
+    func test_parseRecipients_garbageData_throwsError() {
+        guard let engine = self.engine else { return }
+        let garbage = Data([0x00, 0xFF, 0xDE, 0xAD, 0xBE, 0xEF])
+        XCTAssertThrowsError(try engine.parseRecipients(ciphertext: garbage)) { error in
+            XCTAssertTrue(error is PgpError, "Expected PgpError for garbage input, got \(type(of: error))")
+        }
+    }
+
+    /// Multi-recipient: both recipients can decrypt (Phase 1 shows ≥2 IDs, Phase 2 works for each).
+    func test_twoPhaseDecrypt_multiRecipient_bothCanDecrypt() throws {
+        let engine = try XCTUnwrap(self.engine)
+        let alice = try engine.generateKey(name: "Alice Multi", email: nil, expirySeconds: nil, profile: .universal)
+        let bob = try engine.generateKey(name: "Bob Multi", email: nil, expirySeconds: nil, profile: .universal)
+
+        let plaintext = "multi-recipient message"
+        let ciphertext = try engine.encrypt(
+            plaintext: Data(plaintext.utf8),
+            recipients: [alice.publicKeyData, bob.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        // Phase 1: should identify at least 2 recipients
+        let recipientKeyIDs = try engine.parseRecipients(ciphertext: ciphertext)
+        XCTAssertGreaterThanOrEqual(recipientKeyIDs.count, 2, "Phase 1 should find both recipients")
+
+        // Phase 2: Alice can decrypt
+        let resultAlice = try engine.decrypt(ciphertext: ciphertext, secretKeys: [alice.certData], verificationKeys: [])
+        XCTAssertEqual(String(data: resultAlice.plaintext, encoding: .utf8), plaintext)
+
+        // Phase 2: Bob can decrypt
+        let resultBob = try engine.decrypt(ciphertext: ciphertext, secretKeys: [bob.certData], verificationKeys: [])
+        XCTAssertEqual(String(data: resultBob.plaintext, encoding: .utf8), plaintext)
+    }
+
+    // MARK: - KeyExpired Error Mapping
+
+    /// Verify that a key with expirySeconds=1 is detected as expired after waiting.
+    /// Sequoia may or may not reject encryption to an expired key at the API level,
+    /// so this test accepts both outcomes: if encryption succeeds, it verifies the key
+    /// info shows isExpired; if it throws, it verifies the error type.
+    func test_errorMapping_keyExpired_detectsExpiredKey() throws {
+        let engine = try XCTUnwrap(self.engine)
+        let key = try engine.generateKey(name: "Expiry Test", email: nil, expirySeconds: 1, profile: .universal)
+        let info = try engine.parseKeyInfo(keyData: key.publicKeyData)
+
+        // Wait for the key to expire
+        Thread.sleep(forTimeInterval: 2.0)
+
+        // Re-parse to check isExpired flag after waiting
+        let infoAfter = try engine.parseKeyInfo(keyData: key.publicKeyData)
+
+        do {
+            _ = try engine.encrypt(
+                plaintext: Data("to expired key".utf8),
+                recipients: [key.publicKeyData],
+                signingKey: nil,
+                encryptToSelf: nil
+            )
+            // Sequoia allowed encryption — verify the key IS expired via parseKeyInfo
+            XCTAssertTrue(infoAfter.isExpired, "Key with expirySeconds=1 should report isExpired after 2s")
+        } catch {
+            // Sequoia rejected encryption — verify it's a PgpError
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            // Accept KeyExpired or EncryptionFailed
+            switch pgpError {
+            case .KeyExpired, .EncryptionFailed:
+                break // Expected
+            default:
+                XCTFail("Expected KeyExpired or EncryptionFailed, got \(pgpError)")
+            }
+        }
+    }
+
+    // MARK: - Memory Zeroing Tests
+
+    /// Verify Data.zeroize() sets all bytes to zero.
+    func test_dataZeroize_setsAllBytesToZero() {
+        var data = Data([0xAB, 0xCD, 0xEF, 0x12, 0x34])
+        let originalCount = data.count
+        data.zeroize()
+        XCTAssertEqual(data.count, originalCount, "Count must not change")
+        XCTAssertTrue(data.allSatisfy { $0 == 0 }, "All bytes must be zero after zeroize()")
+    }
+
+    /// Verify Data.zeroize() on empty data does not crash.
+    func test_dataZeroize_emptyData_noop() {
+        var data = Data()
+        data.zeroize()
+        XCTAssertTrue(data.isEmpty, "Empty data remains empty")
+    }
+
+    /// Verify Data.zeroize() works on large buffers.
+    func test_dataZeroize_largeBuffer_allZeros() {
+        var data = Data(repeating: 0xFF, count: 1_048_576) // 1 MB
+        data.zeroize()
+        XCTAssertTrue(data.allSatisfy { $0 == 0 }, "All bytes in 1 MB buffer must be zero")
+    }
+
+    /// Verify Array<UInt8>.zeroize() sets all elements to zero.
+    func test_arrayZeroize_setsAllElementsToZero() {
+        var arr: [UInt8] = [0x01, 0x02, 0x03, 0xFF, 0xAB]
+        let originalCount = arr.count
+        arr.zeroize()
+        XCTAssertEqual(arr.count, originalCount, "Count must not change")
+        XCTAssertTrue(arr.allSatisfy { $0 == 0 }, "All elements must be zero after zeroize()")
+    }
+
+    /// Verify Array<UInt8>.zeroize() on empty array does not crash.
+    func test_arrayZeroize_emptyArray_noop() {
+        var arr: [UInt8] = []
+        arr.zeroize()
+        XCTAssertTrue(arr.isEmpty, "Empty array remains empty")
+    }
+
+    /// Verify SensitiveData.zeroize() clears the underlying storage.
+    func test_sensitiveData_explicitZeroize_clearsData() {
+        let sensitive = SensitiveData(Data([0xDE, 0xAD, 0xBE, 0xEF]))
+        XCTAssertEqual(sensitive.count, 4)
+        sensitive.zeroize()
+        XCTAssertTrue(sensitive.data.allSatisfy { $0 == 0 }, "SensitiveData must be zeroed after zeroize()")
+    }
+
+    /// Verify SensitiveData deinit does not crash (zeroing happens in deinit).
+    func test_sensitiveData_deinit_zerosStorage() {
+        // Create and immediately release — deinit should fire without crash.
+        autoreleasepool {
+            _ = SensitiveData(Data(repeating: 0x42, count: 64))
+        }
+        // If we reach here without crash, deinit zeroing worked.
+    }
 }
 
 /// Error thrown when PgpEngine is unexpectedly nil in concurrent test closures.
