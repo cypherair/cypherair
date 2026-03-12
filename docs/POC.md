@@ -114,9 +114,9 @@ Validate Sequoia PGP 2.2.0 + crypto-openssl + UniFFI + Secure Enclave + dual Pro
 ### 2.10 Memory Integrity Enforcement
 
 - [x] C8.1: Enable Enhanced Security capability in Xcode with Hardware Memory Tagging. *Pass: project builds without issues.* ✅ Project builds and deploys to iPhone 17 Pro Max (A19 Pro) with Enhanced Security capability enabled. 31 device tests pass.
-- [ ] C8.2: Full workflow (both profiles: key gen, encrypt/decrypt, sign/verify) on iPhone 17 or iPhone Air (A19/A19 Pro). *Pass: all operations complete. No tag mismatch crashes. Verify via Xcode Console filter for `EXC_GUARD` and `GUARD_EXC_MTE_SYNC_FAULT`.* ⚠️ Smoke-tested: SE wrap/unwrap cycles (single + 50× rapid) complete without crashes on A19 Pro. Full PGP workflow (FFI encrypt/decrypt/sign/verify) not yet exercised on device under MIE diagnostics.
-- [ ] C8.3: OpenSSL operations (AES-256, SHA-512, Ed25519, X25519, Ed448, X448, Argon2id) under MIE. *Pass: all crypto operations succeed. No memory tagging violations.* ⚠️ Indirectly exercised via SE wrap/unwrap (AES-GCM, SHA-256 HKDF) on device. Full OpenSSL crypto path coverage pending.
-- [ ] C8.4: 100 encrypt/decrypt cycles under MIE (both profiles). Monitor via `log stream --predicate 'eventMessage contains "MTE"'` for intermittent tag mismatches. *Pass: zero tag violations across 100 cycles.* ⚠️ 50× SE wrap/unwrap cycles completed without tag violations. Full 100× PGP encrypt/decrypt cycles under MIE diagnostics pending.
+- [x] C8.2: Full workflow (both profiles: key gen, encrypt/decrypt, sign/verify) on iPhone 17 or iPhone Air (A19/A19 Pro). *Pass: all operations complete. No tag mismatch crashes. Verify via Xcode Console filter for `EXC_GUARD` and `GUARD_EXC_MTE_SYNC_FAULT`.* ✅ 4 tests passed on device (A19 Pro): `test_mie_fullPGPWorkflow_profileA_noTagMismatch` (0.002s), `test_mie_fullPGPWorkflow_profileB_noTagMismatch` (0.002s), `test_mie_crossProfileEncrypt_noTagMismatch` (0.004s), `test_mie_keyExportImport_bothProfiles_noTagMismatch` (3.430s). Zero tag mismatch crashes.
+- [x] C8.3: OpenSSL operations (AES-256, SHA-512, Ed25519, X25519, Ed448, X448, Argon2id) under MIE. *Pass: all crypto operations succeed. No memory tagging violations.* ✅ 2 tests passed on device (A19 Pro): `test_mie_opensslCryptoPaths_allAlgorithms_noTagViolations` (3.274s), `test_mie_armorDearmor_bothProfiles_noTagViolations` (0.002s). All 8 OpenSSL code paths exercised. Zero memory tagging violations.
+- [x] C8.4: 100 encrypt/decrypt cycles under MIE (both profiles). Monitor via `log stream --predicate 'eventMessage contains "MTE"'` for intermittent tag mismatches. *Pass: zero tag violations across 100 cycles.* ✅ 3 tests passed on device (A19 Pro): `test_mie_100xEncryptDecryptCycles_profileA_noIntermittentCrashes` (0.044s), `test_mie_100xEncryptDecryptCycles_profileB_noIntermittentCrashes` (0.058s), `test_mie_100xSignVerifyCycles_bothProfiles_noIntermittentCrashes` (0.045s). 200× encrypt/decrypt + 200× sign/verify = zero tag violations.
 
 ### 2.11 QR / URL Scheme Validation
 
@@ -162,7 +162,7 @@ ALL items must pass on physical device. Upon success: full development begins.
 | ✅ MIE build verification | 1 | C8.1 |
 | ⬜ Remaining SE (device) | 2 | C6.4–C6.5 |
 | ⬜ Remaining Auth (UI) | 1 | C7.5 |
-| ⬜ MIE full validation (A19) | 3 | C8.2–C8.4 |
+| ✅ MIE full validation (A19) | 3 | C8.2–C8.4 |
 | ✅ Argon2id memory guard | 4 | C4.1–C4.4 |
 | ⬜ Argon2id Instruments (manual) | 1 | C4.5 |
 | ⬜ Manual only (Instruments) | 1 | C5.4 |
@@ -175,7 +175,8 @@ ALL items must pass on physical device. Upon success: full development begins.
 | ~~**Blocking**~~ | ~~C1.2–C1.3, C1.5~~ | ~~Cross-compile + XCFramework gates all Swift integration~~ ✅ **RESOLVED** |
 | ~~**Deferred**~~ | ~~C6.1–C6.3, C6.6, C7.1–C7.4, C8.1~~ | ~~Require physical device hardware~~ ✅ **RESOLVED** — tested on iPhone 17 Pro Max |
 | **Non-blocking** | C4.5, C5.4 | Manual Instruments tests |
-| **Deferred** | C6.4–C6.5, C7.5, C8.2–C8.4, C10.x | Require device hardware or UI integration |
+| **Deferred** | C6.4–C6.5, C7.5, C10.x | Require device hardware or UI integration |
+| ~~**Tests implemented, pending device run**~~ | ~~C8.2–C8.4~~ | ✅ **RESOLVED** — 9 tests passed on iPhone (A19 Pro), zero MIE violations |
 
 ### Detailed Status
 
@@ -243,7 +244,9 @@ ALL items must pass on physical device. Upon success: full development begins.
 | C7.4 | ✅ Verified (device) | `Tests/DeviceSecurityTests/DeviceSecurityTests.swift` | Bidirectional switch. Same-mode no-op. No-identities error. |
 | C7.5 | ⬜ Not tested | — | Requires UI layer (backup warning) |
 | C8.1 | ✅ Verified (device) | `Tests/DeviceSecurityTests/DeviceSecurityTests.swift` | Project builds + 31 device tests pass on iPhone 17 Pro Max (A19 Pro). |
-| C8.2–C8.4 | ⬜ Smoke only | `Tests/DeviceSecurityTests/DeviceSecurityTests.swift` | 50× SE wrap/unwrap on A19 Pro, zero crashes. Full PGP workflow under MIE diagnostics pending. |
+| C8.2 | ✅ Verified (device) | `Tests/DeviceSecurityTests/DeviceSecurityTests.swift` | 4 tests passed (A19 Pro): full Profile A/B workflows, cross-profile encrypt, key export/import (Argon2id + Iterated+Salted). Zero tag mismatch crashes. |
+| C8.3 | ✅ Verified (device) | `Tests/DeviceSecurityTests/DeviceSecurityTests.swift` | 2 tests passed (A19 Pro): all 8 OpenSSL code paths (AES-256, SHA-512, Ed25519, X25519, Ed448, X448, OCB, Argon2id) + armor/dearmor. Zero memory tagging violations. |
+| C8.4 | ✅ Verified (device) | `Tests/DeviceSecurityTests/DeviceSecurityTests.swift` | 3 tests passed (A19 Pro): 100× Profile A encrypt/decrypt (0.044s), 100× Profile B encrypt/decrypt (0.058s), 100× sign/verify both profiles (0.045s). Zero tag violations across 200+ cycles. |
 | C9.1 | ✅ Implemented + tested | `pgp-mobile/src/lib.rs`, `tests/qr_url_tests.rs` | v4 QR round-trip |
 | C9.2 | ✅ Implemented + tested | `tests/qr_url_tests.rs` | v6 QR round-trip |
 | C9.3 | ✅ Implemented + tested | `tests/qr_url_tests.rs` | Malformed data → error |
@@ -283,3 +286,4 @@ ALL items must pass on physical device. Upon success: full development begins.
 | v4.3 | **FFI boundary tests completed (C5.1–C5.3, C5.5–C5.7).** Xcode project created via xcodegen (project.yml). UniFFI Swift bindings linked to iOS simulator Rust static library. 16 XCTest cases pass on iPhone 17 simulator (iOS 26.2): binary round-trip (Profile A + B + 1 MB), Unicode round-trip (9 strings + User ID), error enum mapping (5 PgpError variants), KeyProfile enum crossing, concurrent encrypt (10 tasks), concurrent mixed encrypt+decrypt (Profile A + B). All tests complete in 0.76s. C5.4 (memory leak) remains manual-only. Total tested: 47/76 POC items. Remaining: C4 (Argon2id device), C5.4 (Instruments), C6–C7 (SE/Auth device), C8 (MIE A19 device), C10 (Performance device). |
 | v4.4 | **Device security tests completed (C6.1–C6.3, C6.6, C7.1–C7.4, C8.1).** 31 device tests pass on iPhone 17 Pro Max (A19 Pro, iOS 26.3.1) via `CypherAir-DeviceTests` test plan. SE wrapping: P-256 key generation (3 access control configs), Ed25519 + Ed448 wrap/unwrap round-trips, wrong-fingerprint rejection, Keychain full round-trip, SE key reconstruction, 50× rapid lifecycle cycles. Auth modes: Standard + High Security access control creation, biometrics availability, full-stack mode switch (Standard → High Security) with crash recovery (3 scenarios) and rollback on failure. MIE: project builds and all 31 tests pass on A19 Pro hardware; 50× SE wrap/unwrap cycles with zero tag mismatches. Remaining: C6.4–C6.5 (SE + FFI integration), C7.5 (UI backup warning), C8.2–C8.4 (full MIE PGP workflow), C4 (Argon2id device memory), C5.4 (Instruments), C10 (performance). Total tested: **56/76** POC items (up from 47). |
 | v4.5 | **Argon2id memory guard implemented (C4.1–C4.4).** New `Argon2idMemoryGuard` struct validates `os_proc_available_memory()` against S2K memory requirements before Argon2id key import. 75% threshold uses integer arithmetic (`required * 4 <= available * 3`) to avoid floating-point precision issues. `MemoryInfoProvidable` protocol enables mock injection for simulator tests. `@_silgen_name("os_proc_available_memory")` avoids bridging header. 10 FFI integration tests (simulator): real S2K parse (C4.1), synthetic 1 GB low/ample (C4.2), synthetic 2 GB refusal (C4.3), exact 75% boundary + boundary−1 byte + Profile A no-op + defensive edge cases (C4.4). 2 device tests: `SystemMemoryInfo` range validation + full pipeline (parseS2kParams → guard → importSecretKey). C4.5 (Instruments peak memory) remains manual. Total tested: **60/76** POC items (up from 56). |
+| v4.6 | **MIE full validation completed (C8.2–C8.4).** 9 device tests passed on iPhone (A19 Pro) with Enhanced Security / Hardware Memory Tagging enabled. C8.2: full PGP workflow for both profiles (keygen → encrypt → decrypt → sign → verify), cross-profile format auto-selection, key export/import with Argon2id + Iterated+Salted S2K. C8.3: all 8 OpenSSL code paths exercised (AES-256, SHA-512, Ed25519, X25519, Ed448, X448, AES-256-OCB AEAD, Argon2id) + armor/dearmor round-trips. C8.4: 100× encrypt/decrypt cycles for Profile A (0.044s) and Profile B (0.058s), 100× sign/verify for both profiles (0.045s). Zero `EXC_GUARD` / `GUARD_EXC_MTE_SYNC_FAULT` across all tests. Total tested: **63/76** POC items (up from 60). |
