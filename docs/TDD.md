@@ -112,7 +112,7 @@ The App decrypts all supported formats regardless of the user's own key profile:
 
 ### 1.7 Cross-Compilation
 
-Targets: `aarch64-apple-ios` (device) + `aarch64-apple-ios-sim` (Apple Silicon sim). Tier 2 in Rust. `getrandom` uses SecRandomCopyBytes on iOS. Estimated binary: 3–8 MB with LTO + strip.
+Targets: `aarch64-apple-ios` (device) + `aarch64-apple-ios-sim` (Apple Silicon sim). Tier 2 in Rust. `getrandom` uses SecRandomCopyBytes on iOS. LTO and strip are **disabled** in the release profile (`lto = false`, `strip = "none"`) — enabling them causes linker failures with vendored OpenSSL. Binary size is managed via `codegen-units = 1` and Xcode dead code elimination. Estimated app binary contribution: ~6–8 MB.
 
 ---
 
