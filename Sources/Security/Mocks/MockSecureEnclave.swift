@@ -62,8 +62,11 @@ final class MockSecureEnclave: SecureEnclaveManageable {
 
         // Generate random salt
         var salt = Data(count: 32)
-        salt.withUnsafeMutableBytes { ptr in
-            _ = SecRandomCopyBytes(kSecRandomDefault, 32, ptr.baseAddress!)
+        let saltStatus = salt.withUnsafeMutableBytes { ptr in
+            SecRandomCopyBytes(kSecRandomDefault, 32, ptr.baseAddress!)
+        }
+        guard saltStatus == errSecSuccess else {
+            throw MockSEError.randomGenerationFailed
         }
 
         // HKDF derive AES-256 key
@@ -171,4 +174,5 @@ enum MockSEError: Error {
     case invalidKeyHandle
     case keyNotFound
     case authenticationFailed
+    case randomGenerationFailed
 }
