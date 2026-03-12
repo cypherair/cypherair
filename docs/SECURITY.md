@@ -204,11 +204,20 @@ MIE is built right into Apple hardware and software in all models of iPhone 17 a
 
 ### Enablement
 
-In Xcode 26, Enhanced Security is managed via the `ENABLE_ENHANCED_SECURITY = YES` build setting. The `CypherAir.entitlements` file should contain an empty `<dict/>` — Xcode automatically injects the correct entitlements at build time. **Do not manually add entitlement keys to the `.entitlements` file**; doing so causes a build error ("Entitlements file was modified during the build").
+Enhanced Security is enabled via Signing & Capabilities → Add Capability → Enhanced Security → enable Hardware Memory Tagging. When this capability is added, Xcode writes the required entitlement keys into `CypherAir.entitlements`:
 
-To enable: Signing & Capabilities → Add Capability → Enhanced Security → enable Hardware Memory Tagging.
+- `com.apple.security.hardened-process` → `true`
+- `com.apple.security.hardened-process.enhanced-security-version` → `1`
+- `com.apple.security.hardened-process.hardened-heap` → `true`
+- `com.apple.security.hardened-process.platform-restrictions` → `2`
+- `com.apple.security.hardened-process.dyld-ro` → `true`
+- `com.apple.security.hardened-process.checked-allocations` → `true` (Hardware Memory Tagging)
+- `com.apple.security.hardened-process.checked-allocations.enable-pure-data` → `true`
+- `com.apple.security.hardened-process.checked-allocations.no-tagged-receive` → `true`
 
-To verify: check `ENABLE_ENHANCED_SECURITY = YES` in both Debug and Release build settings in `project.pbxproj`.
+**These entitlement keys must be committed to source control.** Xcode reads the `.entitlements` file to determine which protections are enabled. Removing the keys disables the corresponding protections.
+
+Additionally, verify `ENABLE_ENHANCED_SECURITY = YES` in both Debug and Release build settings in `project.pbxproj`.
 
 ### Testing Workflow
 
