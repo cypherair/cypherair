@@ -264,7 +264,7 @@ The following files and functions are security-critical. Claude Code must **stop
 | `pgp-mobile/src/decrypt.rs` | AEAD hard-fail enforcement. Weakening = plaintext leaks. |
 | `pgp-mobile/src/error.rs` | PgpError enum. Must stay 1:1 with Swift. |
 | `CypherAir.entitlements` | MIE, Enhanced Security entitlements. |
-| `Info.plist` | Must have zero permission usage descriptions. |
+| `Info.plist` | Only `NSFaceIDUsageDescription` permitted. No other usage descriptions. |
 
 ### Functions Requiring Human Review
 
