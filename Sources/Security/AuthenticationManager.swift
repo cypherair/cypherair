@@ -2,6 +2,12 @@ import Foundation
 import LocalAuthentication
 import Security
 
+// MARK: - Localized Strings
+
+private enum AuthStrings {
+    static let switchModeReason = String(localized: "Authenticate to change security mode")
+}
+
 /// Errors from authentication and mode switching operations.
 enum AuthenticationError: Error {
     /// Biometric authentication is not available (sensor damaged, locked out, etc.).
@@ -102,14 +108,16 @@ final class AuthenticationManager: AuthenticationEvaluable {
             // Face ID / Touch ID only. Hide the passcode fallback button.
             context.localizedFallbackTitle = ""
 
-            guard canEvaluate(mode: .highSecurity) else {
+            do {
+                return try await context.evaluatePolicy(
+                    .deviceOwnerAuthenticationWithBiometrics,
+                    localizedReason: reason
+                )
+            } catch let error as LAError where error.code == .biometryNotAvailable
+                                             || error.code == .biometryNotEnrolled
+                                             || error.code == .biometryLockout {
                 throw AuthenticationError.biometricsUnavailable
             }
-
-            return try await context.evaluatePolicy(
-                .deviceOwnerAuthenticationWithBiometrics,
-                localizedReason: reason
-            )
         }
     }
 
@@ -148,18 +156,22 @@ final class AuthenticationManager: AuthenticationEvaluable {
     /// This is an atomic operation: if any step fails before old keys are deleted,
     /// the original keys remain intact and the temporary items are cleaned up.
     ///
+    /// The method authenticates the user under the CURRENT mode before proceeding.
+    /// This ensures the security boundary is self-contained and cannot be bypassed
+    /// by a caller forgetting to authenticate first.
+    ///
     /// - Parameters:
     ///   - newMode: The target authentication mode.
     ///   - fingerprints: All identity fingerprints (lowercase hex) that have SE-wrapped keys.
     ///   - hasBackup: Whether at least one private key has been backed up.
     ///     If false and switching to High Security, the caller must show a stronger warning.
-    ///
-    /// Precondition: The caller has already authenticated the user under the current mode
-    /// and shown any necessary warnings (backup, biometrics-only risk).
+    ///   - authenticator: The authentication evaluator to use for verifying user identity.
+    ///     In production, pass `self` (the AuthenticationManager). In tests, pass a mock.
     func switchMode(
         to newMode: AuthenticationMode,
         fingerprints: [String],
-        hasBackup: Bool
+        hasBackup: Bool,
+        authenticator: any AuthenticationEvaluable
     ) async throws {
         guard !fingerprints.isEmpty else {
             throw AuthenticationError.noIdentities
@@ -167,6 +179,15 @@ final class AuthenticationManager: AuthenticationEvaluable {
 
         let oldMode = currentMode
         guard newMode != oldMode else { return }
+
+        // Step 0: Authenticate under the CURRENT mode before any Keychain modification.
+        let authenticated = try await authenticator.evaluate(
+            mode: oldMode,
+            reason: AuthStrings.switchModeReason
+        )
+        guard authenticated else {
+            throw AuthenticationError.failed
+        }
 
         // Step 1: Set in-progress flag before any Keychain modifications.
         defaults.set(true, forKey: AuthPreferences.rewrapInProgressKey)
