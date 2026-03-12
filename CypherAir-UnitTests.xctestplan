@@ -19,7 +19,7 @@
     {
       "target" : {
         "containerPath" : "container:CypherAir.xcodeproj",
-        "identifier" : "CypherAirTests",
+        "identifier" : "8561964DF0A7E2575A3799D6",
         "name" : "CypherAirTests"
       }
     }

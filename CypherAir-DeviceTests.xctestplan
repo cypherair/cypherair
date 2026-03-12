@@ -17,6 +17,9 @@
   },
   "testTargets" : [
     {
+      "selectedTags" : {
+        "includeXCTests" : true
+      },
       "selectedTests" : [
         "DeviceSecurityTests"
       ],

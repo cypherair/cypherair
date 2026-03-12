@@ -36,7 +36,7 @@
 
 /* Begin PBXFileReference section */
 		0FB40F8BED05EDFD21D30FC0 /* MockSecureEnclave.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockSecureEnclave.swift; sourceTree = "<group>"; };
-		108F8485D41E1065D3C9268A /* CypherAirTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CypherAirTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		108F8485D41E1065D3C9268A /* CypherAirTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CypherAirTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		20424B6FAFC1A2F0D749144D /* MemoryZeroingUtility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MemoryZeroingUtility.swift; path = Sources/Security/MemoryZeroingUtility.swift; sourceTree = SOURCE_ROOT; };
 		28D527A8404F04C0FE814B11 /* SecureEnclaveManageable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureEnclaveManageable.swift; sourceTree = "<group>"; };
 		31AB481CBDFEDEA9D2D492D4 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = KeychainManager.swift; path = Sources/Security/KeychainManager.swift; sourceTree = SOURCE_ROOT; };
@@ -47,7 +47,7 @@
 		6F3D4980908222124A478FD8 /* DeviceSecurityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DeviceSecurityTests.swift; path = Tests/DeviceSecurityTests/DeviceSecurityTests.swift; sourceTree = SOURCE_ROOT; };
 		7990845AB81240EF6E852FF4 /* MockKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockKeychain.swift; sourceTree = "<group>"; };
 		837DC6C22137DFF68E868353 /* MockAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockAuthenticator.swift; sourceTree = "<group>"; };
-		9379668011500E781695A4AC /* CypherAir.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CypherAir.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9379668011500E781695A4AC /* CypherAir.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CypherAir.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9BDCB1737386048EAADF9840 /* KeychainManageable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManageable.swift; sourceTree = "<group>"; };
 		A444291AB7231CBA07E9C8CD /* AuthenticationEvaluable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationEvaluable.swift; sourceTree = "<group>"; };
 		D35F4B8C8B4CAB4FB248E04F /* SecureEnclaveManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SecureEnclaveManager.swift; path = Sources/Security/SecureEnclaveManager.swift; sourceTree = SOURCE_ROOT; };
@@ -196,8 +196,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 2630;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = 55F48F6BE6300530916BF414 /* Build configuration list for PBXProject "CypherAir" */;
 			developmentRegion = en;
@@ -264,6 +262,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = D327CF4P4A;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
@@ -278,17 +277,10 @@
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"$(inherited)",
-					"-Xcc",
-					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
-				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.tests;
 				SDKROOT = iphoneos;
-				SWIFT_INCLUDE_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/bindings",
-				);
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(PROJECT_DIR)/bindings";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CypherAir.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CypherAir";
 			};
@@ -298,6 +290,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = D327CF4P4A;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
@@ -312,17 +305,10 @@
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"$(inherited)",
-					"-Xcc",
-					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
-				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.tests;
 				SDKROOT = iphoneos;
-				SWIFT_INCLUDE_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/bindings",
-				);
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(PROJECT_DIR)/bindings";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CypherAir.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CypherAir";
 			};
@@ -334,16 +320,23 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = D327CF4P4A;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/bindings",
 				);
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher ​Air uses ​Face ​ID to protect your private keys.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios/release",
+				);
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release",
 				);
@@ -356,17 +349,10 @@
 					"$(inherited)",
 					"-lpgp_mobile",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"$(inherited)",
-					"-Xcc",
-					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
-				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.app;
 				SDKROOT = iphoneos;
-				SWIFT_INCLUDE_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/bindings",
-				);
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(PROJECT_DIR)/bindings";
 				SWIFT_OBJC_BRIDGING_HEADER = "";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -497,16 +483,23 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = D327CF4P4A;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/bindings",
 				);
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher ​Air uses ​Face ​ID to protect your private keys.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios/release",
+					"$(inherited)",
+				);
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release",
 				);
@@ -519,17 +512,10 @@
 					"$(inherited)",
 					"-lpgp_mobile",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"$(inherited)",
-					"-Xcc",
-					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
-				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.app;
 				SDKROOT = iphoneos;
-				SWIFT_INCLUDE_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/bindings",
-				);
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(PROJECT_DIR)/bindings";
 				SWIFT_OBJC_BRIDGING_HEADER = "";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
