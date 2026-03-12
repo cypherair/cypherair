@@ -2,39 +2,15 @@
 //! Covers POC test cases C2X.1–C2X.5.
 //! Validates format auto-selection by recipient key version.
 
+mod common;
+use common::detect_message_format;
+
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::encrypt;
 use pgp_mobile::decrypt;
 use pgp_mobile::sign;
 use pgp_mobile::verify;
 use pgp_mobile::decrypt::SignatureStatus;
-use sequoia_openpgp as openpgp;
-use openpgp::parse::Parse;
-
-/// Helper: detect whether binary ciphertext uses SEIPDv1 or SEIPDv2.
-/// Uses PacketParser to inspect packet headers without fully decrypting.
-/// Returns (has_seipd_v1, has_seipd_v2).
-fn detect_message_format(ciphertext: &[u8]) -> (bool, bool) {
-    let mut has_v1 = false;
-    let mut has_v2 = false;
-    let mut ppr = openpgp::parse::PacketParser::from_bytes(ciphertext)
-        .expect("Should parse ciphertext");
-    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
-        match &pp.packet {
-            openpgp::Packet::SEIP(seip) => {
-                if seip.version() == 1 {
-                    has_v1 = true;
-                } else if seip.version() == 2 {
-                    has_v2 = true;
-                }
-            }
-            _ => {}
-        }
-        let (_, next) = pp.next().expect("Should advance");
-        ppr = next;
-    }
-    (has_v1, has_v2)
-}
 
 /// C2X.1: Profile A encrypts to Profile B recipient (v6 key).
 /// Pass: message format is SEIPDv2. Recipient decrypts.
@@ -124,7 +100,7 @@ fn test_profile_b_encrypts_to_profile_a() {
 /// Pass: format is SEIPDv1 (lowest common). Both decrypt.
 #[test]
 fn test_mixed_recipients_v4_and_v6() {
-    let sender_b = keys::generate_key_with_profile(
+    let _sender_b = keys::generate_key_with_profile(
         "Alice (B)".to_string(),
         None,
         None,
