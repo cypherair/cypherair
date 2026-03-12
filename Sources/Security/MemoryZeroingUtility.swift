@@ -17,7 +17,20 @@ final class SensitiveData {
     private var storage: Data
 
     /// The underlying data. Read-only access.
+    ///
+    /// WARNING: This returns a value copy of the data (Swift copy-on-write semantics).
+    /// The returned copy is NOT controlled by `SensitiveData.zeroize()` or `deinit`.
+    /// If you store the returned `Data` in a variable, you are responsible for calling
+    /// `.zeroize()` on that copy when done. Prefer `withUnsafeBytes` when possible
+    /// to avoid creating unmanaged copies.
     var data: Data { storage }
+
+    /// Access the underlying bytes without creating an unmanaged copy.
+    /// The closure receives a read-only pointer to the data. No copy is made,
+    /// so `zeroize()` / `deinit` will reliably clear the only copy.
+    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        try storage.withUnsafeBytes(body)
+    }
 
     /// The byte count of the underlying data.
     var count: Int { storage.count }

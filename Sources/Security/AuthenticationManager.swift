@@ -192,6 +192,8 @@ final class AuthenticationManager: AuthenticationEvaluable {
         // Step 1: Set in-progress flag before any Keychain modifications.
         defaults.set(true, forKey: AuthPreferences.rewrapInProgressKey)
 
+        // Phase A: Create all pending items (Steps 2-3).
+        // If anything fails here, old items are intact — safe to clean up pending and abort.
         do {
             let newAccessControl = try createAccessControl(for: newMode)
 
@@ -276,7 +278,18 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     account: KeychainConstants.defaultAccount
                 )
             }
+        } catch {
+            // Phase A failed: old items are intact. Safe to clean up pending and abort.
+            cleanupPendingItems(fingerprints: fingerprints)
+            defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
+            throw AuthenticationError.modeSwitchFailed(underlying: error)
+        }
 
+        // Phase B: Delete old items and promote pending (Steps 4-7).
+        // At this point all pending items are confirmed stored. If anything fails here,
+        // we must NOT clean up pending items — they may be the only copy of some keys.
+        // Instead, leave the rewrapInProgress flag set so crash recovery can handle it.
+        do {
             // Step 4: Delete OLD Keychain items. All new items are confirmed stored.
             for fingerprint in fingerprints {
                 try keychain.delete(
@@ -305,9 +318,9 @@ final class AuthenticationManager: AuthenticationEvaluable {
             defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
 
         } catch {
-            // Rollback: clean up any temporary items that were created.
-            cleanupPendingItems(fingerprints: fingerprints)
-            defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
+            // Phase B failed: some old items may already be deleted.
+            // Do NOT clean up pending items — they are the only remaining copy.
+            // Leave rewrapInProgress flag set so crash recovery runs on next launch.
             throw AuthenticationError.modeSwitchFailed(underlying: error)
         }
     }
@@ -334,25 +347,42 @@ final class AuthenticationManager: AuthenticationEvaluable {
                 service: KeychainConstants.seKeyService(fingerprint: fingerprint),
                 account: KeychainConstants.defaultAccount
             )
-            let pendingExists = keychain.exists(
+            let pendingSeKeyExists = keychain.exists(
                 service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
                 account: KeychainConstants.defaultAccount
             )
 
-            if oldExists && pendingExists {
+            if oldExists && pendingSeKeyExists {
                 // Case 1: Interrupted before old items deleted.
                 // Delete temporary items. Original keys are intact.
                 cleanupPendingItems(fingerprints: [fingerprint])
 
-            } else if !oldExists && pendingExists {
+            } else if !oldExists && pendingSeKeyExists {
                 // Case 2: Interrupted after old deletion but before rename.
-                // Promote temporary items to permanent names.
-                do {
-                    try promoteFromPending(fingerprint: fingerprint)
-                } catch {
-                    // If promotion fails, the user will need to restore from backup.
-                    // The pending items are still in Keychain for manual recovery.
+                // Verify all 3 pending items exist before attempting promotion.
+                // If only some pending items were written (partial write crash),
+                // promotion will fail and the user must restore from backup.
+                let pendingSaltExists = keychain.exists(
+                    service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+                    account: KeychainConstants.defaultAccount
+                )
+                let pendingSealedExists = keychain.exists(
+                    service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+                    account: KeychainConstants.defaultAccount
+                )
+
+                if pendingSaltExists && pendingSealedExists {
+                    // All 3 pending items present — safe to promote.
+                    do {
+                        try promoteFromPending(fingerprint: fingerprint)
+                    } catch {
+                        // If promotion fails, the pending items remain in Keychain
+                        // for manual recovery. The user will need to restore from backup.
+                    }
                 }
+                // else: Incomplete pending set — catastrophic partial write.
+                // Cannot promote. The user must restore from backup.
+                // Leave the incomplete pending items as-is for forensics.
 
             }
             // Case 3: Neither exists — catastrophic loss. Nothing we can do here.
@@ -366,11 +396,15 @@ final class AuthenticationManager: AuthenticationEvaluable {
     // MARK: - Private Helpers
 
     /// Promote pending Keychain items to permanent names for one identity.
-    /// Sequence: load pending → save as permanent → delete pending.
+    /// Sequence: load all pending → save as permanent → delete pending.
+    ///
+    /// If saving permanent items partially fails, any already-saved permanent
+    /// items are rolled back (deleted) to preserve the pending-only state.
+    /// This prevents crash recovery from seeing partial permanent data.
     private func promoteFromPending(fingerprint: String) throws {
         let account = KeychainConstants.defaultAccount
 
-        // Load pending items.
+        // Load all 3 pending items first (validates completeness before writing).
         let seKeyData = try keychain.load(
             service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
             account: account
@@ -384,27 +418,43 @@ final class AuthenticationManager: AuthenticationEvaluable {
             account: account
         )
 
-        // Save under permanent names.
-        try keychain.save(
-            seKeyData,
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-        try keychain.save(
-            saltData,
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-        try keychain.save(
-            sealedData,
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
+        // Save under permanent names, rolling back on partial failure.
+        // Track which permanent items were successfully saved.
+        var savedPermanentServices: [String] = []
 
-        // Delete pending items.
+        do {
+            try keychain.save(
+                seKeyData,
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: account,
+                accessControl: nil
+            )
+            savedPermanentServices.append(KeychainConstants.seKeyService(fingerprint: fingerprint))
+
+            try keychain.save(
+                saltData,
+                service: KeychainConstants.saltService(fingerprint: fingerprint),
+                account: account,
+                accessControl: nil
+            )
+            savedPermanentServices.append(KeychainConstants.saltService(fingerprint: fingerprint))
+
+            try keychain.save(
+                sealedData,
+                service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+                account: account,
+                accessControl: nil
+            )
+        } catch {
+            // Partial save failure: rollback any permanent items we just created.
+            // This restores the pending-only state so crash recovery works correctly.
+            for service in savedPermanentServices {
+                try? keychain.delete(service: service, account: account)
+            }
+            throw error
+        }
+
+        // All 3 permanent items saved successfully. Delete pending items.
         try? keychain.delete(
             service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
             account: account

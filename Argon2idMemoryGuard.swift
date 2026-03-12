@@ -24,6 +24,10 @@ struct Argon2idMemoryGuard {
     /// - Parameter s2kInfo: The parsed S2K parameters from the key file.
     /// - Throws: `PgpError.Argon2idMemoryExceeded` if memory requirement
     ///   exceeds 75% of available memory.
+    /// RFC 9580 maximum encoded_m is 31 (2^31 KiB = 2 TB).
+    /// Any value beyond this is malformed or malicious.
+    private static let maxMemoryKib: UInt64 = 1 << 31
+
     func validate(s2kInfo: S2kInfo) throws {
         // Non-Argon2id (Profile A: "iterated-salted") — no memory check needed.
         guard s2kInfo.s2kType == "argon2id" else { return }
@@ -32,12 +36,39 @@ struct Argon2idMemoryGuard {
         // but be defensive).
         guard s2kInfo.memoryKib > 0 else { return }
 
+        // Defense-in-depth: reject memoryKib values that exceed RFC 9580's
+        // maximum encoded_m=31 (2^31 KiB). This prevents overflow in the
+        // multiplication below and rejects malformed S2K parameters early.
+        guard s2kInfo.memoryKib <= Self.maxMemoryKib else {
+            let requiredMb = s2kInfo.memoryKib / 1024
+            throw PgpError.Argon2idMemoryExceeded(requiredMb: requiredMb)
+        }
+
         let requiredBytes = s2kInfo.memoryKib * 1024
         let availableBytes = memoryInfo.availableMemoryBytes()
 
         // 75% threshold using integer arithmetic to avoid floating-point rounding.
         // required <= available * 3/4  ⟺  required * 4 <= available * 3
-        guard requiredBytes &* 4 <= availableBytes &* 3 else {
+        //
+        // Use overflow-checked multiplication instead of wrapping (&*).
+        // Wrapping multiplication could silently wrap to a small value on overflow,
+        // allowing a malicious S2K parameter to bypass the guard.
+        let (r4, overflowR) = requiredBytes.multipliedReportingOverflow(by: 4)
+        let (a3, overflowA) = availableBytes.multipliedReportingOverflow(by: 3)
+
+        // If required*4 overflows, requirement is > 4 EB — always refuse.
+        // If available*3 overflows, available memory > 6 EB — always pass
+        // (impossible on iOS, but logically correct).
+        let exceeds: Bool
+        if overflowR {
+            exceeds = true
+        } else if overflowA {
+            exceeds = false
+        } else {
+            exceeds = r4 > a3
+        }
+
+        guard !exceeds else {
             let requiredMb = s2kInfo.memoryKib / 1024
             throw PgpError.Argon2idMemoryExceeded(requiredMb: requiredMb)
         }
