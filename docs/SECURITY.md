@@ -202,37 +202,18 @@ This prevents iOS Jetsam from killing the app. The 75% threshold provides a safe
 
 MIE is built right into Apple hardware and software in all models of iPhone 17 and iPhone Air (A19/A19 Pro). It provides hardware-level defense against buffer overflows and use-after-free in all C/C++ code, including vendored OpenSSL. The system allocator assigns 4-bit tags to heap allocations. Every memory access is checked by hardware in real time. Tag mismatch = immediate process termination.
 
-### Entitlements
+### Enablement
 
-The `CypherAir.entitlements` file must contain Enhanced Security entitlements. **The exact entitlement key names below are illustrative — verify against the Xcode 26 Signing & Capabilities editor, as Apple may use different keys than shown here:**
+In Xcode 26, Enhanced Security is managed via the `ENABLE_ENHANCED_SECURITY = YES` build setting. The `CypherAir.entitlements` file should contain an empty `<dict/>` — Xcode automatically injects the correct entitlements at build time. **Do not manually add entitlement keys to the `.entitlements` file**; doing so causes a build error ("Entitlements file was modified during the build").
 
-```xml
-<!-- Illustrative — verify actual keys in Xcode 26 Signing & Capabilities -->
-<key>com.apple.security.hardened-process.hardened-heap</key>
-<true/>
-<key>com.apple.security.hardened-process.platform-restrictions</key>
-<true/>
-<key>com.apple.security.hardened-process.checked-allocations</key>
-<true/>
-<key>com.apple.security.hardened-process.dyld-ro</key>
-<true/>
-```
+To enable: Signing & Capabilities → Add Capability → Enhanced Security → enable Hardware Memory Tagging.
 
-For development/TestFlight, add soft mode:
-```xml
-<key>com.apple.security.hardened-process.checked-allocations.soft-mode</key>
-<true/>
-```
-
-Remove soft mode for production release builds.
-
-**The canonical way to enable MIE is via Xcode 26: Signing & Capabilities → Add Capability → Enhanced Security → enable Hardware Memory Tagging.** The entitlement XML above is provided for reference and auditing only.
+To verify: check `ENABLE_ENHANCED_SECURITY = YES` in both Debug and Release build settings in `project.pbxproj`.
 
 ### Testing Workflow
 
 1. **Xcode diagnostics:** Enable Hardware Memory Tagging in Scheme → Run → Diagnostics. Run full test suite on A19 device. Any tag mismatch surfaces as a crash with exact location.
-2. **Soft Mode (TestFlight):** Deploy with soft-mode entitlement. Simulated crash reports appear in Xcode → Devices → Opened Recent Logs with exception type `EXC_GUARD / GUARD_EXC_MTE_SYNC_FAULT` but do NOT terminate the app. Review all reports.
-3. **Hard Mode (production):** Remove `checked-allocations.soft-mode` entitlement. Tag mismatches now terminate the process immediately. Only enable after all violations are resolved.
+2. **Production:** Tag mismatches terminate the process immediately. This is the desired behavior — it converts silent corruption into a detectable, non-exploitable crash.
 
 ### Impact on Vendored OpenSSL
 

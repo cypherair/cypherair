@@ -1,41 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-	<!-- Enhanced Security / Memory Integrity Enforcement (MIE)
-	     These entitlements enable hardware memory tagging on A19/A19 Pro devices
-	     (all models of iPhone 17 and iPhone Air).
-
-	     TODO: Verify exact entitlement key names in Xcode 26 Signing & Capabilities editor.
-	     The keys below are based on SECURITY.md Section 6 documentation.
-	     The canonical way to enable MIE is via Xcode 26:
-	     Signing & Capabilities → Add Capability → Enhanced Security → enable Hardware Memory Tagging.
-	-->
-
-	<!-- Hardened heap (typed allocator) -->
-	<key>com.apple.security.hardened-process.hardened-heap</key>
-	<true/>
-
-	<!-- Platform restrictions (runtime restrictions) -->
-	<key>com.apple.security.hardened-process.platform-restrictions</key>
-	<true/>
-
-	<!-- Checked allocations (hardware memory tagging) -->
-	<key>com.apple.security.hardened-process.checked-allocations</key>
-	<true/>
-
-	<!-- Read-only platform memory (dyld protections) -->
-	<key>com.apple.security.hardened-process.dyld-ro</key>
-	<true/>
-
-	<!-- Authenticate Pointers -->
-	<key>com.apple.security.hardened-process.authenticate-pointers</key>
-	<true/>
-
-	<!-- Soft mode: enabled for development/TestFlight builds.
-	     Logs tag mismatches as simulated crashes without terminating the app.
-	     MUST be removed for production release builds. -->
-	<key>com.apple.security.hardened-process.checked-allocations.soft-mode</key>
-	<true/>
-</dict>
+<dict/>
 </plist>
