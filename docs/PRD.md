@@ -14,7 +14,7 @@ A fully offline OpenPGP encryption tool that enables everyday users to communica
 ### 1.2 Core Value Proposition
 
 - **Truly Offline:** Zero network access; data leakage eliminated at the architectural level.
-- **Zero Permissions:** No system permissions requested. All I/O via system-provided pickers and Share Sheet.
+- **Minimal Permissions:** The only permission is Face ID usage description (`NSFaceIDUsageDescription`), required by iOS for biometric authentication. No camera, photo library, contacts, or network permissions. All I/O via system-provided pickers and Share Sheet.
 - **Standards-Compliant:** Compatible with GnuPG (Profile A) and the latest RFC 9580 standard (Profile B).
 - **Usable by Anyone:** No cryptographic knowledge required.
 
@@ -47,9 +47,9 @@ English + Simplified Chinese. iOS String Catalog (.xcstrings) for community tran
 
 No HTTP(S). No networked SDKs. No update checks. Code audit confirms zero network paths.
 
-### 2.2 Zero Permissions (Hard Requirement)
+### 2.2 Minimal Permissions (Hard Requirement)
 
-No permission descriptions in Info.plist. No camera (QR via system Camera + URL scheme). No photo library (PHPickerViewController). Permitted I/O: App sandbox, Share Sheet, file picker, photo picker, URL scheme, system "Open With."
+The only Info.plist usage description is `NSFaceIDUsageDescription`, which is required by iOS when the App uses `LAContext` for Face ID / Touch ID authentication. This is not a runtime permission prompt — iOS mandates the key's presence and crashes the process if it is absent. No camera (QR via system Camera + URL scheme). No photo library (PHPickerViewController). No other permission descriptions in Info.plist. Permitted I/O: App sandbox, Share Sheet, file picker, photo picker, URL scheme, system "Open With."
 
 ---
 
@@ -309,7 +309,7 @@ Key gen, encrypt/decrypt, sign/verify, tamper (1-bit flip), QR encode/decode. Ru
 
 ### 8.5 Offline & Permission
 
-- [ ] Airplane Mode works. No prompts. No usage descriptions. No network/camera/photo APIs.
+- [ ] Airplane Mode works. No prompts. Only `NSFaceIDUsageDescription` in Info.plist (no other usage descriptions). No network/camera/photo APIs.
 
 ### 8.6 Accessibility
 

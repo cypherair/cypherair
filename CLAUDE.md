@@ -1,6 +1,6 @@
 # Cypher Air
 
-Offline OpenPGP encryption tool for iOS. GPLv3. Zero network access. Zero permissions.
+Offline OpenPGP encryption tool for iOS. GPLv3. Zero network access. Minimal permissions (Face ID usage description only).
 
 ## Tech Stack
 
@@ -70,7 +70,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
 ## Hard Constraints — NEVER Violate
 
 1. **Zero network access.** No HTTP(S), no networked SDKs, no telemetry. Code audit must confirm zero network code paths. No network URL loading (http/https). No NWConnection. No URLSession. Custom app URL scheme handling (`cypherair://`) is permitted — it is local IPC, not network access.
-2. **Zero permissions.** No entries in Info.plist usage descriptions. No camera, photo library, contacts, or network entitlements. All I/O through system pickers, Share Sheet, URL scheme.
+2. **Minimal permissions.** The only Info.plist usage description is `NSFaceIDUsageDescription` (required by iOS for Face ID / Touch ID authentication via `LAContext`). No camera, photo library, contacts, or network entitlements. All I/O through system pickers, Share Sheet, URL scheme.
 3. **AEAD hard-fail.** Authentication failure during decryption must abort immediately. Never show partial plaintext.
 4. **No plaintext or private keys in logs.** Never `print()`, `os_log()`, or `NSLog()` any key material, passphrase, or decrypted content. Not even in DEBUG builds.
 5. **Memory zeroing.** All sensitive data (`Data` buffers containing keys, passphrases, plaintext) must be overwritten with zeros when no longer needed. Rust side: `zeroize` crate. Swift side: `resetBytes(in:)` on `Data`.
@@ -90,7 +90,7 @@ STOP and describe proposed changes before editing any file in these areas:
 - `Sources/Services/QRService.swift` — external URL input parsing (untrusted data)
 - `pgp-mobile/src/` — any Rust cryptographic code
 - `CypherAir.entitlements` — capability entitlements
-- `Info.plist` — permission descriptions (must remain empty)
+- `Info.plist` — permission descriptions (only `NSFaceIDUsageDescription` permitted)
 
 Full security model and red lines: @docs/SECURITY.md
 
