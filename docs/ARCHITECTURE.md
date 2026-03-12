@@ -65,6 +65,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `SecureEnclaveManager` | P-256 key generation in SE, self-ECDH + HKDF + AES-GCM wrapping/unwrapping, key deletion. Same wrapping scheme for Ed25519/X25519/Ed448/X448. |
 | `KeychainManager` | CRUD for Keychain items (SE key blob, salt, sealed box), access control flag configuration |
 | `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, crash recovery for interrupted re-wrap |
+| `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K memory requirements before key import. 75% threshold prevents Jetsam termination. No-op for Profile A (Iterated+Salted S2K). |
 | `MemoryZeroingUtility` | Extensions on `Data` and `Array<UInt8>` for secure clearing |
 
 ### Models (`Sources/Models/`)
