@@ -2,7 +2,9 @@ import Foundation
 
 /// Mock authenticator for testing authentication flows.
 /// Controls whether authentication succeeds and whether biometrics are available.
-final class MockAuthenticator: AuthenticationEvaluable {
+///
+/// - Warning: Not thread-safe. Only use from test methods on a single actor.
+final class MockAuthenticator: AuthenticationEvaluable, @unchecked Sendable {
     /// Whether the next authentication attempt should succeed.
     var shouldSucceed = true
 
