@@ -1,6 +1,6 @@
 # Proof-of-Concept (POC) Test Plan
 
-> **Version:** v4.4
+> **Version:** v4.5
 > **Companion to:** [PRD](PRD.md) · [TDD](TDD.md)  
 > **Audience:** POC Developers
 
@@ -78,11 +78,11 @@ Validate Sequoia PGP 2.2.0 + crypto-openssl + UniFFI + Secure Enclave + dual Pro
 
 ### 2.6 Argon2id Memory Safety (Profile B Only)
 
-- [ ] C4.1: Decrypt Profile B key with 512 MB Argon2id → success on 8 GB+ device.
-- [ ] C4.2: Decrypt key with 1 GB Argon2id (external) → success or graceful error. NO crash.
-- [ ] C4.3: Decrypt key with 2 GB Argon2id → graceful refusal. NO crash.
-- [ ] C4.4: os_proc_available_memory() guard blocks > 75% available.
-- [ ] C4.5: Monitor actual memory peak during 512 MB Argon2id import via Instruments. *Record value.*
+- [x] C4.1: Decrypt Profile B key with 512 MB Argon2id → success on 8 GB+ device. ✅ Real S2K parse via `PgpEngine.parseS2kParams()` returns argon2id/524288 KiB/p=4/t=3. `Argon2idMemoryGuard.validate()` passes with mock 6 GB available. Device test: full pipeline (parseS2kParams → guard → importSecretKey) succeeds on iPhone 17 Pro Max.
+- [x] C4.2: Decrypt key with 1 GB Argon2id (external) → success or graceful error. NO crash. ✅ Synthetic 1 GB S2K (memoryKib=1048576): mock 1 GB available → throws `PgpError.Argon2idMemoryExceeded(requiredMb: 1024)`. Mock 6 GB available → passes. No crash in either case.
+- [x] C4.3: Decrypt key with 2 GB Argon2id → graceful refusal. NO crash. ✅ Synthetic 2 GB S2K (memoryKib=2097152) + mock 2.5 GB available → throws `Argon2idMemoryExceeded(requiredMb: 2048)`. Graceful error, no crash.
+- [x] C4.4: os_proc_available_memory() guard blocks > 75% available. ✅ Integer-arithmetic threshold (`required * 4 <= available * 3`): exact 75% boundary passes, boundary−1 byte throws. Profile A (iterated-salted S2K) is no-op even with 1 byte available. Defensive: argon2id with memoryKib=0 → no-op; unknown S2K type → no-op. Memory provider queried exactly once.
+- [ ] C4.5: Monitor actual memory peak during 512 MB Argon2id import via Instruments. *Record value.* ⚠️ Manual Instruments test — not automatable. Device tests (C4.5 in `DeviceSecurityTests`) verify `SystemMemoryInfo` returns > 500 MB and ≤ physical memory on real device.
 
 ### 2.7 FFI Boundary
 
@@ -163,7 +163,8 @@ ALL items must pass on physical device. Upon success: full development begins.
 | ⬜ Remaining SE (device) | 2 | C6.4–C6.5 |
 | ⬜ Remaining Auth (UI) | 1 | C7.5 |
 | ⬜ MIE full validation (A19) | 3 | C8.2–C8.4 |
-| ⬜ Needs device (Argon2id) | 5 | C4.1–C4.5 |
+| ✅ Argon2id memory guard | 4 | C4.1–C4.4 |
+| ⬜ Argon2id Instruments (manual) | 1 | C4.5 |
 | ⬜ Manual only (Instruments) | 1 | C5.4 |
 | ⬜ Performance (soft-fail) | 8 | C10.1–C10.8 |
 
@@ -173,8 +174,8 @@ ALL items must pass on physical device. Upon success: full development begins.
 |---------------|-------|-----------|
 | ~~**Blocking**~~ | ~~C1.2–C1.3, C1.5~~ | ~~Cross-compile + XCFramework gates all Swift integration~~ ✅ **RESOLVED** |
 | ~~**Deferred**~~ | ~~C6.1–C6.3, C6.6, C7.1–C7.4, C8.1~~ | ~~Require physical device hardware~~ ✅ **RESOLVED** — tested on iPhone 17 Pro Max |
-| **Non-blocking** | C5.4 | Manual Instruments test |
-| **Deferred** | C4.x, C6.4–C6.5, C7.5, C8.2–C8.4, C10.x | Require device hardware or UI integration |
+| **Non-blocking** | C4.5, C5.4 | Manual Instruments tests |
+| **Deferred** | C6.4–C6.5, C7.5, C8.2–C8.4, C10.x | Require device hardware or UI integration |
 
 ### Detailed Status
 
@@ -218,7 +219,11 @@ ALL items must pass on physical device. Upon success: full development begins.
 | C3.6 | ✅ Implemented + tested | `tests/gnupg_interop_tests.rs` | Tampered GnuPG ciphertext → decrypt fails; tampered Sequoia ciphertext → fails |
 | C3.7 | ✅ Implemented + tested | `tests/gnupg_interop_tests.rs` | Full round-trip: import gpg pubkey → encrypt → decrypt (unsigned + signed) |
 | C3.8 | ✅ Implemented + tested | `tests/gnupg_interop_tests.rs` | Profile B produces v6 key + SEIPDv2 (GnuPG incompatible, verified structurally) |
-| C4.1–C4.5 | ⬜ Not implemented | — | Needs iOS device for memory tests |
+| C4.1 | ✅ Verified | `Argon2idMemoryGuard.swift`, `Tests/FFIIntegrationTests`, `Tests/DeviceSecurityTests` | Real S2K parse + guard pass (mock 6 GB). Device: full pipeline succeeds on iPhone 17 Pro Max. |
+| C4.2 | ✅ Verified | `Tests/FFIIntegrationTests` | Synthetic 1 GB: low memory → Argon2idMemoryExceeded; ample memory → pass. |
+| C4.3 | ✅ Verified | `Tests/FFIIntegrationTests` | Synthetic 2 GB + mock 2.5 GB → Argon2idMemoryExceeded. No crash. |
+| C4.4 | ✅ Verified | `Tests/FFIIntegrationTests` | Integer-arithmetic 75% threshold. Exact boundary passes, boundary−1 byte fails. Profile A no-op. Defensive edge cases. |
+| C4.5 | ⬜ Manual only | `Tests/DeviceSecurityTests` (partial) | Instruments peak memory recording pending. Device test verifies `SystemMemoryInfo` returns valid range. |
 | C5.1 | ✅ Verified | `Tests/FFIIntegrationTests/FFIIntegrationTests.swift` | Profile A + B round-trip, 1 MB large data. 3 tests pass. |
 | C5.2 | ✅ Verified | `Tests/FFIIntegrationTests/FFIIntegrationTests.swift` | 9 Unicode strings (CJK, emoji, zero-width, combining, Arabic). User ID preservation. 2 tests pass. |
 | C5.3 | ✅ Verified | `Tests/FFIIntegrationTests/FFIIntegrationTests.swift` | NoMatchingKey, IntegrityCheckFailed, CorruptData, WrongPassphrase, InvalidKeyData. 5 tests pass. |
@@ -277,3 +282,4 @@ ALL items must pass on physical device. Upon success: full development begins.
 | v4.2 | **Compilation & integration tests completed (C1.1–C1.6).** All blocking items resolved. Rust 1.94.0 + Xcode 26.3 + iOS 26.2 SDK verified. Vendored OpenSSL build (`openssl = { features = ["vendored"] }`) added to Cargo.toml for host builds. LTO + strip + codegen-units=1 configured in release profile. Cross-compilation to aarch64-apple-ios and aarch64-apple-ios-sim both succeed. UniFFI bindgen produces complete Swift bindings (77 KB pgp_mobile.swift). XCFramework created with device + simulator slices. Binary size: host dylib 6.5 MB, estimated app contribution ~6–8 MB (within 10 MB threshold). Total tested: 41/76 POC items (up from 35). Remaining items require physical iOS device or manual Instruments profiling. |
 | v4.3 | **FFI boundary tests completed (C5.1–C5.3, C5.5–C5.7).** Xcode project created via xcodegen (project.yml). UniFFI Swift bindings linked to iOS simulator Rust static library. 16 XCTest cases pass on iPhone 17 simulator (iOS 26.2): binary round-trip (Profile A + B + 1 MB), Unicode round-trip (9 strings + User ID), error enum mapping (5 PgpError variants), KeyProfile enum crossing, concurrent encrypt (10 tasks), concurrent mixed encrypt+decrypt (Profile A + B). All tests complete in 0.76s. C5.4 (memory leak) remains manual-only. Total tested: 47/76 POC items. Remaining: C4 (Argon2id device), C5.4 (Instruments), C6–C7 (SE/Auth device), C8 (MIE A19 device), C10 (Performance device). |
 | v4.4 | **Device security tests completed (C6.1–C6.3, C6.6, C7.1–C7.4, C8.1).** 31 device tests pass on iPhone 17 Pro Max (A19 Pro, iOS 26.3.1) via `CypherAir-DeviceTests` test plan. SE wrapping: P-256 key generation (3 access control configs), Ed25519 + Ed448 wrap/unwrap round-trips, wrong-fingerprint rejection, Keychain full round-trip, SE key reconstruction, 50× rapid lifecycle cycles. Auth modes: Standard + High Security access control creation, biometrics availability, full-stack mode switch (Standard → High Security) with crash recovery (3 scenarios) and rollback on failure. MIE: project builds and all 31 tests pass on A19 Pro hardware; 50× SE wrap/unwrap cycles with zero tag mismatches. Remaining: C6.4–C6.5 (SE + FFI integration), C7.5 (UI backup warning), C8.2–C8.4 (full MIE PGP workflow), C4 (Argon2id device memory), C5.4 (Instruments), C10 (performance). Total tested: **56/76** POC items (up from 47). |
+| v4.5 | **Argon2id memory guard implemented (C4.1–C4.4).** New `Argon2idMemoryGuard` struct validates `os_proc_available_memory()` against S2K memory requirements before Argon2id key import. 75% threshold uses integer arithmetic (`required * 4 <= available * 3`) to avoid floating-point precision issues. `MemoryInfoProvidable` protocol enables mock injection for simulator tests. `@_silgen_name("os_proc_available_memory")` avoids bridging header. 10 FFI integration tests (simulator): real S2K parse (C4.1), synthetic 1 GB low/ample (C4.2), synthetic 2 GB refusal (C4.3), exact 75% boundary + boundary−1 byte + Profile A no-op + defensive edge cases (C4.4). 2 device tests: `SystemMemoryInfo` range validation + full pipeline (parseS2kParams → guard → importSecretKey). C4.5 (Instruments peak memory) remains manual. Total tested: **60/76** POC items (up from 56). |

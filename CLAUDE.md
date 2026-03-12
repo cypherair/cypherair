@@ -21,7 +21,7 @@ Three-layer bridge: Rust (`pgp-mobile`) → UniFFI scaffolding → Swift app.
 Sources/
 ├── App/              # SwiftUI views, navigation, onboarding
 ├── Services/         # Encryption, signing, key management, contacts, QR
-├── Security/         # SE wrapping, Keychain, auth modes, memory zeroing
+├── Security/         # SE wrapping, Keychain, auth modes, Argon2id memory guard, memory zeroing
 ├── Models/           # Data types, PGP key representations, error types
 ├── Extensions/       # Swift/Foundation extensions
 └── Resources/        # Assets, String Catalog, Info.plist
