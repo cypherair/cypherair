@@ -16,7 +16,16 @@
     }
   },
   "testTargets" : [
-
+    {
+      "selectedTests" : [
+        "DeviceSecurityTests"
+      ],
+      "target" : {
+        "containerPath" : "container:CypherAir.xcodeproj",
+        "identifier" : "CypherAirTests",
+        "name" : "CypherAirTests"
+      }
+    }
   ],
   "version" : 1
 }
