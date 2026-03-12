@@ -41,12 +41,25 @@ pub fn verify_cleartext(
         signer_fingerprint: None,
     };
 
-    let mut verifier = VerifierBuilder::from_bytes(signed_message)
+    let verifier_result = VerifierBuilder::from_bytes(signed_message)
         .map_err(|e| PgpError::CorruptData {
             reason: format!("Failed to parse signed message: {e}"),
         })?
-        .with_policy(&policy, None, helper)
-        .map_err(|_e| PgpError::BadSignature)?;
+        .with_policy(&policy, None, helper);
+
+    // Graded result: if with_policy() fails (e.g., tampered cleartext signature),
+    // return Bad status instead of throwing. This lets the caller inspect the
+    // result rather than catching an exception.
+    let mut verifier = match verifier_result {
+        Ok(v) => v,
+        Err(_) => {
+            return Ok(VerifyResult {
+                status: SignatureStatus::Bad,
+                signer_fingerprint: None,
+                content: None,
+            });
+        }
+    };
 
     let mut content = Vec::new();
     std::io::Read::read_to_end(&mut verifier, &mut content).map_err(|e| {
@@ -88,14 +101,33 @@ pub fn verify_detached(
         signer_fingerprint: None,
     };
 
-    let mut verifier = DetachedVerifierBuilder::from_bytes(signature)
+    let verifier_result = DetachedVerifierBuilder::from_bytes(signature)
         .map_err(|e| PgpError::CorruptData {
             reason: format!("Failed to parse signature: {e}"),
         })?
-        .with_policy(&policy, None, helper)
-        .map_err(|_e| PgpError::BadSignature)?;
+        .with_policy(&policy, None, helper);
 
-    verifier.verify_bytes(data).map_err(|_| PgpError::BadSignature)?;
+    // Graded result: if with_policy() fails, return Bad status instead of throwing.
+    let mut verifier = match verifier_result {
+        Ok(v) => v,
+        Err(_) => {
+            return Ok(VerifyResult {
+                status: SignatureStatus::Bad,
+                signer_fingerprint: None,
+                content: None,
+            });
+        }
+    };
+
+    // verify_bytes may fail for tampered data — return Bad status as graded result.
+    if verifier.verify_bytes(data).is_err() {
+        let helper = verifier.into_helper();
+        return Ok(VerifyResult {
+            status: SignatureStatus::Bad,
+            signer_fingerprint: helper.signer_fingerprint,
+            content: None,
+        });
+    }
 
     let helper = verifier.into_helper();
 
