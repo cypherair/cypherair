@@ -20,3 +20,6 @@ Packages/
 
 # XCFramework (built artifact, not source)
 *.xcframework/
+
+# Claude Code local worktrees (not project config)
+.claude/worktrees/
