@@ -3,7 +3,7 @@
 > **Version:** v3.9  
 > **Platform:** iOS 26+ / iPadOS 26+  
 > **License:** GPLv3  
-> **Companion documents:** [TDD](TDD.md) · [POC](POC.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md)
+> **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
 
 ## 1. Product Overview
 
@@ -59,37 +59,17 @@ The App offers two encryption profiles. The user selects a profile when generati
 
 ### 3.1 Profile A: Universal Compatible (Default)
 
-Designed for maximum interoperability with all major PGP implementations, including GnuPG.
+Designed for maximum interoperability with all major PGP implementations, including GnuPG. v4 key format (RFC 4880), Ed25519+X25519, SEIPDv1, ~128-bit security.
 
-| Component | Algorithm | Notes |
-|-----------|-----------|-------|
-| Key format | v4 (RFC 4880) | Universal compatibility |
-| Signing | Ed25519 (legacy EdDSA) | GnuPG 2.1+ support |
-| Encryption | X25519 (legacy ECDH) | GnuPG 2.1+ support |
-| Symmetric | AES-256 | |
-| Message format | SEIPDv1 (MDC) | Non-AEAD; GnuPG compatible |
-| Hash | SHA-512 | Accepts SHA-256 for legacy signature verification |
-| S2K (key export) | Iterated+Salted (mode 3) | GnuPG compatible |
-| Compression | DEFLATE (read-only) | Enabled for reading compatibility; outgoing messages are never compressed |
-| Security level | ~128 bit | |
+For complete algorithm specifications, see [SECURITY.md](SECURITY.md) Section 1 (Profile A).
 
 **Compatible with:** GnuPG 2.1+, Sequoia, OpenPGP.js, GopenPGP, Thunderbird, Bouncy Castle — virtually all PGP tools.
 
 ### 3.2 Profile B: Advanced Security
 
-Designed for maximum security using RFC 9580 (the latest OpenPGP standard). Not compatible with GnuPG.
+Designed for maximum security using RFC 9580 (the latest OpenPGP standard). Not compatible with GnuPG. v6 key format, Ed448+X448, SEIPDv2 AEAD, ~224-bit security.
 
-| Component | Algorithm | Notes |
-|-----------|-----------|-------|
-| Key format | v6 (RFC 9580) | Latest standard |
-| Signing | Ed448 | ~224-bit security; deterministic signatures |
-| Encryption | X448 | ~224-bit security; inherent AES-256 key wrap |
-| Symmetric | AES-256 | |
-| AEAD | OCB (primary), GCM (secondary) | OCB is RFC 9580 mandatory mode |
-| Hash | SHA-512 | |
-| S2K (key export) | Argon2id (512 MB / p=4 / ~3s) | Memory-hard; RFC 9580 recommended |
-| Compression | DEFLATE (read-only) | Enabled for reading compatibility; outgoing messages are never compressed |
-| Security level | ~224 bit | |
+For complete algorithm specifications, see [SECURITY.md](SECURITY.md) Section 1 (Profile B).
 
 **Compatible with:** Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+, PGPainless 2.0+. **Not compatible with GnuPG.**
 
@@ -391,10 +371,4 @@ macOS. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack.
 
 ## Appendix B: Revision Log
 
-| Version | Changes |
-|---------|---------|
-| v2.0–v3.5 | See previous history. |
-| v3.6 | **Dual profile system introduced.** Profile A (Universal Compatible): v4 keys, Ed25519+X25519, SEIPDv1, Iterated+Salted S2K — full GnuPG compatibility. Profile B (Advanced Security): v6 keys, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id — RFC 9580 ecosystem only. Auto format selection by recipient key version. Mixed recipient handling (v4+v6 → SEIPDv1). Profile selection in key generation UX. Acceptance criteria split by profile. Self-test covers both profiles. Scenarios updated for mixed-profile communication. Documents split into PRD + TDD + POC markdown files in repository. |
-| v3.7 | **Content restoration and consolidation.** Restored content that was inadvertently removed or over-compressed during v3.6 revision: compression algorithm setting (Disabled) in both profile tables, file output format (.gpg default), full Authentication Mode description (High Security Mode rationale, activation safeguards, technical detail) with cross-references retained as supplementary, detailed App Protection acceptance criteria (High Security biometric-only enforcement), MIE explanatory note on compatibility, Technical Architecture summary (SE wrapping detail, UI framework, storage architecture). Scenarios 5–10 restored with full descriptions (previously marked "unchanged from v3.5" without content). Scenario numbering updated (v3.5 Scenario 7 merged with new Scenario 11). |
-| v3.8 | **Cross-version audit and completeness pass.** Restored content inadvertently lost during v3.6/v3.7 revisions, verified against v3.5 docx and companion documents (SECURITY.md, ARCHITECTURE.md, CLAUDE.md). Changes: Section 4.1 restored "recommended" hint for email field. Section 4.6 added revocation cert export path. Section 8.3 restored "URL scheme requires confirmation" acceptance criterion. Section 9 restored full FFI pipeline description ("Wrapper crate → Swift bindings → XCFramework") and full MIE description ("Hardware Memory Tagging protects vendored OpenSSL C code on A19+ devices"). Section 10.1 MVP checklist restored multi-key, expiry modification, and revocation cert features. |
-| v3.9 | **Second cross-version audit against v3.5 docx.** Scenario 11 restored Secure Enclave hardware binding + biometric-only access control description (present in v3.5 Scenario 7, lost during v3.6 rewrite). Section 5.1 restored "badge" in "backup status badge" (UI element specificity). Section 6.1 restored general "⚠️ Possible risk" label alongside format downgrade example (v3.8 had replaced the general label with a single specific case). |
+Full revision history: [CHANGELOG.md](CHANGELOG.md)

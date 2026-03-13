@@ -150,7 +150,7 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Module breakdown, data flows, storage layout |
 | [SECURITY](docs/SECURITY.md) | Encryption scheme, key lifecycle, threat model |
 | [TESTING](docs/TESTING.md) | Test strategy and coverage |
-| [POC](docs/POC.md) | Proof-of-concept test plan |
+| [POC](docs/archive/POC.md) | Proof-of-concept test plan (archived) |
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards and SwiftUI patterns |
 | [LIQUID_GLASS](docs/LIQUID_GLASS.md) | iOS 26 Liquid Glass design adoption guide |
 
