@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'CRITICAL REMINDERS: 1) Zero network access 2) No plaintext in logs 3) AEAD hard-fail 4) Memory zeroing required 5) Ask before editing Sources/Security/ or pgp-mobile/src/'"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -37,3 +37,10 @@ cryptographic operations, Keychain access, or direct Sequoia calls.
   of services in views.
 - No `async` work in `body`. Trigger async operations via button actions or `.task {}`.
 - Extract subviews into separate files when `body` exceeds ~50 lines.
+
+## Definition of Done
+
+- `xcodebuild build -scheme CypherAir` succeeds
+- All user-visible strings added to String Catalog (`Localizable.xcstrings`)
+- VoiceOver labels on all interactive elements
+- 44pt minimum touch targets on all interactive elements
