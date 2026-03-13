@@ -97,3 +97,11 @@ Any change to the public API surface of `pgp-mobile` (new functions, changed sig
 ## License
 
 Sequoia PGP is licensed under LGPL-2.0-or-later. The App is GPLv3, which is compatible (GPLv3 satisfies LGPL requirements). Since the App is fully open-source, LGPL compliance is inherently met — the LGPL'd source is available alongside all other source code.
+
+## Definition of Done
+
+- `cargo test --manifest-path pgp-mobile/Cargo.toml` passes
+- `cargo clippy --all-targets --manifest-path pgp-mobile/Cargo.toml -- -D warnings` is clean
+- Both iOS targets compile: `aarch64-apple-ios` and `aarch64-apple-ios-sim`
+- FFI bindings regenerated if public API changed (see "Changing the Public API" above)
+- Tests cover both Profile A and Profile B unless explicitly scoped to one

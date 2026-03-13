@@ -124,6 +124,7 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 - MIE: test on iPhone 17 or iPhone Air (A19/A19 Pro) with Hardware Memory Tagging diagnostics enabled.
 - Test plans: `CypherAir-UnitTests.xctestplan` (simulator/CI), `CypherAir-DeviceTests.xctestplan` (physical device).
 - Full testing guide: @docs/TESTING.md
+- Code review checklist: @docs/CODE_REVIEW.md
 
 ## Workflow Reminders
 

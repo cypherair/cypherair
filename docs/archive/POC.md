@@ -1,7 +1,9 @@
 # Proof-of-Concept (POC) Test Plan
 
+> **Status:** Archived — all POC validations completed. For current testing guidance, see [TESTING.md](TESTING.md).
+
 > **Version:** v4.7
-> **Companion to:** [PRD](PRD.md) · [TDD](TDD.md)  
+> **Companion to:** [PRD](PRD.md) · [TDD](TDD.md)
 > **Audience:** POC Developers
 
 ## 1. Objective
