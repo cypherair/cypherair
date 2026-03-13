@@ -82,6 +82,11 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         }
 
         // HKDF derive AES-256 key with domain-separated info string.
+        // Note: SymmetricKey is an opaque CryptoKit type that manages its own secure
+        // memory lifecycle internally. There is no public zeroize() API — the key
+        // material is cleared by the framework when the value goes out of scope.
+        // This satisfies SECURITY.md §3.2 step 6 ("zeroize symmetric key") via
+        // framework guarantees rather than explicit application-level zeroing.
         let infoData = SEConstants.hkdfInfo(fingerprint: fingerprint)
         let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
@@ -114,6 +119,7 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         )
 
         // Re-derive symmetric key with stored salt and same info string.
+        // See wrap() for note on SymmetricKey's opaque secure memory lifecycle.
         let infoData = SEConstants.hkdfInfo(fingerprint: fingerprint)
         let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
