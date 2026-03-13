@@ -38,6 +38,12 @@ struct ContactDetailView: View {
                     Section {
                         Text(contact.formattedFingerprint)
                             .font(.system(.body, design: .monospaced))
+                            .accessibilityLabel(
+                                contact.formattedFingerprint
+                                    .split(separator: " ")
+                                    .map { $0.map(String.init).joined(separator: " ") }
+                                    .joined(separator: ", ")
+                            )
                     } header: {
                         Text(String(localized: "contactdetail.fingerprint", defaultValue: "Fingerprint"))
                     }
@@ -49,6 +55,12 @@ struct ContactDetailView: View {
                             Image(systemName: contact.canEncryptTo ? "checkmark.circle.fill" : "xmark.circle.fill")
                                 .foregroundStyle(contact.canEncryptTo ? .green : .red)
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(
+                            contact.canEncryptTo
+                                ? String(localized: "contactdetail.canEncrypt.yes", defaultValue: "Can encrypt to this contact: Yes")
+                                : String(localized: "contactdetail.canEncrypt.no", defaultValue: "Can encrypt to this contact: No")
+                        )
                     }
 
                     Section {

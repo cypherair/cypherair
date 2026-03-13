@@ -67,10 +67,10 @@ struct FileEncryptView: View {
                 }
             }
 
-            if encryptedData != nil {
+            if let data = encryptedData {
                 Section {
                     ShareLink(
-                        item: encryptedData!,
+                        item: data,
                         preview: SharePreview(
                             "\(originalFilename ?? "encrypted").gpg",
                             image: Image(systemName: "lock.doc")

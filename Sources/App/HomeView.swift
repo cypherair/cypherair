@@ -165,7 +165,7 @@ struct HomeView: View {
         case .about:
             AboutView()
         default:
-            Text("Coming soon")
+            Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
         }
     }
 }
