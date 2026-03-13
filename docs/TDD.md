@@ -244,15 +244,17 @@ Per identity (fingerprint = lowercase hex, no spaces):
 com.cypherair.v1.se-key.<fingerprint>
 com.cypherair.v1.salt.<fingerprint>
 com.cypherair.v1.sealed-key.<fingerprint>
+com.cypherair.v1.metadata.<fingerprint>
 ```
 
 **Keychain item configuration:**
 
-| Item | kSecClass | kSecAttrAccessible |
-|------|-----------|-------------------|
-| SE key `dataRepresentation` | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` |
-| Salt | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` |
-| Encrypted private key | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` |
+| Item | kSecClass | kSecAttrAccessible | Access Control |
+|------|-----------|-------------------|----------------|
+| SE key `dataRepresentation` | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | Per auth mode |
+| Salt | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
+| Encrypted private key | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
+| Key metadata (PGPKeyIdentity JSON) | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None (no SE auth) |
 
 ### 3.6 Security Properties
 

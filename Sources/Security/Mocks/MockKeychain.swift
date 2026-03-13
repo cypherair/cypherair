@@ -89,6 +89,16 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
         storage[storageKey(service: service, account: account)] != nil
     }
 
+    func listItems(servicePrefix: String, account: String) throws -> [String] {
+        let suffix = ":\(account)"
+        return storage.keys.compactMap { key in
+            guard key.hasSuffix(suffix) else { return nil }
+            let service = String(key.dropLast(suffix.count))
+            guard service.hasPrefix(servicePrefix) else { return nil }
+            return service
+        }
+    }
+
     /// Reset all state for clean test setup.
     func reset() {
         storage.removeAll()
