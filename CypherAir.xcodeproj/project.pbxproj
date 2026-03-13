@@ -75,13 +75,6 @@
 				F3EC8935DF44293B377AB6CB /* Sources */,
 				A1C9AAA2B5ED04BDA656105D /* Tests */,
 				87A0C373A5702D60FD4DC48F /* Products */,
-				4F7A45988890FF1A2C03A4B8 /* AuthenticationManager.swift */,
-				31AB481CBDFEDEA9D2D492D4 /* KeychainManager.swift */,
-				D35F4B8C8B4CAB4FB248E04F /* SecureEnclaveManager.swift */,
-				20424B6FAFC1A2F0D749144D /* MemoryZeroingUtility.swift */,
-				F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */,
-				6F3D4980908222124A478FD8 /* DeviceSecurityTests.swift */,
-				CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -106,27 +99,42 @@
 			isa = PBXGroup;
 			children = (
 				EB25CBF841620099B863C9EF /* FFIIntegrationTests */,
+				CE340E9D2F6323140047E290 /* DeviceSecurityTests */,
 			);
 			path = Tests;
-			sourceTree = "<group>";
-		};
-		A781A821CF8EAECAAECABD0B /* Protocols */ = {
-			isa = PBXGroup;
-			children = (
-				A444291AB7231CBA07E9C8CD /* AuthenticationEvaluable.swift */,
-				9BDCB1737386048EAADF9840 /* KeychainManageable.swift */,
-				28D527A8404F04C0FE814B11 /* SecureEnclaveManageable.swift */,
-				CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */,
-			);
-			path = Protocols;
 			sourceTree = "<group>";
 		};
 		CB69DE072B594667995CB9C9 /* Security */ = {
 			isa = PBXGroup;
 			children = (
 				D2A79E1E7BD6672E1EA9B80D /* Mocks */,
+				4F7A45988890FF1A2C03A4B8 /* AuthenticationManager.swift */,
+				31AB481CBDFEDEA9D2D492D4 /* KeychainManager.swift */,
+				D35F4B8C8B4CAB4FB248E04F /* SecureEnclaveManager.swift */,
+				20424B6FAFC1A2F0D749144D /* MemoryZeroingUtility.swift */,
+				CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */,
+				A444291AB7231CBA07E9C8CD /* AuthenticationEvaluable.swift */,
+				9BDCB1737386048EAADF9840 /* KeychainManageable.swift */,
+				28D527A8404F04C0FE814B11 /* SecureEnclaveManageable.swift */,
+				CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */,
 			);
 			path = Security;
+			sourceTree = "<group>";
+		};
+		CE340E9C2F6323140047E290 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		CE340E9D2F6323140047E290 /* DeviceSecurityTests */ = {
+			isa = PBXGroup;
+			children = (
+				6F3D4980908222124A478FD8 /* DeviceSecurityTests.swift */,
+			);
+			path = DeviceSecurityTests;
 			sourceTree = "<group>";
 		};
 		D2A79E1E7BD6672E1EA9B80D /* Mocks */ = {
@@ -153,8 +161,8 @@
 			children = (
 				88575B810543423FEB67AE78 /* App */,
 				7C5ACE182F45D1FBDBBA47F9 /* PgpMobile */,
-				A781A821CF8EAECAAECABD0B /* Protocols */,
 				CB69DE072B594667995CB9C9 /* Security */,
+				CE340E9C2F6323140047E290 /* Extensions */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -344,7 +352,13 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/bindings",
 				);
+				INFOPLIST_KEY_CFBundleDisplayName = "Cypher Air";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher ​Air uses ​Face ​ID to protect your private keys.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "";
+				INFOPLIST_KEY_UIStatusBarStyle = "";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -528,7 +542,13 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/bindings",
 				);
+				INFOPLIST_KEY_CFBundleDisplayName = "Cypher Air";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher ​Air uses ​Face ​ID to protect your private keys.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "";
+				INFOPLIST_KEY_UIStatusBarStyle = "";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
