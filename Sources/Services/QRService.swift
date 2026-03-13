@@ -1,0 +1,96 @@
+import Foundation
+import CoreImage
+import CoreImage.CIFilterBuiltins
+
+/// QR code generation and URL scheme parsing.
+///
+/// SECURITY-CRITICAL: This service parses untrusted external input
+/// (cypherair:// URLs from QR codes). Changes require human review.
+/// See SECURITY.md Section 7.
+@Observable
+final class QRService {
+
+    private let engine: PgpEngine
+
+    init(engine: PgpEngine = PgpEngine()) {
+        self.engine = engine
+    }
+
+    // MARK: - QR Generation
+
+    /// Generate a QR code image for a public key.
+    /// Format: cypherair://import/v1/<base64url, no padding>
+    ///
+    /// - Parameter publicKeyData: Binary public key data.
+    /// - Returns: A CIImage of the QR code, or nil if generation fails.
+    func generateQRCode(for publicKeyData: Data) throws -> CIImage? {
+        let urlString = try engine.encodeQrUrl(publicKeyData: publicKeyData)
+
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(urlString.utf8)
+        filter.correctionLevel = "M"
+
+        return filter.outputImage
+    }
+
+    // MARK: - URL Parsing
+
+    /// Parse a cypherair:// import URL and extract the public key data.
+    ///
+    /// SECURITY: This processes untrusted external input. The Rust engine
+    /// validates the URL format and parses the OpenPGP key, rejecting
+    /// invalid data and secret key material.
+    ///
+    /// - Parameter url: The cypherair:// URL.
+    /// - Returns: Binary public key data.
+    func parseImportURL(_ url: URL) throws -> Data {
+        guard let urlString = url.absoluteString as String? else {
+            throw CypherAirError.invalidQRCode
+        }
+
+        // Validate scheme
+        guard url.scheme == "cypherair" else {
+            throw CypherAirError.invalidQRCode
+        }
+
+        // Validate host/path format
+        guard url.host == "import" || urlString.hasPrefix("cypherair://import/") else {
+            throw CypherAirError.invalidQRCode
+        }
+
+        // Check version segment
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+        if let firstComponent = pathComponents.first {
+            guard firstComponent == "v1" else {
+                throw CypherAirError.unsupportedQRVersion
+            }
+        }
+
+        // Delegate to Rust engine for full parsing and validation
+        return try engine.decodeQrUrl(url: urlString)
+    }
+
+    // MARK: - QR Decoding from Image
+
+    /// Decode QR codes from a CIImage (e.g., from PHPicker selection).
+    /// Uses CIDetector for QR code detection.
+    ///
+    /// - Parameter image: The image to scan for QR codes.
+    /// - Returns: Array of decoded string values from QR codes found.
+    func decodeQRCodes(from image: CIImage) async throws -> [String] {
+        // Use CIDetector for QR code detection (synchronous, runs on caller's context)
+        let detector = CIDetector(
+            ofType: CIDetectorTypeQRCode,
+            context: nil,
+            options: [CIDetectorAccuracy: CIDetectorAccuracyHigh]
+        )
+
+        guard let features = detector?.features(in: image) else {
+            return []
+        }
+
+        return features.compactMap { feature in
+            (feature as? CIQRCodeFeature)?.messageString
+        }
+    }
+}

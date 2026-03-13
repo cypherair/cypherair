@@ -35,6 +35,15 @@ protocol KeychainManageable {
 
     /// Check if an item exists in the Keychain without loading it.
     func exists(service: String, account: String) -> Bool
+
+    /// List all service names matching a given prefix.
+    /// Used for key enumeration on cold launch.
+    ///
+    /// - Parameters:
+    ///   - servicePrefix: The prefix to filter by (e.g., "com.cypherair.v1.metadata.").
+    ///   - account: The Keychain account identifier.
+    /// - Returns: Array of full service names matching the prefix.
+    func listItems(servicePrefix: String, account: String) throws -> [String]
 }
 
 /// Keychain service name constants.
@@ -72,6 +81,15 @@ enum KeychainConstants {
     static func pendingSealedKeyService(fingerprint: String) -> String {
         "\(prefix).pending-sealed-key.\(fingerprint)"
     }
+
+    /// Key identity metadata (Codable JSON, no sensitive data).
+    /// Used for cold-launch key enumeration without SE authentication.
+    static func metadataService(fingerprint: String) -> String {
+        "\(prefix).metadata.\(fingerprint)"
+    }
+
+    /// Service prefix for metadata items (used for enumeration).
+    static let metadataPrefix = "\(prefix).metadata."
 
     /// Default Keychain account identifier.
     static let defaultAccount = "com.cypherair"

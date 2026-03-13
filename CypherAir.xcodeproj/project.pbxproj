@@ -21,6 +21,45 @@
 		A8B4434FA49C1E1C1D83AB0D /* Data+Zeroing.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */; };
 		B8462A44F4C7F182FE942E78 /* FFIIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6640F8252CB178C778859069 /* FFIIntegrationTests.swift */; };
 		CB6546CBB702B1311AFEDEB3 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31AB481CBDFEDEA9D2D492D4 /* KeychainManager.swift */; };
+		CE0064A02F6492D8008604AB /* KeyProfile+App.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00649F2F6492D8008604AB /* KeyProfile+App.swift */; };
+		CE0064A22F6492D8008604AB /* PGPKeyIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064A12F6492D8008604AB /* PGPKeyIdentity.swift */; };
+		CE0064A42F6492D8008604AB /* Contact.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064A32F6492D8008604AB /* Contact.swift */; };
+		CE0064A62F6492D8008604AB /* AppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064A52F6492D8008604AB /* AppConfiguration.swift */; };
+		CE0064A82F6492FD008604AB /* CypherAirError.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064A72F6492FD008604AB /* CypherAirError.swift */; };
+		CE0064AA2F6492FD008604AB /* SignatureVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064A92F6492FD008604AB /* SignatureVerification.swift */; };
+		CE0064AC2F649416008604AB /* KeyManagementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064AB2F649416008604AB /* KeyManagementService.swift */; };
+		CE0064AE2F649416008604AB /* ContactService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064AD2F649416008604AB /* ContactService.swift */; };
+		CE0064B02F649416008604AB /* EncryptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064AF2F649416008604AB /* EncryptionService.swift */; };
+		CE0064B22F649416008604AB /* DecryptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064B12F649416008604AB /* DecryptionService.swift */; };
+		CE0064B42F649454008604AB /* SigningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064B32F649454008604AB /* SigningService.swift */; };
+		CE0064B62F649455008604AB /* QRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064B52F649455008604AB /* QRService.swift */; };
+		CE0064B82F649455008604AB /* SelfTestService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064B72F649455008604AB /* SelfTestService.swift */; };
+		CE0064BA2F649539008604AB /* AppRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064B92F649539008604AB /* AppRoute.swift */; };
+		CE0064BC2F64953A008604AB /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064BB2F64953A008604AB /* ContentView.swift */; };
+		CE0064BE2F64953B008604AB /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064BD2F64953B008604AB /* HomeView.swift */; };
+		CE0064C62F649576008604AB /* MyKeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064C52F649576008604AB /* MyKeysView.swift */; };
+		CE0064C82F649576008604AB /* KeyGenerationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064C72F649576008604AB /* KeyGenerationView.swift */; };
+		CE0064CA2F649576008604AB /* KeyDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064C92F649576008604AB /* KeyDetailView.swift */; };
+		CE0064CC2F649576008604AB /* BackupKeyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064CB2F649576008604AB /* BackupKeyView.swift */; };
+		CE0064CE2F649576008604AB /* ImportKeyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064CD2F649576008604AB /* ImportKeyView.swift */; };
+		CE0064D02F6495C2008604AB /* ContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064CF2F6495C2008604AB /* ContactsView.swift */; };
+		CE0064D22F6495C2008604AB /* ContactDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064D12F6495C2008604AB /* ContactDetailView.swift */; };
+		CE0064D42F6495C2008604AB /* AddContactView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064D32F6495C2008604AB /* AddContactView.swift */; };
+		CE0064D62F6495C2008604AB /* EncryptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064D52F6495C2008604AB /* EncryptView.swift */; };
+		CE0064D82F6495C2008604AB /* DecryptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064D72F6495C2008604AB /* DecryptView.swift */; };
+		CE0064DA2F6495C2008604AB /* SignView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064D92F6495C2008604AB /* SignView.swift */; };
+		CE0064DC2F6495C3008604AB /* VerifyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064DB2F6495C3008604AB /* VerifyView.swift */; };
+		CE0064DE2F6495C3008604AB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064DD2F6495C3008604AB /* SettingsView.swift */; };
+		CE0064E02F6495C3008604AB /* SelfTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064DF2F6495C3008604AB /* SelfTestView.swift */; };
+		CE0064E22F6495C3008604AB /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064E12F6495C3008604AB /* AboutView.swift */; };
+		CE0064E52F64972D008604AB /* PrivacyScreenModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064E42F64972D008604AB /* PrivacyScreenModifier.swift */; };
+		CE0064E72F64972D008604AB /* QRDisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064E62F64972D008604AB /* QRDisplayView.swift */; };
+		CE0064E92F64972D008604AB /* QRPhotoImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064E82F64972D008604AB /* QRPhotoImportView.swift */; };
+		CE0064EC2F64975C008604AB /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064EB2F64975C008604AB /* OnboardingView.swift */; };
+		CE0064EE2F64975C008604AB /* FileEncryptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064ED2F64975C008604AB /* FileEncryptView.swift */; };
+		CE0064F02F64975D008604AB /* FileDecryptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064EF2F64975D008604AB /* FileDecryptView.swift */; };
+		CE0064F22F649F3F008604AB /* ImportConfirmView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064F12F649F3F008604AB /* ImportConfirmView.swift */; };
+		CE0064F42F649FED008604AB /* KeyProfile+Codable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064F32F649FED008604AB /* KeyProfile+Codable.swift */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
 		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
@@ -53,6 +92,45 @@
 		9379668011500E781695A4AC /* CypherAir.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CypherAir.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9BDCB1737386048EAADF9840 /* KeychainManageable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManageable.swift; sourceTree = "<group>"; };
 		A444291AB7231CBA07E9C8CD /* AuthenticationEvaluable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationEvaluable.swift; sourceTree = "<group>"; };
+		CE00649F2F6492D8008604AB /* KeyProfile+App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyProfile+App.swift"; sourceTree = "<group>"; };
+		CE0064A12F6492D8008604AB /* PGPKeyIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PGPKeyIdentity.swift; sourceTree = "<group>"; };
+		CE0064A32F6492D8008604AB /* Contact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Contact.swift; sourceTree = "<group>"; };
+		CE0064A52F6492D8008604AB /* AppConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfiguration.swift; sourceTree = "<group>"; };
+		CE0064A72F6492FD008604AB /* CypherAirError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CypherAirError.swift; sourceTree = "<group>"; };
+		CE0064A92F6492FD008604AB /* SignatureVerification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureVerification.swift; sourceTree = "<group>"; };
+		CE0064AB2F649416008604AB /* KeyManagementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyManagementService.swift; sourceTree = "<group>"; };
+		CE0064AD2F649416008604AB /* ContactService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactService.swift; sourceTree = "<group>"; };
+		CE0064AF2F649416008604AB /* EncryptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptionService.swift; sourceTree = "<group>"; };
+		CE0064B12F649416008604AB /* DecryptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecryptionService.swift; sourceTree = "<group>"; };
+		CE0064B32F649454008604AB /* SigningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SigningService.swift; sourceTree = "<group>"; };
+		CE0064B52F649455008604AB /* QRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRService.swift; sourceTree = "<group>"; };
+		CE0064B72F649455008604AB /* SelfTestService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTestService.swift; sourceTree = "<group>"; };
+		CE0064B92F649539008604AB /* AppRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoute.swift; sourceTree = "<group>"; };
+		CE0064BB2F64953A008604AB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		CE0064BD2F64953B008604AB /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		CE0064C52F649576008604AB /* MyKeysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyKeysView.swift; sourceTree = "<group>"; };
+		CE0064C72F649576008604AB /* KeyGenerationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyGenerationView.swift; sourceTree = "<group>"; };
+		CE0064C92F649576008604AB /* KeyDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyDetailView.swift; sourceTree = "<group>"; };
+		CE0064CB2F649576008604AB /* BackupKeyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupKeyView.swift; sourceTree = "<group>"; };
+		CE0064CD2F649576008604AB /* ImportKeyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportKeyView.swift; sourceTree = "<group>"; };
+		CE0064CF2F6495C2008604AB /* ContactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsView.swift; sourceTree = "<group>"; };
+		CE0064D12F6495C2008604AB /* ContactDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactDetailView.swift; sourceTree = "<group>"; };
+		CE0064D32F6495C2008604AB /* AddContactView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddContactView.swift; sourceTree = "<group>"; };
+		CE0064D52F6495C2008604AB /* EncryptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptView.swift; sourceTree = "<group>"; };
+		CE0064D72F6495C2008604AB /* DecryptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecryptView.swift; sourceTree = "<group>"; };
+		CE0064D92F6495C2008604AB /* SignView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignView.swift; sourceTree = "<group>"; };
+		CE0064DB2F6495C3008604AB /* VerifyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyView.swift; sourceTree = "<group>"; };
+		CE0064DD2F6495C3008604AB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		CE0064DF2F6495C3008604AB /* SelfTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTestView.swift; sourceTree = "<group>"; };
+		CE0064E12F6495C3008604AB /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		CE0064E42F64972D008604AB /* PrivacyScreenModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyScreenModifier.swift; sourceTree = "<group>"; };
+		CE0064E62F64972D008604AB /* QRDisplayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRDisplayView.swift; sourceTree = "<group>"; };
+		CE0064E82F64972D008604AB /* QRPhotoImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRPhotoImportView.swift; sourceTree = "<group>"; };
+		CE0064EB2F64975C008604AB /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		CE0064ED2F64975C008604AB /* FileEncryptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileEncryptView.swift; sourceTree = "<group>"; };
+		CE0064EF2F64975D008604AB /* FileDecryptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDecryptView.swift; sourceTree = "<group>"; };
+		CE0064F12F649F3F008604AB /* ImportConfirmView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportConfirmView.swift; sourceTree = "<group>"; };
+		CE0064F32F649FED008604AB /* KeyProfile+Codable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyProfile+Codable.swift"; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
 		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
@@ -91,6 +169,17 @@
 			isa = PBXGroup;
 			children = (
 				560911E5832C74A71A2E6BEB /* CypherAirApp.swift */,
+				CE0064B92F649539008604AB /* AppRoute.swift */,
+				CE0064BB2F64953A008604AB /* ContentView.swift */,
+				CE0064BD2F64953B008604AB /* HomeView.swift */,
+				CE0064BF2F649542008604AB /* Keys */,
+				CE0064C02F649542008604AB /* Contacts */,
+				CE0064C12F649542008604AB /* Encrypt */,
+				CE0064C22F649542008604AB /* Decrypt */,
+				CE0064C32F649542008604AB /* Sign */,
+				CE0064C42F649542008604AB /* Settings */,
+				CE0064E32F64970D008604AB /* Common */,
+				CE0064EA2F649730008604AB /* Onboarding */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -121,10 +210,116 @@
 			path = Security;
 			sourceTree = "<group>";
 		};
+		CE00649D2F6492AF008604AB /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				CE00649F2F6492D8008604AB /* KeyProfile+App.swift */,
+				CE0064A12F6492D8008604AB /* PGPKeyIdentity.swift */,
+				CE0064A32F6492D8008604AB /* Contact.swift */,
+				CE0064A52F6492D8008604AB /* AppConfiguration.swift */,
+				CE0064A72F6492FD008604AB /* CypherAirError.swift */,
+				CE0064A92F6492FD008604AB /* SignatureVerification.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		CE00649E2F6492AF008604AB /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064AB2F649416008604AB /* KeyManagementService.swift */,
+				CE0064AD2F649416008604AB /* ContactService.swift */,
+				CE0064AF2F649416008604AB /* EncryptionService.swift */,
+				CE0064B12F649416008604AB /* DecryptionService.swift */,
+				CE0064B32F649454008604AB /* SigningService.swift */,
+				CE0064B52F649455008604AB /* QRService.swift */,
+				CE0064B72F649455008604AB /* SelfTestService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		CE0064BF2F649542008604AB /* Keys */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064C52F649576008604AB /* MyKeysView.swift */,
+				CE0064C72F649576008604AB /* KeyGenerationView.swift */,
+				CE0064C92F649576008604AB /* KeyDetailView.swift */,
+				CE0064CB2F649576008604AB /* BackupKeyView.swift */,
+				CE0064CD2F649576008604AB /* ImportKeyView.swift */,
+			);
+			path = Keys;
+			sourceTree = "<group>";
+		};
+		CE0064C02F649542008604AB /* Contacts */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064CF2F6495C2008604AB /* ContactsView.swift */,
+				CE0064D12F6495C2008604AB /* ContactDetailView.swift */,
+				CE0064D32F6495C2008604AB /* AddContactView.swift */,
+				CE0064E62F64972D008604AB /* QRDisplayView.swift */,
+				CE0064E82F64972D008604AB /* QRPhotoImportView.swift */,
+				CE0064F12F649F3F008604AB /* ImportConfirmView.swift */,
+			);
+			path = Contacts;
+			sourceTree = "<group>";
+		};
+		CE0064C12F649542008604AB /* Encrypt */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064D52F6495C2008604AB /* EncryptView.swift */,
+				CE0064ED2F64975C008604AB /* FileEncryptView.swift */,
+			);
+			path = Encrypt;
+			sourceTree = "<group>";
+		};
+		CE0064C22F649542008604AB /* Decrypt */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064D72F6495C2008604AB /* DecryptView.swift */,
+				CE0064EF2F64975D008604AB /* FileDecryptView.swift */,
+			);
+			path = Decrypt;
+			sourceTree = "<group>";
+		};
+		CE0064C32F649542008604AB /* Sign */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064D92F6495C2008604AB /* SignView.swift */,
+				CE0064DB2F6495C3008604AB /* VerifyView.swift */,
+			);
+			path = Sign;
+			sourceTree = "<group>";
+		};
+		CE0064C42F649542008604AB /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064DD2F6495C3008604AB /* SettingsView.swift */,
+				CE0064DF2F6495C3008604AB /* SelfTestView.swift */,
+				CE0064E12F6495C3008604AB /* AboutView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		CE0064E32F64970D008604AB /* Common */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064E42F64972D008604AB /* PrivacyScreenModifier.swift */,
+			);
+			path = Common;
+			sourceTree = "<group>";
+		};
+		CE0064EA2F649730008604AB /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064EB2F64975C008604AB /* OnboardingView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
 		CE340E9C2F6323140047E290 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
 				F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */,
+				CE0064F32F649FED008604AB /* KeyProfile+Codable.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -163,6 +358,8 @@
 				7C5ACE182F45D1FBDBBA47F9 /* PgpMobile */,
 				CB69DE072B594667995CB9C9 /* Security */,
 				CE340E9C2F6323140047E290 /* Extensions */,
+				CE00649D2F6492AF008604AB /* Models */,
+				CE00649E2F6492AF008604AB /* Services */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -249,21 +446,60 @@
 			buildActionMask = 2147483647;
 			files = (
 				07BB58075398DDDF1125EDB2 /* AuthenticationEvaluable.swift in Sources */,
+				CE0064B42F649454008604AB /* SigningService.swift in Sources */,
+				CE0064D82F6495C2008604AB /* DecryptView.swift in Sources */,
+				CE0064B62F649455008604AB /* QRService.swift in Sources */,
+				CE0064A42F6492D8008604AB /* Contact.swift in Sources */,
+				CE0064E92F64972D008604AB /* QRPhotoImportView.swift in Sources */,
 				9F4284F9BEE858C4C9110D9B /* CypherAirApp.swift in Sources */,
+				CE0064E72F64972D008604AB /* QRDisplayView.swift in Sources */,
 				174304A352D9A283F7CB3E53 /* KeychainManageable.swift in Sources */,
 				6F25017F340541D84E52FB11 /* MockAuthenticator.swift in Sources */,
 				91742FB968D0385CEB2081B7 /* MockKeychain.swift in Sources */,
+				CE0064A62F6492D8008604AB /* AppConfiguration.swift in Sources */,
 				1550A8234C0473B09F20716F /* MockSecureEnclave.swift in Sources */,
+				CE0064DA2F6495C2008604AB /* SignView.swift in Sources */,
 				CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */,
+				CE0064EC2F64975C008604AB /* OnboardingView.swift in Sources */,
+				CE0064BC2F64953A008604AB /* ContentView.swift in Sources */,
+				CE0064C62F649576008604AB /* MyKeysView.swift in Sources */,
+				CE0064AA2F6492FD008604AB /* SignatureVerification.swift in Sources */,
+				CE0064C82F649576008604AB /* KeyGenerationView.swift in Sources */,
+				CE0064D02F6495C2008604AB /* ContactsView.swift in Sources */,
+				CE0064BE2F64953B008604AB /* HomeView.swift in Sources */,
+				CE0064E52F64972D008604AB /* PrivacyScreenModifier.swift in Sources */,
+				CE0064A82F6492FD008604AB /* CypherAirError.swift in Sources */,
+				CE0064D22F6495C2008604AB /* ContactDetailView.swift in Sources */,
 				CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */,
 				F0260E1FA58DA39B13A0AEDA /* SecureEnclaveManageable.swift in Sources */,
+				CE0064A22F6492D8008604AB /* PGPKeyIdentity.swift in Sources */,
+				CE0064D62F6495C2008604AB /* EncryptView.swift in Sources */,
 				9247AAEC4846E2A9C01931EA /* pgp_mobile.swift in Sources */,
+				CE0064B02F649416008604AB /* EncryptionService.swift in Sources */,
+				CE0064CE2F649576008604AB /* ImportKeyView.swift in Sources */,
+				CE0064F22F649F3F008604AB /* ImportConfirmView.swift in Sources */,
+				CE0064EE2F64975C008604AB /* FileEncryptView.swift in Sources */,
+				CE0064F42F649FED008604AB /* KeyProfile+Codable.swift in Sources */,
+				CE0064E22F6495C3008604AB /* AboutView.swift in Sources */,
+				CE0064CA2F649576008604AB /* KeyDetailView.swift in Sources */,
+				CE0064F02F64975D008604AB /* FileDecryptView.swift in Sources */,
+				CE0064AC2F649416008604AB /* KeyManagementService.swift in Sources */,
+				CE0064DE2F6495C3008604AB /* SettingsView.swift in Sources */,
+				CE0064CC2F649576008604AB /* BackupKeyView.swift in Sources */,
+				CE0064DC2F6495C3008604AB /* VerifyView.swift in Sources */,
+				CE0064B82F649455008604AB /* SelfTestService.swift in Sources */,
 				091B4000887E8EB8CEEC9995 /* AuthenticationManager.swift in Sources */,
 				CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */,
+				CE0064E02F6495C3008604AB /* SelfTestView.swift in Sources */,
+				CE0064D42F6495C2008604AB /* AddContactView.swift in Sources */,
 				CB6546CBB702B1311AFEDEB3 /* KeychainManager.swift in Sources */,
+				CE0064B22F649416008604AB /* DecryptionService.swift in Sources */,
 				0CE34DAE946FF6FC9777163E /* SecureEnclaveManager.swift in Sources */,
+				CE0064AE2F649416008604AB /* ContactService.swift in Sources */,
 				4DA245F5A994CBE9EAA3DE75 /* MemoryZeroingUtility.swift in Sources */,
 				A8B4434FA49C1E1C1D83AB0D /* Data+Zeroing.swift in Sources */,
+				CE0064A02F6492D8008604AB /* KeyProfile+App.swift in Sources */,
+				CE0064BA2F649539008604AB /* AppRoute.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
