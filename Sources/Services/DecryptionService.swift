@@ -47,13 +47,17 @@ final class DecryptionService {
     func parseRecipients(ciphertext: Data) async throws -> Phase1Result {
         // Dearmor if needed
         let binaryData: Data
-        if let firstChar = ciphertext.first, firstChar == 0x2D { // '-' = ASCII armor
-            binaryData = try engine.dearmor(armored: ciphertext)
-        } else {
-            binaryData = ciphertext
+        let recipientKeyIds: [String]
+        do {
+            if let firstChar = ciphertext.first, firstChar == 0x2D { // '-' = ASCII armor
+                binaryData = try engine.dearmor(armored: ciphertext)
+            } else {
+                binaryData = ciphertext
+            }
+            recipientKeyIds = try engine.parseRecipients(ciphertext: binaryData)
+        } catch {
+            throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
-
-        let recipientKeyIds = try engine.parseRecipients(ciphertext: binaryData)
 
         // Match against local keys
         let matchedKey = keyManagement.keys.first { identity in
@@ -91,7 +95,12 @@ final class DecryptionService {
         }
 
         // SE unwrap triggers Face ID / Touch ID
-        var secretKey = try keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
+        var secretKey: Data
+        do {
+            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
+        } catch {
+            throw CypherAirError.from(error) { _ in .authenticationFailed }
+        }
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
@@ -101,11 +110,16 @@ final class DecryptionService {
             + keyManagement.keys.map { $0.publicKeyData }
 
         // Decrypt via Rust engine
-        let result = try engine.decrypt(
-            ciphertext: phase1.ciphertext,
-            secretKeys: [secretKey],
-            verificationKeys: verificationKeys
-        )
+        let result: DecryptResult
+        do {
+            result = try engine.decrypt(
+                ciphertext: phase1.ciphertext,
+                secretKeys: [secretKey],
+                verificationKeys: verificationKeys
+            )
+        } catch {
+            throw CypherAirError.from(error) { .corruptData(reason: $0) }
+        }
 
         // Build signature verification result
         let sigVerification = SignatureVerification(

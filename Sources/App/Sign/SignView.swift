@@ -67,14 +67,8 @@ struct SignView: View {
             do {
                 let signed = try await service.signCleartext(message, signerFingerprint: signerFp)
                 signedMessage = String(data: signed, encoding: .utf8)
-            } catch let err as CypherAirError {
-                error = err
-                showError = true
-            } catch let pgpError as PgpError {
-                error = CypherAirError(pgpError: pgpError)
-                showError = true
             } catch {
-                self.error = .signingFailed(reason: error.localizedDescription)
+                self.error = CypherAirError.from(error) { .signingFailed(reason: $0) }
                 showError = true
             }
             isSigning = false

@@ -44,9 +44,7 @@ final class QRService {
     /// - Parameter url: The cypherair:// URL.
     /// - Returns: Binary public key data.
     func parseImportURL(_ url: URL) throws -> Data {
-        guard let urlString = url.absoluteString as String? else {
-            throw CypherAirError.invalidQRCode
-        }
+        let urlString = url.absoluteString
 
         // Validate scheme
         guard url.scheme == "cypherair" else {
@@ -58,12 +56,20 @@ final class QRService {
             throw CypherAirError.invalidQRCode
         }
 
-        // Check version segment
+        // Reject absurdly large payloads before passing to Rust.
+        // A valid QR-encoded public key URL is ~600 chars; QR capacity at level M is ~2500.
+        // 4096 provides generous headroom while blocking multi-MB URL scheme attacks.
+        guard urlString.count <= 4096 else {
+            throw CypherAirError.invalidQRCode
+        }
+
+        // Check version segment (mandatory — empty path is invalid)
         let pathComponents = url.pathComponents.filter { $0 != "/" }
-        if let firstComponent = pathComponents.first {
-            guard firstComponent == "v1" else {
-                throw CypherAirError.unsupportedQRVersion
-            }
+        guard let firstComponent = pathComponents.first else {
+            throw CypherAirError.invalidQRCode
+        }
+        guard firstComponent == "v1" else {
+            throw CypherAirError.unsupportedQRVersion
         }
 
         // Delegate to Rust engine for full parsing and validation

@@ -294,7 +294,7 @@ Format: `cypherair://import/v1/<base64url binary key, no padding>`. Works for bo
 
 ~250–350 bytes binary → ~340–470 chars base64url → <600 chars total. Single QR at Level M.
 
-Generate: `CIQRCodeGenerator`. Decode from photo: PHPicker + Vision `VNDetectBarcodesRequest`.
+Generate: `CIQRCodeGenerator`. Decode from photo: PHPicker + CoreImage `CIDetector` (QR code type).
 
 ---
 

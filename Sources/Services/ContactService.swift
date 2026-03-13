@@ -1,5 +1,16 @@
 import Foundation
 
+/// Result of attempting to add a contact.
+enum AddContactResult {
+    /// Contact was added successfully.
+    case added(Contact)
+    /// Contact already exists (same fingerprint). No changes made.
+    case duplicate(Contact)
+    /// Same userId but different fingerprint detected. The caller must confirm
+    /// before the old key is replaced. Call `confirmKeyUpdate` to proceed.
+    case keyUpdateDetected(newContact: Contact, existingContact: Contact, keyData: Data)
+}
+
 /// Manages contacts (imported public keys).
 /// Public keys are stored as binary .gpg files in the Documents/contacts/ directory.
 ///
@@ -13,10 +24,14 @@ final class ContactService {
     private let engine: PgpEngine
     private let contactsDirectory: URL
 
-    init(engine: PgpEngine = PgpEngine()) {
+    init(engine: PgpEngine = PgpEngine(), contactsDirectory: URL? = nil) {
         self.engine = engine
-        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        self.contactsDirectory = documentsDir.appendingPathComponent("contacts", isDirectory: true)
+        if let dir = contactsDirectory {
+            self.contactsDirectory = dir
+        } else {
+            let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            self.contactsDirectory = documentsDir.appendingPathComponent("contacts", isDirectory: true)
+        }
     }
 
     // MARK: - Load Contacts
@@ -51,32 +66,42 @@ final class ContactService {
     /// Import a public key and add it as a contact.
     /// Handles both binary and ASCII-armored input.
     ///
+    /// Returns `.keyUpdateDetected` if the same userId has a different fingerprint.
+    /// In that case, the caller must present a warning and call `confirmKeyUpdate` if the user approves.
+    ///
     /// - Parameter publicKeyData: The public key data (binary or armored).
-    /// - Returns: The newly added contact.
+    /// - Returns: The result of the add operation.
     @discardableResult
-    func addContact(publicKeyData: Data) throws -> Contact {
+    func addContact(publicKeyData: Data) throws -> AddContactResult {
         // Try to dearmor if it looks like ASCII armor
         let binaryData: Data
-        if let firstChar = publicKeyData.first, firstChar == 0x2D { // '-' = ASCII armor header
-            binaryData = try engine.dearmor(armored: publicKeyData)
-        } else {
-            binaryData = publicKeyData
+        let contact: Contact
+        do {
+            if let firstChar = publicKeyData.first, firstChar == 0x2D { // '-' = ASCII armor header
+                binaryData = try engine.dearmor(armored: publicKeyData)
+            } else {
+                binaryData = publicKeyData
+            }
+            contact = try parseContact(from: binaryData)
+        } catch {
+            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
         }
-
-        let contact = try parseContact(from: binaryData)
 
         // Check for duplicate
         if let existingIndex = contacts.firstIndex(where: { $0.fingerprint == contact.fingerprint }) {
             // Same fingerprint = same key, no update needed
-            return contacts[existingIndex]
+            return .duplicate(contacts[existingIndex])
         }
 
         // Check for same userId but different fingerprint (key update)
         if let userId = contact.userId,
            let existingIndex = contacts.firstIndex(where: { $0.userId == userId && $0.fingerprint != contact.fingerprint }) {
-            // Different fingerprint = key regenerated — replace after caller confirms
-            // For now, store alongside; the UI will handle the warning
-            _ = existingIndex  // Acknowledge the existing contact
+            // Different fingerprint = key regenerated — caller must confirm before replacing.
+            return .keyUpdateDetected(
+                newContact: contact,
+                existingContact: contacts[existingIndex],
+                keyData: binaryData
+            )
         }
 
         // Save to filesystem
@@ -85,7 +110,26 @@ final class ContactService {
         try binaryData.write(to: fileURL, options: .atomic)
 
         contacts.append(contact)
-        return contact
+        return .added(contact)
+    }
+
+    /// Replace an existing contact's key after the user has confirmed the key update.
+    /// Called when `addContact` returns `.keyUpdateDetected`.
+    ///
+    /// - Parameters:
+    ///   - existingFingerprint: Fingerprint of the old contact to replace.
+    ///   - newContact: The new contact parsed from the incoming key.
+    ///   - keyData: Binary public key data for the new contact.
+    func confirmKeyUpdate(existingFingerprint: String, newContact: Contact, keyData: Data) throws {
+        // Remove old key file and contact entry
+        try removeContact(fingerprint: existingFingerprint)
+
+        // Save new key
+        let filename = "\(newContact.fingerprint).gpg"
+        let fileURL = contactsDirectory.appendingPathComponent(filename)
+        try keyData.write(to: fileURL, options: .atomic)
+
+        contacts.append(newContact)
     }
 
     // MARK: - Remove Contact

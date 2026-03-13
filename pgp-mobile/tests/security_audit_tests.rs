@@ -6,11 +6,15 @@
 //! - parse_recipients() Phase 1 API coverage
 //! - Expired/revoked key encryption rejection
 //! - Legacy SEIPD (no MDC) rejection
+//! - Empty recipients rejection
+//! - Signature tamper detection (cleartext + detached)
 
-use pgp_mobile::decrypt;
+use pgp_mobile::decrypt::{self, SignatureStatus};
 use pgp_mobile::encrypt;
+use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
+use pgp_mobile::verify;
 
 /// Verify that tampered Profile A (SEIPDv1) ciphertext produces an integrity-related
 /// error, not a generic CorruptData. Exercises the case-insensitive error classification.
@@ -411,5 +415,163 @@ fn test_decrypt_legacy_seipd_no_mdc_rejected() {
     assert!(
         result.is_err(),
         "Decryption must reject legacy SEIPD (no MDC) messages"
+    );
+}
+
+// ── Empty recipients rejection ──────────────────────────────────────────
+
+/// Encrypting with no recipients and no encrypt-to-self must fail.
+/// Validates the guard at encrypt.rs:16-20.
+#[test]
+fn test_encrypt_empty_recipients_rejected() {
+    let result = encrypt::encrypt(b"should fail", &[], None, None);
+    assert!(result.is_err(), "Encryption with no recipients must fail");
+    match result {
+        Err(PgpError::EncryptionFailed { .. }) => {}
+        Err(other) => panic!("Expected EncryptionFailed, got: {other}"),
+        Ok(_) => unreachable!(),
+    }
+}
+
+/// Encrypting with no recipients but with encrypt-to-self should succeed.
+#[test]
+fn test_encrypt_empty_recipients_but_encrypt_to_self_succeeds() {
+    let key = keys::generate_key_with_profile(
+        "Self".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let result = encrypt::encrypt(
+        b"encrypt to self only",
+        &[],
+        None,
+        Some(&key.public_key_data),
+    );
+    assert!(
+        result.is_ok(),
+        "Encryption with no explicit recipients but encrypt-to-self should succeed"
+    );
+}
+
+// ── Signature tamper detection ──────────────────────────────────────────
+
+/// Tampered cleartext-signed message must produce SignatureStatus::Bad.
+/// Validates verify.rs graded result handling for cleartext signatures.
+#[test]
+fn test_verify_tampered_cleartext_returns_bad() {
+    let key = keys::generate_key_with_profile(
+        "Signer".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let text = b"Original cleartext message";
+    let signed = sign::sign_cleartext(text, &key.cert_data)
+        .expect("Signing should succeed");
+
+    // Tamper: modify the signed content within the cleartext structure.
+    // Cleartext signatures embed the text between the header and the armor.
+    // We flip a character in the message body.
+    let mut tampered = signed.clone();
+    let signed_str = String::from_utf8_lossy(&tampered);
+    // Find the message text within the cleartext-signed structure
+    if let Some(pos) = signed_str.find("Original") {
+        tampered[pos] ^= 0x01;
+    } else {
+        panic!("Could not find message text in cleartext-signed output");
+    }
+
+    let result = verify::verify_cleartext(&tampered, &[key.public_key_data.clone()])
+        .expect("Verification should return a graded result, not throw");
+
+    assert_eq!(
+        result.status,
+        SignatureStatus::Bad,
+        "Tampered cleartext message must produce Bad signature status"
+    );
+}
+
+/// Tampered data with detached signature must produce SignatureStatus::Bad.
+/// Validates verify.rs graded result handling for detached signatures.
+#[test]
+fn test_verify_tampered_detached_returns_bad() {
+    let key = keys::generate_key_with_profile(
+        "Signer".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let data = b"Original file content for detached signing";
+    let signature = sign::sign_detached(data, &key.cert_data)
+        .expect("Detached signing should succeed");
+
+    // Tamper: modify the data after signing
+    let mut tampered_data = data.to_vec();
+    tampered_data[0] ^= 0x01;
+
+    let result = verify::verify_detached(
+        &tampered_data,
+        &signature,
+        &[key.public_key_data.clone()],
+    )
+    .expect("Verification should return a graded result, not throw");
+
+    assert_eq!(
+        result.status,
+        SignatureStatus::Bad,
+        "Tampered data with detached signature must produce Bad status"
+    );
+}
+
+// ── Revoked key encryption rejection (Profile B) ────────────────────────
+
+/// Encrypting to a revoked Profile B key must fail.
+/// Complements test_encrypt_to_revoked_key_rejected (Profile A).
+#[test]
+fn test_encrypt_to_revoked_key_profile_b_rejected() {
+    use sequoia_openpgp as openpgp;
+    use openpgp::parse::Parse;
+    use openpgp::serialize::Serialize;
+
+    let key = keys::generate_key_with_profile(
+        "Revocable B".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    assert_eq!(key.key_version, 6, "Profile B must produce v6 key");
+
+    // Apply the revocation cert to create a revoked certificate
+    let cert = openpgp::Cert::from_bytes(&key.public_key_data)
+        .expect("Parse public key should succeed");
+    let rev_sig = openpgp::Packet::from_bytes(&key.revocation_cert)
+        .expect("Parse revocation cert should succeed");
+    let (revoked_cert, _) = cert.insert_packets(vec![rev_sig])
+        .expect("Insert revocation should succeed");
+
+    // Serialize the revoked cert
+    let mut revoked_pubkey = Vec::new();
+    revoked_cert.serialize(&mut revoked_pubkey)
+        .expect("Serialize revoked cert should succeed");
+
+    let result = encrypt::encrypt_binary(
+        b"Should fail",
+        &[revoked_pubkey],
+        None,
+        None,
+    );
+
+    assert!(
+        result.is_err(),
+        "Encrypting to a revoked Profile B key must fail"
     );
 }
