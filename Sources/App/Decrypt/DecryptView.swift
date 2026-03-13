@@ -69,6 +69,11 @@ struct DecryptView: View {
         } message: { err in
             Text(err.localizedDescription)
         }
+        .onDisappear {
+            // PRD §4.4: Text plaintext zeroed on dismiss.
+            decryptedText = nil
+            signatureVerification = nil
+        }
     }
 
     private func decrypt() {

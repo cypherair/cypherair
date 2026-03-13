@@ -4,6 +4,8 @@ import PhotosUI
 /// Import a public key from a QR code in a photo.
 /// Uses PHPickerViewController (no photo library permission required)
 /// and CIDetector for QR code detection.
+///
+/// PRD §4.2: All import paths require user confirmation with fingerprint verification reminder.
 struct QRPhotoImportView: View {
     @Environment(QRService.self) private var qrService
     @Environment(ContactService.self) private var contactService
@@ -15,6 +17,7 @@ struct QRPhotoImportView: View {
     @State private var error: CypherAirError?
     @State private var showError = false
     @State private var showSuccess = false
+    @State private var pendingConfirm: PendingQRImport?
     @State private var pendingKeyUpdate: PendingQRKeyUpdate?
     @State private var showKeyUpdateAlert = false
 
@@ -72,6 +75,23 @@ struct QRPhotoImportView: View {
                 Text(contact.displayName)
             }
         }
+        .sheet(isPresented: Binding(
+            get: { pendingConfirm != nil },
+            set: { if !$0 { pendingConfirm = nil } }
+        )) {
+            if let pending = pendingConfirm {
+                ImportConfirmView(
+                    keyInfo: pending.keyInfo,
+                    detectedProfile: pending.profile,
+                    onConfirm: {
+                        confirmImport(pending)
+                    },
+                    onCancel: {
+                        pendingConfirm = nil
+                    }
+                )
+            }
+        }
         .alert(
             String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
             isPresented: $showKeyUpdateAlert,
@@ -101,7 +121,6 @@ struct QRPhotoImportView: View {
     private func processSelectedPhoto(_ item: PhotosPickerItem) {
         isProcessing = true
         let service = qrService
-        let contacts = contactService
         Task {
             defer { isProcessing = false }
             do {
@@ -128,25 +147,52 @@ struct QRPhotoImportView: View {
                 }
 
                 let publicKeyData = try service.parseImportURL(url)
-                let result = try contacts.addContact(publicKeyData: publicKeyData)
-                switch result {
-                case .added(let contact), .duplicate(let contact):
-                    importedContact = contact
-                    showSuccess = true
-                case .keyUpdateDetected(let newContact, let existingContact, let keyData):
-                    pendingKeyUpdate = PendingQRKeyUpdate(
-                        newContact: newContact,
-                        existingContact: existingContact,
-                        keyData: keyData
-                    )
-                    showKeyUpdateAlert = true
-                }
+
+                // PRD §4.2: Show confirmation with fingerprint verification before adding.
+                let keyInfo = try service.inspectKeyInfo(keyData: publicKeyData)
+                let profile = try service.detectKeyProfile(keyData: publicKeyData)
+                pendingConfirm = PendingQRImport(
+                    keyData: publicKeyData,
+                    keyInfo: keyInfo,
+                    profile: profile
+                )
             } catch {
                 self.error = CypherAirError.from(error) { _ in .invalidQRCode }
                 showError = true
             }
         }
     }
+
+    private func confirmImport(_ pending: PendingQRImport) {
+        do {
+            let result = try contactService.addContact(publicKeyData: pending.keyData)
+            switch result {
+            case .added(let contact), .duplicate(let contact):
+                importedContact = contact
+                pendingConfirm = nil
+                showSuccess = true
+            case .keyUpdateDetected(let newContact, let existingContact, let keyData):
+                pendingConfirm = nil
+                pendingKeyUpdate = PendingQRKeyUpdate(
+                    newContact: newContact,
+                    existingContact: existingContact,
+                    keyData: keyData
+                )
+                showKeyUpdateAlert = true
+            }
+        } catch {
+            self.error = CypherAirError.from(error) { _ in .invalidQRCode }
+            pendingConfirm = nil
+            showError = true
+        }
+    }
+}
+
+/// Holds parsed key data pending user confirmation via ImportConfirmView.
+private struct PendingQRImport {
+    let keyData: Data
+    let keyInfo: KeyInfo
+    let profile: KeyProfile
 }
 
 /// Holds state for a pending key update confirmation via QR import.

@@ -5,6 +5,11 @@ struct KeyDetailView: View {
     let fingerprint: String
 
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var showDeleteConfirmation = false
+    @State private var error: CypherAirError?
+    @State private var showError = false
 
     private var key: PGPKeyIdentity? {
         keyManagement.keys.first { $0.fingerprint == fingerprint }
@@ -96,7 +101,7 @@ struct KeyDetailView: View {
 
                     Section {
                         Button(role: .destructive) {
-                            // Deletion is handled via confirmation dialog
+                            showDeleteConfirmation = true
                         } label: {
                             Label(
                                 String(localized: "keydetail.delete", defaultValue: "Delete Key"),
@@ -113,5 +118,31 @@ struct KeyDetailView: View {
             }
         }
         .navigationTitle(String(localized: "keydetail.title", defaultValue: "Key Detail"))
+        .confirmationDialog(
+            String(localized: "keydetail.delete.title", defaultValue: "Delete Key"),
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "keydetail.delete.confirm", defaultValue: "Delete Permanently"), role: .destructive) {
+                do {
+                    try keyManagement.deleteKey(fingerprint: fingerprint)
+                    dismiss()
+                } catch {
+                    self.error = CypherAirError.from(error) { .keychainError($0) }
+                    showError = true
+                }
+            }
+        } message: {
+            Text(String(localized: "keydetail.delete.message", defaultValue: "This will permanently delete this key from your device. This action cannot be undone. Make sure you have a backup."))
+        }
+        .alert(
+            String(localized: "error.title", defaultValue: "Error"),
+            isPresented: $showError,
+            presenting: error
+        ) { _ in
+            Button(String(localized: "error.ok", defaultValue: "OK")) {}
+        } message: { err in
+            Text(err.localizedDescription)
+        }
     }
 }

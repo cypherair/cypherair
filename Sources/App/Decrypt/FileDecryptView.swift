@@ -50,11 +50,11 @@ struct FileDecryptView: View {
                 }
             }
 
-            if decryptedData != nil {
+            if let data = decryptedData {
                 Section {
                     let filename = decryptedFilename()
                     ShareLink(
-                        item: decryptedData!,
+                        item: data,
                         preview: SharePreview(
                             filename,
                             image: Image(systemName: "doc")
@@ -91,10 +91,9 @@ struct FileDecryptView: View {
             Text(err.localizedDescription)
         }
         .onDisappear {
-            // Zeroize decrypted data when leaving the view
-            if var data = decryptedData {
-                data.resetBytes(in: 0..<data.count)
-            }
+            // PRD §4.4: Zeroize decrypted data when leaving the view.
+            // Operate directly on the original buffer, not a value-type copy.
+            decryptedData?.resetBytes(in: 0..<(decryptedData?.count ?? 0))
             decryptedData = nil
         }
     }

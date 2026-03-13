@@ -49,6 +49,25 @@ struct BackupKeyView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(passphrase.isEmpty || passphrase != passphraseConfirm || isExporting)
             }
+
+            if let exportedData {
+                Section {
+                    ShareLink(
+                        item: exportedData,
+                        preview: SharePreview(
+                            "\(fingerprint.prefix(16)).asc",
+                            image: Image(systemName: "key.fill")
+                        )
+                    ) {
+                        Label(
+                            String(localized: "backup.share", defaultValue: "Save Backup File"),
+                            systemImage: "square.and.arrow.up"
+                        )
+                    }
+                } header: {
+                    Text(String(localized: "backup.ready", defaultValue: "Backup Ready"))
+                }
+            }
         }
         .navigationTitle(String(localized: "backup.title", defaultValue: "Backup Key"))
         .alert(
@@ -71,8 +90,6 @@ struct BackupKeyView: View {
                     passphrase: passphrase
                 )
                 exportedData = data
-                // TODO: Present Share Sheet with exported data
-                dismiss()
             } catch {
                 self.error = CypherAirError.from(error) { .encryptionFailed(reason: $0) }
                 showError = true
