@@ -9,10 +9,9 @@ bindings/
 .DS_Store
 
 # Xcode
-*.xcuserdata
+**/xcuserdata/
 DerivedData/
 build/
-*.xcworkspace/xcuserdata/
 
 # Swift Package Manager
 .build/
