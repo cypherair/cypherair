@@ -1,14 +1,28 @@
-# Handover: Codex Audit Fixes
+# Handover: Codex Audit Fixes + MVP App Layer
 
 > Session: 2026-03-13
 > Branch: `fix/build-scripts-and-gitignore`
-> Status: All 10 issues + 1 additional finding implemented. Project builds (0 errors). Tests not yet run.
+> PR: https://github.com/cypherair/Cypherair_poc_new/pull/39
+> Status: All fixes implemented. Build passes. **108/108 tests pass.** Ready for review.
 
 ## What Was Done
 
-A Codex security audit identified 10 issues + 1 additional finding. All have been confirmed and fixed.
+### MVP App Layer (27 views, 7 services, 6 models)
 
-### Fixes by Batch
+Complete SwiftUI view hierarchy covering all PRD workflows:
+- **Home/Navigation**: `HomeView`, `ContentView` (TabView), `AppRoute`
+- **Keys**: `MyKeysView`, `KeyGenerationView`, `KeyDetailView`, `BackupKeyView`, `ImportKeyView`
+- **Contacts**: `ContactsView`, `ContactDetailView`, `AddContactView`, `QRDisplayView`, `QRPhotoImportView`, `ImportConfirmView`
+- **Encrypt/Decrypt**: `EncryptView`, `FileEncryptView`, `DecryptView`, `FileDecryptView`
+- **Sign/Verify**: `SignView`, `VerifyView`
+- **Settings**: `SettingsView`, `SelfTestView`, `AboutView`
+- **Common**: `PrivacyScreenModifier`, `OnboardingView`
+- **Services**: `EncryptionService`, `DecryptionService`, `SigningService`, `KeyManagementService`, `ContactService`, `QRService`, `SelfTestService`
+- **Models**: `CypherAirError`, `Contact`, `AppConfiguration`, `PGPKeyIdentity`, `SignatureVerification`, `KeyProfile+App`
+
+### Codex Audit Fixes (10 issues + 1 additional finding)
+
+A Codex security audit identified 10 issues + 1 additional finding. All have been confirmed and fixed.
 
 #### Batch 2: Memory Zeroing CoW Fixes (4 fixes)
 
@@ -51,6 +65,27 @@ A Codex security audit identified 10 issues + 1 additional finding. All have bee
 - `KeyManagementService.swift` — Added `loadKeys()`, `saveMetadata()`, `updateMetadata()`, updated `generateKey()`, `importKey()`, `exportKey()`, `deleteKey()`
 - `CypherAirApp.swift` — Added `try? keyMgmt.loadKeys()` before crash recovery in `init()`
 
+### Bug Fix: PrivacyScreenModifier Environment Crash
+
+**Problem:** `PrivacyScreenModifier` uses `@Environment(AppConfiguration.self)` and `@Environment(AuthenticationManager.self)`, but `.privacyScreen()` was applied **after** `.environment()` calls in `CypherAirApp.body`. In SwiftUI, modifiers applied later wrap outermost — the modifier was outside the environment scope and couldn't find the injected values.
+
+**Error:** `Fatal error: No Observable object of type AppConfiguration found. A View.environmentObject(_:) for AppConfiguration may be missing as an ancestor of this view.`
+
+**Fix:** Moved `.privacyScreen()` before `.environment()` calls so it sits inside the environment chain:
+```swift
+// Before (broken): modifier is outermost, outside environment scope
+ContentView()
+    .environment(config)
+    .environment(authManager)
+    .privacyScreen()          // ← can't see config or authManager
+
+// After (fixed): modifier is innermost, inside environment scope
+ContentView()
+    .privacyScreen()          // ← receives config and authManager from above
+    .environment(config)
+    .environment(authManager)
+```
+
 ### New Files Created
 
 1. `Sources/App/Contacts/ImportConfirmView.swift` — Confirmation sheet for URL scheme key import
@@ -62,32 +97,24 @@ A Codex security audit identified 10 issues + 1 additional finding. All have bee
 - `docs/SECURITY.md` — Updated Key Lifecycle diagram to mention metadata storage
 - `docs/TDD.md` — Updated Section 3.5 Keychain Layout to include metadata item with access control info
 
-## Known Issues / Remaining Work
+## Test Results
 
-### Tests Not Yet Run
+**108 tests: 108 passed, 0 failed, 0 skipped**
 
-The test suite (`RunAllTests` via Xcode MCP) was attempted twice but timed out / got stuck. Tests should be run manually:
+| Target | Tests | Status |
+|--------|-------|--------|
+| DeviceSecurityTests | 59 | All passed |
+| FFIIntegrationTests | 49 | All passed |
 
-```bash
-# Swift unit + FFI tests (simulator)
-xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=iOS Simulator,name=iPhone 17'
+Test coverage includes: SE wrap/unwrap (both profiles), auth mode switching, crash recovery, MIE validation, performance benchmarks, binary round-trip, Unicode preservation, all PgpError mappings, Argon2id memory guard, two-phase decrypt.
 
-# Or in Xcode: Cmd+U
-```
+## Remaining Manual Verification
 
-**Expected test targets:**
-- `FFIIntegrationTests` — ~49 tests
-- `DeviceSecurityTests` — ~59 tests (some require physical device)
+- [ ] URL import: scan QR → confirmation sheet appears → only adds contact on confirm
+- [ ] Privacy screen: background app → wait > grace period → re-auth required on resume
+- [ ] Memory zeroing: run under Instruments Allocations, verify key bytes zeroed after operations
 
-### Potential Test Adjustments
-
-The following changes may require test updates:
-- `KeychainManageable` protocol now has a `listItems` method — `MockKeychain` already implements it, but existing tests that create `MockKeychain` instances should still work
-- `PGPKeyIdentity` is now `Codable` — no breaking change
-- `CypherAirError` has 2 new cases (`s2kError`, `internalError`) — existing `switch` statements may need updating if they don't have a `default` case
-
-### PrivacyScreenModifier Concurrency Note
+## PrivacyScreenModifier Concurrency Note
 
 The `PrivacyScreenModifier` was fixed for a Swift 6.2 data race issue. The pattern used:
 ```swift
