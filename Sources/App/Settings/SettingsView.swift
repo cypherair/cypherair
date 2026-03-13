@@ -64,7 +64,7 @@ struct SettingsView: View {
             switch route {
             case .selfTest: SelfTestView()
             case .about: AboutView()
-            default: Text("Coming soon")
+            default: Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
             }
         }
     }

@@ -49,7 +49,7 @@ struct ContactsView: View {
             case .addContact:
                 AddContactView()
             default:
-                Text("Coming soon")
+                Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
             }
         }
         .task {

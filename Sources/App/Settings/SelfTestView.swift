@@ -45,6 +45,8 @@ struct SelfTestView: View {
                             .font(.headline)
                             .foregroundStyle(passed == results.count ? .green : .red)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(String(localized: "selftest.results.a11y", defaultValue: "\(passed) of \(results.count) tests passed"))
                 }
 
                 Section {

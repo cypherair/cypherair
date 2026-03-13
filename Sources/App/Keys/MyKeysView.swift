@@ -55,7 +55,7 @@ struct MyKeysView: View {
             case .keyDetail(let fp): KeyDetailView(fingerprint: fp)
             case .backupKey(let fp): BackupKeyView(fingerprint: fp)
             case .importKey: ImportKeyView()
-            default: Text("Coming soon")
+            default: Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
             }
         }
     }
