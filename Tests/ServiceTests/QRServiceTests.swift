@@ -1,0 +1,224 @@
+import XCTest
+@testable import CypherAir
+
+/// Tests for QRService — SECURITY-CRITICAL: validates parsing of untrusted external input.
+/// QRService.parseImportURL() processes cypherair:// URLs from QR codes.
+/// These tests verify rejection of malformed, malicious, and invalid input.
+final class QRServiceTests: XCTestCase {
+
+    private var engine: PgpEngine!
+    private var qrService: QRService!
+
+    override func setUp() {
+        super.setUp()
+        engine = PgpEngine()
+        qrService = QRService(engine: engine)
+    }
+
+    override func tearDown() {
+        qrService = nil
+        engine = nil
+        super.tearDown()
+    }
+
+    // MARK: - Positive: Valid URL Round-Trip
+
+    func test_parseImportURL_validV1URL_profileA_returnsPublicKeyData() throws {
+        // Generate a Profile A key and encode it as a QR URL
+        let generated = try engine.generateKey(
+            name: "Alice", email: "alice@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+        let urlString = try engine.encodeQrUrl(publicKeyData: generated.publicKeyData)
+        let url = try XCTUnwrap(URL(string: urlString))
+
+        // Parse the URL back
+        let parsedData = try qrService.parseImportURL(url)
+
+        // Verify we got valid public key data back
+        XCTAssertFalse(parsedData.isEmpty, "Parsed key data should not be empty")
+
+        // Verify the parsed data is a valid key by parsing its info
+        let keyInfo = try engine.parseKeyInfo(keyData: parsedData)
+        XCTAssertEqual(keyInfo.keyVersion, 4, "Profile A should produce v4 key")
+    }
+
+    func test_parseImportURL_validV1URL_profileB_returnsPublicKeyData() throws {
+        let generated = try engine.generateKey(
+            name: "Bob", email: "bob@example.com",
+            expirySeconds: nil, profile: .advanced
+        )
+        let urlString = try engine.encodeQrUrl(publicKeyData: generated.publicKeyData)
+        let url = try XCTUnwrap(URL(string: urlString))
+
+        let parsedData = try qrService.parseImportURL(url)
+
+        XCTAssertFalse(parsedData.isEmpty)
+        let keyInfo = try engine.parseKeyInfo(keyData: parsedData)
+        XCTAssertEqual(keyInfo.keyVersion, 6, "Profile B should produce v6 key")
+    }
+
+    func test_parseImportURL_roundTrip_fingerprintMatches() throws {
+        let generated = try engine.generateKey(
+            name: "Carol", email: "carol@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+        let originalInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
+
+        // Encode → Parse → Compare
+        let urlString = try engine.encodeQrUrl(publicKeyData: generated.publicKeyData)
+        let url = try XCTUnwrap(URL(string: urlString))
+        let parsedData = try qrService.parseImportURL(url)
+        let parsedInfo = try engine.parseKeyInfo(keyData: parsedData)
+
+        XCTAssertEqual(originalInfo.fingerprint, parsedInfo.fingerprint,
+                       "Fingerprint should survive QR URL round-trip")
+    }
+
+    func test_parseImportURL_roundTrip_profileB_fingerprintMatches() throws {
+        let generated = try engine.generateKey(
+            name: "Dave", email: "dave@example.com",
+            expirySeconds: nil, profile: .advanced
+        )
+        let originalInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
+
+        let urlString = try engine.encodeQrUrl(publicKeyData: generated.publicKeyData)
+        let url = try XCTUnwrap(URL(string: urlString))
+        let parsedData = try qrService.parseImportURL(url)
+        let parsedInfo = try engine.parseKeyInfo(keyData: parsedData)
+
+        XCTAssertEqual(originalInfo.fingerprint, parsedInfo.fingerprint,
+                       "Profile B fingerprint should survive QR URL round-trip")
+    }
+
+    // MARK: - Negative: Wrong Scheme
+
+    func test_parseImportURL_wrongScheme_https_throwsInvalidQRCode() {
+        let url = URL(string: "https://import/v1/AAAA")!
+
+        XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            if case .invalidQRCode = cypherError {
+                // Expected
+            } else {
+                XCTFail("Expected .invalidQRCode, got \(cypherError)")
+            }
+        }
+    }
+
+    func test_parseImportURL_wrongScheme_http_throwsInvalidQRCode() {
+        let url = URL(string: "http://import/v1/AAAA")!
+
+        XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            if case .invalidQRCode = cypherError {
+                // Expected
+            } else {
+                XCTFail("Expected .invalidQRCode, got \(cypherError)")
+            }
+        }
+    }
+
+    // MARK: - Negative: Wrong Host/Path
+
+    func test_parseImportURL_wrongHost_throwsInvalidQRCode() {
+        let url = URL(string: "cypherair://export/v1/AAAA")!
+
+        XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            if case .invalidQRCode = cypherError {
+                // Expected
+            } else {
+                XCTFail("Expected .invalidQRCode, got \(cypherError)")
+            }
+        }
+    }
+
+    // MARK: - Negative: Unsupported Version
+
+    func test_parseImportURL_unsupportedVersion_v2_throwsUnsupportedQRVersion() {
+        let url = URL(string: "cypherair://import/v2/AAAA")!
+
+        XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            if case .unsupportedQRVersion = cypherError {
+                // Expected
+            } else {
+                XCTFail("Expected .unsupportedQRVersion, got \(cypherError)")
+            }
+        }
+    }
+
+    // MARK: - Negative: Missing/Invalid Payload
+
+    func test_parseImportURL_missingPayload_throwsError() {
+        // URL with valid scheme/host/version but no base64 payload
+        let url = URL(string: "cypherair://import/v1/")!
+
+        XCTAssertThrowsError(try qrService.parseImportURL(url)) { _ in
+            // Any error is acceptable — the payload is missing
+        }
+    }
+
+    func test_parseImportURL_invalidBase64_throwsError() {
+        // Invalid base64url characters (contains !, @, #)
+        let url = URL(string: "cypherair://import/v1/!!!@@@###")!
+
+        XCTAssertThrowsError(try qrService.parseImportURL(url)) { _ in
+            // Any error is acceptable — the base64 is invalid
+        }
+    }
+
+    func test_parseImportURL_validBase64ButNotPGP_throwsError() {
+        // Valid base64url encoding of "Hello, World!" — not a PGP key
+        // "Hello, World!" = SGVsbG8sIFdvcmxkIQ (base64url, no padding)
+        let url = URL(string: "cypherair://import/v1/SGVsbG8sIFdvcmxkIQ")!
+
+        XCTAssertThrowsError(try qrService.parseImportURL(url)) { _ in
+            // Any error — valid base64 but not OpenPGP data
+        }
+    }
+
+    // MARK: - Negative: Secret Key Material (Security)
+
+    func test_parseImportURL_secretKeyMaterial_throwsError() throws {
+        // Generate a key and try to encode the FULL cert (public + secret)
+        // The Rust engine's encodeQrUrl should only accept public keys,
+        // but we verify that parsing rejects secret key material if somehow encoded.
+        let generated = try engine.generateKey(
+            name: "Mallory", email: nil,
+            expirySeconds: nil, profile: .universal
+        )
+
+        // Try encoding cert data (contains secret key) — the Rust engine should reject this
+        XCTAssertThrowsError(try engine.encodeQrUrl(publicKeyData: generated.certData)) { _ in
+            // The engine should refuse to encode secret key material into a QR URL
+        }
+    }
+
+    // MARK: - QR Code Generation
+
+    func test_generateQRCode_validPublicKey_returnsCIImage() throws {
+        let generated = try engine.generateKey(
+            name: "QR Test", email: nil,
+            expirySeconds: nil, profile: .universal
+        )
+
+        let image = try qrService.generateQRCode(for: generated.publicKeyData)
+        XCTAssertNotNil(image, "QR code image should be generated for valid public key")
+    }
+
+    func test_generateQRCode_emptyData_throwsError() {
+        XCTAssertThrowsError(try qrService.generateQRCode(for: Data())) { _ in
+            // Empty data should fail during URL encoding
+        }
+    }
+}

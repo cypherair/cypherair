@@ -73,11 +73,8 @@ struct BackupKeyView: View {
                 exportedData = data
                 // TODO: Present Share Sheet with exported data
                 dismiss()
-            } catch let err as CypherAirError {
-                error = err
-                showError = true
             } catch {
-                self.error = .encryptionFailed(reason: error.localizedDescription)
+                self.error = CypherAirError.from(error) { .encryptionFailed(reason: $0) }
                 showError = true
             }
             isExporting = false

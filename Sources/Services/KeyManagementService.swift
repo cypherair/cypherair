@@ -104,20 +104,9 @@ final class KeyManagementService {
             fingerprint: keyInfo.fingerprint
         )
 
-        // Store all three Keychain items
+        // Store all three Keychain items atomically (rollback on partial failure).
         let fp = keyInfo.fingerprint
-        try keychain.save(bundle.seKeyData,
-                          service: KeychainConstants.seKeyService(fingerprint: fp),
-                          account: KeychainConstants.defaultAccount,
-                          accessControl: nil)
-        try keychain.save(bundle.salt,
-                          service: KeychainConstants.saltService(fingerprint: fp),
-                          account: KeychainConstants.defaultAccount,
-                          accessControl: nil)
-        try keychain.save(bundle.sealedBox,
-                          service: KeychainConstants.sealedKeyService(fingerprint: fp),
-                          account: KeychainConstants.defaultAccount,
-                          accessControl: nil)
+        try saveWrappedKeyBundle(bundle, fingerprint: fp)
 
         let identity = PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
@@ -135,8 +124,14 @@ final class KeyManagementService {
             subkeyAlgo: keyInfo.subkeyAlgo
         )
 
-        // Persist metadata for cold-launch enumeration
-        try saveMetadata(identity)
+        // Persist metadata for cold-launch enumeration.
+        // If metadata save fails, roll back the SE bundle too.
+        do {
+            try saveMetadata(identity)
+        } catch {
+            rollbackKeychainBundle(fingerprint: fp)
+            throw error
+        }
 
         keys.append(identity)
 
@@ -189,20 +184,9 @@ final class KeyManagementService {
             fingerprint: keyInfo.fingerprint
         )
 
-        // Store in Keychain
+        // Store all three Keychain items atomically (rollback on partial failure).
         let fp = keyInfo.fingerprint
-        try keychain.save(bundle.seKeyData,
-                          service: KeychainConstants.seKeyService(fingerprint: fp),
-                          account: KeychainConstants.defaultAccount,
-                          accessControl: nil)
-        try keychain.save(bundle.salt,
-                          service: KeychainConstants.saltService(fingerprint: fp),
-                          account: KeychainConstants.defaultAccount,
-                          accessControl: nil)
-        try keychain.save(bundle.sealedBox,
-                          service: KeychainConstants.sealedKeyService(fingerprint: fp),
-                          account: KeychainConstants.defaultAccount,
-                          accessControl: nil)
+        try saveWrappedKeyBundle(bundle, fingerprint: fp)
 
         let identity = PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
@@ -220,8 +204,14 @@ final class KeyManagementService {
             subkeyAlgo: keyInfo.subkeyAlgo
         )
 
-        // Persist metadata for cold-launch enumeration
-        try saveMetadata(identity)
+        // Persist metadata for cold-launch enumeration.
+        // If metadata save fails, roll back the SE bundle too.
+        do {
+            try saveMetadata(identity)
+        } catch {
+            rollbackKeychainBundle(fingerprint: fp)
+            throw error
+        }
 
         keys.append(identity)
 
@@ -265,26 +255,40 @@ final class KeyManagementService {
     // MARK: - Key Deletion
 
     /// Permanently delete a key and all its Keychain items.
+    /// Keychain deletions are best-effort: `itemNotFound` is benign (idempotent delete),
+    /// but other errors are collected and reported after all items are attempted.
     func deleteKey(fingerprint: String) throws {
-        // Delete all four Keychain items (3 SE items + metadata)
-        try? keychain.delete(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount)
-        try? keychain.delete(
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount)
-        try? keychain.delete(
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount)
-        try? keychain.delete(
-            service: KeychainConstants.metadataService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount)
+        let services = [
+            KeychainConstants.seKeyService(fingerprint: fingerprint),
+            KeychainConstants.saltService(fingerprint: fingerprint),
+            KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            KeychainConstants.metadataService(fingerprint: fingerprint)
+        ]
 
+        var deletionErrors: [Error] = []
+        for service in services {
+            do {
+                try keychain.delete(service: service, account: KeychainConstants.defaultAccount)
+            } catch KeychainError.itemNotFound {
+                // Benign: item already absent. Continue.
+            } catch {
+                deletionErrors.append(error)
+            }
+        }
+
+        // Always update in-memory state (the key is logically deleted).
         keys.removeAll { $0.fingerprint == fingerprint }
 
         // If the deleted key was default, assign a new default
         if !keys.isEmpty && !keys.contains(where: { $0.isDefault }) {
             keys[0].isDefault = true
+        }
+
+        // Report partial deletion failure to the caller.
+        if let firstError = deletionErrors.first {
+            throw CypherAirError.keychainError(
+                "Partial key deletion: \(deletionErrors.count) item(s) could not be removed — \(firstError.localizedDescription)"
+            )
         }
     }
 
@@ -324,7 +328,72 @@ final class KeyManagementService {
         return try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fp)
     }
 
-    // MARK: - Access Control
+    // MARK: - Keychain Bundle Helpers
+
+    /// Save the three SE-wrapped key items to Keychain.
+    /// If any write fails, rolls back the ones that succeeded.
+    private func saveWrappedKeyBundle(_ bundle: WrappedKeyBundle, fingerprint: String) throws {
+        do {
+            try keychain.save(
+                bundle.seKeyData,
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+        } catch {
+            throw error
+        }
+
+        do {
+            try keychain.save(
+                bundle.salt,
+                service: KeychainConstants.saltService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+        } catch {
+            try? keychain.delete(
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            )
+            throw error
+        }
+
+        do {
+            try keychain.save(
+                bundle.sealedBox,
+                service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+        } catch {
+            try? keychain.delete(
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            )
+            try? keychain.delete(
+                service: KeychainConstants.saltService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            )
+            throw error
+        }
+    }
+
+    /// Best-effort rollback: remove all three SE bundle items from Keychain.
+    private func rollbackKeychainBundle(fingerprint: String) {
+        try? keychain.delete(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount
+        )
+        try? keychain.delete(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount
+        )
+        try? keychain.delete(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount
+        )
+    }
 
     // MARK: - Metadata Persistence
 
@@ -343,10 +412,14 @@ final class KeyManagementService {
     /// Update existing metadata (delete + re-save).
     /// Used when mutable properties like isBackedUp change.
     private func updateMetadata(_ identity: PGPKeyIdentity) throws {
-        try? keychain.delete(
-            service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
-            account: KeychainConstants.defaultAccount
-        )
+        do {
+            try keychain.delete(
+                service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
+                account: KeychainConstants.defaultAccount
+            )
+        } catch KeychainError.itemNotFound {
+            // Benign: first-time save, nothing to delete.
+        }
         try saveMetadata(identity)
     }
 

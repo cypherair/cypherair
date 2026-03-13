@@ -294,6 +294,66 @@ fn test_cross_profile_signed_encrypted_round_trip() {
     );
 }
 
+/// Extended: Profile B sender signs encrypted message for Profile A recipient.
+/// Full round-trip: sign + encrypt + decrypt + verify.
+/// Complements test_cross_profile_signed_encrypted_round_trip (which tests A→B).
+#[test]
+fn test_cross_profile_b_to_a_signed_encrypted_round_trip() {
+    let sender_b = keys::generate_key_with_profile(
+        "Alice (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Sender key gen should succeed");
+
+    let recipient_a = keys::generate_key_with_profile(
+        "Bob (A)".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Recipient key gen should succeed");
+
+    let plaintext = b"Full round-trip: B->A signed+encrypted.";
+
+    // Encrypt and sign (B sender → A recipient)
+    // Per PRD: v4 recipient → SEIPDv1 format auto-selected
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[recipient_a.public_key_data.clone()],
+        Some(&sender_b.cert_data),
+        Some(&sender_b.public_key_data),  // encrypt-to-self
+    )
+    .expect("Encryption should succeed");
+
+    // Recipient A decrypts and verifies sender B's signature
+    let result = decrypt::decrypt(
+        &ciphertext,
+        &[recipient_a.cert_data.clone()],
+        &[sender_b.public_key_data.clone()],
+    )
+    .expect("Decryption should succeed");
+
+    assert_eq!(result.plaintext, plaintext);
+    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
+    assert_eq!(
+        result.signer_fingerprint,
+        Some(sender_b.fingerprint.clone())
+    );
+
+    // Sender B can also decrypt (encrypt-to-self)
+    let result_self = decrypt::decrypt(
+        &ciphertext,
+        &[sender_b.cert_data.clone()],
+        &[sender_b.public_key_data.clone()],
+    )
+    .expect("Sender should decrypt via encrypt-to-self");
+
+    assert_eq!(result_self.plaintext, plaintext);
+    assert_eq!(result_self.signature_status, Some(SignatureStatus::Valid));
+}
+
 /// Verify that encrypting to v4 recipient produces SEIPDv1.
 /// This directly validates PRD Section 3.4 format auto-selection rule.
 #[test]

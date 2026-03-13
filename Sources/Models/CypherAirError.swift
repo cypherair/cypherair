@@ -99,6 +99,20 @@ enum CypherAirError: Error, LocalizedError {
         }
     }
 
+    /// Wrap any error into CypherAirError.
+    /// - If it's already a CypherAirError, return as-is.
+    /// - If it's a PgpError, map via init(pgpError:).
+    /// - Otherwise, use the fallback case with the error's description.
+    static func from(_ error: Error, fallback: (String) -> CypherAirError) -> CypherAirError {
+        if let cypherAirError = error as? CypherAirError {
+            return cypherAirError
+        } else if let pgpError = error as? PgpError {
+            return CypherAirError(pgpError: pgpError)
+        } else {
+            return fallback(error.localizedDescription)
+        }
+    }
+
     /// Initialize from a UniFFI PgpError.
     init(pgpError: PgpError) {
         switch pgpError {

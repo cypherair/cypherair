@@ -124,10 +124,17 @@ struct CypherAirApp: App {
                             detectedProfile: pending.profile,
                             onConfirm: {
                                 do {
-                                    try contactService.addContact(publicKeyData: pending.keyData)
+                                    let result = try contactService.addContact(publicKeyData: pending.keyData)
+                                    if case .keyUpdateDetected(let newContact, let existingContact, let keyData) = result {
+                                        // User confirmed import via ImportConfirmView — proceed with replacement.
+                                        try contactService.confirmKeyUpdate(
+                                            existingFingerprint: existingContact.fingerprint,
+                                            newContact: newContact,
+                                            keyData: keyData
+                                        )
+                                    }
                                 } catch {
-                                    // Contact add failed — error will be visible
-                                    // through the contacts list state
+                                    importError = CypherAirError.from(error) { _ in .invalidQRCode }
                                 }
                                 pendingImport = nil
                             },
@@ -183,10 +190,8 @@ struct CypherAirApp: App {
             let profile = try engine.detectProfile(certData: publicKeyData)
             // Show confirmation sheet — do NOT add directly (PRD Section 4.2).
             pendingImport = PendingImport(keyData: publicKeyData, keyInfo: keyInfo, profile: profile)
-        } catch let error as CypherAirError {
-            importError = error
         } catch {
-            importError = .invalidQRCode
+            importError = CypherAirError.from(error) { _ in .invalidQRCode }
         }
     }
 

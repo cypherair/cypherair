@@ -1,0 +1,208 @@
+import XCTest
+@testable import CypherAir
+
+/// Tests for SigningService — cleartext/detached signing and verification.
+final class SigningServiceTests: XCTestCase {
+
+    private var stack: TestHelpers.ServiceStack!
+
+    override func setUp() {
+        super.setUp()
+        stack = TestHelpers.makeServiceStack()
+    }
+
+    override func tearDown() {
+        stack.cleanup()
+        stack = nil
+        super.tearDown()
+    }
+
+    // MARK: - Helpers
+
+    /// Generate a key and register it as a contact.
+    private func generateKeyAndContact(
+        profile: KeyProfile,
+        name: String = "Signer"
+    ) throws -> PGPKeyIdentity {
+        let identity = try TestHelpers.generateAndStoreKey(
+            service: stack.keyManagement,
+            profile: profile,
+            name: name
+        )
+        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        return identity
+    }
+
+    // MARK: - Cleartext Signing
+
+    func test_signCleartext_profileA_producesSignedMessage() async throws {
+        let identity = try generateKeyAndContact(profile: .universal)
+
+        let signed = try await stack.signingService.signCleartext(
+            "Test message for signing",
+            signerFingerprint: identity.fingerprint
+        )
+
+        XCTAssertFalse(signed.isEmpty, "Signed message should not be empty")
+
+        // Cleartext signed messages start with "-----BEGIN PGP SIGNED MESSAGE-----"
+        let header = String(data: signed.prefix(40), encoding: .utf8)
+        XCTAssertTrue(header?.contains("SIGNED MESSAGE") == true,
+                      "Should produce cleartext signed message")
+    }
+
+    func test_signCleartext_profileB_producesSignedMessage() async throws {
+        let identity = try generateKeyAndContact(profile: .advanced)
+
+        let signed = try await stack.signingService.signCleartext(
+            "Test message Profile B",
+            signerFingerprint: identity.fingerprint
+        )
+
+        XCTAssertFalse(signed.isEmpty)
+    }
+
+    // MARK: - Detached Signing
+
+    func test_signDetached_profileA_producesDetachedSignature() async throws {
+        let identity = try generateKeyAndContact(profile: .universal)
+        let data = Data("File content for signing".utf8)
+
+        let signature = try await stack.signingService.signDetached(
+            data, signerFingerprint: identity.fingerprint
+        )
+
+        XCTAssertFalse(signature.isEmpty, "Detached signature should not be empty")
+    }
+
+    func test_signDetached_profileB_producesDetachedSignature() async throws {
+        let identity = try generateKeyAndContact(profile: .advanced)
+        let data = Data("File content for Profile B signing".utf8)
+
+        let signature = try await stack.signingService.signDetached(
+            data, signerFingerprint: identity.fingerprint
+        )
+
+        XCTAssertFalse(signature.isEmpty)
+    }
+
+    // MARK: - Cleartext Verification
+
+    func test_verifyCleartext_validSignature_returnsValid() async throws {
+        let identity = try generateKeyAndContact(profile: .universal)
+
+        let signed = try await stack.signingService.signCleartext(
+            "Verify this message",
+            signerFingerprint: identity.fingerprint
+        )
+
+        let result = try await stack.signingService.verifyCleartext(signed)
+        XCTAssertEqual(result.verification.status, .valid,
+                       "Valid signature should verify as .valid")
+    }
+
+    func test_verifyCleartext_tamperedMessage_returnsBad() async throws {
+        let identity = try generateKeyAndContact(profile: .universal)
+
+        var signed = try await stack.signingService.signCleartext(
+            "Original message",
+            signerFingerprint: identity.fingerprint
+        )
+
+        // Tamper: find "Original" and replace with "Modified"
+        if let signedString = String(data: signed, encoding: .utf8) {
+            let tampered = signedString.replacingOccurrences(of: "Original", with: "Modified")
+            signed = Data(tampered.utf8)
+        }
+
+        let result = try await stack.signingService.verifyCleartext(signed)
+        XCTAssertEqual(result.verification.status, .bad,
+                       "Tampered message should verify as .bad")
+    }
+
+    func test_verifyCleartext_unknownSigner_returnsUnknownSigner() async throws {
+        // Generate a key but DON'T add it as a contact
+        let identity = try TestHelpers.generateAndStoreKey(
+            service: stack.keyManagement,
+            profile: .universal,
+            name: "Unknown"
+        )
+
+        let signed = try await stack.signingService.signCleartext(
+            "Message from unknown",
+            signerFingerprint: identity.fingerprint
+        )
+
+        // Remove all contacts and the signing key from keyManagement.keys
+        // to simulate an unknown signer scenario
+        // Actually, the key IS in keyManagement.keys — for unknown signer we need
+        // a key that's NOT in our contacts OR our own keys
+        // This is tricky — let's create a separate stack for signing and verify on the original
+        let otherStack = TestHelpers.makeServiceStack()
+        defer { otherStack.cleanup() }
+
+        let otherIdentity = try TestHelpers.generateAndStoreKey(
+            service: otherStack.keyManagement,
+            profile: .universal,
+            name: "Stranger"
+        )
+
+        let strangerSigned = try await otherStack.signingService.signCleartext(
+            "Message from a stranger",
+            signerFingerprint: otherIdentity.fingerprint
+        )
+
+        // Verify on the original stack — the signer is not known
+        let result = try await stack.signingService.verifyCleartext(strangerSigned)
+        XCTAssertEqual(result.verification.status, .unknownSigner,
+                       "Unknown signer should be flagged")
+    }
+
+    // MARK: - Detached Verification
+
+    func test_verifyDetached_validSignature_returnsValid() async throws {
+        let identity = try generateKeyAndContact(profile: .universal)
+        let data = Data("Detached verify data".utf8)
+
+        let signature = try await stack.signingService.signDetached(
+            data, signerFingerprint: identity.fingerprint
+        )
+
+        let result = try await stack.signingService.verifyDetached(
+            data: data, signature: signature
+        )
+        XCTAssertEqual(result.status, .valid)
+    }
+
+    func test_verifyDetached_tamperedData_returnsBad() async throws {
+        let identity = try generateKeyAndContact(profile: .universal)
+        let data = Data("Original detached data".utf8)
+
+        let signature = try await stack.signingService.signDetached(
+            data, signerFingerprint: identity.fingerprint
+        )
+
+        let tamperedData = Data("Tampered detached data".utf8)
+        let result = try await stack.signingService.verifyDetached(
+            data: tamperedData, signature: signature
+        )
+        XCTAssertEqual(result.status, .bad,
+                       "Tampered data should fail detached verification")
+    }
+
+    // MARK: - Known Contact Resolution
+
+    func test_verifyCleartext_knownContact_resolvesSigner() async throws {
+        let identity = try generateKeyAndContact(profile: .universal, name: "Alice Known")
+
+        let signed = try await stack.signingService.signCleartext(
+            "From a known contact",
+            signerFingerprint: identity.fingerprint
+        )
+
+        let result = try await stack.signingService.verifyCleartext(signed)
+        XCTAssertEqual(result.verification.status, .valid)
+        // The signer's fingerprint should be resolved
+        XCTAssertNotNil(result.verification.signerFingerprint)
+    }
+}

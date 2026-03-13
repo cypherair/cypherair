@@ -82,14 +82,8 @@ struct VerifyView: View {
                     originalText = String(data: content, encoding: .utf8)
                 }
                 verification = result.verification
-            } catch let err as CypherAirError {
-                error = err
-                showError = true
-            } catch let pgpError as PgpError {
-                error = CypherAirError(pgpError: pgpError)
-                showError = true
             } catch {
-                self.error = .badSignature
+                self.error = CypherAirError.from(error) { _ in .badSignature }
                 showError = true
             }
             isVerifying = false
