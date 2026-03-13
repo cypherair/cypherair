@@ -106,6 +106,13 @@ rm -rf "$BINDINGS_DIR"
 mkdir -p "$BINDINGS_DIR"
 (cd "$SCRIPT_DIR/pgp-mobile" && cargo run $CARGO_FLAGS --bin uniffi-bindgen \
     generate --library "$HOST_DYLIB" --language swift --out-dir "$BINDINGS_DIR")
+
+# Create module.modulemap alias expected by Xcode project build settings
+# (UniFFI generates pgp_mobileFFI.modulemap, but project.pbxproj references module.modulemap)
+if [ -f "$BINDINGS_DIR/pgp_mobileFFI.modulemap" ]; then
+    cp "$BINDINGS_DIR/pgp_mobileFFI.modulemap" "$BINDINGS_DIR/module.modulemap"
+fi
+
 echo "  ✓ Bindings generated in $BINDINGS_DIR"
 ls -la "$BINDINGS_DIR"
 
