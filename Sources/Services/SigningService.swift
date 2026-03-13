@@ -29,15 +29,24 @@ final class SigningService {
     /// - Returns: The cleartext-signed message data.
     @concurrent
     func signCleartext(_ text: String, signerFingerprint: String) async throws -> Data {
-        var secretKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
+        var secretKey: Data
+        do {
+            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
+        } catch {
+            throw CypherAirError.from(error) { _ in .authenticationFailed }
+        }
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        return try engine.signCleartext(
-            text: Data(text.utf8),
-            signerCert: secretKey
-        )
+        do {
+            return try engine.signCleartext(
+                text: Data(text.utf8),
+                signerCert: secretKey
+            )
+        } catch {
+            throw CypherAirError.from(error) { .signingFailed(reason: $0) }
+        }
     }
 
     /// Create a detached signature for file data.
@@ -49,15 +58,24 @@ final class SigningService {
     /// - Returns: The detached signature data (.sig).
     @concurrent
     func signDetached(_ data: Data, signerFingerprint: String) async throws -> Data {
-        var secretKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
+        var secretKey: Data
+        do {
+            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
+        } catch {
+            throw CypherAirError.from(error) { _ in .authenticationFailed }
+        }
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        return try engine.signDetached(
-            data: data,
-            signerCert: secretKey
-        )
+        do {
+            return try engine.signDetached(
+                data: data,
+                signerCert: secretKey
+            )
+        } catch {
+            throw CypherAirError.from(error) { .signingFailed(reason: $0) }
+        }
     }
 
     // MARK: - Verification
@@ -70,10 +88,15 @@ final class SigningService {
     func verifyCleartext(_ signedMessage: Data) async throws -> (text: Data?, verification: SignatureVerification) {
         let verificationKeys = allVerificationKeys()
 
-        let result = try engine.verifyCleartext(
-            signedMessage: signedMessage,
-            verificationKeys: verificationKeys
-        )
+        let result: VerifyResult
+        do {
+            result = try engine.verifyCleartext(
+                signedMessage: signedMessage,
+                verificationKeys: verificationKeys
+            )
+        } catch {
+            throw CypherAirError.from(error) { _ in .badSignature }
+        }
 
         let sigVerification = SignatureVerification(
             status: result.status,
@@ -96,11 +119,16 @@ final class SigningService {
     func verifyDetached(data: Data, signature: Data) async throws -> SignatureVerification {
         let verificationKeys = allVerificationKeys()
 
-        let result = try engine.verifyDetached(
-            data: data,
-            signature: signature,
-            verificationKeys: verificationKeys
-        )
+        let result: VerifyResult
+        do {
+            result = try engine.verifyDetached(
+                data: data,
+                signature: signature,
+                verificationKeys: verificationKeys
+            )
+        } catch {
+            throw CypherAirError.from(error) { _ in .badSignature }
+        }
 
         return SignatureVerification(
             status: result.status,

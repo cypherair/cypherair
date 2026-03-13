@@ -8,6 +8,8 @@ struct AddContactView: View {
     @State private var armoredText = ""
     @State private var error: CypherAirError?
     @State private var showError = false
+    @State private var pendingKeyUpdate: PendingKeyUpdate?
+    @State private var showKeyUpdateAlert = false
 
     var body: some View {
         Form {
@@ -40,22 +42,56 @@ struct AddContactView: View {
         } message: { err in
             Text(err.localizedDescription)
         }
+        .alert(
+            String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
+            isPresented: $showKeyUpdateAlert,
+            presenting: pendingKeyUpdate
+        ) { update in
+            Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
+                do {
+                    try contactService.confirmKeyUpdate(
+                        existingFingerprint: update.existingContact.fingerprint,
+                        newContact: update.newContact,
+                        keyData: update.keyData
+                    )
+                    dismiss()
+                } catch {
+                    self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+                    showError = true
+                }
+            }
+            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {}
+        } message: { update in
+            Text(String(localized: "addcontact.keyUpdate.message",
+                        defaultValue: "This contact (\(update.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
+        }
     }
 
     private func addFromPaste() {
         do {
             let data = Data(armoredText.utf8)
-            _ = try contactService.addContact(publicKeyData: data)
-            dismiss()
-        } catch let err as CypherAirError {
-            error = err
-            showError = true
-        } catch let pgpError as PgpError {
-            error = CypherAirError(pgpError: pgpError)
-            showError = true
+            let result = try contactService.addContact(publicKeyData: data)
+            switch result {
+            case .added, .duplicate:
+                dismiss()
+            case .keyUpdateDetected(let newContact, let existingContact, let keyData):
+                pendingKeyUpdate = PendingKeyUpdate(
+                    newContact: newContact,
+                    existingContact: existingContact,
+                    keyData: keyData
+                )
+                showKeyUpdateAlert = true
+            }
         } catch {
-            self.error = .invalidKeyData(reason: error.localizedDescription)
+            self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
             showError = true
         }
     }
+}
+
+/// Holds state for a pending key update confirmation.
+private struct PendingKeyUpdate {
+    let newContact: Contact
+    let existingContact: Contact
+    let keyData: Data
 }

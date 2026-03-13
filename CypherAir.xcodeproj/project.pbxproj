@@ -60,6 +60,13 @@
 		CE0064F02F64975D008604AB /* FileDecryptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064EF2F64975D008604AB /* FileDecryptView.swift */; };
 		CE0064F22F649F3F008604AB /* ImportConfirmView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064F12F649F3F008604AB /* ImportConfirmView.swift */; };
 		CE0064F42F649FED008604AB /* KeyProfile+Codable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064F32F649FED008604AB /* KeyProfile+Codable.swift */; };
+		CE0064F72F64B199008604AB /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064F62F64B199008604AB /* TestHelpers.swift */; };
+		CE0064F92F64B1C4008604AB /* QRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064F82F64B1C4008604AB /* QRServiceTests.swift */; };
+		CE0064FB2F64B1F4008604AB /* KeyManagementServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064FA2F64B1F4008604AB /* KeyManagementServiceTests.swift */; };
+		CE0064FD2F64B219008604AB /* DecryptionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064FC2F64B219008604AB /* DecryptionServiceTests.swift */; };
+		CE0064FF2F64B248008604AB /* EncryptionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064FE2F64B248008604AB /* EncryptionServiceTests.swift */; };
+		CE0065012F64B26E008604AB /* SigningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065002F64B26E008604AB /* SigningServiceTests.swift */; };
+		CE0065032F64B29A008604AB /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065022F64B29A008604AB /* ModelTests.swift */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
 		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
@@ -131,6 +138,13 @@
 		CE0064EF2F64975D008604AB /* FileDecryptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDecryptView.swift; sourceTree = "<group>"; };
 		CE0064F12F649F3F008604AB /* ImportConfirmView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportConfirmView.swift; sourceTree = "<group>"; };
 		CE0064F32F649FED008604AB /* KeyProfile+Codable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyProfile+Codable.swift"; sourceTree = "<group>"; };
+		CE0064F62F64B199008604AB /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
+		CE0064F82F64B1C4008604AB /* QRServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRServiceTests.swift; sourceTree = "<group>"; };
+		CE0064FA2F64B1F4008604AB /* KeyManagementServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyManagementServiceTests.swift; sourceTree = "<group>"; };
+		CE0064FC2F64B219008604AB /* DecryptionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecryptionServiceTests.swift; sourceTree = "<group>"; };
+		CE0064FE2F64B248008604AB /* EncryptionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptionServiceTests.swift; sourceTree = "<group>"; };
+		CE0065002F64B26E008604AB /* SigningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SigningServiceTests.swift; sourceTree = "<group>"; };
+		CE0065022F64B29A008604AB /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
 		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
@@ -189,6 +203,7 @@
 			children = (
 				EB25CBF841620099B863C9EF /* FFIIntegrationTests */,
 				CE340E9D2F6323140047E290 /* DeviceSecurityTests */,
+				CE0064F52F64B185008604AB /* ServiceTests */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -315,6 +330,20 @@
 			path = Onboarding;
 			sourceTree = "<group>";
 		};
+		CE0064F52F64B185008604AB /* ServiceTests */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064F62F64B199008604AB /* TestHelpers.swift */,
+				CE0064F82F64B1C4008604AB /* QRServiceTests.swift */,
+				CE0064FA2F64B1F4008604AB /* KeyManagementServiceTests.swift */,
+				CE0064FC2F64B219008604AB /* DecryptionServiceTests.swift */,
+				CE0064FE2F64B248008604AB /* EncryptionServiceTests.swift */,
+				CE0065002F64B26E008604AB /* SigningServiceTests.swift */,
+				CE0065022F64B29A008604AB /* ModelTests.swift */,
+			);
+			path = ServiceTests;
+			sourceTree = "<group>";
+		};
 		CE340E9C2F6323140047E290 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
@@ -436,8 +465,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CE0065032F64B29A008604AB /* ModelTests.swift in Sources */,
 				B8462A44F4C7F182FE942E78 /* FFIIntegrationTests.swift in Sources */,
 				28B947F8AAAFFB1BF3B9F796 /* DeviceSecurityTests.swift in Sources */,
+				CE0064FD2F64B219008604AB /* DecryptionServiceTests.swift in Sources */,
+				CE0064F92F64B1C4008604AB /* QRServiceTests.swift in Sources */,
+				CE0064FF2F64B248008604AB /* EncryptionServiceTests.swift in Sources */,
+				CE0064FB2F64B1F4008604AB /* KeyManagementServiceTests.swift in Sources */,
+				CE0064F72F64B199008604AB /* TestHelpers.swift in Sources */,
+				CE0065012F64B26E008604AB /* SigningServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

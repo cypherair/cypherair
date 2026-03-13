@@ -1,0 +1,138 @@
+import Foundation
+import XCTest
+@testable import CypherAir
+
+/// Shared test infrastructure for Services layer tests.
+/// Creates mock-backed service instances for integration-style testing.
+enum TestHelpers {
+
+    // MARK: - KeyManagementService Factory
+
+    /// Create a KeyManagementService backed by mock SE, Keychain, and Authenticator.
+    /// Returns the service and all three mocks for verification.
+    static func makeKeyManagement(
+        engine: PgpEngine = PgpEngine()
+    ) -> (service: KeyManagementService, mockSE: MockSecureEnclave, mockKC: MockKeychain, mockAuth: MockAuthenticator) {
+        let mockSE = MockSecureEnclave()
+        let mockKC = MockKeychain()
+        let mockAuth = MockAuthenticator()
+
+        let service = KeyManagementService(
+            engine: engine,
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            authenticator: mockAuth
+        )
+
+        return (service, mockSE, mockKC, mockAuth)
+    }
+
+    // MARK: - ContactService Factory
+
+    /// Create a ContactService using a temporary directory for contacts storage.
+    /// Returns the service and the temp directory URL (caller should clean up in tearDown).
+    static func makeContactService(
+        engine: PgpEngine = PgpEngine()
+    ) -> (service: ContactService, tempDir: URL) {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirTests-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        let service = ContactService(engine: engine, contactsDirectory: tempDir)
+        return (service, tempDir)
+    }
+
+    // MARK: - Key Generation Helpers
+
+    /// Generate a key pair and store it in the mock-backed KeyManagementService.
+    /// Returns the PGPKeyIdentity of the generated key.
+    @discardableResult
+    static func generateAndStoreKey(
+        service: KeyManagementService,
+        profile: KeyProfile,
+        name: String = "Test User",
+        email: String? = "test@example.com"
+    ) throws -> PGPKeyIdentity {
+        try service.generateKey(
+            name: name,
+            email: email,
+            expirySeconds: nil,
+            profile: profile,
+            authMode: .standard
+        )
+    }
+
+    /// Generate a Profile A key and return its identity.
+    @discardableResult
+    static func generateProfileAKey(
+        service: KeyManagementService,
+        name: String = "Alice",
+        email: String? = "alice@example.com"
+    ) throws -> PGPKeyIdentity {
+        try generateAndStoreKey(service: service, profile: .universal, name: name, email: email)
+    }
+
+    /// Generate a Profile B key and return its identity.
+    @discardableResult
+    static func generateProfileBKey(
+        service: KeyManagementService,
+        name: String = "Bob",
+        email: String? = "bob@example.com"
+    ) throws -> PGPKeyIdentity {
+        try generateAndStoreKey(service: service, profile: .advanced, name: name, email: email)
+    }
+
+    // MARK: - Full Service Stack Factory
+
+    /// Create a complete service stack (KeyManagement + Contact + Encryption + Decryption + Signing)
+    /// backed by mocks. Useful for end-to-end integration tests.
+    static func makeServiceStack(
+        engine: PgpEngine = PgpEngine()
+    ) -> ServiceStack {
+        let (keyMgmt, mockSE, mockKC, mockAuth) = makeKeyManagement(engine: engine)
+        let (contactSvc, tempDir) = makeContactService(engine: engine)
+
+        let encryptionSvc = EncryptionService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)
+        let decryptionSvc = DecryptionService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)
+        let signingSvc = SigningService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)
+
+        return ServiceStack(
+            engine: engine,
+            keyManagement: keyMgmt,
+            contactService: contactSvc,
+            encryptionService: encryptionSvc,
+            decryptionService: decryptionSvc,
+            signingService: signingSvc,
+            mockSE: mockSE,
+            mockKC: mockKC,
+            mockAuth: mockAuth,
+            tempDir: tempDir
+        )
+    }
+
+    /// Holds all services and mocks for a complete test environment.
+    struct ServiceStack {
+        let engine: PgpEngine
+        let keyManagement: KeyManagementService
+        let contactService: ContactService
+        let encryptionService: EncryptionService
+        let decryptionService: DecryptionService
+        let signingService: SigningService
+        let mockSE: MockSecureEnclave
+        let mockKC: MockKeychain
+        let mockAuth: MockAuthenticator
+        let tempDir: URL
+
+        /// Clean up temporary files. Call in tearDown.
+        func cleanup() {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+    }
+
+    // MARK: - Cleanup
+
+    /// Remove a temporary directory created by makeContactService.
+    static func cleanupTempDir(_ url: URL) {
+        try? FileManager.default.removeItem(at: url)
+    }
+}

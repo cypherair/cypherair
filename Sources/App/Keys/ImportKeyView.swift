@@ -70,11 +70,8 @@ struct ImportKeyView: View {
                     authMode: config.authMode
                 )
                 dismiss()
-            } catch let err as CypherAirError {
-                error = err
-                showError = true
             } catch {
-                self.error = .invalidKeyData(reason: error.localizedDescription)
+                self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
                 showError = true
             }
             isImporting = false

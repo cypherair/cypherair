@@ -131,14 +131,8 @@ struct FileEncryptView: View {
                     encryptToSelf: selfEncrypt
                 )
                 encryptedData = result
-            } catch let err as CypherAirError {
-                error = err
-                showError = true
-            } catch let pgpError as PgpError {
-                error = CypherAirError(pgpError: pgpError)
-                showError = true
             } catch {
-                self.error = .encryptionFailed(reason: error.localizedDescription)
+                self.error = CypherAirError.from(error) { .encryptionFailed(reason: $0) }
                 showError = true
             }
         }

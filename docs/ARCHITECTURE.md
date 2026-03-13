@@ -53,7 +53,7 @@ Orchestrates user-facing operations by coordinating the Security layer and the R
 | `SigningService` | Cleartext text signatures, detached file signatures, verification with graded results |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation |
 | `ContactService` | Public key storage, update detection (same fingerprint vs different), flat list management |
-| `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (Vision), URL scheme parsing. **Security-critical: parses untrusted external input.** |
+| `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing. **Security-critical: parses untrusted external input.** |
 | `SelfTestService` | One-tap diagnostic covering **both profiles**: key gen → encrypt/decrypt → sign/verify → tamper test → QR round-trip |
 
 ### Security Layer (`Sources/Security/`)
