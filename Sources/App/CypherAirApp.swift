@@ -99,6 +99,7 @@ struct CypherAirApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .privacyScreen()
                 .environment(config)
                 .environment(keyManagement)
                 .environment(contactService)
@@ -108,7 +109,6 @@ struct CypherAirApp: App {
                 .environment(qrService)
                 .environment(selfTestService)
                 .environment(authManager)
-                .privacyScreen()
                 .sheet(isPresented: showOnboarding) {
                     OnboardingView()
                         .environment(config)
