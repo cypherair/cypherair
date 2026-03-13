@@ -48,7 +48,7 @@ struct KeyGenerationView: View {
                 )
                 .textContentType(.emailAddress)
                 .keyboardType(.emailAddress)
-                .autocapitalization(.none)
+                .textInputAutocapitalization(.never)
             } header: {
                 Text(String(localized: "keygen.identity.header", defaultValue: "Identity"))
             }

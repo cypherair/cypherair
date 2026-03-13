@@ -76,6 +76,19 @@ final class QRService {
         return try engine.decodeQrUrl(url: urlString)
     }
 
+    // MARK: - Key Inspection (for UI confirmation)
+
+    /// Parse key metadata for display in the import confirmation view.
+    /// This is a read-only inspection — no keys are stored.
+    func inspectKeyInfo(keyData: Data) throws -> KeyInfo {
+        try engine.parseKeyInfo(keyData: keyData)
+    }
+
+    /// Detect the encryption profile of a public key.
+    func detectKeyProfile(keyData: Data) throws -> KeyProfile {
+        try engine.detectProfile(certData: keyData)
+    }
+
     // MARK: - QR Decoding from Image
 
     /// Decode QR codes from a CIImage (e.g., from PHPicker selection).
