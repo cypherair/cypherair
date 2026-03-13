@@ -113,7 +113,11 @@ final class EncryptionService {
         // Get signing key if requested (requires SE unwrap → Face ID)
         var signingKey: Data?
         if let signerFp = signWithFingerprint {
-            signingKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFp)
+            do {
+                signingKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFp)
+            } catch {
+                throw CypherAirError.from(error) { _ in .authenticationFailed }
+            }
         }
 
         // Get encrypt-to-self key
@@ -123,27 +127,42 @@ final class EncryptionService {
         }
 
         defer {
-            // Zeroize signing key (must mutate the original binding, not a copy)
+            // Safety-net zeroing. Primary zeroing happens inline below.
             if signingKey != nil {
                 signingKey!.resetBytes(in: 0..<signingKey!.count)
                 signingKey = nil
             }
         }
 
-        if binary {
-            return try engine.encryptBinary(
-                plaintext: plaintext,
-                recipients: recipientKeys,
-                signingKey: signingKey,
-                encryptToSelf: selfKey
-            )
-        } else {
-            return try engine.encrypt(
-                plaintext: plaintext,
-                recipients: recipientKeys,
-                signingKey: signingKey,
-                encryptToSelf: selfKey
-            )
+        let result: Data
+        do {
+            if binary {
+                result = try engine.encryptBinary(
+                    plaintext: plaintext,
+                    recipients: recipientKeys,
+                    signingKey: signingKey,
+                    encryptToSelf: selfKey
+                )
+            } else {
+                result = try engine.encrypt(
+                    plaintext: plaintext,
+                    recipients: recipientKeys,
+                    signingKey: signingKey,
+                    encryptToSelf: selfKey
+                )
+            }
+        } catch {
+            throw CypherAirError.from(error) { .encryptionFailed(reason: $0) }
         }
+
+        // Primary zeroing: immediately after engine call returns, signingKey is most
+        // likely uniquely referenced (UniFFI lower() temporaries released). This
+        // maximizes the chance that resetBytes mutates the original buffer under COW.
+        if signingKey != nil {
+            signingKey!.resetBytes(in: 0..<signingKey!.count)
+            signingKey = nil
+        }
+
+        return result
     }
 }

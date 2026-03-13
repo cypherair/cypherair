@@ -87,14 +87,8 @@ struct DecryptView: View {
                 // Zeroize plaintext data
                 var mutablePlaintext = result.plaintext
                 mutablePlaintext.resetBytes(in: 0..<mutablePlaintext.count)
-            } catch let err as CypherAirError {
-                error = err
-                showError = true
-            } catch let pgpError as PgpError {
-                error = CypherAirError(pgpError: pgpError)
-                showError = true
             } catch {
-                self.error = .corruptData(reason: error.localizedDescription)
+                self.error = CypherAirError.from(error) { .corruptData(reason: $0) }
                 showError = true
             }
             isDecrypting = false

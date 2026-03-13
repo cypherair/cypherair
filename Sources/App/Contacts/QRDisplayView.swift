@@ -68,11 +68,8 @@ struct QRDisplayView: View {
                     qrImage = UIImage(cgImage: cgImage)
                 }
             }
-        } catch let err as CypherAirError {
-            error = err
-            showError = true
         } catch {
-            self.error = .corruptData(reason: error.localizedDescription)
+            self.error = CypherAirError.from(error) { .corruptData(reason: $0) }
             showError = true
         }
     }

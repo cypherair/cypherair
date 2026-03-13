@@ -15,6 +15,8 @@ struct QRPhotoImportView: View {
     @State private var error: CypherAirError?
     @State private var showError = false
     @State private var showSuccess = false
+    @State private var pendingKeyUpdate: PendingQRKeyUpdate?
+    @State private var showKeyUpdateAlert = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -70,6 +72,30 @@ struct QRPhotoImportView: View {
                 Text(contact.displayName)
             }
         }
+        .alert(
+            String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
+            isPresented: $showKeyUpdateAlert,
+            presenting: pendingKeyUpdate
+        ) { update in
+            Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
+                do {
+                    try contactService.confirmKeyUpdate(
+                        existingFingerprint: update.existingContact.fingerprint,
+                        newContact: update.newContact,
+                        keyData: update.keyData
+                    )
+                    importedContact = update.newContact
+                    showSuccess = true
+                } catch {
+                    self.error = CypherAirError.from(error) { _ in .invalidQRCode }
+                    showError = true
+                }
+            }
+            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {}
+        } message: { update in
+            Text(String(localized: "addcontact.keyUpdate.message",
+                        defaultValue: "This contact (\(update.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
+        }
     }
 
     private func processSelectedPhoto(_ item: PhotosPickerItem) {
@@ -102,16 +128,30 @@ struct QRPhotoImportView: View {
                 }
 
                 let publicKeyData = try service.parseImportURL(url)
-                let contact = try contacts.addContact(publicKeyData: publicKeyData)
-                importedContact = contact
-                showSuccess = true
-            } catch let err as CypherAirError {
-                error = err
-                showError = true
+                let result = try contacts.addContact(publicKeyData: publicKeyData)
+                switch result {
+                case .added(let contact), .duplicate(let contact):
+                    importedContact = contact
+                    showSuccess = true
+                case .keyUpdateDetected(let newContact, let existingContact, let keyData):
+                    pendingKeyUpdate = PendingQRKeyUpdate(
+                        newContact: newContact,
+                        existingContact: existingContact,
+                        keyData: keyData
+                    )
+                    showKeyUpdateAlert = true
+                }
             } catch {
-                self.error = .invalidQRCode
+                self.error = CypherAirError.from(error) { _ in .invalidQRCode }
                 showError = true
             }
         }
     }
+}
+
+/// Holds state for a pending key update confirmation via QR import.
+private struct PendingQRKeyUpdate {
+    let newContact: Contact
+    let existingContact: Contact
+    let keyData: Data
 }

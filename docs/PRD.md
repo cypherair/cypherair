@@ -110,7 +110,7 @@ Open App → Onboarding (3 pages) → "Generate My Key"
 **Method A: QR via System Camera (Recommended)**
 - Format: `cypherair://import/v1/<base64url OpenPGP binary, no padding>`
 - Alice shows QR → Bob scans with system Camera → "Open in Cypher Air" → confirm → added.
-- Fallback: QR from photo (PHPicker + Vision).
+- Fallback: QR from photo (PHPicker + CIDetector).
 
 **Method B:** Share .asc file via Share Sheet.
 
@@ -361,7 +361,7 @@ macOS. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack.
 
 **Scenario 8: Key Compromise** — Alice discovers her key may be compromised. She exports and distributes her revocation certificate. Contacts mark the key as revoked. Alice generates a new key.
 
-**Scenario 9: QR from Screenshot** — Bob receives a screenshot of Alice's QR code. Contacts → Add Friend's Key → QR Photo → PHPicker (no permission) → Vision decode → confirm → added.
+**Scenario 9: QR from Screenshot** — Bob receives a screenshot of Alice's QR code. Contacts → Add Friend's Key → QR Photo → PHPicker (no permission) → CIDetector decode → confirm → added.
 
 **Scenario 10: Contact Key Update** — Alice regenerates her key (same UID, new fingerprint). She sends her new public key. Bob's App detects same UID but different fingerprint → warning → Bob verifies with Alice → confirms update.
 
