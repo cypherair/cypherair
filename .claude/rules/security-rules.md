@@ -53,3 +53,11 @@ authentication boundaries (Phase 1/Phase 2) and parse untrusted external input
 - Verify encryption format matches recipient key version before sending.
 - Include both positive tests (correct auth succeeds) and negative tests (wrong auth fails, tampered data rejected) for every change.
 - Guard SE-dependent code with `SecureEnclave.isAvailable` for simulator compatibility.
+
+## Definition of Done
+
+- `cargo test --manifest-path pgp-mobile/Cargo.toml` passes
+- `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests` passes
+- Both positive tests (correct inputs succeed) and negative tests (wrong inputs fail gracefully) included
+- Diff reviewed against SECURITY.md invariants (§3 SE wrapping, §4 auth modes, §7 red lines)
+- No `print()` / `os_log()` / `NSLog()` of sensitive data added
