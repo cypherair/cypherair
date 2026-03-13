@@ -43,7 +43,9 @@ Generate (Profile A: Ed25519+X25519 v4 / Profile B: Ed448+X448 v6)
     │
     ├──→ SE Wrap (P-256 self-ECDH + HKDF + AES-GCM)
     │       │
-    │       └──→ Store in Keychain (3 items per identity)
+    │       └──→ Store in Keychain (3 items per identity + 1 metadata item)
+    │
+    ├──→ Store PGPKeyIdentity metadata in Keychain (no SE auth, for cold-launch enumeration)
     │
     ├──→ Auto-generate revocation certificate
     │       └──→ Prompt user to export separately

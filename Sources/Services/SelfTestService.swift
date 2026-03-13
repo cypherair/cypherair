@@ -1,0 +1,282 @@
+import Foundation
+
+/// One-tap self-diagnostic covering both profiles:
+/// key generation → encrypt/decrypt → sign/verify → tamper detection → QR round-trip.
+///
+/// Results are stored as a shareable report in Documents/self-test/.
+@Observable
+final class SelfTestService {
+
+    /// Individual test result.
+    struct TestResult: Identifiable {
+        let id = UUID()
+        let name: String
+        let profile: KeyProfile?
+        let passed: Bool
+        let message: String
+        let duration: TimeInterval
+    }
+
+    /// Overall test run state.
+    enum RunState {
+        case idle
+        case running(progress: Double)
+        case completed(results: [TestResult])
+        case failed(error: Error)
+    }
+
+    /// Current state of the self-test run.
+    private(set) var state: RunState = .idle
+
+    private let engine: PgpEngine
+
+    init(engine: PgpEngine = PgpEngine()) {
+        self.engine = engine
+    }
+
+    // MARK: - Run Self-Test
+
+    /// Run the complete self-test suite for both profiles.
+    func runAllTests() async {
+        state = .running(progress: 0)
+
+        var results: [TestResult] = []
+        let profiles: [KeyProfile] = [.universal, .advanced]
+        let totalTests = profiles.count * 5 + 1 // 5 tests per profile + 1 QR test
+        var completedTests = 0
+
+        for profile in profiles {
+            // Test 1: Key generation
+            let genResult = runTest(
+                name: "Key Generation",
+                profile: profile
+            ) {
+                let generated = try self.engine.generateKey(
+                    name: "Self-Test",
+                    email: "test@cypherair.local",
+                    expirySeconds: 3600,
+                    profile: profile
+                )
+                let info = try self.engine.parseKeyInfo(keyData: generated.publicKeyData)
+                guard info.keyVersion == profile.keyVersion else {
+                    throw CypherAirError.corruptData(reason: "Wrong key version: expected \(profile.keyVersion), got \(info.keyVersion)")
+                }
+                return generated
+            }
+            results.append(genResult.result)
+            completedTests += 1
+            updateProgress(Double(completedTests) / Double(totalTests))
+
+            // Need key data for subsequent tests
+            guard genResult.passed, let generated = genResult.value else { continue }
+
+            // Test 2: Encrypt/Decrypt round-trip
+            let encDecResult = runTest(
+                name: "Encrypt/Decrypt",
+                profile: profile
+            ) {
+                let plaintext = Data("Self-test 自检 🔐".utf8)
+                let ciphertext = try self.engine.encrypt(
+                    plaintext: plaintext,
+                    recipients: [generated.publicKeyData],
+                    signingKey: generated.certData,
+                    encryptToSelf: nil
+                )
+                let decrypted = try self.engine.decrypt(
+                    ciphertext: ciphertext,
+                    secretKeys: [generated.certData],
+                    verificationKeys: [generated.publicKeyData]
+                )
+                guard decrypted.plaintext == plaintext else {
+                    throw CypherAirError.corruptData(reason: "Plaintext mismatch after round-trip")
+                }
+                return decrypted
+            }
+            results.append(encDecResult.result)
+            completedTests += 1
+            updateProgress(Double(completedTests) / Double(totalTests))
+
+            // Test 3: Sign/Verify round-trip
+            let signResult = runTest(
+                name: "Sign/Verify",
+                profile: profile
+            ) {
+                let text = Data("Signed message 签名消息".utf8)
+                let signed = try self.engine.signCleartext(
+                    text: text,
+                    signerCert: generated.certData
+                )
+                let verified = try self.engine.verifyCleartext(
+                    signedMessage: signed,
+                    verificationKeys: [generated.publicKeyData]
+                )
+                guard verified.status == .valid else {
+                    throw CypherAirError.badSignature
+                }
+                return verified
+            }
+            results.append(signResult.result)
+            completedTests += 1
+            updateProgress(Double(completedTests) / Double(totalTests))
+
+            // Test 4: Tamper detection (1-bit flip)
+            let tamperResult = runTest(
+                name: "Tamper Detection",
+                profile: profile
+            ) {
+                let plaintext = Data("Tamper test".utf8)
+                var ciphertext = try self.engine.encrypt(
+                    plaintext: plaintext,
+                    recipients: [generated.publicKeyData],
+                    signingKey: nil,
+                    encryptToSelf: nil
+                )
+
+                // Flip one bit near the middle
+                let midpoint = ciphertext.count / 2
+                ciphertext[midpoint] ^= 0x01
+
+                do {
+                    _ = try self.engine.decrypt(
+                        ciphertext: ciphertext,
+                        secretKeys: [generated.certData],
+                        verificationKeys: []
+                    )
+                    throw CypherAirError.corruptData(reason: "Tampered ciphertext was not rejected")
+                } catch let error as PgpError {
+                    // Expected: decryption should fail
+                    _ = error
+                    return true
+                }
+            }
+            results.append(tamperResult.result)
+            completedTests += 1
+            updateProgress(Double(completedTests) / Double(totalTests))
+
+            // Test 5: Key export/import round-trip
+            let exportResult = runTest(
+                name: "Export/Import",
+                profile: profile
+            ) {
+                let passphrase = "self-test-passphrase-2024"
+                let exported = try self.engine.exportSecretKey(
+                    certData: generated.certData,
+                    passphrase: passphrase,
+                    profile: profile
+                )
+                let imported = try self.engine.importSecretKey(
+                    armoredData: exported,
+                    passphrase: passphrase
+                )
+                let originalInfo = try self.engine.parseKeyInfo(keyData: generated.certData)
+                let importedInfo = try self.engine.parseKeyInfo(keyData: imported)
+                guard originalInfo.fingerprint == importedInfo.fingerprint else {
+                    throw CypherAirError.corruptData(reason: "Fingerprint mismatch after export/import")
+                }
+                return importedInfo
+            }
+            results.append(exportResult.result)
+            completedTests += 1
+            updateProgress(Double(completedTests) / Double(totalTests))
+        }
+
+        // QR URL round-trip test (profile-agnostic, use first generated key)
+        let qrResult = runTest(name: "QR URL Encode/Decode", profile: nil) {
+            // Generate a fresh key for QR test
+            let generated = try self.engine.generateKey(
+                name: "QR-Test",
+                email: nil,
+                expirySeconds: 3600,
+                profile: .universal
+            )
+            let url = try self.engine.encodeQrUrl(publicKeyData: generated.publicKeyData)
+            let decoded = try self.engine.decodeQrUrl(url: url)
+            let originalInfo = try self.engine.parseKeyInfo(keyData: generated.publicKeyData)
+            let decodedInfo = try self.engine.parseKeyInfo(keyData: decoded)
+            guard originalInfo.fingerprint == decodedInfo.fingerprint else {
+                throw CypherAirError.corruptData(reason: "QR round-trip fingerprint mismatch")
+            }
+            return decodedInfo
+        }
+        results.append(qrResult.result)
+
+        // Save report
+        saveReport(results: results)
+        state = .completed(results: results)
+    }
+
+    // MARK: - Private Helpers
+
+    private struct TestOutput<T> {
+        let result: TestResult
+        let passed: Bool
+        let value: T?
+    }
+
+    private func runTest<T>(
+        name: String,
+        profile: KeyProfile?,
+        operation: () throws -> T
+    ) -> TestOutput<T> {
+        let start = Date()
+        do {
+            let value = try operation()
+            let duration = Date().timeIntervalSince(start)
+            let result = TestResult(
+                name: name,
+                profile: profile,
+                passed: true,
+                message: "Passed",
+                duration: duration
+            )
+            return TestOutput(result: result, passed: true, value: value)
+        } catch {
+            let duration = Date().timeIntervalSince(start)
+            let result = TestResult(
+                name: name,
+                profile: profile,
+                passed: false,
+                message: error.localizedDescription,
+                duration: duration
+            )
+            return TestOutput(result: result, passed: false, value: nil)
+        }
+    }
+
+    private func updateProgress(_ progress: Double) {
+        state = .running(progress: progress)
+    }
+
+    private func saveReport(results: [TestResult]) {
+        let fm = FileManager.default
+        let docsDir = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let reportDir = docsDir.appendingPathComponent("self-test", isDirectory: true)
+
+        try? fm.createDirectory(at: reportDir, withIntermediateDirectories: true)
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
+        let filename = "self-test-\(dateFormatter.string(from: Date())).txt"
+        let fileURL = reportDir.appendingPathComponent(filename)
+
+        var report = "Cypher Air Self-Test Report\n"
+        report += "Date: \(Date())\n"
+        report += "========================\n\n"
+
+        let passed = results.filter { $0.passed }.count
+        report += "Results: \(passed)/\(results.count) passed\n\n"
+
+        for result in results {
+            let profileStr = result.profile?.displayName ?? "General"
+            let statusStr = result.passed ? "PASS" : "FAIL"
+            report += "[\(statusStr)] \(profileStr) — \(result.name)"
+            report += " (\(String(format: "%.3f", result.duration))s)"
+            if !result.passed {
+                report += "\n  Error: \(result.message)"
+            }
+            report += "\n"
+        }
+
+        try? report.write(to: fileURL, atomically: true, encoding: .utf8)
+    }
+}

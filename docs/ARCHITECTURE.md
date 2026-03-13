@@ -265,7 +265,8 @@ iOS Keychain (kSecClassGenericPassword, WhenUnlockedThisDeviceOnly):
 ├── Per identity (fingerprint = lowercase hex, no spaces/separators):
 │   ├── com.cypherair.v1.se-key.<fingerprint>        → SE key dataRepresentation
 │   ├── com.cypherair.v1.salt.<fingerprint>           → Random HKDF salt
-│   └── com.cypherair.v1.sealed-key.<fingerprint>     → AES-GCM sealed private key
+│   ├── com.cypherair.v1.sealed-key.<fingerprint>     → AES-GCM sealed private key
+│   └── com.cypherair.v1.metadata.<fingerprint>       → PGPKeyIdentity JSON (Codable, no SE auth needed)
 │
 ├── During mode switch (temporary, deleted after successful switch):
 │   ├── com.cypherair.v1.pending-se-key.<fingerprint>
@@ -291,6 +292,7 @@ App Sandbox:
 **Keychain key naming conventions:**
 - All keys prefixed with `com.cypherair.v1.` — the `v1` segment enables future data migration if the wrapping scheme changes.
 - `<fingerprint>` is the full key fingerprint in lowercase hexadecimal, no spaces or separators (e.g., `a1b2c3d4...`).
+- Metadata items use `metadata.` prefix and store `PGPKeyIdentity` as JSON. These items have no access control (no SE authentication required) and are used for cold-launch key enumeration via `KeyManagementService.loadKeys()`.
 - Temporary keys during mode switch use `pending-` prefix and are cleaned up on app launch if the `rewrapInProgress` flag is set.
 
 ## 6. Memory Integrity Enforcement
