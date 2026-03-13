@@ -102,6 +102,11 @@ final class DecryptionService {
             throw CypherAirError.from(error) { _ in .authenticationFailed }
         }
         defer {
+            // Note: passing secretKey into [secretKey] below may trigger a CoW copy.
+            // This defer zeros this variable's buffer; the array's copy is freed
+            // (but not zeroed) when the engine call returns. This is an inherent
+            // limitation of Swift value semantics. See EncryptionService for the
+            // detailed mitigation analysis.
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
