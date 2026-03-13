@@ -114,4 +114,30 @@ struct SystemKeychain: KeychainManageable {
         let status = SecItemCopyMatching(query as CFDictionary, nil)
         return status == errSecSuccess
     }
+
+    func listItems(servicePrefix: String, account: String) throws -> [String] {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: account,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        switch status {
+        case errSecSuccess:
+            guard let items = result as? [[String: Any]] else { return [] }
+            return items.compactMap { item in
+                guard let service = item[kSecAttrService as String] as? String,
+                      service.hasPrefix(servicePrefix) else { return nil }
+                return service
+            }
+        case errSecItemNotFound:
+            return []
+        default:
+            throw KeychainError.unhandledError(status)
+        }
+    }
 }

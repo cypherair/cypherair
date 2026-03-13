@@ -1,0 +1,86 @@
+import SwiftUI
+
+/// Passphrase-protected key export for backup.
+struct BackupKeyView: View {
+    let fingerprint: String
+
+    @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var passphrase = ""
+    @State private var passphraseConfirm = ""
+    @State private var isExporting = false
+    @State private var exportedData: Data?
+    @State private var error: CypherAirError?
+    @State private var showError = false
+
+    var body: some View {
+        Form {
+            Section {
+                SecureField(
+                    String(localized: "backup.passphrase", defaultValue: "Passphrase"),
+                    text: $passphrase
+                )
+                SecureField(
+                    String(localized: "backup.confirm", defaultValue: "Confirm Passphrase"),
+                    text: $passphraseConfirm
+                )
+            } header: {
+                Text(String(localized: "backup.header", defaultValue: "Protect your backup with a strong passphrase."))
+            } footer: {
+                if !passphrase.isEmpty && passphrase != passphraseConfirm {
+                    Text(String(localized: "backup.mismatch", defaultValue: "Passphrases do not match."))
+                        .foregroundStyle(.red)
+                }
+            }
+
+            Section {
+                Button {
+                    exportBackup()
+                } label: {
+                    if isExporting {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Text(String(localized: "backup.export", defaultValue: "Export Backup"))
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(passphrase.isEmpty || passphrase != passphraseConfirm || isExporting)
+            }
+        }
+        .navigationTitle(String(localized: "backup.title", defaultValue: "Backup Key"))
+        .alert(
+            String(localized: "error.title", defaultValue: "Error"),
+            isPresented: $showError,
+            presenting: error
+        ) { _ in
+            Button(String(localized: "error.ok", defaultValue: "OK")) {}
+        } message: { err in
+            Text(err.localizedDescription)
+        }
+    }
+
+    private func exportBackup() {
+        isExporting = true
+        Task {
+            do {
+                let data = try keyManagement.exportKey(
+                    fingerprint: fingerprint,
+                    passphrase: passphrase
+                )
+                exportedData = data
+                // TODO: Present Share Sheet with exported data
+                dismiss()
+            } catch let err as CypherAirError {
+                error = err
+                showError = true
+            } catch {
+                self.error = .encryptionFailed(reason: error.localizedDescription)
+                showError = true
+            }
+            isExporting = false
+        }
+    }
+}
