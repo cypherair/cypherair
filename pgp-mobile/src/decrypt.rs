@@ -86,6 +86,100 @@ pub fn parse_recipients(ciphertext: &[u8]) -> Result<Vec<String>, PgpError> {
     Ok(recipients)
 }
 
+/// Match PKESK recipients in ciphertext against provided local certificates.
+/// Returns the primary fingerprints of certificates that have a matching encryption subkey.
+/// This is Phase 1 of the two-phase decryption protocol — no secret keys needed.
+///
+/// PKESK packets contain encryption *subkey* identifiers (Key IDs for v4, fingerprints for v6),
+/// not primary key fingerprints. This function uses Sequoia's `key_handles()` to correctly
+/// match subkey identifiers against certificates, then returns the primary fingerprint of
+/// each matched certificate.
+///
+/// Parameters:
+/// - `ciphertext`: The encrypted message (binary, not armored).
+/// - `local_certs_data`: Public key certificates (binary) to match against.
+///
+/// Returns: Deduplicated list of matched primary key fingerprints (lowercase hex).
+/// Returns `PgpError::NoMatchingKey` if no certificates match.
+pub fn match_recipients(
+    ciphertext: &[u8],
+    local_certs_data: &[Vec<u8>],
+) -> Result<Vec<String>, PgpError> {
+    let policy = StandardPolicy::new();
+
+    // Parse PKESK recipients as KeyHandle values (not strings).
+    let mut pkesk_recipients: Vec<openpgp::KeyHandle> = Vec::new();
+    let ppr = openpgp::parse::PacketParser::from_bytes(ciphertext).map_err(|e| {
+        PgpError::CorruptData {
+            reason: format!("Failed to parse message: {e}"),
+        }
+    })?;
+    let mut ppr = ppr;
+    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
+        match pp.packet {
+            openpgp::Packet::PKESK(ref pkesk) => {
+                if let Some(rid) = pkesk.recipient() {
+                    pkesk_recipients.push(rid.clone());
+                }
+            }
+            openpgp::Packet::SEIP(_) => {
+                break;
+            }
+            _ => {}
+        }
+        let (_, next) = pp.recurse().map_err(|e| PgpError::CorruptData {
+            reason: format!("Failed to parse message: {e}"),
+        })?;
+        ppr = next;
+    }
+
+    if pkesk_recipients.is_empty() {
+        return Err(PgpError::CorruptData {
+            reason: "No recipients found in message".to_string(),
+        });
+    }
+
+    // Parse local certificates (silently skip unparseable ones).
+    let mut local_certs = Vec::new();
+    for cert_data in local_certs_data {
+        if let Ok(cert) = openpgp::Cert::from_bytes(cert_data) {
+            local_certs.push(cert);
+        }
+    }
+
+    // Match: for each local cert, check if any of its encryption subkeys match a PKESK recipient.
+    // cert.keys() iterates ALL keys in a certificate (primary + subkeys).
+    // .key_handles() filters to those whose KeyHandle matches the PKESK recipient.
+    // .for_transport_encryption() ensures we only match encryption-capable subkeys.
+    let mut matched_fingerprints: Vec<String> = Vec::new();
+    for cert in &local_certs {
+        let primary_fp = cert.fingerprint().to_hex().to_lowercase();
+        if matched_fingerprints.contains(&primary_fp) {
+            continue; // Already matched
+        }
+        for rid in &pkesk_recipients {
+            let has_match = cert
+                .keys()
+                .with_policy(&policy, None)
+                .supported()
+                .key_handles(std::iter::once(rid))
+                .for_transport_encryption()
+                .next()
+                .is_some();
+            if has_match {
+                matched_fingerprints.push(primary_fp);
+                break; // This cert matched, move to next cert
+            }
+        }
+    }
+
+    if matched_fingerprints.is_empty() {
+        return Err(PgpError::NoMatchingKey);
+    }
+
+    Ok(matched_fingerprints)
+}
+
 /// Decrypt a message using the provided secret keys.
 /// This is Phase 2 of the two-phase decryption protocol — requires authenticated key access.
 ///

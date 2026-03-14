@@ -465,3 +465,69 @@ fn test_revocation_cert_cross_profile_mismatch() {
     let result = keys::parse_revocation_cert(&key_b.revocation_cert, &key_a.cert_data);
     assert!(result.is_err(), "Profile B revocation cert should not verify against Profile A key");
 }
+
+// ── match_recipients cross-profile tests ────────────────────────────
+
+/// match_recipients: cross-profile — Profile B sender encrypts to Profile A recipient.
+/// Message format is SEIPDv1 (mixed/v4 recipient). match_recipients should still find the match.
+#[test]
+fn test_match_recipients_cross_profile_b_sender_a_recipient() {
+    let sender_b = keys::generate_key_with_profile(
+        "Sender B".to_string(), None, None, KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let recipient_a = keys::generate_key_with_profile(
+        "Recipient A".to_string(), None, None, KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"cross profile",
+        &[recipient_a.public_key_data.clone()],
+        Some(&sender_b.cert_data),
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let matched = decrypt::match_recipients(
+        &ciphertext,
+        &[recipient_a.public_key_data.clone()],
+    )
+    .expect("match_recipients should work cross-profile");
+
+    assert_eq!(matched.len(), 1);
+    assert_eq!(matched[0], recipient_a.fingerprint);
+}
+
+/// match_recipients: cross-profile — Profile A sender encrypts to Profile B recipient.
+/// Message format is SEIPDv2 (v6 recipient). match_recipients should find the match.
+#[test]
+fn test_match_recipients_cross_profile_a_sender_b_recipient() {
+    let sender_a = keys::generate_key_with_profile(
+        "Sender A".to_string(), None, None, KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let recipient_b = keys::generate_key_with_profile(
+        "Recipient B".to_string(), None, None, KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"cross profile reverse",
+        &[recipient_b.public_key_data.clone()],
+        Some(&sender_a.cert_data),
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let matched = decrypt::match_recipients(
+        &ciphertext,
+        &[recipient_b.public_key_data.clone()],
+    )
+    .expect("match_recipients should work cross-profile");
+
+    assert_eq!(matched.len(), 1);
+    assert_eq!(matched[0], recipient_b.fingerprint);
+}

@@ -324,6 +324,11 @@ uint8_t uniffi_pgp_mobile_fn_method_pgpengine_get_key_version(uint64_t ptr, Rust
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_import_secret_key(uint64_t ptr, RustBuffer armored_data, RustBuffer passphrase, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_MATCH_RECIPIENTS
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_MATCH_RECIPIENTS
+RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_match_recipients(uint64_t ptr, RustBuffer ciphertext, RustBuffer local_certs, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_PARSE_KEY_INFO
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_PARSE_KEY_INFO
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_parse_key_info(uint64_t ptr, RustBuffer key_data, RustCallStatus *_Nonnull out_status
@@ -699,6 +704,12 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_get_key_version(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_IMPORT_SECRET_KEY
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_IMPORT_SECRET_KEY
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS
+uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients(void
     
 );
 #endif

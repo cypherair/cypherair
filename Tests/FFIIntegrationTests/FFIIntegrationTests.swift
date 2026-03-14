@@ -1180,6 +1180,106 @@ final class FFIIntegrationTests: XCTestCase {
         }
         // If we reach here without crash, deinit zeroing worked.
     }
+
+    // MARK: - matchRecipients FFI Tests
+
+    /// matchRecipients returns primary fingerprint for Profile A (v4) key.
+    func test_matchRecipients_profileA_returnsPrimaryFingerprint() throws {
+        let engine = try XCTUnwrap(self.engine)
+        let key = try engine.generateKey(name: "Match A", email: nil, expirySeconds: nil, profile: .universal)
+
+        let ciphertext = try engine.encrypt(
+            plaintext: Data("match test".utf8),
+            recipients: [key.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        let matched = try engine.matchRecipients(
+            ciphertext: ciphertext,
+            localCerts: [key.publicKeyData]
+        )
+
+        XCTAssertEqual(matched.count, 1, "Should match exactly one certificate")
+        XCTAssertEqual(matched.first, key.fingerprint.lowercased(),
+                       "Should return the primary fingerprint")
+    }
+
+    /// matchRecipients returns primary fingerprint for Profile B (v6) key.
+    func test_matchRecipients_profileB_returnsPrimaryFingerprint() throws {
+        let engine = try XCTUnwrap(self.engine)
+        let key = try engine.generateKey(name: "Match B", email: nil, expirySeconds: nil, profile: .advanced)
+
+        let ciphertext = try engine.encrypt(
+            plaintext: Data("match test B".utf8),
+            recipients: [key.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        let matched = try engine.matchRecipients(
+            ciphertext: ciphertext,
+            localCerts: [key.publicKeyData]
+        )
+
+        XCTAssertEqual(matched.count, 1, "Should match exactly one certificate")
+        XCTAssertEqual(matched.first, key.fingerprint.lowercased(),
+                       "Should return the primary fingerprint for Profile B")
+    }
+
+    /// matchRecipients throws NoMatchingKey when no local cert matches.
+    func test_matchRecipients_wrongCert_throwsNoMatchingKey() throws {
+        let engine = try XCTUnwrap(self.engine)
+        let encryptKey = try engine.generateKey(name: "Encrypt", email: nil, expirySeconds: nil, profile: .universal)
+        let wrongKey = try engine.generateKey(name: "Wrong", email: nil, expirySeconds: nil, profile: .universal)
+
+        let ciphertext = try engine.encrypt(
+            plaintext: Data("no match".utf8),
+            recipients: [encryptKey.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        XCTAssertThrowsError(
+            try engine.matchRecipients(
+                ciphertext: ciphertext,
+                localCerts: [wrongKey.publicKeyData]
+            )
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            switch pgpError {
+            case .NoMatchingKey:
+                break // expected
+            default:
+                XCTFail("Expected NoMatchingKey, got \(pgpError)")
+            }
+        }
+    }
+
+    /// matchRecipients with multi-recipient message returns all matching certs.
+    func test_matchRecipients_multiRecipient_returnsAllMatches() throws {
+        let engine = try XCTUnwrap(self.engine)
+        let alice = try engine.generateKey(name: "Alice MR", email: nil, expirySeconds: nil, profile: .universal)
+        let bob = try engine.generateKey(name: "Bob MR", email: nil, expirySeconds: nil, profile: .universal)
+
+        let ciphertext = try engine.encrypt(
+            plaintext: Data("multi-recipient".utf8),
+            recipients: [alice.publicKeyData, bob.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        let matched = try engine.matchRecipients(
+            ciphertext: ciphertext,
+            localCerts: [alice.publicKeyData, bob.publicKeyData]
+        )
+
+        XCTAssertEqual(matched.count, 2, "Should match both recipients")
+        XCTAssertTrue(matched.contains(alice.fingerprint.lowercased()))
+        XCTAssertTrue(matched.contains(bob.fingerprint.lowercased()))
+    }
 }
 
 /// Error thrown when PgpEngine is unexpectedly nil in concurrent test closures.

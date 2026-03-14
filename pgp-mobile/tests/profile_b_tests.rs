@@ -804,3 +804,59 @@ fn test_concurrent_encrypt_decrypt_profile_b() {
     handle1.join().expect("Thread 1 should not panic");
     handle2.join().expect("Thread 2 should not panic");
 }
+
+// ── match_recipients tests ─────────────────────────────────────────
+
+/// match_recipients: Profile B (v6 key, SEIPDv2) returns primary fingerprint.
+#[test]
+fn test_match_recipients_profile_b_returns_primary_fingerprint() {
+    let key = keys::generate_key_with_profile(
+        "Bob".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"profile b test",
+        &[key.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let matched = decrypt::match_recipients(&ciphertext, &[key.public_key_data.clone()])
+        .expect("match_recipients should succeed for Profile B");
+
+    assert_eq!(matched.len(), 1);
+    assert_eq!(matched[0], key.fingerprint);
+}
+
+/// match_recipients: Profile B wrong key → NoMatchingKey.
+#[test]
+fn test_match_recipients_profile_b_wrong_key_returns_error() {
+    let alice = keys::generate_key_with_profile(
+        "Alice".to_string(), None, None, KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let bob = keys::generate_key_with_profile(
+        "Bob".to_string(), None, None, KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"for alice only",
+        &[alice.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let result = decrypt::match_recipients(&ciphertext, &[bob.public_key_data.clone()]);
+    assert!(
+        matches!(result, Err(pgp_mobile::error::PgpError::NoMatchingKey)),
+        "Should return NoMatchingKey for wrong cert, got: {result:?}"
+    );
+}
