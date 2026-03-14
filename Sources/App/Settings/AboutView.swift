@@ -26,7 +26,7 @@ struct AboutView: View {
                 )
                 LabeledContent(
                     String(localized: "about.ffi", defaultValue: "UniFFI"),
-                    value: "0.29.5"
+                    value: "0.31.0"
                 )
                 LabeledContent(
                     String(localized: "about.zeroize", defaultValue: "zeroize"),

@@ -352,19 +352,29 @@ private func uniffiTraitInterfaceCallWithError<T, E>(
         callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
     }
 }
+// Initial value and increment amount for handles. 
+// These ensure that SWIFT handles always have the lowest bit set
+fileprivate let UNIFFI_HANDLEMAP_INITIAL: UInt64 = 1
+fileprivate let UNIFFI_HANDLEMAP_DELTA: UInt64 = 2
+
 fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
     // All mutation happens with this lock held, which is why we implement @unchecked Sendable.
     private let lock = NSLock()
     private var map: [UInt64: T] = [:]
-    private var currentHandle: UInt64 = 1
+    private var currentHandle: UInt64 = UNIFFI_HANDLEMAP_INITIAL
 
     func insert(obj: T) -> UInt64 {
         lock.withLock {
-            let handle = currentHandle
-            currentHandle += 1
-            map[handle] = obj
-            return handle
+            return doInsert(obj)
         }
+    }
+
+    // Low-level insert function, this assumes `lock` is held.
+    private func doInsert(_ obj: T) -> UInt64 {
+        let handle = currentHandle
+        currentHandle += UNIFFI_HANDLEMAP_DELTA
+        map[handle] = obj
+        return handle
     }
 
      func get(handle: UInt64) throws -> T {
@@ -373,6 +383,15 @@ fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
                 throw UniffiInternalError.unexpectedStaleHandle
             }
             return obj
+        }
+    }
+
+     func clone(handle: UInt64) throws -> UInt64 {
+        try lock.withLock {
+            guard let obj = map[handle] else {
+                throw UniffiInternalError.unexpectedStaleHandle
+            }
+            return doInsert(obj)
         }
     }
 
@@ -670,13 +689,13 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
  * Thread-safe (Send + Sync).
  */
 open class PgpEngine: PgpEngineProtocol, @unchecked Sendable {
-    fileprivate let pointer: UnsafeMutableRawPointer!
+    fileprivate let handle: UInt64
 
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public struct NoPointer {
+    public struct NoHandle {
         public init() {}
     }
 
@@ -686,46 +705,47 @@ open class PgpEngine: PgpEngineProtocol, @unchecked Sendable {
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
     }
 
     // This constructor can be used to instantiate a fake object.
-    // - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
     //
     // - Warning:
-    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
+    public init(noHandle: NoHandle) {
+        self.handle = 0
     }
 
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_pgp_mobile_fn_clone_pgpengine(self.pointer, $0) }
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_pgp_mobile_fn_clone_pgpengine(self.handle, $0) }
     }
     /**
      * Create a new PGP engine instance.
      */
 public convenience init() {
-    let pointer =
+    let handle =
         try! rustCall() {
     uniffi_pgp_mobile_fn_constructor_pgpengine_new($0
     )
 }
-    self.init(unsafeFromRawPointer: pointer)
+    self.init(unsafeFromHandle: handle)
 }
 
     deinit {
-        guard let pointer = pointer else {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
             return
         }
 
-        try! rustCall { uniffi_pgp_mobile_fn_free_pgpengine(pointer, $0) }
+        try! rustCall { uniffi_pgp_mobile_fn_free_pgpengine(handle, $0) }
     }
 
     
@@ -736,7 +756,8 @@ public convenience init() {
      */
 open func armor(data: Data, kind: ArmorKind)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_armor(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_armor(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(data),
         FfiConverterTypeArmorKind_lower(kind),$0
     )
@@ -748,7 +769,8 @@ open func armor(data: Data, kind: ArmorKind)throws  -> Data  {
      */
 open func armorPublicKey(certData: Data)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_armor_public_key(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_armor_public_key(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),$0
     )
 })
@@ -759,7 +781,8 @@ open func armorPublicKey(certData: Data)throws  -> Data  {
      */
 open func dearmor(armored: Data)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_dearmor(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_dearmor(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(armored),$0
     )
 })
@@ -772,7 +795,8 @@ open func dearmor(armored: Data)throws  -> Data  {
      */
 open func decodeQrUrl(url: String)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_decode_qr_url(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_decode_qr_url(
+            self.uniffiCloneHandle(),
         FfiConverterString.lower(url),$0
     )
 })
@@ -784,7 +808,8 @@ open func decodeQrUrl(url: String)throws  -> Data  {
      */
 open func decrypt(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data])throws  -> DecryptResult  {
     return try  FfiConverterTypeDecryptResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_decrypt(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_decrypt(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),
         FfiConverterSequenceData.lower(secretKeys),
         FfiConverterSequenceData.lower(verificationKeys),$0
@@ -797,7 +822,8 @@ open func decrypt(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data]
      */
 open func detectProfile(certData: Data)throws  -> KeyProfile  {
     return try  FfiConverterTypeKeyProfile_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_detect_profile(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_detect_profile(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),$0
     )
 })
@@ -812,7 +838,8 @@ open func detectProfile(certData: Data)throws  -> KeyProfile  {
      */
 open func encodeQrUrl(publicKeyData: Data)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_encode_qr_url(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_encode_qr_url(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(publicKeyData),$0
     )
 })
@@ -828,7 +855,8 @@ open func encodeQrUrl(publicKeyData: Data)throws  -> String  {
      */
 open func encrypt(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_encrypt(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
         FfiConverterSequenceData.lower(recipients),
         FfiConverterOptionData.lower(signingKey),
@@ -842,7 +870,8 @@ open func encrypt(plaintext: Data, recipients: [Data], signingKey: Data?, encryp
      */
 open func encryptBinary(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
         FfiConverterSequenceData.lower(recipients),
         FfiConverterOptionData.lower(signingKey),
@@ -857,7 +886,8 @@ open func encryptBinary(plaintext: Data, recipients: [Data], signingKey: Data?, 
      */
 open func exportSecretKey(certData: Data, passphrase: String, profile: KeyProfile)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_export_secret_key(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_export_secret_key(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),
         FfiConverterString.lower(passphrase),
         FfiConverterTypeKeyProfile_lower(profile),$0
@@ -873,7 +903,8 @@ open func exportSecretKey(certData: Data, passphrase: String, profile: KeyProfil
      */
 open func generateKey(name: String, email: String?, expirySeconds: UInt64?, profile: KeyProfile)throws  -> GeneratedKey  {
     return try  FfiConverterTypeGeneratedKey_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_generate_key(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_key(
+            self.uniffiCloneHandle(),
         FfiConverterString.lower(name),
         FfiConverterOptionString.lower(email),
         FfiConverterOptionUInt64.lower(expirySeconds),
@@ -887,7 +918,8 @@ open func generateKey(name: String, email: String?, expirySeconds: UInt64?, prof
      */
 open func getKeyVersion(certData: Data)throws  -> UInt8  {
     return try  FfiConverterUInt8.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_get_key_version(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_get_key_version(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),$0
     )
 })
@@ -899,7 +931,8 @@ open func getKeyVersion(certData: Data)throws  -> UInt8  {
      */
 open func importSecretKey(armoredData: Data, passphrase: String)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_import_secret_key(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_import_secret_key(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(armoredData),
         FfiConverterString.lower(passphrase),$0
     )
@@ -911,7 +944,8 @@ open func importSecretKey(armoredData: Data, passphrase: String)throws  -> Data 
      */
 open func parseKeyInfo(keyData: Data)throws  -> KeyInfo  {
     return try  FfiConverterTypeKeyInfo_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_parse_key_info(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_parse_key_info(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(keyData),$0
     )
 })
@@ -923,7 +957,8 @@ open func parseKeyInfo(keyData: Data)throws  -> KeyInfo  {
      */
 open func parseRecipients(ciphertext: Data)throws  -> [String]  {
     return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_parse_recipients(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_parse_recipients(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),$0
     )
 })
@@ -934,7 +969,8 @@ open func parseRecipients(ciphertext: Data)throws  -> [String]  {
      */
 open func parseRevocationCert(revData: Data, certData: Data)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_parse_revocation_cert(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_parse_revocation_cert(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(revData),
         FfiConverterData.lower(certData),$0
     )
@@ -948,7 +984,8 @@ open func parseRevocationCert(revData: Data, certData: Data)throws  -> String  {
      */
 open func parseS2kParams(armoredData: Data)throws  -> S2kInfo  {
     return try  FfiConverterTypeS2kInfo_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_parse_s2k_params(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_parse_s2k_params(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(armoredData),$0
     )
 })
@@ -959,7 +996,8 @@ open func parseS2kParams(armoredData: Data)throws  -> S2kInfo  {
      */
 open func signCleartext(text: Data, signerCert: Data)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_sign_cleartext(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_sign_cleartext(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(text),
         FfiConverterData.lower(signerCert),$0
     )
@@ -971,7 +1009,8 @@ open func signCleartext(text: Data, signerCert: Data)throws  -> Data  {
      */
 open func signDetached(data: Data, signerCert: Data)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_sign_detached(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_sign_detached(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(data),
         FfiConverterData.lower(signerCert),$0
     )
@@ -983,7 +1022,8 @@ open func signDetached(data: Data, signerCert: Data)throws  -> Data  {
      */
 open func verifyCleartext(signedMessage: Data, verificationKeys: [Data])throws  -> VerifyResult  {
     return try  FfiConverterTypeVerifyResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_verify_cleartext(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_verify_cleartext(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(signedMessage),
         FfiConverterSequenceData.lower(verificationKeys),$0
     )
@@ -995,7 +1035,8 @@ open func verifyCleartext(signedMessage: Data, verificationKeys: [Data])throws  
      */
 open func verifyDetached(data: Data, signature: Data, verificationKeys: [Data])throws  -> VerifyResult  {
     return try  FfiConverterTypeVerifyResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_verify_detached(self.uniffiClonePointer(),
+    uniffi_pgp_mobile_fn_method_pgpengine_verify_detached(
+            self.uniffiCloneHandle(),
         FfiConverterData.lower(data),
         FfiConverterData.lower(signature),
         FfiConverterSequenceData.lower(verificationKeys),$0
@@ -1004,6 +1045,7 @@ open func verifyDetached(data: Data, signature: Data, verificationKeys: [Data])t
 }
     
 
+    
 }
 
 
@@ -1011,33 +1053,24 @@ open func verifyDetached(data: Data, signature: Data, verificationKeys: [Data])t
 @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypePgpEngine: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
+    typealias FfiType = UInt64
     typealias SwiftType = PgpEngine
 
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> PgpEngine {
-        return PgpEngine(unsafeFromRawPointer: pointer)
+    public static func lift(_ handle: UInt64) throws -> PgpEngine {
+        return PgpEngine(unsafeFromHandle: handle)
     }
 
-    public static func lower(_ value: PgpEngine) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
+    public static func lower(_ value: PgpEngine) -> UInt64 {
+        return value.uniffiCloneHandle()
     }
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PgpEngine {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
     }
 
     public static func write(_ value: PgpEngine, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+        writeInt(&buf, lower(value))
     }
 }
 
@@ -1045,14 +1078,14 @@ public struct FfiConverterTypePgpEngine: FfiConverter {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePgpEngine_lift(_ pointer: UnsafeMutableRawPointer) throws -> PgpEngine {
-    return try FfiConverterTypePgpEngine.lift(pointer)
+public func FfiConverterTypePgpEngine_lift(_ handle: UInt64) throws -> PgpEngine {
+    return try FfiConverterTypePgpEngine.lift(handle)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePgpEngine_lower(_ value: PgpEngine) -> UnsafeMutableRawPointer {
+public func FfiConverterTypePgpEngine_lower(_ value: PgpEngine) -> UInt64 {
     return FfiConverterTypePgpEngine.lower(value)
 }
 
@@ -1070,7 +1103,7 @@ public func FfiConverterTypePgpEngine_lower(_ value: PgpEngine) -> UnsafeMutable
  * error path is handled explicitly in `decrypt()` (line 143). On the success path,
  * the Swift caller is responsible for zeroization after use.
  */
-public struct DecryptResult {
+public struct DecryptResult: Equatable, Hashable {
     /**
      * The decrypted plaintext. MUST be zeroized by the caller after use.
      */
@@ -1100,35 +1133,15 @@ public struct DecryptResult {
         self.signatureStatus = signatureStatus
         self.signerFingerprint = signerFingerprint
     }
+
+    
+
+    
 }
 
 #if compiler(>=6)
 extension DecryptResult: Sendable {}
 #endif
-
-
-extension DecryptResult: Equatable, Hashable {
-    public static func ==(lhs: DecryptResult, rhs: DecryptResult) -> Bool {
-        if lhs.plaintext != rhs.plaintext {
-            return false
-        }
-        if lhs.signatureStatus != rhs.signatureStatus {
-            return false
-        }
-        if lhs.signerFingerprint != rhs.signerFingerprint {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(plaintext)
-        hasher.combine(signatureStatus)
-        hasher.combine(signerFingerprint)
-    }
-}
-
-
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -1175,7 +1188,7 @@ public func FfiConverterTypeDecryptResult_lower(_ value: DecryptResult) -> RustB
  * 3. Store `revocation_cert` securely and zeroize the in-memory copy.
  * `public_key_data` does not contain sensitive material and does not need zeroizing.
  */
-public struct GeneratedKey {
+public struct GeneratedKey: Equatable, Hashable {
     /**
      * Full certificate (public + secret) in binary OpenPGP format.
      * MUST be zeroized by the caller after SE wrapping.
@@ -1233,47 +1246,15 @@ public struct GeneratedKey {
         self.keyVersion = keyVersion
         self.profile = profile
     }
+
+    
+
+    
 }
 
 #if compiler(>=6)
 extension GeneratedKey: Sendable {}
 #endif
-
-
-extension GeneratedKey: Equatable, Hashable {
-    public static func ==(lhs: GeneratedKey, rhs: GeneratedKey) -> Bool {
-        if lhs.certData != rhs.certData {
-            return false
-        }
-        if lhs.publicKeyData != rhs.publicKeyData {
-            return false
-        }
-        if lhs.revocationCert != rhs.revocationCert {
-            return false
-        }
-        if lhs.fingerprint != rhs.fingerprint {
-            return false
-        }
-        if lhs.keyVersion != rhs.keyVersion {
-            return false
-        }
-        if lhs.profile != rhs.profile {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(certData)
-        hasher.combine(publicKeyData)
-        hasher.combine(revocationCert)
-        hasher.combine(fingerprint)
-        hasher.combine(keyVersion)
-        hasher.combine(profile)
-    }
-}
-
-
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -1320,7 +1301,7 @@ public func FfiConverterTypeGeneratedKey_lower(_ value: GeneratedKey) -> RustBuf
 /**
  * Information extracted from a parsed key.
  */
-public struct KeyInfo {
+public struct KeyInfo: Equatable, Hashable {
     /**
      * Key fingerprint as lowercase hex string.
      */
@@ -1398,59 +1379,15 @@ public struct KeyInfo {
         self.primaryAlgo = primaryAlgo
         self.subkeyAlgo = subkeyAlgo
     }
+
+    
+
+    
 }
 
 #if compiler(>=6)
 extension KeyInfo: Sendable {}
 #endif
-
-
-extension KeyInfo: Equatable, Hashable {
-    public static func ==(lhs: KeyInfo, rhs: KeyInfo) -> Bool {
-        if lhs.fingerprint != rhs.fingerprint {
-            return false
-        }
-        if lhs.keyVersion != rhs.keyVersion {
-            return false
-        }
-        if lhs.userId != rhs.userId {
-            return false
-        }
-        if lhs.hasEncryptionSubkey != rhs.hasEncryptionSubkey {
-            return false
-        }
-        if lhs.isRevoked != rhs.isRevoked {
-            return false
-        }
-        if lhs.isExpired != rhs.isExpired {
-            return false
-        }
-        if lhs.profile != rhs.profile {
-            return false
-        }
-        if lhs.primaryAlgo != rhs.primaryAlgo {
-            return false
-        }
-        if lhs.subkeyAlgo != rhs.subkeyAlgo {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(fingerprint)
-        hasher.combine(keyVersion)
-        hasher.combine(userId)
-        hasher.combine(hasEncryptionSubkey)
-        hasher.combine(isRevoked)
-        hasher.combine(isExpired)
-        hasher.combine(profile)
-        hasher.combine(primaryAlgo)
-        hasher.combine(subkeyAlgo)
-    }
-}
-
-
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -1504,7 +1441,7 @@ public func FfiConverterTypeKeyInfo_lower(_ value: KeyInfo) -> RustBuffer {
  * S2K (String-to-Key) parameters extracted from a passphrase-protected key.
  * Used by Swift side to check memory requirements before importing.
  */
-public struct S2kInfo {
+public struct S2kInfo: Equatable, Hashable {
     /**
      * S2K type: "iterated-salted" for Profile A, "argon2id" for Profile B, or "unknown".
      */
@@ -1542,39 +1479,15 @@ public struct S2kInfo {
         self.parallelism = parallelism
         self.timePasses = timePasses
     }
+
+    
+
+    
 }
 
 #if compiler(>=6)
 extension S2kInfo: Sendable {}
 #endif
-
-
-extension S2kInfo: Equatable, Hashable {
-    public static func ==(lhs: S2kInfo, rhs: S2kInfo) -> Bool {
-        if lhs.s2kType != rhs.s2kType {
-            return false
-        }
-        if lhs.memoryKib != rhs.memoryKib {
-            return false
-        }
-        if lhs.parallelism != rhs.parallelism {
-            return false
-        }
-        if lhs.timePasses != rhs.timePasses {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(s2kType)
-        hasher.combine(memoryKib)
-        hasher.combine(parallelism)
-        hasher.combine(timePasses)
-    }
-}
-
-
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -1617,7 +1530,7 @@ public func FfiConverterTypeS2kInfo_lower(_ value: S2kInfo) -> RustBuffer {
 /**
  * Result of signature verification.
  */
-public struct VerifyResult {
+public struct VerifyResult: Equatable, Hashable {
     /**
      * Signature verification status.
      */
@@ -1647,35 +1560,15 @@ public struct VerifyResult {
         self.signerFingerprint = signerFingerprint
         self.content = content
     }
+
+    
+
+    
 }
 
 #if compiler(>=6)
 extension VerifyResult: Sendable {}
 #endif
-
-
-extension VerifyResult: Equatable, Hashable {
-    public static func ==(lhs: VerifyResult, rhs: VerifyResult) -> Bool {
-        if lhs.status != rhs.status {
-            return false
-        }
-        if lhs.signerFingerprint != rhs.signerFingerprint {
-            return false
-        }
-        if lhs.content != rhs.content {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(status)
-        hasher.combine(signerFingerprint)
-        hasher.combine(content)
-    }
-}
-
-
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -1718,14 +1611,18 @@ public func FfiConverterTypeVerifyResult_lower(_ value: VerifyResult) -> RustBuf
  * Armor kind for the FFI boundary.
  */
 
-public enum ArmorKind {
+public enum ArmorKind: Equatable, Hashable {
     
     case publicKey
     case secretKey
     case message
     case signature
-}
 
+
+
+
+
+}
 
 #if compiler(>=6)
 extension ArmorKind: Sendable {}
@@ -1792,13 +1689,6 @@ public func FfiConverterTypeArmorKind_lower(_ value: ArmorKind) -> RustBuffer {
 }
 
 
-extension ArmorKind: Equatable, Hashable {}
-
-
-
-
-
-
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
@@ -1807,7 +1697,7 @@ extension ArmorKind: Equatable, Hashable {}
  * Profile B (Advanced): v6, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id S2K.
  */
 
-public enum KeyProfile {
+public enum KeyProfile: Equatable, Hashable {
     
     /**
      * Profile A: Universal compatible. v4 keys, GnuPG compatible.
@@ -1817,8 +1707,12 @@ public enum KeyProfile {
      * Profile B: Advanced security. v6 keys, RFC 9580.
      */
     case advanced
-}
 
+
+
+
+
+}
 
 #if compiler(>=6)
 extension KeyProfile: Sendable {}
@@ -1873,20 +1767,13 @@ public func FfiConverterTypeKeyProfile_lower(_ value: KeyProfile) -> RustBuffer 
 }
 
 
-extension KeyProfile: Equatable, Hashable {}
-
-
-
-
-
-
 
 /**
  * PGP error types exposed across the FFI boundary.
- * Each variant maps 1:1 to a Swift `PGPError` enum case.
+ * Each variant maps 1:1 to a Swift `CypherAirError` enum case (via UniFFI-generated `PgpError`).
  * See PRD Section 4.7 for user-facing error messages.
  */
-public enum PgpError: Swift.Error {
+public enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
     
     
@@ -1983,8 +1870,21 @@ public enum PgpError: Swift.Error {
      */
     case InternalError(reason: String
     )
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
 }
 
+#if compiler(>=6)
+extension PgpError: Sendable {}
+#endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -2152,28 +2052,13 @@ public func FfiConverterTypePgpError_lower(_ value: PgpError) -> RustBuffer {
     return FfiConverterTypePgpError.lower(value)
 }
 
-
-extension PgpError: Equatable, Hashable {}
-
-
-
-
-extension PgpError: Foundation.LocalizedError {
-    public var errorDescription: String? {
-        String(reflecting: self)
-    }
-}
-
-
-
-
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
  * Signature verification status for decrypted messages.
  */
 
-public enum SignatureStatus {
+public enum SignatureStatus: Equatable, Hashable {
     
     /**
      * Signature is valid and the signer key is known.
@@ -2191,8 +2076,12 @@ public enum SignatureStatus {
      * Message was not signed.
      */
     case notSigned
-}
 
+
+
+
+
+}
 
 #if compiler(>=6)
 extension SignatureStatus: Sendable {}
@@ -2257,13 +2146,6 @@ public func FfiConverterTypeSignatureStatus_lift(_ buf: RustBuffer) throws -> Si
 public func FfiConverterTypeSignatureStatus_lower(_ value: SignatureStatus) -> RustBuffer {
     return FfiConverterTypeSignatureStatus.lower(value)
 }
-
-
-extension SignatureStatus: Equatable, Hashable {}
-
-
-
-
 
 
 #if swift(>=5.8)
@@ -2421,73 +2303,73 @@ private enum InitializationResult {
 // the code inside is only computed once.
 private let initializationResult: InitializationResult = {
     // Get the bindings contract version from our ComponentInterface
-    let bindings_contract_version = 29
+    let bindings_contract_version = 30
     // Get the scaffolding contract version by calling the into the dylib
     let scaffolding_contract_version = ffi_pgp_mobile_uniffi_contract_version()
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_armor() != 4079) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_armor() != 21480) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_armor_public_key() != 43170) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_armor_public_key() != 42631) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_dearmor() != 13156) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_dearmor() != 5898) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decode_qr_url() != 3945) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decode_qr_url() != 60506) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt() != 38587) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt() != 23459) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_detect_profile() != 29961) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_detect_profile() != 25919) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encode_qr_url() != 36481) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encode_qr_url() != 4268) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt() != 18910) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt() != 59436) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary() != 58703) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary() != 46131) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 5663) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 10460) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key() != 41062) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key() != 9133) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_get_key_version() != 49104) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_get_key_version() != 2783) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key() != 20423) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key() != 53716) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_key_info() != 3845) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_key_info() != 6277) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_recipients() != 38924) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_recipients() != 31760) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_revocation_cert() != 11971) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_revocation_cert() != 24404) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_s2k_params() != 26766) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_s2k_params() != 17727) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext() != 50077) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext() != 29260) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached() != 55777) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached() != 61044) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext() != 25880) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext() != 52338) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached() != 48459) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached() != 29734) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_constructor_pgpengine_new() != 55978) {
