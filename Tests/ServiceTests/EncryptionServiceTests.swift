@@ -284,6 +284,43 @@ final class EncryptionServiceTests: XCTestCase {
         XCTAssertEqual(decryptedText, "Cross-profile message")
     }
 
+    func test_encryptText_mixedRecipients_v4AndV6_bothCanDecrypt() async throws {
+        // PRD §3.3 / TDD §1.4: mixed v4+v6 recipients → SEIPDv1 (lowest common denominator)
+        let keyV4 = try generateKeyAndContact(profile: .universal, name: "RecipientV4")
+        let keyV6 = try generateKeyAndContact(profile: .advanced, name: "RecipientV6")
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "Mixed recipients message",
+            recipientFingerprints: [keyV4.fingerprint, keyV6.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false
+        )
+
+        let binary = try stack.engine.dearmor(armored: ciphertext)
+
+        // v4 recipient can decrypt
+        var secretV4 = try stack.keyManagement.unwrapPrivateKey(fingerprint: keyV4.fingerprint)
+        defer { secretV4.resetBytes(in: 0..<secretV4.count) }
+
+        let resultV4 = try stack.engine.decrypt(
+            ciphertext: binary,
+            secretKeys: [secretV4],
+            verificationKeys: []
+        )
+        XCTAssertEqual(String(data: resultV4.plaintext, encoding: .utf8), "Mixed recipients message")
+
+        // v6 recipient can also decrypt
+        var secretV6 = try stack.keyManagement.unwrapPrivateKey(fingerprint: keyV6.fingerprint)
+        defer { secretV6.resetBytes(in: 0..<secretV6.count) }
+
+        let resultV6 = try stack.engine.decrypt(
+            ciphertext: binary,
+            secretKeys: [secretV6],
+            verificationKeys: []
+        )
+        XCTAssertEqual(String(data: resultV6.plaintext, encoding: .utf8), "Mixed recipients message")
+    }
+
     func test_encryptText_multipleRecipients_bothCanDecrypt() async throws {
         let keyA = try generateKeyAndContact(profile: .universal, name: "RecipientA")
         let keyB = try generateKeyAndContact(profile: .universal, name: "RecipientB")

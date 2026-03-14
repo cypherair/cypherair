@@ -68,15 +68,18 @@ The App uses Sequoia's `Profile` and `CipherSuite` enums to implement two encryp
 // Profile A
 let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
     .set_cipher_suite(CipherSuite::Cv25519)
-    // Profile::RFC4880 is the default — no explicit set needed
+    .set_profile(Profile::RFC4880)?
+    .set_features(Features::empty().set_seipdv1())?
     .generate()?;
 
 // Profile B
 let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
     .set_cipher_suite(CipherSuite::Cv448)
-    .set_profile(Profile::RFC9580)
+    .set_profile(Profile::RFC9580)?
     .generate()?;
 ```
+
+**Profile A `set_features` rationale:** Sequoia 2.2.0 defaults to advertising SEIPDv2 support in the Features subpacket (because the library itself supports it). For Profile A (GnuPG-compatible), we must explicitly set `Features::empty().set_seipdv1()` so that other implementations send SEIPDv1 messages to this key. Without this, a GnuPG sender would see SEIPDv2 advertised and attempt to send an AEAD-encrypted message, which GnuPG cannot produce correctly — resulting in interoperability failure. `set_profile(Profile::RFC4880)` is also set explicitly rather than relying on defaults, for clarity and forward-compatibility.
 
 ### 1.4 Encryption Format Auto-Selection
 

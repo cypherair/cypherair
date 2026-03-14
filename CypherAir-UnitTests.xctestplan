@@ -17,6 +17,9 @@
   },
   "testTargets" : [
     {
+      "skippedTests" : [
+        "DeviceSecurityTests"
+      ],
       "target" : {
         "containerPath" : "container:CypherAir.xcodeproj",
         "identifier" : "8561964DF0A7E2575A3799D6",

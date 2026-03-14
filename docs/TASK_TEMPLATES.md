@@ -148,7 +148,7 @@ DecryptionService catches the error but maps it to a generic case instead of
 
 ### Files Likely Affected
 - Sources/Services/DecryptionService.swift
-- Sources/Models/PGPError.swift (verify mapping)
+- Sources/Models/CypherAirError.swift (verify mapping)
 
 ### Security Impact
 - [ ] Data leakage: No — decryption correctly fails, just wrong message.
@@ -306,7 +306,7 @@ pub fn new_function(args...) -> Result<ReturnType, PgpError>
 - [ ] Update Swift call sites in `Sources/Services/` to use new API
 - [ ] Add/update Rust tests in `pgp-mobile/tests/` (positive + negative, both profiles)
 - [ ] Add/update FFI round-trip tests in Swift test target (both profiles)
-- [ ] If new error variant: add to `PgpError` enum + update `PGPError.swift` mapping
+- [ ] If new error variant: add to `PgpError` enum + update `CypherAirError.swift` mapping
 
 ### Profile Impact
 - [ ] Affects Profile A, B, or both?
