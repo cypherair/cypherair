@@ -14,6 +14,9 @@ struct KeyDetailView: View {
     @State private var showError = false
     @State private var armoredPublicKey: Data?
     @State private var showCopiedNotice = false
+    @State private var showExpirySheet = false
+    @State private var newExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date())!
+    @State private var isModifyingExpiry = false
 
     private var key: PGPKeyIdentity? {
         keyManagement.keys.first { $0.fingerprint == fingerprint }
@@ -51,6 +54,33 @@ struct KeyDetailView: View {
                         .foregroundStyle(.secondary)
                     } header: {
                         Text(String(localized: "keydetail.info", defaultValue: "Key Information"))
+                    }
+
+                    Section {
+                        HStack {
+                            Text(String(localized: "keydetail.expiry", defaultValue: "Expiry"))
+                            Spacer()
+                            if key.isExpired {
+                                Text(key.expiryDate?.formatted(date: .abbreviated, time: .omitted) ?? "—")
+                                    .foregroundStyle(.red)
+                            } else if let expiryDate = key.expiryDate {
+                                Text(expiryDate.formatted(date: .abbreviated, time: .omitted))
+                            } else {
+                                Text(String(localized: "keydetail.expiry.never", defaultValue: "Never"))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Button {
+                            showExpirySheet = true
+                        } label: {
+                            Label(
+                                String(localized: "keydetail.modifyExpiry", defaultValue: "Modify Expiry"),
+                                systemImage: "calendar.badge.clock"
+                            )
+                        }
+                    } header: {
+                        Text(String(localized: "keydetail.validity", defaultValue: "Validity"))
                     }
 
                     Section {
@@ -216,6 +246,55 @@ struct KeyDetailView: View {
         } message: {
             Text(String(localized: "clipboard.copied.publicKey", defaultValue: "Public key copied to clipboard."))
         }
+        .sheet(isPresented: $showExpirySheet) {
+            NavigationStack {
+                Form {
+                    Section {
+                        DatePicker(
+                            String(localized: "keydetail.expiry.newDate", defaultValue: "New Expiry Date"),
+                            selection: $newExpiryDate,
+                            in: Calendar.current.date(byAdding: .day, value: 1, to: Date())!...Calendar.current.date(byAdding: .year, value: 10, to: Date())!,
+                            displayedComponents: .date
+                        )
+                    } header: {
+                        Text(String(localized: "keydetail.expiry.setDate", defaultValue: "Set Expiry Date"))
+                    }
+
+                    Section {
+                        Button {
+                            performModifyExpiry(seconds: nil)
+                        } label: {
+                            Label(
+                                String(localized: "keydetail.expiry.removeExpiry", defaultValue: "Remove Expiry (Never Expire)"),
+                                systemImage: "infinity"
+                            )
+                        }
+                    }
+                }
+                .navigationTitle(String(localized: "keydetail.expiry.title", defaultValue: "Modify Expiry"))
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(String(localized: "keydetail.expiry.cancel", defaultValue: "Cancel")) {
+                            showExpirySheet = false
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(String(localized: "keydetail.expiry.save", defaultValue: "Save")) {
+                            let seconds = UInt64(max(0, newExpiryDate.timeIntervalSinceNow))
+                            performModifyExpiry(seconds: seconds)
+                        }
+                        .disabled(isModifyingExpiry)
+                    }
+                }
+                .overlay {
+                    if isModifyingExpiry {
+                        ProgressView()
+                    }
+                }
+                .disabled(isModifyingExpiry)
+            }
+            .presentationDetents([.medium])
+        }
         .task {
             do {
                 armoredPublicKey = try keyManagement.exportPublicKey(fingerprint: fingerprint)
@@ -223,5 +302,23 @@ struct KeyDetailView: View {
                 // Non-critical — sharing buttons will be disabled
             }
         }
+    }
+
+    private func performModifyExpiry(seconds: UInt64?) {
+        isModifyingExpiry = true
+        do {
+            _ = try keyManagement.modifyExpiry(
+                fingerprint: fingerprint,
+                newExpirySeconds: seconds,
+                authMode: config.authMode
+            )
+            // Re-export public key since it changed (new binding signatures)
+            armoredPublicKey = try? keyManagement.exportPublicKey(fingerprint: fingerprint)
+            showExpirySheet = false
+        } catch {
+            self.error = CypherAirError.from(error) { .keychainError($0) }
+            showError = true
+        }
+        isModifyingExpiry = false
     }
 }
