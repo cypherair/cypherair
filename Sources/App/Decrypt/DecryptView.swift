@@ -92,16 +92,10 @@ struct DecryptView: View {
             }
 
             // File mode result
-            if decryptMode == .file, let data = decryptedFileData {
+            if decryptMode == .file, let data = decryptedFileData,
+               let fileURL = data.writeToShareTempFile(named: decryptedFilename()) {
                 Section {
-                    let filename = decryptedFilename()
-                    ShareLink(
-                        item: data,
-                        preview: SharePreview(
-                            filename,
-                            image: Image(systemName: "doc")
-                        )
-                    ) {
+                    ShareLink(item: fileURL) {
                         Label(
                             String(localized: "fileDecrypt.save", defaultValue: "Save Decrypted File"),
                             systemImage: "square.and.arrow.down"

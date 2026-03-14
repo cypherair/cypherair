@@ -50,15 +50,10 @@ struct BackupKeyView: View {
                 .disabled(passphrase.isEmpty || passphrase != passphraseConfirm || isExporting)
             }
 
-            if let exportedData {
+            if let exportedData,
+               let fileURL = exportedData.writeToShareTempFile(named: "\(fingerprint.prefix(16)).asc") {
                 Section {
-                    ShareLink(
-                        item: exportedData,
-                        preview: SharePreview(
-                            "\(fingerprint.prefix(16)).asc",
-                            image: Image(systemName: "key.fill")
-                        )
-                    ) {
+                    ShareLink(item: fileURL) {
                         Label(
                             String(localized: "backup.share", defaultValue: "Save Backup File"),
                             systemImage: "square.and.arrow.up"
