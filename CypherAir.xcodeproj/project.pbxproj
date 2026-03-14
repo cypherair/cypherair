@@ -67,6 +67,9 @@
 		CE0064FF2F64B248008604AB /* EncryptionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064FE2F64B248008604AB /* EncryptionServiceTests.swift */; };
 		CE0065012F64B26E008604AB /* SigningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065002F64B26E008604AB /* SigningServiceTests.swift */; };
 		CE0065032F64B29A008604AB /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065022F64B29A008604AB /* ModelTests.swift */; };
+		CE0065052F64D0D5008604AB /* ContactServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065042F64D0D5008604AB /* ContactServiceTests.swift */; };
+		CE0065072F64D9B9008604AB /* FixtureLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065062F64D9B9008604AB /* FixtureLoader.swift */; };
+		CE0065092F64DA10008604AB /* GnuPGInteropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065082F64DA10008604AB /* GnuPGInteropTests.swift */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
 		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
@@ -145,6 +148,9 @@
 		CE0064FE2F64B248008604AB /* EncryptionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptionServiceTests.swift; sourceTree = "<group>"; };
 		CE0065002F64B26E008604AB /* SigningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SigningServiceTests.swift; sourceTree = "<group>"; };
 		CE0065022F64B29A008604AB /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
+		CE0065042F64D0D5008604AB /* ContactServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactServiceTests.swift; sourceTree = "<group>"; };
+		CE0065062F64D9B9008604AB /* FixtureLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureLoader.swift; sourceTree = "<group>"; };
+		CE0065082F64DA10008604AB /* GnuPGInteropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GnuPGInteropTests.swift; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
 		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
@@ -340,6 +346,9 @@
 				CE0064FE2F64B248008604AB /* EncryptionServiceTests.swift */,
 				CE0065002F64B26E008604AB /* SigningServiceTests.swift */,
 				CE0065022F64B29A008604AB /* ModelTests.swift */,
+				CE0065042F64D0D5008604AB /* ContactServiceTests.swift */,
+				CE0065062F64D9B9008604AB /* FixtureLoader.swift */,
+				CE0065082F64DA10008604AB /* GnuPGInteropTests.swift */,
 			);
 			path = ServiceTests;
 			sourceTree = "<group>";
@@ -418,6 +427,7 @@
 			buildConfigurationList = 5587EF2BB001B4E86E85C261 /* Build configuration list for PBXNativeTarget "CypherAirTests" */;
 			buildPhases = (
 				1242D2BD7FB363D9F6CBAB8A /* Sources */,
+				CE00650B2F64DF16008604AB /* Copy GnuPG Fixture */,
 			);
 			buildRules = (
 			);
@@ -460,6 +470,29 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		CE00650B2F64DF16008604AB /* Copy GnuPG Fixture */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(​SRCROOT)/pgp​-mobile​/tests​/fixtures",
+			);
+			name = "Copy GnuPG Fixture";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(​TARGET​_​BUILD​_​DIR)/$(​UNLOCALIZED​_​RESOURCES​_​FOLDER​_​PATH)/​Fixtures\n",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nFIXTURE_SRC=\"${SRCROOT}/pgp-mobile/tests/fixtures\"\nFIXTURE_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Fixtures\"\nmkdir -p \"$FIXTURE_DST\"\nfor ext in asc gpg sig txt; do\n    for f in \"$FIXTURE_SRC\"/*.\"$ext\"; do\n        [ -f \"$f\" ] && cp \"$f\" \"$FIXTURE_DST/\"\n    done\ndone\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		1242D2BD7FB363D9F6CBAB8A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -467,6 +500,8 @@
 			files = (
 				CE0065032F64B29A008604AB /* ModelTests.swift in Sources */,
 				B8462A44F4C7F182FE942E78 /* FFIIntegrationTests.swift in Sources */,
+				CE0065052F64D0D5008604AB /* ContactServiceTests.swift in Sources */,
+				CE0065072F64D9B9008604AB /* FixtureLoader.swift in Sources */,
 				28B947F8AAAFFB1BF3B9F796 /* DeviceSecurityTests.swift in Sources */,
 				CE0064FD2F64B219008604AB /* DecryptionServiceTests.swift in Sources */,
 				CE0064F92F64B1C4008604AB /* QRServiceTests.swift in Sources */,
@@ -474,6 +509,7 @@
 				CE0064FB2F64B1F4008604AB /* KeyManagementServiceTests.swift in Sources */,
 				CE0064F72F64B199008604AB /* TestHelpers.swift in Sources */,
 				CE0065012F64B26E008604AB /* SigningServiceTests.swift in Sources */,
+				CE0065092F64DA10008604AB /* GnuPGInteropTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

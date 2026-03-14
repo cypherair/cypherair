@@ -251,6 +251,7 @@ The following files and functions are security-critical. Claude Code must **stop
 | `Sources/Security/KeychainManager.swift` | Access control flags. Wrong flags = wrong auth behavior. |
 | `Sources/Security/AuthenticationManager.swift` | Mode switching re-wrap. Error = keys permanently lost. |
 | `Sources/Security/MemoryZeroingUtility.swift` | Removing a zeroize call = key material leaks. |
+| `Sources/Extensions/Data+Zeroing.swift` | Contains `@_optimize(none)` zeroing barrier. Weakening = compiler may eliminate all memory zeroing app-wide. |
 | `Sources/Services/DecryptionService.swift` | Phase 1/Phase 2 auth boundary. Skipping Phase 2 auth check = biometric bypass. |
 | `Sources/Services/QRService.swift` | Parses untrusted external input (`cypherair://` URLs). Bugs here may trigger Sequoia parser on malicious data. |
 | `pgp-mobile/src/decrypt.rs` | AEAD hard-fail enforcement. Weakening = plaintext leaks. |

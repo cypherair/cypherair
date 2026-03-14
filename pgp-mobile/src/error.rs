@@ -1,5 +1,5 @@
 /// PGP error types exposed across the FFI boundary.
-/// Each variant maps 1:1 to a Swift `PGPError` enum case.
+/// Each variant maps 1:1 to a Swift `CypherAirError` enum case (via UniFFI-generated `PgpError`).
 /// See PRD Section 4.7 for user-facing error messages.
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
