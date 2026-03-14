@@ -329,6 +329,11 @@ RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_import_secret_key(uint64_t ptr,
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_match_recipients(uint64_t ptr, RustBuffer ciphertext, RustBuffer local_certs, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_MODIFY_EXPIRY
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_MODIFY_EXPIRY
+RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_modify_expiry(uint64_t ptr, RustBuffer cert_data, RustBuffer new_expiry_seconds, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_PARSE_KEY_INFO
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_PARSE_KEY_INFO
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_parse_key_info(uint64_t ptr, RustBuffer key_data, RustCallStatus *_Nonnull out_status
@@ -710,6 +715,12 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MODIFY_EXPIRY
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MODIFY_EXPIRY
+uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry(void
     
 );
 #endif

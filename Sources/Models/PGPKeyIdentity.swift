@@ -38,7 +38,8 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     var isBackedUp: Bool
 
     /// Public key data in binary OpenPGP format (for sharing).
-    let publicKeyData: Data
+    /// Mutable because expiry modification creates new binding signatures.
+    var publicKeyData: Data
 
     /// Revocation certificate data (auto-generated at key creation).
     let revocationCert: Data
@@ -48,6 +49,10 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
 
     /// Subkey algorithm description (e.g., "X25519", "X448").
     let subkeyAlgo: String?
+
+    /// Expiration date, if set. Nil means the key does not expire.
+    /// Populated from KeyInfo.expiryTimestamp (seconds since Unix epoch).
+    var expiryDate: Date?
 
     /// Short Key ID (last 16 hex chars of fingerprint). De-emphasized in UI.
     var shortKeyId: String {

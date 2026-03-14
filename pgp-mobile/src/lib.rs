@@ -15,7 +15,7 @@ pub mod verify;
 use crate::armor::ArmorKind;
 use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
-use crate::keys::{GeneratedKey, KeyInfo, KeyProfile, S2kInfo};
+use crate::keys::{GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult, S2kInfo};
 use crate::verify::VerifyResult;
 
 uniffi::setup_scaffolding!();
@@ -65,6 +65,21 @@ impl PgpEngine {
     /// Detect the profile of a key (Universal or Advanced).
     pub fn detect_profile(&self, cert_data: Vec<u8>) -> Result<KeyProfile, PgpError> {
         keys::detect_profile(&cert_data)
+    }
+
+    // ── Key Modification ──────────────────────────────────────────────
+
+    /// Modify the expiration time of an existing certificate.
+    /// Requires the full certificate (with secret key material) to re-sign binding signatures.
+    ///
+    /// SECURITY: Output `cert_data` contains unencrypted secret key material.
+    /// The Swift caller must SE-wrap it immediately and zeroize after wrapping.
+    pub fn modify_expiry(
+        &self,
+        cert_data: Vec<u8>,
+        new_expiry_seconds: Option<u64>,
+    ) -> Result<ModifyExpiryResult, PgpError> {
+        keys::modify_expiry(&cert_data, new_expiry_seconds)
     }
 
     // ── Encryption ──────────────────────────────────────────────────

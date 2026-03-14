@@ -121,7 +121,10 @@ final class KeyManagementService {
             publicKeyData: generated.publicKeyData,
             revocationCert: generated.revocationCert,
             primaryAlgo: keyInfo.primaryAlgo,
-            subkeyAlgo: keyInfo.subkeyAlgo
+            subkeyAlgo: keyInfo.subkeyAlgo,
+            expiryDate: keyInfo.expiryTimestamp.map {
+                Date(timeIntervalSince1970: TimeInterval($0))
+            }
         )
 
         // Persist metadata for cold-launch enumeration.
@@ -195,13 +198,16 @@ final class KeyManagementService {
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: false,
-            isExpired: false,
+            isExpired: keyInfo.isExpired,
             isDefault: keys.isEmpty,
             isBackedUp: false,
             publicKeyData: publicKeyData,
             revocationCert: Data(),
             primaryAlgo: keyInfo.primaryAlgo,
-            subkeyAlgo: keyInfo.subkeyAlgo
+            subkeyAlgo: keyInfo.subkeyAlgo,
+            expiryDate: keyInfo.expiryTimestamp.map {
+                Date(timeIntervalSince1970: TimeInterval($0))
+            }
         )
 
         // Persist metadata for cold-launch enumeration.
@@ -250,6 +256,69 @@ final class KeyManagementService {
         }
 
         return exported
+    }
+
+    // MARK: - Key Expiry Modification
+
+    /// Modify the expiration time of an existing certificate.
+    /// Requires device authentication to access the SE-wrapped private key.
+    ///
+    /// SECURITY: The full certificate (with secret key) is needed to re-sign binding signatures.
+    /// After modification, the updated cert is re-wrapped with a new SE key and stored.
+    ///
+    /// - Parameters:
+    ///   - fingerprint: Fingerprint of the key to modify.
+    ///   - newExpirySeconds: New expiry duration from now in seconds, or nil to remove expiry.
+    ///   - authMode: Current authentication mode for SE key access control.
+    /// - Returns: The updated key identity with new expiry information.
+    func modifyExpiry(
+        fingerprint: String,
+        newExpirySeconds: UInt64?,
+        authMode: AuthenticationMode
+    ) throws -> PGPKeyIdentity {
+        // 1. Unwrap private key (triggers Face ID / Touch ID)
+        var secretKey = try unwrapPrivateKey(fingerprint: fingerprint)
+        defer { secretKey.resetBytes(in: 0..<secretKey.count) }
+
+        // 2. Call Rust engine to modify expiry
+        var result = try engine.modifyExpiry(
+            certData: secretKey,
+            newExpirySeconds: newExpirySeconds
+        )
+        defer { result.certData.resetBytes(in: 0..<result.certData.count) }
+
+        // 3. Look up existing identity
+        guard let index = keys.firstIndex(where: { $0.fingerprint == fingerprint }) else {
+            throw CypherAirError.noMatchingKey
+        }
+        let existingIdentity = keys[index]
+
+        // 4. Delete old SE bundle
+        rollbackKeychainBundle(fingerprint: fingerprint)
+
+        // 5. Re-wrap updated cert with SE
+        let accessControl = try createAccessControl(mode: authMode)
+        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
+        let bundle = try secureEnclave.wrap(
+            privateKey: result.certData,
+            using: seHandle,
+            fingerprint: fingerprint
+        )
+        try saveWrappedKeyBundle(bundle, fingerprint: fingerprint)
+
+        // 6. Update identity metadata
+        var updated = existingIdentity
+        updated.isExpired = result.keyInfo.isExpired
+        updated.publicKeyData = result.publicKeyData
+        updated.expiryDate = result.keyInfo.expiryTimestamp.map {
+            Date(timeIntervalSince1970: TimeInterval($0))
+        }
+
+        // 7. Persist metadata and update in-memory state
+        try updateMetadata(updated)
+        keys[index] = updated
+
+        return updated
     }
 
     // MARK: - Key Deletion

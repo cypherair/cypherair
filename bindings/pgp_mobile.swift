@@ -651,6 +651,15 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func matchRecipients(ciphertext: Data, localCerts: [Data]) throws  -> [String]
     
     /**
+     * Modify the expiration time of an existing certificate.
+     * Requires the full certificate (with secret key material) to re-sign binding signatures.
+     *
+     * SECURITY: Output `cert_data` contains unencrypted secret key material.
+     * The Swift caller must SE-wrap it immediately and zeroize after wrapping.
+     */
+    func modifyExpiry(certData: Data, newExpirySeconds: UInt64?) throws  -> ModifyExpiryResult
+    
+    /**
      * Parse a key and extract information (fingerprint, version, User ID, etc.).
      */
     func parseKeyInfo(keyData: Data) throws  -> KeyInfo
@@ -968,6 +977,23 @@ open func matchRecipients(ciphertext: Data, localCerts: [Data])throws  -> [Strin
             self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),
         FfiConverterSequenceData.lower(localCerts),$0
+    )
+})
+}
+    
+    /**
+     * Modify the expiration time of an existing certificate.
+     * Requires the full certificate (with secret key material) to re-sign binding signatures.
+     *
+     * SECURITY: Output `cert_data` contains unencrypted secret key material.
+     * The Swift caller must SE-wrap it immediately and zeroize after wrapping.
+     */
+open func modifyExpiry(certData: Data, newExpirySeconds: UInt64?)throws  -> ModifyExpiryResult  {
+    return try  FfiConverterTypeModifyExpiryResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_modify_expiry(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(certData),
+        FfiConverterOptionUInt64.lower(newExpirySeconds),$0
     )
 })
 }
@@ -1374,6 +1400,10 @@ public struct KeyInfo: Equatable, Hashable {
      * Encryption subkey algorithm name (e.g., "X25519", "X448"), if present.
      */
     public var subkeyAlgo: String?
+    /**
+     * Expiration timestamp as seconds since Unix epoch. None if the key never expires.
+     */
+    public var expiryTimestamp: UInt64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1404,7 +1434,10 @@ public struct KeyInfo: Equatable, Hashable {
          */primaryAlgo: String, 
         /**
          * Encryption subkey algorithm name (e.g., "X25519", "X448"), if present.
-         */subkeyAlgo: String?) {
+         */subkeyAlgo: String?, 
+        /**
+         * Expiration timestamp as seconds since Unix epoch. None if the key never expires.
+         */expiryTimestamp: UInt64?) {
         self.fingerprint = fingerprint
         self.keyVersion = keyVersion
         self.userId = userId
@@ -1414,6 +1447,7 @@ public struct KeyInfo: Equatable, Hashable {
         self.profile = profile
         self.primaryAlgo = primaryAlgo
         self.subkeyAlgo = subkeyAlgo
+        self.expiryTimestamp = expiryTimestamp
     }
 
     
@@ -1440,7 +1474,8 @@ public struct FfiConverterTypeKeyInfo: FfiConverterRustBuffer {
                 isExpired: FfiConverterBool.read(from: &buf), 
                 profile: FfiConverterTypeKeyProfile.read(from: &buf), 
                 primaryAlgo: FfiConverterString.read(from: &buf), 
-                subkeyAlgo: FfiConverterOptionString.read(from: &buf)
+                subkeyAlgo: FfiConverterOptionString.read(from: &buf), 
+                expiryTimestamp: FfiConverterOptionUInt64.read(from: &buf)
         )
     }
 
@@ -1454,6 +1489,7 @@ public struct FfiConverterTypeKeyInfo: FfiConverterRustBuffer {
         FfiConverterTypeKeyProfile.write(value.profile, into: &buf)
         FfiConverterString.write(value.primaryAlgo, into: &buf)
         FfiConverterOptionString.write(value.subkeyAlgo, into: &buf)
+        FfiConverterOptionUInt64.write(value.expiryTimestamp, into: &buf)
     }
 }
 
@@ -1470,6 +1506,91 @@ public func FfiConverterTypeKeyInfo_lift(_ buf: RustBuffer) throws -> KeyInfo {
 #endif
 public func FfiConverterTypeKeyInfo_lower(_ value: KeyInfo) -> RustBuffer {
     return FfiConverterTypeKeyInfo.lower(value)
+}
+
+
+/**
+ * Result of modifying a certificate's expiration time.
+ *
+ * SECURITY: `cert_data` contains unencrypted secret key material. The Swift caller must:
+ * 1. SE-wrap `cert_data` immediately.
+ * 2. Zeroize `cert_data` (via `resetBytes(in:)`) after wrapping is confirmed.
+ */
+public struct ModifyExpiryResult: Equatable, Hashable {
+    /**
+     * Updated full certificate (public + secret) in binary OpenPGP format.
+     * MUST be zeroized by the caller after SE wrapping.
+     */
+    public var certData: Data
+    /**
+     * Updated public key only in binary OpenPGP format.
+     */
+    public var publicKeyData: Data
+    /**
+     * Updated key info with new expiry status.
+     */
+    public var keyInfo: KeyInfo
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Updated full certificate (public + secret) in binary OpenPGP format.
+         * MUST be zeroized by the caller after SE wrapping.
+         */certData: Data, 
+        /**
+         * Updated public key only in binary OpenPGP format.
+         */publicKeyData: Data, 
+        /**
+         * Updated key info with new expiry status.
+         */keyInfo: KeyInfo) {
+        self.certData = certData
+        self.publicKeyData = publicKeyData
+        self.keyInfo = keyInfo
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ModifyExpiryResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeModifyExpiryResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ModifyExpiryResult {
+        return
+            try ModifyExpiryResult(
+                certData: FfiConverterData.read(from: &buf), 
+                publicKeyData: FfiConverterData.read(from: &buf), 
+                keyInfo: FfiConverterTypeKeyInfo.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ModifyExpiryResult, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.certData, into: &buf)
+        FfiConverterData.write(value.publicKeyData, into: &buf)
+        FfiConverterTypeKeyInfo.write(value.keyInfo, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeModifyExpiryResult_lift(_ buf: RustBuffer) throws -> ModifyExpiryResult {
+    return try FfiConverterTypeModifyExpiryResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeModifyExpiryResult_lower(_ value: ModifyExpiryResult) -> RustBuffer {
+    return FfiConverterTypeModifyExpiryResult.lower(value)
 }
 
 
@@ -2385,6 +2506,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients() != 28006) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry() != 7301) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_key_info() != 6277) {
