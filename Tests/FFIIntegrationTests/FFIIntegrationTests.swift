@@ -1091,9 +1091,11 @@ final class FFIIntegrationTests: XCTestCase {
     func test_errorMapping_keyExpired_detectsExpiredKey() throws {
         let engine = try XCTUnwrap(self.engine)
         let key = try engine.generateKey(name: "Expiry Test", email: nil, expirySeconds: 1, profile: .universal)
-        let info = try engine.parseKeyInfo(keyData: key.publicKeyData)
+        // Parse immediately — with expirySeconds=1, the key may already be expired
+        // by the time generation + parsing completes, so we don't assert on this result.
+        _ = try engine.parseKeyInfo(keyData: key.publicKeyData)
 
-        // Wait for the key to expire
+        // Wait to ensure the key is definitely expired
         Thread.sleep(forTimeInterval: 2.0)
 
         // Re-parse to check isExpired flag after waiting

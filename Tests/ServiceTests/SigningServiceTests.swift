@@ -121,23 +121,8 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_unknownSigner_returnsUnknownSigner() async throws {
-        // Generate a key but DON'T add it as a contact
-        let identity = try TestHelpers.generateAndStoreKey(
-            service: stack.keyManagement,
-            profile: .universal,
-            name: "Unknown"
-        )
-
-        let signed = try await stack.signingService.signCleartext(
-            "Message from unknown",
-            signerFingerprint: identity.fingerprint
-        )
-
-        // Remove all contacts and the signing key from keyManagement.keys
-        // to simulate an unknown signer scenario
-        // Actually, the key IS in keyManagement.keys — for unknown signer we need
-        // a key that's NOT in our contacts OR our own keys
-        // This is tricky — let's create a separate stack for signing and verify on the original
+        // Create a separate stack for signing — the signer must not be known
+        // to the verifier's contacts or own keys
         let otherStack = TestHelpers.makeServiceStack()
         defer { otherStack.cleanup() }
 
