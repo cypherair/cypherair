@@ -238,8 +238,8 @@ func test_decrypt_withTamperedCiphertext_throwsAEADError() throws {
     ciphertext[midpoint] ^= 0x01
     
     XCTAssertThrowsError(try pgpMobile.decrypt(ciphertext: ciphertext, privateKey: keyPair.privateKey)) { error in
-        guard let pgpError = error as? PGPError else { return XCTFail("Wrong error type") }
-        XCTAssertEqual(pgpError, .aeadAuthenticationFailed)
+        guard let pgpError = error as? PgpError else { return XCTFail("Wrong error type") }
+        XCTAssertEqual(pgpError, .AeadAuthenticationFailed(message: ""))
     }
 }
 ```
