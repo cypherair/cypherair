@@ -47,24 +47,33 @@ final class DecryptionService {
     func parseRecipients(ciphertext: Data) async throws -> Phase1Result {
         // Dearmor if needed
         let binaryData: Data
-        let recipientKeyIds: [String]
         do {
             if let firstChar = ciphertext.first, firstChar == 0x2D { // '-' = ASCII armor
                 binaryData = try engine.dearmor(armored: ciphertext)
             } else {
                 binaryData = ciphertext
             }
-            recipientKeyIds = try engine.parseRecipients(ciphertext: binaryData)
         } catch {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
-        // Match against local keys
+        // Match PKESK recipients against local certificates.
+        // Uses Rust-side Sequoia key_handles() for correct subkey-to-cert matching,
+        // returning primary fingerprints of matched certificates.
+        let localCerts = keyManagement.keys.map { $0.publicKeyData }
+        let matchedFingerprints: [String]
+        do {
+            matchedFingerprints = try engine.matchRecipients(
+                ciphertext: binaryData,
+                localCerts: localCerts
+            )
+        } catch {
+            throw CypherAirError.noMatchingKey
+        }
+
+        // Look up the matched key identity by primary fingerprint
         let matchedKey = keyManagement.keys.first { identity in
-            recipientKeyIds.contains { keyId in
-                identity.fingerprint.hasSuffix(keyId.lowercased()) ||
-                identity.fingerprint == keyId.lowercased()
-            }
+            matchedFingerprints.contains(identity.fingerprint)
         }
 
         guard matchedKey != nil else {
@@ -72,7 +81,7 @@ final class DecryptionService {
         }
 
         return Phase1Result(
-            recipientKeyIds: recipientKeyIds,
+            recipientKeyIds: matchedFingerprints,
             matchedKey: matchedKey,
             ciphertext: binaryData
         )
