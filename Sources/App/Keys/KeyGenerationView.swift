@@ -13,6 +13,7 @@ struct KeyGenerationView: View {
     @State private var isGenerating = false
     @State private var error: CypherAirError?
     @State private var showError = false
+    @State private var generatedIdentity: PGPKeyIdentity?
 
     private let expiryOptions = [12, 24, 36, 48, 60]
 
@@ -93,6 +94,11 @@ struct KeyGenerationView: View {
         } message: { err in
             Text(err.localizedDescription)
         }
+        .sheet(item: $generatedIdentity) { identity in
+            PostGenerationPromptView(identity: identity)
+                .environment(keyManagement)
+                .interactiveDismissDisabled(false)
+        }
     }
 
     private func generate() {
@@ -103,14 +109,14 @@ struct KeyGenerationView: View {
 
         Task {
             do {
-                _ = try keyManagement.generateKey(
+                let identity = try keyManagement.generateKey(
                     name: trimmedName,
                     email: trimmedEmail.isEmpty ? nil : trimmedEmail,
                     expirySeconds: expirySeconds,
                     profile: profile,
                     authMode: config.authMode
                 )
-                dismiss()
+                generatedIdentity = identity
             } catch {
                 self.error = CypherAirError.from(error) { .keyGenerationFailed(reason: $0) }
                 showError = true

@@ -70,6 +70,7 @@
 		CE0065052F64D0D5008604AB /* ContactServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065042F64D0D5008604AB /* ContactServiceTests.swift */; };
 		CE0065072F64D9B9008604AB /* FixtureLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065062F64D9B9008604AB /* FixtureLoader.swift */; };
 		CE0065092F64DA10008604AB /* GnuPGInteropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065082F64DA10008604AB /* GnuPGInteropTests.swift */; };
+		CE00650F2F6501E2008604AB /* PostGenerationPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00650E2F6501E2008604AB /* PostGenerationPromptView.swift */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
 		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
@@ -151,6 +152,8 @@
 		CE0065042F64D0D5008604AB /* ContactServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactServiceTests.swift; sourceTree = "<group>"; };
 		CE0065062F64D9B9008604AB /* FixtureLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureLoader.swift; sourceTree = "<group>"; };
 		CE0065082F64DA10008604AB /* GnuPGInteropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GnuPGInteropTests.swift; sourceTree = "<group>"; };
+		CE00650E2F6501E2008604AB /* PostGenerationPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostGenerationPromptView.swift; sourceTree = "<group>"; };
+		CE0065102F6502B4008604AB /* CypherAir-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "CypherAir-Info.plist"; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
 		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
@@ -170,6 +173,7 @@
 		7C9F769E62E925ECA46373E6 = {
 			isa = PBXGroup;
 			children = (
+				CE0065102F6502B4008604AB /* CypherAir-Info.plist */,
 				F3EC8935DF44293B377AB6CB /* Sources */,
 				A1C9AAA2B5ED04BDA656105D /* Tests */,
 				87A0C373A5702D60FD4DC48F /* Products */,
@@ -266,6 +270,7 @@
 				CE0064C92F649576008604AB /* KeyDetailView.swift */,
 				CE0064CB2F649576008604AB /* BackupKeyView.swift */,
 				CE0064CD2F649576008604AB /* ImportKeyView.swift */,
+				CE00650E2F6501E2008604AB /* PostGenerationPromptView.swift */,
 			);
 			path = Keys;
 			sourceTree = "<group>";
@@ -353,6 +358,13 @@
 			path = ServiceTests;
 			sourceTree = "<group>";
 		};
+		CE00650C2F65009E008604AB /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		CE340E9C2F6323140047E290 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
@@ -398,6 +410,7 @@
 				CE340E9C2F6323140047E290 /* Extensions */,
 				CE00649D2F6492AF008604AB /* Models */,
 				CE00649E2F6492AF008604AB /* Services */,
+				CE00650C2F65009E008604AB /* Resources */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -549,6 +562,7 @@
 				9247AAEC4846E2A9C01931EA /* pgp_mobile.swift in Sources */,
 				CE0064B02F649416008604AB /* EncryptionService.swift in Sources */,
 				CE0064CE2F649576008604AB /* ImportKeyView.swift in Sources */,
+				CE00650F2F6501E2008604AB /* PostGenerationPromptView.swift in Sources */,
 				CE0064F22F649F3F008604AB /* ImportConfirmView.swift in Sources */,
 				CE0064EE2F64975C008604AB /* FileEncryptView.swift in Sources */,
 				CE0064F42F649FED008604AB /* KeyProfile+Codable.swift in Sources */,
@@ -660,9 +674,11 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/bindings",
 				);
+				INFOPLIST_FILE = "CypherAir-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Cypher Air";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher ​Air uses ​Face ​ID to protect your private keys.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Cypher Air";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = "";
 				INFOPLIST_KEY_UIStatusBarStyle = "";
@@ -850,9 +866,11 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/bindings",
 				);
+				INFOPLIST_FILE = "CypherAir-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Cypher Air";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher ​Air uses ​Face ​ID to protect your private keys.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Cypher Air";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = "";
 				INFOPLIST_KEY_UIStatusBarStyle = "";

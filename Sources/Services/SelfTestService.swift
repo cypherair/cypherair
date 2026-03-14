@@ -28,6 +28,9 @@ final class SelfTestService {
     /// Current state of the self-test run.
     private(set) var state: RunState = .idle
 
+    /// URL of the most recently saved report, for sharing.
+    private(set) var lastReportURL: URL?
+
     private let engine: PgpEngine
 
     init(engine: PgpEngine = PgpEngine()) {
@@ -286,5 +289,6 @@ final class SelfTestService {
         }
 
         try? report.write(to: fileURL, atomically: true, encoding: .utf8)
+        lastReportURL = fileURL
     }
 }

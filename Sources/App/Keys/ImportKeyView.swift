@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Import a private key from file, paste, or QR photo.
 struct ImportKeyView: View {
@@ -11,6 +12,7 @@ struct ImportKeyView: View {
     @State private var isImporting = false
     @State private var error: CypherAirError?
     @State private var showError = false
+    @State private var showFileImporter = false
 
     var body: some View {
         Form {
@@ -20,6 +22,19 @@ struct ImportKeyView: View {
                     .frame(minHeight: 120)
             } header: {
                 Text(String(localized: "import.paste.header", defaultValue: "Paste armored private key"))
+            }
+
+            Section {
+                Button {
+                    showFileImporter = true
+                } label: {
+                    Label(
+                        String(localized: "import.fromFile", defaultValue: "Import from File"),
+                        systemImage: "doc"
+                    )
+                }
+            } header: {
+                Text(String(localized: "import.file.header", defaultValue: "Or Import from File"))
             }
 
             Section {
@@ -56,6 +71,37 @@ struct ImportKeyView: View {
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: { err in
             Text(err.localizedDescription)
+        }
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [
+                UTType(filenameExtension: "asc") ?? .plainText,
+                UTType(filenameExtension: "gpg") ?? .data,
+                UTType(filenameExtension: "pgp") ?? .data,
+                .data
+            ],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                loadFileContents(from: url)
+            }
+        }
+    }
+
+    private func loadFileContents(from url: URL) {
+        guard url.startAccessingSecurityScopedResource() else { return }
+        defer { url.stopAccessingSecurityScopedResource() }
+        do {
+            let data = try Data(contentsOf: url)
+            if let text = String(data: data, encoding: .utf8) {
+                armoredText = text
+            } else {
+                // Binary key data — convert to string representation for the text field
+                armoredText = String(data: data, encoding: .ascii) ?? ""
+            }
+        } catch {
+            self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+            showError = true
         }
     }
 

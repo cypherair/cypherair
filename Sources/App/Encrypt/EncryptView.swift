@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Text encryption view: plaintext input, recipient selection, signature toggle.
 struct EncryptView: View {
@@ -10,10 +11,12 @@ struct EncryptView: View {
     @State private var plaintext = ""
     @State private var selectedRecipients: Set<String> = []
     @State private var signMessage = true
+    @State private var signerFingerprint: String?
     @State private var isEncrypting = false
     @State private var ciphertext: Data?
     @State private var error: CypherAirError?
     @State private var showError = false
+    @State private var showClipboardNotice = false
 
     var body: some View {
         Form {
@@ -36,11 +39,14 @@ struct EncryptView: View {
                             }
                         }
                     )) {
-                        VStack(alignment: .leading) {
-                            Text(contact.displayName)
-                            Text(contact.profile.displayName)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        HStack {
+                            compatibilityIndicator(for: contact)
+                            VStack(alignment: .leading) {
+                                Text(contact.displayName)
+                                Text(contact.profile.displayName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -53,6 +59,18 @@ struct EncryptView: View {
                     String(localized: "encrypt.sign", defaultValue: "Sign Message"),
                     isOn: $signMessage
                 )
+
+                if signMessage && keyManagement.keys.count > 1 {
+                    Picker(
+                        String(localized: "encrypt.signingKey", defaultValue: "Signing Key"),
+                        selection: $signerFingerprint
+                    ) {
+                        ForEach(keyManagement.keys) { key in
+                            Text(key.userId ?? key.shortKeyId)
+                                .tag(Optional(key.fingerprint))
+                        }
+                    }
+                }
             }
 
             Section {
@@ -76,6 +94,32 @@ struct EncryptView: View {
                     Text(ciphertextString)
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
+
+                    HStack {
+                        Button {
+                            UIPasteboard.general.string = ciphertextString
+                            if config.clipboardNotice {
+                                showClipboardNotice = true
+                            }
+                        } label: {
+                            Label(
+                                String(localized: "common.copy", defaultValue: "Copy"),
+                                systemImage: "doc.on.doc"
+                            )
+                        }
+
+                        Spacer()
+
+                        ShareLink(
+                            item: ciphertextString,
+                            preview: SharePreview(String(localized: "encrypt.share.preview", defaultValue: "Encrypted Message"))
+                        ) {
+                            Label(
+                                String(localized: "common.share", defaultValue: "Share"),
+                                systemImage: "square.and.arrow.up"
+                            )
+                        }
+                    }
                 } header: {
                     Text(String(localized: "encrypt.result", defaultValue: "Encrypted Message"))
                 }
@@ -91,6 +135,38 @@ struct EncryptView: View {
         } message: { err in
             Text(err.localizedDescription)
         }
+        .alert(
+            String(localized: "clipboard.notice.title", defaultValue: "Copied to Clipboard"),
+            isPresented: $showClipboardNotice
+        ) {
+            Button(String(localized: "clipboard.notice.dismiss", defaultValue: "OK")) {}
+            Button(String(localized: "clipboard.notice.dontShow", defaultValue: "Don't Show Again")) {
+                config.clipboardNotice = false
+            }
+        } message: {
+            Text(String(localized: "clipboard.notice.message", defaultValue: "The encrypted message has been copied. Remember to clear your clipboard after pasting."))
+        }
+        .onAppear {
+            signerFingerprint = keyManagement.defaultKey?.fingerprint
+        }
+    }
+
+    private func compatibilityIndicator(for contact: Contact) -> some View {
+        Group {
+            if contact.isExpired || contact.isRevoked {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+                    .accessibilityLabel(String(localized: "encrypt.compat.expired", defaultValue: "Key expired or revoked"))
+            } else if keyManagement.defaultKey?.keyVersion == 6 && contact.keyVersion == 4 {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .accessibilityLabel(String(localized: "encrypt.compat.downgrade", defaultValue: "Format downgrade to SEIPDv1"))
+            } else {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .accessibilityLabel(String(localized: "encrypt.compat.ok", defaultValue: "Compatible"))
+            }
+        }
     }
 
     private func encrypt() {
@@ -98,7 +174,7 @@ struct EncryptView: View {
         let service = encryptionService
         let text = plaintext
         let recipients = Array(selectedRecipients)
-        let signerFp = signMessage ? keyManagement.defaultKey?.fingerprint : nil
+        let signerFp = signMessage ? signerFingerprint : nil
         let selfEncrypt = config.encryptToSelf
         Task {
             do {

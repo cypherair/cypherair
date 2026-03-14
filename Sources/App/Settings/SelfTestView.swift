@@ -84,5 +84,17 @@ struct SelfTestView: View {
             }
         }
         .navigationTitle(String(localized: "selftest.title", defaultValue: "Self-Test"))
+        .toolbar {
+            if case .completed = selfTestService.state, let reportURL = selfTestService.lastReportURL {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(item: reportURL) {
+                        Label(
+                            String(localized: "selftest.share", defaultValue: "Share Report"),
+                            systemImage: "square.and.arrow.up"
+                        )
+                    }
+                }
+            }
+        }
     }
 }
