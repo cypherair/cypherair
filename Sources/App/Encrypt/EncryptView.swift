@@ -170,15 +170,10 @@ struct EncryptView: View {
             }
 
             // File mode result
-            if encryptMode == .file, let data = encryptedFileData {
+            if encryptMode == .file, let data = encryptedFileData,
+               let fileURL = data.writeToShareTempFile(named: "\(selectedFileName ?? "encrypted").gpg") {
                 Section {
-                    ShareLink(
-                        item: data,
-                        preview: SharePreview(
-                            "\(selectedFileName ?? "encrypted").gpg",
-                            image: Image(systemName: "lock.doc")
-                        )
-                    ) {
+                    ShareLink(item: fileURL) {
                         Label(
                             String(localized: "fileEncrypt.share", defaultValue: "Share Encrypted File"),
                             systemImage: "square.and.arrow.up"
