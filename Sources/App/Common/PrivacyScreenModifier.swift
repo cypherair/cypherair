@@ -41,6 +41,8 @@ struct PrivacyScreenModifier: ViewModifier {
     private func handleResume() {
         if config.gracePeriod == 0 || config.isGracePeriodExpired {
             // Grace period expired or set to "Immediately" — require re-authentication
+            // Clear any decrypted content before re-auth.
+            config.requestContentClear()
             guard !isAuthenticating else { return }
             isAuthenticating = true
             let auth = authManager

@@ -40,6 +40,14 @@ final class AppConfiguration {
         }
     }
 
+    /// Incremented when decrypted content should be cleared (e.g., grace period expired).
+    var contentClearGeneration: Int = 0
+
+    /// Request that views holding decrypted content clear it.
+    func requestContentClear() {
+        contentClearGeneration += 1
+    }
+
     /// Timestamp of last successful authentication, for grace period calculation.
     var lastAuthenticationDate: Date?
 

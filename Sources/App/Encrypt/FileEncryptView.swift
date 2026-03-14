@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 /// File encryption view with document picker and progress.
@@ -17,6 +18,7 @@ struct FileEncryptView: View {
     @State private var originalFilename: String?
     @State private var error: CypherAirError?
     @State private var showError = false
+    @State private var currentTask: Task<Void, Never>?
 
     var body: some View {
         Form {
@@ -63,7 +65,15 @@ struct FileEncryptView: View {
 
             if isEncrypting {
                 Section {
-                    ProgressView(String(localized: "fileEncrypt.encrypting", defaultValue: "Encrypting..."))
+                    HStack {
+                        ProgressView(String(localized: "fileEncrypt.encrypting", defaultValue: "Encrypting..."))
+                        Spacer()
+                        Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
+                            currentTask?.cancel()
+                            currentTask = nil
+                            isEncrypting = false
+                        }
+                    }
                 }
             }
 
@@ -113,8 +123,19 @@ struct FileEncryptView: View {
         let selfEncrypt = config.encryptToSelf
 
         isEncrypting = true
-        Task {
-            defer { isEncrypting = false }
+        currentTask = Task {
+            var bgTaskID = UIBackgroundTaskIdentifier.invalid
+            bgTaskID = UIApplication.shared.beginBackgroundTask {
+                UIApplication.shared.endBackgroundTask(bgTaskID)
+                bgTaskID = .invalid
+            }
+            defer {
+                if bgTaskID != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTaskID)
+                }
+                isEncrypting = false
+                currentTask = nil
+            }
             do {
                 guard url.startAccessingSecurityScopedResource() else {
                     error = .corruptData(reason: "Cannot access file")
@@ -124,13 +145,17 @@ struct FileEncryptView: View {
                 defer { url.stopAccessingSecurityScopedResource() }
 
                 let fileData = try Data(contentsOf: url)
+                try Task.checkCancellation()
                 let result = try await service.encryptFile(
                     fileData,
                     recipientFingerprints: recipients,
                     signWithFingerprint: signerFp,
                     encryptToSelf: selfEncrypt
                 )
+                try Task.checkCancellation()
                 encryptedData = result
+            } catch is CancellationError {
+                // User cancelled — no error to show
             } catch {
                 self.error = CypherAirError.from(error) { .encryptionFailed(reason: $0) }
                 showError = true

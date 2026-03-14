@@ -306,6 +306,17 @@ final class KeyManagementService {
         keys.first(where: { $0.isDefault })
     }
 
+    // MARK: - Public Key Export
+
+    /// Export the public key in ASCII-armored format for sharing.
+    /// Does NOT require authentication (public key only).
+    func exportPublicKey(fingerprint: String) throws -> Data {
+        guard let identity = keys.first(where: { $0.fingerprint == fingerprint }) else {
+            throw CypherAirError.noMatchingKey
+        }
+        return try engine.armorPublicKey(certData: identity.publicKeyData)
+    }
+
     // MARK: - Private Key Access (SE Unwrap)
 
     /// Unwrap a private key from SE for use in crypto operations.
