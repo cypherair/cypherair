@@ -13,13 +13,32 @@ struct AboutView: View {
                     String(localized: "about.license", defaultValue: "License"),
                     value: "GPLv3"
                 )
+            }
+
+            Section(String(localized: "about.dependencies", defaultValue: "Dependencies")) {
                 LabeledContent(
-                    String(localized: "about.pgp", defaultValue: "PGP Engine"),
-                    value: "Sequoia 2.2.0"
+                    String(localized: "about.pgp", defaultValue: "Sequoia PGP"),
+                    value: "2.2.0"
                 )
                 LabeledContent(
-                    String(localized: "about.ffi", defaultValue: "FFI"),
-                    value: "UniFFI 0.29"
+                    String(localized: "about.openssl", defaultValue: "OpenSSL"),
+                    value: "3.5.5"
+                )
+                LabeledContent(
+                    String(localized: "about.ffi", defaultValue: "UniFFI"),
+                    value: "0.29.5"
+                )
+                LabeledContent(
+                    String(localized: "about.zeroize", defaultValue: "zeroize"),
+                    value: "1.8.2"
+                )
+                LabeledContent(
+                    String(localized: "about.base64", defaultValue: "base64"),
+                    value: "0.22.1"
+                )
+                LabeledContent(
+                    String(localized: "about.thiserror", defaultValue: "thiserror"),
+                    value: "2.0.18"
                 )
             }
 
