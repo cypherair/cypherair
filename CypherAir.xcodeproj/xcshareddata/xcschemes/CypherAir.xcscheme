@@ -29,11 +29,11 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:CypherAir-UnitTests.xctestplan"
-            default = "YES">
+            reference = "container:CypherAir-UnitTests.xctestplan">
          </TestPlanReference>
          <TestPlanReference
-            reference = "container:CypherAir-DeviceTests.xctestplan">
+            reference = "container:CypherAir-DeviceTests.xctestplan"
+            default = "YES">
          </TestPlanReference>
       </TestPlans>
    </TestAction>
