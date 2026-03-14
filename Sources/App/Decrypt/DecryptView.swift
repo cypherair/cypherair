@@ -3,6 +3,7 @@ import SwiftUI
 /// Two-phase decryption view.
 struct DecryptView: View {
     @Environment(DecryptionService.self) private var decryptionService
+    @Environment(AppConfiguration.self) private var config
 
     @State private var ciphertextInput = ""
     @State private var isDecrypting = false
@@ -71,6 +72,11 @@ struct DecryptView: View {
         }
         .onDisappear {
             // PRD §4.4: Text plaintext zeroed on dismiss.
+            decryptedText = nil
+            signatureVerification = nil
+        }
+        .onChange(of: config.contentClearGeneration) {
+            // PRD §4.4: Clear decrypted content when grace period expires.
             decryptedText = nil
             signatureVerification = nil
         }
