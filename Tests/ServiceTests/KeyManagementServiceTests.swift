@@ -266,6 +266,58 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertFalse(privateKeyData.isEmpty)
     }
 
+    // MARK: - Key Import/Restore
+
+    func test_importKey_profileA_exportThenImport_fingerprintMatches() throws {
+        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Export Test A")
+        let passphrase = "test-passphrase-123"
+
+        // Export the key
+        let exportedData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        XCTAssertFalse(exportedData.isEmpty)
+
+        // Delete the original key
+        try service.deleteKey(fingerprint: identity.fingerprint)
+        XCTAssertTrue(service.keys.isEmpty)
+
+        // Import the exported key
+        let imported = try service.importKey(
+            armoredData: exportedData,
+            passphrase: passphrase,
+            authMode: .standard
+        )
+
+        // Verify fingerprint and profile match
+        XCTAssertEqual(imported.fingerprint, identity.fingerprint,
+                       "Imported key fingerprint should match original")
+        XCTAssertEqual(imported.profile, .universal,
+                       "Imported key should retain Profile A (universal)")
+        XCTAssertEqual(imported.keyVersion, 4)
+    }
+
+    func test_importKey_profileB_exportThenImport_fingerprintMatches() throws {
+        let identity = try TestHelpers.generateProfileBKey(service: service, name: "Export Test B")
+        let passphrase = "test-passphrase-456"
+
+        let exportedData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        XCTAssertFalse(exportedData.isEmpty)
+
+        try service.deleteKey(fingerprint: identity.fingerprint)
+        XCTAssertTrue(service.keys.isEmpty)
+
+        let imported = try service.importKey(
+            armoredData: exportedData,
+            passphrase: passphrase,
+            authMode: .standard
+        )
+
+        XCTAssertEqual(imported.fingerprint, identity.fingerprint,
+                       "Imported key fingerprint should match original")
+        XCTAssertEqual(imported.profile, .advanced,
+                       "Imported key should retain Profile B (advanced)")
+        XCTAssertEqual(imported.keyVersion, 6)
+    }
+
     // MARK: - Default Key
 
     func test_setDefaultKey_switchesDefault() throws {

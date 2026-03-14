@@ -251,7 +251,7 @@ These pairs must be updated together. A change to one without the other will cau
 
 | Module A | Module B | Coupling Reason |
 |----------|----------|----------------|
-| `pgp-mobile/src/error.rs` | `Sources/Models/PGPError.swift` | PgpError enum variants must match 1:1 across FFI |
+| `pgp-mobile/src/error.rs` | `Sources/Models/CypherAirError.swift` | PgpError enum variants must match 1:1 across FFI |
 | `pgp-mobile/src/lib.rs` (public API) | `Sources/Services/*Service.swift` | Any Rust API change requires Swift call-site updates |
 | `SecureEnclaveManager` | `KeychainManager` | SE wrapping writes 3 Keychain items; unwrapping reads them |
 | `SecureEnclaveManager` | `AuthenticationManager` | Mode switch re-wraps all keys via SE manager |

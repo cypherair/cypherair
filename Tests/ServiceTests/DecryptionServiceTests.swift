@@ -224,6 +224,62 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
+    // MARK: - Tamper Detection (1-Bit Flip)
+
+    func test_decrypt_profileA_tamperedCiphertext_throwsIntegrityError() async throws {
+        let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
+            profile: .universal
+        )
+
+        // Flip one bit near the middle of the ciphertext
+        var tampered = binaryCiphertext
+        let midpoint = tampered.count / 2
+        tampered[midpoint] ^= 0x01
+
+        // Construct Phase1Result with tampered data
+        let recipientKeyIds = try stack.engine.parseRecipients(ciphertext: binaryCiphertext)
+        let phase1 = DecryptionService.Phase1Result(
+            recipientKeyIds: recipientKeyIds,
+            matchedKey: identity,
+            ciphertext: tampered
+        )
+
+        // Phase 2 should fail — MDC integrity check (Profile A / SEIPDv1)
+        do {
+            _ = try await stack.decryptionService.decrypt(phase1: phase1)
+            XCTFail("Expected decryption to fail on tampered ciphertext")
+        } catch {
+            // Any error is acceptable — the ciphertext integrity is broken
+        }
+    }
+
+    func test_decrypt_profileB_tamperedCiphertext_throwsAEADError() async throws {
+        let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
+            profile: .advanced
+        )
+
+        // Flip one bit near the middle of the ciphertext
+        var tampered = binaryCiphertext
+        let midpoint = tampered.count / 2
+        tampered[midpoint] ^= 0x01
+
+        // Construct Phase1Result with tampered data
+        let recipientKeyIds = try stack.engine.parseRecipients(ciphertext: binaryCiphertext)
+        let phase1 = DecryptionService.Phase1Result(
+            recipientKeyIds: recipientKeyIds,
+            matchedKey: identity,
+            ciphertext: tampered
+        )
+
+        // Phase 2 should fail — AEAD hard-fail (Profile B / SEIPDv2)
+        do {
+            _ = try await stack.decryptionService.decrypt(phase1: phase1)
+            XCTFail("Expected AEAD hard-fail on tampered ciphertext")
+        } catch {
+            // Any error is acceptable — AEAD authentication must fail
+        }
+    }
+
     // MARK: - Full Round-Trip via Engine (Encrypt → Decrypt)
 
     func test_encryptDecrypt_profileA_fullRoundTrip() async throws {

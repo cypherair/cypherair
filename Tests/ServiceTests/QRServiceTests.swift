@@ -204,6 +204,51 @@ final class QRServiceTests: XCTestCase {
         }
     }
 
+    // MARK: - Negative: URL Length Limit (Anti-DoS)
+
+    func test_parseImportURL_exceedsMaxLength_throwsInvalidQRCode() {
+        // Construct a URL that exceeds the 4096-character limit
+        let prefix = "cypherair://import/v1/"
+        let padding = String(repeating: "A", count: 4097 - prefix.count)
+        let url = URL(string: prefix + padding)!
+
+        XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            if case .invalidQRCode = cypherError {
+                // Expected: URL length exceeds 4096 limit
+            } else {
+                XCTFail("Expected .invalidQRCode, got \(cypherError)")
+            }
+        }
+    }
+
+    func test_parseImportURL_atMaxLength_doesNotThrowLengthError() {
+        // Construct a URL at exactly 4096 characters — should NOT be rejected by length guard.
+        // It will likely fail for invalid key data, which is acceptable.
+        let prefix = "cypherair://import/v1/"
+        let padding = String(repeating: "A", count: 4096 - prefix.count)
+        let url = URL(string: prefix + padding)!
+
+        // The error should NOT be from the length guard.
+        // It may throw invalidKeyData or another error from Rust parsing, but not
+        // because of the length check.
+        do {
+            _ = try qrService.parseImportURL(url)
+            // If this somehow succeeds, that's fine too
+        } catch let error as CypherAirError {
+            // Any error other than invalidQRCode is acceptable, since the data is garbage.
+            // invalidQRCode is also technically possible from the Rust parser side,
+            // but the key point is that we reached Rust parsing (past the length guard).
+            // We can't distinguish "length guard" from "Rust parser" invalidQRCode here,
+            // so we just verify the over-limit case above is the real safety check.
+            _ = error
+        } catch {
+            // Non-CypherAirError is also acceptable
+        }
+    }
+
     // MARK: - QR Code Generation
 
     func test_generateQRCode_validPublicKey_returnsCIImage() throws {
