@@ -1,10 +1,12 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 /// File decryption view with document picker, two-phase decryption, and preview/save.
 /// Decrypted files are stored in tmp/decrypted/ and deleted on view exit + app launch.
 struct FileDecryptView: View {
     @Environment(DecryptionService.self) private var decryptionService
+    @Environment(AppConfiguration.self) private var config
 
     @State private var showDocumentPicker = false
     @State private var isDecrypting = false
@@ -13,6 +15,7 @@ struct FileDecryptView: View {
     @State private var originalFilename: String?
     @State private var error: CypherAirError?
     @State private var showError = false
+    @State private var currentTask: Task<Void, Never>?
 
     var body: some View {
         Form {
@@ -33,7 +36,15 @@ struct FileDecryptView: View {
 
             if isDecrypting {
                 Section {
-                    ProgressView(String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting..."))
+                    HStack {
+                        ProgressView(String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting..."))
+                        Spacer()
+                        Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
+                            currentTask?.cancel()
+                            currentTask = nil
+                            isDecrypting = false
+                        }
+                    }
                 }
             }
 
@@ -96,6 +107,12 @@ struct FileDecryptView: View {
             decryptedData?.resetBytes(in: 0..<(decryptedData?.count ?? 0))
             decryptedData = nil
         }
+        .onChange(of: config.contentClearGeneration) {
+            // PRD §4.4: Clear decrypted content when grace period expires.
+            decryptedData?.resetBytes(in: 0..<(decryptedData?.count ?? 0))
+            decryptedData = nil
+            signatureVerification = nil
+        }
     }
 
     private func handleFileSelection(_ result: Result<[URL], Error>) {
@@ -105,8 +122,19 @@ struct FileDecryptView: View {
         let service = decryptionService
 
         isDecrypting = true
-        Task {
-            defer { isDecrypting = false }
+        currentTask = Task {
+            var bgTaskID = UIBackgroundTaskIdentifier.invalid
+            bgTaskID = UIApplication.shared.beginBackgroundTask {
+                UIApplication.shared.endBackgroundTask(bgTaskID)
+                bgTaskID = .invalid
+            }
+            defer {
+                if bgTaskID != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTaskID)
+                }
+                isDecrypting = false
+                currentTask = nil
+            }
             do {
                 guard url.startAccessingSecurityScopedResource() else {
                     error = .corruptData(reason: "Cannot access file")
@@ -116,10 +144,14 @@ struct FileDecryptView: View {
                 defer { url.stopAccessingSecurityScopedResource() }
 
                 let ciphertext = try Data(contentsOf: url)
+                try Task.checkCancellation()
                 let result = try await service.decryptMessage(ciphertext: ciphertext)
+                try Task.checkCancellation()
 
                 decryptedData = result.plaintext
                 signatureVerification = result.signature
+            } catch is CancellationError {
+                // User cancelled — no error to show
             } catch {
                 self.error = CypherAirError.from(error) { .corruptData(reason: $0) }
                 showError = true
