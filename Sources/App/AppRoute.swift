@@ -24,10 +24,6 @@ enum AppRoute: Hashable {
     case sign
     case verify
 
-    // File operations
-    case fileEncrypt
-    case fileDecrypt
-
     // Settings
     case settings
     case authModeSetting
