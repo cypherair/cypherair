@@ -256,7 +256,8 @@ final class ModelTests: XCTestCase {
             publicKeyData: Data(),
             revocationCert: Data(),
             primaryAlgo: "Ed25519",
-            subkeyAlgo: "X25519"
+            subkeyAlgo: "X25519",
+            expiryDate: nil
         )
     }
 }

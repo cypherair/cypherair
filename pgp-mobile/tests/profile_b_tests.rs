@@ -860,3 +860,124 @@ fn test_match_recipients_profile_b_wrong_key_returns_error() {
         "Should return NoMatchingKey for wrong cert, got: {result:?}"
     );
 }
+
+// ── Modify Expiry Tests (Profile B) ─────────────────────────────────────
+
+/// Modify expiry on a Profile B key: extend to 3 years.
+/// Pass: key is not expired, expiry_timestamp is set, key info updated.
+#[test]
+fn test_modify_expiry_profile_b_extend() {
+    let generated = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        Some("alice@example.com".to_string()),
+        Some(365 * 24 * 3600), // 1 year
+        KeyProfile::Advanced,
+    )
+    .expect("Key generation should succeed");
+
+    let result = keys::modify_expiry(
+        &generated.cert_data,
+        Some(3 * 365 * 24 * 3600), // 3 years from now
+    )
+    .expect("modify_expiry should succeed for Profile B");
+
+    assert!(!result.cert_data.is_empty(), "Updated cert should not be empty");
+    assert!(!result.public_key_data.is_empty(), "Updated public key should not be empty");
+    assert!(!result.key_info.is_expired, "Key should not be expired after extending");
+    assert!(result.key_info.expiry_timestamp.is_some(), "Should have an expiry timestamp");
+    assert_eq!(result.key_info.key_version, 6, "Profile B key version must remain 6");
+    assert_eq!(result.key_info.profile, KeyProfile::Advanced);
+
+    // Verify the updated cert can still be parsed
+    let re_parsed = keys::parse_key_info(&result.public_key_data)
+        .expect("Updated public key should be parseable");
+    assert!(!re_parsed.is_expired);
+    assert!(re_parsed.expiry_timestamp.is_some());
+}
+
+/// Modify expiry on a Profile B key: remove expiry (set to never expire).
+/// Pass: key has no expiry timestamp, key is not expired.
+#[test]
+fn test_modify_expiry_profile_b_remove() {
+    let generated = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        Some(365 * 24 * 3600), // 1 year
+        KeyProfile::Advanced,
+    )
+    .expect("Key generation should succeed");
+
+    // Verify it has an expiry first
+    let info_before = keys::parse_key_info(&generated.public_key_data)
+        .expect("Parse should succeed");
+    assert!(info_before.expiry_timestamp.is_some(), "Should have expiry before removal");
+
+    // Remove expiry
+    let result = keys::modify_expiry(&generated.cert_data, None)
+        .expect("modify_expiry with None should succeed");
+
+    assert!(!result.key_info.is_expired, "Key should not be expired after removing expiry");
+    assert!(
+        result.key_info.expiry_timestamp.is_none(),
+        "Expiry timestamp should be None after removal"
+    );
+}
+
+/// Modify expiry on a Profile B key: set to 1 second (effectively expired).
+/// Pass: key is expired.
+#[test]
+fn test_modify_expiry_profile_b_to_past() {
+    let generated = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key generation should succeed");
+
+    // Set expiry to 1 second from now
+    let result = keys::modify_expiry(&generated.cert_data, Some(1))
+        .expect("modify_expiry should succeed");
+
+    // Sleep to let it expire
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
+    // Re-parse to check expiry status (since is_expired is evaluated at parse time)
+    let info = keys::parse_key_info(&result.public_key_data)
+        .expect("Parse should succeed");
+    assert!(info.is_expired, "Key should be expired after setting 1-second expiry and waiting");
+}
+
+/// Verify that encrypt/decrypt still works after modifying expiry on a Profile B key.
+#[test]
+fn test_modify_expiry_profile_b_roundtrip_encrypt_decrypt() {
+    let generated = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        Some(365 * 24 * 3600),
+        KeyProfile::Advanced,
+    )
+    .expect("Key generation should succeed");
+
+    // Extend expiry
+    let result = keys::modify_expiry(
+        &generated.cert_data,
+        Some(3 * 365 * 24 * 3600),
+    )
+    .expect("modify_expiry should succeed");
+
+    // Encrypt with updated public key
+    let plaintext = b"Hello after expiry modification (Profile B)!";
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[result.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed with updated key");
+
+    // Decrypt with updated cert (contains secret key)
+    let decrypted = decrypt::decrypt(&ciphertext, &[result.cert_data.clone()], &[])
+        .expect("Decryption should succeed with updated key");
+    assert_eq!(decrypted.plaintext, plaintext);
+}

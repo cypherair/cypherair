@@ -154,6 +154,7 @@
 		CE0065082F64DA10008604AB /* GnuPGInteropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GnuPGInteropTests.swift; sourceTree = "<group>"; };
 		CE00650E2F6501E2008604AB /* PostGenerationPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostGenerationPromptView.swift; sourceTree = "<group>"; };
 		CE0065102F6502B4008604AB /* CypherAir-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "CypherAir-Info.plist"; sourceTree = "<group>"; };
+		CE0065112F6518D3008604AB /* CypherAir.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = CypherAir.icon; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
 		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
@@ -173,6 +174,7 @@
 		7C9F769E62E925ECA46373E6 = {
 			isa = PBXGroup;
 			children = (
+				CE0065112F6518D3008604AB /* CypherAir.icon */,
 				CE0065102F6502B4008604AB /* CypherAir-Info.plist */,
 				F3EC8935DF44293B377AB6CB /* Sources */,
 				A1C9AAA2B5ED04BDA656105D /* Tests */,
@@ -660,7 +662,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = CypherAir;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
@@ -852,7 +854,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = CypherAir;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
