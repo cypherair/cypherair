@@ -156,6 +156,13 @@ final class ContactService {
 
     /// Find contacts whose fingerprints match the given key IDs.
     /// Key IDs may be short (last 16 hex chars) or full fingerprints.
+    ///
+    /// WARNING: This method uses suffix/equality matching which does NOT work
+    /// for PKESK subkey IDs (which differ from primary fingerprints). For
+    /// matching ciphertext recipients against contacts, use PgpEngine.matchRecipients()
+    /// instead, which performs correct subkey-to-certificate resolution via Sequoia.
+    /// This method currently has zero callers and is retained for potential future use
+    /// with pre-resolved primary fingerprints only.
     func contacts(matchingKeyIds keyIds: [String]) -> [Contact] {
         contacts.filter { contact in
             keyIds.contains { keyId in

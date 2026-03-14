@@ -5,9 +5,10 @@ import XCTest
 /// Phase 1 (parseRecipients) must NOT trigger SE unwrap or authentication.
 /// Phase 2 (decrypt) MUST trigger SE unwrap (which requires biometric auth).
 ///
-/// NOTE: `parseRecipients` returns encryption subkey IDs from the PKESK packet,
-/// which may differ from the primary key fingerprint stored in PGPKeyIdentity.
-/// Tests that exercise Phase 2 construct Phase1Result directly to isolate
+/// `parseRecipients` now uses `PgpEngine.matchRecipients()` for correct
+/// subkey-to-certificate matching via Sequoia's key_handles(). It returns
+/// primary fingerprints that match PGPKeyIdentity.fingerprint directly.
+/// Some Phase 2 tests still construct Phase1Result directly to isolate
 /// the decryption logic from the key-matching logic.
 final class DecryptionServiceTests: XCTestCase {
 
@@ -149,12 +150,15 @@ final class DecryptionServiceTests: XCTestCase {
 
         let unwrapCountBefore = stack.mockSE.unwrapCallCount
 
-        // parseRecipients may or may not find a match (depends on key ID format),
-        // but either way it should NOT trigger SE unwrap
-        _ = try? await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
+        // Phase 1 should succeed AND should NOT trigger SE unwrap
+        let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
 
         XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore,
                        "Phase 1 must NOT trigger SE unwrap — no authentication should occur")
+        XCTAssertNotNil(phase1.matchedKey,
+                        "Phase 1 should find a matched key")
+        XCTAssertEqual(phase1.matchedKey?.fingerprint, identity.fingerprint,
+                       "Phase 1 should match the correct key by primary fingerprint")
     }
 
     // MARK: - Phase 2: Decrypt (Authentication Required)
@@ -367,5 +371,82 @@ final class DecryptionServiceTests: XCTestCase {
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
         XCTAssertEqual(result.signature.status, .valid)
+    }
+
+    // MARK: - End-to-End via decryptMessage() (Phase 1 + Phase 2)
+
+    func test_decryptMessage_profileA_endToEnd() async throws {
+        let plaintext = "End-to-end Profile A 你好"
+        let identity = try TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            plaintext,
+            recipientFingerprints: [identity.fingerprint],
+            signWithFingerprint: identity.fingerprint,
+            encryptToSelf: false
+        )
+
+        // decryptMessage exercises both Phase 1 (parseRecipients) and Phase 2 (decrypt)
+        let result = try await stack.decryptionService.decryptMessage(ciphertext: ciphertext)
+
+        let decryptedText = String(data: result.plaintext, encoding: .utf8)
+        XCTAssertEqual(decryptedText, plaintext)
+        XCTAssertEqual(result.signature.status, .valid)
+    }
+
+    func test_decryptMessage_profileB_endToEnd() async throws {
+        let plaintext = "End-to-end Profile B 加密"
+        let identity = try TestHelpers.generateProfileBKey(service: stack.keyManagement)
+        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            plaintext,
+            recipientFingerprints: [identity.fingerprint],
+            signWithFingerprint: identity.fingerprint,
+            encryptToSelf: false
+        )
+
+        let result = try await stack.decryptionService.decryptMessage(ciphertext: ciphertext)
+
+        let decryptedText = String(data: result.plaintext, encoding: .utf8)
+        XCTAssertEqual(decryptedText, plaintext)
+        XCTAssertEqual(result.signature.status, .valid)
+    }
+
+    func test_parseRecipients_profileA_matchesCorrectKey() async throws {
+        let identity = try TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "match test",
+            recipientFingerprints: [identity.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false
+        )
+
+        let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
+
+        XCTAssertEqual(phase1.matchedKey?.fingerprint, identity.fingerprint,
+                       "Should match the correct Profile A key")
+        XCTAssertFalse(phase1.recipientKeyIds.isEmpty,
+                       "Should return matched fingerprints")
+    }
+
+    func test_parseRecipients_profileB_matchesCorrectKey() async throws {
+        let identity = try TestHelpers.generateProfileBKey(service: stack.keyManagement)
+        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "match test",
+            recipientFingerprints: [identity.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false
+        )
+
+        let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
+
+        XCTAssertEqual(phase1.matchedKey?.fingerprint, identity.fingerprint,
+                       "Should match the correct Profile B key")
     }
 }

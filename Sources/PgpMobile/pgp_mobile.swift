@@ -640,6 +640,17 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func importSecretKey(armoredData: Data, passphrase: String) throws  -> Data
     
     /**
+     * Match PKESK recipients against local certificates (Phase 1 — no auth needed).
+     * Returns primary fingerprints of matching certificates (lowercase hex).
+     *
+     * PKESK packets contain encryption subkey identifiers, not primary key fingerprints.
+     * This function uses Sequoia's key_handles() to correctly match subkey IDs against
+     * certificates, then returns the primary fingerprint of each matched certificate.
+     * Only public key data is needed — no secret keys, no authentication.
+     */
+    func matchRecipients(ciphertext: Data, localCerts: [Data]) throws  -> [String]
+    
+    /**
      * Parse a key and extract information (fingerprint, version, User ID, etc.).
      */
     func parseKeyInfo(keyData: Data) throws  -> KeyInfo
@@ -647,6 +658,9 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     /**
      * Parse recipients of an encrypted message (Phase 1 — no auth needed).
      * Returns recipient key IDs as hex strings.
+     *
+     * NOTE: These are encryption *subkey* identifiers from PKESK packets, not primary
+     * key fingerprints. For matching against local keys, use `match_recipients` instead.
      */
     func parseRecipients(ciphertext: Data) throws  -> [String]
     
@@ -940,6 +954,25 @@ open func importSecretKey(armoredData: Data, passphrase: String)throws  -> Data 
 }
     
     /**
+     * Match PKESK recipients against local certificates (Phase 1 — no auth needed).
+     * Returns primary fingerprints of matching certificates (lowercase hex).
+     *
+     * PKESK packets contain encryption subkey identifiers, not primary key fingerprints.
+     * This function uses Sequoia's key_handles() to correctly match subkey IDs against
+     * certificates, then returns the primary fingerprint of each matched certificate.
+     * Only public key data is needed — no secret keys, no authentication.
+     */
+open func matchRecipients(ciphertext: Data, localCerts: [Data])throws  -> [String]  {
+    return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_match_recipients(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(ciphertext),
+        FfiConverterSequenceData.lower(localCerts),$0
+    )
+})
+}
+    
+    /**
      * Parse a key and extract information (fingerprint, version, User ID, etc.).
      */
 open func parseKeyInfo(keyData: Data)throws  -> KeyInfo  {
@@ -954,6 +987,9 @@ open func parseKeyInfo(keyData: Data)throws  -> KeyInfo  {
     /**
      * Parse recipients of an encrypted message (Phase 1 — no auth needed).
      * Returns recipient key IDs as hex strings.
+     *
+     * NOTE: These are encryption *subkey* identifiers from PKESK packets, not primary
+     * key fingerprints. For matching against local keys, use `match_recipients` instead.
      */
 open func parseRecipients(ciphertext: Data)throws  -> [String]  {
     return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
@@ -2348,10 +2384,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key() != 53716) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients() != 28006) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_key_info() != 6277) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_recipients() != 31760) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_recipients() != 20) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_revocation_cert() != 24404) {
