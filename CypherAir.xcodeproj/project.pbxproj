@@ -71,6 +71,7 @@
 		CE0065072F64D9B9008604AB /* FixtureLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065062F64D9B9008604AB /* FixtureLoader.swift */; };
 		CE0065092F64DA10008604AB /* GnuPGInteropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065082F64DA10008604AB /* GnuPGInteropTests.swift */; };
 		CE00650F2F6501E2008604AB /* PostGenerationPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00650E2F6501E2008604AB /* PostGenerationPromptView.swift */; };
+		CE0065172F652334008604AB /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065122F651C44008604AB /* AppIcon.icon */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
 		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
@@ -425,6 +426,7 @@
 			buildConfigurationList = 04FFA0AC2AEDE901A06224E1 /* Build configuration list for PBXNativeTarget "CypherAir" */;
 			buildPhases = (
 				C1FB1E6897EF4454B406EDAF /* Sources */,
+				CE0065162F65232F008604AB /* Resources */,
 			);
 			buildRules = (
 			);
@@ -484,6 +486,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CE0065162F65232F008604AB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CE0065172F652334008604AB /* AppIcon.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		CE00650B2F64DF16008604AB /* Copy GnuPG Fixture */ = {
