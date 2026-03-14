@@ -70,6 +70,7 @@
 		CE0065092F64DA10008604AB /* GnuPGInteropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065082F64DA10008604AB /* GnuPGInteropTests.swift */; };
 		CE00650F2F6501E2008604AB /* PostGenerationPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00650E2F6501E2008604AB /* PostGenerationPromptView.swift */; };
 		CE0065172F652334008604AB /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065122F651C44008604AB /* AppIcon.icon */; };
+		CE0065192F653CF4008604AB /* Data+TempFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065182F653CF4008604AB /* Data+TempFile.swift */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
 		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
@@ -152,6 +153,7 @@
 		CE00650E2F6501E2008604AB /* PostGenerationPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostGenerationPromptView.swift; sourceTree = "<group>"; };
 		CE0065102F6502B4008604AB /* CypherAir-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "CypherAir-Info.plist"; sourceTree = "<group>"; };
 		CE0065122F651C44008604AB /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		CE0065182F653CF4008604AB /* Data+TempFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Data+TempFile.swift"; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
 		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
@@ -367,6 +369,7 @@
 			children = (
 				F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */,
 				CE0064F32F649FED008604AB /* KeyProfile+Codable.swift */,
+				CE0065182F653CF4008604AB /* Data+TempFile.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -560,6 +563,7 @@
 				CE0064AA2F6492FD008604AB /* SignatureVerification.swift in Sources */,
 				CE0064C82F649576008604AB /* KeyGenerationView.swift in Sources */,
 				CE0064D02F6495C2008604AB /* ContactsView.swift in Sources */,
+				CE0065192F653CF4008604AB /* Data+TempFile.swift in Sources */,
 				CE0064BE2F64953B008604AB /* HomeView.swift in Sources */,
 				CE0064E52F64972D008604AB /* PrivacyScreenModifier.swift in Sources */,
 				CE0064A82F6492FD008604AB /* CypherAirError.swift in Sources */,
