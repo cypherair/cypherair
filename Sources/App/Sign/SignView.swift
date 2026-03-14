@@ -118,13 +118,10 @@ struct SignView: View {
                 }
             }
 
-            if signMode == .file, let detachedSignature {
+            if signMode == .file, let detachedSignature,
+               let sigURL = detachedSignature.writeToShareTempFile(named: (selectedFileName ?? "file") + ".sig") {
                 Section {
-                    let fileName = (selectedFileName ?? "file") + ".sig"
-                    ShareLink(
-                        item: detachedSignature,
-                        preview: SharePreview(fileName)
-                    ) {
+                    ShareLink(item: sigURL) {
                         Label(
                             String(localized: "sign.share.signature", defaultValue: "Share .sig File"),
                             systemImage: "square.and.arrow.up"

@@ -97,14 +97,9 @@ struct KeyDetailView: View {
                     }
 
                     Section {
-                        if let armoredPublicKey {
-                            ShareLink(
-                                item: armoredPublicKey,
-                                preview: SharePreview(
-                                    "\(key.shortKeyId).asc",
-                                    image: Image(systemName: "key")
-                                )
-                            ) {
+                        if let armoredPublicKey,
+                           let pubKeyURL = armoredPublicKey.writeToShareTempFile(named: "\(key.shortKeyId).asc") {
+                            ShareLink(item: pubKeyURL) {
                                 Label(
                                     String(localized: "keydetail.sharePublicKey", defaultValue: "Share Public Key"),
                                     systemImage: "square.and.arrow.up"
@@ -162,14 +157,9 @@ struct KeyDetailView: View {
                             )
                         }
 
-                        if !key.revocationCert.isEmpty {
-                            ShareLink(
-                                item: key.revocationCert,
-                                preview: SharePreview(
-                                    "revocation-\(key.shortKeyId).asc",
-                                    image: Image(systemName: "xmark.seal")
-                                )
-                            ) {
+                        if !key.revocationCert.isEmpty,
+                           let revURL = key.revocationCert.writeToShareTempFile(named: "revocation-\(key.shortKeyId).asc") {
+                            ShareLink(item: revURL) {
                                 Label(
                                     String(localized: "keydetail.exportRevocation", defaultValue: "Export Revocation Certificate"),
                                     systemImage: "xmark.seal"
