@@ -531,3 +531,55 @@ fn test_match_recipients_cross_profile_a_sender_b_recipient() {
     assert_eq!(matched.len(), 1);
     assert_eq!(matched[0], recipient_b.fingerprint);
 }
+
+// ── Modify Expiry: Negative Tests ───────────────────────────────────────
+
+/// modify_expiry with public key only (no secret material) must fail.
+/// Tests both Profile A and Profile B.
+#[test]
+fn test_modify_expiry_public_key_only_fails_profile_a() {
+    let generated = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        Some(365 * 24 * 3600),
+        KeyProfile::Universal,
+    )
+    .expect("Key generation should succeed");
+
+    // Pass public key only — should fail because secret key is needed for re-signing
+    let result = keys::modify_expiry(&generated.public_key_data, Some(3 * 365 * 24 * 3600));
+    assert!(result.is_err(), "modify_expiry should fail with public key only");
+    match result.unwrap_err() {
+        pgp_mobile::error::PgpError::InvalidKeyData { reason } => {
+            assert!(
+                reason.contains("secret") || reason.contains("Secret"),
+                "Error should mention missing secret key material, got: {reason}"
+            );
+        }
+        other => panic!("Expected InvalidKeyData error, got: {other:?}"),
+    }
+}
+
+#[test]
+fn test_modify_expiry_public_key_only_fails_profile_b() {
+    let generated = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        Some(365 * 24 * 3600),
+        KeyProfile::Advanced,
+    )
+    .expect("Key generation should succeed");
+
+    // Pass public key only — should fail because secret key is needed for re-signing
+    let result = keys::modify_expiry(&generated.public_key_data, Some(3 * 365 * 24 * 3600));
+    assert!(result.is_err(), "modify_expiry should fail with public key only");
+    match result.unwrap_err() {
+        pgp_mobile::error::PgpError::InvalidKeyData { reason } => {
+            assert!(
+                reason.contains("secret") || reason.contains("Secret"),
+                "Error should mention missing secret key material, got: {reason}"
+            );
+        }
+        other => panic!("Expected InvalidKeyData error, got: {other:?}"),
+    }
+}
