@@ -144,10 +144,7 @@ struct HomeView: View {
             EncryptView()
         case .decrypt:
             DecryptView()
-        case .fileEncrypt:
-            FileEncryptView()
-        case .fileDecrypt:
-            FileDecryptView()
+
         case .sign:
             SignView()
         case .verify:

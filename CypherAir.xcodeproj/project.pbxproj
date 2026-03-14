@@ -56,8 +56,6 @@
 		CE0064E72F64972D008604AB /* QRDisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064E62F64972D008604AB /* QRDisplayView.swift */; };
 		CE0064E92F64972D008604AB /* QRPhotoImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064E82F64972D008604AB /* QRPhotoImportView.swift */; };
 		CE0064EC2F64975C008604AB /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064EB2F64975C008604AB /* OnboardingView.swift */; };
-		CE0064EE2F64975C008604AB /* FileEncryptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064ED2F64975C008604AB /* FileEncryptView.swift */; };
-		CE0064F02F64975D008604AB /* FileDecryptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064EF2F64975D008604AB /* FileDecryptView.swift */; };
 		CE0064F22F649F3F008604AB /* ImportConfirmView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064F12F649F3F008604AB /* ImportConfirmView.swift */; };
 		CE0064F42F649FED008604AB /* KeyProfile+Codable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064F32F649FED008604AB /* KeyProfile+Codable.swift */; };
 		CE0064F72F64B199008604AB /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0064F62F64B199008604AB /* TestHelpers.swift */; };
@@ -139,8 +137,6 @@
 		CE0064E62F64972D008604AB /* QRDisplayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRDisplayView.swift; sourceTree = "<group>"; };
 		CE0064E82F64972D008604AB /* QRPhotoImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRPhotoImportView.swift; sourceTree = "<group>"; };
 		CE0064EB2F64975C008604AB /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
-		CE0064ED2F64975C008604AB /* FileEncryptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileEncryptView.swift; sourceTree = "<group>"; };
-		CE0064EF2F64975D008604AB /* FileDecryptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDecryptView.swift; sourceTree = "<group>"; };
 		CE0064F12F649F3F008604AB /* ImportConfirmView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportConfirmView.swift; sourceTree = "<group>"; };
 		CE0064F32F649FED008604AB /* KeyProfile+Codable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyProfile+Codable.swift"; sourceTree = "<group>"; };
 		CE0064F62F64B199008604AB /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
@@ -295,7 +291,6 @@
 			isa = PBXGroup;
 			children = (
 				CE0064D52F6495C2008604AB /* EncryptView.swift */,
-				CE0064ED2F64975C008604AB /* FileEncryptView.swift */,
 			);
 			path = Encrypt;
 			sourceTree = "<group>";
@@ -304,7 +299,6 @@
 			isa = PBXGroup;
 			children = (
 				CE0064D72F6495C2008604AB /* DecryptView.swift */,
-				CE0064EF2F64975D008604AB /* FileDecryptView.swift */,
 			);
 			path = Decrypt;
 			sourceTree = "<group>";
@@ -579,11 +573,9 @@
 				CE0064CE2F649576008604AB /* ImportKeyView.swift in Sources */,
 				CE00650F2F6501E2008604AB /* PostGenerationPromptView.swift in Sources */,
 				CE0064F22F649F3F008604AB /* ImportConfirmView.swift in Sources */,
-				CE0064EE2F64975C008604AB /* FileEncryptView.swift in Sources */,
 				CE0064F42F649FED008604AB /* KeyProfile+Codable.swift in Sources */,
 				CE0064E22F6495C3008604AB /* AboutView.swift in Sources */,
 				CE0064CA2F649576008604AB /* KeyDetailView.swift in Sources */,
-				CE0064F02F64975D008604AB /* FileDecryptView.swift in Sources */,
 				CE0064AC2F649416008604AB /* KeyManagementService.swift in Sources */,
 				CE0064DE2F6495C3008604AB /* SettingsView.swift in Sources */,
 				CE0064CC2F649576008604AB /* BackupKeyView.swift in Sources */,
