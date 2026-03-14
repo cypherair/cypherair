@@ -110,8 +110,26 @@ impl PgpEngine {
 
     /// Parse recipients of an encrypted message (Phase 1 — no auth needed).
     /// Returns recipient key IDs as hex strings.
+    ///
+    /// NOTE: These are encryption *subkey* identifiers from PKESK packets, not primary
+    /// key fingerprints. For matching against local keys, use `match_recipients` instead.
     pub fn parse_recipients(&self, ciphertext: Vec<u8>) -> Result<Vec<String>, PgpError> {
         decrypt::parse_recipients(&ciphertext)
+    }
+
+    /// Match PKESK recipients against local certificates (Phase 1 — no auth needed).
+    /// Returns primary fingerprints of matching certificates (lowercase hex).
+    ///
+    /// PKESK packets contain encryption subkey identifiers, not primary key fingerprints.
+    /// This function uses Sequoia's key_handles() to correctly match subkey IDs against
+    /// certificates, then returns the primary fingerprint of each matched certificate.
+    /// Only public key data is needed — no secret keys, no authentication.
+    pub fn match_recipients(
+        &self,
+        ciphertext: Vec<u8>,
+        local_certs: Vec<Vec<u8>>,
+    ) -> Result<Vec<String>, PgpError> {
+        decrypt::match_recipients(&ciphertext, &local_certs)
     }
 
     /// Decrypt a message (Phase 2 — requires authenticated key access).

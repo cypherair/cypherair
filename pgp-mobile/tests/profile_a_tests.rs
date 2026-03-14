@@ -827,3 +827,124 @@ fn test_concurrent_encrypt_profile_a() {
     handle1.join().expect("Thread 1 should complete without panic");
     handle2.join().expect("Thread 2 should complete without panic");
 }
+
+// ── match_recipients tests ─────────────────────────────────────────
+
+/// match_recipients: encrypt to a Profile A key, match against its public cert.
+/// Verifies the returned fingerprint is the primary key fingerprint (not the subkey ID).
+#[test]
+fn test_match_recipients_profile_a_returns_primary_fingerprint() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"test message",
+        &[key.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let matched = decrypt::match_recipients(&ciphertext, &[key.public_key_data.clone()])
+        .expect("match_recipients should succeed");
+
+    assert_eq!(matched.len(), 1, "Should match exactly one certificate");
+    assert_eq!(
+        matched[0], key.fingerprint,
+        "Matched fingerprint should be the primary key fingerprint"
+    );
+}
+
+/// match_recipients: encrypt to key A, match against key B → NoMatchingKey.
+#[test]
+fn test_match_recipients_profile_a_wrong_key_returns_error() {
+    let alice = keys::generate_key_with_profile(
+        "Alice".to_string(), None, None, KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let bob = keys::generate_key_with_profile(
+        "Bob".to_string(), None, None, KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"for alice only",
+        &[alice.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let result = decrypt::match_recipients(&ciphertext, &[bob.public_key_data.clone()]);
+    assert!(
+        matches!(result, Err(pgp_mobile::error::PgpError::NoMatchingKey)),
+        "Should return NoMatchingKey for wrong cert, got: {result:?}"
+    );
+}
+
+/// match_recipients: multi-recipient message matches both certs.
+#[test]
+fn test_match_recipients_profile_a_multi_recipient() {
+    let alice = keys::generate_key_with_profile(
+        "Alice".to_string(), None, None, KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let bob = keys::generate_key_with_profile(
+        "Bob".to_string(), None, None, KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"for both",
+        &[alice.public_key_data.clone(), bob.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let matched = decrypt::match_recipients(
+        &ciphertext,
+        &[alice.public_key_data.clone(), bob.public_key_data.clone()],
+    )
+    .expect("match_recipients should succeed");
+
+    assert_eq!(matched.len(), 2, "Should match both certificates");
+    assert!(matched.contains(&alice.fingerprint));
+    assert!(matched.contains(&bob.fingerprint));
+}
+
+/// match_recipients: encrypt-to-self includes sender in match.
+#[test]
+fn test_match_recipients_profile_a_encrypt_to_self() {
+    let sender = keys::generate_key_with_profile(
+        "Alice".to_string(), None, None, KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let recipient = keys::generate_key_with_profile(
+        "Bob".to_string(), None, None, KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"with encrypt-to-self",
+        &[recipient.public_key_data.clone()],
+        None,
+        Some(&sender.public_key_data),
+    )
+    .expect("Encryption should succeed");
+
+    // Match against sender's cert only — should find the self-encryption PKESK
+    let matched = decrypt::match_recipients(&ciphertext, &[sender.public_key_data.clone()])
+        .expect("match_recipients should find sender via encrypt-to-self");
+
+    assert_eq!(matched.len(), 1);
+    assert_eq!(matched[0], sender.fingerprint);
+}
