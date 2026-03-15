@@ -8,7 +8,7 @@ use crate::error::PgpError;
 
 /// Parse recipient certificates, validate each has at least one encryption-capable
 /// subkey, deduplicate by fingerprint, and return the parsed certs.
-fn collect_recipients(
+pub(crate) fn collect_recipients(
     recipient_certs: &[Vec<u8>],
     encrypt_to_self: Option<&[u8]>,
     policy: &StandardPolicy,
@@ -85,7 +85,7 @@ fn collect_recipients(
 
 /// Collect Recipient objects from parsed certs. Must be called where certs are
 /// in scope so the borrowed Recipient references remain valid.
-fn build_recipients<'a>(
+pub(crate) fn build_recipients<'a>(
     certs: &'a [openpgp::Cert],
     policy: &'a StandardPolicy<'a>,
 ) -> Vec<Recipient<'a>> {
@@ -105,7 +105,7 @@ fn build_recipients<'a>(
 }
 
 /// Set up an optional signer for the message pipeline.
-fn setup_signer<'a>(
+pub(crate) fn setup_signer<'a>(
     message: Message<'a>,
     signing_key: Option<&[u8]>,
     policy: &StandardPolicy,

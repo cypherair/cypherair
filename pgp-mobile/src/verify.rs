@@ -149,10 +149,11 @@ pub fn verify_detached(
 }
 
 /// Helper struct for Sequoia's verification API.
-struct VerifyHelper<'a> {
-    certs: &'a [openpgp::Cert],
-    status: SignatureStatus,
-    signer_fingerprint: Option<String>,
+/// `pub(crate)` so that `streaming.rs` can construct this for file-based verification.
+pub(crate) struct VerifyHelper<'a> {
+    pub(crate) certs: &'a [openpgp::Cert],
+    pub(crate) status: SignatureStatus,
+    pub(crate) signer_fingerprint: Option<String>,
 }
 
 impl<'a> VerificationHelper for VerifyHelper<'a> {
