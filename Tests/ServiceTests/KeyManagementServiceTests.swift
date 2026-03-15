@@ -21,6 +21,10 @@ final class KeyManagementServiceTests: XCTestCase {
     }
 
     override func tearDown() {
+        // Clean up crash recovery flags that tests may have set
+        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
         service = nil
         mockSE = nil
         mockKC = nil
@@ -327,7 +331,7 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertTrue(service.keys.first(where: { $0.fingerprint == first.fingerprint })!.isDefault)
         XCTAssertFalse(service.keys.first(where: { $0.fingerprint == second.fingerprint })!.isDefault)
 
-        service.setDefaultKey(fingerprint: second.fingerprint)
+        try service.setDefaultKey(fingerprint: second.fingerprint)
 
         XCTAssertFalse(service.keys.first(where: { $0.fingerprint == first.fingerprint })!.isDefault)
         XCTAssertTrue(service.keys.first(where: { $0.fingerprint == second.fingerprint })!.isDefault)
@@ -341,4 +345,275 @@ final class KeyManagementServiceTests: XCTestCase {
     func test_defaultKey_noKeys_returnsNil() {
         XCTAssertNil(service.defaultKey)
     }
+
+    func test_setDefaultKey_persistsAcrossReload() throws {
+        let first = try TestHelpers.generateProfileAKey(service: service, name: "First")
+        let second = try TestHelpers.generateProfileBKey(service: service, name: "Second")
+
+        // Switch default from first to second
+        try service.setDefaultKey(fingerprint: second.fingerprint)
+
+        // Create a fresh service with the same mock Keychain — simulates cold restart
+        let freshService = KeyManagementService(
+            engine: engine,
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            authenticator: mockAuth
+        )
+        try freshService.loadKeys()
+
+        // Verify the persisted default survived the "restart"
+        let reloadedFirst = freshService.keys.first(where: { $0.fingerprint == first.fingerprint })
+        let reloadedSecond = freshService.keys.first(where: { $0.fingerprint == second.fingerprint })
+        XCTAssertEqual(reloadedFirst?.isDefault, false,
+                       "First key should not be default after reload")
+        XCTAssertEqual(reloadedSecond?.isDefault, true,
+                       "Second key should remain default after reload")
+    }
+
+    // MARK: - Duplicate Key Import Guard
+
+    func test_importKey_duplicateFingerprint_throwsDuplicateKeyError() throws {
+        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Original A")
+        let passphrase = "test-pass-dup-a"
+
+        // Export the key (to get armored data for re-import)
+        let exportedData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+
+        // Attempt to import without deleting — should throw duplicateKey
+        XCTAssertThrowsError(
+            try service.importKey(armoredData: exportedData, passphrase: passphrase, authMode: .standard)
+        ) { error in
+            guard let cypherError = error as? CypherAirError,
+                  case .duplicateKey = cypherError else {
+                return XCTFail("Expected CypherAirError.duplicateKey, got \(error)")
+            }
+        }
+
+        // Verify no extra SE key was generated (guard fired before SE wrapping)
+        // 1 generate for original key + 0 for the rejected import = 1 total
+        XCTAssertEqual(mockSE.generateCallCount, 1,
+                       "SE key should not be generated for duplicate import")
+    }
+
+    func test_importKey_duplicateFingerprint_profileB_throwsDuplicateKeyError() throws {
+        let identity = try TestHelpers.generateProfileBKey(service: service, name: "Original B")
+        let passphrase = "test-pass-dup-b"
+
+        let exportedData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+
+        XCTAssertThrowsError(
+            try service.importKey(armoredData: exportedData, passphrase: passphrase, authMode: .standard)
+        ) { error in
+            guard let cypherError = error as? CypherAirError,
+                  case .duplicateKey = cypherError else {
+                return XCTFail("Expected CypherAirError.duplicateKey, got \(error)")
+            }
+        }
+
+        XCTAssertEqual(mockSE.generateCallCount, 1,
+                       "SE key should not be generated for duplicate Profile B import")
+    }
+
+    // MARK: - Modify Expiry
+
+    func test_modifyExpiry_profileA_updatesExpiryDate() throws {
+        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Expiry A")
+
+        // Modify expiry to 1 year (31536000 seconds)
+        let updated = try service.modifyExpiry(
+            fingerprint: identity.fingerprint,
+            newExpirySeconds: 31_536_000,
+            authMode: .standard
+        )
+
+        XCTAssertNotNil(updated.expiryDate, "Updated key should have an expiry date")
+        XCTAssertFalse(updated.isExpired, "Key should not be expired immediately after modification")
+        XCTAssertEqual(updated.fingerprint, identity.fingerprint,
+                       "Fingerprint should not change after expiry modification")
+    }
+
+    func test_modifyExpiry_profileB_updatesExpiryDate() throws {
+        let identity = try TestHelpers.generateProfileBKey(service: service, name: "Expiry B")
+
+        let updated = try service.modifyExpiry(
+            fingerprint: identity.fingerprint,
+            newExpirySeconds: 31_536_000,
+            authMode: .standard
+        )
+
+        XCTAssertNotNil(updated.expiryDate)
+        XCTAssertFalse(updated.isExpired)
+        XCTAssertEqual(updated.fingerprint, identity.fingerprint)
+    }
+
+    func test_modifyExpiry_setsAndClearsCrashRecoveryFlag() throws {
+        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Flag Test")
+
+        // Verify flags are not set before operation
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+
+        _ = try service.modifyExpiry(
+            fingerprint: identity.fingerprint,
+            newExpirySeconds: 31_536_000,
+            authMode: .standard
+        )
+
+        // After successful completion, flags should be cleared
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey),
+                       "In-progress flag should be cleared after successful modifyExpiry")
+        XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey),
+                     "Fingerprint flag should be cleared after successful modifyExpiry")
+    }
+
+    // MARK: - Modify Expiry Crash Recovery
+
+    func test_modifyExpiryCrashRecovery_oldAndPendingExist_deletesPending() throws {
+        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Recovery Test")
+        let fp = identity.fingerprint
+        let account = KeychainConstants.defaultAccount
+
+        // Simulate interrupted modifyExpiry: set flags and store pending items
+        // while old permanent items still exist.
+        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
+        let dummyData = Data("pending-data".utf8)
+        try mockKC.save(dummyData, service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+                        account: account, accessControl: nil)
+        try mockKC.save(dummyData, service: KeychainConstants.pendingSaltService(fingerprint: fp),
+                        account: account, accessControl: nil)
+        try mockKC.save(dummyData, service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
+                        account: account, accessControl: nil)
+
+        // Run recovery
+        service.checkAndRecoverFromInterruptedModifyExpiry()
+
+        // Verify: flags cleared
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey),
+                       "In-progress flag should be cleared after recovery")
+        XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey),
+                     "Fingerprint flag should be cleared after recovery")
+
+        // Verify: pending items deleted
+        XCTAssertFalse(mockKC.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+                                     account: account),
+                       "Pending SE key should be deleted")
+        XCTAssertFalse(mockKC.exists(service: KeychainConstants.pendingSaltService(fingerprint: fp),
+                                     account: account),
+                       "Pending salt should be deleted")
+        XCTAssertFalse(mockKC.exists(service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
+                                     account: account),
+                       "Pending sealed key should be deleted")
+
+        // Verify: original permanent items still intact
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp),
+                                    account: account),
+                      "Original SE key should remain intact")
+    }
+
+    func test_modifyExpiryCrashRecovery_onlyPendingExists_promotesToPermanent() throws {
+        // Generate a key, export its fingerprint, then manually delete permanent items
+        // to simulate a crash after deletion but before promotion.
+        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Promote Test")
+        let fp = identity.fingerprint
+        let account = KeychainConstants.defaultAccount
+
+        // Copy current permanent data to pending names (simulating what modifyExpiry does)
+        let seKeyData = try mockKC.load(
+            service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
+        let saltData = try mockKC.load(
+            service: KeychainConstants.saltService(fingerprint: fp), account: account)
+        let sealedData = try mockKC.load(
+            service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
+
+        try mockKC.save(seKeyData, service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+                        account: account, accessControl: nil)
+        try mockKC.save(saltData, service: KeychainConstants.pendingSaltService(fingerprint: fp),
+                        account: account, accessControl: nil)
+        try mockKC.save(sealedData, service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
+                        account: account, accessControl: nil)
+
+        // Delete the permanent items (simulating the crash point)
+        try mockKC.delete(service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
+        try mockKC.delete(service: KeychainConstants.saltService(fingerprint: fp), account: account)
+        try mockKC.delete(service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
+
+        // Set crash recovery flags
+        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
+        // Run recovery
+        service.checkAndRecoverFromInterruptedModifyExpiry()
+
+        // Verify: flags cleared
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+
+        // Verify: permanent items restored from pending
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp),
+                                    account: account),
+                      "SE key should be promoted to permanent")
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.saltService(fingerprint: fp),
+                                    account: account),
+                      "Salt should be promoted to permanent")
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.sealedKeyService(fingerprint: fp),
+                                    account: account),
+                      "Sealed key should be promoted to permanent")
+    }
+
+    func test_modifyExpiryCrashRecovery_noFlag_doesNothing() throws {
+        let identity = try TestHelpers.generateProfileAKey(service: service, name: "No Flag Test")
+        let fp = identity.fingerprint
+        let account = KeychainConstants.defaultAccount
+
+        // Ensure no crash recovery flag is set
+        UserDefaults.standard.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
+        let saveCountBefore = mockKC.saveCallCount
+        let deleteCountBefore = mockKC.deleteCallCount
+
+        // Run recovery — should be a no-op
+        service.checkAndRecoverFromInterruptedModifyExpiry()
+
+        // Verify: no Keychain operations performed
+        XCTAssertEqual(mockKC.saveCallCount, saveCountBefore,
+                       "No Keychain saves should occur when flag is not set")
+        XCTAssertEqual(mockKC.deleteCallCount, deleteCountBefore,
+                       "No Keychain deletes should occur when flag is not set")
+
+        // Verify: original key still intact
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp),
+                                    account: account))
+    }
+
+    // MARK: - Delete Key Default Persistence
+
+    func test_deleteKey_reassignsDefault_persistsAcrossReload() throws {
+        let first = try TestHelpers.generateProfileAKey(service: service, name: "Default")
+        let second = try TestHelpers.generateProfileBKey(service: service, name: "Other")
+
+        XCTAssertTrue(first.isDefault)
+        XCTAssertFalse(second.isDefault)
+
+        // Delete the default key — second should become default
+        try service.deleteKey(fingerprint: first.fingerprint)
+        XCTAssertTrue(service.keys.first?.isDefault == true)
+
+        // Create a fresh service to simulate cold restart
+        let freshService = KeyManagementService(
+            engine: engine,
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            authenticator: mockAuth
+        )
+        try freshService.loadKeys()
+
+        // Verify the promoted default persisted through reload
+        XCTAssertEqual(freshService.keys.count, 1)
+        XCTAssertTrue(freshService.keys.first?.isDefault == true,
+                      "Promoted default should persist across reload")
+        XCTAssertEqual(freshService.keys.first?.fingerprint, second.fingerprint)
+    }
+
 }
