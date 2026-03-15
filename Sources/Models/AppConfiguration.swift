@@ -37,6 +37,13 @@ final class AppConfiguration {
         }
     }
 
+    /// Whether to require device authentication on cold launch (default false).
+    var requireAuthOnLaunch: Bool {
+        didSet {
+            UserDefaults.standard.set(requireAuthOnLaunch, forKey: Self.requireAuthOnLaunchKey)
+        }
+    }
+
     /// Whether the user has completed onboarding.
     var hasCompletedOnboarding: Bool {
         didSet {
@@ -59,6 +66,7 @@ final class AppConfiguration {
 
     private static let encryptToSelfKey = "com.cypherair.preference.encryptToSelf"
     private static let clipboardNoticeKey = "com.cypherair.preference.clipboardNotice"
+    private static let requireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
     private static let onboardingCompleteKey = "com.cypherair.preference.onboardingComplete"
 
     // MARK: - Initialization
@@ -87,6 +95,9 @@ final class AppConfiguration {
         } else {
             self.clipboardNotice = true
         }
+
+        // Require auth on launch (default false)
+        self.requireAuthOnLaunch = defaults.bool(forKey: Self.requireAuthOnLaunchKey)
 
         // Onboarding
         self.hasCompletedOnboarding = defaults.bool(forKey: Self.onboardingCompleteKey)

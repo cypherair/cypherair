@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 /// Mock authenticator for testing authentication flows.
 /// Controls whether authentication succeeds and whether biometrics are available.
@@ -17,6 +18,9 @@ final class MockAuthenticator: AuthenticationEvaluable, @unchecked Sendable {
     private(set) var lastReason: String?
 
     var isBiometricsAvailable: Bool { biometricsAvailable }
+
+    /// Mock has no real LAContext — returns nil.
+    var lastEvaluatedContext: LAContext? { nil }
 
     func canEvaluate(mode: AuthenticationMode) -> Bool {
         switch mode {

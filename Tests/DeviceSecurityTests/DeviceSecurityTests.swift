@@ -817,6 +817,10 @@ final class DeviceSecurityTests: XCTestCase {
         try keychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
 
         // 2. Switch mode.
+        // Brief pause to let any prior SE authentication session settle,
+        // preventing "Canceled by another authentication" from overlapping requests.
+        try await Task.sleep(for: .seconds(2))
+
         let mockAuth = MockAuthenticator()
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
@@ -1797,6 +1801,10 @@ final class DeviceSecurityTests: XCTestCase {
         try keychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
 
         // 2. Switch mode: High Security → Standard.
+        // Brief pause to let any prior SE authentication session settle,
+        // preventing "Canceled by another authentication" from overlapping requests.
+        try await Task.sleep(for: .seconds(2))
+
         let mockAuth = MockAuthenticator()
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,

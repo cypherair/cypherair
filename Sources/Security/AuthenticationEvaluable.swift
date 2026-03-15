@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 /// Authentication mode for the app.
@@ -69,6 +70,13 @@ protocol AuthenticationEvaluable {
 
     /// Check if biometrics are currently available.
     var isBiometricsAvailable: Bool { get }
+
+    /// The LAContext from the most recent successful evaluate() call.
+    /// Used by switchMode to pass a pre-authenticated context to SE key
+    /// reconstruction, avoiding repeated Face ID prompts.
+    /// Production: returns the authenticated LAContext.
+    /// Test mock: returns nil.
+    var lastEvaluatedContext: LAContext? { get }
 }
 
 /// UserDefaults keys for authentication preferences.
