@@ -47,7 +47,7 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 | Platform | iOS 26.2+ / iPadOS 26.2+, minimum 8 GB RAM |
 | Language | Swift 6.2, SwiftUI (Liquid Glass), UIKit for system pickers |
 | OpenPGP Engine | Sequoia PGP 2.2.0 (Rust), `crypto-openssl` backend (vendored) |
-| FFI Bridge | Mozilla UniFFI 0.29.x |
+| FFI Bridge | Mozilla UniFFI 0.31.x |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |
 | Build | Xcode 26, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` |
 | Localization | English + Simplified Chinese (.xcstrings) |
