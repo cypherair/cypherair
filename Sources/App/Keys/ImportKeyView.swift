@@ -115,6 +115,11 @@ struct ImportKeyView: View {
                     passphrase: passphrase,
                     authMode: config.authMode
                 )
+                // Clear sensitive state before dismiss.
+                // Note: Swift String cannot be reliably zeroized (SECURITY.md §7.1),
+                // but we minimize lifetime by clearing references immediately.
+                armoredText = ""
+                passphrase = ""
                 dismiss()
             } catch {
                 self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }

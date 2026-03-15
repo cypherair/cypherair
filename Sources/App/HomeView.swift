@@ -35,6 +35,7 @@ struct HomeView: View {
             Image(systemName: "key.slash")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
             Text(String(localized: "home.noKeys.title", defaultValue: "No Keys Yet"))
                 .font(.headline)
@@ -64,8 +65,15 @@ struct HomeView: View {
                     HStack {
                         Image(systemName: "key.fill")
                             .foregroundStyle(.tint)
-                        Text(defaultKey.userId ?? defaultKey.shortKeyId)
-                            .font(.headline)
+                            .accessibilityHidden(true)
+                        if let userId = defaultKey.userId {
+                            Text(userId)
+                                .font(.headline)
+                        } else {
+                            Text(defaultKey.shortKeyId)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                         Spacer()
                         Text(defaultKey.profile.displayName)
                             .font(.caption)
@@ -118,13 +126,15 @@ struct HomeView: View {
             VStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.title2)
+                    .accessibilityHidden(true)
                 Text(title)
                     .font(.subheadline.weight(.medium))
             }
             .frame(maxWidth: .infinity, minHeight: 80)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.glass)
         .tint(tint)
+        .accessibilityLabel(title)
     }
 
     // MARK: - Navigation Destinations
@@ -161,8 +171,6 @@ struct HomeView: View {
             SelfTestView()
         case .about:
             AboutView()
-        default:
-            Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
         }
     }
 }

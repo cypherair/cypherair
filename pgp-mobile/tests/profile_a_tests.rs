@@ -5,6 +5,7 @@
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::encrypt;
 use pgp_mobile::decrypt;
+use pgp_mobile::error::PgpError;
 use pgp_mobile::sign;
 use pgp_mobile::verify;
 use pgp_mobile::armor;
@@ -708,7 +709,12 @@ fn test_decrypt_wrong_key_profile_a() {
 
     // Bob tries to decrypt Alice's message
     let result = decrypt::decrypt(&ciphertext, &[bob.cert_data.clone()], &[]);
-    assert!(result.is_err(), "Wrong key should fail");
+    // M1: Verify the specific error variant, not just that it failed
+    match result {
+        Err(PgpError::NoMatchingKey) => {} // expected
+        Err(other) => panic!("Expected NoMatchingKey, got: {other:?}"),
+        Ok(_) => panic!("Wrong key should fail to decrypt"),
+    }
 }
 
 /// Empty plaintext encrypt/decrypt round-trip (Profile A).
