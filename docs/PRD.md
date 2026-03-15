@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD)
 
-> **Version:** v3.9  
-> **Platform:** iOS 26.2+ / iPadOS 26.2+
+> **Version:** v4.0
+> **Platform:** iOS 26.2+ / iPadOS 26.2+ / macOS 26.2+
 > **License:** GPLv3  
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
 
@@ -20,11 +20,11 @@ A fully offline OpenPGP encryption tool that enables everyday users to communica
 
 ### 1.3 Supported Platforms
 
-iOS 26.2+ / iPadOS 26.2+ (same codebase). Minimum device: 8 GB RAM.
+iOS 26.2+ / iPadOS 26.2+ / macOS 26.2+ (same codebase). Minimum device: 8 GB RAM.
 
 ### 1.4 Explicit Exclusions
 
-No macOS (this release). No messaging. No key-server sync. No custom encryption formats.
+No messaging. No key-server sync. No custom encryption formats.
 
 ### 1.5 Open-Source License
 
@@ -333,13 +333,19 @@ Full details in [TDD](TDD.md). Key decisions:
 - [x] Privacy screen + re-auth + content lifecycle. Onboarding. Backup indicator.
 - [x] English + Chinese. Zero permissions. Background tasks. Accessibility. MIE.
 
-### 10.2 v1.1
+### 10.2 v1.1 — Completed
 
-Streaming file processing. File size increase.
+- [x] Streaming file processing: file-path-based streaming I/O with constant memory usage (64 KB buffers), replacing in-memory processing for file operations.
+- [x] File size increase: removed fixed 100 MB limit, replaced with runtime disk space validation.
+- [x] Progress reporting and cancellation for all file operations (encrypt, decrypt, sign, verify).
 
-### 10.3 v2.0
+### 10.3 v1.2 — Completed
 
-Share Extension. macOS. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack.
+- [x] macOS 26.2+ support (same codebase). Separate entitlements for macOS sandbox and file access. Conditional compilation for platform-specific APIs (clipboard, background tasks, biometric icons). XCFramework extended with `aarch64-apple-darwin` slice.
+
+### 10.4 v2.0
+
+Share Extension. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack.
 
 ---
 
