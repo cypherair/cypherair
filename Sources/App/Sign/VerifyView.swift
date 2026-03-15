@@ -23,9 +23,10 @@ struct VerifyView: View {
     @State private var error: CypherAirError?
     @State private var showError = false
 
-    // Detached mode state
-    @State private var showOriginalFileImporter = false
-    @State private var showSignatureFileImporter = false
+    // Detached mode state — single file importer with target tracking
+    enum FilePickerTarget { case original, signature }
+    @State private var filePickerTarget: FilePickerTarget?
+    @State private var showFileImporter = false
     @State private var originalFileURL: URL?
     @State private var originalFileName: String?
     @State private var signatureFileURL: URL?
@@ -122,23 +123,23 @@ struct VerifyView: View {
             Text(err.localizedDescription)
         }
         .fileImporter(
-            isPresented: $showOriginalFileImporter,
-            allowedContentTypes: [.data],
+            isPresented: $showFileImporter,
+            allowedContentTypes: filePickerTarget == .signature
+                ? [UTType(filenameExtension: "sig") ?? .data, .data]
+                : [.data],
             allowsMultipleSelection: false
         ) { result in
             if case .success(let urls) = result, let url = urls.first {
-                originalFileURL = url
-                originalFileName = url.lastPathComponent
-            }
-        }
-        .fileImporter(
-            isPresented: $showSignatureFileImporter,
-            allowedContentTypes: [.data],
-            allowsMultipleSelection: false
-        ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                signatureFileURL = url
-                signatureFileName = url.lastPathComponent
+                switch filePickerTarget {
+                case .original:
+                    originalFileURL = url
+                    originalFileName = url.lastPathComponent
+                case .signature:
+                    signatureFileURL = url
+                    signatureFileName = url.lastPathComponent
+                case nil:
+                    break
+                }
             }
         }
     }
@@ -160,7 +161,8 @@ struct VerifyView: View {
     private var detachedContent: some View {
         Section {
             Button {
-                showOriginalFileImporter = true
+                filePickerTarget = .original
+                showFileImporter = true
             } label: {
                 Label(
                     String(localized: "verify.selectOriginal", defaultValue: "Select Original File"),
@@ -179,7 +181,8 @@ struct VerifyView: View {
 
         Section {
             Button {
-                showSignatureFileImporter = true
+                filePickerTarget = .signature
+                showFileImporter = true
             } label: {
                 Label(
                     String(localized: "verify.selectSignature", defaultValue: "Select .sig File"),
