@@ -78,6 +78,43 @@ final class SigningService {
         }
     }
 
+    // MARK: - Streaming File Signing
+
+    /// Create a detached signature for a file using streaming I/O.
+    /// Triggers device authentication via SE unwrap.
+    ///
+    /// - Parameters:
+    ///   - fileURL: URL of the file to sign.
+    ///   - signerFingerprint: Fingerprint of the signing key.
+    ///   - progress: Progress reporter for UI updates and cancellation.
+    /// - Returns: The detached signature data (.sig, ASCII-armored).
+    @concurrent
+    func signDetachedStreaming(
+        fileURL: URL,
+        signerFingerprint: String,
+        progress: FileProgressReporter?
+    ) async throws -> Data {
+        var secretKey: Data
+        do {
+            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
+        } catch {
+            throw CypherAirError.from(error) { _ in .authenticationFailed }
+        }
+        defer {
+            secretKey.resetBytes(in: 0..<secretKey.count)
+        }
+
+        do {
+            return try engine.signDetachedFile(
+                inputPath: fileURL.path,
+                signerCert: secretKey,
+                progress: progress
+            )
+        } catch {
+            throw CypherAirError.from(error) { .signingFailed(reason: $0) }
+        }
+    }
+
     // MARK: - Verification
 
     /// Verify a cleartext-signed message.
@@ -125,6 +162,44 @@ final class SigningService {
                 data: data,
                 signature: signature,
                 verificationKeys: verificationKeys
+            )
+        } catch {
+            throw CypherAirError.from(error) { .corruptData(reason: $0) }
+        }
+
+        return SignatureVerification(
+            status: result.status,
+            signerFingerprint: result.signerFingerprint,
+            signerContact: result.signerFingerprint.flatMap {
+                contactService.contact(forFingerprint: $0)
+            }
+        )
+    }
+
+    // MARK: - Streaming File Verification
+
+    /// Verify a detached signature against a file using streaming I/O.
+    ///
+    /// - Parameters:
+    ///   - fileURL: URL of the data file.
+    ///   - signature: The detached signature data.
+    ///   - progress: Progress reporter for UI updates and cancellation.
+    /// - Returns: Verification result with signer info.
+    @concurrent
+    func verifyDetachedStreaming(
+        fileURL: URL,
+        signature: Data,
+        progress: FileProgressReporter?
+    ) async throws -> SignatureVerification {
+        let verificationKeys = allVerificationKeys()
+
+        let result: VerifyResult
+        do {
+            result = try engine.verifyDetachedFile(
+                dataPath: fileURL.path,
+                signature: signature,
+                verificationKeys: verificationKeys,
+                progress: progress
             )
         } catch {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
