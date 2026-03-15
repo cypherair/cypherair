@@ -171,6 +171,12 @@ struct HomeView: View {
             SelfTestView()
         case .about:
             AboutView()
+        case .appIcon:
+            #if canImport(UIKit)
+            AppIconPickerView()
+            #else
+            Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
+            #endif
         }
     }
 }
