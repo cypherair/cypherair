@@ -688,7 +688,8 @@
 				INFOPLIST_FILE = "CypherAir-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Cypher Air";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher ​Air uses ​Face ​ID to protect your private keys.";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = NO;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher Air uses FaceID to protect your secret keys.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Cypher Air";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = "";
@@ -880,7 +881,8 @@
 				INFOPLIST_FILE = "CypherAir-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Cypher Air";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher ​Air uses ​Face ​ID to protect your private keys.";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = NO;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher Air uses FaceID to protect your secret keys.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Cypher Air";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = "";
