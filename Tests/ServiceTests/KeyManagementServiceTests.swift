@@ -616,4 +616,58 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(freshService.keys.first?.fingerprint, second.fingerprint)
     }
 
+    // MARK: - Binary Format Key Import
+
+    func test_importKey_binaryFormat_profileA_fingerprintMatches() throws {
+        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Binary Import A")
+        let passphrase = "binary-test-pass-a"
+
+        // Export produces ASCII armor
+        let armoredData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        XCTAssertTrue(String(data: armoredData.prefix(5), encoding: .utf8)?.hasPrefix("-----") == true)
+
+        // Convert to binary OpenPGP format
+        let binaryData = try engine.dearmor(armored: armoredData)
+        XCTAssertNotEqual(binaryData.first, UInt8(ascii: "-"),
+                          "Dearmored data should not start with ASCII armor header")
+
+        // Delete the original
+        try service.deleteKey(fingerprint: identity.fingerprint)
+        XCTAssertTrue(service.keys.isEmpty)
+
+        // Import using binary format — this is the same path that views now use
+        let imported = try service.importKey(
+            armoredData: binaryData,
+            passphrase: passphrase,
+            authMode: .standard
+        )
+
+        XCTAssertEqual(imported.fingerprint, identity.fingerprint,
+                       "Binary import should produce same fingerprint as original")
+        XCTAssertEqual(imported.profile, .universal)
+        XCTAssertEqual(imported.keyVersion, 4)
+    }
+
+    func test_importKey_binaryFormat_profileB_fingerprintMatches() throws {
+        let identity = try TestHelpers.generateProfileBKey(service: service, name: "Binary Import B")
+        let passphrase = "binary-test-pass-b"
+
+        let armoredData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let binaryData = try engine.dearmor(armored: armoredData)
+
+        try service.deleteKey(fingerprint: identity.fingerprint)
+        XCTAssertTrue(service.keys.isEmpty)
+
+        let imported = try service.importKey(
+            armoredData: binaryData,
+            passphrase: passphrase,
+            authMode: .standard
+        )
+
+        XCTAssertEqual(imported.fingerprint, identity.fingerprint,
+                       "Binary import should produce same fingerprint as original")
+        XCTAssertEqual(imported.profile, .advanced)
+        XCTAssertEqual(imported.keyVersion, 6)
+    }
+
 }
