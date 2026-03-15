@@ -28,6 +28,7 @@ struct CypherAirApp: App {
     /// Pending public key import awaiting user confirmation (Issue #3).
     @State private var pendingImport: PendingImport?
     @State private var importError: CypherAirError?
+    @State private var loadError: String?
 
     /// Holds parsed key data and info for the import confirmation sheet.
     private struct PendingImport {
@@ -82,7 +83,12 @@ struct CypherAirApp: App {
         _selfTestService = State(initialValue: selfTest)
 
         // Load stored key identities from Keychain metadata (no SE auth needed).
-        try? keyMgmt.loadKeys()
+        do {
+            try keyMgmt.loadKeys()
+        } catch {
+            // Non-fatal: keys will appear empty. Store error for diagnostic display.
+            _loadError = State(initialValue: error.localizedDescription)
+        }
 
         // Crash recovery: check for interrupted auth mode switch.
         auth.checkAndRecoverFromInterruptedRewrap(fingerprints: keyMgmt.keys.map(\.fingerprint))
@@ -91,7 +97,13 @@ struct CypherAirApp: App {
         keyMgmt.checkAndRecoverFromInterruptedModifyExpiry()
 
         // Load contacts from disk.
-        try? contacts.loadContacts()
+        do {
+            try contacts.loadContacts()
+        } catch {
+            // Non-fatal: contacts will appear empty. Append to diagnostic info.
+            let existing = _loadError.wrappedValue ?? ""
+            _loadError = State(initialValue: existing.isEmpty ? error.localizedDescription : "\(existing)\n\(error.localizedDescription)")
+        }
 
         // Clean up any leftover decrypted files from tmp/.
         cleanupTempDecryptedFiles()
@@ -160,6 +172,21 @@ struct CypherAirApp: App {
                 } message: {
                     if let importError {
                         Text(importError.localizedDescription)
+                    }
+                }
+                .alert(
+                    String(localized: "app.loadError.title", defaultValue: "Load Warning"),
+                    isPresented: Binding(
+                        get: { loadError != nil },
+                        set: { if !$0 { loadError = nil } }
+                    )
+                ) {
+                    Button(String(localized: "error.ok", defaultValue: "OK")) {
+                        loadError = nil
+                    }
+                } message: {
+                    if let loadError {
+                        Text(loadError)
                     }
                 }
                 .onOpenURL { url in

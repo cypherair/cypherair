@@ -88,29 +88,33 @@ struct SignView: View {
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
 
-                    HStack {
-                        Button {
-                            UIPasteboard.general.string = signedMessage
-                            if config.clipboardNotice {
-                                showClipboardNotice = true
+                    GlassEffectContainer(spacing: 8) {
+                        HStack {
+                            Button {
+                                UIPasteboard.general.string = signedMessage
+                                if config.clipboardNotice {
+                                    showClipboardNotice = true
+                                }
+                            } label: {
+                                Label(
+                                    String(localized: "common.copy", defaultValue: "Copy"),
+                                    systemImage: "doc.on.doc"
+                                )
                             }
-                        } label: {
-                            Label(
-                                String(localized: "common.copy", defaultValue: "Copy"),
-                                systemImage: "doc.on.doc"
-                            )
-                        }
+                            .glassEffect()
 
-                        Spacer()
+                            Spacer()
 
-                        ShareLink(
-                            item: signedMessage,
-                            preview: SharePreview(String(localized: "sign.share.preview", defaultValue: "Signed Message"))
-                        ) {
-                            Label(
-                                String(localized: "common.share", defaultValue: "Share"),
-                                systemImage: "square.and.arrow.up"
-                            )
+                            ShareLink(
+                                item: signedMessage,
+                                preview: SharePreview(String(localized: "sign.share.preview", defaultValue: "Signed Message"))
+                            ) {
+                                Label(
+                                    String(localized: "common.share", defaultValue: "Share"),
+                                    systemImage: "square.and.arrow.up"
+                                )
+                            }
+                            .glassEffect()
                         }
                     }
                 } header: {
@@ -241,7 +245,7 @@ struct SignView: View {
         Task {
             do {
                 guard fileURL.startAccessingSecurityScopedResource() else {
-                    throw CypherAirError.internalError(reason: "Cannot access selected file")
+                    throw CypherAirError.internalError(reason: String(localized: "sign.cannotAccessFile", defaultValue: "Cannot access selected file"))
                 }
                 defer { fileURL.stopAccessingSecurityScopedResource() }
                 let fileData = try Data(contentsOf: fileURL)

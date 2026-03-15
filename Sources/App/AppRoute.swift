@@ -16,18 +16,13 @@ enum AppRoute: Hashable {
 
     // Encrypt / Decrypt
     case encrypt
-    case encryptResult(ciphertext: Data)
     case decrypt
-    case decryptResult
 
     // Sign / Verify
     case sign
     case verify
 
     // Settings
-    case settings
-    case authModeSetting
-    case gracePeriodSetting
     case selfTest
     case about
 }

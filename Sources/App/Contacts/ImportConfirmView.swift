@@ -43,7 +43,7 @@ struct ImportConfirmView: View {
                 }
 
                 Section {
-                    let formatted = formatFingerprint(keyInfo.fingerprint)
+                    let formatted = PGPKeyIdentity.formatFingerprint(keyInfo.fingerprint)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(String(localized: "import.fingerprint", defaultValue: "Fingerprint"))
                             .font(.caption)
@@ -84,11 +84,4 @@ struct ImportConfirmView: View {
         }
     }
 
-    private func formatFingerprint(_ hex: String) -> String {
-        stride(from: 0, to: hex.count, by: 4).map { offset in
-            let start = hex.index(hex.startIndex, offsetBy: offset)
-            let end = hex.index(start, offsetBy: min(4, hex.count - offset))
-            return String(hex[start..<end])
-        }.joined(separator: " ")
-    }
 }

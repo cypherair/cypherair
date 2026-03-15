@@ -73,6 +73,7 @@ struct SelfTestView: View {
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         }
+                        .accessibilityElement(children: .combine)
                     }
                 }
 

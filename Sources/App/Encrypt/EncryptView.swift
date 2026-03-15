@@ -29,6 +29,7 @@ struct EncryptView: View {
     @State private var error: CypherAirError?
     @State private var showError = false
     @State private var showClipboardNotice = false
+    @State private var encryptToSelf: Bool?
 
     // File mode state
     @State private var showFileImporter = false
@@ -82,6 +83,14 @@ struct EncryptView: View {
             }
 
             Section {
+                Toggle(
+                    String(localized: "encrypt.encryptToSelf", defaultValue: "Encrypt to Self"),
+                    isOn: Binding(
+                        get: { encryptToSelf ?? config.encryptToSelf },
+                        set: { encryptToSelf = $0 }
+                    )
+                )
+
                 Toggle(
                     String(localized: "encrypt.sign", defaultValue: "Sign Message"),
                     isOn: $signMessage
@@ -139,29 +148,33 @@ struct EncryptView: View {
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
 
-                    HStack {
-                        Button {
-                            UIPasteboard.general.string = ciphertextString
-                            if config.clipboardNotice {
-                                showClipboardNotice = true
+                    GlassEffectContainer(spacing: 8) {
+                        HStack {
+                            Button {
+                                UIPasteboard.general.string = ciphertextString
+                                if config.clipboardNotice {
+                                    showClipboardNotice = true
+                                }
+                            } label: {
+                                Label(
+                                    String(localized: "common.copy", defaultValue: "Copy"),
+                                    systemImage: "doc.on.doc"
+                                )
                             }
-                        } label: {
-                            Label(
-                                String(localized: "common.copy", defaultValue: "Copy"),
-                                systemImage: "doc.on.doc"
-                            )
-                        }
+                            .glassEffect()
 
-                        Spacer()
+                            Spacer()
 
-                        ShareLink(
-                            item: ciphertextString,
-                            preview: SharePreview(String(localized: "encrypt.share.preview", defaultValue: "Encrypted Message"))
-                        ) {
-                            Label(
-                                String(localized: "common.share", defaultValue: "Share"),
-                                systemImage: "square.and.arrow.up"
-                            )
+                            ShareLink(
+                                item: ciphertextString,
+                                preview: SharePreview(String(localized: "encrypt.share.preview", defaultValue: "Encrypted Message"))
+                            ) {
+                                Label(
+                                    String(localized: "common.share", defaultValue: "Share"),
+                                    systemImage: "square.and.arrow.up"
+                                )
+                            }
+                            .glassEffect()
                         }
                     }
                 } header: {
@@ -292,7 +305,7 @@ struct EncryptView: View {
         let text = plaintext
         let recipients = Array(selectedRecipients)
         let signerFp = signMessage ? signerFingerprint : nil
-        let selfEncrypt = config.encryptToSelf
+        let selfEncrypt = encryptToSelf ?? config.encryptToSelf
         Task {
             do {
                 let result = try await service.encryptText(
@@ -315,7 +328,7 @@ struct EncryptView: View {
         let service = encryptionService
         let recipients = Array(selectedRecipients)
         let signerFp = signMessage ? signerFingerprint : nil
-        let selfEncrypt = config.encryptToSelf
+        let selfEncrypt = encryptToSelf ?? config.encryptToSelf
 
         isEncrypting = true
         currentTask = Task {
@@ -333,7 +346,7 @@ struct EncryptView: View {
             }
             do {
                 guard fileURL.startAccessingSecurityScopedResource() else {
-                    error = .corruptData(reason: "Cannot access file")
+                    error = .corruptData(reason: String(localized: "fileEncrypt.cannotAccess", defaultValue: "Cannot access file"))
                     showError = true
                     return
                 }
