@@ -14,7 +14,7 @@ Validate Sequoia PGP 2.2.0 + crypto-openssl + UniFFI + Secure Enclave + dual Pro
 
 | Item | Requirement |
 |------|-------------|
-| Device | All models of iPhone 17 or iPhone Air (A19/A19 Pro, MIE) with iOS 26+, 8 GB+ RAM |
+| Device | All models of iPhone 17 or iPhone Air (A19/A19 Pro, MIE) with iOS 26.2+, 8 GB+ RAM |
 | Mac | Apple Silicon, Xcode latest stable |
 | Rust | Stable latest + aarch64-apple-ios, aarch64-apple-ios-sim |
 | Sequoia | sequoia-openpgp 2.2.0 |
