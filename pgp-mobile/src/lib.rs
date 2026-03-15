@@ -10,12 +10,16 @@ pub mod encrypt;
 pub mod error;
 pub mod keys;
 pub mod sign;
+pub mod streaming;
 pub mod verify;
+
+use std::sync::Arc;
 
 use crate::armor::ArmorKind;
 use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
 use crate::keys::{GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult, S2kInfo};
+use crate::streaming::FileDecryptResult;
 use crate::verify::VerifyResult;
 
 uniffi::setup_scaffolding!();
@@ -259,6 +263,81 @@ impl PgpEngine {
     /// Armor a public key certificate.
     pub fn armor_public_key(&self, cert_data: Vec<u8>) -> Result<Vec<u8>, PgpError> {
         armor::armor_public_key(&cert_data)
+    }
+
+    // ── Streaming File Operations ──────────────────────────────────────
+
+    /// Encrypt a file using streaming I/O. Constant memory usage.
+    /// Output is binary (.gpg format). Message format auto-selected by recipient key versions.
+    pub fn encrypt_file(
+        &self,
+        input_path: String,
+        output_path: String,
+        recipients: Vec<Vec<u8>>,
+        signing_key: Option<Vec<u8>>,
+        encrypt_to_self: Option<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+    ) -> Result<(), PgpError> {
+        streaming::encrypt_file(
+            &input_path,
+            &output_path,
+            &recipients,
+            signing_key.as_deref(),
+            encrypt_to_self.as_deref(),
+            progress,
+        )
+    }
+
+    /// Decrypt a file using streaming I/O. Phase 2 — requires authenticated key access.
+    /// Handles both SEIPDv1 and SEIPDv2. AEAD/MDC failure → hard-fail (no partial output).
+    pub fn decrypt_file(
+        &self,
+        input_path: String,
+        output_path: String,
+        secret_keys: Vec<Vec<u8>>,
+        verification_keys: Vec<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+    ) -> Result<FileDecryptResult, PgpError> {
+        streaming::decrypt_file(
+            &input_path,
+            &output_path,
+            &secret_keys,
+            &verification_keys,
+            progress,
+        )
+    }
+
+    /// Create a detached signature for a file using streaming I/O.
+    /// Returns the ASCII-armored signature.
+    pub fn sign_detached_file(
+        &self,
+        input_path: String,
+        signer_cert: Vec<u8>,
+        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+    ) -> Result<Vec<u8>, PgpError> {
+        streaming::sign_detached_file(&input_path, &signer_cert, progress)
+    }
+
+    /// Verify a detached signature against a file using streaming I/O.
+    pub fn verify_detached_file(
+        &self,
+        data_path: String,
+        signature: Vec<u8>,
+        verification_keys: Vec<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+    ) -> Result<VerifyResult, PgpError> {
+        streaming::verify_detached_file(&data_path, &signature, &verification_keys, progress)
+    }
+
+    /// Match PKESK recipients from an encrypted file against local certificates (Phase 1).
+    /// Reads only PKESK headers — does not load the full file into memory.
+    /// Handles both binary and ASCII-armored input.
+    pub fn match_recipients_from_file(
+        &self,
+        input_path: String,
+        local_certs: Vec<Vec<u8>>,
+    ) -> Result<Vec<String>, PgpError> {
+        streaming::match_recipients_from_file(&input_path, &local_certs)
     }
 
     // ── QR / URL Scheme ─────────────────────────────────────────────
