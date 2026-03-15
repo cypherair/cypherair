@@ -401,6 +401,8 @@ final class AuthenticationManager: AuthenticationEvaluable {
             targetMode = currentMode
         }
 
+        var anyPromotionOccurred = false
+
         for fingerprint in fingerprints {
             let oldExists = keychain.exists(
                 service: KeychainConstants.seKeyService(fingerprint: fingerprint),
@@ -437,6 +439,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     // generated with the correct biometric flags in Phase A).
                     do {
                         try promoteFromPending(fingerprint: fingerprint, seKeyAccessControl: nil)
+                        anyPromotionOccurred = true
                     } catch {
                         // If promotion fails, the pending items remain in Keychain
                         // for manual recovery. The user will need to restore from backup.
@@ -451,11 +454,13 @@ final class AuthenticationManager: AuthenticationEvaluable {
             // The user must restore from backup. Clear the flag below.
         }
 
-        // If Case 2 promotion succeeded, persist the target mode as the current mode.
-        // This is safe even if some keys failed promotion — the mode matches the
-        // access control flags on the keys that were successfully promoted.
-        // If no promotion happened (Case 1 or Case 3), this is harmless.
-        defaults.set(targetMode.rawValue, forKey: AuthPreferences.authModeKey)
+        // Only persist targetMode if Case 2 promotion actually occurred.
+        // In Case 1, old keys are intact with the ORIGINAL mode's access control
+        // flags — changing the persisted mode would create a mismatch between the
+        // UI and the actual SE key ACLs. In Case 3, keys are lost entirely.
+        if anyPromotionOccurred {
+            defaults.set(targetMode.rawValue, forKey: AuthPreferences.authModeKey)
+        }
 
         // Always clear the flags after recovery attempt.
         defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)

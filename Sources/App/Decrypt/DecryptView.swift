@@ -389,7 +389,6 @@ struct DecryptView: View {
                     UIApplication.shared.endBackgroundTask(bgTaskID)
                 }
                 #endif
-                selectedFileURL?.stopAccessingSecurityScopedResource()
                 fileProgress = nil
                 isDecrypting = false
                 currentTask = nil
@@ -401,6 +400,7 @@ struct DecryptView: View {
                     showError = true
                     return
                 }
+                defer { selectedFileURL?.stopAccessingSecurityScopedResource() }
 
                 let result = try await service.decryptFileStreaming(
                     phase1: phase1,
