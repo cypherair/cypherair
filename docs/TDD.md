@@ -319,7 +319,7 @@ Keychain: SE key + salt + sealed-key per identity (both profiles)
 
 ## 7. UI Framework
 
-SwiftUI (iOS 26+). UIKit: UIActivityViewController, UIDocumentPickerViewController, PHPickerViewController, beginBackgroundTask.
+SwiftUI (iOS 26.2+). UIKit: UIActivityViewController, UIDocumentPickerViewController, PHPickerViewController, beginBackgroundTask.
 
 ---
 
