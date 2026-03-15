@@ -7,7 +7,7 @@
 
 Liquid Glass is Apple's iOS 26 design language. It is a translucent, refracting material that replaces the blur-based materials used since iOS 7. Glass belongs exclusively on the **navigation and controls layer** — floating above content, never applied to content itself.
 
-**Cypher Air targets iOS 26+ exclusively.** There is no need for backward compatibility with older design languages. Do not use `UIDesignRequiresCompatibility`. Fully embrace Liquid Glass.
+**Cypher Air targets iOS 26.2+ exclusively.** There is no need for backward compatibility with older design languages. Do not use `UIDesignRequiresCompatibility`. Fully embrace Liquid Glass.
 
 ## 2. Automatic Adoption
 
