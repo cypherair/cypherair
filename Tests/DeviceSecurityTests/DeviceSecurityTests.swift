@@ -674,8 +674,10 @@ final class DeviceSecurityTests: XCTestCase {
         try keychain.save(Data("pending-salt".utf8), service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
         try keychain.save(Data("pending-sealed".utf8), service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
 
-        // Set the crash recovery flag.
+        // Set the crash recovery flag and simulate switching from standard → highSecurity.
         UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
+        UserDefaults.standard.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
+        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
 
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
@@ -698,6 +700,13 @@ final class DeviceSecurityTests: XCTestCase {
             keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account),
             "Pending items must be cleaned up"
         )
+
+        // Verify: auth mode remains standard (old keys have standard ACLs).
+        XCTAssertEqual(
+            authManager.currentMode,
+            .standard,
+            "Case 1 recovery must NOT change auth mode — old keys retain original ACLs"
+        )
     }
 
     func test_crashRecovery_onlyPendingExist_promotesToPermanent() throws {
@@ -712,7 +721,10 @@ final class DeviceSecurityTests: XCTestCase {
         try keychain.save(pendingSalt, service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
         try keychain.save(pendingSealed, service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
 
+        // Simulate switching from standard → highSecurity.
         UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
+        UserDefaults.standard.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
+        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
 
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
@@ -735,6 +747,13 @@ final class DeviceSecurityTests: XCTestCase {
 
         // Verify: pending items removed.
         XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
+
+        // Verify: auth mode updated to highSecurity (promoted keys have new ACLs).
+        XCTAssertEqual(
+            authManager.currentMode,
+            .highSecurity,
+            "Case 2 recovery must update auth mode to target — promoted keys have new ACLs"
+        )
     }
 
     func test_crashRecovery_noFlag_doesNothing() throws {

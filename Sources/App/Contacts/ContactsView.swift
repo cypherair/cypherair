@@ -4,6 +4,9 @@ import SwiftUI
 struct ContactsView: View {
     @Environment(ContactService.self) private var contactService
 
+    @State private var deleteError: String?
+    @State private var showDeleteError = false
+
     var body: some View {
         List {
             if contactService.contacts.isEmpty {
@@ -29,7 +32,12 @@ struct ContactsView: View {
                 .onDelete { indexSet in
                     for index in indexSet {
                         let contact = contactService.contacts[index]
-                        try? contactService.removeContact(fingerprint: contact.fingerprint)
+                        do {
+                            try contactService.removeContact(fingerprint: contact.fingerprint)
+                        } catch {
+                            deleteError = error.localizedDescription
+                            showDeleteError = true
+                        }
                     }
                 }
             }
@@ -54,6 +62,16 @@ struct ContactsView: View {
         }
         .task {
             try? contactService.loadContacts()
+        }
+        .alert(
+            String(localized: "error.title", defaultValue: "Error"),
+            isPresented: $showDeleteError
+        ) {
+            Button(String(localized: "error.ok", defaultValue: "OK")) {}
+        } message: {
+            if let deleteError {
+                Text(deleteError)
+            }
         }
     }
 }

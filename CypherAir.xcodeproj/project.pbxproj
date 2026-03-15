@@ -744,6 +744,8 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.application;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.cypherair.cypherair;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.cypherair.cypherair;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -962,6 +964,8 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.application;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.cypherair.cypherair;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.cypherair.cypherair;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
