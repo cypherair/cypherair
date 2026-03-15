@@ -21,6 +21,17 @@ final class DecryptionService {
         let ciphertext: Data
     }
 
+    /// Result of Phase 1 analysis for file-based decryption.
+    /// Unlike Phase1Result, this stores the file path instead of ciphertext Data.
+    struct FilePhase1Result {
+        /// Recipient key IDs found in the ciphertext header.
+        let recipientKeyIds: [String]
+        /// Matched local key identity, if any.
+        let matchedKey: PGPKeyIdentity?
+        /// Path to the encrypted input file (passed through for Phase 2).
+        let inputPath: String
+    }
+
     private let engine: PgpEngine
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
@@ -87,6 +98,47 @@ final class DecryptionService {
         )
     }
 
+    // MARK: - Phase 1: Parse Recipients from File (No Authentication)
+
+    /// Parse recipient headers from an encrypted file WITHOUT loading it into memory.
+    /// This phase does NOT require authentication — no private key is accessed.
+    ///
+    /// Uses `matchRecipientsFromFile` which reads only PKESK headers from the file,
+    /// keeping memory usage constant regardless of file size.
+    ///
+    /// - Parameter fileURL: URL of the encrypted file.
+    /// - Returns: FilePhase1Result with matched key info.
+    /// - Throws: CypherAirError.noMatchingKey if no local key matches.
+    @concurrent
+    func parseRecipientsFromFile(fileURL: URL) async throws -> FilePhase1Result {
+        let inputPath = fileURL.path
+        let localCerts = keyManagement.keys.map { $0.publicKeyData }
+
+        let matchedFingerprints: [String]
+        do {
+            matchedFingerprints = try engine.matchRecipientsFromFile(
+                inputPath: inputPath,
+                localCerts: localCerts
+            )
+        } catch {
+            throw CypherAirError.noMatchingKey
+        }
+
+        let matchedKey = keyManagement.keys.first { identity in
+            matchedFingerprints.contains(identity.fingerprint)
+        }
+
+        guard matchedKey != nil else {
+            throw CypherAirError.noMatchingKey
+        }
+
+        return FilePhase1Result(
+            recipientKeyIds: matchedFingerprints,
+            matchedKey: matchedKey,
+            inputPath: inputPath
+        )
+    }
+
     // MARK: - Phase 2: Decrypt (Authentication Required)
 
     /// Decrypt a message using the matched key from Phase 1.
@@ -145,6 +197,86 @@ final class DecryptionService {
         )
 
         return (plaintext: result.plaintext, signature: sigVerification)
+    }
+
+    // MARK: - Phase 2: Streaming File Decrypt (Authentication Required)
+
+    /// Decrypt a file using streaming I/O (constant memory).
+    /// This phase triggers device authentication (Face ID / Touch ID) via SE unwrap.
+    ///
+    /// SECURITY: This method must only be called after Phase 1 has identified the key.
+    /// The private key exists in memory only during the decrypt call and is zeroized immediately after.
+    ///
+    /// - Parameters:
+    ///   - phase1: The result from parseRecipientsFromFile().
+    ///   - progress: Progress reporter for UI updates and cancellation.
+    /// - Returns: URL of the decrypted output file and signature verification result.
+    @concurrent
+    func decryptFileStreaming(
+        phase1: FilePhase1Result,
+        progress: FileProgressReporter?
+    ) async throws -> (outputURL: URL, signature: SignatureVerification) {
+        guard let matchedKey = phase1.matchedKey else {
+            throw CypherAirError.noMatchingKey
+        }
+
+        // SE unwrap triggers Face ID / Touch ID
+        var secretKey: Data
+        do {
+            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
+        } catch {
+            throw CypherAirError.from(error) { _ in .authenticationFailed }
+        }
+        defer {
+            secretKey.resetBytes(in: 0..<secretKey.count)
+        }
+
+        // Gather verification keys (all contacts + own public keys)
+        let verificationKeys = contactService.contacts.map { $0.publicKeyData }
+            + keyManagement.keys.map { $0.publicKeyData }
+
+        // Prepare output path in tmp/decrypted/
+        let decryptedDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("decrypted", isDirectory: true)
+        try FileManager.default.createDirectory(at: decryptedDir, withIntermediateDirectories: true)
+
+        // Strip .gpg/.pgp/.asc extension for output filename
+        let inputFilename = (phase1.inputPath as NSString).lastPathComponent
+        let outputFilename: String
+        let ext = (inputFilename as NSString).pathExtension.lowercased()
+        if ["gpg", "pgp", "asc"].contains(ext) {
+            outputFilename = (inputFilename as NSString).deletingPathExtension
+        } else {
+            outputFilename = inputFilename + ".decrypted"
+        }
+        let outputURL = decryptedDir.appendingPathComponent(outputFilename)
+
+        // Decrypt via Rust engine (streaming)
+        let fileResult: FileDecryptResult
+        do {
+            fileResult = try engine.decryptFile(
+                inputPath: phase1.inputPath,
+                outputPath: outputURL.path,
+                secretKeys: [secretKey],
+                verificationKeys: verificationKeys,
+                progress: progress
+            )
+        } catch {
+            // Clean up partial output on failure
+            try? FileManager.default.removeItem(at: outputURL)
+            throw CypherAirError.from(error) { .corruptData(reason: $0) }
+        }
+
+        // Build signature verification result
+        let sigVerification = SignatureVerification(
+            status: fileResult.signatureStatus ?? .notSigned,
+            signerFingerprint: fileResult.signerFingerprint,
+            signerContact: fileResult.signerFingerprint.flatMap {
+                contactService.contact(forFingerprint: $0)
+            }
+        )
+
+        return (outputURL: outputURL, signature: sigVerification)
     }
 
     // MARK: - Convenience: Full Decrypt
