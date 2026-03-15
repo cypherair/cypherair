@@ -13,7 +13,7 @@ import Foundation
 /// // Automatically zeroed when `sensitive` goes out of scope.
 /// // Or call sensitive.zeroize() explicitly for immediate clearing.
 /// ```
-final class SensitiveData {
+nonisolated final class SensitiveData {
     private var storage: Data
 
     /// The underlying data. Read-only access.
