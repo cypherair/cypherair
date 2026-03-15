@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD)
 
 > **Version:** v3.9  
-> **Platform:** iOS 26+ / iPadOS 26+  
+> **Platform:** iOS 26.2+ / iPadOS 26.2+
 > **License:** GPLv3  
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
 
@@ -20,7 +20,7 @@ A fully offline OpenPGP encryption tool that enables everyday users to communica
 
 ### 1.3 Supported Platforms
 
-iOS 26+ / iPadOS 26+ (same codebase). Minimum device: 8 GB RAM.
+iOS 26.2+ / iPadOS 26.2+ (same codebase). Minimum device: 8 GB RAM.
 
 ### 1.4 Explicit Exclusions
 
