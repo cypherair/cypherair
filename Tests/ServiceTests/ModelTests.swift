@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import CypherAir
 
 /// Tests for model types: CypherAirError, Contact, PGPKeyIdentity,
@@ -208,6 +209,44 @@ final class ModelTests: XCTestCase {
             status: .notSigned, signerFingerprint: nil, signerContact: nil
         )
         XCTAssertFalse(verification.isWarning)
+    }
+
+    // MARK: - SignatureVerification: statusColor
+
+    func test_signatureVerification_statusColor_validIsGreen() {
+        let verification = SignatureVerification(
+            status: .valid, signerFingerprint: nil, signerContact: nil
+        )
+        XCTAssertEqual(verification.statusColor, .green)
+    }
+
+    func test_signatureVerification_statusColor_badIsRed() {
+        let verification = SignatureVerification(
+            status: .bad, signerFingerprint: nil, signerContact: nil
+        )
+        XCTAssertEqual(verification.statusColor, .red)
+    }
+
+    func test_signatureVerification_statusColor_notSignedIsSecondary() {
+        let verification = SignatureVerification(
+            status: .notSigned, signerFingerprint: nil, signerContact: nil
+        )
+        XCTAssertEqual(verification.statusColor, .secondary)
+    }
+
+    // MARK: - AppConfiguration: Grace Period Validation
+
+    func test_appConfiguration_gracePeriod_validValuePersists() {
+        let config = AppConfiguration()
+        config.gracePeriod = 60
+        XCTAssertEqual(config.gracePeriod, 60)
+    }
+
+    func test_appConfiguration_gracePeriod_invalidValueClampsToDefault() {
+        let config = AppConfiguration()
+        config.gracePeriod = 42  // Not a valid option
+        XCTAssertEqual(config.gracePeriod, 180,
+                       "Invalid gracePeriod should be clamped to the default (180)")
     }
 
     // MARK: - Contact: Formatted Fingerprint
