@@ -62,6 +62,7 @@ struct ImportKeyView: View {
                 .disabled(armoredText.isEmpty || passphrase.isEmpty || isImporting)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(String(localized: "import.title", defaultValue: "Import Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

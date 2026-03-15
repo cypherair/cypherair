@@ -1,5 +1,10 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 import UniformTypeIdentifiers
 
 /// Unified text and file encryption view with segmented mode picker.
@@ -30,6 +35,7 @@ struct EncryptView: View {
     @State private var showError = false
     @State private var showClipboardNotice = false
     @State private var encryptToSelf: Bool?
+    @State private var encryptToSelfFingerprint: String?
 
     // File mode state
     @State private var showFileImporter = false
@@ -91,6 +97,18 @@ struct EncryptView: View {
                     )
                 )
 
+                if (encryptToSelf ?? config.encryptToSelf) && keyManagement.keys.count > 1 {
+                    Picker(
+                        String(localized: "encrypt.encryptToSelfKey", defaultValue: "Encrypt to Self With"),
+                        selection: $encryptToSelfFingerprint
+                    ) {
+                        ForEach(keyManagement.keys) { key in
+                            Text(key.userId ?? key.shortKeyId)
+                                .tag(Optional(key.fingerprint))
+                        }
+                    }
+                }
+
                 Toggle(
                     String(localized: "encrypt.sign", defaultValue: "Sign Message"),
                     isOn: $signMessage
@@ -151,7 +169,12 @@ struct EncryptView: View {
                     GlassEffectContainer(spacing: 8) {
                         HStack {
                             Button {
+                                #if canImport(UIKit)
                                 UIPasteboard.general.string = ciphertextString
+                                #elseif canImport(AppKit)
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(ciphertextString, forType: .string)
+                                #endif
                                 if config.clipboardNotice {
                                     showClipboardNotice = true
                                 }
@@ -195,6 +218,7 @@ struct EncryptView: View {
                 }
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(String(localized: "encrypt.title", defaultValue: "Encrypt"))
         .fileImporter(
             isPresented: $showFileImporter,
@@ -228,6 +252,7 @@ struct EncryptView: View {
         }
         .onAppear {
             signerFingerprint = keyManagement.defaultKey?.fingerprint
+            encryptToSelfFingerprint = keyManagement.defaultKey?.fingerprint
         }
     }
 
@@ -306,13 +331,15 @@ struct EncryptView: View {
         let recipients = Array(selectedRecipients)
         let signerFp = signMessage ? signerFingerprint : nil
         let selfEncrypt = encryptToSelf ?? config.encryptToSelf
+        let selfEncryptFp = selfEncrypt ? encryptToSelfFingerprint : nil
         Task {
             do {
                 let result = try await service.encryptText(
                     text,
                     recipientFingerprints: recipients,
                     signWithFingerprint: signerFp,
-                    encryptToSelf: selfEncrypt
+                    encryptToSelf: selfEncrypt,
+                    encryptToSelfFingerprint: selfEncryptFp
                 )
                 ciphertext = result
             } catch {
@@ -329,18 +356,23 @@ struct EncryptView: View {
         let recipients = Array(selectedRecipients)
         let signerFp = signMessage ? signerFingerprint : nil
         let selfEncrypt = encryptToSelf ?? config.encryptToSelf
+        let selfEncryptFp = selfEncrypt ? encryptToSelfFingerprint : nil
 
         isEncrypting = true
         currentTask = Task {
+            #if canImport(UIKit)
             var bgTaskID = UIBackgroundTaskIdentifier.invalid
             bgTaskID = UIApplication.shared.beginBackgroundTask {
                 UIApplication.shared.endBackgroundTask(bgTaskID)
                 bgTaskID = .invalid
             }
+            #endif
             defer {
+                #if canImport(UIKit)
                 if bgTaskID != .invalid {
                     UIApplication.shared.endBackgroundTask(bgTaskID)
                 }
+                #endif
                 isEncrypting = false
                 currentTask = nil
             }
@@ -358,7 +390,8 @@ struct EncryptView: View {
                     fileData,
                     recipientFingerprints: recipients,
                     signWithFingerprint: signerFp,
-                    encryptToSelf: selfEncrypt
+                    encryptToSelf: selfEncrypt,
+                    encryptToSelfFingerprint: selfEncryptFp
                 )
                 try Task.checkCancellation()
                 encryptedFileData = result

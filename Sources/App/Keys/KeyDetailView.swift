@@ -1,5 +1,10 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 
 /// Detailed view of a single key identity.
 struct KeyDetailView: View {
@@ -123,7 +128,12 @@ struct KeyDetailView: View {
                         Button {
                             if let armoredPublicKey,
                                let armoredString = String(data: armoredPublicKey, encoding: .utf8) {
+                                #if canImport(UIKit)
                                 UIPasteboard.general.string = armoredString
+                                #elseif canImport(AppKit)
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(armoredString, forType: .string)
+                                #endif
                                 showCopiedNotice = true
                             }
                         } label: {
