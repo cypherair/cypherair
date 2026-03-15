@@ -10,6 +10,10 @@ struct AboutView: View {
                     value: "Cypher Air"
                 )
                 LabeledContent(
+                    String(localized: "about.version", defaultValue: "Version"),
+                    value: appVersion
+                )
+                LabeledContent(
                     String(localized: "about.license", defaultValue: "License"),
                     value: "GPLv3"
                 )
@@ -49,5 +53,12 @@ struct AboutView: View {
             }
         }
         .navigationTitle(String(localized: "about.title", defaultValue: "About"))
+    }
+
+    /// Version string from Info.plist (e.g. "1.0.0 (1)").
+    private var appVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+        return "\(version) (\(build))"
     }
 }
