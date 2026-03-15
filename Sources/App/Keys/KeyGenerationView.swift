@@ -105,7 +105,8 @@ struct KeyGenerationView: View {
         isGenerating = true
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
-        let expirySeconds = UInt64(expiryMonths) * 30 * 24 * 3600
+        let expiryDate = Calendar.current.date(byAdding: .month, value: expiryMonths, to: Date()) ?? Date()
+        let expirySeconds = UInt64(max(0, expiryDate.timeIntervalSinceNow))
 
         Task {
             do {

@@ -85,6 +85,7 @@ struct VerifyView: View {
                         Text(verification.statusDescription)
                             .font(.subheadline)
                     }
+                    .accessibilityElement(children: .combine)
                 } header: {
                     Text(String(localized: "verify.result", defaultValue: "Verification Result"))
                 }
@@ -214,12 +215,12 @@ struct VerifyView: View {
         Task {
             do {
                 guard origURL.startAccessingSecurityScopedResource() else {
-                    throw CypherAirError.internalError(reason: "Cannot access original file")
+                    throw CypherAirError.internalError(reason: String(localized: "verify.cannotAccessOriginal", defaultValue: "Cannot access original file"))
                 }
                 defer { origURL.stopAccessingSecurityScopedResource() }
 
                 guard sigURL.startAccessingSecurityScopedResource() else {
-                    throw CypherAirError.internalError(reason: "Cannot access signature file")
+                    throw CypherAirError.internalError(reason: String(localized: "verify.cannotAccessSignature", defaultValue: "Cannot access signature file"))
                 }
                 defer { sigURL.stopAccessingSecurityScopedResource() }
 

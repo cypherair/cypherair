@@ -19,10 +19,26 @@ struct PrivacyScreenModifier: ViewModifier {
         content
             .overlay {
                 if isBlurred {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
+                    ZStack {
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                            .ignoresSafeArea()
+
+                        if !isAuthenticating {
+                            Button {
+                                handleResume()
+                            } label: {
+                                Label(
+                                    String(localized: "privacy.tapToAuth", defaultValue: "Tap to Authenticate"),
+                                    systemImage: "faceid"
+                                )
+                                .font(.headline)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .accessibilityLabel(String(localized: "privacy.tapToAuth.a11y", defaultValue: "Authenticate to unlock the app"))
+                        }
+                    }
+                    .transition(.opacity)
                 }
             }
             .animation(.easeInOut(duration: 0.15), value: isBlurred)

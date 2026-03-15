@@ -30,8 +30,9 @@ struct OnboardingPageOne: View {
             Spacer()
 
             Image(systemName: "wifi.slash")
-                .font(.system(size: 72))
+                .font(.system(size: 72, weight: .light))
                 .foregroundStyle(.blue)
+                .accessibilityHidden(true)
 
             Text(String(localized: "onboarding.p1.title", defaultValue: "Completely Offline"))
                 .font(.title.bold())
@@ -55,8 +56,9 @@ struct OnboardingPageTwo: View {
             Spacer()
 
             Image(systemName: "lock.shield")
-                .font(.system(size: 72))
+                .font(.system(size: 72, weight: .light))
                 .foregroundStyle(.green)
+                .accessibilityHidden(true)
 
             Text(String(localized: "onboarding.p2.title", defaultValue: "OpenPGP Standard"))
                 .font(.title.bold())
@@ -83,8 +85,9 @@ struct OnboardingPageThree: View {
             Spacer()
 
             Image(systemName: "key.fill")
-                .font(.system(size: 72))
+                .font(.system(size: 72, weight: .light))
                 .foregroundStyle(.orange)
+                .accessibilityHidden(true)
 
             Text(String(localized: "onboarding.p3.title", defaultValue: "Generate Your Key"))
                 .font(.title.bold())

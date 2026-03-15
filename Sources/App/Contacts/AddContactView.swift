@@ -230,18 +230,13 @@ struct AddContactView: View {
                 }
 
                 let publicKeyData = try service.parseImportURL(url)
-                // Add contact directly with binary data
-                let contactResult = try contactService.addContact(publicKeyData: publicKeyData)
-                switch contactResult {
-                case .added, .duplicate:
-                    dismiss()
-                case .keyUpdateDetected(let newContact, let existingContact, let keyData):
-                    pendingKeyUpdate = PendingKeyUpdate(
-                        newContact: newContact,
-                        existingContact: existingContact,
-                        keyData: keyData
-                    )
-                    showKeyUpdateAlert = true
+                // Populate armoredText so the user must confirm via the "Add Contact" button
+                // rather than bypassing the confirmation flow (PRD Section 4.2).
+                if let armoredString = String(data: publicKeyData, encoding: .utf8) {
+                    armoredText = armoredString
+                } else {
+                    // Binary key data — encode as ASCII for the text field
+                    armoredText = String(data: publicKeyData, encoding: .ascii) ?? ""
                 }
             } catch {
                 self.error = CypherAirError.from(error) { _ in .invalidQRCode }
