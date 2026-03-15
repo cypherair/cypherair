@@ -147,18 +147,22 @@ final class SelfTestService {
                 let midpoint = ciphertext.count / 2
                 ciphertext[midpoint] ^= 0x01
 
+                let decryptSucceeded: Bool
                 do {
                     _ = try engine.decrypt(
                         ciphertext: ciphertext,
                         secretKeys: [generated.certData],
                         verificationKeys: []
                     )
-                    throw CypherAirError.corruptData(reason: "Tampered ciphertext was not rejected")
-                } catch let error as PgpError {
-                    // Expected: decryption should fail
-                    _ = error
-                    return true
+                    decryptSucceeded = true
+                } catch {
+                    // Any error = decryption correctly rejected tampered data
+                    decryptSucceeded = false
                 }
+                guard !decryptSucceeded else {
+                    throw CypherAirError.corruptData(reason: "Tampered ciphertext was not rejected")
+                }
+                return true
             }
             results.append(tamperResult.result)
             completedTests += 1
@@ -170,15 +174,19 @@ final class SelfTestService {
                 profile: profile
             ) {
                 let passphrase = "self-test-passphrase-2024"
-                let exported = try engine.exportSecretKey(
+                var exported = try engine.exportSecretKey(
                     certData: generated.certData,
                     passphrase: passphrase,
                     profile: profile
                 )
-                let imported = try engine.importSecretKey(
+                var imported = try engine.importSecretKey(
                     armoredData: exported,
                     passphrase: passphrase
                 )
+                defer {
+                    exported.resetBytes(in: 0..<exported.count)
+                    imported.resetBytes(in: 0..<imported.count)
+                }
                 let originalInfo = try engine.parseKeyInfo(keyData: generated.certData)
                 let importedInfo = try engine.parseKeyInfo(keyData: imported)
                 guard originalInfo.fingerprint == importedInfo.fingerprint else {
@@ -214,6 +222,8 @@ final class SelfTestService {
             return decodedInfo
         }
         results.append(qrResult.result)
+        completedTests += 1
+        state = .running(progress: Double(completedTests) / Double(totalTests))
 
         // Save report
         saveReport(results: results)
@@ -288,7 +298,11 @@ final class SelfTestService {
             report += "\n"
         }
 
-        try? report.write(to: fileURL, atomically: true, encoding: .utf8)
-        lastReportURL = fileURL
+        do {
+            try report.write(to: fileURL, atomically: true, encoding: .utf8)
+            lastReportURL = fileURL
+        } catch {
+            lastReportURL = nil
+        }
     }
 }
