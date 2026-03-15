@@ -200,6 +200,65 @@ final class EncryptionServiceTests: XCTestCase {
         }
     }
 
+    func test_encryptText_profileB_encryptToSelf_canDecryptWithOwnKey() async throws {
+        let sender = try generateKeyAndContact(profile: .advanced, name: "Sender B")
+        let recipient = try generateKeyAndContact(profile: .advanced, name: "Recipient B")
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "Profile B encrypt to self test",
+            recipientFingerprints: [recipient.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: true
+        )
+
+        // Sender should be able to decrypt (encrypted to self)
+        let binary = try stack.engine.dearmor(armored: ciphertext)
+        var senderSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
+        defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
+
+        let result = try stack.engine.decrypt(
+            ciphertext: binary,
+            secretKeys: [senderSecret],
+            verificationKeys: []
+        )
+        let decryptedText = String(data: result.plaintext, encoding: .utf8)
+        XCTAssertEqual(decryptedText, "Profile B encrypt to self test")
+    }
+
+    func test_encryptText_profileB_encryptToSelfOff_cannotDecryptWithSenderKey() async throws {
+        let sender = try generateKeyAndContact(profile: .advanced, name: "Sender B")
+        let recipient = try generateKeyAndContact(profile: .advanced, name: "Recipient B")
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "Profile B no self-encryption",
+            recipientFingerprints: [recipient.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false
+        )
+
+        // Sender should NOT be able to decrypt — not encrypted to self
+        let binary = try stack.engine.dearmor(armored: ciphertext)
+        var senderSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
+        defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
+
+        XCTAssertThrowsError(
+            try stack.engine.decrypt(
+                ciphertext: binary,
+                secretKeys: [senderSecret],
+                verificationKeys: []
+            )
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            if case .NoMatchingKey = pgpError {
+                // Expected
+            } else {
+                XCTFail("Expected .NoMatchingKey, got \(pgpError)")
+            }
+        }
+    }
+
     // MARK: - File Encryption: Size Validation
 
     func test_encryptFile_underLimit_succeeds() async throws {
@@ -246,6 +305,21 @@ final class EncryptionServiceTests: XCTestCase {
 
         // Exactly 100 MB — should be within the limit
         let fileData = Data(repeating: 0xCC, count: 100 * 1024 * 1024)
+        let ciphertext = try await stack.encryptionService.encryptFile(
+            fileData,
+            recipientFingerprints: [identity.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false
+        )
+
+        XCTAssertFalse(ciphertext.isEmpty)
+    }
+
+    func test_encryptFile_profileB_underLimit_succeeds() async throws {
+        let identity = try generateKeyAndContact(profile: .advanced)
+
+        // Create a 1 KB file
+        let fileData = Data(repeating: 0xAB, count: 1024)
         let ciphertext = try await stack.encryptionService.encryptFile(
             fileData,
             recipientFingerprints: [identity.fingerprint],

@@ -331,10 +331,16 @@ final class FFIIntegrationTests: XCTestCase {
                 verificationKeys: []
             )
         ) { error in
-            guard error is PgpError else {
+            guard let pgpError = error as? PgpError else {
                 return XCTFail("Expected PgpError, got \(type(of: error))")
             }
-            // Any PgpError is acceptable for garbage input
+            // Garbage input should fail at the parsing stage, not decryption
+            switch pgpError {
+            case .CorruptData, .ArmorError, .InternalError:
+                break // acceptable for non-PGP garbage input
+            default:
+                XCTFail("Expected CorruptData, ArmorError, or InternalError, got \(pgpError)")
+            }
         }
     }
 
