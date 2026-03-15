@@ -45,6 +45,11 @@ struct SettingsView: View {
                         Text(option.label).tag(option.value)
                     }
                 }
+
+                Toggle(
+                    String(localized: "settings.requireAuthOnLaunch", defaultValue: "Require Authentication on Launch"),
+                    isOn: $config.requireAuthOnLaunch
+                )
             } header: {
                 Text(String(localized: "settings.security", defaultValue: "Security"))
             }
@@ -151,6 +156,7 @@ struct SettingsView: View {
                     }
                 }
                 .navigationTitle(String(localized: "settings.mode.highWarning.title", defaultValue: "Enable High Security Mode"))
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(String(localized: "common.cancel", defaultValue: "Cancel")) {

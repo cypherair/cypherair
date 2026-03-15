@@ -9,7 +9,7 @@ private enum AuthStrings {
 }
 
 /// Errors from authentication and mode switching operations.
-enum AuthenticationError: Error {
+enum AuthenticationError: Error, LocalizedError {
     /// Biometric authentication is not available (sensor damaged, locked out, etc.).
     case biometricsUnavailable
     /// The user cancelled the authentication prompt.
@@ -26,6 +26,32 @@ enum AuthenticationError: Error {
     /// High Security mode requires at least one backed-up key.
     /// The user must back up a key before enabling High Security mode.
     case backupRequired
+
+    var errorDescription: String? {
+        switch self {
+        case .biometricsUnavailable:
+            String(localized: "error.auth.biometricsUnavailable",
+                   defaultValue: "Biometric authentication is currently unavailable. In High Security mode, all private key operations are blocked until biometric authentication is restored.")
+        case .cancelled:
+            String(localized: "error.auth.cancelled",
+                   defaultValue: "Authentication was cancelled.")
+        case .failed:
+            String(localized: "error.auth.failed",
+                   defaultValue: "Authentication failed.")
+        case .accessControlCreationFailed:
+            String(localized: "error.auth.accessControlFailed",
+                   defaultValue: "Failed to configure security access controls.")
+        case .modeSwitchFailed:
+            String(localized: "error.auth.modeSwitchFailed",
+                   defaultValue: "Failed to switch authentication mode. Your keys remain safely protected under the previous mode.")
+        case .noIdentities:
+            String(localized: "error.auth.noIdentities",
+                   defaultValue: "No private keys found. Generate or import a key first.")
+        case .backupRequired:
+            String(localized: "error.auth.backupRequired",
+                   defaultValue: "High Security mode requires at least one backed-up key. Please back up a key before enabling this mode.")
+        }
+    }
 }
 
 /// Manages device authentication (Face ID / Touch ID) and auth mode switching.
@@ -47,6 +73,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private let defaults: UserDefaults
 
     // MARK: - State
+
+    /// The LAContext from the most recent successful evaluate() call.
+    /// Used by switchMode to pass a pre-authenticated context to SE key
+    /// reconstruction, avoiding repeated Face ID prompts.
+    private(set) var lastEvaluatedContext: LAContext?
 
     /// The current authentication mode, persisted in UserDefaults.
     var currentMode: AuthenticationMode {
@@ -98,11 +129,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
 
     func evaluate(mode: AuthenticationMode, reason: String) async throws -> Bool {
         let context = LAContext()
+        let success: Bool
 
         switch mode {
         case .standard:
             // Face ID / Touch ID with device passcode fallback.
-            return try await context.evaluatePolicy(
+            success = try await context.evaluatePolicy(
                 .deviceOwnerAuthentication,
                 localizedReason: reason
             )
@@ -112,7 +144,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
             context.localizedFallbackTitle = ""
 
             do {
-                return try await context.evaluatePolicy(
+                success = try await context.evaluatePolicy(
                     .deviceOwnerAuthenticationWithBiometrics,
                     localizedReason: reason
                 )
@@ -128,6 +160,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
                 throw AuthenticationError.failed
             }
         }
+
+        if success {
+            lastEvaluatedContext = context
+        }
+        return success
     }
 
     // MARK: - Access Control Creation
@@ -209,8 +246,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     account: KeychainConstants.defaultAccount
                 )
 
-                // 2b. Reconstruct SE key (triggers biometric/passcode auth under CURRENT mode).
-                let existingHandle = try secureEnclave.reconstructKey(from: existingSEKeyData)
+                // 2b. Reconstruct SE key. Passes the pre-authenticated LAContext from
+                // Step 0 to avoid triggering another Face ID prompt for each key.
+                let existingHandle = try secureEnclave.reconstructKey(
+                    from: existingSEKeyData,
+                    authenticationContext: authenticator.lastEvaluatedContext
+                )
 
                 let existingBundle = WrappedKeyBundle(
                     seKeyData: existingSEKeyData,
@@ -231,7 +272,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
                 }
 
                 // 2d. Generate new SE key with new access control flags and re-wrap.
-                let newHandle = try secureEnclave.generateWrappingKey(accessControl: newAccessControl)
+                // Pass pre-authenticated LAContext so the new key's first ECDH operation
+                // (in wrap()) reuses the existing Face ID session instead of prompting again.
+                let newHandle = try secureEnclave.generateWrappingKey(
+                    accessControl: newAccessControl,
+                    authenticationContext: authenticator.lastEvaluatedContext
+                )
                 let newBundle = try secureEnclave.wrap(
                     privateKey: rawKeyBytes,
                     using: newHandle,

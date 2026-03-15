@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 /// Result of wrapping a private key with the Secure Enclave.
@@ -30,9 +31,13 @@ protocol SecureEnclaveManageable {
     /// Generate a new P-256 wrapping key in the Secure Enclave.
     /// The access control flags determine auth requirements (Standard vs High Security).
     ///
-    /// - Parameter accessControl: SecAccessControl with appropriate flags for the auth mode.
+    /// - Parameters:
+    ///   - accessControl: SecAccessControl with appropriate flags for the auth mode.
+    ///   - authenticationContext: A pre-authenticated LAContext to associate with the
+    ///     new key, avoiding a Face ID prompt on first use (e.g., during mode switch).
+    ///     Pass `nil` for normal key generation.
     /// - Returns: A handle to the SE key.
-    func generateWrappingKey(accessControl: SecAccessControl?) throws -> any SEKeyHandle
+    func generateWrappingKey(accessControl: SecAccessControl?, authenticationContext: LAContext?) throws -> any SEKeyHandle
 
     /// Wrap a private key using the SE wrapping scheme:
     /// self-ECDH → HKDF(SHA-256, salt, info="CypherAir-SE-Wrap-v1:"+fingerprint) → AES-GCM seal.
@@ -57,11 +62,31 @@ protocol SecureEnclaveManageable {
     func deleteKey(_ handle: any SEKeyHandle) throws
 
     /// Reconstruct an SE key handle from its data representation.
-    /// This triggers device authentication on real hardware.
-    func reconstructKey(from data: Data) throws -> any SEKeyHandle
+    /// This triggers device authentication on real hardware unless a
+    /// pre-authenticated `LAContext` is provided.
+    ///
+    /// - Parameters:
+    ///   - data: The SE key's `dataRepresentation` from Keychain.
+    ///   - authenticationContext: A pre-authenticated LAContext to reuse,
+    ///     avoiding a repeated Face ID prompt. Pass `nil` for implicit auth.
+    func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle
 
     /// Check if Secure Enclave is available on this device.
     static var isAvailable: Bool { get }
+}
+
+extension SecureEnclaveManageable {
+    /// Convenience: generate wrapping key without an explicit authentication context.
+    /// First use of the key will trigger Face ID / Touch ID if access control requires it.
+    func generateWrappingKey(accessControl: SecAccessControl?) throws -> any SEKeyHandle {
+        try generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
+    }
+
+    /// Convenience: reconstruct without an explicit authentication context.
+    /// Uses implicit SE authentication (triggers Face ID / Touch ID prompt).
+    func reconstructKey(from data: Data) throws -> any SEKeyHandle {
+        try reconstructKey(from: data, authenticationContext: nil)
+    }
 }
 
 /// HKDF info string constant.

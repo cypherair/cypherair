@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 #if canImport(CryptoKit)
 import CryptoKit
@@ -36,7 +37,7 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
 
     static var isAvailable: Bool { true }
 
-    func generateWrappingKey(accessControl: SecAccessControl?) throws -> any SEKeyHandle {
+    func generateWrappingKey(accessControl: SecAccessControl?, authenticationContext: LAContext?) throws -> any SEKeyHandle {
         if let error = nextError {
             nextError = nil
             throw error
@@ -149,7 +150,8 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         keys.removeValue(forKey: handle.dataRepresentation)
     }
 
-    func reconstructKey(from data: Data) throws -> any SEKeyHandle {
+    func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle {
+        // Mock ignores authenticationContext — software P-256 doesn't need it.
         #if canImport(CryptoKit)
         let privateKey = try P256.KeyAgreement.PrivateKey(rawRepresentation: data)
         return MockSEKey(privateKey: privateKey)
