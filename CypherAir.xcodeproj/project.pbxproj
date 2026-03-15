@@ -75,6 +75,14 @@
 		CE00651D2F673AF5008604AB /* DiskSpaceChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00651C2F673AF5008604AB /* DiskSpaceChecker.swift */; };
 		CE00651F2F673B04008604AB /* MockDiskSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00651E2F673B04008604AB /* MockDiskSpace.swift */; };
 		CE0065212F673BC4008604AB /* StreamingServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065202F673BC4008604AB /* StreamingServiceTests.swift */; };
+		CE0065252F676EBC008604AB /* AppIconB.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065232F676EBC008604AB /* AppIconB.icon */; };
+		CE0065262F676EBC008604AB /* AppIconC.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065242F676EBC008604AB /* AppIconC.icon */; };
+		CE0065272F676EBC008604AB /* AppIconA.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065222F676EBC008604AB /* AppIconA.icon */; };
+		CE0065292F67773D008604AB /* AppIconPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065282F67773D008604AB /* AppIconPickerView.swift */; };
+		CE00652E2F677880008604AB /* AppIconAPreview.png in Resources */ = {isa = PBXBuildFile; fileRef = CE00652A2F677880008604AB /* AppIconAPreview.png */; };
+		CE00652F2F677880008604AB /* AppIconCPreview.png in Resources */ = {isa = PBXBuildFile; fileRef = CE00652C2F677880008604AB /* AppIconCPreview.png */; };
+		CE0065302F677880008604AB /* AppIconBPreview.png in Resources */ = {isa = PBXBuildFile; fileRef = CE00652B2F677880008604AB /* AppIconBPreview.png */; };
+		CE0065312F677880008604AB /* AppIconPreview.png in Resources */ = {isa = PBXBuildFile; fileRef = CE00652D2F677880008604AB /* AppIconPreview.png */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
 		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
@@ -162,6 +170,14 @@
 		CE00651C2F673AF5008604AB /* DiskSpaceChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskSpaceChecker.swift; sourceTree = "<group>"; };
 		CE00651E2F673B04008604AB /* MockDiskSpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockDiskSpace.swift; sourceTree = "<group>"; };
 		CE0065202F673BC4008604AB /* StreamingServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingServiceTests.swift; sourceTree = "<group>"; };
+		CE0065222F676EBC008604AB /* AppIconA.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconA.icon; sourceTree = "<group>"; };
+		CE0065232F676EBC008604AB /* AppIconB.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconB.icon; sourceTree = "<group>"; };
+		CE0065242F676EBC008604AB /* AppIconC.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconC.icon; sourceTree = "<group>"; };
+		CE0065282F67773D008604AB /* AppIconPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconPickerView.swift; sourceTree = "<group>"; };
+		CE00652A2F677880008604AB /* AppIconAPreview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIconAPreview.png; sourceTree = "<group>"; };
+		CE00652B2F677880008604AB /* AppIconBPreview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIconBPreview.png; sourceTree = "<group>"; };
+		CE00652C2F677880008604AB /* AppIconCPreview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIconCPreview.png; sourceTree = "<group>"; };
+		CE00652D2F677880008604AB /* AppIconPreview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIconPreview.png; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
 		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
@@ -182,6 +198,9 @@
 			isa = PBXGroup;
 			children = (
 				CE0065122F651C44008604AB /* AppIcon.icon */,
+				CE0065222F676EBC008604AB /* AppIconA.icon */,
+				CE0065232F676EBC008604AB /* AppIconB.icon */,
+				CE0065242F676EBC008604AB /* AppIconC.icon */,
 				CE0065102F6502B4008604AB /* CypherAir-Info.plist */,
 				F3EC8935DF44293B377AB6CB /* Sources */,
 				A1C9AAA2B5ED04BDA656105D /* Tests */,
@@ -330,6 +349,7 @@
 				CE0064DD2F6495C3008604AB /* SettingsView.swift */,
 				CE0064DF2F6495C3008604AB /* SelfTestView.swift */,
 				CE0064E12F6495C3008604AB /* AboutView.swift */,
+				CE0065282F67773D008604AB /* AppIconPickerView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -371,6 +391,10 @@
 		CE00650C2F65009E008604AB /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				CE00652A2F677880008604AB /* AppIconAPreview.png */,
+				CE00652B2F677880008604AB /* AppIconBPreview.png */,
+				CE00652C2F677880008604AB /* AppIconCPreview.png */,
+				CE00652D2F677880008604AB /* AppIconPreview.png */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -501,6 +525,13 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CE0065252F676EBC008604AB /* AppIconB.icon in Resources */,
+				CE00652E2F677880008604AB /* AppIconAPreview.png in Resources */,
+				CE00652F2F677880008604AB /* AppIconCPreview.png in Resources */,
+				CE0065302F677880008604AB /* AppIconBPreview.png in Resources */,
+				CE0065312F677880008604AB /* AppIconPreview.png in Resources */,
+				CE0065262F676EBC008604AB /* AppIconC.icon in Resources */,
+				CE0065272F676EBC008604AB /* AppIconA.icon in Resources */,
 				CE0065172F652334008604AB /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -581,6 +612,7 @@
 				CE0064BE2F64953B008604AB /* HomeView.swift in Sources */,
 				CE0064E52F64972D008604AB /* PrivacyScreenModifier.swift in Sources */,
 				CE0064A82F6492FD008604AB /* CypherAirError.swift in Sources */,
+				CE0065292F67773D008604AB /* AppIconPickerView.swift in Sources */,
 				CE0064D22F6495C2008604AB /* ContactDetailView.swift in Sources */,
 				CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */,
 				F0260E1FA58DA39B13A0AEDA /* SecureEnclaveManageable.swift in Sources */,
@@ -687,7 +719,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconC AppIconB AppIcon";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconA;
 				CLANG_WARN_COMPLETION_HANDLER_MISUSE = YES;
 				CLANG_WARN_OBJC_MISSING_PROPERTY_SYNTHESIS = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
@@ -907,7 +940,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconC AppIconB AppIcon";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconA;
 				CLANG_WARN_COMPLETION_HANDLER_MISUSE = YES;
 				CLANG_WARN_OBJC_MISSING_PROPERTY_SYNTHESIS = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;

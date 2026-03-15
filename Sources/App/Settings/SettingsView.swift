@@ -67,6 +67,19 @@ struct SettingsView: View {
                 Text(String(localized: "settings.encryption", defaultValue: "Encryption"))
             }
 
+            #if canImport(UIKit)
+            Section {
+                NavigationLink(value: AppRoute.appIcon) {
+                    Label(
+                        String(localized: "settings.appIcon", defaultValue: "App Icon"),
+                        systemImage: "app"
+                    )
+                }
+            } header: {
+                Text(String(localized: "settings.appearance", defaultValue: "Appearance"))
+            }
+            #endif
+
             Section {
                 NavigationLink(value: AppRoute.selfTest) {
                     Label(
@@ -95,6 +108,7 @@ struct SettingsView: View {
             switch route {
             case .selfTest: SelfTestView()
             case .about: AboutView()
+            case .appIcon: AppIconPickerView()
             case .keyGeneration, .keyDetail, .backupKey, .importKey,
                  .contactDetail, .addContact, .qrDisplay, .qrPhotoImport,
                  .encrypt, .decrypt,

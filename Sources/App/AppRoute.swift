@@ -25,4 +25,5 @@ enum AppRoute: Hashable {
     // Settings
     case selfTest
     case about
+    case appIcon
 }
