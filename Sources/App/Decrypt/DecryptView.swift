@@ -34,9 +34,10 @@ struct DecryptView: View {
     @State private var showFileImporter = false
     @State private var selectedFileURL: URL?
     @State private var selectedFileName: String?
-    @State private var decryptedFileData: Data?
+    @State private var decryptedFileURL: URL?
     @State private var currentTask: Task<Void, Never>?
-    @State private var tempShareFileURL: URL?
+    @State private var filePhase1Result: DecryptionService.FilePhase1Result?
+    @State private var fileProgress: FileProgressReporter?
 
     var body: some View {
         Form {
@@ -64,7 +65,7 @@ struct DecryptView: View {
                         parseRecipientsFile()
                     }
                 } label: {
-                    if isDecrypting && phase1Result == nil {
+                    if isDecrypting && !hasPhase1Result {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                     } else {
@@ -73,11 +74,11 @@ struct DecryptView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(decryptButtonDisabled || phase1Result != nil)
+                .disabled(decryptButtonDisabled || hasPhase1Result)
             }
 
             // Phase 1 result: show matched key before authentication
-            if let phase1 = phase1Result, let matchedKey = phase1.matchedKey {
+            if let matchedKey = activeMatchedKey {
                 Section {
                     LabeledContent(
                         String(localized: "decrypt.matchedKey.name", defaultValue: "Key"),
@@ -97,20 +98,25 @@ struct DecryptView: View {
                 // Phase 2: Decrypt with authentication
                 Section {
                     Button {
-                        if decryptMode == .text {
+                        if decryptMode == .text, let phase1 = phase1Result {
                             decryptText(phase1: phase1)
-                        } else {
-                            decryptFile(phase1: phase1)
+                        } else if let filePhase1 = filePhase1Result {
+                            decryptFile(phase1: filePhase1)
                         }
                     } label: {
                         if isDecrypting {
                             HStack {
-                                ProgressView(decryptMode == .file
-                                    ? String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting...")
-                                    : "")
+                                if decryptMode == .file, let progress = fileProgress {
+                                    ProgressView(value: progress.fractionCompleted)
+                                        .progressViewStyle(.linear)
+                                    Text(String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting..."))
+                                } else {
+                                    ProgressView()
+                                }
                                 if decryptMode == .file {
                                     Spacer()
                                     Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
+                                        fileProgress?.cancel()
                                         currentTask?.cancel()
                                         currentTask = nil
                                         isDecrypting = false
@@ -139,17 +145,15 @@ struct DecryptView: View {
             }
 
             // File mode result
-            if decryptMode == .file, let data = decryptedFileData,
-               let fileURL = data.writeToShareTempFile(named: decryptedFilename()) {
+            if decryptMode == .file, let decryptedURL = decryptedFileURL {
                 Section {
-                    ShareLink(item: fileURL) {
+                    ShareLink(item: decryptedURL) {
                         Label(
                             String(localized: "fileDecrypt.save", defaultValue: "Save Decrypted File"),
                             systemImage: "square.and.arrow.down"
                         )
                     }
                 }
-                .onAppear { tempShareFileURL = fileURL }
             }
 
             // Signature verification (shared by both modes)
@@ -194,33 +198,31 @@ struct DecryptView: View {
             Text(err.localizedDescription)
         }
         .onDisappear {
-            // PRD §4.4: Zeroize decrypted data when leaving the view.
+            // PRD §4.4: Zeroize/delete decrypted data when leaving the view.
             // Note: Swift String cannot be reliably zeroized (SECURITY.md §7.1).
             // Assigning empty string before nil reduces the old string's reference lifetime.
             decryptedText = ""
             decryptedText = nil
-            decryptedFileData?.resetBytes(in: 0..<(decryptedFileData?.count ?? 0))
-            decryptedFileData = nil
+            // Delete streaming decrypted file from disk
+            if let url = decryptedFileURL {
+                try? FileManager.default.removeItem(at: url)
+                decryptedFileURL = nil
+            }
             signatureVerification = nil
             phase1Result = nil
-            // M2: Delete temp share file from disk
-            if let url = tempShareFileURL {
-                try? FileManager.default.removeItem(at: url)
-                tempShareFileURL = nil
-            }
+            filePhase1Result = nil
         }
         .onChange(of: config.contentClearGeneration) {
             // PRD §4.4: Clear decrypted content when grace period expires.
             decryptedText = ""
             decryptedText = nil
-            decryptedFileData?.resetBytes(in: 0..<(decryptedFileData?.count ?? 0))
-            decryptedFileData = nil
+            if let url = decryptedFileURL {
+                try? FileManager.default.removeItem(at: url)
+                decryptedFileURL = nil
+            }
             signatureVerification = nil
             phase1Result = nil
-            if let url = tempShareFileURL {
-                try? FileManager.default.removeItem(at: url)
-                tempShareFileURL = nil
-            }
+            filePhase1Result = nil
         }
     }
 
@@ -264,9 +266,25 @@ struct DecryptView: View {
 
     // MARK: - State
 
+    private var activeMatchedKey: PGPKeyIdentity? {
+        if decryptMode == .text {
+            return phase1Result?.matchedKey
+        } else {
+            return filePhase1Result?.matchedKey
+        }
+    }
+
+    private var hasPhase1Result: Bool {
+        if decryptMode == .text {
+            return phase1Result != nil
+        } else {
+            return filePhase1Result != nil
+        }
+    }
+
     private var decryptButtonDisabled: Bool {
         if isDecrypting { return true }
-        if phase1Result != nil { return true }
+        if hasPhase1Result { return true }
         switch decryptMode {
         case .text: return ciphertextInput.isEmpty
         case .file: return selectedFileURL == nil
@@ -316,9 +334,8 @@ struct DecryptView: View {
                     return
                 }
                 defer { fileURL.stopAccessingSecurityScopedResource() }
-                let ciphertext = try Data(contentsOf: fileURL)
-                let result = try await service.parseRecipients(ciphertext: ciphertext)
-                phase1Result = result
+                let result = try await service.parseRecipientsFromFile(fileURL: fileURL)
+                filePhase1Result = result
             } catch {
                 self.error = CypherAirError.from(error) { .corruptData(reason: $0) }
                 showError = true
@@ -352,8 +369,10 @@ struct DecryptView: View {
         }
     }
 
-    private func decryptFile(phase1: DecryptionService.Phase1Result) {
+    private func decryptFile(phase1: DecryptionService.FilePhase1Result) {
         let service = decryptionService
+        let progress = FileProgressReporter()
+        fileProgress = progress
 
         isDecrypting = true
         currentTask = Task {
@@ -370,19 +389,30 @@ struct DecryptView: View {
                     UIApplication.shared.endBackgroundTask(bgTaskID)
                 }
                 #endif
+                selectedFileURL?.stopAccessingSecurityScopedResource()
+                fileProgress = nil
                 isDecrypting = false
                 currentTask = nil
             }
             do {
-                try Task.checkCancellation()
-                let result = try await service.decrypt(phase1: phase1)
-                try Task.checkCancellation()
+                // Re-acquire security-scoped resource (Phase 1 released it)
+                guard selectedFileURL?.startAccessingSecurityScopedResource() == true else {
+                    error = .corruptData(reason: String(localized: "fileDecrypt.cannotAccess", defaultValue: "Cannot access file"))
+                    showError = true
+                    return
+                }
 
-                decryptedFileData = result.plaintext
+                let result = try await service.decryptFileStreaming(
+                    phase1: phase1,
+                    progress: progress
+                )
+                try Task.checkCancellation()
+                decryptedFileURL = result.outputURL
                 signatureVerification = result.signature
             } catch is CancellationError {
                 // User cancelled — no error to show
             } catch {
+                if case .operationCancelled = error as? CypherAirError { return }
                 self.error = CypherAirError.from(error) { .corruptData(reason: $0) }
                 showError = true
             }

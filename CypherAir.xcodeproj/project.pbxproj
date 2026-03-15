@@ -71,6 +71,10 @@
 		CE00650F2F6501E2008604AB /* PostGenerationPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00650E2F6501E2008604AB /* PostGenerationPromptView.swift */; };
 		CE0065172F652334008604AB /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065122F651C44008604AB /* AppIcon.icon */; };
 		CE0065192F653CF4008604AB /* Data+TempFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065182F653CF4008604AB /* Data+TempFile.swift */; };
+		CE00651B2F673ADE008604AB /* FileProgressReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00651A2F673ADE008604AB /* FileProgressReporter.swift */; };
+		CE00651D2F673AF5008604AB /* DiskSpaceChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00651C2F673AF5008604AB /* DiskSpaceChecker.swift */; };
+		CE00651F2F673B04008604AB /* MockDiskSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE00651E2F673B04008604AB /* MockDiskSpace.swift */; };
+		CE0065212F673BC4008604AB /* StreamingServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0065202F673BC4008604AB /* StreamingServiceTests.swift */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
 		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
@@ -154,6 +158,10 @@
 		CE0065102F6502B4008604AB /* CypherAir-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "CypherAir-Info.plist"; sourceTree = "<group>"; };
 		CE0065122F651C44008604AB /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		CE0065182F653CF4008604AB /* Data+TempFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Data+TempFile.swift"; sourceTree = "<group>"; };
+		CE00651A2F673ADE008604AB /* FileProgressReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProgressReporter.swift; sourceTree = "<group>"; };
+		CE00651C2F673AF5008604AB /* DiskSpaceChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskSpaceChecker.swift; sourceTree = "<group>"; };
+		CE00651E2F673B04008604AB /* MockDiskSpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockDiskSpace.swift; sourceTree = "<group>"; };
+		CE0065202F673BC4008604AB /* StreamingServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingServiceTests.swift; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
 		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
@@ -259,6 +267,8 @@
 				CE0064B32F649454008604AB /* SigningService.swift */,
 				CE0064B52F649455008604AB /* QRService.swift */,
 				CE0064B72F649455008604AB /* SelfTestService.swift */,
+				CE00651A2F673ADE008604AB /* FileProgressReporter.swift */,
+				CE00651C2F673AF5008604AB /* DiskSpaceChecker.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -353,6 +363,7 @@
 				CE0065042F64D0D5008604AB /* ContactServiceTests.swift */,
 				CE0065062F64D9B9008604AB /* FixtureLoader.swift */,
 				CE0065082F64DA10008604AB /* GnuPGInteropTests.swift */,
+				CE0065202F673BC4008604AB /* StreamingServiceTests.swift */,
 			);
 			path = ServiceTests;
 			sourceTree = "<group>";
@@ -389,6 +400,7 @@
 				7990845AB81240EF6E852FF4 /* MockKeychain.swift */,
 				0FB40F8BED05EDFD21D30FC0 /* MockSecureEnclave.swift */,
 				CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */,
+				CE00651E2F673B04008604AB /* MockDiskSpace.swift */,
 			);
 			path = Mocks;
 			sourceTree = "<group>";
@@ -529,6 +541,7 @@
 				CE0065072F64D9B9008604AB /* FixtureLoader.swift in Sources */,
 				28B947F8AAAFFB1BF3B9F796 /* DeviceSecurityTests.swift in Sources */,
 				CE0064FD2F64B219008604AB /* DecryptionServiceTests.swift in Sources */,
+				CE0065212F673BC4008604AB /* StreamingServiceTests.swift in Sources */,
 				CE0064F92F64B1C4008604AB /* QRServiceTests.swift in Sources */,
 				CE0064FF2F64B248008604AB /* EncryptionServiceTests.swift in Sources */,
 				CE0064FB2F64B1F4008604AB /* KeyManagementServiceTests.swift in Sources */,
@@ -547,6 +560,7 @@
 				CE0064D82F6495C2008604AB /* DecryptView.swift in Sources */,
 				CE0064B62F649455008604AB /* QRService.swift in Sources */,
 				CE0064A42F6492D8008604AB /* Contact.swift in Sources */,
+				CE00651B2F673ADE008604AB /* FileProgressReporter.swift in Sources */,
 				CE0064E92F64972D008604AB /* QRPhotoImportView.swift in Sources */,
 				9F4284F9BEE858C4C9110D9B /* CypherAirApp.swift in Sources */,
 				CE0064E72F64972D008604AB /* QRDisplayView.swift in Sources */,
@@ -572,6 +586,7 @@
 				F0260E1FA58DA39B13A0AEDA /* SecureEnclaveManageable.swift in Sources */,
 				CE0064A22F6492D8008604AB /* PGPKeyIdentity.swift in Sources */,
 				CE0064D62F6495C2008604AB /* EncryptView.swift in Sources */,
+				CE00651F2F673B04008604AB /* MockDiskSpace.swift in Sources */,
 				9247AAEC4846E2A9C01931EA /* pgp_mobile.swift in Sources */,
 				CE0064B02F649416008604AB /* EncryptionService.swift in Sources */,
 				CE0064CE2F649576008604AB /* ImportKeyView.swift in Sources */,
@@ -588,6 +603,7 @@
 				091B4000887E8EB8CEEC9995 /* AuthenticationManager.swift in Sources */,
 				CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */,
 				CE0064E02F6495C3008604AB /* SelfTestView.swift in Sources */,
+				CE00651D2F673AF5008604AB /* DiskSpaceChecker.swift in Sources */,
 				CE0064D42F6495C2008604AB /* AddContactView.swift in Sources */,
 				CB6546CBB702B1311AFEDEB3 /* KeychainManager.swift in Sources */,
 				CE0064B22F649416008604AB /* DecryptionService.swift in Sources */,

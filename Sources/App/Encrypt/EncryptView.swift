@@ -41,8 +41,9 @@ struct EncryptView: View {
     @State private var showFileImporter = false
     @State private var selectedFileURL: URL?
     @State private var selectedFileName: String?
-    @State private var encryptedFileData: Data?
+    @State private var encryptedFileURL: URL?
     @State private var currentTask: Task<Void, Never>?
+    @State private var fileProgress: FileProgressReporter?
 
     var body: some View {
         Form {
@@ -137,12 +138,17 @@ struct EncryptView: View {
                 } label: {
                     if isEncrypting {
                         HStack {
-                            ProgressView(encryptMode == .file
-                                ? String(localized: "fileEncrypt.encrypting", defaultValue: "Encrypting...")
-                                : "")
+                            if encryptMode == .file, let progress = fileProgress {
+                                ProgressView(value: progress.fractionCompleted)
+                                    .progressViewStyle(.linear)
+                                Text(String(localized: "fileEncrypt.encrypting", defaultValue: "Encrypting..."))
+                            } else {
+                                ProgressView()
+                            }
                             if encryptMode == .file {
                                 Spacer()
                                 Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
+                                    fileProgress?.cancel()
                                     currentTask?.cancel()
                                     currentTask = nil
                                     isEncrypting = false
@@ -206,10 +212,9 @@ struct EncryptView: View {
             }
 
             // File mode result
-            if encryptMode == .file, let data = encryptedFileData,
-               let fileURL = data.writeToShareTempFile(named: "\(selectedFileName ?? "encrypted").gpg") {
+            if encryptMode == .file, let encryptedURL = encryptedFileURL {
                 Section {
-                    ShareLink(item: fileURL) {
+                    ShareLink(item: encryptedURL) {
                         Label(
                             String(localized: "fileEncrypt.share", defaultValue: "Share Encrypted File"),
                             systemImage: "square.and.arrow.up"
@@ -288,8 +293,6 @@ struct EncryptView: View {
             }
         } header: {
             Text(String(localized: "fileEncrypt.file", defaultValue: "File"))
-        } footer: {
-            Text(String(localized: "fileEncrypt.sizeLimit", defaultValue: "Maximum file size: 100 MB"))
         }
     }
 
@@ -358,6 +361,9 @@ struct EncryptView: View {
         let selfEncrypt = encryptToSelf ?? config.encryptToSelf
         let selfEncryptFp = selfEncrypt ? encryptToSelfFingerprint : nil
 
+        let progress = FileProgressReporter()
+        fileProgress = progress
+
         isEncrypting = true
         currentTask = Task {
             #if canImport(UIKit)
@@ -373,6 +379,7 @@ struct EncryptView: View {
                     UIApplication.shared.endBackgroundTask(bgTaskID)
                 }
                 #endif
+                fileProgress = nil
                 isEncrypting = false
                 currentTask = nil
             }
@@ -384,20 +391,20 @@ struct EncryptView: View {
                 }
                 defer { fileURL.stopAccessingSecurityScopedResource() }
 
-                let fileData = try Data(contentsOf: fileURL)
-                try Task.checkCancellation()
-                let result = try await service.encryptFile(
-                    fileData,
+                let result = try await service.encryptFileStreaming(
+                    inputURL: fileURL,
                     recipientFingerprints: recipients,
                     signWithFingerprint: signerFp,
                     encryptToSelf: selfEncrypt,
-                    encryptToSelfFingerprint: selfEncryptFp
+                    encryptToSelfFingerprint: selfEncryptFp,
+                    progress: progress
                 )
                 try Task.checkCancellation()
-                encryptedFileData = result
+                encryptedFileURL = result
             } catch is CancellationError {
                 // User cancelled — no error to show
             } catch {
+                if case .operationCancelled = error as? CypherAirError { return }
                 self.error = CypherAirError.from(error) { .encryptionFailed(reason: $0) }
                 showError = true
             }
