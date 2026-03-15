@@ -339,7 +339,7 @@ Streaming file processing. File size increase.
 
 ### 10.3 v2.0
 
-Share Extension. macOS. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack. Multi-device sync.
+Share Extension. macOS. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack.
 
 ---
 
