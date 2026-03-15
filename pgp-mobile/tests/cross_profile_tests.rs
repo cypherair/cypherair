@@ -100,7 +100,7 @@ fn test_profile_b_encrypts_to_profile_a() {
 /// Pass: format is SEIPDv1 (lowest common). Both decrypt.
 #[test]
 fn test_mixed_recipients_v4_and_v6() {
-    let _sender_b = keys::generate_key_with_profile(
+    let sender_b = keys::generate_key_with_profile(
         "Alice (B)".to_string(),
         None,
         None,
@@ -126,13 +126,14 @@ fn test_mixed_recipients_v4_and_v6() {
 
     let plaintext = b"Message to mixed v4+v6 recipients.";
 
+    // M11: Use sender_b as the signing key (was previously unused)
     let ciphertext = encrypt::encrypt(
         plaintext,
         &[
             recipient_a.public_key_data.clone(),
             recipient_b.public_key_data.clone(),
         ],
-        None,
+        Some(&sender_b.cert_data),
         None,
     )
     .expect("Encryption should succeed");
@@ -438,6 +439,128 @@ fn test_format_selection_mixed_recipients_produces_seipd_v1() {
     assert!(!has_v2, "Mixed v4+v6 recipients should NOT produce SEIPDv2");
 }
 
+// ── H2: Format verification for cross-profile encrypt (sender ≠ recipient profile) ──
+
+/// Profile A sender encrypts to Profile B recipient → must produce SEIPDv2.
+/// Validates that format selection depends on RECIPIENT key version, not sender's profile.
+#[test]
+fn test_format_selection_a_sender_to_b_recipient_produces_seipd_v2() {
+    let sender_a = keys::generate_key_with_profile(
+        "Sender A".to_string(), None, None, KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let recipient_b = keys::generate_key_with_profile(
+        "Recipient B".to_string(), None, None, KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"Cross-profile format check A->B",
+        &[recipient_b.public_key_data.clone()],
+        Some(&sender_a.cert_data),
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let (has_v1, has_v2) = detect_message_format(&ciphertext);
+    assert!(!has_v1, "A sender to v6 recipient must NOT produce SEIPDv1");
+    assert!(has_v2, "A sender to v6 recipient must produce SEIPDv2");
+}
+
+/// Profile B sender encrypts to Profile A recipient → must produce SEIPDv1.
+/// Validates format downgrade for v4 recipients regardless of sender's profile.
+#[test]
+fn test_format_selection_b_sender_to_a_recipient_produces_seipd_v1() {
+    let sender_b = keys::generate_key_with_profile(
+        "Sender B".to_string(), None, None, KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let recipient_a = keys::generate_key_with_profile(
+        "Recipient A".to_string(), None, None, KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"Cross-profile format check B->A",
+        &[recipient_a.public_key_data.clone()],
+        Some(&sender_b.cert_data),
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    let (has_v1, has_v2) = detect_message_format(&ciphertext);
+    assert!(has_v1, "B sender to v4 recipient must produce SEIPDv1");
+    assert!(!has_v2, "B sender to v4 recipient must NOT produce SEIPDv2");
+}
+
+// ── H3: Profile A sender + encrypt-to-self + v6 recipient ────────────────
+
+/// Profile A sender with encrypt-to-self encrypts to v6 recipient.
+/// Mixed v4 (sender) + v6 (recipient) → must use SEIPDv1.
+/// Inverse of test_profile_b_encrypt_to_self_with_v4_recipient.
+#[test]
+fn test_profile_a_encrypt_to_self_with_v6_recipient() {
+    let sender_a = keys::generate_key_with_profile(
+        "Alice (A)".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Sender key gen should succeed");
+
+    let recipient_b = keys::generate_key_with_profile(
+        "Bob (B)".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Recipient key gen should succeed");
+
+    let plaintext = b"A->B with encrypt-to-self (mixed -> SEIPDv1).";
+
+    // Encrypt to v6 recipient with v4 encrypt-to-self → mixed → SEIPDv1
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[recipient_b.public_key_data.clone()],
+        None,
+        Some(&sender_a.public_key_data),
+    )
+    .expect("Encryption should succeed");
+
+    // v6 recipient decrypts
+    let result_b = decrypt::decrypt(
+        &ciphertext,
+        &[recipient_b.cert_data.clone()],
+        &[],
+    )
+    .expect("v6 recipient should decrypt");
+    assert_eq!(result_b.plaintext, plaintext);
+
+    // v4 sender decrypts (encrypt-to-self)
+    let result_a = decrypt::decrypt(
+        &ciphertext,
+        &[sender_a.cert_data.clone()],
+        &[],
+    )
+    .expect("v4 sender should decrypt own message");
+    assert_eq!(result_a.plaintext, plaintext);
+
+    // Verify format is SEIPDv1 (mixed v4+v6 → lowest common denominator)
+    let ciphertext_binary = encrypt::encrypt_binary(
+        plaintext,
+        &[recipient_b.public_key_data.clone()],
+        None,
+        Some(&sender_a.public_key_data),
+    )
+    .expect("Binary encryption should succeed");
+
+    let (has_v1, has_v2) = detect_message_format(&ciphertext_binary);
+    assert!(has_v1, "Mixed v4+v6 (encrypt-to-self) must produce SEIPDv1");
+    assert!(!has_v2, "Mixed v4+v6 (encrypt-to-self) must NOT produce SEIPDv2");
+}
+
 /// Revocation cert from Profile A key should not verify against Profile B key (and vice versa).
 #[test]
 fn test_revocation_cert_cross_profile_mismatch() {
@@ -549,13 +672,11 @@ fn test_modify_expiry_public_key_only_fails_profile_a() {
     // Pass public key only — should fail because secret key is needed for re-signing
     let result = keys::modify_expiry(&generated.public_key_data, Some(3 * 365 * 24 * 3600));
     assert!(result.is_err(), "modify_expiry should fail with public key only");
+    // L9: Match on the error variant only — the exact reason string is an implementation
+    // detail of Sequoia and may change across versions. The InvalidKeyData variant match
+    // is sufficient to confirm the correct error category.
     match result.unwrap_err() {
-        pgp_mobile::error::PgpError::InvalidKeyData { reason } => {
-            assert!(
-                reason.contains("secret") || reason.contains("Secret"),
-                "Error should mention missing secret key material, got: {reason}"
-            );
-        }
+        pgp_mobile::error::PgpError::InvalidKeyData { .. } => {} // expected
         other => panic!("Expected InvalidKeyData error, got: {other:?}"),
     }
 }
@@ -573,13 +694,9 @@ fn test_modify_expiry_public_key_only_fails_profile_b() {
     // Pass public key only — should fail because secret key is needed for re-signing
     let result = keys::modify_expiry(&generated.public_key_data, Some(3 * 365 * 24 * 3600));
     assert!(result.is_err(), "modify_expiry should fail with public key only");
+    // L9: Match on the error variant only — see comment in Profile A test above.
     match result.unwrap_err() {
-        pgp_mobile::error::PgpError::InvalidKeyData { reason } => {
-            assert!(
-                reason.contains("secret") || reason.contains("Secret"),
-                "Error should mention missing secret key material, got: {reason}"
-            );
-        }
+        pgp_mobile::error::PgpError::InvalidKeyData { .. } => {} // expected
         other => panic!("Expected InvalidKeyData error, got: {other:?}"),
     }
 }

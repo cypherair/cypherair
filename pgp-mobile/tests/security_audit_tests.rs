@@ -11,6 +11,12 @@
 //! - H1: Blanket From<anyhow::Error> removal (compile-time guard)
 //! - M2+M3: Expired signer key produces SignatureStatus::Expired
 //! - L5: ArmorKind::Unknown for unrecognized armor types
+//! - H1: AeadAuthenticationFailed exercisability analysis
+//! - H4: Wrong-key plaintext leak test for Profile B
+//! - M4: Complete profile coverage for signature tamper tests
+//! - M5: Signing with expired key
+//! - M9: Unicode plaintext encrypt/decrypt round-trip
+//! - L2: Signing-only cert rejection for Profile B
 
 use pgp_mobile::armor::{self, ArmorKind};
 use pgp_mobile::decrypt::{self, SignatureStatus};
@@ -850,4 +856,269 @@ fn test_armor_decode_known_kinds_not_unknown() {
         ArmorKind::PublicKey,
         "Armored public key must decode as PublicKey, not Unknown"
     );
+}
+
+// ── H1: AeadAuthenticationFailed exercisability analysis ──────────────────
+//
+// FINDING: PgpError::AeadAuthenticationFailed is never produced by self-generated
+// Profile B messages because v6 PKESK uses AEAD-protected session key transport.
+// ANY byte corruption (PKESK or SEIPD body) causes the PKESK AEAD to fail first,
+// producing NoMatchingKey before the SEIPD payload AEAD check is reached.
+//
+// The AeadAuthenticationFailed error path IS reachable via:
+// 1. Interop messages using v3 PKESK + SEIPDv2 (from other RFC 9580 implementations)
+// 2. OpenSSL AEAD tag mismatch errors caught by classify_decrypt_error string matching
+//
+// The CRITICAL security property — no plaintext leak on tampered ciphertext — is
+// verified by test_tamper_detection_aead_profile_b (profile_b_tests.rs) and
+// test_error_classification_tampered_profile_b (this file).
+//
+// A dedicated test exercising AeadAuthenticationFailed would require constructing
+// a message with valid v3 PKESK but corrupted SEIPDv2 body, which requires either
+// Sequoia low-level packet API (fragile, couples to internals) or a fixture from
+// another RFC 9580 implementation. Tracked as a future improvement alongside M10
+// (RSA fixture) and M6 (compressed SEIPDv2 fixture).
+
+// ── H4: Wrong-key plaintext leak test for Profile B ──────────────────────
+
+/// Decryption with wrong key must never return plaintext (Profile B / AEAD path).
+/// Complements test_decrypt_wrong_key_no_plaintext_leak (Profile A only).
+#[test]
+fn test_decrypt_wrong_key_no_plaintext_leak_profile_b() {
+    let alice = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let bob = keys::generate_key_with_profile(
+        "Bob".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt(
+        b"secret for alice only (AEAD)",
+        &[alice.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encrypt should succeed");
+
+    // Try decrypting with Bob's key — must fail
+    let result = decrypt::decrypt(&ciphertext, &[bob.cert_data.clone()], &[]);
+    match result {
+        Ok(_) => panic!("Wrong key must fail decryption (Profile B)"),
+        Err(pgp_mobile::error::PgpError::NoMatchingKey) => {}
+        Err(other) => panic!("Expected NoMatchingKey, got: {other}"),
+    }
+}
+
+// ── M4: Complete profile coverage for signature tamper tests ──────────────
+
+/// Tampered cleartext-signed message must produce SignatureStatus::Bad (Profile B).
+/// Complements test_verify_tampered_cleartext_returns_bad (Profile A only).
+#[test]
+fn test_verify_tampered_cleartext_returns_bad_profile_b() {
+    let key = keys::generate_key_with_profile(
+        "Signer".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let text = b"Original cleartext message";
+    let signed = sign::sign_cleartext(text, &key.cert_data)
+        .expect("Signing should succeed");
+
+    let mut tampered = signed.clone();
+    let signed_str = String::from_utf8_lossy(&tampered);
+    if let Some(pos) = signed_str.find("Original") {
+        tampered[pos] ^= 0x01;
+    } else {
+        panic!("Could not find message text in cleartext-signed output");
+    }
+
+    let result = verify::verify_cleartext(&tampered, &[key.public_key_data.clone()])
+        .expect("Verification should return a graded result, not throw");
+
+    assert_eq!(
+        result.status,
+        SignatureStatus::Bad,
+        "Tampered cleartext message must produce Bad signature status (Profile B)"
+    );
+}
+
+/// Tampered data with detached signature must produce SignatureStatus::Bad (Profile A).
+/// Complements test_verify_tampered_detached_returns_bad (Profile B only).
+#[test]
+fn test_verify_tampered_detached_returns_bad_profile_a() {
+    let key = keys::generate_key_with_profile(
+        "Signer".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let data = b"Original file content for detached signing";
+    let signature = sign::sign_detached(data, &key.cert_data)
+        .expect("Detached signing should succeed");
+
+    let mut tampered_data = data.to_vec();
+    tampered_data[0] ^= 0x01;
+
+    let result = verify::verify_detached(
+        &tampered_data,
+        &signature,
+        &[key.public_key_data.clone()],
+    )
+    .expect("Verification should return a graded result, not throw");
+
+    assert_eq!(
+        result.status,
+        SignatureStatus::Bad,
+        "Tampered data with detached signature must produce Bad status (Profile A)"
+    );
+}
+
+// ── M5: Signing with expired key ──────────────────────────────────────────
+
+/// Signing with an expired key: either the signing operation itself fails,
+/// or (if Sequoia allows it) the resulting signature is detected as expired
+/// at verification time. Both outcomes are acceptable — what matters is that
+/// expired-key signatures are never accepted as Valid.
+#[test]
+fn test_sign_with_expired_key_not_accepted_as_valid() {
+    for (profile, label) in [
+        (KeyProfile::Universal, "Profile A"),
+        (KeyProfile::Advanced, "Profile B"),
+    ] {
+        let key = keys::generate_key_with_profile(
+            "Expiring Signer".to_string(),
+            None,
+            Some(1), // 1-second expiry
+            profile,
+        )
+        .expect("Key gen should succeed");
+
+        // Wait for the key to expire
+        std::thread::sleep(std::time::Duration::from_secs(3));
+
+        let result = sign::sign_cleartext(b"Should not produce a Valid signature", &key.cert_data);
+        match result {
+            Err(_) => {
+                // Signing rejected at creation time — this is the strictest behavior.
+            }
+            Ok(signed) => {
+                // Sequoia allowed signing but verification must NOT return Valid.
+                let verify_result = verify::verify_cleartext(
+                    &signed,
+                    &[key.public_key_data.clone()],
+                )
+                .expect("Verification should return a graded result");
+                assert_ne!(
+                    verify_result.status,
+                    SignatureStatus::Valid,
+                    "Expired-key signature must not verify as Valid ({label})"
+                );
+            }
+        }
+    }
+}
+
+// ── M9: Unicode plaintext encrypt/decrypt round-trip ──────────────────────
+
+/// Encrypt/decrypt round-trip with Unicode plaintext (Chinese + emoji) for both profiles.
+#[test]
+fn test_encrypt_decrypt_unicode_plaintext_round_trip() {
+    let unicode_plaintext = "Hello, 你好, 🔐 — encrypted message with CJK and emoji.";
+    let plaintext_bytes = unicode_plaintext.as_bytes();
+
+    for (profile, label) in [
+        (KeyProfile::Universal, "Profile A"),
+        (KeyProfile::Advanced, "Profile B"),
+    ] {
+        let key = keys::generate_key_with_profile(
+            "Unicode Test".to_string(),
+            None,
+            None,
+            profile,
+        )
+        .expect("Key gen should succeed");
+
+        let ciphertext = encrypt::encrypt(
+            plaintext_bytes,
+            &[key.public_key_data.clone()],
+            None,
+            None,
+        )
+        .unwrap_or_else(|e| panic!("Encryption should succeed ({label}): {e}"));
+
+        let result = decrypt::decrypt(
+            &ciphertext,
+            &[key.cert_data.clone()],
+            &[],
+        )
+        .unwrap_or_else(|e| panic!("Decryption should succeed ({label}): {e}"));
+
+        assert_eq!(
+            result.plaintext, plaintext_bytes,
+            "Unicode plaintext must survive encrypt/decrypt round-trip ({label})"
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&result.plaintext),
+            unicode_plaintext,
+            "Decoded string must match ({label})"
+        );
+    }
+}
+
+// ── L2: Signing-only cert rejection for Profile B ────────────────────────
+
+/// Encrypting to a signing-only cert (no encryption subkey) must fail (Profile B / v6).
+/// Complements test_encrypt_binary_rejects_no_encryption_subkey (Profile A) in
+/// profile_a_tests.rs.
+#[test]
+fn test_encrypt_rejects_signing_only_cert_profile_b() {
+    use sequoia_openpgp as openpgp;
+    use openpgp::cert::prelude::*;
+    use openpgp::serialize::Serialize;
+
+    // Create a v6 cert with ONLY signing capability, no encryption subkey
+    let (cert, _rev) = CertBuilder::new()
+        .set_cipher_suite(CipherSuite::Cv448)
+        .set_profile(openpgp::Profile::RFC9580)
+        .expect("set_profile should succeed")
+        .add_userid("SignOnly-v6")
+        .add_signing_subkey()
+        // No add_transport_encryption_subkey()
+        .generate()
+        .expect("Cert gen should succeed");
+
+    assert_eq!(cert.primary_key().key().version(), 6, "Must be v6 cert");
+
+    let mut pubkey_data = Vec::new();
+    cert.serialize(&mut pubkey_data).expect("Serialize should succeed");
+
+    let result = encrypt::encrypt(
+        b"Should fail",
+        &[pubkey_data.clone()],
+        None,
+        None,
+    );
+    assert!(result.is_err(), "encrypt should reject v6 recipient without encryption subkey");
+
+    let result_binary = encrypt::encrypt_binary(
+        b"Should fail",
+        &[pubkey_data],
+        None,
+        None,
+    );
+    assert!(result_binary.is_err(), "encrypt_binary should reject v6 recipient without encryption subkey");
 }
