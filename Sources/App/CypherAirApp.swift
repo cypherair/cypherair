@@ -240,5 +240,9 @@ struct CypherAirApp: App {
         if fm.fileExists(atPath: shareDir.path) {
             try? fm.removeItem(at: shareDir)
         }
+        let streamingDir = fm.temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
+        if fm.fileExists(atPath: streamingDir.path) {
+            try? fm.removeItem(at: streamingDir)
+        }
     }
 }

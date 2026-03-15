@@ -13,15 +13,18 @@ final class EncryptionService {
     private let engine: PgpEngine
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
+    private let diskSpaceChecker: DiskSpaceChecker
 
     init(
         engine: PgpEngine = PgpEngine(),
         keyManagement: KeyManagementService,
-        contactService: ContactService
+        contactService: ContactService,
+        diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker()
     ) {
         self.engine = engine
         self.keyManagement = keyManagement
         self.contactService = contactService
+        self.diskSpaceChecker = diskSpaceChecker
     }
 
     // MARK: - Text Encryption
@@ -89,6 +92,114 @@ final class EncryptionService {
             encryptToSelfFingerprint: encryptToSelfFingerprint,
             binary: true
         )
+    }
+
+    // MARK: - Streaming File Encryption
+
+    /// Encrypt a file using streaming I/O (constant memory).
+    /// The input file is read from `inputURL`, and the encrypted output is
+    /// written to a temp file in `tmp/streaming/`.
+    ///
+    /// - Parameters:
+    ///   - inputURL: URL of the plaintext file.
+    ///   - recipientFingerprints: Fingerprints of recipients to encrypt to.
+    ///   - signWithFingerprint: Fingerprint of the signing key (nil = don't sign).
+    ///   - encryptToSelf: Whether to also encrypt to the sender's own key.
+    ///   - progress: Progress reporter for UI updates and cancellation.
+    /// - Returns: URL of the encrypted output file (.gpg).
+    @concurrent
+    func encryptFileStreaming(
+        inputURL: URL,
+        recipientFingerprints: [String],
+        signWithFingerprint: String?,
+        encryptToSelf: Bool,
+        encryptToSelfFingerprint: String? = nil,
+        progress: FileProgressReporter?
+    ) async throws -> URL {
+        guard !recipientFingerprints.isEmpty else {
+            throw CypherAirError.noRecipientsSelected
+        }
+
+        // Get file size for disk space check
+        let inputPath = inputURL.path
+        let attrs = try FileManager.default.attributesOfItem(atPath: inputPath)
+        let fileSize = attrs[.size] as? UInt64 ?? 0
+
+        // Validate disk space before starting
+        try diskSpaceChecker.validateForEncryption(inputFileSize: fileSize)
+
+        // Gather recipient public keys
+        let recipientKeys = recipientFingerprints.compactMap { fp in
+            contactService.contact(forFingerprint: fp)?.publicKeyData
+        }
+
+        guard recipientKeys.count == recipientFingerprints.count else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(localized: "error.recipientNotFound",
+                               defaultValue: "One or more recipients could not be found in contacts.")
+            )
+        }
+
+        // Get signing key if requested (requires SE unwrap → Face ID)
+        var signingKey: Data?
+        if let signerFp = signWithFingerprint {
+            do {
+                signingKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFp)
+            } catch {
+                throw CypherAirError.from(error) { _ in .authenticationFailed }
+            }
+        }
+
+        // Get encrypt-to-self key
+        var selfKey: Data?
+        if encryptToSelf {
+            if let fp = encryptToSelfFingerprint,
+               let key = keyManagement.keys.first(where: { $0.fingerprint == fp }) {
+                selfKey = key.publicKeyData
+            } else if let defaultKey = keyManagement.defaultKey {
+                selfKey = defaultKey.publicKeyData
+            } else {
+                throw CypherAirError.noKeySelected
+            }
+        }
+
+        defer {
+            // Safety-net zeroing.
+            if signingKey != nil {
+                signingKey!.resetBytes(in: 0..<signingKey!.count)
+                signingKey = nil
+            }
+        }
+
+        // Prepare output path in tmp/streaming/
+        let streamingDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("streaming", isDirectory: true)
+        try FileManager.default.createDirectory(at: streamingDir, withIntermediateDirectories: true)
+        let outputFilename = inputURL.lastPathComponent + ".gpg"
+        let outputURL = streamingDir.appendingPathComponent(outputFilename)
+
+        do {
+            try engine.encryptFile(
+                inputPath: inputPath,
+                outputPath: outputURL.path,
+                recipients: recipientKeys,
+                signingKey: signingKey,
+                encryptToSelf: selfKey,
+                progress: progress
+            )
+        } catch {
+            // Clean up partial output on failure
+            try? FileManager.default.removeItem(at: outputURL)
+            throw CypherAirError.from(error) { .encryptionFailed(reason: $0) }
+        }
+
+        // Primary zeroing: immediately after engine call returns
+        if signingKey != nil {
+            signingKey!.resetBytes(in: 0..<signingKey!.count)
+            signingKey = nil
+        }
+
+        return outputURL
     }
 
     // MARK: - Private
