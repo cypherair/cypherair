@@ -35,6 +35,8 @@ struct SignView: View {
     @State private var showFileImporter = false
     @State private var selectedFileURL: URL?
     @State private var selectedFileName: String?
+    @State private var currentTask: Task<Void, Never>?
+    @State private var fileProgress: FileProgressReporter?
 
     var body: some View {
         Form {
@@ -76,8 +78,25 @@ struct SignView: View {
                     }
                 } label: {
                     if isSigning {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
+                        HStack {
+                            if signMode == .file, let progress = fileProgress {
+                                ProgressView(value: progress.fractionCompleted)
+                                    .progressViewStyle(.linear)
+                                Text(String(localized: "sign.signing", defaultValue: "Signing..."))
+                            } else {
+                                ProgressView()
+                            }
+                            if signMode == .file {
+                                Spacer()
+                                Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
+                                    fileProgress?.cancel()
+                                    currentTask?.cancel()
+                                    currentTask = nil
+                                    isSigning = false
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
                     } else {
                         Text(String(localized: "sign.button", defaultValue: "Sign"))
                             .frame(maxWidth: .infinity)
@@ -251,22 +270,48 @@ struct SignView: View {
     private func signFile() {
         guard let fileURL = selectedFileURL,
               let signerFp = signerFingerprint ?? keyManagement.defaultKey?.fingerprint else { return }
-        isSigning = true
         let service = signingService
-        Task {
+        let progress = FileProgressReporter()
+        fileProgress = progress
+
+        isSigning = true
+        currentTask = Task {
+            #if canImport(UIKit)
+            var bgTaskID = UIBackgroundTaskIdentifier.invalid
+            bgTaskID = UIApplication.shared.beginBackgroundTask {
+                UIApplication.shared.endBackgroundTask(bgTaskID)
+                bgTaskID = .invalid
+            }
+            #endif
+            defer {
+                #if canImport(UIKit)
+                if bgTaskID != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTaskID)
+                }
+                #endif
+                fileProgress = nil
+                isSigning = false
+                currentTask = nil
+            }
             do {
                 guard fileURL.startAccessingSecurityScopedResource() else {
                     throw CypherAirError.internalError(reason: String(localized: "sign.cannotAccessFile", defaultValue: "Cannot access selected file"))
                 }
                 defer { fileURL.stopAccessingSecurityScopedResource() }
-                let fileData = try Data(contentsOf: fileURL)
-                let sig = try await service.signDetached(fileData, signerFingerprint: signerFp)
+                let sig = try await service.signDetachedStreaming(
+                    fileURL: fileURL,
+                    signerFingerprint: signerFp,
+                    progress: progress
+                )
+                try Task.checkCancellation()
                 detachedSignature = sig
+            } catch is CancellationError {
+                // User cancelled — no error to show
             } catch {
+                if case .operationCancelled = error as? CypherAirError { return }
                 self.error = CypherAirError.from(error) { .signingFailed(reason: $0) }
                 showError = true
             }
-            isSigning = false
         }
     }
 }
