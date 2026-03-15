@@ -3,7 +3,7 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use sequoia_openpgp as openpgp;
 
-use crate::decrypt::SignatureStatus;
+use crate::decrypt::{SignatureStatus, is_expired_error};
 use crate::error::PgpError;
 
 /// Result of signature verification.
@@ -47,14 +47,19 @@ pub fn verify_cleartext(
         })?
         .with_policy(&policy, None, helper);
 
-    // Graded result: if with_policy() fails (e.g., tampered cleartext signature),
-    // return Bad status instead of throwing. This lets the caller inspect the
-    // result rather than catching an exception.
+    // Graded result: if with_policy() fails, inspect the error before defaulting
+    // to Bad. A policy failure due to key expiry should produce Expired status so
+    // the UI can show "Ask sender to update" instead of "Content may have been modified."
     let mut verifier = match verifier_result {
         Ok(v) => v,
-        Err(_) => {
+        Err(e) => {
+            let status = if is_expired_error(&e) {
+                SignatureStatus::Expired
+            } else {
+                SignatureStatus::Bad
+            };
             return Ok(VerifyResult {
-                status: SignatureStatus::Bad,
+                status,
                 signer_fingerprint: None,
                 content: None,
             });
@@ -107,12 +112,17 @@ pub fn verify_detached(
         })?
         .with_policy(&policy, None, helper);
 
-    // Graded result: if with_policy() fails, return Bad status instead of throwing.
+    // Graded result: if with_policy() fails, inspect the error before defaulting to Bad.
     let mut verifier = match verifier_result {
         Ok(v) => v,
-        Err(_) => {
+        Err(e) => {
+            let status = if is_expired_error(&e) {
+                SignatureStatus::Expired
+            } else {
+                SignatureStatus::Bad
+            };
             return Ok(VerifyResult {
-                status: SignatureStatus::Bad,
+                status,
                 signer_fingerprint: None,
                 content: None,
             });
@@ -168,6 +178,18 @@ impl<'a> VerificationHelper for VerifyHelper<'a> {
                             }
                             Err(VerificationError::MissingKey { .. }) => {
                                 self.status = SignatureStatus::UnknownSigner;
+                            }
+                            Err(VerificationError::BadKey { ka, error, .. }) => {
+                                // Distinguish expired signer key from other key issues
+                                if is_expired_error(&error) {
+                                    self.status = SignatureStatus::Expired;
+                                    self.signer_fingerprint = Some(
+                                        ka.cert().fingerprint().to_hex().to_lowercase(),
+                                    );
+                                } else {
+                                    self.status = SignatureStatus::Bad;
+                                }
+                                return Ok(());
                             }
                             Err(_) => {
                                 // Graded result: set status but return Ok so the caller

@@ -36,13 +36,13 @@ final class MockAuthenticator: AuthenticationEvaluable, @unchecked Sendable {
 
         // High Security mode with no biometrics → always fail
         if mode == .highSecurity && !biometricsAvailable {
-            throw MockAuthError.biometricsUnavailable
+            throw AuthenticationError.biometricsUnavailable
         }
 
         if shouldSucceed {
             return true
         } else {
-            throw MockAuthError.authenticationFailed
+            throw AuthenticationError.failed
         }
     }
 
@@ -56,7 +56,4 @@ final class MockAuthenticator: AuthenticationEvaluable, @unchecked Sendable {
     }
 }
 
-enum MockAuthError: Error {
-    case authenticationFailed
-    case biometricsUnavailable
-}
+

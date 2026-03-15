@@ -173,8 +173,13 @@ fn write_and_finalize(message: Message, plaintext: &[u8]) -> Result<(), PgpError
 /// - All v6 recipients → SEIPDv2 (AEAD OCB)
 /// - Mixed v4+v6 → SEIPDv1 (lowest common denominator)
 ///
-/// Sequoia handles format auto-selection when recipient certs are passed
-/// to the encryption API.
+/// SECURITY NOTE (audit finding M1): Format auto-selection is intentionally
+/// delegated to Sequoia's `Encryptor`, which inspects recipient certificates'
+/// Features subpackets to determine the correct message format. This invariant
+/// is verified by packet-level assertions in `pgp-mobile/tests/cross_profile_tests.rs`
+/// (test_format_selection_*), which parse the raw SEIP version field for every
+/// recipient key version combination. After any Sequoia version bump, these tests
+/// must pass to confirm no regression in format selection behavior.
 ///
 /// Parameters:
 /// - `plaintext`: The data to encrypt.
