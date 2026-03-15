@@ -87,6 +87,12 @@ enum AuthPreferences {
     /// correct access control flags and update the mode preference.
     static let rewrapTargetModeKey = "com.cypherair.internal.rewrapTargetMode"
 
+    /// Flag indicating an interrupted modifyExpiry operation (crash recovery).
+    static let modifyExpiryInProgressKey = "com.cypherair.internal.modifyExpiryInProgress"
+
+    /// The fingerprint of the key being modified during an interrupted modifyExpiry.
+    static let modifyExpiryFingerprintKey = "com.cypherair.internal.modifyExpiryFingerprint"
+
     /// Default grace period: 3 minutes (180 seconds).
     static let defaultGracePeriod = 180
 }

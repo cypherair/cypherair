@@ -87,6 +87,9 @@ struct CypherAirApp: App {
         // Crash recovery: check for interrupted auth mode switch.
         auth.checkAndRecoverFromInterruptedRewrap(fingerprints: keyMgmt.keys.map(\.fingerprint))
 
+        // Crash recovery: check for interrupted modifyExpiry operation.
+        keyMgmt.checkAndRecoverFromInterruptedModifyExpiry()
+
         // Load contacts from disk.
         try? contacts.loadContacts()
 
