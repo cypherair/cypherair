@@ -40,6 +40,9 @@ pub enum SignatureStatus {
     Bad,
     /// Message was not signed.
     NotSigned,
+    /// Signer key has expired. Signature may have been valid when created.
+    /// PRD: "Ask sender to update."
+    Expired,
 }
 
 /// Parse the recipients of an encrypted message without decrypting.
@@ -300,6 +303,18 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
                             Err(VerificationError::MissingKey { .. }) => {
                                 self.signature_status = Some(SignatureStatus::UnknownSigner);
                             }
+                            Err(VerificationError::BadKey { ka, error, .. }) => {
+                                // Distinguish expired signer key from other key issues
+                                // (revoked, not signing-capable, etc.)
+                                if is_expired_error(&error) {
+                                    self.signature_status = Some(SignatureStatus::Expired);
+                                    self.signer_fingerprint = Some(
+                                        ka.cert().fingerprint().to_hex().to_lowercase(),
+                                    );
+                                } else {
+                                    self.signature_status = Some(SignatureStatus::Bad);
+                                }
+                            }
                             Err(_) => {
                                 self.signature_status = Some(SignatureStatus::Bad);
                             }
@@ -417,6 +432,31 @@ fn map_openpgp_error(err: &openpgp::Error, original: &openpgp::anyhow::Error) ->
             reason: format!("Decryption failed: {original}"),
         },
     }
+}
+
+/// Check if an error chain contains an `openpgp::Error::Expired` variant.
+/// Used to distinguish expired signer keys from other verification failures,
+/// so that the UI can show "Ask sender to update" instead of "Content may have
+/// been modified." See security audit finding M2+M3.
+///
+/// Uses the same hybrid strategy as `classify_decrypt_error()`:
+/// 1. Structured downcast (preferred, resilient to message rewording)
+/// 2. Error chain walk (catches nested Expired errors)
+/// 3. String fallback (defense-in-depth)
+pub(crate) fn is_expired_error(error: &openpgp::anyhow::Error) -> bool {
+    // Strategy 1: Direct downcast
+    if matches!(error.downcast_ref::<openpgp::Error>(), Some(openpgp::Error::Expired(_))) {
+        return true;
+    }
+    // Strategy 2: Walk the error chain for nested Expired variants
+    for cause in error.chain() {
+        if let Some(openpgp::Error::Expired(_)) = cause.downcast_ref::<openpgp::Error>() {
+            return true;
+        }
+    }
+    // Strategy 3: String fallback (defense-in-depth against error wrapping changes)
+    let err_str = error.to_string().to_lowercase();
+    err_str.contains("expired")
 }
 
 impl<'a> DecryptionHelper for DecryptHelper<'a> {
