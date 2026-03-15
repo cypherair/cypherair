@@ -1774,6 +1774,11 @@ public enum ArmorKind: Equatable, Hashable {
     case secretKey
     case message
     case signature
+    /**
+     * Unrecognized armor type. The data was dearmored successfully
+     * but the armor kind header was not one of the known types.
+     */
+    case unknown
 
 
 
@@ -1803,6 +1808,8 @@ public struct FfiConverterTypeArmorKind: FfiConverterRustBuffer {
         
         case 4: return .signature
         
+        case 5: return .unknown
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -1825,6 +1832,10 @@ public struct FfiConverterTypeArmorKind: FfiConverterRustBuffer {
         
         case .signature:
             writeInt(&buf, Int32(4))
+        
+        
+        case .unknown:
+            writeInt(&buf, Int32(5))
         
         }
     }
@@ -2233,6 +2244,11 @@ public enum SignatureStatus: Equatable, Hashable {
      * Message was not signed.
      */
     case notSigned
+    /**
+     * Signer key has expired. Signature may have been valid when created.
+     * PRD: "Ask sender to update."
+     */
+    case expired
 
 
 
@@ -2262,6 +2278,8 @@ public struct FfiConverterTypeSignatureStatus: FfiConverterRustBuffer {
         
         case 4: return .notSigned
         
+        case 5: return .expired
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -2284,6 +2302,10 @@ public struct FfiConverterTypeSignatureStatus: FfiConverterRustBuffer {
         
         case .notSigned:
             writeInt(&buf, Int32(4))
+        
+        
+        case .expired:
+            writeInt(&buf, Int32(5))
         
         }
     }

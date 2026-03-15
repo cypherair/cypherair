@@ -19,6 +19,7 @@ struct SignatureVerification {
         case .bad: "xmark.seal.fill"
         case .unknownSigner: "questionmark.circle.fill"
         case .notSigned: "minus.circle"
+        case .expired: "clock.badge.exclamationmark"
         }
     }
 
@@ -29,6 +30,7 @@ struct SignatureVerification {
         case .bad: "red"
         case .unknownSigner: "orange"
         case .notSigned: "secondary"
+        case .expired: "orange"
         }
     }
 
@@ -51,6 +53,8 @@ struct SignatureVerification {
             String(localized: "signature.unknown", defaultValue: "Signed by an unknown key — signer not in your contacts")
         case .notSigned:
             String(localized: "signature.none", defaultValue: "This message was not signed")
+        case .expired:
+            String(localized: "signature.expired", defaultValue: "Signed by an expired key — ask the sender to update their key")
         }
     }
 
@@ -59,6 +63,7 @@ struct SignatureVerification {
         switch status {
         case .bad: true
         case .unknownSigner: true
+        case .expired: true
         default: false
         }
     }

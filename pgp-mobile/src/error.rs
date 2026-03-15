@@ -87,11 +87,8 @@ pub enum PgpError {
     InternalError { reason: String },
 }
 
-/// Convert anyhow::Error to PgpError for Sequoia operations.
-impl From<sequoia_openpgp::anyhow::Error> for PgpError {
-    fn from(e: sequoia_openpgp::anyhow::Error) -> Self {
-        PgpError::InternalError {
-            reason: e.to_string(),
-        }
-    }
-}
+// NOTE: There is intentionally NO blanket `From<anyhow::Error> for PgpError` impl.
+// All Sequoia anyhow::Error results must be mapped to specific PgpError variants via
+// explicit .map_err() calls. This prevents the ? operator from silently converting
+// errors to InternalError, which would bypass classify_decrypt_error() and potentially
+// misclassify AEAD/MDC/wrong-key errors. See security audit finding H1.
