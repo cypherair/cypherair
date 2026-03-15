@@ -1,16 +1,16 @@
 # Cypher Air
 
-Offline OpenPGP encryption tool for iOS. GPLv3. Zero network access. Minimal permissions (Face ID usage description only).
+Offline OpenPGP encryption tool for iOS, iPadOS, and macOS. GPLv3. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
 
 ## Tech Stack
 
-- **Platform:** iOS 26.2+ / iPadOS 26.2+ only. Minimum device: 8 GB RAM.
+- **Platform:** iOS 26.2+ / iPadOS 26.2+ / macOS 26.2+. Minimum device: 8 GB RAM.
 - **Language:** Swift 6.2, SwiftUI (iOS 26 Liquid Glass design). UIKit only for system pickers.
 - **OpenPGP:** Sequoia PGP 2.2.0 (Rust, LGPL-2.0-or-later, compatible with App's GPLv3) with `crypto-openssl` backend (vendored static linking).
 - **Profiles:** Profile A (Universal): v4 keys, Ed25519+X25519, SEIPDv1. Profile B (Advanced): v6 keys, Ed448+X448, SEIPDv2 AEAD. See @docs/PRD.md Section 3.
 - **FFI:** Mozilla UniFFI 0.31.x. Rust wrapper crate `pgp-mobile` → generated Swift bindings → XCFramework.
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain).
-- **Build:** Xcode 26, Rust stable (latest, MSRV follows sequoia-openpgp requirements), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim`.
+- **Build:** Xcode 26, Rust stable (latest, MSRV follows sequoia-openpgp requirements), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin`.
 - **Localization:** English + Simplified Chinese via `.xcstrings` String Catalog.
 
 ## Architecture
