@@ -35,6 +35,141 @@ final class ModelTests: XCTestCase {
         }
     }
 
+    func test_cypherAirError_initFromPgpError_unsupportedAlgorithmMapped() {
+        let error = CypherAirError(pgpError: .UnsupportedAlgorithm(algo: "RSA"))
+        if case .unsupportedAlgorithm(let algo) = error {
+            XCTAssertEqual(algo, "RSA")
+        } else {
+            XCTFail("Expected .unsupportedAlgorithm, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_keyExpiredMapped() {
+        let error = CypherAirError(pgpError: .KeyExpired)
+        if case .keyExpired = error {
+            // Expected
+        } else {
+            XCTFail("Expected .keyExpired, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_badSignatureMapped() {
+        let error = CypherAirError(pgpError: .BadSignature)
+        if case .badSignature = error {
+            // Expected
+        } else {
+            XCTFail("Expected .badSignature, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_unknownSignerMapped() {
+        let error = CypherAirError(pgpError: .UnknownSigner)
+        if case .unknownSigner = error {
+            // Expected
+        } else {
+            XCTFail("Expected .unknownSigner, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_corruptDataMapped() {
+        let error = CypherAirError(pgpError: .CorruptData(reason: "test damage"))
+        if case .corruptData(let reason) = error {
+            XCTAssertEqual(reason, "test damage")
+        } else {
+            XCTFail("Expected .corruptData, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_invalidKeyDataMapped() {
+        let error = CypherAirError(pgpError: .InvalidKeyData(reason: "not a key"))
+        if case .invalidKeyData(let reason) = error {
+            XCTAssertEqual(reason, "not a key")
+        } else {
+            XCTFail("Expected .invalidKeyData, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_encryptionFailedMapped() {
+        let error = CypherAirError(pgpError: .EncryptionFailed(reason: "no recipients"))
+        if case .encryptionFailed(let reason) = error {
+            XCTAssertEqual(reason, "no recipients")
+        } else {
+            XCTFail("Expected .encryptionFailed, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_signingFailedMapped() {
+        let error = CypherAirError(pgpError: .SigningFailed(reason: "invalid key"))
+        if case .signingFailed(let reason) = error {
+            XCTAssertEqual(reason, "invalid key")
+        } else {
+            XCTFail("Expected .signingFailed, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_armorErrorMapped() {
+        let error = CypherAirError(pgpError: .ArmorError(reason: "bad format"))
+        if case .armorError(let reason) = error {
+            XCTAssertEqual(reason, "bad format")
+        } else {
+            XCTFail("Expected .armorError, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_integrityCheckFailedMapped() {
+        let error = CypherAirError(pgpError: .IntegrityCheckFailed)
+        if case .integrityCheckFailed = error {
+            // Expected
+        } else {
+            XCTFail("Expected .integrityCheckFailed, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_argon2idMemoryExceededMapped() {
+        let error = CypherAirError(pgpError: .Argon2idMemoryExceeded(requiredMb: 512))
+        if case .argon2idMemoryExceeded(let requiredMb) = error {
+            XCTAssertEqual(requiredMb, 512)
+        } else {
+            XCTFail("Expected .argon2idMemoryExceeded, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_revocationErrorMapped() {
+        let error = CypherAirError(pgpError: .RevocationError(reason: "bad cert"))
+        if case .revocationError(let reason) = error {
+            XCTAssertEqual(reason, "bad cert")
+        } else {
+            XCTFail("Expected .revocationError, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_keyGenerationFailedMapped() {
+        let error = CypherAirError(pgpError: .KeyGenerationFailed(reason: "rng failure"))
+        if case .keyGenerationFailed(let reason) = error {
+            XCTAssertEqual(reason, "rng failure")
+        } else {
+            XCTFail("Expected .keyGenerationFailed, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_s2kErrorMapped() {
+        let error = CypherAirError(pgpError: .S2kError(reason: "unsupported mode"))
+        if case .s2kError(let reason) = error {
+            XCTAssertEqual(reason, "unsupported mode")
+        } else {
+            XCTFail("Expected .s2kError, got \(error)")
+        }
+    }
+
+    func test_cypherAirError_initFromPgpError_internalErrorMapped() {
+        let error = CypherAirError(pgpError: .InternalError(reason: "unexpected state"))
+        if case .internalError(let reason) = error {
+            XCTAssertEqual(reason, "unexpected state")
+        } else {
+            XCTFail("Expected .internalError, got \(error)")
+        }
+    }
+
     func test_cypherAirError_errorDescription_notNil() {
         // Every error case should produce a non-nil errorDescription
         let errors: [CypherAirError] = [
