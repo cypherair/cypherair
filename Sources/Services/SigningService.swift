@@ -95,7 +95,7 @@ final class SigningService {
                 verificationKeys: verificationKeys
             )
         } catch {
-            throw CypherAirError.from(error) { _ in .badSignature }
+            throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
         let sigVerification = SignatureVerification(
@@ -127,7 +127,7 @@ final class SigningService {
                 verificationKeys: verificationKeys
             )
         } catch {
-            throw CypherAirError.from(error) { _ in .badSignature }
+            throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
         return SignatureVerification(

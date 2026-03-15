@@ -81,7 +81,7 @@ struct VerifyView: View {
                 Section {
                     HStack {
                         Image(systemName: verification.symbolName)
-                            .foregroundStyle(Color(verification.statusColor))
+                            .foregroundStyle(verification.statusColor)
                         Text(verification.statusDescription)
                             .font(.subheadline)
                     }

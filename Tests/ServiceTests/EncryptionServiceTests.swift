@@ -101,10 +101,10 @@ final class EncryptionServiceTests: XCTestCase {
             )
             XCTFail("Expected error for unknown recipient")
         } catch let error as CypherAirError {
-            if case .noRecipientsSelected = error {
+            if case .invalidKeyData = error {
                 // Expected — recipient fingerprint not found in contacts
             } else {
-                XCTFail("Expected .noRecipientsSelected, got \(error)")
+                XCTFail("Expected .invalidKeyData, got \(error)")
             }
         } catch {
             XCTFail("Unexpected error type: \(error)")
@@ -320,6 +320,87 @@ final class EncryptionServiceTests: XCTestCase {
         )
         XCTAssertEqual(String(data: resultV6.plaintext, encoding: .utf8), "Mixed recipients message")
     }
+
+    // MARK: - Encrypt-to-Self: No Default Key
+
+    func test_encryptText_encryptToSelf_noDefaultKey_throwsNoKeySelected() async {
+        // Create a recipient contact directly (no own key generated → no default key)
+        let recipientKey = try! PgpEngine().generateKey(
+            name: "Recipient", email: nil, expirySeconds: nil, profile: .universal
+        )
+        try! stack.contactService.addContact(publicKeyData: recipientKey.publicKeyData)
+        let info = try! PgpEngine().parseKeyInfo(keyData: recipientKey.publicKeyData)
+
+        do {
+            _ = try await stack.encryptionService.encryptText(
+                "test",
+                recipientFingerprints: [info.fingerprint],
+                signWithFingerprint: nil,
+                encryptToSelf: true
+            )
+            XCTFail("Expected noKeySelected error")
+        } catch let error as CypherAirError {
+            if case .noKeySelected = error {
+                // Expected — no default key when encryptToSelf is true
+            } else {
+                XCTFail("Expected .noKeySelected, got \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    // MARK: - Unknown Recipient: Improved Error
+
+    func test_encryptText_partialUnknownRecipient_throwsInvalidKeyData() async throws {
+        let identity = try generateKeyAndContact(profile: .universal)
+
+        do {
+            _ = try await stack.encryptionService.encryptText(
+                "test",
+                recipientFingerprints: [identity.fingerprint, "nonexistent-fingerprint"],
+                signWithFingerprint: nil,
+                encryptToSelf: false
+            )
+            XCTFail("Expected error for partially unknown recipients")
+        } catch let error as CypherAirError {
+            if case .invalidKeyData = error {
+                // Expected — one recipient not found in contacts
+            } else {
+                XCTFail("Expected .invalidKeyData, got \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    // MARK: - File Size: Rounding
+
+    func test_encryptFile_slightlyOver100MB_reportsCeiledSize() async {
+        do {
+            let identity = try generateKeyAndContact(profile: .universal)
+            // 100 MB + 1 byte → should report 101 MB (ceiling), not 100 MB (truncated)
+            let fileData = Data(repeating: 0xFF, count: 100 * 1024 * 1024 + 1)
+            _ = try await stack.encryptionService.encryptFile(
+                fileData,
+                recipientFingerprints: [identity.fingerprint],
+                signWithFingerprint: nil,
+                encryptToSelf: false
+            )
+            XCTFail("Expected fileTooLarge error")
+        } catch let error as CypherAirError {
+            if case .fileTooLarge(let sizeMB) = error {
+                XCTAssertEqual(sizeMB, 101,
+                               "File size should be ceiling-rounded to 101 MB, not truncated to 100")
+            } else {
+                XCTFail("Expected .fileTooLarge, got \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    // MARK: - Multiple Recipients
 
     func test_encryptText_multipleRecipients_bothCanDecrypt() async throws {
         let keyA = try generateKeyAndContact(profile: .universal, name: "RecipientA")

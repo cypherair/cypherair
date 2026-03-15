@@ -120,6 +120,52 @@ final class ContactServiceTests: XCTestCase {
                        "Contact should be removed from array")
     }
 
+    // MARK: - Confirm Key Update
+
+    func test_confirmKeyUpdate_replacesOldContact() throws {
+        let key1 = try engine.generateKey(
+            name: "Carol", email: "carol@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+        let key2 = try engine.generateKey(
+            name: "Carol", email: "carol@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+
+        // Add first key
+        _ = try contactService.addContact(publicKeyData: key1.publicKeyData)
+        XCTAssertEqual(contactService.contacts.count, 1)
+        let oldFingerprint = contactService.contacts[0].fingerprint
+
+        // Detect update
+        let result = try contactService.addContact(publicKeyData: key2.publicKeyData)
+        guard case .keyUpdateDetected(let newContact, _, let keyData) = result else {
+            return XCTFail("Expected .keyUpdateDetected")
+        }
+
+        // Confirm update
+        try contactService.confirmKeyUpdate(
+            existingFingerprint: oldFingerprint,
+            newContact: newContact,
+            keyData: keyData
+        )
+
+        // Verify: old contact replaced, new contact present
+        XCTAssertEqual(contactService.contacts.count, 1)
+        XCTAssertEqual(contactService.contacts[0].fingerprint, newContact.fingerprint)
+        XCTAssertNotEqual(contactService.contacts[0].fingerprint, oldFingerprint)
+
+        // Verify: new file exists on disk
+        let newFile = tempDir.appendingPathComponent("\(newContact.fingerprint).gpg")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: newFile.path),
+                      "New key file should exist after confirmKeyUpdate")
+
+        // Verify: old file removed
+        let oldFile = tempDir.appendingPathComponent("\(oldFingerprint).gpg")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldFile.path),
+                       "Old key file should be removed after confirmKeyUpdate")
+    }
+
     // MARK: - Lookup
 
     func test_contactsMatchingKeyIds_returnsCorrectContacts() throws {

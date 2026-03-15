@@ -75,7 +75,7 @@ final class EncryptionService {
         // Validate file size (100 MB limit)
         let maxSize = 100 * 1024 * 1024
         guard fileData.count <= maxSize else {
-            throw CypherAirError.fileTooLarge(sizeMB: fileData.count / (1024 * 1024))
+            throw CypherAirError.fileTooLarge(sizeMB: (fileData.count + 1024 * 1024 - 1) / (1024 * 1024))
         }
 
         return try await encrypt(
@@ -107,7 +107,10 @@ final class EncryptionService {
         }
 
         guard recipientKeys.count == recipientFingerprints.count else {
-            throw CypherAirError.noRecipientsSelected
+            throw CypherAirError.invalidKeyData(
+                reason: String(localized: "error.recipientNotFound",
+                               defaultValue: "One or more recipients could not be found in contacts.")
+            )
         }
 
         // Get signing key if requested (requires SE unwrap → Face ID)
@@ -122,7 +125,10 @@ final class EncryptionService {
 
         // Get encrypt-to-self key
         var selfKey: Data?
-        if encryptToSelf, let defaultKey = keyManagement.defaultKey {
+        if encryptToSelf {
+            guard let defaultKey = keyManagement.defaultKey else {
+                throw CypherAirError.noKeySelected
+            }
             selfKey = defaultKey.publicKeyData
         }
 
