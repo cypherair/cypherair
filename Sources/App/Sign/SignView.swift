@@ -1,5 +1,10 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 import UniformTypeIdentifiers
 
 /// Cleartext and detached signing view.
@@ -91,7 +96,12 @@ struct SignView: View {
                     GlassEffectContainer(spacing: 8) {
                         HStack {
                             Button {
+                                #if canImport(UIKit)
                                 UIPasteboard.general.string = signedMessage
+                                #elseif canImport(AppKit)
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(signedMessage, forType: .string)
+                                #endif
                                 if config.clipboardNotice {
                                     showClipboardNotice = true
                                 }
@@ -136,6 +146,7 @@ struct SignView: View {
                 }
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(String(localized: "sign.title", defaultValue: "Sign"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

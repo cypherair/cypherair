@@ -8,14 +8,14 @@ struct QRDisplayView: View {
     let publicKeyData: Data
     let displayName: String
 
-    @State private var qrImage: UIImage?
+    @State private var qrCGImage: CGImage?
     @State private var error: CypherAirError?
     @State private var showError = false
 
     var body: some View {
         VStack(spacing: 24) {
-            if let qrImage {
-                Image(uiImage: qrImage)
+            if let qrCGImage {
+                Image(decorative: qrCGImage, scale: 1.0)
                     .interpolation(.none)
                     .resizable()
                     .scaledToFit()
@@ -65,7 +65,7 @@ struct QRDisplayView: View {
                 let scaledImage = ciImage.transformed(by: transform)
 
                 if let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) {
-                    qrImage = UIImage(cgImage: cgImage)
+                    qrCGImage = cgImage
                 }
             }
         } catch {

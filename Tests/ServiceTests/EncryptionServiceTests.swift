@@ -424,6 +424,135 @@ final class EncryptionServiceTests: XCTestCase {
         }
     }
 
+    // MARK: - Encrypt-to-Self: Key Selection
+
+    func test_encryptText_encryptToSelfWithSpecificKey_canDecryptWithThatKey() async throws {
+        // Generate two keys — first becomes default, second is non-default
+        let defaultKey = try generateKeyAndContact(profile: .universal, name: "Default")
+        let specificKey = try generateKeyAndContact(profile: .universal, name: "Specific")
+        let recipient = try generateKeyAndContact(profile: .universal, name: "Recipient")
+
+        // Encrypt-to-self using the non-default key
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "Specific key self-encrypt",
+            recipientFingerprints: [recipient.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: true,
+            encryptToSelfFingerprint: specificKey.fingerprint
+        )
+
+        let binary = try stack.engine.dearmor(armored: ciphertext)
+
+        // The specific (non-default) key should be able to decrypt
+        var specificSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: specificKey.fingerprint)
+        defer { specificSecret.resetBytes(in: 0..<specificSecret.count) }
+
+        let result = try stack.engine.decrypt(
+            ciphertext: binary,
+            secretKeys: [specificSecret],
+            verificationKeys: []
+        )
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "Specific key self-encrypt")
+
+        // The default key should NOT be able to decrypt
+        var defaultSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)
+        defer { defaultSecret.resetBytes(in: 0..<defaultSecret.count) }
+
+        XCTAssertThrowsError(
+            try stack.engine.decrypt(
+                ciphertext: binary,
+                secretKeys: [defaultSecret],
+                verificationKeys: []
+            )
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            if case .NoMatchingKey = pgpError {
+                // Expected — default key is not a recipient
+            } else {
+                XCTFail("Expected .NoMatchingKey, got \(pgpError)")
+            }
+        }
+    }
+
+    func test_encryptText_encryptToSelfFingerprintNil_usesDefaultKey() async throws {
+        // Generate two keys — first becomes default
+        let defaultKey = try generateKeyAndContact(profile: .universal, name: "Default")
+        _ = try generateKeyAndContact(profile: .universal, name: "Other")
+        let recipient = try generateKeyAndContact(profile: .universal, name: "Recipient")
+
+        // Encrypt-to-self with nil fingerprint — should fall back to default key
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "Default key fallback",
+            recipientFingerprints: [recipient.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: true,
+            encryptToSelfFingerprint: nil
+        )
+
+        let binary = try stack.engine.dearmor(armored: ciphertext)
+
+        // Default key should be able to decrypt
+        var defaultSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)
+        defer { defaultSecret.resetBytes(in: 0..<defaultSecret.count) }
+
+        let result = try stack.engine.decrypt(
+            ciphertext: binary,
+            secretKeys: [defaultSecret],
+            verificationKeys: []
+        )
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "Default key fallback")
+    }
+
+    func test_encryptText_encryptToSelfWithSpecificKey_profileB() async throws {
+        let defaultKey = try generateKeyAndContact(profile: .advanced, name: "Default B")
+        let specificKey = try generateKeyAndContact(profile: .advanced, name: "Specific B")
+        let recipient = try generateKeyAndContact(profile: .advanced, name: "Recipient B")
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "Profile B specific key",
+            recipientFingerprints: [recipient.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: true,
+            encryptToSelfFingerprint: specificKey.fingerprint
+        )
+
+        let binary = try stack.engine.dearmor(armored: ciphertext)
+
+        // Specific key can decrypt
+        var specificSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: specificKey.fingerprint)
+        defer { specificSecret.resetBytes(in: 0..<specificSecret.count) }
+
+        let result = try stack.engine.decrypt(
+            ciphertext: binary,
+            secretKeys: [specificSecret],
+            verificationKeys: []
+        )
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "Profile B specific key")
+
+        // Default key cannot decrypt
+        var defaultSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)
+        defer { defaultSecret.resetBytes(in: 0..<defaultSecret.count) }
+
+        XCTAssertThrowsError(
+            try stack.engine.decrypt(
+                ciphertext: binary,
+                secretKeys: [defaultSecret],
+                verificationKeys: []
+            )
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            if case .NoMatchingKey = pgpError {
+                // Expected
+            } else {
+                XCTFail("Expected .NoMatchingKey, got \(pgpError)")
+            }
+        }
+    }
+
     // MARK: - Unknown Recipient: Improved Error
 
     func test_encryptText_partialUnknownRecipient_throwsInvalidKeyData() async throws {

@@ -91,6 +91,7 @@ struct VerifyView: View {
                 }
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(String(localized: "verify.title", defaultValue: "Verify"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
