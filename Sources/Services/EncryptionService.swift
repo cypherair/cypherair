@@ -40,7 +40,8 @@ final class EncryptionService {
         _ plaintext: String,
         recipientFingerprints: [String],
         signWithFingerprint: String?,
-        encryptToSelf: Bool
+        encryptToSelf: Bool,
+        encryptToSelfFingerprint: String? = nil
     ) async throws -> Data {
         let plaintextData = Data(plaintext.utf8)
         return try await encrypt(
@@ -48,6 +49,7 @@ final class EncryptionService {
             recipientFingerprints: recipientFingerprints,
             signWithFingerprint: signWithFingerprint,
             encryptToSelf: encryptToSelf,
+            encryptToSelfFingerprint: encryptToSelfFingerprint,
             binary: false
         )
     }
@@ -70,7 +72,8 @@ final class EncryptionService {
         _ fileData: Data,
         recipientFingerprints: [String],
         signWithFingerprint: String?,
-        encryptToSelf: Bool
+        encryptToSelf: Bool,
+        encryptToSelfFingerprint: String? = nil
     ) async throws -> Data {
         // Validate file size (100 MB limit)
         let maxSize = 100 * 1024 * 1024
@@ -83,6 +86,7 @@ final class EncryptionService {
             recipientFingerprints: recipientFingerprints,
             signWithFingerprint: signWithFingerprint,
             encryptToSelf: encryptToSelf,
+            encryptToSelfFingerprint: encryptToSelfFingerprint,
             binary: true
         )
     }
@@ -95,6 +99,7 @@ final class EncryptionService {
         recipientFingerprints: [String],
         signWithFingerprint: String?,
         encryptToSelf: Bool,
+        encryptToSelfFingerprint: String? = nil,
         binary: Bool
     ) async throws -> Data {
         guard !recipientFingerprints.isEmpty else {
@@ -126,10 +131,14 @@ final class EncryptionService {
         // Get encrypt-to-self key
         var selfKey: Data?
         if encryptToSelf {
-            guard let defaultKey = keyManagement.defaultKey else {
+            if let fp = encryptToSelfFingerprint,
+               let key = keyManagement.keys.first(where: { $0.fingerprint == fp }) {
+                selfKey = key.publicKeyData
+            } else if let defaultKey = keyManagement.defaultKey {
+                selfKey = defaultKey.publicKeyData
+            } else {
                 throw CypherAirError.noKeySelected
             }
-            selfKey = defaultKey.publicKeyData
         }
 
         defer {

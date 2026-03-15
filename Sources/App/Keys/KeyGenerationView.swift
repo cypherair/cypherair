@@ -6,6 +6,9 @@ struct KeyGenerationView: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
 
+    enum Field { case name, email }
+    @FocusState private var focusedField: Field?
+
     @State private var name = ""
     @State private var email = ""
     @State private var profile: KeyProfile = .universal
@@ -42,14 +45,22 @@ struct KeyGenerationView: View {
                     text: $name
                 )
                 .textContentType(.name)
+                .focused($focusedField, equals: .name)
+                .submitLabel(.next)
+                .onSubmit { focusedField = .email }
 
                 TextField(
                     String(localized: "keygen.email", defaultValue: "Email (optional)"),
                     text: $email
                 )
                 .textContentType(.emailAddress)
+                #if canImport(UIKit)
                 .keyboardType(.emailAddress)
                 .textInputAutocapitalization(.never)
+                #endif
+                .focused($focusedField, equals: .email)
+                .submitLabel(.done)
+                .onSubmit { focusedField = nil }
             } header: {
                 Text(String(localized: "keygen.identity.header", defaultValue: "Identity"))
             }
@@ -84,6 +95,7 @@ struct KeyGenerationView: View {
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isGenerating)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(String(localized: "keygen.title", defaultValue: "Generate Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

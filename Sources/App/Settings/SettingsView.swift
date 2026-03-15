@@ -156,7 +156,9 @@ struct SettingsView: View {
                     }
                 }
                 .navigationTitle(String(localized: "settings.mode.highWarning.title", defaultValue: "Enable High Security Mode"))
+                #if canImport(UIKit)
                 .navigationBarTitleDisplayMode(.inline)
+                #endif
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(String(localized: "common.cancel", defaultValue: "Cancel")) {

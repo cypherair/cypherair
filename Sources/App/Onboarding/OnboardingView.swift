@@ -18,8 +18,10 @@ struct OnboardingView: View {
             OnboardingPageThree()
                 .tag(2)
         }
+        #if canImport(UIKit)
         .tabViewStyle(.page(indexDisplayMode: .always))
         .indexViewStyle(.page(backgroundDisplayMode: .always))
+        #endif
     }
 }
 

@@ -2,13 +2,13 @@
 # build-xcframework.sh — Automated build pipeline for pgp-mobile XCFramework.
 #
 # This script:
-# 1. Cross-compiles pgp-mobile for iOS device and simulator targets
+# 1. Cross-compiles pgp-mobile for iOS device, simulator, and macOS targets
 # 2. Generates UniFFI Swift bindings
 # 3. Creates the XCFramework
 #
 # Prerequisites:
 # - Xcode (latest stable) with command-line tools
-# - Rust stable with targets: aarch64-apple-ios, aarch64-apple-ios-sim
+# - Rust stable with targets: aarch64-apple-ios, aarch64-apple-ios-sim, aarch64-apple-darwin
 # - perl + make (for vendored OpenSSL compilation)
 #
 # Usage:
@@ -39,7 +39,7 @@ echo "Build mode: $BUILD_DIR"
 echo ""
 
 # ── Step 1: Verify Rust targets ──────────────────────────────────
-echo "[1/7] Verifying Rust targets..."
+echo "[1/9] Verifying Rust targets..."
 if ! rustup target list --installed | grep -q "aarch64-apple-ios$"; then
     echo "  Installing aarch64-apple-ios target..."
     rustup target add aarch64-apple-ios
@@ -48,11 +48,15 @@ if ! rustup target list --installed | grep -q "aarch64-apple-ios-sim"; then
     echo "  Installing aarch64-apple-ios-sim target..."
     rustup target add aarch64-apple-ios-sim
 fi
+if ! rustup target list --installed | grep -q "aarch64-apple-darwin"; then
+    echo "  Installing aarch64-apple-darwin target..."
+    rustup target add aarch64-apple-darwin
+fi
 echo "  ✓ Targets ready"
 
 # ── Step 2: Build for iOS device ─────────────────────────────────
 echo ""
-echo "[2/7] Building for aarch64-apple-ios (device)..."
+echo "[2/9] Building for aarch64-apple-ios (device)..."
 echo "  Note: First build compiles vendored OpenSSL (~3-5 min)"
 cargo build $CARGO_FLAGS --target aarch64-apple-ios --manifest-path "$MANIFEST"
 DEVICE_LIB="$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-ios/$BUILD_DIR/libpgp_mobile.a"
@@ -65,7 +69,7 @@ ls -lh "$DEVICE_LIB"
 
 # ── Step 3: Build for iOS simulator ──────────────────────────────
 echo ""
-echo "[3/7] Building for aarch64-apple-ios-sim (simulator)..."
+echo "[3/9] Building for aarch64-apple-ios-sim (simulator)..."
 cargo build $CARGO_FLAGS --target aarch64-apple-ios-sim --manifest-path "$MANIFEST"
 SIM_LIB="$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-ios-sim/$BUILD_DIR/libpgp_mobile.a"
 if [ ! -f "$SIM_LIB" ]; then
@@ -74,9 +78,20 @@ fi
 echo "  ✓ Simulator library: $SIM_LIB"
 ls -lh "$SIM_LIB"
 
-# ── Step 4: Build host dylib for UniFFI bindgen ──────────────────
+# ── Step 4: Build for macOS (Apple Silicon) ──────────────────────
 echo ""
-echo "[4/7] Building host dylib for UniFFI bindgen..."
+echo "[4/9] Building for aarch64-apple-darwin (macOS)..."
+cargo build $CARGO_FLAGS --target aarch64-apple-darwin --manifest-path "$MANIFEST"
+MACOS_LIB="$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.a"
+if [ ! -f "$MACOS_LIB" ]; then
+    MACOS_LIB="$SCRIPT_DIR/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.a"
+fi
+echo "  ✓ macOS library: $MACOS_LIB"
+ls -lh "$MACOS_LIB"
+
+# ── Step 5: Build host dylib for UniFFI bindgen ──────────────────
+echo ""
+echo "[5/9] Building host dylib for UniFFI bindgen..."
 # Temporarily add cdylib to crate-type so cargo produces a .dylib for bindgen.
 # The dylib is only needed on the macOS host for uniffi-bindgen — it is never
 # shipped to iOS.  We restore the original Cargo.toml afterwards.
@@ -113,9 +128,9 @@ if [ ! -f "$HOST_DYLIB" ]; then
 fi
 echo "  ✓ Host dylib: $HOST_DYLIB"
 
-# ── Step 5: Generate Swift bindings ──────────────────────────────
+# ── Step 6: Generate Swift bindings ──────────────────────────────
 echo ""
-echo "[5/7] Generating UniFFI Swift bindings..."
+echo "[6/9] Generating UniFFI Swift bindings..."
 rm -rf "$BINDINGS_DIR"
 mkdir -p "$BINDINGS_DIR"
 (cd "$SCRIPT_DIR/pgp-mobile" && cargo run $CARGO_FLAGS --bin uniffi-bindgen \
@@ -130,9 +145,9 @@ fi
 echo "  ✓ Bindings generated in $BINDINGS_DIR"
 ls -la "$BINDINGS_DIR"
 
-# ── Step 6: Create XCFramework ───────────────────────────────────
+# ── Step 7: Create XCFramework ───────────────────────────────────
 echo ""
-echo "[6/7] Creating XCFramework..."
+echo "[7/9] Creating XCFramework..."
 rm -rf "$XCFRAMEWORK_OUTPUT"
 
 # Move the modulemap and header to a headers directory
@@ -148,17 +163,20 @@ fi
 xcodebuild -create-xcframework \
     -library "$DEVICE_LIB" -headers "$HEADERS_DIR" \
     -library "$SIM_LIB" -headers "$HEADERS_DIR" \
+    -library "$MACOS_LIB" -headers "$HEADERS_DIR" \
     -output "$XCFRAMEWORK_OUTPUT"
 
 echo "  ✓ XCFramework created: $XCFRAMEWORK_OUTPUT"
 
-# ── Step 7: Check binary size ────────────────────────────────────
+# ── Step 8: Check binary size ────────────────────────────────────
 echo ""
-echo "[7/8] Binary size check..."
+echo "[8/9] Binary size check..."
 DEVICE_SIZE=$(stat -f%z "$DEVICE_LIB" 2>/dev/null || stat --printf="%s" "$DEVICE_LIB" 2>/dev/null || echo "unknown")
 SIM_SIZE=$(stat -f%z "$SIM_LIB" 2>/dev/null || stat --printf="%s" "$SIM_LIB" 2>/dev/null || echo "unknown")
+MACOS_SIZE=$(stat -f%z "$MACOS_LIB" 2>/dev/null || stat --printf="%s" "$MACOS_LIB" 2>/dev/null || echo "unknown")
 echo "  Device library: $DEVICE_SIZE bytes"
 echo "  Simulator library: $SIM_SIZE bytes"
+echo "  macOS library: $MACOS_SIZE bytes"
 
 # Check if under 10 MB threshold (C1.6)
 if [ "$DEVICE_SIZE" != "unknown" ] && [ "$DEVICE_SIZE" -gt 10485760 ]; then
@@ -167,9 +185,9 @@ else
     echo "  ✓ Device library within 10 MB threshold"
 fi
 
-# ── Step 8: Sync Swift bindings to Xcode source tree ─────────────
+# ── Step 9: Sync Swift bindings to Xcode source tree ─────────────
 echo ""
-echo "[8/8] Syncing generated bindings to Sources/PgpMobile/..."
+echo "[9/9] Syncing generated bindings to Sources/PgpMobile/..."
 SWIFT_BINDING_SRC="$BINDINGS_DIR/pgp_mobile.swift"
 SWIFT_BINDING_DST="$SCRIPT_DIR/Sources/PgpMobile/pgp_mobile.swift"
 if [ -f "$SWIFT_BINDING_SRC" ]; then

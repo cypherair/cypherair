@@ -66,6 +66,7 @@ struct AddContactView: View {
                 .disabled(addButtonDisabled)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(String(localized: "addcontact.title", defaultValue: "Add Contact"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

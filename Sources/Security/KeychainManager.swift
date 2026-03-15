@@ -31,7 +31,8 @@ struct SystemKeychain: KeychainManageable {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecValueData as String: data
+            kSecValueData as String: data,
+            kSecUseDataProtectionKeychain as String: true
         ]
 
         // kSecAttrAccessControl and kSecAttrAccessible are mutually exclusive.
@@ -61,7 +62,8 @@ struct SystemKeychain: KeychainManageable {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseDataProtectionKeychain as String: true
         ]
 
         var result: AnyObject?
@@ -88,7 +90,8 @@ struct SystemKeychain: KeychainManageable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
         ]
 
         let status = SecItemDelete(query as CFDictionary)
@@ -108,7 +111,8 @@ struct SystemKeychain: KeychainManageable {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecReturnData as String: false
+            kSecReturnData as String: false,
+            kSecUseDataProtectionKeychain as String: true
         ]
 
         let status = SecItemCopyMatching(query as CFDictionary, nil)
@@ -120,7 +124,8 @@ struct SystemKeychain: KeychainManageable {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: account,
             kSecReturnAttributes as String: true,
-            kSecMatchLimit as String: kSecMatchLimitAll
+            kSecMatchLimit as String: kSecMatchLimitAll,
+            kSecUseDataProtectionKeychain as String: true
         ]
 
         var result: AnyObject?

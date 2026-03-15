@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 import UniformTypeIdentifiers
 
 /// Unified two-phase decryption view for text and files.
@@ -165,6 +167,7 @@ struct DecryptView: View {
                 }
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(String(localized: "decrypt.title", defaultValue: "Decrypt"))
         .fileImporter(
             isPresented: $showFileImporter,
@@ -354,15 +357,19 @@ struct DecryptView: View {
 
         isDecrypting = true
         currentTask = Task {
+            #if canImport(UIKit)
             var bgTaskID = UIBackgroundTaskIdentifier.invalid
             bgTaskID = UIApplication.shared.beginBackgroundTask {
                 UIApplication.shared.endBackgroundTask(bgTaskID)
                 bgTaskID = .invalid
             }
+            #endif
             defer {
+                #if canImport(UIKit)
                 if bgTaskID != .invalid {
                     UIApplication.shared.endBackgroundTask(bgTaskID)
                 }
+                #endif
                 isDecrypting = false
                 currentTask = nil
             }
