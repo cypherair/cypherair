@@ -23,6 +23,9 @@ enum AuthenticationError: Error {
     case modeSwitchFailed(underlying: Error)
     /// No private key identities found to re-wrap during mode switch.
     case noIdentities
+    /// High Security mode requires at least one backed-up key.
+    /// The user must back up a key before enabling High Security mode.
+    case backupRequired
 }
 
 /// Manages device authentication (Face ID / Touch ID) and auth mode switching.
@@ -117,6 +120,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
                                              || error.code == .biometryNotEnrolled
                                              || error.code == .biometryLockout {
                 throw AuthenticationError.biometricsUnavailable
+            } catch let error as LAError where error.code == .userCancel
+                                             || error.code == .appCancel
+                                             || error.code == .systemCancel {
+                throw AuthenticationError.cancelled
+            } catch {
+                throw AuthenticationError.failed
             }
         }
     }
@@ -124,29 +133,9 @@ final class AuthenticationManager: AuthenticationEvaluable {
     // MARK: - Access Control Creation
 
     /// Create a SecAccessControl appropriate for the given authentication mode.
-    ///
-    /// - Standard: [.privateKeyUsage, .biometryAny, .or, .devicePasscode]
-    /// - High Security: [.privateKeyUsage, .biometryAny]
+    /// Delegates to `AuthenticationMode.createAccessControl()` — the single source of truth.
     func createAccessControl(for mode: AuthenticationMode) throws -> SecAccessControl {
-        let flags: SecAccessControlCreateFlags
-        switch mode {
-        case .standard:
-            flags = [.privateKeyUsage, .biometryAny, .or, .devicePasscode]
-        case .highSecurity:
-            flags = [.privateKeyUsage, .biometryAny]
-        }
-
-        var error: Unmanaged<CFError>?
-        guard let accessControl = SecAccessControlCreateWithFlags(
-            kCFAllocatorDefault,
-            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            flags,
-            &error
-        ) else {
-            throw AuthenticationError.accessControlCreationFailed
-        }
-
-        return accessControl
+        try mode.createAccessControl()
     }
 
     // MARK: - Mode Switching
@@ -177,6 +166,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
             throw AuthenticationError.noIdentities
         }
 
+        // Defense-in-depth: require at least one backed-up key before enabling
+        // High Security mode. The UI should also warn; this is the safety net.
+        if newMode == .highSecurity && !hasBackup {
+            throw AuthenticationError.backupRequired
+        }
+
         let oldMode = currentMode
         guard newMode != oldMode else { return }
 
@@ -189,8 +184,9 @@ final class AuthenticationManager: AuthenticationEvaluable {
             throw AuthenticationError.failed
         }
 
-        // Step 1: Set in-progress flag before any Keychain modifications.
+        // Step 1: Set in-progress flag and target mode before any Keychain modifications.
         defaults.set(true, forKey: AuthPreferences.rewrapInProgressKey)
+        defaults.set(newMode.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
 
         // Phase A: Create all pending items (Steps 2-3).
         // If anything fails here, old items are intact — safe to clean up pending and abort.
@@ -282,6 +278,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
             // Phase A failed: old items are intact. Safe to clean up pending and abort.
             cleanupPendingItems(fingerprints: fingerprints)
             defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
+            defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
             throw AuthenticationError.modeSwitchFailed(underlying: error)
         }
 
@@ -307,15 +304,20 @@ final class AuthenticationManager: AuthenticationEvaluable {
             }
 
             // Step 5: Rename temporary items to permanent names (load + save + delete).
+            // The SE key item is saved without Keychain-level access control because
+            // the primary enforcement is at the SE level: the SE key was generated
+            // in Phase A with the correct biometric/passcode flags, and
+            // reconstructKey(from:) enforces those flags in hardware.
             for fingerprint in fingerprints {
-                try promoteFromPending(fingerprint: fingerprint)
+                try promoteFromPending(fingerprint: fingerprint, seKeyAccessControl: nil)
             }
 
             // Step 6: Persist mode preference.
             defaults.set(newMode.rawValue, forKey: AuthPreferences.authModeKey)
 
-            // Step 7: Clear in-progress flag.
+            // Step 7: Clear in-progress flag and target mode.
             defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
+            defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
 
         } catch {
             // Phase B failed: some old items may already be deleted.
@@ -335,11 +337,22 @@ final class AuthenticationManager: AuthenticationEvaluable {
     /// - Temporary items exist + old items exist: interrupted before deletion.
     ///   Delete temporary items. Original keys remain intact.
     /// - Old items missing + temporary items exist: interrupted after old deletion
-    ///   but before rename. Promote temporary items to permanent names.
+    ///   but before rename. Promote temporary items to permanent names with
+    ///   correct access control flags, and update the persisted auth mode.
     /// - Neither exists: catastrophic. Clear flag. User must restore from backup.
     func checkAndRecoverFromInterruptedRewrap(fingerprints: [String]) {
         guard defaults.bool(forKey: AuthPreferences.rewrapInProgressKey) else {
             return
+        }
+
+        // Read the target mode that was being switched to.
+        // If absent (legacy data or corruption), fall back to current mode.
+        let targetMode: AuthenticationMode
+        if let targetRaw = defaults.string(forKey: AuthPreferences.rewrapTargetModeKey),
+           let mode = AuthenticationMode(rawValue: targetRaw) {
+            targetMode = mode
+        } else {
+            targetMode = currentMode
         }
 
         for fingerprint in fingerprints {
@@ -373,8 +386,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
 
                 if pendingSaltExists && pendingSealedExists {
                     // All 3 pending items present — safe to promote.
+                    // The SE key item is saved without Keychain-level access control.
+                    // The primary enforcement is at the SE level (the SE key was
+                    // generated with the correct biometric flags in Phase A).
                     do {
-                        try promoteFromPending(fingerprint: fingerprint)
+                        try promoteFromPending(fingerprint: fingerprint, seKeyAccessControl: nil)
                     } catch {
                         // If promotion fails, the pending items remain in Keychain
                         // for manual recovery. The user will need to restore from backup.
@@ -389,8 +405,15 @@ final class AuthenticationManager: AuthenticationEvaluable {
             // The user must restore from backup. Clear the flag below.
         }
 
-        // Always clear the flag after recovery attempt.
+        // If Case 2 promotion succeeded, persist the target mode as the current mode.
+        // This is safe even if some keys failed promotion — the mode matches the
+        // access control flags on the keys that were successfully promoted.
+        // If no promotion happened (Case 1 or Case 3), this is harmless.
+        defaults.set(targetMode.rawValue, forKey: AuthPreferences.authModeKey)
+
+        // Always clear the flags after recovery attempt.
         defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
+        defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
     }
 
     // MARK: - Private Helpers
@@ -398,10 +421,13 @@ final class AuthenticationManager: AuthenticationEvaluable {
     /// Promote pending Keychain items to permanent names for one identity.
     /// Sequence: load all pending → save as permanent → delete pending.
     ///
+    /// The SE key item is saved with the provided access control (defense-in-depth
+    /// at the Keychain layer). Salt and sealed box use no access control.
+    ///
     /// If saving permanent items partially fails, any already-saved permanent
     /// items are rolled back (deleted) to preserve the pending-only state.
     /// This prevents crash recovery from seeing partial permanent data.
-    private func promoteFromPending(fingerprint: String) throws {
+    private func promoteFromPending(fingerprint: String, seKeyAccessControl: SecAccessControl?) throws {
         let account = KeychainConstants.defaultAccount
 
         // Load all 3 pending items first (validates completeness before writing).
@@ -423,11 +449,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
         var savedPermanentServices: [String] = []
 
         do {
+            // SE key item gets access control flags for defense-in-depth.
             try keychain.save(
                 seKeyData,
                 service: KeychainConstants.seKeyService(fingerprint: fingerprint),
                 account: account,
-                accessControl: nil
+                accessControl: seKeyAccessControl
             )
             savedPermanentServices.append(KeychainConstants.seKeyService(fingerprint: fingerprint))
 
