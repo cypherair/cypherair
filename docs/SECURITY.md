@@ -239,7 +239,33 @@ The `openssl-src` crate compiles OpenSSL from C source. Any undiscovered buffer 
 
 The Enhanced Security capability is additive. It never breaks compatibility with older devices.
 
-## 7. AI Coding Red Lines
+## 7. Known Limitations
+
+### 7.1 Passphrase `String` Cannot Be Reliably Zeroized
+
+**Scope:** Affects only private key import and export operations — not routine decryption or signing, which use SE-unwrapped key bytes (`Data`) that are properly zeroized.
+
+**Issue:** Swift `String` is a value type with copy-on-write semantics. There is no supported API to overwrite a `String`'s internal buffer in place. When the user enters a passphrase for key export (S2K protection) or key import (S2K unlock), the passphrase exists as a `String` in memory until ARC deallocates it. The exact lifetime depends on the Swift runtime and is not deterministic.
+
+**Why this is not fixed:**
+
+1. **SwiftUI constraint:** `SecureField` — the only system-provided secure text input — binds to `String`. There is no `Data`-backed alternative.
+2. **FFI boundary:** UniFFI transfers `String` by copying through `RustBuffer`. Even if the Swift side could zeroize its copy, the Rust side receives an independent copy (which Sequoia consumes and the Rust `zeroize` crate handles on its side).
+3. **Platform-wide pattern:** No shipping iOS app (including Apple's own Keychain prompts) can zeroize `String` passphrases. This is an accepted platform limitation.
+
+**Mitigations:**
+
+- **Short lifetime:** The passphrase `String` is only alive for the duration of the import/export call. It is not stored in any persistent state, UserDefaults, or Keychain.
+- **Rust-side zeroize:** The `zeroize` crate ensures the Rust copy of the passphrase is overwritten after use.
+- **iOS memory protections:** ASLR, sandboxing, and MIE (on A19+ devices) make memory scanning attacks significantly harder.
+- **Low frequency:** Import and export are infrequent operations (typically once during setup and for backups), minimizing the window of exposure.
+
+**Rejected alternatives:**
+
+- `UnsafeMutableBufferPointer<UInt8>` with manual zeroing: Would require forking `SecureField` or building a custom UIKit text field, bypassing system-provided secure input. The security loss from a custom input field (no system-level screen recording protection, no secure text entry mode) would outweigh the benefit of zeroizable memory.
+- `Data`-based passphrase: UniFFI does not support `Data` ↔ `String` conversion at the FFI boundary without an intermediate `String` allocation, negating the benefit.
+
+## 8. AI Coding Red Lines
 
 The following files and functions are security-critical. Claude Code must **stop and describe proposed changes** before editing them. Do not make autonomous modifications.
 
