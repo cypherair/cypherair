@@ -121,14 +121,13 @@ final class ContactService {
     ///   - newContact: The new contact parsed from the incoming key.
     ///   - keyData: Binary public key data for the new contact.
     func confirmKeyUpdate(existingFingerprint: String, newContact: Contact, keyData: Data) throws {
-        // Remove old key file and contact entry
-        try removeContact(fingerprint: existingFingerprint)
-
-        // Save new key
+        // Write new key first — if this fails, the old contact remains intact
         let filename = "\(newContact.fingerprint).gpg"
         let fileURL = contactsDirectory.appendingPathComponent(filename)
         try keyData.write(to: fileURL, options: .atomic)
 
+        // Now safe to remove old contact
+        try removeContact(fingerprint: existingFingerprint)
         contacts.append(newContact)
     }
 
