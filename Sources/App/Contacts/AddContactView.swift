@@ -32,6 +32,9 @@ struct AddContactView: View {
 
     // File import state
     @State private var showFileImporter = false
+    /// Raw key data for binary .gpg/.pgp files that cannot be represented as a String.
+    @State private var importedKeyData: Data?
+    @State private var importedFileName: String?
 
     var body: some View {
         Form {
@@ -114,6 +117,11 @@ struct AddContactView: View {
                 loadFileContents(from: url)
             }
         }
+        .onChange(of: importMode) { _, _ in
+            // Clear stale binary data when switching modes
+            importedKeyData = nil
+            importedFileName = nil
+        }
         .onChange(of: selectedPhotoItem) { _, newItem in
             guard let newItem else { return }
             processQRPhoto(newItem)
@@ -165,6 +173,24 @@ struct AddContactView: View {
                     systemImage: "doc"
                 )
             }
+
+            if let fileName = importedFileName, importedKeyData != nil {
+                HStack {
+                    Label(fileName, systemImage: "doc.fill")
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Button {
+                        importedKeyData = nil
+                        importedFileName = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(String(localized: "addcontact.clearFile", defaultValue: "Clear file"))
+                }
+            }
         } header: {
             Text(String(localized: "addcontact.file.header", defaultValue: "Public Key File (.asc, .gpg, .pgp)"))
         }
@@ -175,8 +201,8 @@ struct AddContactView: View {
     private var addButtonDisabled: Bool {
         switch importMode {
         case .paste: return armoredText.isEmpty
-        case .qrPhoto: return armoredText.isEmpty || isProcessingQR
-        case .file: return armoredText.isEmpty
+        case .qrPhoto: return (armoredText.isEmpty && importedKeyData == nil) || isProcessingQR
+        case .file: return armoredText.isEmpty && importedKeyData == nil
         }
     }
 
@@ -184,7 +210,7 @@ struct AddContactView: View {
 
     private func addContact() {
         do {
-            let data = Data(armoredText.utf8)
+            let data = importedKeyData ?? Data(armoredText.utf8)
             let result = try contactService.addContact(publicKeyData: data)
             switch result {
             case .added, .duplicate:
@@ -235,9 +261,13 @@ struct AddContactView: View {
                 // rather than bypassing the confirmation flow (PRD Section 4.2).
                 if let armoredString = String(data: publicKeyData, encoding: .utf8) {
                     armoredText = armoredString
+                    importedKeyData = nil
+                    importedFileName = nil
                 } else {
-                    // Binary key data — encode as ASCII for the text field
-                    armoredText = String(data: publicKeyData, encoding: .ascii) ?? ""
+                    // Binary key data — store raw Data, bypass String conversion
+                    importedKeyData = publicKeyData
+                    importedFileName = String(localized: "addcontact.qr.binaryKey", defaultValue: "Binary key from QR")
+                    armoredText = ""
                 }
             } catch {
                 self.error = CypherAirError.from(error) { _ in .invalidQRCode }
@@ -253,8 +283,13 @@ struct AddContactView: View {
             let data = try Data(contentsOf: url)
             if let text = String(data: data, encoding: .utf8) {
                 armoredText = text
+                importedKeyData = nil
+                importedFileName = nil
             } else {
-                armoredText = String(data: data, encoding: .ascii) ?? ""
+                // Binary .gpg/.pgp key — store raw Data, bypass String conversion
+                importedKeyData = data
+                importedFileName = url.lastPathComponent
+                armoredText = ""
             }
         } catch {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
