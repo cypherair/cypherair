@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var switchError: String?
     @State private var showSwitchError = false
     @State private var showOnboarding = false
+    @State private var riskAcknowledged = false
 
     var body: some View {
         @Bindable var config = config
@@ -89,7 +90,12 @@ struct SettingsView: View {
             switch route {
             case .selfTest: SelfTestView()
             case .about: AboutView()
-            default: Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
+            case .keyGeneration, .keyDetail, .backupKey, .importKey,
+                 .contactDetail, .addContact, .qrDisplay, .qrPhotoImport,
+                 .encrypt, .decrypt,
+                 .sign, .verify:
+                let _ = assertionFailure("Unexpected route \(route) in SettingsView")
+                Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
             }
         }
         .confirmationDialog(
@@ -97,14 +103,64 @@ struct SettingsView: View {
             isPresented: $showModeWarning,
             titleVisibility: .visible
         ) {
-            Button(String(localized: "settings.mode.confirm", defaultValue: "Switch Mode"), role: .destructive) {
-                performModeSwitch()
-            }
-            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {
-                pendingMode = nil
+            if pendingMode == .highSecurity && !hasBackup {
+                // Risk acknowledgment required — handled by the sheet below instead
+                Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {
+                    pendingMode = nil
+                }
+            } else {
+                Button(String(localized: "settings.mode.confirm", defaultValue: "Switch Mode"), role: .destructive) {
+                    performModeSwitch()
+                }
+                Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {
+                    pendingMode = nil
+                }
             }
         } message: {
-            Text(modeWarningMessage)
+            if pendingMode == .highSecurity && !hasBackup {
+                Text(String(localized: "settings.mode.highWarning.noBackup.useSheet", defaultValue: "You have not backed up any keys. A separate confirmation is required."))
+            } else {
+                Text(modeWarningMessage)
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { pendingMode == .highSecurity && !hasBackup && showModeWarning },
+            set: { if !$0 { pendingMode = nil; riskAcknowledged = false } }
+        )) {
+            NavigationStack {
+                Form {
+                    Section {
+                        Text(modeWarningMessage)
+                            .font(.callout)
+                    }
+
+                    Section {
+                        Toggle(isOn: $riskAcknowledged) {
+                            Text(String(localized: "settings.mode.riskAck", defaultValue: "I understand that if biometrics become unavailable, I will lose access to my private keys"))
+                                .font(.callout)
+                        }
+                    }
+
+                    Section {
+                        Button(String(localized: "settings.mode.confirm", defaultValue: "Switch Mode"), role: .destructive) {
+                            showModeWarning = false
+                            performModeSwitch()
+                        }
+                        .disabled(!riskAcknowledged)
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .navigationTitle(String(localized: "settings.mode.highWarning.title", defaultValue: "Enable High Security Mode"))
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                            pendingMode = nil
+                            riskAcknowledged = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
         }
         .alert(
             String(localized: "settings.mode.error.title", defaultValue: "Mode Switch Failed"),

@@ -2,7 +2,7 @@
 # Generate GnuPG interoperability test fixtures for Cypher Air POC.
 # These fixtures validate C3.1–C3.8 (GnuPG interop) and C2A.9/C2B.10 (DEFLATE).
 #
-# Requirements: GnuPG 2.4.x
+# Requirements: GnuPG 2.4.x or later (fixtures last generated with 2.5.18)
 # Output: All fixtures written to the same directory as this script.
 #
 # IMPORTANT: This script creates a temporary GNUPGHOME and cleans it up.

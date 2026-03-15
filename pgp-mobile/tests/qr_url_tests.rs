@@ -184,3 +184,73 @@ fn test_qr_url_length_reasonable() {
         url_b.len()
     );
 }
+
+// ── M7: QR URL edge-case malformed inputs ─────────────────────────────────
+
+/// Empty string is not a valid QR URL.
+#[test]
+fn test_qr_url_decode_empty_string() {
+    let engine = PgpEngine::new();
+    let result = engine.decode_qr_url("".to_string());
+    assert!(result.is_err(), "Empty string should fail");
+}
+
+/// Extra path segments after the base64 payload should fail
+/// (/ is not valid base64url).
+#[test]
+fn test_qr_url_decode_extra_path_segments() {
+    let engine = PgpEngine::new();
+    let result = engine.decode_qr_url("cypherair://import/v1/extra/segments/data".to_string());
+    assert!(result.is_err(), "Extra path segments should fail");
+}
+
+/// Query parameters appended to the URL should fail
+/// (? is not valid base64url).
+#[test]
+fn test_qr_url_decode_query_params() {
+    let engine = PgpEngine::new();
+
+    // First encode a valid key to get a real URL
+    let key = keys::generate_key_with_profile(
+        "Test".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let valid_url = engine.encode_qr_url(key.public_key_data.clone())
+        .expect("Encoding should succeed");
+
+    // Append query params — should break base64url decoding
+    let url_with_params = format!("{valid_url}?foo=bar");
+    let result = engine.decode_qr_url(url_with_params);
+    assert!(result.is_err(), "URL with query parameters should fail");
+}
+
+/// Unicode characters in the payload are not valid base64url.
+#[test]
+fn test_qr_url_decode_unicode_in_payload() {
+    let engine = PgpEngine::new();
+    let result = engine.decode_qr_url("cypherair://import/v1/\u{4f60}\u{597d}".to_string());
+    assert!(result.is_err(), "Unicode in payload should fail");
+}
+
+// ── L5: Base64url padding handling ────────────────────────────────────────
+
+/// Standard base64 padding characters (=) are not valid in base64url-no-pad format.
+#[test]
+fn test_qr_url_decode_with_base64_padding() {
+    let engine = PgpEngine::new();
+
+    // Use standard base64 (with padding) instead of base64url-no-pad
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
+    let payload = b"some test data that needs padding!!";
+    let padded = STANDARD.encode(payload);
+    assert!(padded.contains('='), "Test data should produce padding");
+
+    let url = format!("cypherair://import/v1/{padded}");
+    let result = engine.decode_qr_url(url);
+    assert!(result.is_err(), "Standard base64 with padding should be rejected");
+}

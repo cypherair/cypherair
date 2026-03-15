@@ -15,7 +15,7 @@ struct KeyDetailView: View {
     @State private var armoredPublicKey: Data?
     @State private var showCopiedNotice = false
     @State private var showExpirySheet = false
-    @State private var newExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date())!
+    @State private var newExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
     @State private var isModifyingExpiry = false
 
     private var key: PGPKeyIdentity? {
@@ -61,8 +61,14 @@ struct KeyDetailView: View {
                             Text(String(localized: "keydetail.expiry", defaultValue: "Expiry"))
                             Spacer()
                             if key.isExpired {
-                                Text(key.expiryDate?.formatted(date: .abbreviated, time: .omitted) ?? "—")
-                                    .foregroundStyle(.red)
+                                HStack(spacing: 4) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundStyle(.red)
+                                    Text(String(localized: "keydetail.expiry.expired", defaultValue: "Expired"))
+                                        .foregroundStyle(.red)
+                                    Text(key.expiryDate?.formatted(date: .abbreviated, time: .omitted) ?? "—")
+                                        .foregroundStyle(.red)
+                                }
                             } else if let expiryDate = key.expiryDate {
                                 Text(expiryDate.formatted(date: .abbreviated, time: .omitted))
                             } else {
@@ -248,7 +254,7 @@ struct KeyDetailView: View {
                         DatePicker(
                             String(localized: "keydetail.expiry.newDate", defaultValue: "New Expiry Date"),
                             selection: $newExpiryDate,
-                            in: Calendar.current.date(byAdding: .day, value: 1, to: Date())!...Calendar.current.date(byAdding: .year, value: 10, to: Date())!,
+                            in: (Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date())...(Calendar.current.date(byAdding: .year, value: 10, to: Date()) ?? Date()),
                             displayedComponents: .date
                         )
                     } header: {

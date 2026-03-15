@@ -5,6 +5,11 @@ struct ContactDetailView: View {
     let fingerprint: String
 
     @Environment(ContactService.self) private var contactService
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var showDeleteConfirmation = false
+    @State private var deleteError: String?
+    @State private var showDeleteError = false
 
     private var contact: Contact? {
         contactService.contact(forFingerprint: fingerprint)
@@ -65,7 +70,7 @@ struct ContactDetailView: View {
 
                     Section {
                         Button(role: .destructive) {
-                            try? contactService.removeContact(fingerprint: fingerprint)
+                            showDeleteConfirmation = true
                         } label: {
                             Label(
                                 String(localized: "contactdetail.delete", defaultValue: "Remove Contact"),
@@ -82,5 +87,33 @@ struct ContactDetailView: View {
             }
         }
         .navigationTitle(String(localized: "contactdetail.title", defaultValue: "Contact"))
+        .confirmationDialog(
+            String(localized: "contactdetail.delete.title", defaultValue: "Remove Contact"),
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "contactdetail.delete.confirm", defaultValue: "Remove"), role: .destructive) {
+                do {
+                    try contactService.removeContact(fingerprint: fingerprint)
+                    dismiss()
+                } catch {
+                    deleteError = error.localizedDescription
+                    showDeleteError = true
+                }
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "contactdetail.delete.message", defaultValue: "This will remove the contact's public key from your device."))
+        }
+        .alert(
+            String(localized: "error.title", defaultValue: "Error"),
+            isPresented: $showDeleteError
+        ) {
+            Button(String(localized: "error.ok", defaultValue: "OK")) {}
+        } message: {
+            if let deleteError {
+                Text(deleteError)
+            }
+        }
     }
 }
