@@ -250,7 +250,7 @@ Key gen, encrypt/decrypt, sign/verify, tamper (1-bit flip), QR encode/decode. Ru
 
 ## 7. System Integration
 
-- File types: .asc, .gpg/.pgp, .sig. URL scheme: cypherair://. Share Extension: v1.1.
+- File types: .asc, .gpg/.pgp, .sig. URL scheme: cypherair://. Share Extension: v2.0.
 - Clipboard: no proactive reading; paste areas; copy with safety notice.
 
 ---
@@ -335,11 +335,11 @@ Full details in [TDD](TDD.md). Key decisions:
 
 ### 10.2 v1.1
 
-Share Extension + streaming. File size increase.
+Streaming file processing. File size increase.
 
 ### 10.3 v2.0
 
-macOS. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack. Multi-device sync.
+Share Extension. macOS. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack. Multi-device sync.
 
 ---
 
