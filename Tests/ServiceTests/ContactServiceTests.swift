@@ -166,6 +166,68 @@ final class ContactServiceTests: XCTestCase {
                        "Old key file should be removed after confirmKeyUpdate")
     }
 
+    // MARK: - Binary Key Import
+
+    func test_addContact_binaryPublicKey_profileA_returnsAdded() throws {
+        // generateKey returns publicKeyData in binary OpenPGP format (not armored).
+        // This confirms the service accepts raw binary Data — the same format
+        // the views should pass after the binary import fix.
+        let generated = try engine.generateKey(
+            name: "BinaryA", email: nil,
+            expirySeconds: nil, profile: .universal
+        )
+
+        // Verify the data is actually binary (not ASCII armor)
+        let firstByte = generated.publicKeyData.first
+        XCTAssertNotEqual(firstByte, UInt8(ascii: "-"),
+                          "publicKeyData should be binary, not armored")
+
+        let result = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        if case .added(let contact) = result {
+            XCTAssertFalse(contact.fingerprint.isEmpty)
+        } else {
+            XCTFail("Expected .added for binary Profile A key, got \(result)")
+        }
+    }
+
+    func test_addContact_binaryPublicKey_profileB_returnsAdded() throws {
+        let generated = try engine.generateKey(
+            name: "BinaryB", email: nil,
+            expirySeconds: nil, profile: .advanced
+        )
+
+        let firstByte = generated.publicKeyData.first
+        XCTAssertNotEqual(firstByte, UInt8(ascii: "-"),
+                          "publicKeyData should be binary, not armored")
+
+        let result = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        if case .added(let contact) = result {
+            XCTAssertFalse(contact.fingerprint.isEmpty)
+        } else {
+            XCTFail("Expected .added for binary Profile B key, got \(result)")
+        }
+    }
+
+    func test_addContact_armoredPublicKey_profileA_returnsAdded() throws {
+        // Verify armored format also works (regression guard)
+        let generated = try engine.generateKey(
+            name: "ArmoredA", email: nil,
+            expirySeconds: nil, profile: .universal
+        )
+
+        let armoredData = try engine.armorPublicKey(certData: generated.publicKeyData)
+        let firstChar = String(data: armoredData.prefix(5), encoding: .utf8)
+        XCTAssertTrue(firstChar?.hasPrefix("-----") == true,
+                      "Armored data should start with PGP header")
+
+        let result = try contactService.addContact(publicKeyData: armoredData)
+        if case .added(let contact) = result {
+            XCTAssertFalse(contact.fingerprint.isEmpty)
+        } else {
+            XCTFail("Expected .added for armored Profile A key, got \(result)")
+        }
+    }
+
     // MARK: - Lookup
 
     func test_contactsMatchingKeyIds_returnsCorrectContacts() throws {

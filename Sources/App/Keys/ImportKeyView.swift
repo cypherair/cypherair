@@ -13,13 +13,34 @@ struct ImportKeyView: View {
     @State private var error: CypherAirError?
     @State private var showError = false
     @State private var showFileImporter = false
+    /// Raw key data for binary .gpg/.pgp files that cannot be represented as a String.
+    @State private var importedKeyData: Data?
+    @State private var importedFileName: String?
 
     var body: some View {
         Form {
             Section {
-                TextEditor(text: $armoredText)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(minHeight: 120)
+                if let fileName = importedFileName, importedKeyData != nil {
+                    HStack {
+                        Label(fileName, systemImage: "doc.fill")
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button {
+                            importedKeyData = nil
+                            importedFileName = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(String(localized: "import.clearFile", defaultValue: "Clear file"))
+                    }
+                } else {
+                    TextEditor(text: $armoredText)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(minHeight: 120)
+                }
             } header: {
                 Text(String(localized: "import.paste.header", defaultValue: "Paste armored private key"))
             }
@@ -59,7 +80,7 @@ struct ImportKeyView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(armoredText.isEmpty || passphrase.isEmpty || isImporting)
+                .disabled((armoredText.isEmpty && importedKeyData == nil) || passphrase.isEmpty || isImporting)
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -96,9 +117,13 @@ struct ImportKeyView: View {
             let data = try Data(contentsOf: url)
             if let text = String(data: data, encoding: .utf8) {
                 armoredText = text
+                importedKeyData = nil
+                importedFileName = nil
             } else {
-                // Binary key data — convert to string representation for the text field
-                armoredText = String(data: data, encoding: .ascii) ?? ""
+                // Binary .gpg/.pgp key — store raw Data, bypass String conversion
+                importedKeyData = data
+                importedFileName = url.lastPathComponent
+                armoredText = ""
             }
         } catch {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
@@ -110,7 +135,7 @@ struct ImportKeyView: View {
         isImporting = true
         Task {
             do {
-                let data = Data(armoredText.utf8)
+                let data = importedKeyData ?? Data(armoredText.utf8)
                 _ = try keyManagement.importKey(
                     armoredData: data,
                     passphrase: passphrase,
@@ -121,6 +146,9 @@ struct ImportKeyView: View {
                 // but we minimize lifetime by clearing references immediately.
                 armoredText = ""
                 passphrase = ""
+                importedKeyData?.resetBytes(in: 0..<(importedKeyData?.count ?? 0))
+                importedKeyData = nil
+                importedFileName = nil
                 dismiss()
             } catch {
                 self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
