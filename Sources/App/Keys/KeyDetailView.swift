@@ -173,7 +173,12 @@ struct KeyDetailView: View {
                     if !key.isDefault {
                         Section {
                             Button {
-                                keyManagement.setDefaultKey(fingerprint: fingerprint)
+                                do {
+                                    try keyManagement.setDefaultKey(fingerprint: fingerprint)
+                                } catch {
+                                    self.error = CypherAirError.from(error) { .keychainError($0) }
+                                    showError = true
+                                }
                             } label: {
                                 Label(
                                     String(localized: "keydetail.setDefault", defaultValue: "Set as Default"),

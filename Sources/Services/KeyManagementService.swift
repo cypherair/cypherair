@@ -175,6 +175,12 @@ final class KeyManagementService {
         let keyInfo = try engine.parseKeyInfo(keyData: secretKeyData)
         let profile = try engine.detectProfile(certData: secretKeyData)
 
+        // Guard against duplicate import: check before SE wrapping
+        // to avoid creating an orphaned SE key on Keychain duplicateItem failure.
+        if keys.contains(where: { $0.fingerprint == keyInfo.fingerprint }) {
+            throw CypherAirError.duplicateKey
+        }
+
         // Extract public key before SE wrapping (needs certData)
         let publicKeyData = try engine.armorPublicKey(certData: secretKeyData)
 
@@ -249,7 +255,13 @@ final class KeyManagementService {
             profile: identity.profile
         )
 
-        // Mark as backed up and persist metadata change
+        // Mark as backed up and persist metadata change.
+        // try? rationale: The export operation above already succeeded — the user
+        // has their backup. In-memory isBackedUp is correct for the current session.
+        // If the app crashes before the next metadata write, isBackedUp resets to false
+        // on cold launch — this is conservative and safe (triggers an unnecessary backup
+        // reminder rather than data loss). A throwing failure here should not invalidate
+        // the successful export.
         if let index = keys.firstIndex(where: { $0.fingerprint == fingerprint }) {
             keys[index].isBackedUp = true
             try? updateMetadata(keys[index])
@@ -328,19 +340,29 @@ final class KeyManagementService {
             throw error
         }
 
-        // 6. Delete old permanent items. Pending items are confirmed stored.
+        // 6. Set crash recovery flag before entering the danger zone.
+        // If the app crashes between here and the flag-clear below,
+        // checkAndRecoverFromInterruptedModifyExpiry() runs on next launch.
+        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.set(fingerprint, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
+        // 7. Delete old permanent items. Pending items are confirmed stored.
         rollbackKeychainBundle(fingerprint: fingerprint)
 
-        // 7. Promote pending → permanent.
+        // 8. Promote pending → permanent.
         do {
-            try promotePendingToPermament(fingerprint: fingerprint)
+            try promotePendingToPermanent(fingerprint: fingerprint)
         } catch {
             // If promotion fails, pending items remain. They are the only copy.
-            // Next modifyExpiry or manual recovery can retry.
+            // Leave the flag set so crash recovery can handle it on next launch.
             throw error
         }
 
-        // 8. Update identity metadata
+        // 9. Clear crash recovery flag — danger zone complete.
+        UserDefaults.standard.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
+        // 10. Update identity metadata
         var updated = existingIdentity
         updated.isExpired = result.keyInfo.isExpired
         updated.publicKeyData = result.publicKeyData
@@ -348,7 +370,7 @@ final class KeyManagementService {
             Date(timeIntervalSince1970: TimeInterval($0))
         }
 
-        // 9. Persist metadata and update in-memory state
+        // 11. Persist metadata and update in-memory state
         try updateMetadata(updated)
         keys[index] = updated
 
@@ -385,6 +407,10 @@ final class KeyManagementService {
         // If the deleted key was default, assign a new default
         if !keys.isEmpty && !keys.contains(where: { $0.isDefault }) {
             keys[0].isDefault = true
+            // Persist the promoted default so it survives cold restart.
+            // try? because key deletion already succeeded — failing to persist
+            // the new default only affects the next cold launch (user sees no default).
+            try? updateMetadata(keys[0])
         }
 
         // Report partial deletion failure to the caller.
@@ -398,9 +424,18 @@ final class KeyManagementService {
     // MARK: - Default Key
 
     /// Set a key as the default signing/encryption identity.
-    func setDefaultKey(fingerprint: String) {
+    /// Persists the change to Keychain metadata so it survives cold restart.
+    func setDefaultKey(fingerprint: String) throws {
+        var changedIndices: [Int] = []
         for i in keys.indices {
-            keys[i].isDefault = (keys[i].fingerprint == fingerprint)
+            let newDefault = (keys[i].fingerprint == fingerprint)
+            if keys[i].isDefault != newDefault {
+                keys[i].isDefault = newDefault
+                changedIndices.append(i)
+            }
+        }
+        for i in changedIndices {
+            try updateMetadata(keys[i])
         }
     }
 
@@ -418,6 +453,70 @@ final class KeyManagementService {
             throw CypherAirError.noMatchingKey
         }
         return try engine.armorPublicKey(certData: identity.publicKeyData)
+    }
+
+    // MARK: - Crash Recovery
+
+    /// Check for an interrupted modifyExpiry operation and recover.
+    /// Call from the app's initialization path, after loadKeys().
+    ///
+    /// Recovery logic mirrors AuthenticationManager.checkAndRecoverFromInterruptedRewrap:
+    /// - Old + pending both exist: interrupted before old deletion. Delete pending. Originals intact.
+    /// - Only pending exists: interrupted after old deletion. Promote pending to permanent.
+    /// - Neither exists: catastrophic loss. Clear flag. User must restore from backup.
+    func checkAndRecoverFromInterruptedModifyExpiry() {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey) else {
+            return
+        }
+
+        guard let fingerprint = defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey),
+              !fingerprint.isEmpty else {
+            // No fingerprint recorded — cannot recover. Clear flag.
+            defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
+            defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+            return
+        }
+
+        let account = KeychainConstants.defaultAccount
+        let oldExists = keychain.exists(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account
+        )
+        let pendingExists = keychain.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: account
+        )
+
+        if oldExists && pendingExists {
+            // Case 1: Interrupted before old items deleted.
+            // Delete temporary items. Original keys are intact.
+            cleanupPendingItems(fingerprint: fingerprint)
+
+        } else if !oldExists && pendingExists {
+            // Case 2: Interrupted after old deletion but before promotion.
+            // Verify all 3 pending items exist before attempting promotion.
+            let pendingSaltExists = keychain.exists(
+                service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+                account: account
+            )
+            let pendingSealedExists = keychain.exists(
+                service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+                account: account
+            )
+
+            if pendingSaltExists && pendingSealedExists {
+                // All 3 pending items present — safe to promote.
+                try? promotePendingToPermanent(fingerprint: fingerprint)
+            }
+            // else: Incomplete pending set — catastrophic partial write.
+            // Cannot promote. User must restore from backup.
+        }
+        // Case 3: Neither exists — catastrophic loss. Nothing we can do.
+
+        // Always clear the flags after recovery attempt.
+        defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
     }
 
     // MARK: - Private Key Access (SE Unwrap)
@@ -544,7 +643,12 @@ final class KeyManagementService {
 
     /// Promote pending Keychain items to permanent names for one identity.
     /// Sequence: load all pending → save as permanent → delete pending.
-    private func promotePendingToPermament(fingerprint: String) throws {
+    ///
+    /// - Note: `AuthenticationManager.promoteFromPending` is a parallel implementation
+    ///   of the same pending→permanent promotion pattern for auth mode switching.
+    ///   They are kept separate to avoid a circular dependency between KMS and AuthManager.
+    ///   If the promotion logic changes, update both implementations.
+    private func promotePendingToPermanent(fingerprint: String) throws {
         let account = KeychainConstants.defaultAccount
 
         // Load all 3 pending items first.

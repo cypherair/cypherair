@@ -36,6 +36,7 @@ enum CypherAirError: Error, LocalizedError {
     case noKeySelected
     case noRecipientsSelected
     case biometricsUnavailable
+    case duplicateKey
 
     /// User-facing error description per PRD Section 4.7.
     var errorDescription: String? {
@@ -96,6 +97,8 @@ enum CypherAirError: Error, LocalizedError {
             String(localized: "error.noRecipients", defaultValue: "Please select at least one recipient.")
         case .biometricsUnavailable:
             String(localized: "error.biometricsUnavailable", defaultValue: "Biometric authentication is currently unavailable. In High Security mode, all private key operations are blocked until biometric authentication is restored.")
+        case .duplicateKey:
+            String(localized: "error.duplicateKey", defaultValue: "A key with this fingerprint already exists on this device.")
         }
     }
 
