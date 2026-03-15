@@ -7,6 +7,7 @@ use pgp_mobile::encrypt;
 use pgp_mobile::decrypt;
 use pgp_mobile::sign;
 use pgp_mobile::verify;
+use pgp_mobile::armor;
 use pgp_mobile::decrypt::SignatureStatus;
 
 /// C2B.1: Generate Ed448+X448 v6 key pair.
@@ -980,4 +981,180 @@ fn test_modify_expiry_profile_b_roundtrip_encrypt_decrypt() {
     let decrypted = decrypt::decrypt(&ciphertext, &[result.cert_data.clone()], &[])
         .expect("Decryption should succeed with updated key");
     assert_eq!(decrypted.plaintext, plaintext);
+}
+
+// ── M2: Wrong key decryption (Profile B) ──────────────────────────────────
+
+/// Decrypt with wrong Profile B key → NoMatchingKey error.
+/// Ensures the full AEAD decrypt path fails correctly with wrong key.
+#[test]
+fn test_decrypt_wrong_key_profile_b() {
+    let alice = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let bob = keys::generate_key_with_profile(
+        "Bob".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let plaintext = b"Only for Alice (Profile B).";
+
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[alice.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    // Bob tries to decrypt Alice's message
+    let result = decrypt::decrypt(&ciphertext, &[bob.cert_data.clone()], &[]);
+    match result {
+        Ok(_) => panic!("Wrong key must fail decryption"),
+        Err(pgp_mobile::error::PgpError::NoMatchingKey) => {}
+        Err(other) => panic!("Expected NoMatchingKey, got: {other}"),
+    }
+}
+
+// ── M3: Multi-recipient encrypt/decrypt (Profile B) ──────────────────────
+
+/// Encrypt to multiple v6 recipients → each can independently decrypt.
+#[test]
+fn test_multi_recipient_encrypt_decrypt_profile_b() {
+    let alice = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let bob = keys::generate_key_with_profile(
+        "Bob".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let plaintext = b"Message for both Alice and Bob (Profile B).";
+
+    let ciphertext = encrypt::encrypt(
+        plaintext,
+        &[
+            alice.public_key_data.clone(),
+            bob.public_key_data.clone(),
+        ],
+        None,
+        None,
+    )
+    .expect("Encryption should succeed");
+
+    // Alice decrypts
+    let result_alice = decrypt::decrypt(
+        &ciphertext,
+        &[alice.cert_data.clone()],
+        &[],
+    )
+    .expect("Alice should decrypt");
+    assert_eq!(result_alice.plaintext, plaintext);
+
+    // Bob decrypts
+    let result_bob = decrypt::decrypt(
+        &ciphertext,
+        &[bob.cert_data.clone()],
+        &[],
+    )
+    .expect("Bob should decrypt");
+    assert_eq!(result_bob.plaintext, plaintext);
+}
+
+// ── L3: Armor round-trip (Profile B) ──────────────────────────────────────
+
+/// Armor round-trip: Profile B public key → armor → dearmor → identical.
+#[test]
+fn test_armor_roundtrip_profile_b() {
+    let key = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let armored = armor::armor_public_key(&key.public_key_data)
+        .expect("Armor should succeed");
+
+    // Armored output should contain the PGP header
+    let armored_str = String::from_utf8_lossy(&armored);
+    assert!(armored_str.contains("BEGIN PGP PUBLIC KEY BLOCK"));
+
+    // Dearmor and compare
+    let (dearmored, _kind) = armor::decode_armor(&armored)
+        .expect("Dearmor should succeed");
+
+    // Parse both and compare fingerprints
+    let original_info = keys::parse_key_info(&key.public_key_data).unwrap();
+    let dearmored_info = keys::parse_key_info(&dearmored).unwrap();
+    assert_eq!(original_info.fingerprint, dearmored_info.fingerprint);
+    assert_eq!(dearmored_info.key_version, 6);
+}
+
+// ── L4: match_recipients with encrypt-to-self (Profile B) ────────────────
+
+/// match_recipients: encrypt-to-self includes sender in match (Profile B).
+/// Complements test_match_recipients_profile_a_encrypt_to_self (Profile A).
+#[test]
+fn test_match_recipients_profile_b_encrypt_to_self() {
+    let sender = keys::generate_key_with_profile(
+        "Alice".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let recipient = keys::generate_key_with_profile(
+        "Bob".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
+
+    let ciphertext = encrypt::encrypt_binary(
+        b"encrypt-to-self test",
+        &[recipient.public_key_data.clone()],
+        None,
+        Some(&sender.public_key_data),
+    )
+    .expect("Encryption should succeed");
+
+    let matched = decrypt::match_recipients(
+        &ciphertext,
+        &[sender.public_key_data.clone(), recipient.public_key_data.clone()],
+    )
+    .expect("match_recipients should find sender via encrypt-to-self");
+
+    assert!(
+        matched.len() >= 2,
+        "match_recipients should find both sender (encrypt-to-self) and recipient, got {}",
+        matched.len()
+    );
+    assert!(
+        matched.contains(&sender.fingerprint),
+        "Sender fingerprint should be in matched set"
+    );
+    assert!(
+        matched.contains(&recipient.fingerprint),
+        "Recipient fingerprint should be in matched set"
+    );
 }
