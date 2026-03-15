@@ -252,8 +252,25 @@ final class DecryptionServiceTests: XCTestCase {
         do {
             _ = try await stack.decryptionService.decrypt(phase1: phase1)
             XCTFail("Expected decryption to fail on tampered ciphertext")
+        } catch let error as CypherAirError {
+            // Profile A (SEIPDv1): bit-flip may corrupt the encrypted payload
+            // (→ integrityCheckFailed), the framing (→ corruptData), or the
+            // recipient key ID (→ noMatchingKey).
+            switch error {
+            case .integrityCheckFailed, .corruptData, .noMatchingKey:
+                break // acceptable MDC/parsing failures
+            default:
+                XCTFail("Expected integrityCheckFailed, corruptData, or noMatchingKey, got \(error)")
+            }
+        } catch let error as PgpError {
+            switch error {
+            case .IntegrityCheckFailed, .CorruptData, .NoMatchingKey:
+                break
+            default:
+                XCTFail("Expected IntegrityCheckFailed, CorruptData, or NoMatchingKey, got \(error)")
+            }
         } catch {
-            // Any error is acceptable — the ciphertext integrity is broken
+            XCTFail("Unexpected error type: \(type(of: error))")
         }
     }
 
@@ -279,8 +296,25 @@ final class DecryptionServiceTests: XCTestCase {
         do {
             _ = try await stack.decryptionService.decrypt(phase1: phase1)
             XCTFail("Expected AEAD hard-fail on tampered ciphertext")
+        } catch let error as CypherAirError {
+            // Profile B (SEIPDv2 AEAD): bit-flip may corrupt the AEAD payload
+            // (→ aeadAuthenticationFailed), the framing (→ corruptData/integrityCheckFailed),
+            // or the recipient key ID (→ noMatchingKey).
+            switch error {
+            case .aeadAuthenticationFailed, .integrityCheckFailed, .corruptData, .noMatchingKey:
+                break // acceptable AEAD/parsing failures
+            default:
+                XCTFail("Expected aeadAuthenticationFailed, integrityCheckFailed, corruptData, or noMatchingKey, got \(error)")
+            }
+        } catch let error as PgpError {
+            switch error {
+            case .AeadAuthenticationFailed, .IntegrityCheckFailed, .CorruptData, .NoMatchingKey:
+                break
+            default:
+                XCTFail("Expected AeadAuthenticationFailed, IntegrityCheckFailed, CorruptData, or NoMatchingKey, got \(error)")
+            }
         } catch {
-            // Any error is acceptable — AEAD authentication must fail
+            XCTFail("Unexpected error type: \(type(of: error))")
         }
     }
 
