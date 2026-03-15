@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Authentication mode for the app.
 /// Determines the SecAccessControl flags used for SE key wrapping.
@@ -11,6 +12,41 @@ enum AuthenticationMode: String {
     /// Flags: [.privateKeyUsage, .biometryAny]
     /// If biometrics unavailable, all private-key operations are blocked.
     case highSecurity
+
+    /// Create a SecAccessControl appropriate for this authentication mode.
+    ///
+    /// - Standard: [.privateKeyUsage, .biometryAny, .or, .devicePasscode]
+    /// - High Security: [.privateKeyUsage, .biometryAny]
+    ///
+    /// This includes `.privateKeyUsage` and is intended for SE key creation
+    /// (`SecureEnclave.P256.KeyAgreement.PrivateKey(accessControl:)`).
+    /// The SE key's `dataRepresentation` stored in the Keychain uses
+    /// `accessControl: nil` because `.privateKeyUsage` is only valid for
+    /// `kSecClassKey` items; the SE-level access control is the primary
+    /// enforcement mechanism.
+    ///
+    /// SECURITY-CRITICAL: These flags must match SECURITY.md Section 4.
+    /// Any change requires human review.
+    func createAccessControl() throws -> SecAccessControl {
+        let flags: SecAccessControlCreateFlags = switch self {
+        case .standard:
+            [.privateKeyUsage, .biometryAny, .or, .devicePasscode]
+        case .highSecurity:
+            [.privateKeyUsage, .biometryAny]
+        }
+
+        var error: Unmanaged<CFError>?
+        guard let accessControl = SecAccessControlCreateWithFlags(
+            kCFAllocatorDefault,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            flags,
+            &error
+        ) else {
+            throw AuthenticationError.accessControlCreationFailed
+        }
+
+        return accessControl
+    }
 }
 
 /// Protocol for authentication evaluation.
@@ -45,6 +81,11 @@ enum AuthPreferences {
 
     /// Flag indicating an interrupted mode switch (crash recovery).
     static let rewrapInProgressKey = "com.cypherair.internal.rewrapInProgress"
+
+    /// The target mode of an in-progress mode switch (crash recovery).
+    /// Stored alongside `rewrapInProgressKey` so crash recovery can create
+    /// correct access control flags and update the mode preference.
+    static let rewrapTargetModeKey = "com.cypherair.internal.rewrapTargetMode"
 
     /// Default grace period: 3 minutes (180 seconds).
     static let defaultGracePeriod = 180

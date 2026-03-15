@@ -94,7 +94,7 @@ final class KeyManagementService {
         let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
 
         // Create access control for SE key
-        let accessControl = try createAccessControl(mode: authMode)
+        let accessControl = try authMode.createAccessControl()
 
         // SE-wrap the private key (certData contains public+secret)
         let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
@@ -179,7 +179,7 @@ final class KeyManagementService {
         let publicKeyData = try engine.armorPublicKey(certData: secretKeyData)
 
         // SE-wrap the imported key
-        let accessControl = try createAccessControl(mode: authMode)
+        let accessControl = try authMode.createAccessControl()
         let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
         let bundle = try secureEnclave.wrap(
             privateKey: secretKeyData,
@@ -265,6 +265,8 @@ final class KeyManagementService {
     ///
     /// SECURITY: The full certificate (with secret key) is needed to re-sign binding signatures.
     /// After modification, the updated cert is re-wrapped with a new SE key and stored.
+    /// Uses the pending-item pattern to prevent key loss on crash: new items are stored
+    /// under temporary names before old items are deleted.
     ///
     /// - Parameters:
     ///   - fingerprint: Fingerprint of the key to modify.
@@ -293,20 +295,52 @@ final class KeyManagementService {
         }
         let existingIdentity = keys[index]
 
-        // 4. Delete old SE bundle
-        rollbackKeychainBundle(fingerprint: fingerprint)
-
-        // 5. Re-wrap updated cert with SE
-        let accessControl = try createAccessControl(mode: authMode)
+        // 4. Re-wrap updated cert with SE and store under PENDING names.
+        // If anything fails here, old items are intact — clean up pending and abort.
+        let accessControl = try authMode.createAccessControl()
         let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
         let bundle = try secureEnclave.wrap(
             privateKey: result.certData,
             using: seHandle,
             fingerprint: fingerprint
         )
-        try saveWrappedKeyBundle(bundle, fingerprint: fingerprint)
 
-        // 6. Update identity metadata
+        do {
+            try savePendingKeyBundle(bundle, fingerprint: fingerprint)
+        } catch {
+            cleanupPendingItems(fingerprint: fingerprint)
+            throw error
+        }
+
+        // 5. Verify all pending items stored successfully.
+        do {
+            _ = try keychain.load(
+                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount)
+            _ = try keychain.load(
+                service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount)
+            _ = try keychain.load(
+                service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount)
+        } catch {
+            cleanupPendingItems(fingerprint: fingerprint)
+            throw error
+        }
+
+        // 6. Delete old permanent items. Pending items are confirmed stored.
+        rollbackKeychainBundle(fingerprint: fingerprint)
+
+        // 7. Promote pending → permanent.
+        do {
+            try promotePendingToPermament(fingerprint: fingerprint)
+        } catch {
+            // If promotion fails, pending items remain. They are the only copy.
+            // Next modifyExpiry or manual recovery can retry.
+            throw error
+        }
+
+        // 8. Update identity metadata
         var updated = existingIdentity
         updated.isExpired = result.keyInfo.isExpired
         updated.publicKeyData = result.publicKeyData
@@ -314,7 +348,7 @@ final class KeyManagementService {
             Date(timeIntervalSince1970: TimeInterval($0))
         }
 
-        // 7. Persist metadata and update in-memory state
+        // 9. Persist metadata and update in-memory state
         try updateMetadata(updated)
         keys[index] = updated
 
@@ -459,6 +493,139 @@ final class KeyManagementService {
         }
     }
 
+    /// Save the three SE-wrapped key items under PENDING Keychain names.
+    /// If any write fails, rolls back the ones that succeeded.
+    private func savePendingKeyBundle(_ bundle: WrappedKeyBundle, fingerprint: String) throws {
+        do {
+            try keychain.save(
+                bundle.seKeyData,
+                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+        } catch {
+            throw error
+        }
+
+        do {
+            try keychain.save(
+                bundle.salt,
+                service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+        } catch {
+            try? keychain.delete(
+                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            )
+            throw error
+        }
+
+        do {
+            try keychain.save(
+                bundle.sealedBox,
+                service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+        } catch {
+            try? keychain.delete(
+                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            )
+            try? keychain.delete(
+                service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            )
+            throw error
+        }
+    }
+
+    /// Promote pending Keychain items to permanent names for one identity.
+    /// Sequence: load all pending → save as permanent → delete pending.
+    private func promotePendingToPermament(fingerprint: String) throws {
+        let account = KeychainConstants.defaultAccount
+
+        // Load all 3 pending items first.
+        let seKeyData = try keychain.load(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: account
+        )
+        let saltData = try keychain.load(
+            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+            account: account
+        )
+        let sealedData = try keychain.load(
+            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+            account: account
+        )
+
+        // Save under permanent names, rolling back on partial failure.
+        var savedPermanentServices: [String] = []
+
+        do {
+            try keychain.save(
+                seKeyData,
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: account,
+                accessControl: nil
+            )
+            savedPermanentServices.append(KeychainConstants.seKeyService(fingerprint: fingerprint))
+
+            try keychain.save(
+                saltData,
+                service: KeychainConstants.saltService(fingerprint: fingerprint),
+                account: account,
+                accessControl: nil
+            )
+            savedPermanentServices.append(KeychainConstants.saltService(fingerprint: fingerprint))
+
+            try keychain.save(
+                sealedData,
+                service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+                account: account,
+                accessControl: nil
+            )
+        } catch {
+            for service in savedPermanentServices {
+                try? keychain.delete(service: service, account: account)
+            }
+            throw error
+        }
+
+        // All 3 permanent items saved. Delete pending items.
+        try? keychain.delete(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: account
+        )
+        try? keychain.delete(
+            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+            account: account
+        )
+        try? keychain.delete(
+            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+            account: account
+        )
+    }
+
+    /// Best-effort cleanup of pending Keychain items for one identity.
+    private func cleanupPendingItems(fingerprint: String) {
+        let account = KeychainConstants.defaultAccount
+        try? keychain.delete(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: account
+        )
+        try? keychain.delete(
+            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+            account: account
+        )
+        try? keychain.delete(
+            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+            account: account
+        )
+    }
+
     /// Best-effort rollback: remove all three SE bundle items from Keychain.
     private func rollbackKeychainBundle(fingerprint: String) {
         try? keychain.delete(
@@ -503,26 +670,5 @@ final class KeyManagementService {
         try saveMetadata(identity)
     }
 
-    // MARK: - Access Control
 
-    private func createAccessControl(mode: AuthenticationMode) throws -> SecAccessControl {
-        var error: Unmanaged<CFError>?
-        let flags: SecAccessControlCreateFlags = switch mode {
-        case .standard:
-            [.privateKeyUsage, .biometryAny, .or, .devicePasscode]
-        case .highSecurity:
-            [.privateKeyUsage, .biometryAny]
-        }
-
-        guard let accessControl = SecAccessControlCreateWithFlags(
-            kCFAllocatorDefault,
-            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            flags,
-            &error
-        ) else {
-            throw CypherAirError.secureEnclaveUnavailable
-        }
-
-        return accessControl
-    }
 }

@@ -12,6 +12,11 @@ pub fn encode_armor(data: &[u8], kind: ArmorKind) -> Result<Vec<u8>, PgpError> {
         ArmorKind::SecretKey => armor::Kind::SecretKey,
         ArmorKind::Message => armor::Kind::Message,
         ArmorKind::Signature => armor::Kind::Signature,
+        ArmorKind::Unknown => {
+            return Err(PgpError::ArmorError {
+                reason: "Cannot encode armor with Unknown kind".to_string(),
+            });
+        }
     };
 
     let mut output = Vec::new();
@@ -46,7 +51,7 @@ pub fn decode_armor(armored: &[u8]) -> Result<(Vec<u8>, ArmorKind), PgpError> {
         Some(armor::Kind::SecretKey) => ArmorKind::SecretKey,
         Some(armor::Kind::Message) => ArmorKind::Message,
         Some(armor::Kind::Signature) => ArmorKind::Signature,
-        _ => ArmorKind::Message, // default
+        _ => ArmorKind::Unknown,
     };
 
     Ok((data, kind))
@@ -59,6 +64,9 @@ pub enum ArmorKind {
     SecretKey,
     Message,
     Signature,
+    /// Unrecognized armor type. The data was dearmored successfully
+    /// but the armor kind header was not one of the known types.
+    Unknown,
 }
 
 /// Create an armor writer for use in other modules.
