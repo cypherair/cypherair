@@ -85,6 +85,14 @@ pub enum PgpError {
     /// Internal error — should not happen in normal operation.
     #[error("Internal error: {reason}")]
     InternalError { reason: String },
+
+    /// Operation was cancelled by the user (via progress callback returning false).
+    #[error("Operation cancelled")]
+    OperationCancelled,
+
+    /// File I/O error (path not found, permission denied, disk full, etc.).
+    #[error("File I/O error: {reason}")]
+    FileIoError { reason: String },
 }
 
 // NOTE: There is intentionally NO blanket `From<anyhow::Error> for PgpError` impl.
