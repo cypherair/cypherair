@@ -8,7 +8,9 @@ extension Data {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("share", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appendingPathComponent(filename)
+        let sanitized = (filename as NSString).lastPathComponent
+        guard !sanitized.isEmpty else { return nil }
+        let url = dir.appendingPathComponent(sanitized)
         do {
             try write(to: url)
             return url

@@ -15,6 +15,10 @@ final class AppConfiguration {
     /// Valid values: 0, 60, 180, 300.
     var gracePeriod: Int {
         didSet {
+            let validValues = Self.gracePeriodOptions.map { $0.value }
+            if !validValues.contains(gracePeriod) {
+                gracePeriod = AuthPreferences.defaultGracePeriod
+            }
             UserDefaults.standard.set(gracePeriod, forKey: AuthPreferences.gracePeriodKey)
         }
     }

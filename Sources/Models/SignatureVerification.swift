@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /// App-level signature verification result for display in the UI.
 /// Wraps the UniFFI `SignatureStatus` with user-facing information.
@@ -23,14 +23,14 @@ struct SignatureVerification {
         }
     }
 
-    /// Color name for the status indicator.
-    var statusColor: String {
+    /// Color for the status indicator.
+    var statusColor: Color {
         switch status {
-        case .valid: "green"
-        case .bad: "red"
-        case .unknownSigner: "orange"
-        case .notSigned: "secondary"
-        case .expired: "orange"
+        case .valid: .green
+        case .bad: .red
+        case .unknownSigner: .orange
+        case .notSigned: .secondary
+        case .expired: .orange
         }
     }
 

@@ -109,7 +109,7 @@ struct DecryptView: View {
                 Section {
                     HStack {
                         Image(systemName: sigVerification.symbolName)
-                            .foregroundStyle(Color(sigVerification.statusColor))
+                            .foregroundStyle(sigVerification.statusColor)
                         Text(sigVerification.statusDescription)
                             .font(.subheadline)
                     }
