@@ -7,6 +7,9 @@ struct BackupKeyView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.dismiss) private var dismiss
 
+    enum Field { case passphrase, confirm }
+    @FocusState private var focusedField: Field?
+
     @State private var passphrase = ""
     @State private var passphraseConfirm = ""
     @State private var isExporting = false
@@ -21,10 +24,17 @@ struct BackupKeyView: View {
                     String(localized: "backup.passphrase", defaultValue: "Passphrase"),
                     text: $passphrase
                 )
+                .focused($focusedField, equals: .passphrase)
+                .submitLabel(.next)
+                .onSubmit { focusedField = .confirm }
+
                 SecureField(
                     String(localized: "backup.confirm", defaultValue: "Confirm Passphrase"),
                     text: $passphraseConfirm
                 )
+                .focused($focusedField, equals: .confirm)
+                .submitLabel(.done)
+                .onSubmit { focusedField = nil }
             } header: {
                 Text(String(localized: "backup.header", defaultValue: "Protect your backup with a strong passphrase."))
             } footer: {
@@ -64,6 +74,7 @@ struct BackupKeyView: View {
                 }
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(String(localized: "backup.title", defaultValue: "Backup Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

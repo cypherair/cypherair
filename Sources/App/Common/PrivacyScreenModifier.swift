@@ -32,7 +32,7 @@ struct PrivacyScreenModifier: ViewModifier {
                             } label: {
                                 Label(
                                     String(localized: "privacy.tapToAuth", defaultValue: "Tap to Authenticate"),
-                                    systemImage: "faceid"
+                                    systemImage: biometricIconName
                                 )
                                 .font(.headline)
                             }
@@ -63,6 +63,14 @@ struct PrivacyScreenModifier: ViewModifier {
                     handleResume()
                 }
             }
+    }
+
+    private var biometricIconName: String {
+        #if os(macOS)
+        "touchid"
+        #else
+        "faceid"
+        #endif
     }
 
     private func handleResume() {
