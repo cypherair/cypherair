@@ -30,6 +30,8 @@ struct VerifyView: View {
     @State private var originalFileName: String?
     @State private var signatureFileURL: URL?
     @State private var signatureFileName: String?
+    @State private var currentTask: Task<Void, Never>?
+    @State private var fileProgress: FileProgressReporter?
 
     var body: some View {
         Form {
@@ -57,8 +59,25 @@ struct VerifyView: View {
                     }
                 } label: {
                     if isVerifying {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
+                        HStack {
+                            if verifyMode == .detached, let progress = fileProgress {
+                                ProgressView(value: progress.fractionCompleted)
+                                    .progressViewStyle(.linear)
+                                Text(String(localized: "verify.verifying", defaultValue: "Verifying..."))
+                            } else {
+                                ProgressView()
+                            }
+                            if verifyMode == .detached {
+                                Spacer()
+                                Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
+                                    fileProgress?.cancel()
+                                    currentTask?.cancel()
+                                    currentTask = nil
+                                    isVerifying = false
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
                     } else {
                         Text(String(localized: "verify.button", defaultValue: "Verify"))
                             .frame(maxWidth: .infinity)
@@ -211,9 +230,17 @@ struct VerifyView: View {
 
     private func verifyDetached() {
         guard let origURL = originalFileURL, let sigURL = signatureFileURL else { return }
-        isVerifying = true
         let service = signingService
-        Task {
+        let progress = FileProgressReporter()
+        fileProgress = progress
+
+        isVerifying = true
+        currentTask = Task {
+            defer {
+                fileProgress = nil
+                isVerifying = false
+                currentTask = nil
+            }
             do {
                 guard origURL.startAccessingSecurityScopedResource() else {
                     throw CypherAirError.internalError(reason: String(localized: "verify.cannotAccessOriginal", defaultValue: "Cannot access original file"))
@@ -225,15 +252,24 @@ struct VerifyView: View {
                 }
                 defer { sigURL.stopAccessingSecurityScopedResource() }
 
-                let fileData = try Data(contentsOf: origURL)
+                // Load only the small .sig file into memory
                 let sigData = try Data(contentsOf: sigURL)
-                let result = try await service.verifyDetached(data: fileData, signature: sigData)
+                try Task.checkCancellation()
+                // Stream the original file for verification
+                let result = try await service.verifyDetachedStreaming(
+                    fileURL: origURL,
+                    signature: sigData,
+                    progress: progress
+                )
+                try Task.checkCancellation()
                 verification = result
+            } catch is CancellationError {
+                // User cancelled — no error to show
             } catch {
+                if case .operationCancelled = error as? CypherAirError { return }
                 self.error = CypherAirError.from(error) { _ in .badSignature }
                 showError = true
             }
-            isVerifying = false
         }
     }
 }
