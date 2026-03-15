@@ -256,12 +256,13 @@ pub fn decrypt(
 }
 
 /// Helper struct for Sequoia's streaming decryption API.
-struct DecryptHelper<'a> {
-    policy: &'a StandardPolicy<'a>,
-    secret_certs: &'a [openpgp::Cert],
-    verifier_certs: &'a [openpgp::Cert],
-    signature_status: Option<SignatureStatus>,
-    signer_fingerprint: Option<String>,
+/// `pub(crate)` so that `streaming.rs` can construct this for file-based decryption.
+pub(crate) struct DecryptHelper<'a> {
+    pub(crate) policy: &'a StandardPolicy<'a>,
+    pub(crate) secret_certs: &'a [openpgp::Cert],
+    pub(crate) verifier_certs: &'a [openpgp::Cert],
+    pub(crate) signature_status: Option<SignatureStatus>,
+    pub(crate) signer_fingerprint: Option<String>,
 }
 
 impl<'a> VerificationHelper for DecryptHelper<'a> {
@@ -353,7 +354,7 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
 ///
 /// MAINTENANCE: After Sequoia version bumps, verify that `openpgp::Error` variants still cover
 /// the expected cases. The string fallback provides defense-in-depth if new error paths appear.
-fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
+pub(crate) fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
     // Strategy 1: Structured downcast — try direct anyhow → openpgp::Error
     // This path handles errors from DecryptorBuilder::with_policy().
     if let Some(openpgp_err) = e.downcast_ref::<openpgp::Error>() {
