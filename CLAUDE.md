@@ -42,11 +42,10 @@ cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Carg
 # Rust: cross-compile for Apple Silicon simulator
 cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
 
-# Generate Swift bindings (MUST use iOS .a, not host dylib — UniFFI 0.31+ generates
-# different checksums per target, and host dylib checksums won't match the iOS static lib)
+# Generate Swift bindings (via build-xcframework.sh, which uses a host macOS dylib for bindgen)
 cargo run --release --manifest-path pgp-mobile/Cargo.toml \
     --bin uniffi-bindgen generate \
-    --library target/aarch64-apple-ios/release/libpgp_mobile.a \
+    --library target/release/libpgp_mobile.dylib \
     --language swift --out-dir bindings/
 
 # Create XCFramework (after lipo for simulator)
