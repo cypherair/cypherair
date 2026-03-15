@@ -14,6 +14,8 @@ struct PrivacyScreenModifier: ViewModifier {
 
     @State private var isBlurred = false
     @State private var isAuthenticating = false
+    @State private var authFailed = false
+    @State private var hasAppearedOnce = false
 
     func body(content: Content) -> some View {
         content
@@ -24,7 +26,7 @@ struct PrivacyScreenModifier: ViewModifier {
                             .fill(.ultraThinMaterial)
                             .ignoresSafeArea()
 
-                        if !isAuthenticating {
+                        if authFailed && !isAuthenticating {
                             Button {
                                 handleResume()
                             } label: {
@@ -46,10 +48,19 @@ struct PrivacyScreenModifier: ViewModifier {
                 switch newPhase {
                 case .background, .inactive:
                     isBlurred = true
+                    authFailed = false
                 case .active:
                     handleResume()
                 @unknown default:
                     break
+                }
+            }
+            .onAppear {
+                guard !hasAppearedOnce else { return }
+                hasAppearedOnce = true
+                if config.requireAuthOnLaunch {
+                    isBlurred = true
+                    handleResume()
                 }
             }
     }
@@ -61,6 +72,7 @@ struct PrivacyScreenModifier: ViewModifier {
             config.requestContentClear()
             guard !isAuthenticating else { return }
             isAuthenticating = true
+            authFailed = false
             let auth = authManager
             let mode = config.authMode
             Task {
@@ -71,16 +83,20 @@ struct PrivacyScreenModifier: ViewModifier {
                     )
                     if success {
                         config.recordAuthentication()
+                        authFailed = false
                         isBlurred = false
+                    } else {
+                        authFailed = true
                     }
-                    // If not successful, keep blur
                 } catch {
-                    // Auth failed or cancelled — keep blur
+                    // Auth failed or cancelled — show retry button
+                    authFailed = true
                 }
                 isAuthenticating = false
             }
         } else {
             // Within grace period — resume normally
+            authFailed = false
             isBlurred = false
         }
     }

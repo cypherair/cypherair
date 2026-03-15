@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import LocalAuthentication
 import Security
 
 /// Errors from Secure Enclave operations.
@@ -46,14 +47,20 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         SecureEnclave.isAvailable
     }
 
-    func generateWrappingKey(accessControl: SecAccessControl?) throws -> any SEKeyHandle {
+    func generateWrappingKey(accessControl: SecAccessControl?, authenticationContext: LAContext?) throws -> any SEKeyHandle {
         guard SecureEnclave.isAvailable else {
             throw SecureEnclaveError.notAvailable
         }
 
         let key: SecureEnclave.P256.KeyAgreement.PrivateKey
         if let accessControl {
-            key = try SecureEnclave.P256.KeyAgreement.PrivateKey(accessControl: accessControl)
+            // Passing a pre-authenticated LAContext associates it with the new SE key,
+            // so that subsequent operations (e.g., sharedSecretFromKeyAgreement in wrap())
+            // reuse the existing authentication session instead of triggering Face ID again.
+            key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
+                accessControl: accessControl,
+                authenticationContext: authenticationContext
+            )
         } else {
             key = try SecureEnclave.P256.KeyAgreement.PrivateKey()
         }
@@ -141,11 +148,14 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         // The caller (AuthenticationManager) is responsible for Keychain deletion.
     }
 
-    func reconstructKey(from data: Data) throws -> any SEKeyHandle {
+    func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle {
         // Reconstructing from dataRepresentation triggers device authentication
         // (Face ID / Touch ID) when the key has biometric access control flags.
+        // Passing a pre-authenticated LAContext reuses the existing session,
+        // avoiding a repeated Face ID prompt.
         let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
-            dataRepresentation: data
+            dataRepresentation: data,
+            authenticationContext: authenticationContext
         )
         return HardwareSEKey(key: key)
     }
