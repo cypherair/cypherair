@@ -22,6 +22,8 @@ enum CypherAirError: Error, LocalizedError {
     case keyGenerationFailed(reason: String)
     case s2kError(reason: String)
     case internalError(reason: String)
+    case operationCancelled
+    case fileIoError(reason: String)
 
     // Security-layer errors
     case secureEnclaveUnavailable
@@ -33,6 +35,7 @@ enum CypherAirError: Error, LocalizedError {
     case invalidQRCode
     case unsupportedQRVersion
     case fileTooLarge(sizeMB: Int)
+    case insufficientDiskSpace(fileSizeMB: Int, requiredMB: Int, availableMB: Int)
     case noKeySelected
     case noRecipientsSelected
     case biometricsUnavailable
@@ -77,6 +80,10 @@ enum CypherAirError: Error, LocalizedError {
             String(localized: "error.s2kError", defaultValue: "Key protection format error: \(reason)")
         case .internalError(let reason):
             String(localized: "error.internalError", defaultValue: "An internal error occurred: \(reason)")
+        case .operationCancelled:
+            String(localized: "error.operationCancelled", defaultValue: "Operation was cancelled.")
+        case .fileIoError(let reason):
+            String(localized: "error.fileIoError", defaultValue: "File operation failed: \(reason)")
         case .secureEnclaveUnavailable:
             String(localized: "error.seUnavailable", defaultValue: "Secure Enclave is not available on this device.")
         case .authenticationFailed:
@@ -91,6 +98,8 @@ enum CypherAirError: Error, LocalizedError {
             String(localized: "error.unsupportedQRVersion", defaultValue: "This QR code requires a newer version of the app. Please update.")
         case .fileTooLarge(let sizeMB):
             String(localized: "error.fileTooLarge", defaultValue: "File is too large (\(sizeMB) MB). Maximum size is 100 MB.")
+        case .insufficientDiskSpace(let fileSizeMB, _, let availableMB):
+            String(localized: "error.insufficientDiskSpace", defaultValue: "Not enough disk space. File requires approximately \(fileSizeMB) MB but only \(availableMB) MB is available.")
         case .noKeySelected:
             String(localized: "error.noKeySelected", defaultValue: "No signing key selected.")
         case .noRecipientsSelected:
@@ -155,6 +164,10 @@ enum CypherAirError: Error, LocalizedError {
             self = .s2kError(reason: reason)
         case .InternalError(let reason):
             self = .internalError(reason: reason)
+        case .OperationCancelled:
+            self = .operationCancelled
+        case .FileIoError(let reason):
+            self = .fileIoError(reason: reason)
         }
     }
 }

@@ -243,6 +243,22 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureRes
     );
 
 #endif
+#ifndef UNIFFI_FFIDEF_CALLBACK_INTERFACE_PROGRESS_REPORTER_METHOD0
+#define UNIFFI_FFIDEF_CALLBACK_INTERFACE_PROGRESS_REPORTER_METHOD0
+typedef void (*UniffiCallbackInterfaceProgressReporterMethod0)(uint64_t, uint64_t, uint64_t, int8_t* _Nonnull, 
+        RustCallStatus *_Nonnull uniffiCallStatus
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_V_TABLE_CALLBACK_INTERFACE_PROGRESS_REPORTER
+#define UNIFFI_FFIDEF_V_TABLE_CALLBACK_INTERFACE_PROGRESS_REPORTER
+typedef struct UniffiVTableCallbackInterfaceProgressReporter {
+    UniffiCallbackInterfaceFree _Nonnull uniffiFree;
+    UniffiCallbackInterfaceClone _Nonnull uniffiClone;
+    UniffiCallbackInterfaceProgressReporterMethod0 _Nonnull onProgress;
+} UniffiVTableCallbackInterfaceProgressReporter;
+
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_CLONE_PGPENGINE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_CLONE_PGPENGINE
 uint64_t uniffi_pgp_mobile_fn_clone_pgpengine(uint64_t handle, RustCallStatus *_Nonnull out_status
@@ -284,6 +300,11 @@ RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_decode_qr_url(uint64_t ptr, Rus
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_decrypt(uint64_t ptr, RustBuffer ciphertext, RustBuffer secret_keys, RustBuffer verification_keys, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT_FILE
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT_FILE
+RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file(uint64_t ptr, RustBuffer input_path, RustBuffer output_path, RustBuffer secret_keys, RustBuffer verification_keys, RustBuffer progress, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DETECT_PROFILE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DETECT_PROFILE
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_detect_profile(uint64_t ptr, RustBuffer cert_data, RustCallStatus *_Nonnull out_status
@@ -302,6 +323,11 @@ RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_encrypt(uint64_t ptr, RustBuffe
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ENCRYPT_BINARY
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ENCRYPT_BINARY
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary(uint64_t ptr, RustBuffer plaintext, RustBuffer recipients, RustBuffer signing_key, RustBuffer encrypt_to_self, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ENCRYPT_FILE
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ENCRYPT_FILE
+void uniffi_pgp_mobile_fn_method_pgpengine_encrypt_file(uint64_t ptr, RustBuffer input_path, RustBuffer output_path, RustBuffer recipients, RustBuffer signing_key, RustBuffer encrypt_to_self, RustBuffer progress, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_EXPORT_SECRET_KEY
@@ -327,6 +353,11 @@ RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_import_secret_key(uint64_t ptr,
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_MATCH_RECIPIENTS
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_MATCH_RECIPIENTS
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_match_recipients(uint64_t ptr, RustBuffer ciphertext, RustBuffer local_certs, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_MATCH_RECIPIENTS_FROM_FILE
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_MATCH_RECIPIENTS_FROM_FILE
+RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_match_recipients_from_file(uint64_t ptr, RustBuffer input_path, RustBuffer local_certs, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_MODIFY_EXPIRY
@@ -364,6 +395,11 @@ RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_sign_cleartext(uint64_t ptr, Ru
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_sign_detached(uint64_t ptr, RustBuffer data, RustBuffer signer_cert, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_SIGN_DETACHED_FILE
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_SIGN_DETACHED_FILE
+RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_sign_detached_file(uint64_t ptr, RustBuffer input_path, RustBuffer signer_cert, RustBuffer progress, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_CLEARTEXT
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_CLEARTEXT
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_verify_cleartext(uint64_t ptr, RustBuffer signed_message, RustBuffer verification_keys, RustCallStatus *_Nonnull out_status
@@ -372,6 +408,31 @@ RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_verify_cleartext(uint64_t ptr, 
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_verify_detached(uint64_t ptr, RustBuffer data, RustBuffer signature, RustBuffer verification_keys, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED_FILE
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED_FILE
+RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_verify_detached_file(uint64_t ptr, RustBuffer data_path, RustBuffer signature, RustBuffer verification_keys, RustBuffer progress, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_CLONE_PROGRESSREPORTER
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_CLONE_PROGRESSREPORTER
+uint64_t uniffi_pgp_mobile_fn_clone_progressreporter(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_FREE_PROGRESSREPORTER
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_FREE_PROGRESSREPORTER
+void uniffi_pgp_mobile_fn_free_progressreporter(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_INIT_CALLBACK_VTABLE_PROGRESSREPORTER
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_INIT_CALLBACK_VTABLE_PROGRESSREPORTER
+void uniffi_pgp_mobile_fn_init_callback_vtable_progressreporter(const UniffiVTableCallbackInterfaceProgressReporter* _Nonnull vtable
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PROGRESSREPORTER_ON_PROGRESS
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PROGRESSREPORTER_ON_PROGRESS
+int8_t uniffi_pgp_mobile_fn_method_progressreporter_on_progress(uint64_t ptr, uint64_t bytes_processed, uint64_t total_bytes, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_PGP_MOBILE_RUSTBUFFER_ALLOC
@@ -664,6 +725,12 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decrypt(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_FILE
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_FILE
+uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DETECT_PROFILE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DETECT_PROFILE
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_detect_profile(void
@@ -685,6 +752,12 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_BINARY
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_BINARY
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_FILE
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_FILE
+uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file(void
     
 );
 #endif
@@ -715,6 +788,12 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS_FROM_FILE
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS_FROM_FILE
+uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients_from_file(void
     
 );
 #endif
@@ -760,6 +839,12 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_SIGN_DETACHED_FILE
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_SIGN_DETACHED_FILE
+uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_CLEARTEXT
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_CLEARTEXT
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext(void
@@ -769,6 +854,18 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED_FILE
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED_FILE
+uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PROGRESSREPORTER_ON_PROGRESS
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PROGRESSREPORTER_ON_PROGRESS
+uint16_t uniffi_pgp_mobile_checksum_method_progressreporter_on_progress(void
     
 );
 #endif
