@@ -504,13 +504,13 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(​SRCROOT)/pgp​-mobile​/tests​/fixtures",
+				"$(SRCROOT)/pgp-mobile/tests/fixtures",
 			);
 			name = "Copy GnuPG Fixture";
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(​TARGET​_​BUILD​_​DIR)/$(​UNLOCALIZED​_​RESOURCES​_​FOLDER​_​PATH)/​Fixtures\n",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Fixtures",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
