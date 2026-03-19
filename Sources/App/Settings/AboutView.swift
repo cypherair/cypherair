@@ -7,7 +7,7 @@ struct AboutView: View {
             Section {
                 LabeledContent(
                     String(localized: "about.app", defaultValue: "App"),
-                    value: "Cypher Air"
+                    value: "CypherAir"
                 )
                 LabeledContent(
                     String(localized: "about.version", defaultValue: "Version"),

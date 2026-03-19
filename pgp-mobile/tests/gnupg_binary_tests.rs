@@ -1,7 +1,7 @@
 //! GnuPG Binary Verification Tests.
 //!
 //! These tests invoke the actual `gpg` binary to verify that GnuPG can correctly
-//! process Cypher Air's (Sequoia-generated) output. This complements the existing
+//! process CypherAir's (Sequoia-generated) output. This complements the existing
 //! `gnupg_interop_tests.rs` which validates the reverse direction (GnuPG output
 //! processed by Sequoia).
 //!

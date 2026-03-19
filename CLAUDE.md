@@ -1,4 +1,4 @@
-# Cypher Air
+# CypherAir
 
 Offline OpenPGP encryption tool for iOS, iPadOS, and macOS. GPLv3. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
 

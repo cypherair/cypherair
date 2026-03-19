@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate GnuPG interoperability test fixtures for Cypher Air POC.
+# Generate GnuPG interoperability test fixtures for CypherAir POC.
 # These fixtures validate C3.1–C3.8 (GnuPG interop) and C2A.9/C2B.10 (DEFLATE).
 #
 # Requirements: GnuPG 2.4.x or later (fixtures last generated with 2.5.18)
@@ -93,7 +93,7 @@ echo "Exported: gpg_pubkey.gpg"
 echo "--- Encrypting test messages with GnuPG ---"
 
 # Plain text message
-echo -n "Hello from GnuPG! This is a test message for Cypher Air interop testing." > "$GNUPGHOME/plaintext.txt"
+echo -n "Hello from GnuPG! This is a test message for CypherAir interop testing." > "$GNUPGHOME/plaintext.txt"
 
 # Encrypt (armored, for text)
 gpg --encrypt --armor --recipient gnupg-test@example.com \

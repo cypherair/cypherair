@@ -41,7 +41,7 @@ struct SelfTestView: View {
                         Text(String(localized: "selftest.results", defaultValue: "Results"))
                             .font(.headline)
                         Spacer()
-                        Text("\(passed)/\(results.count)")
+                        Text(String(localized: "selftest.results.ratio", defaultValue: "\(passed)/\(results.count)"))
                             .font(.headline)
                             .foregroundStyle(passed == results.count ? .green : .red)
                     }
@@ -69,7 +69,7 @@ struct SelfTestView: View {
                                 }
                             }
                             Spacer()
-                            Text(String(format: "%.1fs", result.duration))
+                            Text(String(localized: "selftest.duration", defaultValue: "\(String(format: "%.1f", result.duration))s"))
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         }

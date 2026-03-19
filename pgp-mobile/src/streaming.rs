@@ -1,4 +1,4 @@
-//! Streaming file operations for Cypher Air.
+//! Streaming file operations for CypherAir.
 //!
 //! All functions use constant-memory I/O via manual copy loops with `Zeroizing<Vec<u8>>`
 //! buffers. `std::io::copy` is intentionally avoided because its internal 8 KiB stack

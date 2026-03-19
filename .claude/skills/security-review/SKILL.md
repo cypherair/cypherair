@@ -4,7 +4,7 @@ description: Review code changes touching security-critical paths
 disable-model-invocation: true
 ---
 
-Review the current diff or specified files against Cypher Air's security invariants.
+Review the current diff or specified files against CypherAir's security invariants.
 
 ## Security Invariants Checklist
 

@@ -1,7 +1,7 @@
 # Security Model
 
 > Purpose: Complete description of the encryption scheme, key lifecycle, authentication flows,
-> security invariants, and AI coding boundaries for Cypher Air.
+> security invariants, and AI coding boundaries for CypherAir.
 > Audience: Human developers, security auditors, and AI coding tools.
 
 ## 1. Encryption Scheme
