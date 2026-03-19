@@ -109,7 +109,7 @@ Open App → Onboarding (3 pages) → "Generate My Key"
 
 **Method A: QR via System Camera (Recommended)**
 - Format: `cypherair://import/v1/<base64url OpenPGP binary, no padding>`
-- Alice shows QR → Bob scans with system Camera → "Open in Cypher Air" → confirm → added.
+- Alice shows QR → Bob scans with system Camera → "Open in CypherAir" → confirm → added.
 - Fallback: QR from photo (PHPicker + CIDetector).
 
 **Method B:** Share .asc file via Share Sheet.
@@ -165,7 +165,7 @@ Text: cleartext sig. File: detached .sig. Auto-verify during decryption. Graded 
 | Unknown signer | ⚠️ Signer not in Contacts. |
 | Corrupt data | ❌ Damaged. Ask sender to resend. |
 | Wrong passphrase | ❌ Re-enter backup passphrase. |
-| Invalid QR | ❌ Not a valid Cypher Air key. |
+| Invalid QR | ❌ Not a valid CypherAir key. |
 | Unsupported QR ver | ⚠️ Update the App. |
 | Profile incompatible | ⚠️ This message uses a format your recipient's tool may not support. The message was encrypted using a compatible format instead. |
 
@@ -359,11 +359,11 @@ Share Extension. Post-quantum cryptography (pending IETF PQC standard). Interop 
 
 **Scenario 4: Multiple Keys** — Alice has both a Profile A key (for GnuPG contacts) and a Profile B key (for Sequoia contacts). She selects which identity to use per message.
 
-**Scenario 5: Face-to-Face Exchange** — Alice and Bob meet. Alice shows QR on screen. Bob scans with system Camera → "Open in Cypher Air" → confirm → added. Bob encrypts a message (encrypt-to-self ON) → sends via WeChat → Alice decrypts (two-phase + Face ID) → ✅ Valid signature. Alice sends reply. Bob re-reads his own sent ciphertext.
+**Scenario 5: Face-to-Face Exchange** — Alice and Bob meet. Alice shows QR on screen. Bob scans with system Camera → "Open in CypherAir" → confirm → added. Bob encrypts a message (encrypt-to-self ON) → sends via WeChat → Alice decrypts (two-phase + Face ID) → ✅ Valid signature. Alice sends reply. Bob re-reads his own sent ciphertext.
 
 **Scenario 6: Remote Exchange** — Alice sends her public key (.asc) to Bob via iMessage. Bob imports and verifies fingerprint by phone call.
 
-**Scenario 7: Encrypted File** — Alice encrypts a PDF (≤ 100 MB) → sends .gpg via AirDrop → Bob opens with "Open With" → Cypher Air → two-phase decrypt + Face ID → preview/save.
+**Scenario 7: Encrypted File** — Alice encrypts a PDF (≤ 100 MB) → sends .gpg via AirDrop → Bob opens with "Open With" → CypherAir → two-phase decrypt + Face ID → preview/save.
 
 **Scenario 8: Key Compromise** — Alice discovers her key may be compromised. She exports and distributes her revocation certificate. Contacts mark the key as revoked. Alice generates a new key.
 

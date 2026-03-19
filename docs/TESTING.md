@@ -5,7 +5,7 @@
 
 ## 1. Test Layers
 
-Cypher Air has four test layers, each with different runtime requirements.
+CypherAir has four test layers, each with different runtime requirements.
 
 ### Layer 1: Rust Unit Tests
 

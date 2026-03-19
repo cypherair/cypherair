@@ -329,10 +329,10 @@ SwiftUI (iOS 26.2+). UIKit: UIActivityViewController, UIDocumentPickerViewContro
 
 Memory Integrity Enforcement is Apple's hardware-level memory safety system, built right into Apple hardware and software in all models of iPhone 17 and iPhone Air (A19/A19 Pro chips). It combines Enhanced Memory Tagging Extension (EMTE), secure typed memory allocators, and Tag Confidentiality Enforcement to detect and block memory corruption (buffer overflows, use-after-free) in real time.
 
-### 8.2 Why MIE Matters for Cypher Air
+### 8.2 Why MIE Matters for CypherAir
 
 - **Vendored OpenSSL is C code:** Memory corruption vulnerabilities are the primary attack vector against C cryptographic libraries. MIE provides hardware-level defense against exploitation of any undiscovered OpenSSL bugs.
-- **Security-sensitive app:** Apple explicitly recommends MIE for apps that are "likely entry points for attackers — such as social networks, messaging apps, or any other app where a specific user can be targeted." Cypher Air fits this description.
+- **Security-sensitive app:** Apple explicitly recommends MIE for apps that are "likely entry points for attackers — such as social networks, messaging apps, or any other app where a specific user can be targeted." CypherAir fits this description.
 - **Zero performance cost:** Apple has optimized MIE to maintain device performance. The protection is always on and invisible to users on supported hardware.
 
 ### 8.3 Enablement
