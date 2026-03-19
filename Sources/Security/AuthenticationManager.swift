@@ -5,7 +5,7 @@ import Security
 // MARK: - Localized Strings
 
 private enum AuthStrings {
-    static let switchModeReason = String(localized: "Authenticate to change security mode")
+    static let switchModeReason = String(localized: "auth.switchMode.reason", defaultValue: "Authenticate to change security mode")
 }
 
 /// Errors from authentication and mode switching operations.

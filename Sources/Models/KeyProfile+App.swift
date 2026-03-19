@@ -36,8 +36,10 @@ extension KeyProfile {
     /// Security level description.
     var securityLevel: String {
         switch self {
-        case .universal: "~128 bit"
-        case .advanced: "~224 bit"
+        case .universal:
+            String(localized: "profile.universal.securityLevel", defaultValue: "~128 bit")
+        case .advanced:
+            String(localized: "profile.advanced.securityLevel", defaultValue: "~224 bit")
         }
     }
 }

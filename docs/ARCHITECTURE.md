@@ -1,11 +1,11 @@
 # Architecture
 
-> Purpose: Module breakdown, dependency relationships, and data flow for Cypher Air.
+> Purpose: Module breakdown, dependency relationships, and data flow for CypherAir.
 > Audience: Human developers and AI coding tools.
 
 ## 1. Layer Overview
 
-Cypher Air is a three-layer application: a SwiftUI presentation layer, a Swift services layer, and a Rust cryptographic engine bridged via UniFFI.
+CypherAir is a three-layer application: a SwiftUI presentation layer, a Swift services layer, and a Rust cryptographic engine bridged via UniFFI.
 
 ```mermaid
 graph TB
@@ -176,7 +176,7 @@ sequenceDiagram
     QR->>QR: Base64url decode → binary bytes
     QR->>QR: Parse as OpenPGP public key (v4 or v6, via pgp-mobile)
     alt Invalid data
-        QR-->>App: Error: "Not a valid Cypher Air public key"
+        QR-->>App: Error: "Not a valid CypherAir public key"
     end
     QR-->>App: Parsed key details (name, email, fingerprint, algorithm, profile)
     App->>V: Show key details confirmation page (includes profile indicator)

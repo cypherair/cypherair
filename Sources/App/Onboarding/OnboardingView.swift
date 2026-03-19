@@ -39,7 +39,7 @@ struct OnboardingPageOne: View {
             Text(String(localized: "onboarding.p1.title", defaultValue: "Completely Offline"))
                 .font(.title.bold())
 
-            Text(String(localized: "onboarding.p1.body", defaultValue: "Cypher Air never connects to the internet. Your messages and keys stay on your device."))
+            Text(String(localized: "onboarding.p1.body", defaultValue: "CypherAir never connects to the internet. Your messages and keys stay on your device."))
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

@@ -1,4 +1,4 @@
-//! pgp-mobile: OpenPGP wrapper for Cypher Air iOS app.
+//! pgp-mobile: OpenPGP wrapper for CypherAir iOS app.
 //!
 //! Wraps Sequoia PGP 2.2.0 behind a UniFFI-annotated API.
 //! Exposes profile-aware operations for dual-profile (A/B) encryption.
@@ -381,7 +381,7 @@ impl PgpEngine {
         let prefix = "cypherair://import/v1/";
         if !url.starts_with(prefix) {
             return Err(PgpError::CorruptData {
-                reason: "Not a valid Cypher Air URL. Expected cypherair://import/v1/...".to_string(),
+                reason: "Not a valid CypherAir URL. Expected cypherair://import/v1/...".to_string(),
             });
         }
 

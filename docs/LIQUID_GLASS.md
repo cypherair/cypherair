@@ -1,13 +1,13 @@
 # Liquid Glass Adoption Guide
 
-> Purpose: iOS 26 Liquid Glass design language reference and Cypher Air-specific guidance.
+> Purpose: iOS 26 Liquid Glass design language reference and CypherAir-specific guidance.
 > Audience: Human developers and AI coding tools.
 
 ## 1. Overview
 
 Liquid Glass is Apple's iOS 26 design language. It is a translucent, refracting material that replaces the blur-based materials used since iOS 7. Glass belongs exclusively on the **navigation and controls layer** — floating above content, never applied to content itself.
 
-**Cypher Air targets iOS 26.2+ exclusively.** There is no need for backward compatibility with older design languages. Do not use `UIDesignRequiresCompatibility`. Fully embrace Liquid Glass.
+**CypherAir targets iOS 26.2+ exclusively.** There is no need for backward compatibility with older design languages. Do not use `UIDesignRequiresCompatibility`. Fully embrace Liquid Glass.
 
 ## 2. Automatic Adoption
 
@@ -122,7 +122,7 @@ GlassEffectContainer {
 
 ### TabView
 
-Cypher Air uses four primary tabs. No search tab at root level — search is an in-page feature within Contacts.
+CypherAir uses four primary tabs. No search tab at root level — search is an in-page feature within Contacts.
 
 ```swift
 TabView {
@@ -172,7 +172,7 @@ Button("Encrypt") { ... }
     .buttonStyle(.glassProminent)
 ```
 
-## 6. Cypher Air-Specific Guidance
+## 6. CypherAir-Specific Guidance
 
 ### Where to Apply Glass
 

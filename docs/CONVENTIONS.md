@@ -1,6 +1,6 @@
 # Coding Conventions
 
-> Purpose: Swift coding standards, SwiftUI patterns, and project-wide conventions for Cypher Air.
+> Purpose: Swift coding standards, SwiftUI patterns, and project-wide conventions for CypherAir.
 > Audience: Human developers and AI coding tools.
 
 ## 1. Swift Style
@@ -91,7 +91,7 @@ struct ContentView: View {
 
 ### Liquid Glass
 
-Cypher Air targets iOS 26 exclusively and fully adopts Liquid Glass. See `docs/LIQUID_GLASS.md` for the full guide. Key rules:
+CypherAir targets iOS 26 exclusively and fully adopts Liquid Glass. See `docs/LIQUID_GLASS.md` for the full guide. Key rules:
 
 - Standard components (TabView, NavigationStack, toolbars, sheets) get Liquid Glass automatically. Do not override their backgrounds.
 - Custom floating controls: apply `.glassEffect()` as the last modifier. Remove any `.background()` modifiers first.

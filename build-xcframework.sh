@@ -34,7 +34,7 @@ else
     CARGO_FLAGS="--release"
 fi
 
-echo "=== Cypher Air: pgp-mobile XCFramework Build ==="
+echo "=== CypherAir: pgp-mobile XCFramework Build ==="
 echo "Build mode: $BUILD_DIR"
 echo ""
 
