@@ -83,6 +83,8 @@
 		CE00652F2F677880008604AB /* AppIconCPreview.png in Resources */ = {isa = PBXBuildFile; fileRef = CE00652C2F677880008604AB /* AppIconCPreview.png */; };
 		CE0065302F677880008604AB /* AppIconBPreview.png in Resources */ = {isa = PBXBuildFile; fileRef = CE00652B2F677880008604AB /* AppIconBPreview.png */; };
 		CE0065312F677880008604AB /* AppIconPreview.png in Resources */ = {isa = PBXBuildFile; fileRef = CE00652D2F677880008604AB /* AppIconPreview.png */; };
+		CE18872E2F6C875B00B4CD76 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CE18872D2F6C875B00B4CD76 /* InfoPlist.xcstrings */; };
+		CE1887302F6C8A0F00B4CD76 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CE18872F2F6C8A0F00B4CD76 /* Localizable.xcstrings */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
 		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
@@ -178,6 +180,8 @@
 		CE00652B2F677880008604AB /* AppIconBPreview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIconBPreview.png; sourceTree = "<group>"; };
 		CE00652C2F677880008604AB /* AppIconCPreview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIconCPreview.png; sourceTree = "<group>"; };
 		CE00652D2F677880008604AB /* AppIconPreview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIconPreview.png; sourceTree = "<group>"; };
+		CE18872D2F6C875B00B4CD76 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
+		CE18872F2F6C8A0F00B4CD76 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
 		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
@@ -395,6 +399,8 @@
 				CE00652B2F677880008604AB /* AppIconBPreview.png */,
 				CE00652C2F677880008604AB /* AppIconCPreview.png */,
 				CE00652D2F677880008604AB /* AppIconPreview.png */,
+				CE18872D2F6C875B00B4CD76 /* InfoPlist.xcstrings */,
+				CE18872F2F6C8A0F00B4CD76 /* Localizable.xcstrings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -506,6 +512,7 @@
 			knownRegions = (
 				Base,
 				en,
+				"zh-Hans",
 			);
 			mainGroup = 7C9F769E62E925ECA46373E6;
 			minimizedProjectReferenceProxies = 1;
@@ -528,8 +535,10 @@
 				CE0065252F676EBC008604AB /* AppIconB.icon in Resources */,
 				CE00652E2F677880008604AB /* AppIconAPreview.png in Resources */,
 				CE00652F2F677880008604AB /* AppIconCPreview.png in Resources */,
+				CE18872E2F6C875B00B4CD76 /* InfoPlist.xcstrings in Resources */,
 				CE0065302F677880008604AB /* AppIconBPreview.png in Resources */,
 				CE0065312F677880008604AB /* AppIconPreview.png in Resources */,
+				CE1887302F6C8A0F00B4CD76 /* Localizable.xcstrings in Resources */,
 				CE0065262F676EBC008604AB /* AppIconC.icon in Resources */,
 				CE0065272F676EBC008604AB /* AppIconA.icon in Resources */,
 				CE0065172F652334008604AB /* AppIcon.icon in Resources */,
@@ -721,6 +730,7 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconC AppIconB AppIcon";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconA;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_WARN_COMPLETION_HANDLER_MISUSE = YES;
 				CLANG_WARN_OBJC_MISSING_PROPERTY_SYNTHESIS = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
@@ -739,11 +749,11 @@
 					"$(PROJECT_DIR)/bindings",
 				);
 				INFOPLIST_FILE = "CypherAir-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Cypher Air";
+				INFOPLIST_KEY_CFBundleDisplayName = CypherAir;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher Air uses FaceID to protect your secret keys.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "Cypher Air";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "CypherAir uses FaceID to protect your secret keys.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = CypherAir;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = "";
 				INFOPLIST_KEY_UIStatusBarStyle = "";
@@ -766,7 +776,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.1;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -800,6 +810,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD)";
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++23";
@@ -846,6 +857,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
@@ -867,6 +879,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD)";
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++23";
@@ -919,6 +932,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
@@ -942,6 +956,7 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconC AppIconB AppIcon";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconA;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_WARN_COMPLETION_HANDLER_MISUSE = YES;
 				CLANG_WARN_OBJC_MISSING_PROPERTY_SYNTHESIS = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
@@ -960,11 +975,11 @@
 					"$(PROJECT_DIR)/bindings",
 				);
 				INFOPLIST_FILE = "CypherAir-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Cypher Air";
+				INFOPLIST_KEY_CFBundleDisplayName = CypherAir;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "Cypher Air uses FaceID to protect your secret keys.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "Cypher Air";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "CypherAir uses FaceID to protect your secret keys.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = CypherAir;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = "";
 				INFOPLIST_KEY_UIStatusBarStyle = "";
@@ -987,7 +1002,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.1;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",

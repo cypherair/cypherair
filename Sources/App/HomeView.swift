@@ -21,7 +21,7 @@ struct HomeView: View {
                 }
                 .padding()
             }
-            .navigationTitle(String(localized: "home.title", defaultValue: "Cypher Air"))
+            .navigationTitle(String(localized: "home.title", defaultValue: "CypherAir"))
             .navigationDestination(for: AppRoute.self) { route in
                 destinationView(for: route)
             }

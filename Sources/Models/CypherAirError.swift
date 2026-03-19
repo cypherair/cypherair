@@ -93,7 +93,7 @@ enum CypherAirError: Error, LocalizedError {
         case .keychainError:
             String(localized: "error.keychain", defaultValue: "Failed to access secure storage.")
         case .invalidQRCode:
-            String(localized: "error.invalidQR", defaultValue: "Not a valid Cypher Air public key.")
+            String(localized: "error.invalidQR", defaultValue: "Not a valid CypherAir public key.")
         case .unsupportedQRVersion:
             String(localized: "error.unsupportedQRVersion", defaultValue: "This QR code requires a newer version of the app. Please update.")
         case .fileTooLarge(let sizeMB):

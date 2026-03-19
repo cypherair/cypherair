@@ -27,7 +27,7 @@ struct QRPhotoImportView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(.secondary)
 
-            Text(String(localized: "qrImport.instruction", defaultValue: "Select a photo containing a Cypher Air QR code."))
+            Text(String(localized: "qrImport.instruction", defaultValue: "Select a photo containing a CypherAir QR code."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

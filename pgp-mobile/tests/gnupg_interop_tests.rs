@@ -75,7 +75,7 @@ fn test_c3_1_import_gpg_pubkey_binary() {
 fn test_c3_2_app_encrypt_to_gpg_key() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
-    let plaintext = b"Hello from Cypher Air to GnuPG!";
+    let plaintext = b"Hello from CypherAir to GnuPG!";
 
     // Encrypt with Sequoia to the GnuPG public key
     let ciphertext = encrypt::encrypt(plaintext, &[gpg_pubkey.clone()], None, None)
@@ -101,7 +101,7 @@ fn test_c3_2_app_encrypt_to_gpg_key() {
 fn test_c3_2_app_encrypt_signed_to_gpg_key() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
-    let plaintext = b"Signed message from Cypher Air";
+    let plaintext = b"Signed message from CypherAir";
 
     // Generate a Profile A key for signing
     let sender = keys::generate_key_with_profile(
@@ -151,7 +151,7 @@ fn test_c3_3_app_sign_profile_a() {
     )
     .expect("Key gen should succeed");
 
-    let plaintext = b"This message is signed by Cypher Air Profile A";
+    let plaintext = b"This message is signed by CypherAir Profile A";
     let signed = sign::sign_cleartext(plaintext, &sender.cert_data)
         .expect("Cleartext signing should succeed");
 

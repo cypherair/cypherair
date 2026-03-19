@@ -18,7 +18,7 @@ final class GnuPGInteropTests: XCTestCase {
     /// Note: gpg_plaintext.txt has a trailing newline, but the encrypted fixtures
     /// were created with `echo -n` so the ciphertext does not contain it.
     /// We load the actual plaintext fixture and trim to match.
-    private let expectedPlaintext = "Hello from GnuPG! This is a test message for Cypher Air interop testing."
+    private let expectedPlaintext = "Hello from GnuPG! This is a test message for CypherAir interop testing."
 
     override func setUp() {
         super.setUp()

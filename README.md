@@ -1,8 +1,8 @@
-# Cypher Air
+# CypherAir
 
 **Fully offline OpenPGP encryption for iOS — zero network, zero permissions.**
 
-Cypher Air is an open-source OpenPGP encryption tool for iOS 26.2+ / iPadOS 26.2+. It enables everyday users to communicate securely with friends, preventing message content from being monitored by third parties. The app operates with absolutely zero network access and requests no system permissions — data leakage is eliminated at the architectural level.
+CypherAir is an open-source OpenPGP encryption tool for iOS 26.2+ / iPadOS 26.2+. It enables everyday users to communicate securely with friends, preventing message content from being monitored by third parties. The app operates with absolutely zero network access and requests no system permissions — data leakage is eliminated at the architectural level.
 
 ## Key Features
 
@@ -54,7 +54,7 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 
 ## Architecture
 
-Cypher Air is a three-layer application: a SwiftUI presentation layer, a Swift services layer, and a Rust cryptographic engine bridged via UniFFI.
+CypherAir is a three-layer application: a SwiftUI presentation layer, a Swift services layer, and a Rust cryptographic engine bridged via UniFFI.
 
 ```
 Sources/
@@ -121,7 +121,7 @@ Then open the Xcode project and build normally.
 
 ## Security Model
 
-Cypher Air's security design centers around several layers of protection:
+CypherAir's security design centers around several layers of protection:
 
 - **Private Key Storage** — Keys are wrapped by a Secure Enclave P-256 key via self-ECDH + HKDF + AES-GCM, then stored in the iOS Keychain. Keys are device-bound and never leave the hardware.
 - **Two-Phase Decryption** — Phase 1 parses the message header and matches recipient keys without authentication. Phase 2 requires biometric/passcode auth before decryption proceeds.

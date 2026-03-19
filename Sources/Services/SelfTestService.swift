@@ -54,7 +54,7 @@ final class SelfTestService {
         for profile in profiles {
             // Test 1: Key generation
             let genResult = runTest(
-                name: "Key Generation",
+                name: String(localized: "selftest.name.keyGeneration", defaultValue: "Key Generation"),
                 profile: profile
             ) {
                 let generated = try engine.generateKey(
@@ -83,7 +83,7 @@ final class SelfTestService {
 
             // Test 2: Encrypt/Decrypt round-trip
             let encDecResult = runTest(
-                name: "Encrypt/Decrypt",
+                name: String(localized: "selftest.name.encryptDecrypt", defaultValue: "Encrypt/Decrypt"),
                 profile: profile
             ) {
                 let plaintext = Data("Self-test 自检 🔐".utf8)
@@ -109,7 +109,7 @@ final class SelfTestService {
 
             // Test 3: Sign/Verify round-trip
             let signResult = runTest(
-                name: "Sign/Verify",
+                name: String(localized: "selftest.name.signVerify", defaultValue: "Sign/Verify"),
                 profile: profile
             ) {
                 let text = Data("Signed message 签名消息".utf8)
@@ -132,7 +132,7 @@ final class SelfTestService {
 
             // Test 4: Tamper detection (1-bit flip)
             let tamperResult = runTest(
-                name: "Tamper Detection",
+                name: String(localized: "selftest.name.tamperDetection", defaultValue: "Tamper Detection"),
                 profile: profile
             ) {
                 let plaintext = Data("Tamper test".utf8)
@@ -170,7 +170,7 @@ final class SelfTestService {
 
             // Test 5: Key export/import round-trip
             let exportResult = runTest(
-                name: "Export/Import",
+                name: String(localized: "selftest.name.exportImport", defaultValue: "Export/Import"),
                 profile: profile
             ) {
                 let passphrase = "self-test-passphrase-2024"
@@ -200,7 +200,7 @@ final class SelfTestService {
         }
 
         // QR URL round-trip test (profile-agnostic, use first generated key)
-        let qrResult = runTest(name: "QR URL Encode/Decode", profile: nil) {
+        let qrResult = runTest(name: String(localized: "selftest.name.qrRoundTrip", defaultValue: "QR URL Encode/Decode"), profile: nil) {
             // Generate a fresh key for QR test
             var generated = try engine.generateKey(
                 name: "QR-Test",
@@ -251,7 +251,7 @@ final class SelfTestService {
                 name: name,
                 profile: profile,
                 passed: true,
-                message: "Passed",
+                message: String(localized: "selftest.result.passed", defaultValue: "Passed"),
                 duration: duration
             )
             return TestOutput(result: result, passed: true, value: value)
@@ -280,20 +280,25 @@ final class SelfTestService {
         let filename = "self-test-\(dateFormatter.string(from: Date())).txt"
         let fileURL = reportDir.appendingPathComponent(filename)
 
-        var report = "Cypher Air Self-Test Report\n"
-        report += "Date: \(Date())\n"
+        var report = String(localized: "selftest.report.title", defaultValue: "CypherAir Self-Test Report") + "\n"
+        let dateString = String(describing: Date())
+        report += String(localized: "selftest.report.date", defaultValue: "Date: \(dateString)") + "\n"
         report += "========================\n\n"
 
         let passed = results.filter { $0.passed }.count
-        report += "Results: \(passed)/\(results.count) passed\n\n"
+        report += String(localized: "selftest.report.summary", defaultValue: "Results: \(passed)/\(results.count) passed") + "\n\n"
+
+        let passStr = String(localized: "selftest.report.pass", defaultValue: "PASS")
+        let failStr = String(localized: "selftest.report.fail", defaultValue: "FAIL")
+        let generalStr = String(localized: "selftest.report.general", defaultValue: "General")
 
         for result in results {
-            let profileStr = result.profile?.displayName ?? "General"
-            let statusStr = result.passed ? "PASS" : "FAIL"
+            let profileStr = result.profile?.displayName ?? generalStr
+            let statusStr = result.passed ? passStr : failStr
             report += "[\(statusStr)] \(profileStr) — \(result.name)"
             report += " (\(String(format: "%.3f", result.duration))s)"
             if !result.passed {
-                report += "\n  Error: \(result.message)"
+                report += "\n  " + String(localized: "selftest.report.error", defaultValue: "Error: \(result.message)")
             }
             report += "\n"
         }
