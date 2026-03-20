@@ -8,11 +8,16 @@ struct ContentView: View {
 
     @State private var selectedTab: AppTab = .home
 
-    enum AppTab {
+    enum AppTab: Hashable {
         case home
         case keys
         case contacts
         case settings
+        // Sidebar-only tools (macOS sidebar / iPad top bar)
+        case encrypt
+        case decrypt
+        case sign
+        case verify
     }
 
     var body: some View {
@@ -54,6 +59,50 @@ struct ContentView: View {
                     SettingsView()
                 }
             }
+
+            TabSection(String(localized: "tab.section.tools", defaultValue: "Tools")) {
+                SwiftUI.Tab(
+                    String(localized: "home.encrypt", defaultValue: "Encrypt"),
+                    systemImage: "lock.fill",
+                    value: AppTab.encrypt
+                ) {
+                    NavigationStack {
+                        EncryptView()
+                    }
+                }
+
+                SwiftUI.Tab(
+                    String(localized: "home.decrypt", defaultValue: "Decrypt"),
+                    systemImage: "lock.open.fill",
+                    value: AppTab.decrypt
+                ) {
+                    NavigationStack {
+                        DecryptView()
+                    }
+                }
+
+                SwiftUI.Tab(
+                    String(localized: "home.sign", defaultValue: "Sign"),
+                    systemImage: "signature",
+                    value: AppTab.sign
+                ) {
+                    NavigationStack {
+                        SignView()
+                    }
+                }
+
+                SwiftUI.Tab(
+                    String(localized: "home.verify", defaultValue: "Verify"),
+                    systemImage: "checkmark.seal",
+                    value: AppTab.verify
+                ) {
+                    NavigationStack {
+                        VerifyView()
+                    }
+                }
+            }
+            .defaultVisibility(.hidden, for: .tabBar)
         }
+        .tabViewStyle(.sidebarAdaptable)
     }
 }

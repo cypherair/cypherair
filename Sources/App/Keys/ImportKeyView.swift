@@ -39,7 +39,11 @@ struct ImportKeyView: View {
                 } else {
                     TextEditor(text: $armoredText)
                         .font(.system(.body, design: .monospaced))
+                        #if canImport(UIKit)
                         .frame(minHeight: 120)
+                        #else
+                        .frame(minHeight: 200)
+                        #endif
                 }
             } header: {
                 Text(String(localized: "import.paste.header", defaultValue: "Paste armored private key"))
@@ -83,7 +87,12 @@ struct ImportKeyView: View {
                 .disabled((armoredText.isEmpty && importedKeyData == nil) || passphrase.isEmpty || isImporting)
             }
         }
+        #if canImport(UIKit)
         .scrollDismissesKeyboard(.interactively)
+        #endif
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle(String(localized: "import.title", defaultValue: "Import Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

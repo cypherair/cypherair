@@ -74,7 +74,12 @@ struct BackupKeyView: View {
                 }
             }
         }
+        #if canImport(UIKit)
         .scrollDismissesKeyboard(.interactively)
+        #endif
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle(String(localized: "backup.title", defaultValue: "Backup Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

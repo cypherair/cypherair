@@ -111,7 +111,12 @@ struct VerifyView: View {
                 }
             }
         }
+        #if canImport(UIKit)
         .scrollDismissesKeyboard(.interactively)
+        #endif
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle(String(localized: "verify.title", defaultValue: "Verify"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
@@ -151,7 +156,11 @@ struct VerifyView: View {
         Section {
             TextEditor(text: $signedInput)
                 .font(.system(.body, design: .monospaced))
+                #if canImport(UIKit)
                 .frame(minHeight: 100)
+                #else
+                .frame(minHeight: 250)
+                #endif
         } header: {
             Text(String(localized: "verify.input", defaultValue: "Signed Message"))
         }

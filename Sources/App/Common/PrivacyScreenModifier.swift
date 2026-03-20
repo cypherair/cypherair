@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
 
 /// Applies a blur overlay when the app enters the background.
 /// Prevents multitasking switcher from showing sensitive content.
@@ -16,6 +19,11 @@ struct PrivacyScreenModifier: ViewModifier {
     @State private var isAuthenticating = false
     @State private var authFailed = false
     @State private var hasAppearedOnce = false
+    #if os(macOS)
+    /// Suppresses the next didBecomeActive notification after auth completes,
+    /// because the Touch ID dialog itself causes a resign/become-active cycle.
+    @State private var suppressNextActivation = false
+    #endif
 
     func body(content: Content) -> some View {
         content
@@ -44,6 +52,7 @@ struct PrivacyScreenModifier: ViewModifier {
                 }
             }
             .animation(.easeInOut(duration: 0.15), value: isBlurred)
+            #if canImport(UIKit)
             .onChange(of: scenePhase) { _, newPhase in
                 switch newPhase {
                 case .background, .inactive:
@@ -55,6 +64,24 @@ struct PrivacyScreenModifier: ViewModifier {
                     break
                 }
             }
+            #endif
+            #if os(macOS)
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+                // Skip if auth is in progress — the system Touch ID dialog causes
+                // the app to resign active, and we must not re-blur during that.
+                guard !isAuthenticating && !suppressNextActivation else { return }
+                isBlurred = true
+                authFailed = false
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                if suppressNextActivation {
+                    suppressNextActivation = false
+                    return
+                }
+                guard !isAuthenticating else { return }
+                handleResume()
+            }
+            #endif
             .onAppear {
                 guard !hasAppearedOnce else { return }
                 hasAppearedOnce = true
@@ -100,6 +127,11 @@ struct PrivacyScreenModifier: ViewModifier {
                     // Auth failed or cancelled — show retry button
                     authFailed = true
                 }
+                #if os(macOS)
+                // The Touch ID dialog dismissal will trigger didBecomeActive;
+                // suppress it to prevent re-triggering authentication.
+                suppressNextActivation = true
+                #endif
                 isAuthenticating = false
             }
         } else {

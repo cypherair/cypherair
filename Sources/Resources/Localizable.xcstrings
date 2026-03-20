@@ -5042,6 +5042,7 @@
       }
     },
     "settings.requireAuthOnLaunch" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

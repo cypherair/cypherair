@@ -171,7 +171,12 @@ struct DecryptView: View {
                 }
             }
         }
+        #if canImport(UIKit)
         .scrollDismissesKeyboard(.interactively)
+        #endif
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle(String(localized: "decrypt.title", defaultValue: "Decrypt"))
         .fileImporter(
             isPresented: $showFileImporter,
@@ -233,7 +238,11 @@ struct DecryptView: View {
         Section {
             TextEditor(text: $ciphertextInput)
                 .font(.system(.body, design: .monospaced))
+                #if canImport(UIKit)
                 .frame(minHeight: 100)
+                #else
+                .frame(minHeight: 250)
+                #endif
         } header: {
             Text(String(localized: "decrypt.input", defaultValue: "Encrypted Message"))
         }
