@@ -5,6 +5,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var selectedTab: AppTab = .home
 
@@ -13,7 +14,7 @@ struct ContentView: View {
         case keys
         case contacts
         case settings
-        // Sidebar-only tools (macOS sidebar / iPad top bar)
+        // Sidebar-only tools (hidden in compact; accessible via Home on iPhone)
         case encrypt
         case decrypt
         case sign
@@ -101,8 +102,18 @@ struct ContentView: View {
                     }
                 }
             }
-            .defaultVisibility(.hidden, for: .tabBar)
+            .hidden(sizeClass == .compact)
         }
         .tabViewStyle(.sidebarAdaptable)
+        .onChange(of: sizeClass) { _, newSizeClass in
+            if newSizeClass == .compact {
+                switch selectedTab {
+                case .encrypt, .decrypt, .sign, .verify:
+                    selectedTab = .home
+                default:
+                    break
+                }
+            }
+        }
     }
 }
