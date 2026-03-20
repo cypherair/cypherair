@@ -119,6 +119,8 @@ struct OnboardingPageThree: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showTutorial = false
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -138,17 +140,30 @@ struct OnboardingPageThree: View {
                 .padding(.horizontal, 40)
 
             Button {
-                config.hasCompletedOnboarding = true
-                dismiss()
+                showTutorial = true
             } label: {
-                Text(String(localized: "onboarding.getStarted", defaultValue: "Get Started"))
+                Text(String(localized: "onboarding.viewTutorial", defaultValue: "View Usage Tutorial"))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .padding(.horizontal, 40)
 
+            Button {
+                config.hasCompletedOnboarding = true
+                dismiss()
+            } label: {
+                Text(String(localized: "onboarding.getStarted", defaultValue: "Get Started"))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .padding(.horizontal, 40)
+
             Spacer()
+        }
+        .sheet(isPresented: $showTutorial) {
+            TutorialView()
         }
     }
 }

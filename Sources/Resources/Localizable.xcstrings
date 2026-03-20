@@ -3921,6 +3921,22 @@
         }
       }
     },
+    "onboarding.viewTutorial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View Usage Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看使用教程"
+          }
+        }
+      }
+    },
     "postgen.backup" : {
       "localizations" : {
         "en" : {
@@ -5122,6 +5138,22 @@
         }
       }
     },
+    "settings.viewTutorial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usage Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用教程"
+          }
+        }
+      }
+    },
     "sign.button" : {
       "localizations" : {
         "en" : {
@@ -5550,6 +5582,246 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置"
+          }
+        }
+      }
+    },
+    "tutorial.back" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一步"
+          }
+        }
+      }
+    },
+    "tutorial.next" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一步"
+          }
+        }
+      }
+    },
+    "tutorial.p1.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encryption uses a pair of keys. Your public key is shared with friends so they can send you encrypted messages. Your private key stays on your device and is used to decrypt those messages. Never share your private key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加密使用一对密钥。公钥分享给朋友，他们用它给你发送加密消息。私钥保留在你的设备上，用于解密收到的消息。切勿分享你的私钥。"
+          }
+        }
+      }
+    },
+    "tutorial.p1.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public & Private Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公钥与私钥"
+          }
+        }
+      }
+    },
+    "tutorial.p2.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to the Keys tab and tap \"Generate My Key.\" Enter your name and optionally your email. Choose Universal (compatible with GnuPG) or Advanced (stronger security). Your key will be created and protected by Face ID or Touch ID."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前往「密钥」标签页，点击「生成我的密钥」。输入你的姓名，可选填邮箱。选择通用（兼容 GnuPG）或高级（更强安全性）。你的密钥将被创建，并由面容 ID 或触控 ID 保护。"
+          }
+        }
+      }
+    },
+    "tutorial.p2.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Step 1: Generate Your Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 1 步：生成你的密钥"
+          }
+        }
+      }
+    },
+    "tutorial.p3.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share your public key with friends via QR code, file, or copy-paste. Add their public keys the same way in the Contacts tab. Meet in person for the most secure exchange — scan each other's QR codes with the system camera."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通过二维码、文件或复制粘贴的方式与朋友分享你的公钥。在「联系人」标签页中以相同方式添加他们的公钥。面对面交换最为安全——用系统相机互扫二维码。"
+          }
+        }
+      }
+    },
+    "tutorial.p3.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Step 2: Exchange Public Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 2 步：交换公钥"
+          }
+        }
+      }
+    },
+    "tutorial.p4.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type or paste your message, select recipients from your contacts, and tap Encrypt. The encrypted message can be copied or shared through any messaging app. Only the selected recipients can decrypt it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入或粘贴你的消息，从联系人中选择收件人，然后点击加密。加密后的消息可以复制或通过任何聊天工具分享。只有选定的收件人才能解密。"
+          }
+        }
+      }
+    },
+    "tutorial.p4.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Step 3: Encrypt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 3 步：加密"
+          }
+        }
+      }
+    },
+    "tutorial.p5.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste the encrypted message you received and tap Decrypt. CypherAir will verify it is addressed to you, then ask for Face ID or Touch ID. The decrypted message is shown in memory only and cleared when you leave."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴收到的加密消息并点击解密。CypherAir 会确认消息是否发给你，然后请求面容 ID 或触控 ID 认证。解密后的消息仅保留在内存中，离开时自动清除。"
+          }
+        }
+      }
+    },
+    "tutorial.p5.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Step 4: Decrypt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 4 步：解密"
+          }
+        }
+      }
+    },
+    "tutorial.p6.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back up your private key from the key detail page — if you lose your device without a backup, your key is gone forever. Enable High Security mode in Settings for biometric-only protection. Keep your backup passphrase in a safe place."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从密钥详情页备份你的私钥——如果没有备份就丢失设备，密钥将永远消失。在设置中启用高安全模式以获得纯生物识别保护。将备份密码保存在安全的地方。"
+          }
+        }
+      }
+    },
+    "tutorial.p6.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protect Your Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保护你的密钥"
+          }
+        }
+      }
+    },
+    "tutorial.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usage Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用教程"
           }
         }
       }
