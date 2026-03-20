@@ -8,6 +8,7 @@ struct OnboardingView: View {
     @State private var currentPage = 0
 
     var body: some View {
+        #if canImport(UIKit)
         TabView(selection: $currentPage) {
             OnboardingPageOne()
                 .tag(0)
@@ -18,9 +19,45 @@ struct OnboardingView: View {
             OnboardingPageThree()
                 .tag(2)
         }
-        #if canImport(UIKit)
         .tabViewStyle(.page(indexDisplayMode: .always))
         .indexViewStyle(.page(backgroundDisplayMode: .always))
+        #else
+        VStack {
+            Group {
+                switch currentPage {
+                case 0: OnboardingPageOne()
+                case 1: OnboardingPageTwo()
+                case 2: OnboardingPageThree()
+                default: OnboardingPageOne()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            HStack {
+                Button(String(localized: "onboarding.back", defaultValue: "Back")) {
+                    withAnimation { currentPage -= 1 }
+                }
+                .disabled(currentPage == 0)
+
+                Spacer()
+
+                HStack(spacing: 8) {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .fill(index == currentPage ? Color.primary : Color.secondary.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                    }
+                }
+
+                Spacer()
+
+                Button(String(localized: "onboarding.next", defaultValue: "Next")) {
+                    withAnimation { currentPage += 1 }
+                }
+                .disabled(currentPage >= 2)
+            }
+            .padding()
+        }
         #endif
     }
 }

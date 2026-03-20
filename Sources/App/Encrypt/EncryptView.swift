@@ -223,7 +223,12 @@ struct EncryptView: View {
                 }
             }
         }
+        #if canImport(UIKit)
         .scrollDismissesKeyboard(.interactively)
+        #endif
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle(String(localized: "encrypt.title", defaultValue: "Encrypt"))
         .fileImporter(
             isPresented: $showFileImporter,
@@ -267,7 +272,11 @@ struct EncryptView: View {
     private var textInputContent: some View {
         Section {
             TextEditor(text: $plaintext)
+                #if canImport(UIKit)
                 .frame(minHeight: 100)
+                #else
+                .frame(minHeight: 250)
+                #endif
         } header: {
             Text(String(localized: "encrypt.plaintext", defaultValue: "Message"))
         }

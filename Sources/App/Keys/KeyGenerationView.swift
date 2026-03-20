@@ -95,7 +95,12 @@ struct KeyGenerationView: View {
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isGenerating)
             }
         }
+        #if canImport(UIKit)
         .scrollDismissesKeyboard(.interactively)
+        #endif
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle(String(localized: "keygen.title", defaultValue: "Generate Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

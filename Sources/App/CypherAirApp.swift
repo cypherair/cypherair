@@ -193,6 +193,28 @@ struct CypherAirApp: App {
                     handleIncomingURL(url)
                 }
         }
+        #if os(macOS)
+        .defaultSize(width: 900, height: 650)
+        .windowResizability(.contentMinSize)
+        .commands {
+            // Disable File > New Window on macOS.
+            // CypherAir uses a single-window design; multiple windows would create
+            // independent privacy screen states leading to inconsistent security behavior.
+            CommandGroup(replacing: .newItem) { }
+        }
+        #endif
+
+        #if os(macOS)
+        Settings {
+            NavigationStack {
+                SettingsView()
+            }
+            .environment(config)
+            .environment(authManager)
+            .environment(keyManagement)
+            .environment(selfTestService)
+        }
+        #endif
     }
 
     private var showOnboarding: Binding<Bool> {

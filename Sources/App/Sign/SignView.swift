@@ -165,7 +165,12 @@ struct SignView: View {
                 }
             }
         }
+        #if canImport(UIKit)
         .scrollDismissesKeyboard(.interactively)
+        #endif
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle(String(localized: "sign.title", defaultValue: "Sign"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
@@ -208,7 +213,11 @@ struct SignView: View {
     private var textSigningContent: some View {
         Section {
             TextEditor(text: $text)
+                #if canImport(UIKit)
                 .frame(minHeight: 100)
+                #else
+                .frame(minHeight: 250)
+                #endif
         } header: {
             Text(String(localized: "sign.input", defaultValue: "Message to Sign"))
         }

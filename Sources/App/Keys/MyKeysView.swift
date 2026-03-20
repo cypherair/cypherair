@@ -4,8 +4,20 @@ import SwiftUI
 struct MyKeysView: View {
     @Environment(KeyManagementService.self) private var keyManagement
 
+    #if os(macOS)
+    @State private var showKeyGeneration = false
+    @State private var showImportKey = false
+    #endif
+
     var body: some View {
         List {
+            ForEach(keyManagement.keys) { key in
+                NavigationLink(value: AppRoute.keyDetail(fingerprint: key.fingerprint)) {
+                    KeyRowView(key: key)
+                }
+            }
+        }
+        .overlay {
             if keyManagement.keys.isEmpty {
                 ContentUnavailableView {
                     Label(
@@ -15,16 +27,17 @@ struct MyKeysView: View {
                 } description: {
                     Text(String(localized: "keys.empty.description", defaultValue: "Generate or import a key to get started."))
                 } actions: {
+                    #if os(macOS)
+                    Button(String(localized: "keys.generate", defaultValue: "Generate Key")) {
+                        showKeyGeneration = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    #else
                     NavigationLink(value: AppRoute.keyGeneration) {
                         Text(String(localized: "keys.generate", defaultValue: "Generate Key"))
                     }
                     .buttonStyle(.borderedProminent)
-                }
-            } else {
-                ForEach(keyManagement.keys) { key in
-                    NavigationLink(value: AppRoute.keyDetail(fingerprint: key.fingerprint)) {
-                        KeyRowView(key: key)
-                    }
+                    #endif
                 }
             }
         }
@@ -32,6 +45,24 @@ struct MyKeysView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
+                    #if os(macOS)
+                    Button {
+                        showKeyGeneration = true
+                    } label: {
+                        Label(
+                            String(localized: "keys.action.generate", defaultValue: "Generate Key"),
+                            systemImage: "plus"
+                        )
+                    }
+                    Button {
+                        showImportKey = true
+                    } label: {
+                        Label(
+                            String(localized: "keys.action.import", defaultValue: "Import Key"),
+                            systemImage: "square.and.arrow.down"
+                        )
+                    }
+                    #else
                     NavigationLink(value: AppRoute.keyGeneration) {
                         Label(
                             String(localized: "keys.action.generate", defaultValue: "Generate Key"),
@@ -44,6 +75,7 @@ struct MyKeysView: View {
                             systemImage: "square.and.arrow.down"
                         )
                     }
+                    #endif
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -59,6 +91,34 @@ struct MyKeysView: View {
             default: Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
             }
         }
+        #if os(macOS)
+        .sheet(isPresented: $showKeyGeneration) {
+            NavigationStack {
+                KeyGenerationView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                                showKeyGeneration = false
+                            }
+                        }
+                    }
+            }
+            .frame(minWidth: 450, minHeight: 400)
+        }
+        .sheet(isPresented: $showImportKey) {
+            NavigationStack {
+                ImportKeyView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                                showImportKey = false
+                            }
+                        }
+                    }
+            }
+            .frame(minWidth: 450, minHeight: 400)
+        }
+        #endif
     }
 }
 

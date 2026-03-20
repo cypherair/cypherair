@@ -22,6 +22,10 @@ struct KeyDetailView: View {
     @State private var showExpirySheet = false
     @State private var newExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
     @State private var isModifyingExpiry = false
+    #if os(macOS)
+    @State private var showQRDisplay = false
+    @State private var showBackupKey = false
+    #endif
 
     private var key: PGPKeyIdentity? {
         keyManagement.keys.first { $0.fingerprint == fingerprint }
@@ -118,12 +122,23 @@ struct KeyDetailView: View {
                             }
                         }
 
+                        #if os(macOS)
+                        Button {
+                            showQRDisplay = true
+                        } label: {
+                            Label(
+                                String(localized: "keydetail.showQR", defaultValue: "Show QR Code"),
+                                systemImage: "qrcode"
+                            )
+                        }
+                        #else
                         NavigationLink(value: AppRoute.qrDisplay(publicKeyData: key.publicKeyData, displayName: key.userId ?? key.shortKeyId)) {
                             Label(
                                 String(localized: "keydetail.showQR", defaultValue: "Show QR Code"),
                                 systemImage: "qrcode"
                             )
                         }
+                        #endif
 
                         Button {
                             if let armoredPublicKey,
@@ -166,12 +181,23 @@ struct KeyDetailView: View {
                             }
                         }
 
+                        #if os(macOS)
+                        Button {
+                            showBackupKey = true
+                        } label: {
+                            Label(
+                                String(localized: "keydetail.exportBackup", defaultValue: "Export Backup"),
+                                systemImage: "square.and.arrow.up"
+                            )
+                        }
+                        #else
                         NavigationLink(value: AppRoute.backupKey(fingerprint: fingerprint)) {
                             Label(
                                 String(localized: "keydetail.exportBackup", defaultValue: "Export Backup"),
                                 systemImage: "square.and.arrow.up"
                             )
                         }
+                        #endif
 
                         if !key.revocationCert.isEmpty,
                            let revURL = key.revocationCert.writeToShareTempFile(named: "revocation-\(key.shortKeyId).asc") {
@@ -222,6 +248,9 @@ struct KeyDetailView: View {
                 )
             }
         }
+        #if os(macOS)
+        .listStyle(.inset)
+        #endif
         .navigationTitle(String(localized: "keydetail.title", defaultValue: "Key Detail"))
         .confirmationDialog(
             String(localized: "keydetail.delete.title", defaultValue: "Delete Key"),
@@ -304,8 +333,40 @@ struct KeyDetailView: View {
                 }
                 .disabled(isModifyingExpiry)
             }
+            #if canImport(UIKit)
             .presentationDetents([.medium])
+            #endif
         }
+        #if os(macOS)
+        .sheet(isPresented: $showQRDisplay) {
+            if let key {
+                NavigationStack {
+                    QRDisplayView(publicKeyData: key.publicKeyData, displayName: key.userId ?? key.shortKeyId)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(String(localized: "common.done", defaultValue: "Done")) {
+                                    showQRDisplay = false
+                                }
+                            }
+                        }
+                }
+                .frame(minWidth: 400, minHeight: 450)
+            }
+        }
+        .sheet(isPresented: $showBackupKey) {
+            NavigationStack {
+                BackupKeyView(fingerprint: fingerprint)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                                showBackupKey = false
+                            }
+                        }
+                    }
+            }
+            .frame(minWidth: 450, minHeight: 350)
+        }
+        #endif
         .task {
             do {
                 armoredPublicKey = try keyManagement.exportPublicKey(fingerprint: fingerprint)

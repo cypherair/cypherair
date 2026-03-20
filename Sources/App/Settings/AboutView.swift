@@ -52,6 +52,9 @@ struct AboutView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        #if os(macOS)
+        .listStyle(.inset)
+        #endif
         .navigationTitle(String(localized: "about.title", defaultValue: "About"))
     }
 

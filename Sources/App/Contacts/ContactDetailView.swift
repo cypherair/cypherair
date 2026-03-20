@@ -86,6 +86,9 @@ struct ContactDetailView: View {
                 )
             }
         }
+        #if os(macOS)
+        .listStyle(.inset)
+        #endif
         .navigationTitle(String(localized: "contactdetail.title", defaultValue: "Contact"))
         .confirmationDialog(
             String(localized: "contactdetail.delete.title", defaultValue: "Remove Contact"),
