@@ -84,6 +84,9 @@ struct SelfTestView: View {
                 }
             }
         }
+        #if os(macOS)
+        .listStyle(.inset)
+        #endif
         .navigationTitle(String(localized: "selftest.title", defaultValue: "Self-Test"))
         .toolbar {
             if case .completed = selfTestService.state, let reportURL = selfTestService.lastReportURL {

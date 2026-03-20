@@ -13,11 +13,15 @@ struct SettingsView: View {
     @State private var showSwitchError = false
     @State private var showOnboarding = false
     @State private var riskAcknowledged = false
+    #if os(macOS)
+    @State private var showSelfTest = false
+    @State private var showAbout = false
+    #endif
 
     var body: some View {
         @Bindable var config = config
 
-        List {
+        Form {
             Section {
                 Picker(
                     String(localized: "settings.authMode", defaultValue: "Authentication Mode"),
@@ -46,10 +50,6 @@ struct SettingsView: View {
                     }
                 }
 
-                Toggle(
-                    String(localized: "settings.requireAuthOnLaunch", defaultValue: "Require Authentication on Launch"),
-                    isOn: $config.requireAuthOnLaunch
-                )
             } header: {
                 Text(String(localized: "settings.security", defaultValue: "Security"))
             }
@@ -81,12 +81,23 @@ struct SettingsView: View {
             #endif
 
             Section {
+                #if os(macOS)
+                Button {
+                    showSelfTest = true
+                } label: {
+                    Label(
+                        String(localized: "settings.selfTest", defaultValue: "Self-Test"),
+                        systemImage: "checkmark.circle"
+                    )
+                }
+                #else
                 NavigationLink(value: AppRoute.selfTest) {
                     Label(
                         String(localized: "settings.selfTest", defaultValue: "Self-Test"),
                         systemImage: "checkmark.circle"
                     )
                 }
+                #endif
                 Button {
                     showOnboarding = true
                 } label: {
@@ -95,20 +106,39 @@ struct SettingsView: View {
                         systemImage: "book"
                     )
                 }
+                #if os(macOS)
+                Button {
+                    showAbout = true
+                } label: {
+                    Label(
+                        String(localized: "settings.about", defaultValue: "About"),
+                        systemImage: "info.circle"
+                    )
+                }
+                #else
                 NavigationLink(value: AppRoute.about) {
                     Label(
                         String(localized: "settings.about", defaultValue: "About"),
                         systemImage: "info.circle"
                     )
                 }
+                #endif
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle(String(localized: "settings.title", defaultValue: "Settings"))
         .navigationDestination(for: AppRoute.self) { route in
             switch route {
             case .selfTest: SelfTestView()
             case .about: AboutView()
-            case .appIcon: AppIconPickerView()
+            case .appIcon:
+                #if canImport(UIKit)
+                AppIconPickerView()
+                    #else
+                Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
+                #endif
             case .keyGeneration, .keyDetail, .backupKey, .importKey,
                  .contactDetail, .addContact, .qrDisplay, .qrPhotoImport,
                  .encrypt, .decrypt,
@@ -182,7 +212,9 @@ struct SettingsView: View {
                     }
                 }
             }
+            #if canImport(UIKit)
             .presentationDetents([.medium, .large])
+            #endif
         }
         .alert(
             String(localized: "settings.mode.error.title", defaultValue: "Mode Switch Failed"),
@@ -197,6 +229,34 @@ struct SettingsView: View {
         .sheet(isPresented: $showOnboarding) {
             OnboardingView()
         }
+        #if os(macOS)
+        .sheet(isPresented: $showSelfTest) {
+            NavigationStack {
+                SelfTestView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                                showSelfTest = false
+                            }
+                        }
+                    }
+            }
+            .frame(minWidth: 500, minHeight: 450)
+        }
+        .sheet(isPresented: $showAbout) {
+            NavigationStack {
+                AboutView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(String(localized: "common.done", defaultValue: "Done")) {
+                                showAbout = false
+                            }
+                        }
+                    }
+            }
+            .frame(minWidth: 400, minHeight: 350)
+        }
+        #endif
     }
 
     // MARK: - Mode Switch Warnings
@@ -215,9 +275,17 @@ struct SettingsView: View {
     private var modeWarningMessage: String {
         if pendingMode == .highSecurity {
             if !hasBackup {
+                #if os(macOS)
+                return String(localized: "settings.mode.highWarning.noBackup.mac", defaultValue: "WARNING: In High Security mode, if Touch ID becomes unavailable, you will be unable to access your private keys. You have NOT backed up any keys. If biometrics fail, your keys will be permanently inaccessible. Back up your keys first, or proceed at your own risk.")
+                #else
                 return String(localized: "settings.mode.highWarning.noBackup", defaultValue: "WARNING: In High Security mode, if Face ID / Touch ID becomes unavailable, you will be unable to access your private keys. You have NOT backed up any keys. If biometrics fail, your keys will be permanently inaccessible. Back up your keys first, or proceed at your own risk.")
+                #endif
             }
+            #if os(macOS)
+            return String(localized: "settings.mode.highWarning.message.mac", defaultValue: "In High Security mode, if Touch ID becomes unavailable, you will be unable to access your private keys. Ensure you have a current backup. Biometric authentication is required to confirm this change.")
+            #else
             return String(localized: "settings.mode.highWarning.message", defaultValue: "In High Security mode, if Face ID / Touch ID becomes unavailable, you will be unable to access your private keys. Ensure you have a current backup. Biometric authentication is required to confirm this change.")
+            #endif
         }
         return String(localized: "settings.mode.standardWarning.message", defaultValue: "Switching to Standard Mode will allow device passcode as a fallback for authentication. Biometric authentication is required to confirm this change.")
     }

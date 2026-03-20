@@ -69,7 +69,12 @@ struct AddContactView: View {
                 .disabled(addButtonDisabled)
             }
         }
+        #if canImport(UIKit)
         .scrollDismissesKeyboard(.interactively)
+        #endif
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle(String(localized: "addcontact.title", defaultValue: "Add Contact"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
@@ -135,7 +140,11 @@ struct AddContactView: View {
         Section {
             TextEditor(text: $armoredText)
                 .font(.system(.body, design: .monospaced))
+                #if canImport(UIKit)
                 .frame(minHeight: 120)
+                #else
+                .frame(minHeight: 200)
+                #endif
         } header: {
             Text(String(localized: "addcontact.paste.header", defaultValue: "Paste public key (armored or binary)"))
         }

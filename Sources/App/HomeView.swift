@@ -4,6 +4,9 @@ import SwiftUI
 struct HomeView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @State private var path = NavigationPath()
+    #if os(macOS)
+    @State private var showKeyGeneration = false
+    #endif
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -16,8 +19,14 @@ struct HomeView: View {
                         defaultKeyInfo
                     }
 
-                    // Quick actions
+                    // Quick actions (iOS only — macOS uses sidebar navigation)
+                    #if canImport(UIKit)
                     quickActionsGrid
+                    #else
+                    Text(String(localized: "home.macOS.hint", defaultValue: "Use the sidebar to encrypt, decrypt, sign, or verify messages."))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    #endif
                 }
                 .padding()
             }
@@ -25,6 +34,21 @@ struct HomeView: View {
             .navigationDestination(for: AppRoute.self) { route in
                 destinationView(for: route)
             }
+            #if os(macOS)
+            .sheet(isPresented: $showKeyGeneration) {
+                NavigationStack {
+                    KeyGenerationView()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                                    showKeyGeneration = false
+                                }
+                            }
+                        }
+                }
+                .frame(minWidth: 450, minHeight: 400)
+            }
+            #endif
         }
     }
 
@@ -46,7 +70,11 @@ struct HomeView: View {
                 .multilineTextAlignment(.center)
 
             Button {
+                #if os(macOS)
+                showKeyGeneration = true
+                #else
                 path.append(AppRoute.keyGeneration)
+                #endif
             } label: {
                 Label(
                     String(localized: "home.generateKey", defaultValue: "Generate My Key"),

@@ -96,8 +96,12 @@ final class AppConfiguration {
             self.clipboardNotice = true
         }
 
-        // Require auth on launch (default false)
-        self.requireAuthOnLaunch = defaults.bool(forKey: Self.requireAuthOnLaunchKey)
+        // Require auth on launch (default true)
+        if defaults.object(forKey: Self.requireAuthOnLaunchKey) != nil {
+            self.requireAuthOnLaunch = defaults.bool(forKey: Self.requireAuthOnLaunchKey)
+        } else {
+            self.requireAuthOnLaunch = true
+        }
 
         // Onboarding
         self.hasCompletedOnboarding = defaults.bool(forKey: Self.onboardingCompleteKey)
