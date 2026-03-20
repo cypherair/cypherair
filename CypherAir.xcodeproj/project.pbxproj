@@ -85,6 +85,7 @@
 		CE0065312F677880008604AB /* AppIconPreview.png in Resources */ = {isa = PBXBuildFile; fileRef = CE00652D2F677880008604AB /* AppIconPreview.png */; };
 		CE18872E2F6C875B00B4CD76 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CE18872D2F6C875B00B4CD76 /* InfoPlist.xcstrings */; };
 		CE1887302F6C8A0F00B4CD76 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CE18872F2F6C8A0F00B4CD76 /* Localizable.xcstrings */; };
+		CE4958B22F6D797000BF03E2 /* TutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE4958B12F6D797000BF03E2 /* TutorialView.swift */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
 		CEE730E02F62B61A007CA4A8 /* Argon2idMemoryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */; };
@@ -182,6 +183,7 @@
 		CE00652D2F677880008604AB /* AppIconPreview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIconPreview.png; sourceTree = "<group>"; };
 		CE18872D2F6C875B00B4CD76 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		CE18872F2F6C8A0F00B4CD76 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		CE4958B12F6D797000BF03E2 /* TutorialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialView.swift; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
 		CEE730DF2F62B61A007CA4A8 /* Argon2idMemoryGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2idMemoryGuard.swift; sourceTree = "<group>"; };
@@ -370,6 +372,7 @@
 			isa = PBXGroup;
 			children = (
 				CE0064EB2F64975C008604AB /* OnboardingView.swift */,
+				CE4958B12F6D797000BF03E2 /* TutorialView.swift */,
 			);
 			path = Onboarding;
 			sourceTree = "<group>";
@@ -603,6 +606,7 @@
 				CE00651B2F673ADE008604AB /* FileProgressReporter.swift in Sources */,
 				CE0064E92F64972D008604AB /* QRPhotoImportView.swift in Sources */,
 				9F4284F9BEE858C4C9110D9B /* CypherAirApp.swift in Sources */,
+				CE4958B22F6D797000BF03E2 /* TutorialView.swift in Sources */,
 				CE0064E72F64972D008604AB /* QRDisplayView.swift in Sources */,
 				174304A352D9A283F7CB3E53 /* KeychainManageable.swift in Sources */,
 				6F25017F340541D84E52FB11 /* MockAuthenticator.swift in Sources */,
@@ -777,7 +781,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.4;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -1011,7 +1015,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.4;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",

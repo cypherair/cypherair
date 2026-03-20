@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var switchError: String?
     @State private var showSwitchError = false
     @State private var showOnboarding = false
+    @State private var showTutorial = false
     @State private var riskAcknowledged = false
     #if os(macOS)
     @State private var showSelfTest = false
@@ -104,6 +105,14 @@ struct SettingsView: View {
                     Label(
                         String(localized: "settings.viewOnboarding", defaultValue: "View Onboarding"),
                         systemImage: "book"
+                    )
+                }
+                Button {
+                    showTutorial = true
+                } label: {
+                    Label(
+                        String(localized: "settings.viewTutorial", defaultValue: "Usage Tutorial"),
+                        systemImage: "list.number"
                     )
                 }
                 #if os(macOS)
@@ -228,6 +237,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingView()
+        }
+        .sheet(isPresented: $showTutorial) {
+            TutorialView()
         }
         #if os(macOS)
         .sheet(isPresented: $showSelfTest) {
