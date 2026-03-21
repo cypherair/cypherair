@@ -177,6 +177,12 @@ impl<'a> VerificationHelper for VerifyHelper<'a> {
                                 );
                                 return Ok(());
                             }
+                            // INTENTIONAL: No `return Ok(())` here — fall through to continue
+                            // checking subsequent signatures. If a message has multiple signatures
+                            // and one signer is unknown, a later signature may match a known key.
+                            // This differs from BadKey/catch-all which return immediately because
+                            // those represent definitive outcomes for a known key, while MissingKey
+                            // means we cannot evaluate this particular signature.
                             Err(VerificationError::MissingKey { .. }) => {
                                 self.status = SignatureStatus::UnknownSigner;
                             }

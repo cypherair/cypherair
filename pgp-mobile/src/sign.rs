@@ -99,7 +99,7 @@ pub fn sign_detached(data: &[u8], signer_cert_data: &[u8]) -> Result<Vec<u8>, Pg
             reason: format!("Signer setup failed: {e}"),
         })?;
 
-    std::io::copy(&mut &data[..], &mut signer).map_err(|e| PgpError::SigningFailed {
+    std::io::Write::write_all(&mut signer, data).map_err(|e| PgpError::SigningFailed {
         reason: format!("Write failed: {e}"),
     })?;
 
