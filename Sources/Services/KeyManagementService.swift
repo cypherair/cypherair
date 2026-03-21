@@ -20,7 +20,7 @@ final class KeyManagementService {
     private let jsonDecoder = JSONDecoder()
 
     init(
-        engine: PgpEngine = PgpEngine(),
+        engine: PgpEngine,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         authenticator: any AuthenticationEvaluable
@@ -71,27 +71,23 @@ final class KeyManagementService {
     ///   - profile: Encryption profile (.universal or .advanced).
     ///   - authMode: Current authentication mode for SE key access control.
     /// - Returns: The newly created key identity.
+    @concurrent
     func generateKey(
         name: String,
         email: String?,
         expirySeconds: UInt64?,
         profile: KeyProfile,
         authMode: AuthenticationMode
-    ) throws -> PGPKeyIdentity {
-        // Generate key pair via Rust engine
-        var generated = try engine.generateKey(
-            name: name,
-            email: email,
-            expirySeconds: expirySeconds,
-            profile: profile
+    ) async throws -> PGPKeyIdentity {
+        // PGP engine calls — off main thread via @concurrent helper
+        var (generated, keyInfo) = try await generateKeyOffMainActor(
+            name: name, email: email,
+            expirySeconds: expirySeconds, profile: profile
         )
         defer {
             // Zeroize the raw secret key material
             generated.certData.resetBytes(in: 0..<generated.certData.count)
         }
-
-        // Parse key info for metadata
-        let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
 
         // Create access control for SE key
         let accessControl = try authMode.createAccessControl()
@@ -151,38 +147,36 @@ final class KeyManagementService {
     ///   - passphrase: The passphrase protecting the key.
     ///   - authMode: Current authentication mode for SE key access control.
     /// - Returns: The imported key identity.
+    @concurrent
     func importKey(
         armoredData: Data,
         passphrase: String,
         authMode: AuthenticationMode
-    ) throws -> PGPKeyIdentity {
-        // Check Argon2id memory requirements before import
-        let s2kInfo = try engine.parseS2kParams(armoredData: armoredData)
+    ) async throws -> PGPKeyIdentity {
+        // Check Argon2id memory requirements before import (fast, <1ms — stays on main actor)
+        let s2kInfo: S2kInfo
+        do {
+            s2kInfo = try engine.parseS2kParams(armoredData: armoredData)
+        } catch {
+            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+        }
         let memoryGuard = Argon2idMemoryGuard()
         try memoryGuard.validate(s2kInfo: s2kInfo)
 
-        // Import (decrypt) the secret key
-        var secretKeyData = try engine.importSecretKey(
-            armoredData: armoredData,
-            passphrase: passphrase
+        // Heavy engine calls — off main thread via @concurrent helper
+        var (secretKeyData, keyInfo, profile, publicKeyData) = try await importKeyOffMainActor(
+            armoredData: armoredData, passphrase: passphrase
         )
         defer {
             // Zeroize the raw secret key material
             secretKeyData.resetBytes(in: 0..<secretKeyData.count)
         }
 
-        // Parse key info
-        let keyInfo = try engine.parseKeyInfo(keyData: secretKeyData)
-        let profile = try engine.detectProfile(certData: secretKeyData)
-
         // Guard against duplicate import: check before SE wrapping
         // to avoid creating an orphaned SE key on Keychain duplicateItem failure.
         if keys.contains(where: { $0.fingerprint == keyInfo.fingerprint }) {
             throw CypherAirError.duplicateKey
         }
-
-        // Extract public key before SE wrapping (needs certData)
-        let publicKeyData = try engine.armorPublicKey(certData: secretKeyData)
 
         // SE-wrap the imported key
         let accessControl = try authMode.createAccessControl()
@@ -239,7 +233,8 @@ final class KeyManagementService {
     ///   - fingerprint: Fingerprint of the key to export.
     ///   - passphrase: User-provided passphrase for S2K protection.
     /// - Returns: ASCII-armored passphrase-protected secret key data.
-    func exportKey(fingerprint: String, passphrase: String) throws -> Data {
+    @concurrent
+    func exportKey(fingerprint: String, passphrase: String) async throws -> Data {
         var secretKey = try unwrapPrivateKey(fingerprint: fingerprint)
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
@@ -249,10 +244,9 @@ final class KeyManagementService {
             throw CypherAirError.noMatchingKey
         }
 
-        let exported = try engine.exportSecretKey(
-            certData: secretKey,
-            passphrase: passphrase,
-            profile: identity.profile
+        // S2K protection — off main thread via @concurrent helper
+        let exported = try await exportKeyOffMainActor(
+            certData: secretKey, passphrase: passphrase, profile: identity.profile
         )
 
         // Mark as backed up and persist metadata change.
@@ -285,19 +279,19 @@ final class KeyManagementService {
     ///   - newExpirySeconds: New expiry duration from now in seconds, or nil to remove expiry.
     ///   - authMode: Current authentication mode for SE key access control.
     /// - Returns: The updated key identity with new expiry information.
+    @concurrent
     func modifyExpiry(
         fingerprint: String,
         newExpirySeconds: UInt64?,
         authMode: AuthenticationMode
-    ) throws -> PGPKeyIdentity {
+    ) async throws -> PGPKeyIdentity {
         // 1. Unwrap private key (triggers Face ID / Touch ID)
         var secretKey = try unwrapPrivateKey(fingerprint: fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
 
-        // 2. Call Rust engine to modify expiry
-        var result = try engine.modifyExpiry(
-            certData: secretKey,
-            newExpirySeconds: newExpirySeconds
+        // 2. Modify expiry — off main thread via @concurrent helper
+        var result = try await modifyExpiryOffMainActor(
+            certData: secretKey, newExpirySeconds: newExpirySeconds
         )
         defer { result.certData.resetBytes(in: 0..<result.certData.count) }
 
@@ -452,7 +446,11 @@ final class KeyManagementService {
         guard let identity = keys.first(where: { $0.fingerprint == fingerprint }) else {
             throw CypherAirError.noMatchingKey
         }
-        return try engine.armorPublicKey(certData: identity.publicKeyData)
+        do {
+            return try engine.armorPublicKey(certData: identity.publicKeyData)
+        } catch {
+            throw CypherAirError.from(error) { .armorError(reason: $0) }
+        }
     }
 
     // MARK: - Crash Recovery
@@ -517,6 +515,81 @@ final class KeyManagementService {
         // Always clear the flags after recovery attempt.
         defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
         defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+    }
+
+    // MARK: - Off-Main-Actor Engine Helpers
+
+    /// Run key generation on the cooperative thread pool.
+    /// Error wrapping (Issue 2) lives here so PgpError never escapes.
+    @concurrent
+    private func generateKeyOffMainActor(
+        name: String, email: String?,
+        expirySeconds: UInt64?, profile: KeyProfile
+    ) async throws -> (GeneratedKey, KeyInfo) {
+        do {
+            let generated = try engine.generateKey(
+                name: name,
+                email: email,
+                expirySeconds: expirySeconds,
+                profile: profile
+            )
+            let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
+            return (generated, keyInfo)
+        } catch {
+            throw CypherAirError.from(error) { .keyGenerationFailed(reason: $0) }
+        }
+    }
+
+    /// Run key import + parsing on the cooperative thread pool.
+    /// Includes importSecretKey (Argon2id ~3s for Profile B), parseKeyInfo,
+    /// detectProfile, and armorPublicKey.
+    @concurrent
+    private func importKeyOffMainActor(
+        armoredData: Data, passphrase: String
+    ) async throws -> (secretKeyData: Data, keyInfo: KeyInfo, profile: KeyProfile, publicKeyData: Data) {
+        do {
+            let secretKeyData = try engine.importSecretKey(
+                armoredData: armoredData,
+                passphrase: passphrase
+            )
+            let keyInfo = try engine.parseKeyInfo(keyData: secretKeyData)
+            let profile = try engine.detectProfile(certData: secretKeyData)
+            let publicKeyData = try engine.armorPublicKey(certData: secretKeyData)
+            return (secretKeyData, keyInfo, profile, publicKeyData)
+        } catch {
+            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+        }
+    }
+
+    /// Run secret key export (S2K protection) on the cooperative thread pool.
+    @concurrent
+    private func exportKeyOffMainActor(
+        certData: Data, passphrase: String, profile: KeyProfile
+    ) async throws -> Data {
+        do {
+            return try engine.exportSecretKey(
+                certData: certData,
+                passphrase: passphrase,
+                profile: profile
+            )
+        } catch {
+            throw CypherAirError.from(error) { .s2kError(reason: $0) }
+        }
+    }
+
+    /// Run expiry modification on the cooperative thread pool.
+    @concurrent
+    private func modifyExpiryOffMainActor(
+        certData: Data, newExpirySeconds: UInt64?
+    ) async throws -> ModifyExpiryResult {
+        do {
+            return try engine.modifyExpiry(
+                certData: certData,
+                newExpirySeconds: newExpirySeconds
+            )
+        } catch {
+            throw CypherAirError.from(error) { .keyGenerationFailed(reason: $0) }
+        }
     }
 
     // MARK: - Private Key Access (SE Unwrap)

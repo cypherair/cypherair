@@ -37,7 +37,7 @@ final class DecryptionService {
     private let contactService: ContactService
 
     init(
-        engine: PgpEngine = PgpEngine(),
+        engine: PgpEngine,
         keyManagement: KeyManagementService,
         contactService: ContactService
     ) {
@@ -78,6 +78,15 @@ final class DecryptionService {
                 ciphertext: binaryData,
                 localCerts: localCerts
             )
+        } catch let error as PgpError {
+            switch error {
+            case .CorruptData(let reason):
+                throw CypherAirError.corruptData(reason: reason)
+            case .UnsupportedAlgorithm(let algo):
+                throw CypherAirError.unsupportedAlgorithm(algo: algo)
+            default:
+                throw CypherAirError.noMatchingKey
+            }
         } catch {
             throw CypherAirError.noMatchingKey
         }
@@ -120,6 +129,15 @@ final class DecryptionService {
                 inputPath: inputPath,
                 localCerts: localCerts
             )
+        } catch let error as PgpError {
+            switch error {
+            case .CorruptData(let reason):
+                throw CypherAirError.corruptData(reason: reason)
+            case .UnsupportedAlgorithm(let algo):
+                throw CypherAirError.unsupportedAlgorithm(algo: algo)
+            default:
+                throw CypherAirError.noMatchingKey
+            }
         } catch {
             throw CypherAirError.noMatchingKey
         }

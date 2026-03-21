@@ -24,7 +24,7 @@ final class ContactService {
     private let engine: PgpEngine
     private let contactsDirectory: URL
 
-    init(engine: PgpEngine = PgpEngine(), contactsDirectory: URL? = nil) {
+    init(engine: PgpEngine, contactsDirectory: URL? = nil) {
         self.engine = engine
         if let dir = contactsDirectory {
             self.contactsDirectory = dir

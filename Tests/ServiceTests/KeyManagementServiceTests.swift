@@ -35,8 +35,8 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Key Generation: Profile A
 
-    func test_generateKey_profileA_storesKeychainItems() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service)
+    func test_generateKey_profileA_storesKeychainItems() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
 
         // Should store 4 Keychain items: SE key, salt, sealed box, metadata
         XCTAssertEqual(mockKC.saveCallCount, 4,
@@ -58,8 +58,8 @@ final class KeyManagementServiceTests: XCTestCase {
             account: KeychainConstants.defaultAccount))
     }
 
-    func test_generateKey_profileA_returnsCorrectIdentity() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service)
+    func test_generateKey_profileA_returnsCorrectIdentity() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
 
         XCTAssertEqual(identity.keyVersion, 4, "Profile A should produce v4 key")
         XCTAssertEqual(identity.profile, .universal)
@@ -74,8 +74,8 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Key Generation: Profile B
 
-    func test_generateKey_profileB_storesKeychainItems() throws {
-        let identity = try TestHelpers.generateProfileBKey(service: service)
+    func test_generateKey_profileB_storesKeychainItems() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service)
 
         XCTAssertEqual(mockKC.saveCallCount, 4)
 
@@ -85,8 +85,8 @@ final class KeyManagementServiceTests: XCTestCase {
             account: KeychainConstants.defaultAccount))
     }
 
-    func test_generateKey_profileB_returnsCorrectIdentity() throws {
-        let identity = try TestHelpers.generateProfileBKey(service: service)
+    func test_generateKey_profileB_returnsCorrectIdentity() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service)
 
         XCTAssertEqual(identity.keyVersion, 6, "Profile B should produce v6 key")
         XCTAssertEqual(identity.profile, .advanced)
@@ -95,28 +95,28 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Key Generation: Default Key Logic
 
-    func test_generateKey_firstKey_isDefault() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service)
+    func test_generateKey_firstKey_isDefault() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
         XCTAssertTrue(identity.isDefault, "First key should be default")
     }
 
-    func test_generateKey_secondKey_isNotDefault() throws {
-        try TestHelpers.generateProfileAKey(service: service, name: "First")
-        let second = try TestHelpers.generateProfileBKey(service: service, name: "Second")
+    func test_generateKey_secondKey_isNotDefault() async throws {
+        try await TestHelpers.generateProfileAKey(service: service, name: "First")
+        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
         XCTAssertFalse(second.isDefault, "Second key should not be default")
     }
 
     // MARK: - Key Generation: SE Interaction
 
-    func test_generateKey_seWrapCalled() throws {
-        try TestHelpers.generateProfileAKey(service: service)
+    func test_generateKey_seWrapCalled() async throws {
+        try await TestHelpers.generateProfileAKey(service: service)
 
         XCTAssertEqual(mockSE.generateCallCount, 1, "SE should generate one wrapping key")
         XCTAssertEqual(mockSE.wrapCallCount, 1, "SE should wrap once")
     }
 
-    func test_generateKey_profileB_seWrapCalled() throws {
-        try TestHelpers.generateProfileBKey(service: service)
+    func test_generateKey_profileB_seWrapCalled() async throws {
+        try await TestHelpers.generateProfileBKey(service: service)
 
         XCTAssertEqual(mockSE.generateCallCount, 1)
         XCTAssertEqual(mockSE.wrapCallCount, 1)
@@ -124,14 +124,14 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Key Loading
 
-    func test_loadKeys_emptyKeychain_returnsEmpty() throws {
+    func test_loadKeys_emptyKeychain_returnsEmpty() async throws {
         try service.loadKeys()
         XCTAssertTrue(service.keys.isEmpty)
     }
 
-    func test_loadKeys_withStoredMetadata_loadsKeys() throws {
+    func test_loadKeys_withStoredMetadata_loadsKeys() async throws {
         // Generate a key (stores metadata in mock Keychain)
-        let identity = try TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
 
         // Create a new service instance pointing at the same Keychain
         let newService = KeyManagementService(
@@ -146,9 +146,9 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(newService.keys.first?.fingerprint, identity.fingerprint)
     }
 
-    func test_loadKeys_corruptMetadata_skipsCorruptEntry() throws {
+    func test_loadKeys_corruptMetadata_skipsCorruptEntry() async throws {
         // Store valid metadata
-        try TestHelpers.generateProfileAKey(service: service)
+        try await TestHelpers.generateProfileAKey(service: service)
 
         // Store corrupt metadata under a fake fingerprint
         let corruptData = Data("not-valid-json".utf8)
@@ -174,10 +174,10 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Key Export
 
-    func test_exportKey_profileA_returnsArmoredData() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service)
+    func test_exportKey_profileA_returnsArmoredData() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
 
-        let exported = try service.exportKey(fingerprint: identity.fingerprint, passphrase: "test-pass-123")
+        let exported = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: "test-pass-123")
 
         XCTAssertFalse(exported.isEmpty, "Exported data should not be empty")
         // Check it starts with PGP armor header
@@ -186,33 +186,36 @@ final class KeyManagementServiceTests: XCTestCase {
                       "Exported data should be ASCII-armored")
     }
 
-    func test_exportKey_marksKeyAsBackedUp() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service)
+    func test_exportKey_marksKeyAsBackedUp() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
         XCTAssertFalse(identity.isBackedUp)
 
-        _ = try service.exportKey(fingerprint: identity.fingerprint, passphrase: "backup-pass")
+        _ = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: "backup-pass")
 
         XCTAssertTrue(service.keys.first?.isBackedUp == true,
                       "Key should be marked as backed up after export")
     }
 
-    func test_exportKey_nonexistentFingerprint_throwsError() {
-        XCTAssertThrowsError(try service.exportKey(fingerprint: "nonexistent", passphrase: "pass")) { error in
+    func test_exportKey_nonexistentFingerprint_throwsError() async {
+        do {
+            _ = try await service.exportKey(fingerprint: "nonexistent", passphrase: "pass")
+            XCTFail("Expected error for nonexistent fingerprint")
+        } catch {
             // Should fail — no key with this fingerprint exists in Keychain
         }
     }
 
-    func test_exportKey_profileB_returnsArmoredData() throws {
-        let identity = try TestHelpers.generateProfileBKey(service: service)
+    func test_exportKey_profileB_returnsArmoredData() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service)
 
-        let exported = try service.exportKey(fingerprint: identity.fingerprint, passphrase: "test-pass-456")
+        let exported = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: "test-pass-456")
         XCTAssertFalse(exported.isEmpty)
     }
 
     // MARK: - Key Deletion
 
-    func test_deleteKey_removesKeychainItems() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service)
+    func test_deleteKey_removesKeychainItems() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
         let fp = identity.fingerprint
 
         try service.deleteKey(fingerprint: fp)
@@ -222,17 +225,17 @@ final class KeyManagementServiceTests: XCTestCase {
             account: KeychainConstants.defaultAccount))
     }
 
-    func test_deleteKey_removesFromKeysArray() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service)
+    func test_deleteKey_removesFromKeysArray() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
         XCTAssertEqual(service.keys.count, 1)
 
         try service.deleteKey(fingerprint: identity.fingerprint)
         XCTAssertEqual(service.keys.count, 0)
     }
 
-    func test_deleteKey_reassignsDefaultIfNeeded() throws {
-        let first = try TestHelpers.generateProfileAKey(service: service, name: "First")
-        let second = try TestHelpers.generateProfileBKey(service: service, name: "Second")
+    func test_deleteKey_reassignsDefaultIfNeeded() async throws {
+        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
+        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
 
         XCTAssertTrue(first.isDefault)
         XCTAssertFalse(second.isDefault)
@@ -247,8 +250,8 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Unwrap Private Key
 
-    func test_unwrapPrivateKey_validFingerprint_returnsData() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service)
+    func test_unwrapPrivateKey_validFingerprint_returnsData() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
 
         let privateKeyData = try service.unwrapPrivateKey(fingerprint: identity.fingerprint)
         XCTAssertFalse(privateKeyData.isEmpty, "Unwrapped private key should not be empty")
@@ -263,8 +266,8 @@ final class KeyManagementServiceTests: XCTestCase {
         }
     }
 
-    func test_unwrapPrivateKey_profileB_returnsData() throws {
-        let identity = try TestHelpers.generateProfileBKey(service: service)
+    func test_unwrapPrivateKey_profileB_returnsData() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service)
 
         let privateKeyData = try service.unwrapPrivateKey(fingerprint: identity.fingerprint)
         XCTAssertFalse(privateKeyData.isEmpty)
@@ -272,12 +275,12 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Key Import/Restore
 
-    func test_importKey_profileA_exportThenImport_fingerprintMatches() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Export Test A")
+    func test_importKey_profileA_exportThenImport_fingerprintMatches() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Export Test A")
         let passphrase = "test-passphrase-123"
 
         // Export the key
-        let exportedData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let exportedData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
         XCTAssertFalse(exportedData.isEmpty)
 
         // Delete the original key
@@ -285,7 +288,7 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertTrue(service.keys.isEmpty)
 
         // Import the exported key
-        let imported = try service.importKey(
+        let imported = try await service.importKey(
             armoredData: exportedData,
             passphrase: passphrase,
             authMode: .standard
@@ -299,17 +302,17 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(imported.keyVersion, 4)
     }
 
-    func test_importKey_profileB_exportThenImport_fingerprintMatches() throws {
-        let identity = try TestHelpers.generateProfileBKey(service: service, name: "Export Test B")
+    func test_importKey_profileB_exportThenImport_fingerprintMatches() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service, name: "Export Test B")
         let passphrase = "test-passphrase-456"
 
-        let exportedData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let exportedData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
         XCTAssertFalse(exportedData.isEmpty)
 
         try service.deleteKey(fingerprint: identity.fingerprint)
         XCTAssertTrue(service.keys.isEmpty)
 
-        let imported = try service.importKey(
+        let imported = try await service.importKey(
             armoredData: exportedData,
             passphrase: passphrase,
             authMode: .standard
@@ -324,9 +327,9 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Default Key
 
-    func test_setDefaultKey_switchesDefault() throws {
-        let first = try TestHelpers.generateProfileAKey(service: service, name: "First")
-        let second = try TestHelpers.generateProfileBKey(service: service, name: "Second")
+    func test_setDefaultKey_switchesDefault() async throws {
+        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
+        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
 
         XCTAssertTrue(service.keys.first(where: { $0.fingerprint == first.fingerprint })!.isDefault)
         XCTAssertFalse(service.keys.first(where: { $0.fingerprint == second.fingerprint })!.isDefault)
@@ -337,8 +340,8 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertTrue(service.keys.first(where: { $0.fingerprint == second.fingerprint })!.isDefault)
     }
 
-    func test_defaultKey_returnsFirstDefault() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service)
+    func test_defaultKey_returnsFirstDefault() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
         XCTAssertEqual(service.defaultKey?.fingerprint, identity.fingerprint)
     }
 
@@ -346,9 +349,9 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertNil(service.defaultKey)
     }
 
-    func test_setDefaultKey_persistsAcrossReload() throws {
-        let first = try TestHelpers.generateProfileAKey(service: service, name: "First")
-        let second = try TestHelpers.generateProfileBKey(service: service, name: "Second")
+    func test_setDefaultKey_persistsAcrossReload() async throws {
+        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
+        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
 
         // Switch default from first to second
         try service.setDefaultKey(fingerprint: second.fingerprint)
@@ -373,17 +376,18 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Duplicate Key Import Guard
 
-    func test_importKey_duplicateFingerprint_throwsDuplicateKeyError() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Original A")
+    func test_importKey_duplicateFingerprint_throwsDuplicateKeyError() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Original A")
         let passphrase = "test-pass-dup-a"
 
         // Export the key (to get armored data for re-import)
-        let exportedData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let exportedData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
 
         // Attempt to import without deleting — should throw duplicateKey
-        XCTAssertThrowsError(
-            try service.importKey(armoredData: exportedData, passphrase: passphrase, authMode: .standard)
-        ) { error in
+        do {
+            _ = try await service.importKey(armoredData: exportedData, passphrase: passphrase, authMode: .standard)
+            XCTFail("Expected CypherAirError.duplicateKey")
+        } catch {
             guard let cypherError = error as? CypherAirError,
                   case .duplicateKey = cypherError else {
                 return XCTFail("Expected CypherAirError.duplicateKey, got \(error)")
@@ -396,15 +400,16 @@ final class KeyManagementServiceTests: XCTestCase {
                        "SE key should not be generated for duplicate import")
     }
 
-    func test_importKey_duplicateFingerprint_profileB_throwsDuplicateKeyError() throws {
-        let identity = try TestHelpers.generateProfileBKey(service: service, name: "Original B")
+    func test_importKey_duplicateFingerprint_profileB_throwsDuplicateKeyError() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service, name: "Original B")
         let passphrase = "test-pass-dup-b"
 
-        let exportedData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let exportedData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
 
-        XCTAssertThrowsError(
-            try service.importKey(armoredData: exportedData, passphrase: passphrase, authMode: .standard)
-        ) { error in
+        do {
+            _ = try await service.importKey(armoredData: exportedData, passphrase: passphrase, authMode: .standard)
+            XCTFail("Expected CypherAirError.duplicateKey")
+        } catch {
             guard let cypherError = error as? CypherAirError,
                   case .duplicateKey = cypherError else {
                 return XCTFail("Expected CypherAirError.duplicateKey, got \(error)")
@@ -417,11 +422,11 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Modify Expiry
 
-    func test_modifyExpiry_profileA_updatesExpiryDate() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Expiry A")
+    func test_modifyExpiry_profileA_updatesExpiryDate() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Expiry A")
 
         // Modify expiry to 1 year (31536000 seconds)
-        let updated = try service.modifyExpiry(
+        let updated = try await service.modifyExpiry(
             fingerprint: identity.fingerprint,
             newExpirySeconds: 31_536_000,
             authMode: .standard
@@ -433,10 +438,10 @@ final class KeyManagementServiceTests: XCTestCase {
                        "Fingerprint should not change after expiry modification")
     }
 
-    func test_modifyExpiry_profileB_updatesExpiryDate() throws {
-        let identity = try TestHelpers.generateProfileBKey(service: service, name: "Expiry B")
+    func test_modifyExpiry_profileB_updatesExpiryDate() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service, name: "Expiry B")
 
-        let updated = try service.modifyExpiry(
+        let updated = try await service.modifyExpiry(
             fingerprint: identity.fingerprint,
             newExpirySeconds: 31_536_000,
             authMode: .standard
@@ -447,13 +452,13 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(updated.fingerprint, identity.fingerprint)
     }
 
-    func test_modifyExpiry_setsAndClearsCrashRecoveryFlag() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Flag Test")
+    func test_modifyExpiry_setsAndClearsCrashRecoveryFlag() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Flag Test")
 
         // Verify flags are not set before operation
         XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
 
-        _ = try service.modifyExpiry(
+        _ = try await service.modifyExpiry(
             fingerprint: identity.fingerprint,
             newExpirySeconds: 31_536_000,
             authMode: .standard
@@ -468,8 +473,8 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Modify Expiry Crash Recovery
 
-    func test_modifyExpiryCrashRecovery_oldAndPendingExist_deletesPending() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Recovery Test")
+    func test_modifyExpiryCrashRecovery_oldAndPendingExist_deletesPending() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Recovery Test")
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
@@ -512,10 +517,10 @@ final class KeyManagementServiceTests: XCTestCase {
                       "Original SE key should remain intact")
     }
 
-    func test_modifyExpiryCrashRecovery_onlyPendingExists_promotesToPermanent() throws {
+    func test_modifyExpiryCrashRecovery_onlyPendingExists_promotesToPermanent() async throws {
         // Generate a key, export its fingerprint, then manually delete permanent items
         // to simulate a crash after deletion but before promotion.
-        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Promote Test")
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Promote Test")
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
@@ -561,8 +566,8 @@ final class KeyManagementServiceTests: XCTestCase {
                       "Sealed key should be promoted to permanent")
     }
 
-    func test_modifyExpiryCrashRecovery_noFlag_doesNothing() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service, name: "No Flag Test")
+    func test_modifyExpiryCrashRecovery_noFlag_doesNothing() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "No Flag Test")
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
@@ -589,9 +594,9 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Delete Key Default Persistence
 
-    func test_deleteKey_reassignsDefault_persistsAcrossReload() throws {
-        let first = try TestHelpers.generateProfileAKey(service: service, name: "Default")
-        let second = try TestHelpers.generateProfileBKey(service: service, name: "Other")
+    func test_deleteKey_reassignsDefault_persistsAcrossReload() async throws {
+        let first = try await TestHelpers.generateProfileAKey(service: service, name: "Default")
+        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Other")
 
         XCTAssertTrue(first.isDefault)
         XCTAssertFalse(second.isDefault)
@@ -618,12 +623,12 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Binary Format Key Import
 
-    func test_importKey_binaryFormat_profileA_fingerprintMatches() throws {
-        let identity = try TestHelpers.generateProfileAKey(service: service, name: "Binary Import A")
+    func test_importKey_binaryFormat_profileA_fingerprintMatches() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Binary Import A")
         let passphrase = "binary-test-pass-a"
 
         // Export produces ASCII armor
-        let armoredData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let armoredData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
         XCTAssertTrue(String(data: armoredData.prefix(5), encoding: .utf8)?.hasPrefix("-----") == true)
 
         // Convert to binary OpenPGP format
@@ -636,7 +641,7 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertTrue(service.keys.isEmpty)
 
         // Import using binary format — this is the same path that views now use
-        let imported = try service.importKey(
+        let imported = try await service.importKey(
             armoredData: binaryData,
             passphrase: passphrase,
             authMode: .standard
@@ -648,17 +653,17 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(imported.keyVersion, 4)
     }
 
-    func test_importKey_binaryFormat_profileB_fingerprintMatches() throws {
-        let identity = try TestHelpers.generateProfileBKey(service: service, name: "Binary Import B")
+    func test_importKey_binaryFormat_profileB_fingerprintMatches() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service, name: "Binary Import B")
         let passphrase = "binary-test-pass-b"
 
-        let armoredData = try service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
+        let armoredData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
         let binaryData = try engine.dearmor(armored: armoredData)
 
         try service.deleteKey(fingerprint: identity.fingerprint)
         XCTAssertTrue(service.keys.isEmpty)
 
-        let imported = try service.importKey(
+        let imported = try await service.importKey(
             armoredData: binaryData,
             passphrase: passphrase,
             authMode: .standard
@@ -672,13 +677,13 @@ final class KeyManagementServiceTests: XCTestCase {
 
     // MARK: - Fingerprint Validation (M-1)
 
-    func test_hkdfInfo_validV4Fingerprint_succeeds() throws {
+    func test_hkdfInfo_validV4Fingerprint_succeeds() async throws {
         let v4 = String(repeating: "a1b2c3d4", count: 5) // 40 hex chars
         let data = try SEConstants.hkdfInfo(fingerprint: v4)
         XCTAssertTrue(data.count > 0)
     }
 
-    func test_hkdfInfo_validV6Fingerprint_succeeds() throws {
+    func test_hkdfInfo_validV6Fingerprint_succeeds() async throws {
         let v6 = String(repeating: "a1b2c3d4", count: 8) // 64 hex chars
         let data = try SEConstants.hkdfInfo(fingerprint: v6)
         XCTAssertTrue(data.count > 0)
@@ -696,7 +701,7 @@ final class KeyManagementServiceTests: XCTestCase {
         }
     }
 
-    func test_hkdfInfo_mixedCaseFingerprint_normalizedToLowercase() throws {
+    func test_hkdfInfo_mixedCaseFingerprint_normalizedToLowercase() async throws {
         let upper = "AABBCCDD"
         let lower = "aabbccdd"
         let dataUpper = try SEConstants.hkdfInfo(fingerprint: upper)

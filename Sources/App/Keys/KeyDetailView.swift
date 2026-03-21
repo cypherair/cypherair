@@ -378,19 +378,24 @@ struct KeyDetailView: View {
 
     private func performModifyExpiry(seconds: UInt64?) {
         isModifyingExpiry = true
-        do {
-            _ = try keyManagement.modifyExpiry(
-                fingerprint: fingerprint,
-                newExpirySeconds: seconds,
-                authMode: config.authMode
-            )
-            // Re-export public key since it changed (new binding signatures)
-            armoredPublicKey = try? keyManagement.exportPublicKey(fingerprint: fingerprint)
-            showExpirySheet = false
-        } catch {
-            self.error = CypherAirError.from(error) { .keychainError($0) }
-            showError = true
+        let service = keyManagement
+        let fp = fingerprint
+        let authMode = config.authMode
+        Task {
+            do {
+                _ = try await service.modifyExpiry(
+                    fingerprint: fp,
+                    newExpirySeconds: seconds,
+                    authMode: authMode
+                )
+                // Re-export public key since it changed (new binding signatures)
+                armoredPublicKey = try? service.exportPublicKey(fingerprint: fp)
+                showExpirySheet = false
+            } catch {
+                self.error = CypherAirError.from(error) { .keychainError($0) }
+                showError = true
+            }
+            isModifyingExpiry = false
         }
-        isModifyingExpiry = false
     }
 }

@@ -142,13 +142,16 @@ struct ImportKeyView: View {
 
     private func importKey() {
         isImporting = true
+        let service = keyManagement
+        let data = importedKeyData ?? Data(armoredText.utf8)
+        let pass = passphrase
+        let authMode = config.authMode
         Task {
             do {
-                let data = importedKeyData ?? Data(armoredText.utf8)
-                _ = try keyManagement.importKey(
+                _ = try await service.importKey(
                     armoredData: data,
-                    passphrase: passphrase,
-                    authMode: config.authMode
+                    passphrase: pass,
+                    authMode: authMode
                 )
                 // Clear sensitive state before dismiss.
                 // Note: Swift String cannot be reliably zeroized (SECURITY.md §7.1),

@@ -829,14 +829,14 @@ final class FFIIntegrationTests: XCTestCase {
 
         // Should fail: 1 GB > 75% of 1 GB (768 MB).
         XCTAssertThrowsError(try memoryGuard.validate(s2kInfo: s2kInfo)) { error in
-            guard let pgpError = error as? PgpError else {
-                return XCTFail("Expected PgpError, got \(type(of: error))")
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
             }
-            switch pgpError {
-            case .Argon2idMemoryExceeded(let requiredMb):
+            switch cypherError {
+            case .argon2idMemoryExceeded(let requiredMb):
                 XCTAssertEqual(requiredMb, 1024, "Should report 1024 MB required")
             default:
-                XCTFail("Expected Argon2idMemoryExceeded, got \(pgpError)")
+                XCTFail("Expected argon2idMemoryExceeded, got \(cypherError)")
             }
         }
     }
@@ -875,14 +875,14 @@ final class FFIIntegrationTests: XCTestCase {
 
         // Should fail: 2 GB > 75% of 2.5 GB (1.875 GB).
         XCTAssertThrowsError(try memoryGuard.validate(s2kInfo: s2kInfo)) { error in
-            guard let pgpError = error as? PgpError else {
-                return XCTFail("Expected PgpError, got \(type(of: error))")
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
             }
-            switch pgpError {
-            case .Argon2idMemoryExceeded(let requiredMb):
+            switch cypherError {
+            case .argon2idMemoryExceeded(let requiredMb):
                 XCTAssertEqual(requiredMb, 2048, "Should report 2048 MB required")
             default:
-                XCTFail("Expected Argon2idMemoryExceeded, got \(pgpError)")
+                XCTFail("Expected argon2idMemoryExceeded, got \(cypherError)")
             }
         }
     }

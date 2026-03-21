@@ -9,7 +9,7 @@ final class SigningService {
     private let contactService: ContactService
 
     init(
-        engine: PgpEngine = PgpEngine(),
+        engine: PgpEngine,
         keyManagement: KeyManagementService,
         contactService: ContactService
     ) {

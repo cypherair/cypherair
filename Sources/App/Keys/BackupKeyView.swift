@@ -94,11 +94,14 @@ struct BackupKeyView: View {
 
     private func exportBackup() {
         isExporting = true
+        let service = keyManagement
+        let fp = fingerprint
+        let pass = passphrase
         Task {
             do {
-                let data = try keyManagement.exportKey(
-                    fingerprint: fingerprint,
-                    passphrase: passphrase
+                let data = try await service.exportKey(
+                    fingerprint: fp,
+                    passphrase: pass
                 )
                 exportedData = data
                 // Clear sensitive state after successful export.
