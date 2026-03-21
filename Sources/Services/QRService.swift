@@ -12,7 +12,7 @@ final class QRService {
 
     private let engine: PgpEngine
 
-    init(engine: PgpEngine = PgpEngine()) {
+    init(engine: PgpEngine) {
         self.engine = engine
     }
 
@@ -24,7 +24,12 @@ final class QRService {
     /// - Parameter publicKeyData: Binary public key data.
     /// - Returns: A CIImage of the QR code, or nil if generation fails.
     func generateQRCode(for publicKeyData: Data) throws -> CIImage? {
-        let urlString = try engine.encodeQrUrl(publicKeyData: publicKeyData)
+        let urlString: String
+        do {
+            urlString = try engine.encodeQrUrl(publicKeyData: publicKeyData)
+        } catch {
+            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+        }
 
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(urlString.utf8)
@@ -72,8 +77,14 @@ final class QRService {
             throw CypherAirError.unsupportedQRVersion
         }
 
-        // Delegate to Rust engine for full parsing and validation
-        return try engine.decodeQrUrl(url: urlString)
+        // Delegate to Rust engine for full parsing and validation.
+        // Any engine error here means the QR payload is invalid — always map to .invalidQRCode
+        // regardless of the specific PgpError variant (InvalidKeyData, CorruptData, etc.).
+        do {
+            return try engine.decodeQrUrl(url: urlString)
+        } catch {
+            throw CypherAirError.invalidQRCode
+        }
     }
 
     // MARK: - Key Inspection (for UI confirmation)
@@ -81,12 +92,20 @@ final class QRService {
     /// Parse key metadata for display in the import confirmation view.
     /// This is a read-only inspection — no keys are stored.
     func inspectKeyInfo(keyData: Data) throws -> KeyInfo {
-        try engine.parseKeyInfo(keyData: keyData)
+        do {
+            return try engine.parseKeyInfo(keyData: keyData)
+        } catch {
+            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+        }
     }
 
     /// Detect the encryption profile of a public key.
     func detectKeyProfile(keyData: Data) throws -> KeyProfile {
-        try engine.detectProfile(certData: keyData)
+        do {
+            return try engine.detectProfile(certData: keyData)
+        } catch {
+            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+        }
     }
 
     // MARK: - QR Decoding from Image

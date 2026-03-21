@@ -25,8 +25,8 @@ final class StreamingServiceTests: XCTestCase {
     private func generateKeyAndContact(
         profile: KeyProfile,
         name: String = "Test"
-    ) throws -> PGPKeyIdentity {
-        let identity = try TestHelpers.generateAndStoreKey(
+    ) async throws -> PGPKeyIdentity {
+        let identity = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
             profile: profile,
             name: name
@@ -46,8 +46,8 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Encrypt/Decrypt Round-Trip: Profile A
 
     func test_encryptFileStreaming_profileA_roundTrip() async throws {
-        let sender = try generateKeyAndContact(profile: .universal, name: "Sender A")
-        let recipient = try generateKeyAndContact(profile: .universal, name: "Recipient A")
+        let sender = try await generateKeyAndContact(profile: .universal, name: "Sender A")
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient A")
 
         // Write test file
         let plaintext = Data("Hello streaming Profile A! 你好世界 🔐".utf8)
@@ -91,8 +91,8 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Encrypt/Decrypt Round-Trip: Profile B
 
     func test_encryptFileStreaming_profileB_roundTrip() async throws {
-        let sender = try generateKeyAndContact(profile: .advanced, name: "Sender B")
-        let recipient = try generateKeyAndContact(profile: .advanced, name: "Recipient B")
+        let sender = try await generateKeyAndContact(profile: .advanced, name: "Sender B")
+        let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
 
         let plaintext = Data("Hello streaming Profile B! 你好世界 🔐".utf8)
         let inputURL = try writeTempFile(plaintext)
@@ -127,7 +127,7 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Sign/Verify Round-Trip: Profile A
 
     func test_signDetachedStreaming_profileA_roundTrip() async throws {
-        let signer = try generateKeyAndContact(profile: .universal, name: "Signer A")
+        let signer = try await generateKeyAndContact(profile: .universal, name: "Signer A")
 
         let fileData = Data("Sign me (Profile A)".utf8)
         let inputURL = try writeTempFile(fileData)
@@ -156,7 +156,7 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Sign/Verify Round-Trip: Profile B
 
     func test_signDetachedStreaming_profileB_roundTrip() async throws {
-        let signer = try generateKeyAndContact(profile: .advanced, name: "Signer B")
+        let signer = try await generateKeyAndContact(profile: .advanced, name: "Signer B")
 
         let fileData = Data("Sign me (Profile B)".utf8)
         let inputURL = try writeTempFile(fileData)
@@ -183,7 +183,7 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Cancellation
 
     func test_encryptFileStreaming_cancellation_throwsOperationCancelled() async throws {
-        let recipient = try generateKeyAndContact(profile: .universal, name: "Recipient")
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
 
         // Create a file large enough for progress to be reported
         let fileData = Data(repeating: 0x42, count: 256 * 1024)  // 256 KB
@@ -235,7 +235,7 @@ final class StreamingServiceTests: XCTestCase {
             diskSpaceChecker: diskChecker
         )
 
-        let recipient = try generateKeyAndContact(profile: .universal, name: "Recipient")
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
 
         let fileData = Data(repeating: 0x42, count: 10 * 1024 * 1024)  // 10 MB
         let inputURL = try writeTempFile(fileData)
@@ -265,7 +265,7 @@ final class StreamingServiceTests: XCTestCase {
     // MARK: - Tamper Detection
 
     func test_decryptFileStreaming_tamperedFile_throwsError() async throws {
-        let key = try generateKeyAndContact(profile: .advanced, name: "Tamper Test")
+        let key = try await generateKeyAndContact(profile: .advanced, name: "Tamper Test")
 
         let plaintext = Data("Tamper test content".utf8)
         let inputURL = try writeTempFile(plaintext)

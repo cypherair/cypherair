@@ -52,8 +52,8 @@ enum TestHelpers {
         profile: KeyProfile,
         name: String = "Test User",
         email: String? = "test@example.com"
-    ) throws -> PGPKeyIdentity {
-        try service.generateKey(
+    ) async throws -> PGPKeyIdentity {
+        try await service.generateKey(
             name: name,
             email: email,
             expirySeconds: nil,
@@ -68,8 +68,8 @@ enum TestHelpers {
         service: KeyManagementService,
         name: String = "Alice",
         email: String? = "alice@example.com"
-    ) throws -> PGPKeyIdentity {
-        try generateAndStoreKey(service: service, profile: .universal, name: name, email: email)
+    ) async throws -> PGPKeyIdentity {
+        try await generateAndStoreKey(service: service, profile: .universal, name: name, email: email)
     }
 
     /// Generate a Profile B key and return its identity.
@@ -78,8 +78,8 @@ enum TestHelpers {
         service: KeyManagementService,
         name: String = "Bob",
         email: String? = "bob@example.com"
-    ) throws -> PGPKeyIdentity {
-        try generateAndStoreKey(service: service, profile: .advanced, name: name, email: email)
+    ) async throws -> PGPKeyIdentity {
+        try await generateAndStoreKey(service: service, profile: .advanced, name: name, email: email)
     }
 
     // MARK: - Full Service Stack Factory

@@ -124,15 +124,17 @@ struct KeyGenerationView: View {
         let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
         let expiryDate = Calendar.current.date(byAdding: .month, value: expiryMonths, to: Date()) ?? Date()
         let expirySeconds = UInt64(max(0, expiryDate.timeIntervalSinceNow))
+        let service = keyManagement
+        let authMode = config.authMode
 
         Task {
             do {
-                let identity = try keyManagement.generateKey(
+                let identity = try await service.generateKey(
                     name: trimmedName,
                     email: trimmedEmail.isEmpty ? nil : trimmedEmail,
                     expirySeconds: expirySeconds,
                     profile: profile,
-                    authMode: config.authMode
+                    authMode: authMode
                 )
                 generatedIdentity = identity
             } catch {

@@ -34,7 +34,7 @@ final class DecryptionServiceTests: XCTestCase {
         plaintext: String = "Hello, encrypted world!",
         sign: Bool = true
     ) async throws -> (identity: PGPKeyIdentity, ciphertext: Data, phase1: DecryptionService.Phase1Result) {
-        let identity = try TestHelpers.generateAndStoreKey(
+        let identity = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
             profile: profile,
             name: profile == .universal ? "Alice" : "Bob"
@@ -73,7 +73,7 @@ final class DecryptionServiceTests: XCTestCase {
     // MARK: - Phase 1: Parse Recipients Behavior
 
     func test_parseRecipients_returnsNonEmptyKeyIds() async throws {
-        let identity = try TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
         try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -95,7 +95,7 @@ final class DecryptionServiceTests: XCTestCase {
     }
 
     func test_parseRecipients_profileB_returnsNonEmptyKeyIds() async throws {
-        let identity = try TestHelpers.generateProfileBKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateProfileBKey(service: stack.keyManagement)
         try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -112,7 +112,7 @@ final class DecryptionServiceTests: XCTestCase {
     }
 
     func test_parseRecipients_noMatchingKey_throwsError() async throws {
-        let identity = try TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
         try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -137,8 +137,45 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
+    func test_parseRecipients_corruptData_throwsCorruptDataError() async throws {
+        // Feed completely invalid (non-OpenPGP) data.
+        // matchRecipients should fail with CorruptData, which parseRecipients
+        // now preserves instead of mapping to noMatchingKey.
+        let garbageData = Data("this is not an OpenPGP message".utf8)
+
+        do {
+            _ = try await stack.decryptionService.parseRecipients(ciphertext: garbageData)
+            XCTFail("Expected corruptData error")
+        } catch let error as CypherAirError {
+            if case .corruptData = error {
+                // Expected — garbage data is not a valid OpenPGP message
+            } else {
+                XCTFail("Expected .corruptData, got \(error)")
+            }
+        }
+    }
+
+    func test_parseRecipientsFromFile_corruptData_throwsCorruptDataError() async throws {
+        // Write garbage data to a temp file and attempt to parse it.
+        let tempDir = FileManager.default.temporaryDirectory
+        let tempFile = tempDir.appendingPathComponent("corrupt-\(UUID().uuidString).gpg")
+        try Data("not an OpenPGP message".utf8).write(to: tempFile)
+        defer { try? FileManager.default.removeItem(at: tempFile) }
+
+        do {
+            _ = try await stack.decryptionService.parseRecipientsFromFile(fileURL: tempFile)
+            XCTFail("Expected corruptData error")
+        } catch let error as CypherAirError {
+            if case .corruptData = error {
+                // Expected — garbage data is not a valid OpenPGP message
+            } else {
+                XCTFail("Expected .corruptData, got \(error)")
+            }
+        }
+    }
+
     func test_parseRecipients_doesNotTriggerSeUnwrap() async throws {
-        let identity = try TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
         try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -411,7 +448,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_decryptMessage_profileA_endToEnd() async throws {
         let plaintext = "End-to-end Profile A 你好"
-        let identity = try TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
         try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -431,7 +468,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_decryptMessage_profileB_endToEnd() async throws {
         let plaintext = "End-to-end Profile B 加密"
-        let identity = try TestHelpers.generateProfileBKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateProfileBKey(service: stack.keyManagement)
         try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -449,7 +486,7 @@ final class DecryptionServiceTests: XCTestCase {
     }
 
     func test_parseRecipients_profileA_matchesCorrectKey() async throws {
-        let identity = try TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
         try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -468,7 +505,7 @@ final class DecryptionServiceTests: XCTestCase {
     }
 
     func test_parseRecipients_profileB_matchesCorrectKey() async throws {
-        let identity = try TestHelpers.generateProfileBKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateProfileBKey(service: stack.keyManagement)
         try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(

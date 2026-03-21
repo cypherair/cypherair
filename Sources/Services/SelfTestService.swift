@@ -33,7 +33,7 @@ final class SelfTestService {
 
     private let engine: PgpEngine
 
-    init(engine: PgpEngine = PgpEngine()) {
+    init(engine: PgpEngine) {
         self.engine = engine
     }
 

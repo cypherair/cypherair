@@ -24,8 +24,8 @@ final class EncryptionServiceTests: XCTestCase {
     private func generateKeyAndContact(
         profile: KeyProfile,
         name: String = "Test"
-    ) throws -> PGPKeyIdentity {
-        let identity = try TestHelpers.generateAndStoreKey(
+    ) async throws -> PGPKeyIdentity {
+        let identity = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
             profile: profile,
             name: name
@@ -37,7 +37,7 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Text Encryption: Profile A
 
     func test_encryptText_profileA_producesNonEmptyCiphertext() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Hello, Profile A!",
@@ -55,7 +55,7 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Text Encryption: Profile B
 
     func test_encryptText_profileB_producesNonEmptyCiphertext() async throws {
-        let identity = try generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(profile: .advanced)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Hello, Profile B!",
@@ -114,7 +114,7 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Signing
 
     func test_encryptText_withSignature_succeeds() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Signed message",
@@ -141,8 +141,8 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Encrypt-to-Self
 
     func test_encryptText_encryptToSelf_canDecryptWithOwnKey() async throws {
-        let sender = try generateKeyAndContact(profile: .universal, name: "Sender")
-        let recipient = try generateKeyAndContact(profile: .universal, name: "Recipient")
+        let sender = try await generateKeyAndContact(profile: .universal, name: "Sender")
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Encrypt to self test",
@@ -166,8 +166,8 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptText_encryptToSelfOff_cannotDecryptWithSenderKey() async throws {
-        let sender = try generateKeyAndContact(profile: .universal, name: "Sender")
-        let recipient = try generateKeyAndContact(profile: .universal, name: "Recipient")
+        let sender = try await generateKeyAndContact(profile: .universal, name: "Sender")
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "No self-encryption",
@@ -201,8 +201,8 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptText_profileB_encryptToSelf_canDecryptWithOwnKey() async throws {
-        let sender = try generateKeyAndContact(profile: .advanced, name: "Sender B")
-        let recipient = try generateKeyAndContact(profile: .advanced, name: "Recipient B")
+        let sender = try await generateKeyAndContact(profile: .advanced, name: "Sender B")
+        let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Profile B encrypt to self test",
@@ -226,8 +226,8 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptText_profileB_encryptToSelfOff_cannotDecryptWithSenderKey() async throws {
-        let sender = try generateKeyAndContact(profile: .advanced, name: "Sender B")
-        let recipient = try generateKeyAndContact(profile: .advanced, name: "Recipient B")
+        let sender = try await generateKeyAndContact(profile: .advanced, name: "Sender B")
+        let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Profile B no self-encryption",
@@ -262,7 +262,7 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - File Encryption: Size Validation
 
     func test_encryptFile_underLimit_succeeds() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
 
         // Create a 1 KB file
         let fileData = Data(repeating: 0xAB, count: 1024)
@@ -278,7 +278,7 @@ final class EncryptionServiceTests: XCTestCase {
 
     func test_encryptFile_over100MB_throwsFileTooLarge() async {
         do {
-            let identity = try generateKeyAndContact(profile: .universal)
+            let identity = try await generateKeyAndContact(profile: .universal)
 
             // Create data slightly over 100 MB
             let fileData = Data(repeating: 0xFF, count: 100 * 1024 * 1024 + 1)
@@ -301,7 +301,7 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptFile_exactly100MB_succeeds() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
 
         // Exactly 100 MB — should be within the limit
         let fileData = Data(repeating: 0xCC, count: 100 * 1024 * 1024)
@@ -316,7 +316,7 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptFile_profileB_underLimit_succeeds() async throws {
-        let identity = try generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(profile: .advanced)
 
         // Create a 1 KB file
         let fileData = Data(repeating: 0xAB, count: 1024)
@@ -333,8 +333,8 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Cross-Profile
 
     func test_encryptText_profileBSender_profileARecipient_succeeds() async throws {
-        let sender = try generateKeyAndContact(profile: .advanced, name: "ProfileB Sender")
-        let recipient = try generateKeyAndContact(profile: .universal, name: "ProfileA Recipient")
+        let sender = try await generateKeyAndContact(profile: .advanced, name: "ProfileB Sender")
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "ProfileA Recipient")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Cross-profile message",
@@ -360,8 +360,8 @@ final class EncryptionServiceTests: XCTestCase {
 
     func test_encryptText_mixedRecipients_v4AndV6_bothCanDecrypt() async throws {
         // PRD §3.3 / TDD §1.4: mixed v4+v6 recipients → SEIPDv1 (lowest common denominator)
-        let keyV4 = try generateKeyAndContact(profile: .universal, name: "RecipientV4")
-        let keyV6 = try generateKeyAndContact(profile: .advanced, name: "RecipientV6")
+        let keyV4 = try await generateKeyAndContact(profile: .universal, name: "RecipientV4")
+        let keyV6 = try await generateKeyAndContact(profile: .advanced, name: "RecipientV6")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Mixed recipients message",
@@ -428,9 +428,9 @@ final class EncryptionServiceTests: XCTestCase {
 
     func test_encryptText_encryptToSelfWithSpecificKey_canDecryptWithThatKey() async throws {
         // Generate two keys — first becomes default, second is non-default
-        let defaultKey = try generateKeyAndContact(profile: .universal, name: "Default")
-        let specificKey = try generateKeyAndContact(profile: .universal, name: "Specific")
-        let recipient = try generateKeyAndContact(profile: .universal, name: "Recipient")
+        let defaultKey = try await generateKeyAndContact(profile: .universal, name: "Default")
+        let specificKey = try await generateKeyAndContact(profile: .universal, name: "Specific")
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
 
         // Encrypt-to-self using the non-default key
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -478,9 +478,9 @@ final class EncryptionServiceTests: XCTestCase {
 
     func test_encryptText_encryptToSelfFingerprintNil_usesDefaultKey() async throws {
         // Generate two keys — first becomes default
-        let defaultKey = try generateKeyAndContact(profile: .universal, name: "Default")
-        _ = try generateKeyAndContact(profile: .universal, name: "Other")
-        let recipient = try generateKeyAndContact(profile: .universal, name: "Recipient")
+        let defaultKey = try await generateKeyAndContact(profile: .universal, name: "Default")
+        _ = try await generateKeyAndContact(profile: .universal, name: "Other")
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
 
         // Encrypt-to-self with nil fingerprint — should fall back to default key
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -506,9 +506,9 @@ final class EncryptionServiceTests: XCTestCase {
     }
 
     func test_encryptText_encryptToSelfWithSpecificKey_profileB() async throws {
-        let defaultKey = try generateKeyAndContact(profile: .advanced, name: "Default B")
-        let specificKey = try generateKeyAndContact(profile: .advanced, name: "Specific B")
-        let recipient = try generateKeyAndContact(profile: .advanced, name: "Recipient B")
+        let defaultKey = try await generateKeyAndContact(profile: .advanced, name: "Default B")
+        let specificKey = try await generateKeyAndContact(profile: .advanced, name: "Specific B")
+        let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Profile B specific key",
@@ -556,7 +556,7 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Unknown Recipient: Improved Error
 
     func test_encryptText_partialUnknownRecipient_throwsInvalidKeyData() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
 
         do {
             _ = try await stack.encryptionService.encryptText(
@@ -581,7 +581,7 @@ final class EncryptionServiceTests: XCTestCase {
 
     func test_encryptFile_slightlyOver100MB_reportsCeiledSize() async {
         do {
-            let identity = try generateKeyAndContact(profile: .universal)
+            let identity = try await generateKeyAndContact(profile: .universal)
             // 100 MB + 1 byte → should report 101 MB (ceiling), not 100 MB (truncated)
             let fileData = Data(repeating: 0xFF, count: 100 * 1024 * 1024 + 1)
             _ = try await stack.encryptionService.encryptFile(
@@ -606,8 +606,8 @@ final class EncryptionServiceTests: XCTestCase {
     // MARK: - Multiple Recipients
 
     func test_encryptText_multipleRecipients_bothCanDecrypt() async throws {
-        let keyA = try generateKeyAndContact(profile: .universal, name: "RecipientA")
-        let keyB = try generateKeyAndContact(profile: .universal, name: "RecipientB")
+        let keyA = try await generateKeyAndContact(profile: .universal, name: "RecipientA")
+        let keyB = try await generateKeyAndContact(profile: .universal, name: "RecipientB")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Multi-recipient message",

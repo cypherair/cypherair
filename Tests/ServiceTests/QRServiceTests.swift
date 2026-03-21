@@ -159,77 +159,49 @@ final class QRServiceTests: XCTestCase {
 
     // MARK: - Negative: Missing/Invalid Payload
 
-    func test_parseImportURL_missingPayload_throwsInvalidKeyData() {
+    func test_parseImportURL_missingPayload_throwsInvalidQRCode() {
         // URL with valid scheme/host/version but no base64 payload.
-        // Empty base64 decodes to empty bytes → Cert::from_bytes fails → InvalidKeyData.
-        // The Rust engine throws PgpError directly (QRService doesn't wrap it).
+        // Empty base64 decodes to empty bytes → Cert::from_bytes fails →
+        // QRService wraps as CypherAirError.invalidQRCode.
         let url = URL(string: "cypherair://import/v1/")!
 
         XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
-            if let pgpError = error as? PgpError {
-                if case .InvalidKeyData = pgpError {
-                    // Expected — empty data is not a valid OpenPGP key
-                } else {
-                    XCTFail("Expected .InvalidKeyData, got \(pgpError)")
-                }
-            } else if let cypherError = error as? CypherAirError {
-                if case .invalidKeyData = cypherError {
-                    // Also acceptable if wrapped
-                } else {
-                    XCTFail("Expected .invalidKeyData, got \(cypherError)")
-                }
-            } else {
-                XCTFail("Expected PgpError or CypherAirError, got \(type(of: error))")
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            guard case .invalidQRCode = cypherError else {
+                return XCTFail("Expected .invalidQRCode, got \(cypherError)")
             }
         }
     }
 
-    func test_parseImportURL_invalidBase64_throwsCorruptData() {
+    func test_parseImportURL_invalidBase64_throwsInvalidQRCode() {
         // Invalid base64url characters (contains !, @, #).
-        // Rust base64 decode fails → PgpError.CorruptData.
-        // The Rust engine throws PgpError directly (QRService doesn't wrap it).
+        // Rust base64 decode fails → QRService wraps as CypherAirError.invalidQRCode.
         let url = URL(string: "cypherair://import/v1/!!!@@@###")!
 
         XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
-            if let pgpError = error as? PgpError {
-                if case .CorruptData = pgpError {
-                    // Expected — invalid base64url characters
-                } else {
-                    XCTFail("Expected .CorruptData, got \(pgpError)")
-                }
-            } else if let cypherError = error as? CypherAirError {
-                if case .corruptData = cypherError {
-                    // Also acceptable if wrapped
-                } else {
-                    XCTFail("Expected .corruptData, got \(cypherError)")
-                }
-            } else {
-                XCTFail("Expected PgpError or CypherAirError, got \(type(of: error))")
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            guard case .invalidQRCode = cypherError else {
+                return XCTFail("Expected .invalidQRCode, got \(cypherError)")
             }
         }
     }
 
-    func test_parseImportURL_validBase64ButNotPGP_throwsInvalidKeyData() {
+    func test_parseImportURL_validBase64ButNotPGP_throwsInvalidQRCode() {
         // Valid base64url encoding of "Hello, World!" — not a PGP key.
-        // Base64 decode succeeds but Cert::from_bytes fails → InvalidKeyData.
-        // The Rust engine throws PgpError directly (QRService doesn't wrap it).
+        // Base64 decode succeeds but Cert::from_bytes fails →
+        // QRService wraps as CypherAirError.invalidQRCode.
         let url = URL(string: "cypherair://import/v1/SGVsbG8sIFdvcmxkIQ")!
 
         XCTAssertThrowsError(try qrService.parseImportURL(url)) { error in
-            if let pgpError = error as? PgpError {
-                if case .InvalidKeyData = pgpError {
-                    // Expected — valid base64 but not valid OpenPGP data
-                } else {
-                    XCTFail("Expected .InvalidKeyData, got \(pgpError)")
-                }
-            } else if let cypherError = error as? CypherAirError {
-                if case .invalidKeyData = cypherError {
-                    // Also acceptable if wrapped
-                } else {
-                    XCTFail("Expected .invalidKeyData, got \(cypherError)")
-                }
-            } else {
-                XCTFail("Expected PgpError or CypherAirError, got \(type(of: error))")
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            guard case .invalidQRCode = cypherError else {
+                return XCTFail("Expected .invalidQRCode, got \(cypherError)")
             }
         }
     }
@@ -281,23 +253,13 @@ final class QRServiceTests: XCTestCase {
         do {
             _ = try qrService.parseImportURL(url)
             // If this somehow succeeds, the URL passed the length guard — fine
-        } catch let error as PgpError {
-            // "AAAA..." is valid base64url that decodes to binary, but not a valid PGP key.
-            // Rust engine throws PgpError directly — this confirms we passed the length guard.
-            switch error {
-            case .InvalidKeyData, .CorruptData:
-                break // Expected: Rust-side parsing rejection (not length guard)
-            default:
-                XCTFail("Unexpected PgpError: \(error)")
-            }
         } catch let error as CypherAirError {
-            switch error {
-            case .invalidKeyData, .corruptData:
-                break // Expected: Rust-side parsing rejection wrapped as CypherAirError
-            case .invalidQRCode:
-                // The over-limit test above is the real safety check for the length guard.
-                break
-            default:
+            // "AAAA..." is valid base64url that decodes to binary, but not a valid PGP key.
+            // Rust engine rejects it → parseImportURL wraps all engine errors as .invalidQRCode.
+            // This confirms we passed the Swift-side length guard.
+            if case .invalidQRCode = error {
+                // Expected: Rust-side parsing rejection wrapped as .invalidQRCode
+            } else {
                 XCTFail("Unexpected CypherAirError: \(error)")
             }
         } catch {

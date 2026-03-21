@@ -16,7 +16,7 @@ final class EncryptionService {
     private let diskSpaceChecker: DiskSpaceChecker
 
     init(
-        engine: PgpEngine = PgpEngine(),
+        engine: PgpEngine,
         keyManagement: KeyManagementService,
         contactService: ContactService,
         diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker()

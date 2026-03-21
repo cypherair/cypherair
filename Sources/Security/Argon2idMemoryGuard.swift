@@ -22,7 +22,7 @@ struct Argon2idMemoryGuard {
     /// key derivation for the given S2K parameters.
     ///
     /// - Parameter s2kInfo: The parsed S2K parameters from the key file.
-    /// - Throws: `PgpError.Argon2idMemoryExceeded` if memory requirement
+    /// - Throws: `CypherAirError.argon2idMemoryExceeded` if memory requirement
     ///   exceeds 75% of available memory.
     /// RFC 9580 maximum encoded_m is 31 (2^31 KiB = 2 TB).
     /// Any value beyond this is malformed or malicious.
@@ -41,7 +41,7 @@ struct Argon2idMemoryGuard {
         // multiplication below and rejects malformed S2K parameters early.
         guard s2kInfo.memoryKib <= Self.maxMemoryKib else {
             let requiredMb = s2kInfo.memoryKib / 1024
-            throw PgpError.Argon2idMemoryExceeded(requiredMb: requiredMb)
+            throw CypherAirError.argon2idMemoryExceeded(requiredMb: requiredMb)
         }
 
         let requiredBytes = s2kInfo.memoryKib * 1024
@@ -70,7 +70,7 @@ struct Argon2idMemoryGuard {
 
         guard !exceeds else {
             let requiredMb = s2kInfo.memoryKib / 1024
-            throw PgpError.Argon2idMemoryExceeded(requiredMb: requiredMb)
+            throw CypherAirError.argon2idMemoryExceeded(requiredMb: requiredMb)
         }
     }
 }

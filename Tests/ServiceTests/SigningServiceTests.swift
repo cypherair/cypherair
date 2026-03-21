@@ -23,8 +23,8 @@ final class SigningServiceTests: XCTestCase {
     private func generateKeyAndContact(
         profile: KeyProfile,
         name: String = "Signer"
-    ) throws -> PGPKeyIdentity {
-        let identity = try TestHelpers.generateAndStoreKey(
+    ) async throws -> PGPKeyIdentity {
+        let identity = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
             profile: profile,
             name: name
@@ -36,7 +36,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - Cleartext Signing
 
     func test_signCleartext_profileA_producesSignedMessage() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
 
         let signed = try await stack.signingService.signCleartext(
             "Test message for signing",
@@ -52,7 +52,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_signCleartext_profileB_producesSignedMessage() async throws {
-        let identity = try generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(profile: .advanced)
 
         let signed = try await stack.signingService.signCleartext(
             "Test message Profile B",
@@ -65,7 +65,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - Detached Signing
 
     func test_signDetached_profileA_producesDetachedSignature() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
         let data = Data("File content for signing".utf8)
 
         let signature = try await stack.signingService.signDetached(
@@ -76,7 +76,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_signDetached_profileB_producesDetachedSignature() async throws {
-        let identity = try generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(profile: .advanced)
         let data = Data("File content for Profile B signing".utf8)
 
         let signature = try await stack.signingService.signDetached(
@@ -89,7 +89,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - Cleartext Verification
 
     func test_verifyCleartext_validSignature_returnsValid() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
 
         let signed = try await stack.signingService.signCleartext(
             "Verify this message",
@@ -102,7 +102,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_profileB_validSignature_returnsValid() async throws {
-        let identity = try generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(profile: .advanced)
 
         let signed = try await stack.signingService.signCleartext(
             "Verify this Profile B message",
@@ -115,7 +115,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_tamperedMessage_returnsBad() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
 
         var signed = try await stack.signingService.signCleartext(
             "Original message",
@@ -134,7 +134,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_profileB_tamperedMessage_returnsBad() async throws {
-        let identity = try generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(profile: .advanced)
 
         var signed = try await stack.signingService.signCleartext(
             "Original Profile B message",
@@ -158,7 +158,7 @@ final class SigningServiceTests: XCTestCase {
         let otherStack = TestHelpers.makeServiceStack()
         defer { otherStack.cleanup() }
 
-        let otherIdentity = try TestHelpers.generateAndStoreKey(
+        let otherIdentity = try await TestHelpers.generateAndStoreKey(
             service: otherStack.keyManagement,
             profile: .universal,
             name: "Stranger"
@@ -179,7 +179,7 @@ final class SigningServiceTests: XCTestCase {
         let otherStack = TestHelpers.makeServiceStack()
         defer { otherStack.cleanup() }
 
-        let otherIdentity = try TestHelpers.generateAndStoreKey(
+        let otherIdentity = try await TestHelpers.generateAndStoreKey(
             service: otherStack.keyManagement,
             profile: .advanced,
             name: "Stranger B"
@@ -198,7 +198,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - Detached Verification
 
     func test_verifyDetached_validSignature_returnsValid() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
         let data = Data("Detached verify data".utf8)
 
         let signature = try await stack.signingService.signDetached(
@@ -212,7 +212,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyDetached_profileB_validSignature_returnsValid() async throws {
-        let identity = try generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(profile: .advanced)
         let data = Data("Detached verify Profile B data".utf8)
 
         let signature = try await stack.signingService.signDetached(
@@ -226,7 +226,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyDetached_tamperedData_returnsBad() async throws {
-        let identity = try generateKeyAndContact(profile: .universal)
+        let identity = try await generateKeyAndContact(profile: .universal)
         let data = Data("Original detached data".utf8)
 
         let signature = try await stack.signingService.signDetached(
@@ -242,7 +242,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyDetached_profileB_tamperedData_returnsBad() async throws {
-        let identity = try generateKeyAndContact(profile: .advanced)
+        let identity = try await generateKeyAndContact(profile: .advanced)
         let data = Data("Original detached Profile B data".utf8)
 
         let signature = try await stack.signingService.signDetached(
@@ -261,7 +261,7 @@ final class SigningServiceTests: XCTestCase {
 
     func test_verifyCleartext_expiredSignerKey_returnsExpiredOrWarning() async throws {
         // Generate a key with 1-second expiry
-        let identity = try stack.keyManagement.generateKey(
+        let identity = try await stack.keyManagement.generateKey(
             name: "Expiring Signer",
             email: nil,
             expirySeconds: 1,
@@ -292,7 +292,7 @@ final class SigningServiceTests: XCTestCase {
 
     func test_verifyCleartext_profileB_expiredSignerKey_returnsExpiredOrWarning() async throws {
         // Generate a key with 1-second expiry
-        let identity = try stack.keyManagement.generateKey(
+        let identity = try await stack.keyManagement.generateKey(
             name: "Expiring Profile B Signer",
             email: nil,
             expirySeconds: 1,
@@ -322,7 +322,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - Known Contact Resolution
 
     func test_verifyCleartext_knownContact_resolvesSigner() async throws {
-        let identity = try generateKeyAndContact(profile: .universal, name: "Alice Known")
+        let identity = try await generateKeyAndContact(profile: .universal, name: "Alice Known")
 
         let signed = try await stack.signingService.signCleartext(
             "From a known contact",
@@ -336,7 +336,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_profileB_knownContact_resolvesSigner() async throws {
-        let identity = try generateKeyAndContact(profile: .advanced, name: "Bob Known")
+        let identity = try await generateKeyAndContact(profile: .advanced, name: "Bob Known")
 
         let signed = try await stack.signingService.signCleartext(
             "From a known Profile B contact",
