@@ -5,11 +5,10 @@ import Foundation
 @Observable
 final class AppConfiguration {
     /// Current authentication mode.
-    var authMode: AuthenticationMode {
-        didSet {
-            UserDefaults.standard.set(authMode.rawValue, forKey: AuthPreferences.authModeKey)
-        }
-    }
+    /// Note: UserDefaults persistence is handled by AuthenticationManager.switchMode()
+    /// and crash recovery — not by didSet — to ensure the write occurs only after
+    /// successful SE key re-wrapping.
+    var authMode: AuthenticationMode
 
     /// Grace period in seconds before re-authentication is required.
     /// Valid values: 0, 60, 180, 300.

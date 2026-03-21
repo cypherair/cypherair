@@ -43,6 +43,9 @@ enum AuthenticationMode: String {
             flags,
             &error
         ) else {
+            // SecAccessControlCreateWithFlags follows the CF Create Rule:
+            // on failure, the error output is an owned reference that must be released.
+            _ = error?.takeRetainedValue()
             throw AuthenticationError.accessControlCreationFailed
         }
 

@@ -1814,13 +1814,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "File is too large (%@ MB). Maximum size is 100 MB."
+            "value" : "File is too large (%lld MB). Maximum size is 100 MB."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "文件过大（%@ MB）。最大限制为 100 MB。"
+            "value" : "文件过大（%lld MB）。最大限制为 100 MB。"
           }
         }
       }
@@ -1830,13 +1830,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not enough disk space. File requires approximately %@ MB but only %@ MB is available."
+            "value" : "Not enough disk space. File requires approximately %lld MB but only %lld MB is available."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "磁盘空间不足。文件约需 %@ MB，但仅剩 %@ MB 可用。"
+            "value" : "磁盘空间不足。文件约需 %lld MB，但仅剩 %lld MB 可用。"
           }
         }
       }

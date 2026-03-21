@@ -4,7 +4,7 @@ import LocalAuthentication
 import Security
 
 /// Errors from Secure Enclave operations.
-enum SecureEnclaveError: Error {
+enum SecureEnclaveError: Error, Equatable {
     /// The SE key handle is not a valid HardwareSEKey.
     case invalidKeyHandle
     /// Failed to create SecAccessControl with the given flags.
@@ -15,6 +15,8 @@ enum SecureEnclaveError: Error {
     case notAvailable
     /// Failed to generate secure random bytes.
     case randomGenerationFailed
+    /// The fingerprint is empty or contains non-hex characters.
+    case invalidFingerprint
 }
 
 /// Handle to a real Secure Enclave P-256 key.
@@ -94,7 +96,7 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
         // material is cleared by the framework when the value goes out of scope.
         // This satisfies SECURITY.md §3.2 step 6 ("zeroize symmetric key") via
         // framework guarantees rather than explicit application-level zeroing.
-        let infoData = SEConstants.hkdfInfo(fingerprint: fingerprint)
+        let infoData = try SEConstants.hkdfInfo(fingerprint: fingerprint)
         let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
             salt: salt,
@@ -127,7 +129,7 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
 
         // Re-derive symmetric key with stored salt and same info string.
         // See wrap() for note on SymmetricKey's opaque secure memory lifecycle.
-        let infoData = SEConstants.hkdfInfo(fingerprint: fingerprint)
+        let infoData = try SEConstants.hkdfInfo(fingerprint: fingerprint)
         let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
             salt: bundle.salt,

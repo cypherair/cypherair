@@ -670,4 +670,38 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(imported.keyVersion, 6)
     }
 
+    // MARK: - Fingerprint Validation (M-1)
+
+    func test_hkdfInfo_validV4Fingerprint_succeeds() throws {
+        let v4 = String(repeating: "a1b2c3d4", count: 5) // 40 hex chars
+        let data = try SEConstants.hkdfInfo(fingerprint: v4)
+        XCTAssertTrue(data.count > 0)
+    }
+
+    func test_hkdfInfo_validV6Fingerprint_succeeds() throws {
+        let v6 = String(repeating: "a1b2c3d4", count: 8) // 64 hex chars
+        let data = try SEConstants.hkdfInfo(fingerprint: v6)
+        XCTAssertTrue(data.count > 0)
+    }
+
+    func test_hkdfInfo_emptyFingerprint_throwsInvalidFingerprint() {
+        XCTAssertThrowsError(try SEConstants.hkdfInfo(fingerprint: "")) { error in
+            XCTAssertEqual(error as? SecureEnclaveError, .invalidFingerprint)
+        }
+    }
+
+    func test_hkdfInfo_nonHexFingerprint_throwsInvalidFingerprint() {
+        XCTAssertThrowsError(try SEConstants.hkdfInfo(fingerprint: "xyz!@#")) { error in
+            XCTAssertEqual(error as? SecureEnclaveError, .invalidFingerprint)
+        }
+    }
+
+    func test_hkdfInfo_mixedCaseFingerprint_normalizedToLowercase() throws {
+        let upper = "AABBCCDD"
+        let lower = "aabbccdd"
+        let dataUpper = try SEConstants.hkdfInfo(fingerprint: upper)
+        let dataLower = try SEConstants.hkdfInfo(fingerprint: lower)
+        XCTAssertEqual(dataUpper, dataLower, "Mixed case should normalize to same info data")
+    }
+
 }
