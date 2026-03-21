@@ -91,6 +91,12 @@ struct DecryptView: View {
                     Text(matchedKey.formattedFingerprint)
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel(
+                            matchedKey.formattedFingerprint
+                                .split(separator: " ")
+                                .map { $0.map(String.init).joined(separator: " ") }
+                                .joined(separator: ", ")
+                        )
                 } header: {
                     Text(String(localized: "decrypt.matchedKey", defaultValue: "Matched Key"))
                 }

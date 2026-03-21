@@ -26,6 +26,7 @@ struct QRPhotoImportView: View {
             Image(systemName: "qrcode.viewfinder")
                 .font(.system(size: 64))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
             Text(String(localized: "qrImport.instruction", defaultValue: "Select a photo containing a CypherAir QR code."))
                 .font(.subheadline)

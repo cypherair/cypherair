@@ -15,6 +15,7 @@ struct PostGenerationPromptView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 48))
                             .foregroundStyle(.green)
+                            .accessibilityHidden(true)
 
                         Text(String(localized: "postgen.success", defaultValue: "Key Generated"))
                             .font(.headline)

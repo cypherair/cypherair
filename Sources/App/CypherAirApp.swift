@@ -238,8 +238,8 @@ struct CypherAirApp: App {
 
         do {
             let publicKeyData = try qrService.parseImportURL(url)
-            let keyInfo = try engine.parseKeyInfo(keyData: publicKeyData)
-            let profile = try engine.detectProfile(certData: publicKeyData)
+            let keyInfo = try qrService.inspectKeyInfo(keyData: publicKeyData)
+            let profile = try qrService.detectKeyProfile(keyData: publicKeyData)
             // Show confirmation sheet — do NOT add directly (PRD Section 4.2).
             pendingImport = PendingImport(keyData: publicKeyData, keyInfo: keyInfo, profile: profile)
         } catch {

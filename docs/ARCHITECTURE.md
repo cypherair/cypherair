@@ -280,11 +280,16 @@ App Sandbox:
 │   └── self-test/               → Self-test reports
 ├── Library/Preferences/
 │   └── (UserDefaults)
-│       ├── com.cypherair.preference.authMode           → "standard" | "highSecurity"
-│       ├── com.cypherair.preference.gracePeriod         → Int (seconds): 0 / 60 / 180 / 300
-│       ├── com.cypherair.preference.encryptToSelf       → Bool (default true)
-│       ├── com.cypherair.preference.clipboardNotice     → Bool (default true)
-│       └── com.cypherair.internal.rewrapInProgress      → Bool (crash recovery flag)
+│       ├── com.cypherair.preference.authMode              → "standard" | "highSecurity"
+│       ├── com.cypherair.preference.gracePeriod            → Int (seconds): 0 / 60 / 180 / 300
+│       ├── com.cypherair.preference.encryptToSelf          → Bool (default true)
+│       ├── com.cypherair.preference.clipboardNotice        → Bool (default true)
+│       ├── com.cypherair.preference.requireAuthOnLaunch    → Bool (default true)
+│       ├── com.cypherair.preference.onboardingComplete     → Bool (default false)
+│       ├── com.cypherair.internal.rewrapInProgress         → Bool (crash recovery flag)
+│       ├── com.cypherair.internal.rewrapTargetMode         → String (target auth mode during re-wrap)
+│       ├── com.cypherair.internal.modifyExpiryInProgress   → Bool (crash recovery flag)
+│       └── com.cypherair.internal.modifyExpiryFingerprint  → String (key fingerprint during expiry modification)
 └── tmp/
     └── decrypted/               → Decrypted file previews (deleted on view exit + app launch)
 ```
