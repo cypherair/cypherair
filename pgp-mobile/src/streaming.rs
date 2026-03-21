@@ -88,68 +88,47 @@ impl<R: Read> Read for ProgressReader<R> {
 
 // ── Zeroing Copy Utilities ─────────────────────────────────────────────
 
+/// Internal error type for zeroing_copy that preserves the original io::Error
+/// from the reader, allowing callers to extract and reclassify decryption errors.
+#[derive(Debug)]
+enum CopyError {
+    /// Read error — preserves the original io::Error (may wrap Sequoia anyhow::Error)
+    Read(std::io::Error),
+    /// Write error — preserves the original io::Error
+    Write(std::io::Error),
+    /// Operation cancelled by user (progress callback returned false)
+    Cancelled,
+}
+
 /// Copy data from `reader` to `writer` using a zeroizing buffer.
 ///
 /// Unlike `std::io::copy`, the internal buffer is guaranteed to be zeroized on drop
 /// (including panic/early-return paths) via `Zeroizing<Vec<u8>>`.
+///
+/// Returns `CopyError` instead of `PgpError` to preserve the original `io::Error`
+/// from the reader. This is critical for `decrypt_file`, where Sequoia's Decryptor
+/// wraps decryption errors (AEAD/MDC) as `io::Error`. Callers can extract the inner
+/// error via `io::Error::into_inner()` and reclassify it using `classify_decrypt_error()`.
 fn zeroing_copy<R: Read, W: Write>(
     reader: &mut R,
     writer: &mut W,
     buf_size: usize,
-) -> Result<u64, PgpError> {
+) -> Result<u64, CopyError> {
     let mut buf = Zeroizing::new(vec![0u8; buf_size]);
     let mut total: u64 = 0;
 
     loop {
         let n = reader.read(&mut buf).map_err(|e| {
             if e.kind() == std::io::ErrorKind::Interrupted {
-                PgpError::OperationCancelled
+                CopyError::Cancelled
             } else {
-                PgpError::FileIoError {
-                    reason: format!("Read failed: {e}"),
-                }
+                CopyError::Read(e)
             }
         })?;
         if n == 0 {
             break;
         }
-        writer.write_all(&buf[..n]).map_err(|e| PgpError::FileIoError {
-            reason: format!("Write failed: {e}"),
-        })?;
-        total += n as u64;
-    }
-
-    Ok(total)
-}
-
-/// Copy data from `reader` to `writer` with progress reporting and cancellation.
-///
-/// The `ProgressReader` wrapper handles progress callbacks on the read side.
-/// This function uses a `Zeroizing<Vec<u8>>` buffer for the copy loop.
-fn zeroing_copy_with_progress<W: Write>(
-    reader: &mut ProgressReader<impl Read>,
-    writer: &mut W,
-    buf_size: usize,
-) -> Result<u64, PgpError> {
-    let mut buf = Zeroizing::new(vec![0u8; buf_size]);
-    let mut total: u64 = 0;
-
-    loop {
-        let n = reader.read(&mut buf).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::Interrupted {
-                PgpError::OperationCancelled
-            } else {
-                PgpError::FileIoError {
-                    reason: format!("Read failed: {e}"),
-                }
-            }
-        })?;
-        if n == 0 {
-            break;
-        }
-        writer.write_all(&buf[..n]).map_err(|e| PgpError::FileIoError {
-            reason: format!("Write failed: {e}"),
-        })?;
+        writer.write_all(&buf[..n]).map_err(CopyError::Write)?;
         total += n as u64;
     }
 
@@ -249,13 +228,19 @@ pub fn encrypt_file(
         })?;
 
     // Stream data through the pipeline with progress reporting
-    let result = zeroing_copy_with_progress(&mut progress_reader, &mut literal, STREAM_BUFFER_SIZE);
-
-    if let Err(e) = result {
+    if let Err(e) = zeroing_copy(&mut progress_reader, &mut literal, STREAM_BUFFER_SIZE) {
         // Clean up partial output on error
         drop(literal);
         secure_delete_file(std::path::Path::new(output_path));
-        return Err(e);
+        return Err(match e {
+            CopyError::Read(io_err) => PgpError::EncryptionFailed {
+                reason: format!("Read failed: {io_err}"),
+            },
+            CopyError::Write(io_err) => PgpError::EncryptionFailed {
+                reason: format!("Write failed: {io_err}"),
+            },
+            CopyError::Cancelled => PgpError::OperationCancelled,
+        });
     }
 
     // Finalize the pipeline (flushes encryption/signature)
@@ -275,10 +260,10 @@ pub fn encrypt_file(
 /// cancellation, I/O error), the temp file is securely deleted. The output file is only
 /// created by renaming the temp file after full successful decryption + verification.
 /// This enforces the AEAD hard-fail requirement: no partial plaintext on auth failure.
-pub fn decrypt_file(
+pub fn decrypt_file<K: AsRef<[u8]>>(
     input_path: &str,
     output_path: &str,
-    secret_keys: &[Vec<u8>],
+    secret_keys: &[K],
     verification_keys: &[Vec<u8>],
     progress: Option<Arc<dyn ProgressReporter>>,
 ) -> Result<FileDecryptResult, PgpError> {
@@ -287,7 +272,7 @@ pub fn decrypt_file(
     // Parse secret key certificates
     let mut certs = Vec::new();
     for key_data in secret_keys {
-        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
+        let cert = openpgp::Cert::from_bytes(key_data.as_ref()).map_err(|e| PgpError::InvalidKeyData {
             reason: format!("Invalid secret key: {e}"),
         })?;
         certs.push(cert);
@@ -326,32 +311,39 @@ pub fn decrypt_file(
         .with_policy(&policy, None, helper)
         .map_err(|e| classify_decrypt_error(e))?;
 
-    // Write to temp file first (AEAD hard-fail: no partial plaintext)
-    let temp_path = format!("{output_path}.tmp");
+    // Write to temp file first (AEAD hard-fail: no partial plaintext).
+    // Use a random suffix to prevent predictable temp file paths (M3 fix).
+    let mut random_bytes = [0u8; 8];
+    openpgp::crypto::random(&mut random_bytes).map_err(|e| PgpError::InternalError {
+        reason: format!("Random generation failed: {e}"),
+    })?;
+    let hex_suffix: String = random_bytes.iter().map(|b| format!("{b:02x}")).collect();
+    let temp_path = format!("{output_path}.{hex_suffix}.tmp");
     let temp_path_ref = std::path::Path::new(&temp_path);
 
     let mut temp_file = File::create(&temp_path).map_err(|e| PgpError::FileIoError {
         reason: format!("Cannot create temp file '{}': {e}", temp_path),
     })?;
 
-    // Stream decrypted data to temp file using zeroing copy
+    // Stream decrypted data to temp file using zeroing copy.
+    // CopyError preserves the original io::Error so we can extract and reclassify
+    // Sequoia decryption errors (AEAD/MDC/wrong-key) that are wrapped inside io::Error
+    // by the Decryptor's Read impl. This is the core fix for security finding M2.
     if let Err(e) = zeroing_copy(&mut decryptor, &mut temp_file, STREAM_BUFFER_SIZE) {
         drop(temp_file);
         secure_delete_file(temp_path_ref);
         return Err(match e {
-            PgpError::FileIoError { ref reason } => {
-                // Check if this is actually a decryption error wrapped in an I/O error.
-                // Sequoia's Decryptor implements Read; read() wraps decryption errors in io::Error.
-                if reason.contains("Read failed:") {
-                    // Re-classify: the "read" failure was likely a decryption error
-                    PgpError::CorruptData {
-                        reason: reason.clone(),
-                    }
-                } else {
-                    e
-                }
+            CopyError::Read(io_err) => {
+                // Sequoia's Decryptor wraps decryption errors (anyhow::Error) inside
+                // io::Error via io::Error::new(). Convert to anyhow::Error and pass to
+                // classify_decrypt_error, which already handles unwrapping io::Error
+                // layers (Strategy 1b) to find the inner openpgp::Error.
+                classify_decrypt_error(openpgp::anyhow::Error::from(io_err))
             }
-            _ => e,
+            CopyError::Write(io_err) => PgpError::FileIoError {
+                reason: format!("Write failed: {io_err}"),
+            },
+            CopyError::Cancelled => PgpError::OperationCancelled,
         });
     }
 
@@ -420,7 +412,17 @@ pub fn sign_detached_file(
         })?;
 
     // Stream file data through the signer
-    zeroing_copy_with_progress(&mut progress_reader, &mut signer, STREAM_BUFFER_SIZE)?;
+    if let Err(e) = zeroing_copy(&mut progress_reader, &mut signer, STREAM_BUFFER_SIZE) {
+        return Err(match e {
+            CopyError::Read(io_err) => PgpError::SigningFailed {
+                reason: format!("Read failed: {io_err}"),
+            },
+            CopyError::Write(io_err) => PgpError::SigningFailed {
+                reason: format!("Write failed: {io_err}"),
+            },
+            CopyError::Cancelled => PgpError::OperationCancelled,
+        });
+    }
 
     signer.finalize().map_err(|e| PgpError::SigningFailed {
         reason: format!("Finalize failed: {e}"),

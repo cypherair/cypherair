@@ -28,6 +28,10 @@ use pgp_mobile::verify;
 
 /// Verify that tampered Profile A (SEIPDv1) ciphertext produces an integrity-related
 /// error, not a generic CorruptData. Exercises the case-insensitive error classification.
+///
+/// NOTE: This test accepts multiple error variants because the specific error
+/// depends on WHERE in the ciphertext the tamper occurs. For the streaming path,
+/// see streaming_tests::test_streaming_decrypt_tampered_profile_a_returns_specific_error.
 #[test]
 fn test_error_classification_tampered_profile_a() {
     let key = keys::generate_key_with_profile(
@@ -67,6 +71,10 @@ fn test_error_classification_tampered_profile_a() {
 
 /// Verify that tampered Profile B (SEIPDv2 AEAD) ciphertext produces an
 /// AEAD-related error. Exercises the case-insensitive error classification.
+///
+/// NOTE: This test accepts multiple error variants because the specific error
+/// depends on WHERE in the ciphertext the tamper occurs. For the streaming path,
+/// see streaming_tests::test_streaming_decrypt_tampered_profile_b_returns_specific_error.
 #[test]
 fn test_error_classification_tampered_profile_b() {
     let key = keys::generate_key_with_profile(
@@ -1121,4 +1129,33 @@ fn test_encrypt_rejects_signing_only_cert_profile_b() {
         None,
     );
     assert!(result_binary.is_err(), "encrypt_binary should reject v6 recipient without encryption subkey");
+}
+
+// ── L2: Expired key should still report expiry timestamp ───────────────
+
+/// Verify that parse_key_info() returns the expiry timestamp even for expired keys.
+/// Before the L2 fix, expired keys returned None for expiry_timestamp because
+/// with_policy(Some(now)) fails for expired certs.
+#[test]
+fn test_parse_key_info_expired_cert_still_has_expiry_timestamp() {
+    // Generate a key with a very short expiry (1 second)
+    let key = keys::generate_key_with_profile(
+        "Expiry Test".to_string(),
+        None,
+        Some(1), // 1-second expiry
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    // Wait for the key to expire
+    std::thread::sleep(std::time::Duration::from_secs(3));
+
+    let info = keys::parse_key_info(&key.public_key_data)
+        .expect("parse_key_info should succeed for expired key");
+
+    assert!(info.is_expired, "Key should be reported as expired");
+    assert!(
+        info.expiry_timestamp.is_some(),
+        "Expired key should still have an expiry_timestamp (L2 fix)"
+    );
 }

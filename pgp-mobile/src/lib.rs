@@ -15,6 +15,8 @@ pub mod verify;
 
 use std::sync::Arc;
 
+use zeroize::Zeroizing;
+
 use crate::armor::ArmorKind;
 use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
@@ -83,6 +85,7 @@ impl PgpEngine {
         cert_data: Vec<u8>,
         new_expiry_seconds: Option<u64>,
     ) -> Result<ModifyExpiryResult, PgpError> {
+        let cert_data = Zeroizing::new(cert_data);
         keys::modify_expiry(&cert_data, new_expiry_seconds)
     }
 
@@ -101,10 +104,11 @@ impl PgpEngine {
         signing_key: Option<Vec<u8>>,
         encrypt_to_self: Option<Vec<u8>>,
     ) -> Result<Vec<u8>, PgpError> {
+        let signing_key = signing_key.map(Zeroizing::new);
         encrypt::encrypt(
             &plaintext,
             &recipients,
-            signing_key.as_deref(),
+            signing_key.as_ref().map(|z| z.as_slice()),
             encrypt_to_self.as_deref(),
         )
     }
@@ -117,10 +121,11 @@ impl PgpEngine {
         signing_key: Option<Vec<u8>>,
         encrypt_to_self: Option<Vec<u8>>,
     ) -> Result<Vec<u8>, PgpError> {
+        let signing_key = signing_key.map(Zeroizing::new);
         encrypt::encrypt_binary(
             &plaintext,
             &recipients,
-            signing_key.as_deref(),
+            signing_key.as_ref().map(|z| z.as_slice()),
             encrypt_to_self.as_deref(),
         )
     }
@@ -159,6 +164,8 @@ impl PgpEngine {
         secret_keys: Vec<Vec<u8>>,
         verification_keys: Vec<Vec<u8>>,
     ) -> Result<DecryptResult, PgpError> {
+        let secret_keys: Vec<Zeroizing<Vec<u8>>> =
+            secret_keys.into_iter().map(Zeroizing::new).collect();
         decrypt::decrypt(&ciphertext, &secret_keys, &verification_keys)
     }
 
@@ -170,6 +177,7 @@ impl PgpEngine {
         text: Vec<u8>,
         signer_cert: Vec<u8>,
     ) -> Result<Vec<u8>, PgpError> {
+        let signer_cert = Zeroizing::new(signer_cert);
         sign::sign_cleartext(&text, &signer_cert)
     }
 
@@ -179,6 +187,7 @@ impl PgpEngine {
         data: Vec<u8>,
         signer_cert: Vec<u8>,
     ) -> Result<Vec<u8>, PgpError> {
+        let signer_cert = Zeroizing::new(signer_cert);
         sign::sign_detached(&data, &signer_cert)
     }
 
@@ -213,6 +222,7 @@ impl PgpEngine {
         passphrase: String,
         profile: KeyProfile,
     ) -> Result<Vec<u8>, PgpError> {
+        let cert_data = Zeroizing::new(cert_data);
         keys::export_secret_key(&cert_data, &passphrase, profile)
     }
 
@@ -244,6 +254,7 @@ impl PgpEngine {
         rev_data: Vec<u8>,
         cert_data: Vec<u8>,
     ) -> Result<String, PgpError> {
+        let cert_data = Zeroizing::new(cert_data);
         keys::parse_revocation_cert(&rev_data, &cert_data)
     }
 
@@ -278,11 +289,12 @@ impl PgpEngine {
         encrypt_to_self: Option<Vec<u8>>,
         progress: Option<Arc<dyn streaming::ProgressReporter>>,
     ) -> Result<(), PgpError> {
+        let signing_key = signing_key.map(Zeroizing::new);
         streaming::encrypt_file(
             &input_path,
             &output_path,
             &recipients,
-            signing_key.as_deref(),
+            signing_key.as_ref().map(|z| z.as_slice()),
             encrypt_to_self.as_deref(),
             progress,
         )
@@ -298,6 +310,8 @@ impl PgpEngine {
         verification_keys: Vec<Vec<u8>>,
         progress: Option<Arc<dyn streaming::ProgressReporter>>,
     ) -> Result<FileDecryptResult, PgpError> {
+        let secret_keys: Vec<Zeroizing<Vec<u8>>> =
+            secret_keys.into_iter().map(Zeroizing::new).collect();
         streaming::decrypt_file(
             &input_path,
             &output_path,
@@ -315,6 +329,7 @@ impl PgpEngine {
         signer_cert: Vec<u8>,
         progress: Option<Arc<dyn streaming::ProgressReporter>>,
     ) -> Result<Vec<u8>, PgpError> {
+        let signer_cert = Zeroizing::new(signer_cert);
         streaming::sign_detached_file(&input_path, &signer_cert, progress)
     }
 

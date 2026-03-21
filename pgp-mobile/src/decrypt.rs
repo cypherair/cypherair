@@ -194,9 +194,9 @@ pub fn match_recipients(
 /// - `ciphertext`: The encrypted message (binary or ASCII-armored).
 /// - `secret_keys`: One or more full certificates (with secret keys) in binary format.
 /// - `verification_keys`: Optional public keys for signature verification.
-pub fn decrypt(
+pub fn decrypt<K: AsRef<[u8]>>(
     ciphertext: &[u8],
-    secret_keys: &[Vec<u8>],
+    secret_keys: &[K],
     verification_keys: &[Vec<u8>],
 ) -> Result<DecryptResult, PgpError> {
     let policy = StandardPolicy::new();
@@ -204,7 +204,7 @@ pub fn decrypt(
     // Parse secret key certificates
     let mut certs = Vec::new();
     for key_data in secret_keys {
-        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| {
+        let cert = openpgp::Cert::from_bytes(key_data.as_ref()).map_err(|e| {
             PgpError::InvalidKeyData {
                 reason: format!("Invalid secret key: {e}"),
             }
@@ -286,6 +286,11 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
     /// the message. In contrast, standalone signature verification (`verify_cleartext`,
     /// `verify_detached`) hard-fails on bad signatures because the content is already visible
     /// and the sole purpose is to validate the signature.
+    // NOTE: All non-GoodChecksum arms intentionally fall through (no early return).
+    // Only GoodChecksum triggers early return. For MissingKey, BadKey, and catch-all,
+    // the last-set status wins based on iteration order. This is acceptable because
+    // during decryption, signature verification is "graded" — decryption succeeds
+    // regardless of signature status.
     fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
         for layer in structure {
             match layer {
@@ -455,9 +460,14 @@ pub(crate) fn is_expired_error(error: &openpgp::anyhow::Error) -> bool {
             return true;
         }
     }
-    // Strategy 3: String fallback (defense-in-depth against error wrapping changes)
+    // Strategy 3: String fallback (defense-in-depth against error wrapping changes).
+    // Tightened to specific phrases to avoid false positives from unrelated error
+    // messages that happen to contain the word "expired".
     let err_str = error.to_string().to_lowercase();
-    err_str.contains("expired")
+    err_str.contains("key expired")
+        || err_str.contains("certificate expired")
+        || err_str.contains("signature expired")
+        || err_str.contains("validity period expired")
 }
 
 impl<'a> DecryptionHelper for DecryptHelper<'a> {

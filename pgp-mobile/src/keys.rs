@@ -258,7 +258,11 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         .next()
         .map(|ka| ka.key().pk_algo().to_string())
         .or_else(|| {
-            // Fallback: first subkey regardless of policy/capability
+            // Fallback for display only: if no policy-valid encryption subkey found
+            // (e.g., expired key), report the first subkey's algorithm name.
+            // This does NOT affect encryption operations — encrypt() independently
+            // uses with_policy() to find valid encryption subkeys and will correctly
+            // reject keys with no valid encryption-capable subkey.
             cert.keys().subkeys().next().map(|ka| ka.key().pk_algo().to_string())
         });
 
@@ -268,6 +272,13 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         .with_policy(&policy, Some(now))
         .ok()
         .and_then(|valid_cert| valid_cert.primary_key().key_expiration_time())
+        .or_else(|| {
+            // Fallback for expired certs: validate without temporal check
+            // to retrieve the expiry timestamp for display purposes.
+            cert.with_policy(&policy, None)
+                .ok()
+                .and_then(|valid_cert| valid_cert.primary_key().key_expiration_time())
+        })
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
         .map(|d| d.as_secs());
 
@@ -600,52 +611,74 @@ pub struct S2kInfo {
 /// This allows the Swift side to check memory requirements (e.g., Argon2id 512 MB)
 /// before calling `import_secret_key`, preventing iOS Jetsam kills.
 ///
-/// Only inspects the primary key's S2K specifier.
+/// Inspects the primary key and all subkeys, returning the S2K info with the
+/// highest memory requirement. This handles keys where the primary key and
+/// subkeys may use different S2K parameters (e.g., imported from external tools).
 pub fn parse_s2k_params(armored_data: &[u8]) -> Result<S2kInfo, PgpError> {
     let cert =
         openpgp::Cert::from_bytes(armored_data).map_err(|e| PgpError::InvalidKeyData {
             reason: e.to_string(),
         })?;
 
-    let primary = cert.primary_key().key().clone();
-    let secret = primary.optional_secret();
+    // Iterate primary key + all subkeys, extract S2K info from each encrypted key.
+    let mut best: Option<S2kInfo> = None;
+    let mut has_unencrypted = false;
 
-    match secret {
-        Some(openpgp::packet::key::SecretKeyMaterial::Encrypted(encrypted)) => {
-            let s2k = encrypted.s2k();
-            match s2k {
-                openpgp::crypto::S2K::Argon2 { t, p, m, .. } => {
-                    // memory = 2^m KiB (RFC 9580 encoding)
-                    let memory_kib: u64 = 1u64 << (*m as u64);
-                    Ok(S2kInfo {
-                        s2k_type: "argon2id".to_string(),
-                        memory_kib,
-                        parallelism: *p as u32,
-                        time_passes: *t as u32,
-                    })
+    // Helper closure to extract S2K info from secret key material
+    let mut check_secret = |secret: Option<&openpgp::packet::key::SecretKeyMaterial>| {
+        match secret {
+            Some(openpgp::packet::key::SecretKeyMaterial::Encrypted(encrypted)) => {
+                let info = match encrypted.s2k() {
+                    openpgp::crypto::S2K::Argon2 { t, p, m, .. } => {
+                        let memory_kib: u64 = 1u64 << (*m as u64);
+                        S2kInfo {
+                            s2k_type: "argon2id".to_string(),
+                            memory_kib,
+                            parallelism: *p as u32,
+                            time_passes: *t as u32,
+                        }
+                    }
+                    openpgp::crypto::S2K::Iterated { .. } => S2kInfo {
+                        s2k_type: "iterated-salted".to_string(),
+                        memory_kib: 0,
+                        parallelism: 0,
+                        time_passes: 0,
+                    },
+                    _ => S2kInfo {
+                        s2k_type: "unknown".to_string(),
+                        memory_kib: 0,
+                        parallelism: 0,
+                        time_passes: 0,
+                    },
+                };
+                if best.as_ref().map_or(true, |b| info.memory_kib > b.memory_kib) {
+                    best = Some(info);
                 }
-                openpgp::crypto::S2K::Iterated { .. } => Ok(S2kInfo {
-                    s2k_type: "iterated-salted".to_string(),
-                    memory_kib: 0,
-                    parallelism: 0,
-                    time_passes: 0,
-                }),
-                _ => Ok(S2kInfo {
-                    s2k_type: "unknown".to_string(),
-                    memory_kib: 0,
-                    parallelism: 0,
-                    time_passes: 0,
-                }),
             }
+            Some(openpgp::packet::key::SecretKeyMaterial::Unencrypted(_)) => {
+                has_unencrypted = true;
+            }
+            None => {}
         }
-        Some(openpgp::packet::key::SecretKeyMaterial::Unencrypted(_)) => {
-            Err(PgpError::InvalidKeyData {
-                reason: "Key is not passphrase-protected (unencrypted secret key)".to_string(),
-            })
-        }
-        None => Err(PgpError::InvalidKeyData {
+    };
+
+    // Check primary key
+    check_secret(cert.primary_key().key().optional_secret());
+    // Check all subkeys
+    for ka in cert.keys().subkeys() {
+        check_secret(ka.key().optional_secret());
+    }
+
+    if let Some(info) = best {
+        Ok(info)
+    } else if has_unencrypted {
+        Err(PgpError::InvalidKeyData {
+            reason: "Key is not passphrase-protected (unencrypted secret key)".to_string(),
+        })
+    } else {
+        Err(PgpError::InvalidKeyData {
             reason: "No secret key material found (public key only)".to_string(),
-        }),
+        })
     }
 }
 

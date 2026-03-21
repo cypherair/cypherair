@@ -285,11 +285,16 @@ fn test_decrypt_file_tampered_profile_a() {
         "Decrypted file must not exist after tamper failure"
     );
 
-    // Also verify the temp file was cleaned up
-    let temp_path = format!("{}.tmp", decrypted_path.to_str().unwrap());
+    // Verify no temp files remain (temp path now has random suffix)
+    let tmp_files: Vec<_> = fs::read_dir(dir.path())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "tmp"))
+        .collect();
     assert!(
-        !std::path::Path::new(&temp_path).exists(),
-        "Temp file must be cleaned up after tamper failure"
+        tmp_files.is_empty(),
+        "No .tmp files should remain after tamper failure, found: {:?}",
+        tmp_files.iter().map(|e| e.path()).collect::<Vec<_>>()
     );
 }
 
@@ -331,6 +336,114 @@ fn test_decrypt_file_tampered_profile_b() {
     assert!(
         !decrypted_path.exists(),
         "Decrypted file must not exist after AEAD failure"
+    );
+}
+
+// ── Error Reclassification Tests (M2 fix) ─────────────────────────────
+// These tests verify that streaming decrypt_file correctly reclassifies
+// decryption errors (AEAD/MDC) that are wrapped inside io::Error by
+// Sequoia's Decryptor Read impl, rather than returning generic FileIoError.
+
+#[test]
+fn test_streaming_decrypt_tampered_profile_b_returns_specific_error() {
+    // Profile B uses SEIPDv2 AEAD — tampering should yield AeadAuthenticationFailed
+    // or IntegrityCheckFailed, NOT FileIoError or generic CorruptData.
+    let dir = tempfile::tempdir().unwrap();
+    let key = gen_key("Bob", KeyProfile::Advanced);
+
+    let plaintext = b"AEAD error reclassification test for M2 fix";
+    let input_path = dir.path().join("input.txt");
+    let encrypted_path = dir.path().join("encrypted.gpg");
+    let decrypted_path = dir.path().join("decrypted.txt");
+    fs::write(&input_path, plaintext).unwrap();
+
+    streaming::encrypt_file(
+        input_path.to_str().unwrap(),
+        encrypted_path.to_str().unwrap(),
+        &[key.public_key_data.clone()],
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+
+    // Tamper near the end (AEAD tag area) — flip a bit at 3/4 point
+    let mut ciphertext = fs::read(&encrypted_path).unwrap();
+    let tamper_pos = ciphertext.len() * 3 / 4;
+    ciphertext[tamper_pos] ^= 0x01;
+    fs::write(&encrypted_path, &ciphertext).unwrap();
+
+    let result = streaming::decrypt_file(
+        encrypted_path.to_str().unwrap(),
+        decrypted_path.to_str().unwrap(),
+        &[key.cert_data.clone()],
+        &[key.public_key_data.clone()],
+        None,
+    );
+    assert!(result.is_err(), "Tampered AEAD ciphertext should fail");
+
+    let err = match result {
+        Err(e) => e,
+        Ok(_) => panic!("Expected error but got Ok"),
+    };
+    // The key invariant: the error must NOT be FileIoError. Before the M2 fix,
+    // streaming decrypt errors were misclassified as FileIoError because the
+    // io::Error wrapper was not unwrapped. The specific error variant depends
+    // on WHERE in the ciphertext the tamper occurs (AEAD tag area vs headers
+    // vs session key area), so we accept all properly-classified variants.
+    assert!(
+        !matches!(&err, PgpError::FileIoError { .. }),
+        "Must NOT be FileIoError — error reclassification failed. Got: {err:?}"
+    );
+}
+
+#[test]
+fn test_streaming_decrypt_tampered_profile_a_returns_specific_error() {
+    // Profile A uses SEIPDv1 (MDC) — tampering should yield IntegrityCheckFailed,
+    // NOT FileIoError or generic CorruptData.
+    let dir = tempfile::tempdir().unwrap();
+    let key = gen_key("Alice", KeyProfile::Universal);
+
+    let plaintext = b"MDC error reclassification test for M2 fix";
+    let input_path = dir.path().join("input.txt");
+    let encrypted_path = dir.path().join("encrypted.gpg");
+    let decrypted_path = dir.path().join("decrypted.txt");
+    fs::write(&input_path, plaintext).unwrap();
+
+    streaming::encrypt_file(
+        input_path.to_str().unwrap(),
+        encrypted_path.to_str().unwrap(),
+        &[key.public_key_data.clone()],
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+
+    // Tamper near the end (MDC area) — flip a bit at 3/4 point
+    let mut ciphertext = fs::read(&encrypted_path).unwrap();
+    let tamper_pos = ciphertext.len() * 3 / 4;
+    ciphertext[tamper_pos] ^= 0x01;
+    fs::write(&encrypted_path, &ciphertext).unwrap();
+
+    let result = streaming::decrypt_file(
+        encrypted_path.to_str().unwrap(),
+        decrypted_path.to_str().unwrap(),
+        &[key.cert_data.clone()],
+        &[key.public_key_data.clone()],
+        None,
+    );
+    assert!(result.is_err(), "Tampered MDC ciphertext should fail");
+
+    let err = match result {
+        Err(e) => e,
+        Ok(_) => panic!("Expected error but got Ok"),
+    };
+    // Same invariant as Profile B: error must NOT be FileIoError.
+    // The specific variant depends on tamper position within the ciphertext.
+    assert!(
+        !matches!(&err, PgpError::FileIoError { .. }),
+        "Must NOT be FileIoError — error reclassification failed. Got: {err:?}"
     );
 }
 

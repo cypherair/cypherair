@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::stream::*;
@@ -155,7 +157,7 @@ fn write_and_finalize(message: Message, plaintext: &[u8]) -> Result<(), PgpError
             reason: format!("Literal writer setup failed: {e}"),
         })?;
 
-    std::io::copy(&mut &plaintext[..], &mut literal).map_err(|e| PgpError::EncryptionFailed {
+    literal.write_all(plaintext).map_err(|e| PgpError::EncryptionFailed {
         reason: format!("Write failed: {e}"),
     })?;
 

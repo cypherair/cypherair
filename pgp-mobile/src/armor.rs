@@ -38,6 +38,11 @@ pub fn encode_armor(data: &[u8], kind: ArmorKind) -> Result<Vec<u8>, PgpError> {
 
 /// Dearmor ASCII-armored OpenPGP data into binary format.
 pub fn decode_armor(armored: &[u8]) -> Result<(Vec<u8>, ArmorKind), PgpError> {
+    // ReaderMode::Tolerant(None): accepts both ASCII-armored and raw binary OpenPGP data.
+    // This is intentional — callers may pass raw binary (e.g., from Keychain storage
+    // or .gpg files) or ASCII-armored text (e.g., from clipboard paste or .asc files).
+    // The reader auto-detects format. Passing binary to a strict armor reader would
+    // reject valid input; tolerant mode avoids requiring callers to pre-detect format.
     let mut reader =
         armor::Reader::from_bytes(armored, armor::ReaderMode::Tolerant(None));
 
