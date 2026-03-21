@@ -111,6 +111,12 @@ struct HomeView: View {
                     Text(defaultKey.formattedFingerprint)
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel(
+                            defaultKey.formattedFingerprint
+                                .split(separator: " ")
+                                .map { $0.map(String.init).joined(separator: " ") }
+                                .joined(separator: ", ")
+                        )
                 }
                 .padding()
                 .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))

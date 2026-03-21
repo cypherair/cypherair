@@ -115,6 +115,7 @@ private struct AppIconCell: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 20))
                             .foregroundStyle(.white, .blue)
+                            .accessibilityHidden(true)
                             .offset(x: 4, y: 4)
                     }
                 }
