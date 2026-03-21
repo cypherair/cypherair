@@ -99,8 +99,23 @@ extension SecureEnclaveManageable {
 enum SEConstants {
     static let hkdfInfoPrefix = "CypherAir-SE-Wrap-v1:"
 
+    /// Validate that a fingerprint is non-empty and contains only hex characters.
+    /// Does not enforce a specific length — v4 fingerprints are 40 hex chars,
+    /// v6 fingerprints are 64 hex chars, and future versions may differ.
+    static func validateFingerprint(_ fingerprint: String) throws {
+        guard !fingerprint.isEmpty else {
+            throw SecureEnclaveError.invalidFingerprint
+        }
+        let hexCharacters = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
+        guard fingerprint.unicodeScalars.allSatisfy({ hexCharacters.contains($0) }) else {
+            throw SecureEnclaveError.invalidFingerprint
+        }
+    }
+
     /// Construct the full HKDF info string for a given key fingerprint.
-    static func hkdfInfo(fingerprint: String) -> Data {
+    /// Throws if the fingerprint is empty or contains non-hex characters.
+    static func hkdfInfo(fingerprint: String) throws -> Data {
+        try validateFingerprint(fingerprint)
         let infoString = hkdfInfoPrefix + fingerprint.lowercased()
         return Data(infoString.utf8)
     }

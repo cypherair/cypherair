@@ -82,7 +82,7 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         }
 
         // HKDF derive AES-256 key
-        let infoData = SEConstants.hkdfInfo(fingerprint: fingerprint)
+        let infoData = try SEConstants.hkdfInfo(fingerprint: fingerprint)
         let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
             salt: salt,
@@ -124,7 +124,7 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         )
 
         // HKDF with stored salt and same info string
-        let infoData = SEConstants.hkdfInfo(fingerprint: fingerprint)
+        let infoData = try SEConstants.hkdfInfo(fingerprint: fingerprint)
         let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
             salt: bundle.salt,

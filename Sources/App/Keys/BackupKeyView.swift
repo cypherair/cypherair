@@ -101,6 +101,11 @@ struct BackupKeyView: View {
                     passphrase: passphrase
                 )
                 exportedData = data
+                // Clear sensitive state after successful export.
+                // Note: Swift String cannot be reliably zeroized (SECURITY.md §7.1),
+                // but we minimize lifetime by clearing references immediately.
+                passphrase = ""
+                passphraseConfirm = ""
             } catch {
                 self.error = CypherAirError.from(error) { .encryptionFailed(reason: $0) }
                 showError = true
