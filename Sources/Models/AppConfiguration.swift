@@ -36,7 +36,7 @@ final class AppConfiguration {
         }
     }
 
-    /// Whether to require device authentication on cold launch (default false).
+    /// Whether to require device authentication on cold launch (default true).
     var requireAuthOnLaunch: Bool {
         didSet {
             UserDefaults.standard.set(requireAuthOnLaunch, forKey: Self.requireAuthOnLaunchKey)
