@@ -284,4 +284,41 @@ final class QRServiceTests: XCTestCase {
             // Empty data should fail during URL encoding
         }
     }
+
+    // MARK: - QR Image Round-Trip
+
+    func test_qrCodeRoundTrip_generateThenDecode_recoversPublicKey() async throws {
+        let generated = try engine.generateKey(
+            name: "QR Round-Trip", email: nil,
+            expirySeconds: nil, profile: .universal
+        )
+
+        // Generate QR code image
+        guard let qrImage = try qrService.generateQRCode(for: generated.publicKeyData) else {
+            XCTFail("QR code generation returned nil"); return
+        }
+
+        // Scale up for reliable CIDetector detection.
+        // CIFilter.qrCodeGenerator() outputs ~1px per module (~25×25 total).
+        // CIDetector needs larger images to reliably detect QR codes.
+        let scaledImage = qrImage.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
+
+        // Decode QR codes from the image
+        let decodedStrings = try await qrService.decodeQRCodes(from: scaledImage)
+        XCTAssertFalse(decodedStrings.isEmpty, "Should detect at least one QR code")
+
+        guard let urlString = decodedStrings.first,
+              let url = URL(string: urlString) else {
+            XCTFail("No QR codes detected or invalid URL"); return
+        }
+
+        // Parse the decoded URL to recover the public key
+        let recoveredKeyData = try qrService.parseImportURL(url)
+
+        // Verify fingerprint matches
+        let originalInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
+        let recoveredInfo = try engine.parseKeyInfo(keyData: recoveredKeyData)
+        XCTAssertEqual(originalInfo.fingerprint, recoveredInfo.fingerprint,
+                       "Recovered key fingerprint should match original")
+    }
 }

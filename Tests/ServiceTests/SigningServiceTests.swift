@@ -347,4 +347,23 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.status, .valid)
         XCTAssertNotNil(result.verification.signerFingerprint)
     }
+
+    // MARK: - H1: High Security Biometrics Blocking
+
+    func test_signCleartext_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
+
+        stack.mockSE.simulatedAuthMode = .highSecurity
+        stack.mockSE.biometricsAvailable = false
+
+        do {
+            _ = try await stack.signingService.signCleartext(
+                "Test message",
+                signerFingerprint: identity.fingerprint
+            )
+            XCTFail("Expected error when biometrics unavailable in High Security mode")
+        } catch {
+            // Auth error propagated from SE reconstructKey
+        }
+    }
 }

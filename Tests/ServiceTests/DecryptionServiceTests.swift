@@ -520,4 +520,23 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(phase1.matchedKey?.fingerprint, identity.fingerprint,
                        "Should match the correct Profile B key")
     }
+
+    // MARK: - H1: High Security Biometrics Blocking
+
+    func test_decrypt_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
+        let (_, _, phase1) = try await encryptAndPreparePhase1(profile: .universal)
+
+        // Simulate High Security mode with biometrics unavailable
+        stack.mockSE.simulatedAuthMode = .highSecurity
+        stack.mockSE.biometricsAvailable = false
+
+        do {
+            _ = try await stack.decryptionService.decrypt(phase1: phase1)
+            XCTFail("Expected authentication error when biometrics unavailable in High Security mode")
+        } catch {
+            // The error propagates from MockSEError.authenticationFailed through
+            // KeyManagementService.unwrapPrivateKey → CypherAirError
+            // Accept any error here — the key invariant is that decryption does NOT succeed
+        }
+    }
 }

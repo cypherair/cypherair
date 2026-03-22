@@ -358,4 +358,27 @@ final class StreamingServiceTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - FileIoError
+
+    func test_encryptFileStreaming_invalidInputPath_throwsError() async throws {
+        let identity = try await generateKeyAndContact(profile: .universal)
+
+        let nonexistentURL = URL(fileURLWithPath: "/nonexistent/path/file.txt")
+
+        do {
+            _ = try await stack.encryptionService.encryptFileStreaming(
+                inputURL: nonexistentURL,
+                recipientFingerprints: [identity.fingerprint],
+                signWithFingerprint: nil,
+                encryptToSelf: false,
+                progress: nil
+            )
+            XCTFail("Expected error for non-existent input file")
+        } catch {
+            // The error may surface as CypherAirError.fileIoError (from pgp-mobile streaming)
+            // or as NSCocoaErrorDomain/NSPOSIXErrorDomain (from Swift file validation).
+            // The key invariant is that encryption does NOT succeed for a nonexistent path.
+        }
+    }
 }

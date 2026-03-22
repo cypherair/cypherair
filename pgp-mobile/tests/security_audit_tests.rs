@@ -1159,3 +1159,56 @@ fn test_parse_key_info_expired_cert_still_has_expiry_timestamp() {
         "Expired key should still have an expiry_timestamp (L2 fix)"
     );
 }
+
+// ── L7: Revoked key signature verification ────────────────────────────────
+
+/// Verify that a signature made by a key that is later revoked
+/// is handled appropriately during verification.
+#[test]
+fn test_verify_signature_from_revoked_key() {
+    use sequoia_openpgp as openpgp;
+    use openpgp::parse::Parse;
+    use openpgp::serialize::Serialize;
+
+    // Generate key and sign a message before revocation
+    let key = keys::generate_key_with_profile(
+        "Revoked Signer".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("Key gen should succeed");
+
+    let text = b"Signed before revocation";
+    let signed = sign::sign_cleartext(text, &key.cert_data)
+        .expect("Signing should succeed before revocation");
+
+    // Apply revocation cert to create revoked public key
+    let cert = openpgp::Cert::from_bytes(&key.public_key_data)
+        .expect("Parse public key should succeed");
+    let rev_sig = openpgp::Packet::from_bytes(&key.revocation_cert)
+        .expect("Parse revocation cert should succeed");
+    let (revoked_cert, _) = cert.insert_packets(vec![rev_sig])
+        .expect("Insert revocation should succeed");
+
+    let mut revoked_pubkey = Vec::new();
+    revoked_cert.serialize(&mut revoked_pubkey)
+        .expect("Serialize revoked cert should succeed");
+
+    // Verify the signature with the revoked public key
+    let result = verify::verify_cleartext(&signed, &[revoked_pubkey]);
+
+    // Sequoia should report the signer as revoked — either an error
+    // or a non-valid signature status
+    match result {
+        Ok(vr) => {
+            assert_ne!(
+                vr.status, SignatureStatus::Valid,
+                "Signature from revoked key should not be reported as Valid"
+            );
+        }
+        Err(_) => {
+            // An error is also acceptable — it means the revoked key was rejected
+        }
+    }
+}

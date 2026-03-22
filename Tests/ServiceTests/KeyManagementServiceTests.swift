@@ -709,4 +709,162 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(dataUpper, dataLower, "Mixed case should normalize to same info data")
     }
 
+    // MARK: - H1: High Security Biometrics Blocking
+
+    func test_exportKey_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+
+        mockSE.simulatedAuthMode = .highSecurity
+        mockSE.biometricsAvailable = false
+
+        do {
+            _ = try await service.exportKey(
+                fingerprint: identity.fingerprint,
+                passphrase: "backup-pass"
+            )
+            XCTFail("Expected error when biometrics unavailable in High Security mode")
+        } catch {
+            // Auth error from SE reconstructKey during unwrapPrivateKey
+        }
+    }
+
+    // MARK: - M2: Wrong Passphrase
+
+    func test_importKey_profileA_wrongPassphrase_throwsError() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let exported = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: "correct-passphrase"
+        )
+
+        // Attempt import with wrong passphrase
+        do {
+            _ = try await service.importKey(
+                armoredData: exported,
+                passphrase: "wrong-passphrase",
+                authMode: .standard
+            )
+            XCTFail("Expected error for wrong passphrase")
+        } catch let error as CypherAirError {
+            // Accept .wrongPassphrase or .s2kError — both indicate passphrase failure
+            switch error {
+            case .wrongPassphrase, .s2kError:
+                break // Expected
+            default:
+                XCTFail("Expected wrong passphrase error, got \(error)")
+            }
+        }
+    }
+
+    func test_importKey_profileB_wrongPassphrase_throwsError() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service)
+        let exported = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: "correct-passphrase"
+        )
+
+        do {
+            _ = try await service.importKey(
+                armoredData: exported,
+                passphrase: "wrong-passphrase",
+                authMode: .standard
+            )
+            XCTFail("Expected error for wrong passphrase")
+        } catch let error as CypherAirError {
+            switch error {
+            case .wrongPassphrase, .s2kError:
+                break // Expected
+            default:
+                XCTFail("Expected wrong passphrase error, got \(error)")
+            }
+        }
+    }
+
+    // MARK: - M3: Argon2id Memory Guard Integration
+
+    func test_importKey_profileB_lowMemory_throwsArgon2idExceeded() async throws {
+        // Service with full memory for key generation + export
+        let identity = try await TestHelpers.generateProfileBKey(service: service)
+        let exported = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: "test-pass"
+        )
+
+        // Create a separate service with low memory (500 MB)
+        let mockMemory = MockMemoryInfo()
+        mockMemory.availableBytes = 500_000_000
+        let (lowMemService, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
+
+        // Profile B uses Argon2id with 512 MB; 512 MB > 75% of 500 MB (375 MB) → rejected
+        do {
+            _ = try await lowMemService.importKey(
+                armoredData: exported,
+                passphrase: "test-pass",
+                authMode: .standard
+            )
+            XCTFail("Expected argon2idMemoryExceeded for low-memory import")
+        } catch let error as CypherAirError {
+            if case .argon2idMemoryExceeded = error {
+                // Expected
+            } else {
+                XCTFail("Expected .argon2idMemoryExceeded, got \(error)")
+            }
+        }
+    }
+
+    func test_importKey_profileA_lowMemory_succeeds() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let exported = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: "test-pass"
+        )
+
+        // Create a service with low memory
+        let mockMemory = MockMemoryInfo()
+        mockMemory.availableBytes = 500_000_000
+        let (lowMemService, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
+
+        // Profile A uses Iterated+Salted S2K (no Argon2id) — guard is no-op
+        let imported = try await lowMemService.importKey(
+            armoredData: exported,
+            passphrase: "test-pass",
+            authMode: .standard
+        )
+        XCTAssertEqual(imported.profile, .universal)
+    }
+
+    // MARK: - M4: Revocation Certificate Validity
+
+    func test_generateKey_profileA_revocationCertIsValidOpenPGP() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+
+        XCTAssertFalse(identity.revocationCert.isEmpty, "Revocation cert should not be empty")
+        XCTAssertFalse(identity.publicKeyData.isEmpty, "Public key data should not be empty")
+
+        // engine.parseRevocationCert performs:
+        // 1. Parse as OpenPGP signature packet
+        // 2. Verify signature type is KeyRevocation
+        // 3. Cryptographically verify signature against the key
+        let result = try engine.parseRevocationCert(
+            revData: identity.revocationCert,
+            certData: identity.publicKeyData
+        )
+        XCTAssertTrue(result.lowercased().contains(identity.fingerprint.lowercased()),
+                      "Validation result should contain the key's fingerprint")
+    }
+
+    func test_generateKey_profileB_revocationCertIsValidOpenPGP() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service)
+
+        XCTAssertFalse(identity.revocationCert.isEmpty)
+        XCTAssertFalse(identity.publicKeyData.isEmpty)
+
+        let result = try engine.parseRevocationCert(
+            revData: identity.revocationCert,
+            certData: identity.publicKeyData
+        )
+        XCTAssertTrue(result.lowercased().contains(identity.fingerprint.lowercased()),
+                      "Validation result should contain the key's fingerprint")
+    }
+
 }
