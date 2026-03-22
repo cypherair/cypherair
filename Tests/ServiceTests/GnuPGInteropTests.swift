@@ -206,4 +206,33 @@ final class GnuPGInteropTests: XCTestCase {
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, expectedPlaintext, "Decrypted DEFLATE-compressed message should match plaintext")
     }
+
+    // MARK: - ZLIB Compressed Message Decryption
+
+    func test_decryptZlibCompressedMessage_matchesPlaintext() throws {
+        let ciphertextArmored = try FixtureLoader.loadData("gpg_encrypted_compressed_zlib", ext: "asc")
+        let ciphertext = try engine.dearmor(armored: ciphertextArmored)
+        let secretKey = try loadGpgSecretKey()
+        defer { var mutable = secretKey; mutable.resetBytes(in: 0..<mutable.count) }
+
+        let result = try engine.decrypt(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
+        defer { var plaintext = result.plaintext; plaintext.resetBytes(in: 0..<plaintext.count) }
+
+        let decryptedText = String(data: result.plaintext, encoding: .utf8)
+        XCTAssertEqual(decryptedText, expectedPlaintext,
+                       "Decrypted ZLIB-compressed message should match plaintext")
+    }
+
+    // MARK: - Signed + Compressed Verification
+
+    func test_verifySignedCompressedMessage_returnsValidSignature() throws {
+        let signedMessage = try FixtureLoader.loadData("gpg_signed_compressed", ext: "asc")
+        let pubKey = try loadGpgPublicKey()
+
+        let result = try engine.verifyCleartext(signedMessage: signedMessage, verificationKeys: [pubKey])
+
+        XCTAssertEqual(result.status, .valid,
+                       "GnuPG signed+compressed message should have a valid signature")
+        XCTAssertNotNil(result.signerFingerprint, "Signer fingerprint should be present")
+    }
 }

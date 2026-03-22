@@ -85,6 +85,7 @@
 		CE0065312F677880008604AB /* AppIconPreview.png in Resources */ = {isa = PBXBuildFile; fileRef = CE00652D2F677880008604AB /* AppIconPreview.png */; };
 		CE18872E2F6C875B00B4CD76 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CE18872D2F6C875B00B4CD76 /* InfoPlist.xcstrings */; };
 		CE1887302F6C8A0F00B4CD76 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = CE18872F2F6C8A0F00B4CD76 /* Localizable.xcstrings */; };
+		CE1CB7942F6F762F00F7ABFC /* SelfTestServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1CB7932F6F762E00F7ABFC /* SelfTestServiceTests.swift */; };
 		CE4958B22F6D797000BF03E2 /* TutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE4958B12F6D797000BF03E2 /* TutorialView.swift */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
@@ -183,6 +184,7 @@
 		CE00652D2F677880008604AB /* AppIconPreview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIconPreview.png; sourceTree = "<group>"; };
 		CE18872D2F6C875B00B4CD76 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		CE18872F2F6C8A0F00B4CD76 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		CE1CB7932F6F762E00F7ABFC /* SelfTestServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTestServiceTests.swift; sourceTree = "<group>"; };
 		CE4958B12F6D797000BF03E2 /* TutorialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialView.swift; sourceTree = "<group>"; };
 		CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfoProvidable.swift; sourceTree = "<group>"; };
 		CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryInfo.swift; sourceTree = "<group>"; };
@@ -391,6 +393,7 @@
 				CE0065062F64D9B9008604AB /* FixtureLoader.swift */,
 				CE0065082F64DA10008604AB /* GnuPGInteropTests.swift */,
 				CE0065202F673BC4008604AB /* StreamingServiceTests.swift */,
+				CE1CB7932F6F762E00F7ABFC /* SelfTestServiceTests.swift */,
 			);
 			path = ServiceTests;
 			sourceTree = "<group>";
@@ -589,6 +592,7 @@
 				CE0064FF2F64B248008604AB /* EncryptionServiceTests.swift in Sources */,
 				CE0064FB2F64B1F4008604AB /* KeyManagementServiceTests.swift in Sources */,
 				CE0064F72F64B199008604AB /* TestHelpers.swift in Sources */,
+				CE1CB7942F6F762F00F7ABFC /* SelfTestServiceTests.swift in Sources */,
 				CE0065012F64B26E008604AB /* SigningServiceTests.swift in Sources */,
 				CE0065092F64DA10008604AB /* GnuPGInteropTests.swift in Sources */,
 			);

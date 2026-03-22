@@ -11,18 +11,26 @@ enum TestHelpers {
     /// Create a KeyManagementService backed by mock SE, Keychain, and Authenticator.
     /// Returns the service and all three mocks for verification.
     static func makeKeyManagement(
-        engine: PgpEngine = PgpEngine()
+        engine: PgpEngine = PgpEngine(),
+        memoryInfo: (any MemoryInfoProvidable)? = nil
     ) -> (service: KeyManagementService, mockSE: MockSecureEnclave, mockKC: MockKeychain, mockAuth: MockAuthenticator) {
         let mockSE = MockSecureEnclave()
         let mockKC = MockKeychain()
         let mockAuth = MockAuthenticator()
 
-        let service = KeyManagementService(
-            engine: engine,
-            secureEnclave: mockSE,
-            keychain: mockKC,
-            authenticator: mockAuth
-        )
+        let service: KeyManagementService
+        if let memInfo = memoryInfo {
+            service = KeyManagementService(
+                engine: engine, secureEnclave: mockSE,
+                keychain: mockKC, authenticator: mockAuth,
+                memoryInfo: memInfo
+            )
+        } else {
+            service = KeyManagementService(
+                engine: engine, secureEnclave: mockSE,
+                keychain: mockKC, authenticator: mockAuth
+            )
+        }
 
         return (service, mockSE, mockKC, mockAuth)
     }
@@ -87,9 +95,10 @@ enum TestHelpers {
     /// Create a complete service stack (KeyManagement + Contact + Encryption + Decryption + Signing)
     /// backed by mocks. Useful for end-to-end integration tests.
     static func makeServiceStack(
-        engine: PgpEngine = PgpEngine()
+        engine: PgpEngine = PgpEngine(),
+        memoryInfo: (any MemoryInfoProvidable)? = nil
     ) -> ServiceStack {
-        let (keyMgmt, mockSE, mockKC, mockAuth) = makeKeyManagement(engine: engine)
+        let (keyMgmt, mockSE, mockKC, mockAuth) = makeKeyManagement(engine: engine, memoryInfo: memoryInfo)
         let (contactSvc, tempDir) = makeContactService(engine: engine)
 
         let encryptionSvc = EncryptionService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)

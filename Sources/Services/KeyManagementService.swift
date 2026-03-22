@@ -15,6 +15,7 @@ final class KeyManagementService {
     private let secureEnclave: any SecureEnclaveManageable
     private let keychain: any KeychainManageable
     private let authenticator: any AuthenticationEvaluable
+    private let memoryInfo: any MemoryInfoProvidable
 
     private let jsonEncoder = JSONEncoder()
     private let jsonDecoder = JSONDecoder()
@@ -23,12 +24,14 @@ final class KeyManagementService {
         engine: PgpEngine,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
-        authenticator: any AuthenticationEvaluable
+        authenticator: any AuthenticationEvaluable,
+        memoryInfo: any MemoryInfoProvidable = SystemMemoryInfo()
     ) {
         self.engine = engine
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.authenticator = authenticator
+        self.memoryInfo = memoryInfo
     }
 
     // MARK: - Key Enumeration
@@ -160,7 +163,7 @@ final class KeyManagementService {
         } catch {
             throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
         }
-        let memoryGuard = Argon2idMemoryGuard()
+        let memoryGuard = Argon2idMemoryGuard(memoryInfo: memoryInfo)
         try memoryGuard.validate(s2kInfo: s2kInfo)
 
         // Heavy engine calls — off main thread via @concurrent helper

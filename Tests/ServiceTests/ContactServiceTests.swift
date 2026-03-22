@@ -251,4 +251,28 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertNotNil(found, "Should find contact by full fingerprint")
         XCTAssertEqual(found?.fingerprint, info1.fingerprint)
     }
+
+    // MARK: - M5: Contact Persistence Across Restart
+
+    func test_contactPersistence_survivesServiceRestart() throws {
+        let generated = try engine.generateKey(
+            name: "Persist Test", email: "persist@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+
+        // Add contact to first service instance
+        let addResult = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        guard case .added(let contact) = addResult else {
+            XCTFail("Expected .added"); return
+        }
+        let originalFingerprint = contact.fingerprint
+
+        // Create a NEW service instance pointing to the same temp directory
+        let newService = ContactService(engine: engine, contactsDirectory: tempDir)
+        try newService.loadContacts()
+
+        XCTAssertEqual(newService.contacts.count, 1, "Contact should survive service restart")
+        XCTAssertEqual(newService.contacts.first?.fingerprint, originalFingerprint,
+                       "Fingerprint should match after restart")
+    }
 }

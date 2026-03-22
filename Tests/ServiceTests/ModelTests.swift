@@ -201,6 +201,10 @@ final class ModelTests: XCTestCase {
             .noKeySelected,
             .noRecipientsSelected,
             .biometricsUnavailable,
+            .fileIoError(reason: "test io error"),
+            .operationCancelled,
+            .insufficientDiskSpace(fileSizeMB: 50, requiredMB: 100, availableMB: 30),
+            .duplicateKey,
         ]
 
         for error in errors {

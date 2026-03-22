@@ -32,6 +32,15 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
     /// If set, the next operation will throw this error.
     var nextError: Error?
 
+    /// Simulated authentication mode. When set, reconstructKey() will enforce
+    /// auth mode constraints (e.g., High Security + no biometrics → failure).
+    /// Default: nil (no auth simulation, backward-compatible with existing tests).
+    var simulatedAuthMode: AuthenticationMode?
+
+    /// Whether biometrics are available in the simulated environment.
+    /// Only checked when simulatedAuthMode is set.
+    var biometricsAvailable: Bool = true
+
     /// Simulated key storage (in production, this is in the SE hardware).
     private var keys: [Data: MockSEKey] = [:]
 
@@ -151,6 +160,14 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
     }
 
     func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle {
+        if let error = nextError {
+            nextError = nil
+            throw error
+        }
+        // Simulate auth mode enforcement.
+        if let mode = simulatedAuthMode, mode == .highSecurity, !biometricsAvailable {
+            throw MockSEError.authenticationFailed
+        }
         // Mock ignores authenticationContext — software P-256 doesn't need it.
         #if canImport(CryptoKit)
         let privateKey = try P256.KeyAgreement.PrivateKey(rawRepresentation: data)
@@ -167,6 +184,8 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         unwrapCallCount = 0
         deleteCallCount = 0
         nextError = nil
+        simulatedAuthMode = nil
+        biometricsAvailable = true
         keys.removeAll()
     }
 }
