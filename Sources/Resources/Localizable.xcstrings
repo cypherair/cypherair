@@ -1953,6 +1953,22 @@
         }
       }
     },
+    "error.keyTooLargeForQr" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key contains too much data to display as a QR code. Please share your public key via file or text instead."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥数据量过大，无法生成二维码。请改用文件或文本方式分享公钥。"
+          }
+        }
+      }
+    },
     "error.noKeySelected" : {
       "localizations" : {
         "en" : {
