@@ -545,7 +545,7 @@ final class KeyManagementService {
 
     /// Run key import + parsing on the cooperative thread pool.
     /// Includes importSecretKey (Argon2id ~3s for Profile B), parseKeyInfo,
-    /// detectProfile, and armorPublicKey.
+    /// detectProfile, and public key extraction (binary format).
     @concurrent
     private func importKeyOffMainActor(
         armoredData: Data, passphrase: String
@@ -557,7 +557,10 @@ final class KeyManagementService {
             )
             let keyInfo = try engine.parseKeyInfo(keyData: secretKeyData)
             let profile = try engine.detectProfile(certData: secretKeyData)
-            let publicKeyData = try engine.armorPublicKey(certData: secretKeyData)
+            // Extract binary public key: armor strips secret material, dearmor converts back to binary.
+            // This ensures publicKeyData is binary OpenPGP format, consistent with key generation path.
+            let armoredPubKey = try engine.armorPublicKey(certData: secretKeyData)
+            let publicKeyData = try engine.dearmor(armored: armoredPubKey)
             return (secretKeyData, keyInfo, profile, publicKeyData)
         } catch {
             throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
