@@ -40,6 +40,7 @@ enum CypherAirError: Error, LocalizedError {
     case noRecipientsSelected
     case biometricsUnavailable
     case duplicateKey
+    case keyTooLargeForQr
 
     /// User-facing error description per PRD Section 4.7.
     var errorDescription: String? {
@@ -108,6 +109,8 @@ enum CypherAirError: Error, LocalizedError {
             String(localized: "error.biometricsUnavailable", defaultValue: "Biometric authentication is currently unavailable. In High Security mode, all private key operations are blocked until biometric authentication is restored.")
         case .duplicateKey:
             String(localized: "error.duplicateKey", defaultValue: "A key with this fingerprint already exists on this device.")
+        case .keyTooLargeForQr:
+            String(localized: "error.keyTooLargeForQr", defaultValue: "This key contains too much data to display as a QR code. Please share your public key via file or text instead.")
         }
     }
 
@@ -168,6 +171,8 @@ enum CypherAirError: Error, LocalizedError {
             self = .operationCancelled
         case .FileIoError(let reason):
             self = .fileIoError(reason: reason)
+        case .KeyTooLargeForQr(_, _):
+            self = .keyTooLargeForQr
         }
     }
 }

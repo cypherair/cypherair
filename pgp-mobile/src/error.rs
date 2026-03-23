@@ -93,6 +93,12 @@ pub enum PgpError {
     /// File I/O error (path not found, permission denied, disk full, etc.).
     #[error("File I/O error: {reason}")]
     FileIoError { reason: String },
+
+    /// Public key data is too large to encode as a QR code.
+    /// The QR code standard has a maximum capacity; keys with many accumulated
+    /// signatures (e.g., from repeated expiry modifications) may exceed this limit.
+    #[error("Key too large for QR code: {size_bytes} bytes exceeds maximum {max_bytes} bytes")]
+    KeyTooLargeForQr { size_bytes: u64, max_bytes: u64 },
 }
 
 // NOTE: There is intentionally NO blanket `From<anyhow::Error> for PgpError` impl.
