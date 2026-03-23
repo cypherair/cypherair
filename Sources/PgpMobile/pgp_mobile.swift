@@ -2448,6 +2448,13 @@ public enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedErro
      */
     case FileIoError(reason: String
     )
+    /**
+     * Public key data is too large to encode as a QR code.
+     * The QR code standard has a maximum capacity; keys with many accumulated
+     * signatures (e.g., from repeated expiry modifications) may exceed this limit.
+     */
+    case KeyTooLargeForQr(sizeBytes: UInt64, maxBytes: UInt64
+    )
 
     
 
@@ -2520,6 +2527,10 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
         case 19: return .OperationCancelled
         case 20: return .FileIoError(
             reason: try FfiConverterString.read(from: &buf)
+            )
+        case 21: return .KeyTooLargeForQr(
+            sizeBytes: try FfiConverterUInt64.read(from: &buf), 
+            maxBytes: try FfiConverterUInt64.read(from: &buf)
             )
 
          default: throw UniffiInternalError.unexpectedEnumCase
@@ -2623,6 +2634,12 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
         case let .FileIoError(reason):
             writeInt(&buf, Int32(20))
             FfiConverterString.write(reason, into: &buf)
+            
+        
+        case let .KeyTooLargeForQr(sizeBytes,maxBytes):
+            writeInt(&buf, Int32(21))
+            FfiConverterUInt64.write(sizeBytes, into: &buf)
+            FfiConverterUInt64.write(maxBytes, into: &buf)
             
         }
     }

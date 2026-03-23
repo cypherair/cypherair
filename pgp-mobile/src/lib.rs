@@ -382,7 +382,19 @@ impl PgpEngine {
         }
 
         let encoded = URL_SAFE_NO_PAD.encode(&public_key_data);
-        Ok(format!("cypherair://import/v1/{encoded}"))
+        let url = format!("cypherair://import/v1/{encoded}");
+
+        // QR code capacity at Level L (lowest error correction) is ~2953 binary bytes.
+        // If the URL exceeds this, no standard QR code can encode it.
+        const QR_MAX_BYTES: usize = 2953;
+        if url.len() > QR_MAX_BYTES {
+            return Err(PgpError::KeyTooLargeForQr {
+                size_bytes: public_key_data.len() as u64,
+                max_bytes: QR_MAX_BYTES as u64,
+            });
+        }
+
+        Ok(url)
     }
 
     /// Decode a QR code URL and extract the public key.
