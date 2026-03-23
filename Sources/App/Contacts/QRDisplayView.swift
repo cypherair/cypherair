@@ -55,19 +55,25 @@ struct QRDisplayView: View {
 
     private func generateQR() {
         do {
-            if let ciImage = try qrService.generateQRCode(for: publicKeyData) {
-                let context = CIContext()
-                let size = CGSize(width: 1024, height: 1024)
-                let transform = CGAffineTransform(
-                    scaleX: size.width / ciImage.extent.width,
-                    y: size.height / ciImage.extent.height
-                )
-                let scaledImage = ciImage.transformed(by: transform)
-
-                if let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) {
-                    qrCGImage = cgImage
-                }
+            guard let ciImage = try qrService.generateQRCode(for: publicKeyData) else {
+                self.error = .corruptData(reason: "QR code generation returned no image")
+                showError = true
+                return
             }
+            let context = CIContext()
+            let size = CGSize(width: 1024, height: 1024)
+            let transform = CGAffineTransform(
+                scaleX: size.width / ciImage.extent.width,
+                y: size.height / ciImage.extent.height
+            )
+            let scaledImage = ciImage.transformed(by: transform)
+
+            guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else {
+                self.error = .corruptData(reason: "Failed to render QR code image")
+                showError = true
+                return
+            }
+            qrCGImage = cgImage
         } catch {
             self.error = CypherAirError.from(error) { .corruptData(reason: $0) }
             showError = true
