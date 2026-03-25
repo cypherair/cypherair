@@ -38,7 +38,6 @@ final class EncryptionService {
     ///   - signWithFingerprint: Fingerprint of the signing key (nil = don't sign).
     ///   - encryptToSelf: Whether to also encrypt to the sender's own key.
     /// - Returns: ASCII-armored ciphertext data.
-    @concurrent
     func encryptText(
         _ plaintext: String,
         recipientFingerprints: [String],
@@ -70,7 +69,6 @@ final class EncryptionService {
     ///   - signWithFingerprint: Fingerprint of the signing key (nil = don't sign).
     ///   - encryptToSelf: Whether to also encrypt to the sender's own key.
     /// - Returns: Binary ciphertext data (.gpg format).
-    @concurrent
     func encryptFile(
         _ fileData: Data,
         recipientFingerprints: [String],
@@ -107,7 +105,6 @@ final class EncryptionService {
     ///   - encryptToSelf: Whether to also encrypt to the sender's own key.
     ///   - progress: Progress reporter for UI updates and cancellation.
     /// - Returns: URL of the encrypted output file (.gpg).
-    @concurrent
     func encryptFileStreaming(
         inputURL: URL,
         recipientFingerprints: [String],
@@ -179,12 +176,13 @@ final class EncryptionService {
         let outputURL = streamingDir.appendingPathComponent(outputFilename)
 
         do {
-            try engine.encryptFile(
+            try await Self.performEncryptFile(
+                engine: engine,
                 inputPath: inputPath,
                 outputPath: outputURL.path,
-                recipients: recipientKeys,
+                recipientKeys: recipientKeys,
                 signingKey: signingKey,
-                encryptToSelf: selfKey,
+                selfKey: selfKey,
                 progress: progress
             )
         } catch {
@@ -204,7 +202,6 @@ final class EncryptionService {
 
     // MARK: - Private
 
-    @concurrent
     private func encrypt(
         plaintext: Data,
         recipientFingerprints: [String],
@@ -262,21 +259,14 @@ final class EncryptionService {
 
         let result: Data
         do {
-            if binary {
-                result = try engine.encryptBinary(
-                    plaintext: plaintext,
-                    recipients: recipientKeys,
-                    signingKey: signingKey,
-                    encryptToSelf: selfKey
-                )
-            } else {
-                result = try engine.encrypt(
-                    plaintext: plaintext,
-                    recipients: recipientKeys,
-                    signingKey: signingKey,
-                    encryptToSelf: selfKey
-                )
-            }
+            result = try await Self.performEncrypt(
+                engine: engine,
+                plaintext: plaintext,
+                recipientKeys: recipientKeys,
+                signingKey: signingKey,
+                selfKey: selfKey,
+                binary: binary
+            )
         } catch {
             throw CypherAirError.from(error) { .encryptionFailed(reason: $0) }
         }
@@ -290,5 +280,55 @@ final class EncryptionService {
         }
 
         return result
+    }
+
+    // MARK: - Off-Main-Actor Engine Helpers
+
+    /// Run encryption off the main actor.
+    @concurrent
+    private static func performEncrypt(
+        engine: PgpEngine,
+        plaintext: Data,
+        recipientKeys: [Data],
+        signingKey: Data?,
+        selfKey: Data?,
+        binary: Bool
+    ) async throws -> Data {
+        if binary {
+            return try engine.encryptBinary(
+                plaintext: plaintext,
+                recipients: recipientKeys,
+                signingKey: signingKey,
+                encryptToSelf: selfKey
+            )
+        } else {
+            return try engine.encrypt(
+                plaintext: plaintext,
+                recipients: recipientKeys,
+                signingKey: signingKey,
+                encryptToSelf: selfKey
+            )
+        }
+    }
+
+    /// Run streaming file encryption off the main actor.
+    @concurrent
+    private static func performEncryptFile(
+        engine: PgpEngine,
+        inputPath: String,
+        outputPath: String,
+        recipientKeys: [Data],
+        signingKey: Data?,
+        selfKey: Data?,
+        progress: FileProgressReporter?
+    ) async throws {
+        try engine.encryptFile(
+            inputPath: inputPath,
+            outputPath: outputPath,
+            recipients: recipientKeys,
+            signingKey: signingKey,
+            encryptToSelf: selfKey,
+            progress: progress
+        )
     }
 }

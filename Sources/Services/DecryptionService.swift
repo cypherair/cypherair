@@ -54,7 +54,6 @@ final class DecryptionService {
     /// - Parameter ciphertext: The encrypted message (armored or binary).
     /// - Returns: Phase1Result with matched key info.
     /// - Throws: CypherAirError.noMatchingKey if no local key matches.
-    @concurrent
     func parseRecipients(ciphertext: Data) async throws -> Phase1Result {
         // Dearmor if needed
         let binaryData: Data
@@ -118,7 +117,6 @@ final class DecryptionService {
     /// - Parameter fileURL: URL of the encrypted file.
     /// - Returns: FilePhase1Result with matched key info.
     /// - Throws: CypherAirError.noMatchingKey if no local key matches.
-    @concurrent
     func parseRecipientsFromFile(fileURL: URL) async throws -> FilePhase1Result {
         let inputPath = fileURL.path
         let localCerts = keyManagement.keys.map { $0.publicKeyData }
@@ -167,7 +165,6 @@ final class DecryptionService {
     ///
     /// - Parameter phase1: The result from parseRecipients().
     /// - Returns: Decrypted plaintext and signature verification result.
-    @concurrent
     func decrypt(phase1: Phase1Result) async throws -> (plaintext: Data, signature: SignatureVerification) {
         guard let matchedKey = phase1.matchedKey else {
             throw CypherAirError.noMatchingKey
@@ -193,10 +190,11 @@ final class DecryptionService {
         let verificationKeys = contactService.contacts.map { $0.publicKeyData }
             + keyManagement.keys.map { $0.publicKeyData }
 
-        // Decrypt via Rust engine
+        // Decrypt via Rust engine — off main thread
         let result: DecryptResult
         do {
-            result = try engine.decrypt(
+            result = try await Self.performDecrypt(
+                engine: engine,
                 ciphertext: phase1.ciphertext,
                 secretKeys: [secretKey],
                 verificationKeys: verificationKeys
@@ -229,7 +227,6 @@ final class DecryptionService {
     ///   - phase1: The result from parseRecipientsFromFile().
     ///   - progress: Progress reporter for UI updates and cancellation.
     /// - Returns: URL of the decrypted output file and signature verification result.
-    @concurrent
     func decryptFileStreaming(
         phase1: FilePhase1Result,
         progress: FileProgressReporter?
@@ -269,10 +266,11 @@ final class DecryptionService {
         }
         let outputURL = decryptedDir.appendingPathComponent(outputFilename)
 
-        // Decrypt via Rust engine (streaming)
+        // Decrypt via Rust engine (streaming) — off main thread
         let fileResult: FileDecryptResult
         do {
-            fileResult = try engine.decryptFile(
+            fileResult = try await Self.performDecryptFile(
+                engine: engine,
                 inputPath: phase1.inputPath,
                 outputPath: outputURL.path,
                 secretKeys: [secretKey],
@@ -301,9 +299,44 @@ final class DecryptionService {
 
     /// Perform both Phase 1 and Phase 2 in sequence.
     /// Phase 2 is only reached if Phase 1 finds a matching key.
-    @concurrent
     func decryptMessage(ciphertext: Data) async throws -> (plaintext: Data, signature: SignatureVerification) {
         let phase1 = try await parseRecipients(ciphertext: ciphertext)
         return try await decrypt(phase1: phase1)
+    }
+
+    // MARK: - Off-Main-Actor Engine Helpers
+
+    /// Run decryption off the main actor.
+    @concurrent
+    private static func performDecrypt(
+        engine: PgpEngine,
+        ciphertext: Data,
+        secretKeys: [Data],
+        verificationKeys: [Data]
+    ) async throws -> DecryptResult {
+        try engine.decrypt(
+            ciphertext: ciphertext,
+            secretKeys: secretKeys,
+            verificationKeys: verificationKeys
+        )
+    }
+
+    /// Run streaming file decryption off the main actor.
+    @concurrent
+    private static func performDecryptFile(
+        engine: PgpEngine,
+        inputPath: String,
+        outputPath: String,
+        secretKeys: [Data],
+        verificationKeys: [Data],
+        progress: FileProgressReporter?
+    ) async throws -> FileDecryptResult {
+        try engine.decryptFile(
+            inputPath: inputPath,
+            outputPath: outputPath,
+            secretKeys: secretKeys,
+            verificationKeys: verificationKeys,
+            progress: progress
+        )
     }
 }

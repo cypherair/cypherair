@@ -193,6 +193,14 @@
 		F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Data+Zeroing.swift"; path = "Sources/Extensions/Data+Zeroing.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		CE2F973D2F74687D00232BC9 /* Fixtures */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXGroup section */
 		7C5ACE182F45D1FBDBBA47F9 /* PgpMobile */ = {
 			isa = PBXGroup;
@@ -247,6 +255,7 @@
 		A1C9AAA2B5ED04BDA656105D /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				CE2F973D2F74687D00232BC9 /* Fixtures */,
 				EB25CBF841620099B863C9EF /* FFIIntegrationTests */,
 				CE340E9D2F6323140047E290 /* DeviceSecurityTests */,
 				CE0064F52F64B185008604AB /* ServiceTests */,
@@ -489,12 +498,15 @@
 			buildConfigurationList = 5587EF2BB001B4E86E85C261 /* Build configuration list for PBXNativeTarget "CypherAirTests" */;
 			buildPhases = (
 				1242D2BD7FB363D9F6CBAB8A /* Sources */,
-				CE00650B2F64DF16008604AB /* Copy GnuPG Fixture */,
+				CE2F97D52F746A9E00232BC9 /* ShellScript */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				B51F50D442CECA0DC382B0B8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CE2F973D2F74687D00232BC9 /* Fixtures */,
 			);
 			name = CypherAirTests;
 			packageProductDependencies = (
@@ -554,7 +566,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		CE00650B2F64DF16008604AB /* Copy GnuPG Fixture */ = {
+		CE2F97D52F746A9E00232BC9 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -562,9 +574,8 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/pgp-mobile/tests/fixtures",
+				"$(SRCROOT)/Tests/Fixtures",
 			);
-			name = "Copy GnuPG Fixture";
 			outputFileListPaths = (
 			);
 			outputPaths = (
@@ -572,7 +583,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nFIXTURE_SRC=\"${SRCROOT}/pgp-mobile/tests/fixtures\"\nFIXTURE_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Fixtures\"\nmkdir -p \"$FIXTURE_DST\"\nfor ext in asc gpg sig txt; do\n    for f in \"$FIXTURE_SRC\"/*.\"$ext\"; do\n        [ -f \"$f\" ] && cp \"$f\" \"$FIXTURE_DST/\"\n    done\ndone\n";
+			shellScript = "FIXTURE_SRC=\"${SRCROOT}/Tests/Fixtures\"\nFIXTURE_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Fixtures\"\nmkdir -p \"$FIXTURE_DST\"\nfor ext in asc gpg sig txt; do\n    for f in \"$FIXTURE_SRC\"/*.\"$ext\"; do\n        [ -f \"$f\" ] && cp \"$f\" \"$FIXTURE_DST/\"\n    done\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -680,6 +691,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
@@ -709,6 +721,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
@@ -787,7 +800,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -804,7 +817,7 @@
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_INCLUDE_PATHS = "$(inherited) $(PROJECT_DIR)/bindings";
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -883,7 +896,7 @@
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos macosx";
-				SWIFT_APPROACHABLE_CONCURRENCY = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -968,7 +981,7 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos macosx";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_APPROACHABLE_CONCURRENCY = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -1029,7 +1042,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -1046,7 +1059,7 @@
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_INCLUDE_PATHS = "$(inherited) $(PROJECT_DIR)/bindings";
 				TARGETED_DEVICE_FAMILY = "1,2";
