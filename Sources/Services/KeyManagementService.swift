@@ -74,7 +74,6 @@ final class KeyManagementService {
     ///   - profile: Encryption profile (.universal or .advanced).
     ///   - authMode: Current authentication mode for SE key access control.
     /// - Returns: The newly created key identity.
-    @concurrent
     func generateKey(
         name: String,
         email: String?,
@@ -82,8 +81,9 @@ final class KeyManagementService {
         profile: KeyProfile,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
-        // PGP engine calls — off main thread via @concurrent helper
-        var (generated, keyInfo) = try await generateKeyOffMainActor(
+        // PGP engine calls — off main thread via @concurrent static helper
+        var (generated, keyInfo) = try await Self.generateKeyOffMainActor(
+            engine: engine,
             name: name, email: email,
             expirySeconds: expirySeconds, profile: profile
         )
@@ -150,7 +150,6 @@ final class KeyManagementService {
     ///   - passphrase: The passphrase protecting the key.
     ///   - authMode: Current authentication mode for SE key access control.
     /// - Returns: The imported key identity.
-    @concurrent
     func importKey(
         armoredData: Data,
         passphrase: String,
@@ -166,9 +165,9 @@ final class KeyManagementService {
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: memoryInfo)
         try memoryGuard.validate(s2kInfo: s2kInfo)
 
-        // Heavy engine calls — off main thread via @concurrent helper
-        var (secretKeyData, keyInfo, profile, publicKeyData) = try await importKeyOffMainActor(
-            armoredData: armoredData, passphrase: passphrase
+        // Heavy engine calls — off main thread via @concurrent static helper
+        var (secretKeyData, keyInfo, profile, publicKeyData) = try await Self.importKeyOffMainActor(
+            engine: engine, armoredData: armoredData, passphrase: passphrase
         )
         defer {
             // Zeroize the raw secret key material
@@ -236,7 +235,6 @@ final class KeyManagementService {
     ///   - fingerprint: Fingerprint of the key to export.
     ///   - passphrase: User-provided passphrase for S2K protection.
     /// - Returns: ASCII-armored passphrase-protected secret key data.
-    @concurrent
     func exportKey(fingerprint: String, passphrase: String) async throws -> Data {
         var secretKey = try unwrapPrivateKey(fingerprint: fingerprint)
         defer {
@@ -247,9 +245,9 @@ final class KeyManagementService {
             throw CypherAirError.noMatchingKey
         }
 
-        // S2K protection — off main thread via @concurrent helper
-        let exported = try await exportKeyOffMainActor(
-            certData: secretKey, passphrase: passphrase, profile: identity.profile
+        // S2K protection — off main thread via @concurrent static helper
+        let exported = try await Self.exportKeyOffMainActor(
+            engine: engine, certData: secretKey, passphrase: passphrase, profile: identity.profile
         )
 
         // Mark as backed up and persist metadata change.
@@ -282,7 +280,6 @@ final class KeyManagementService {
     ///   - newExpirySeconds: New expiry duration from now in seconds, or nil to remove expiry.
     ///   - authMode: Current authentication mode for SE key access control.
     /// - Returns: The updated key identity with new expiry information.
-    @concurrent
     func modifyExpiry(
         fingerprint: String,
         newExpirySeconds: UInt64?,
@@ -292,9 +289,9 @@ final class KeyManagementService {
         var secretKey = try unwrapPrivateKey(fingerprint: fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
 
-        // 2. Modify expiry — off main thread via @concurrent helper
-        var result = try await modifyExpiryOffMainActor(
-            certData: secretKey, newExpirySeconds: newExpirySeconds
+        // 2. Modify expiry — off main thread via @concurrent static helper
+        var result = try await Self.modifyExpiryOffMainActor(
+            engine: engine, certData: secretKey, newExpirySeconds: newExpirySeconds
         )
         defer { result.certData.resetBytes(in: 0..<result.certData.count) }
 
@@ -522,11 +519,11 @@ final class KeyManagementService {
 
     // MARK: - Off-Main-Actor Engine Helpers
 
-    /// Run key generation on the cooperative thread pool.
+    /// Run key generation off the main actor.
     /// Error wrapping (Issue 2) lives here so PgpError never escapes.
     @concurrent
-    private func generateKeyOffMainActor(
-        name: String, email: String?,
+    private static func generateKeyOffMainActor(
+        engine: PgpEngine, name: String, email: String?,
         expirySeconds: UInt64?, profile: KeyProfile
     ) async throws -> (GeneratedKey, KeyInfo) {
         do {
@@ -543,12 +540,12 @@ final class KeyManagementService {
         }
     }
 
-    /// Run key import + parsing on the cooperative thread pool.
+    /// Run key import + parsing off the main actor.
     /// Includes importSecretKey (Argon2id ~3s for Profile B), parseKeyInfo,
     /// detectProfile, and public key extraction (binary format).
     @concurrent
-    private func importKeyOffMainActor(
-        armoredData: Data, passphrase: String
+    private static func importKeyOffMainActor(
+        engine: PgpEngine, armoredData: Data, passphrase: String
     ) async throws -> (secretKeyData: Data, keyInfo: KeyInfo, profile: KeyProfile, publicKeyData: Data) {
         do {
             let secretKeyData = try engine.importSecretKey(
@@ -567,10 +564,10 @@ final class KeyManagementService {
         }
     }
 
-    /// Run secret key export (S2K protection) on the cooperative thread pool.
+    /// Run secret key export (S2K protection) off the main actor.
     @concurrent
-    private func exportKeyOffMainActor(
-        certData: Data, passphrase: String, profile: KeyProfile
+    private static func exportKeyOffMainActor(
+        engine: PgpEngine, certData: Data, passphrase: String, profile: KeyProfile
     ) async throws -> Data {
         do {
             return try engine.exportSecretKey(
@@ -583,10 +580,10 @@ final class KeyManagementService {
         }
     }
 
-    /// Run expiry modification on the cooperative thread pool.
+    /// Run expiry modification off the main actor.
     @concurrent
-    private func modifyExpiryOffMainActor(
-        certData: Data, newExpirySeconds: UInt64?
+    private static func modifyExpiryOffMainActor(
+        engine: PgpEngine, certData: Data, newExpirySeconds: UInt64?
     ) async throws -> ModifyExpiryResult {
         do {
             return try engine.modifyExpiry(

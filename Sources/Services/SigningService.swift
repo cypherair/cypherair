@@ -27,7 +27,6 @@ final class SigningService {
     ///   - text: The text to sign.
     ///   - signerFingerprint: Fingerprint of the signing key.
     /// - Returns: The cleartext-signed message data.
-    @concurrent
     func signCleartext(_ text: String, signerFingerprint: String) async throws -> Data {
         var secretKey: Data
         do {
@@ -40,9 +39,8 @@ final class SigningService {
         }
 
         do {
-            return try engine.signCleartext(
-                text: Data(text.utf8),
-                signerCert: secretKey
+            return try await Self.performSignCleartext(
+                engine: engine, text: Data(text.utf8), signerCert: secretKey
             )
         } catch {
             throw CypherAirError.from(error) { .signingFailed(reason: $0) }
@@ -56,7 +54,6 @@ final class SigningService {
     ///   - data: The file data to sign.
     ///   - signerFingerprint: Fingerprint of the signing key.
     /// - Returns: The detached signature data (.sig).
-    @concurrent
     func signDetached(_ data: Data, signerFingerprint: String) async throws -> Data {
         var secretKey: Data
         do {
@@ -69,9 +66,8 @@ final class SigningService {
         }
 
         do {
-            return try engine.signDetached(
-                data: data,
-                signerCert: secretKey
+            return try await Self.performSignDetached(
+                engine: engine, data: data, signerCert: secretKey
             )
         } catch {
             throw CypherAirError.from(error) { .signingFailed(reason: $0) }
@@ -88,7 +84,6 @@ final class SigningService {
     ///   - signerFingerprint: Fingerprint of the signing key.
     ///   - progress: Progress reporter for UI updates and cancellation.
     /// - Returns: The detached signature data (.sig, ASCII-armored).
-    @concurrent
     func signDetachedStreaming(
         fileURL: URL,
         signerFingerprint: String,
@@ -105,10 +100,9 @@ final class SigningService {
         }
 
         do {
-            return try engine.signDetachedFile(
-                inputPath: fileURL.path,
-                signerCert: secretKey,
-                progress: progress
+            return try await Self.performSignDetachedFile(
+                engine: engine, inputPath: fileURL.path,
+                signerCert: secretKey, progress: progress
             )
         } catch {
             throw CypherAirError.from(error) { .signingFailed(reason: $0) }
@@ -121,14 +115,13 @@ final class SigningService {
     ///
     /// - Parameter signedMessage: The cleartext-signed message data.
     /// - Returns: Verification result with signer info and the original text.
-    @concurrent
     func verifyCleartext(_ signedMessage: Data) async throws -> (text: Data?, verification: SignatureVerification) {
         let verificationKeys = allVerificationKeys()
 
         let result: VerifyResult
         do {
-            result = try engine.verifyCleartext(
-                signedMessage: signedMessage,
+            result = try await Self.performVerifyCleartext(
+                engine: engine, signedMessage: signedMessage,
                 verificationKeys: verificationKeys
             )
         } catch {
@@ -152,15 +145,13 @@ final class SigningService {
     ///   - data: The original data.
     ///   - signature: The detached signature data.
     /// - Returns: Verification result with signer info.
-    @concurrent
     func verifyDetached(data: Data, signature: Data) async throws -> SignatureVerification {
         let verificationKeys = allVerificationKeys()
 
         let result: VerifyResult
         do {
-            result = try engine.verifyDetached(
-                data: data,
-                signature: signature,
+            result = try await Self.performVerifyDetached(
+                engine: engine, data: data, signature: signature,
                 verificationKeys: verificationKeys
             )
         } catch {
@@ -185,7 +176,6 @@ final class SigningService {
     ///   - signature: The detached signature data.
     ///   - progress: Progress reporter for UI updates and cancellation.
     /// - Returns: Verification result with signer info.
-    @concurrent
     func verifyDetachedStreaming(
         fileURL: URL,
         signature: Data,
@@ -195,10 +185,9 @@ final class SigningService {
 
         let result: VerifyResult
         do {
-            result = try engine.verifyDetachedFile(
-                dataPath: fileURL.path,
-                signature: signature,
-                verificationKeys: verificationKeys,
+            result = try await Self.performVerifyDetachedFile(
+                engine: engine, dataPath: fileURL.path,
+                signature: signature, verificationKeys: verificationKeys,
                 progress: progress
             )
         } catch {
@@ -221,5 +210,60 @@ final class SigningService {
     private func allVerificationKeys() -> [Data] {
         contactService.contacts.map { $0.publicKeyData }
             + keyManagement.keys.map { $0.publicKeyData }
+    }
+
+    // MARK: - Off-Main-Actor Engine Helpers
+
+    @concurrent
+    private static func performSignCleartext(
+        engine: PgpEngine, text: Data, signerCert: Data
+    ) async throws -> Data {
+        try engine.signCleartext(text: text, signerCert: signerCert)
+    }
+
+    @concurrent
+    private static func performSignDetached(
+        engine: PgpEngine, data: Data, signerCert: Data
+    ) async throws -> Data {
+        try engine.signDetached(data: data, signerCert: signerCert)
+    }
+
+    @concurrent
+    private static func performSignDetachedFile(
+        engine: PgpEngine, inputPath: String,
+        signerCert: Data, progress: FileProgressReporter?
+    ) async throws -> Data {
+        try engine.signDetachedFile(
+            inputPath: inputPath, signerCert: signerCert, progress: progress
+        )
+    }
+
+    @concurrent
+    private static func performVerifyCleartext(
+        engine: PgpEngine, signedMessage: Data, verificationKeys: [Data]
+    ) async throws -> VerifyResult {
+        try engine.verifyCleartext(
+            signedMessage: signedMessage, verificationKeys: verificationKeys
+        )
+    }
+
+    @concurrent
+    private static func performVerifyDetached(
+        engine: PgpEngine, data: Data, signature: Data, verificationKeys: [Data]
+    ) async throws -> VerifyResult {
+        try engine.verifyDetached(
+            data: data, signature: signature, verificationKeys: verificationKeys
+        )
+    }
+
+    @concurrent
+    private static func performVerifyDetachedFile(
+        engine: PgpEngine, dataPath: String, signature: Data,
+        verificationKeys: [Data], progress: FileProgressReporter?
+    ) async throws -> VerifyResult {
+        try engine.verifyDetachedFile(
+            dataPath: dataPath, signature: signature,
+            verificationKeys: verificationKeys, progress: progress
+        )
     }
 }
