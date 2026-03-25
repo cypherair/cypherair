@@ -281,7 +281,9 @@ The following files and functions are security-critical. Claude Code must **stop
 | `Sources/Services/DecryptionService.swift` | Phase 1/Phase 2 auth boundary. Skipping Phase 2 auth check = biometric bypass. |
 | `Sources/Services/QRService.swift` | Parses untrusted external input (`cypherair://` URLs). Bugs here may trigger Sequoia parser on malicious data. |
 | `pgp-mobile/src/decrypt.rs` | AEAD hard-fail enforcement. Weakening = plaintext leaks. |
+| `pgp-mobile/src/streaming.rs` | Streaming file encrypt/decrypt with buffer zeroing. Error in temp file handling = plaintext leaks to disk. |
 | `pgp-mobile/src/error.rs` | PgpError enum. Must stay 1:1 with Swift. |
+| `Sources/Services/DiskSpaceChecker.swift` | Disk space validation threshold. Wrong threshold = Jetsam termination during file operations. |
 | `CypherAir.entitlements` | MIE, Enhanced Security entitlements. |
 | `Info.plist` | Only `NSFaceIDUsageDescription` permitted. No other usage descriptions. |
 

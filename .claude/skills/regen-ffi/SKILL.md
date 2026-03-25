@@ -19,19 +19,23 @@ Regenerate the UniFFI Swift bindings after changes to the `pgp-mobile` Rust crat
        --language swift --out-dir bindings/
    ```
 
-3. Cross-compile for both iOS targets to verify the static lib builds:
+3. Cross-compile for all three targets to verify the static lib builds:
    ```bash
    cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
    cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
+   cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
    ```
 
-4. Recreate the XCFramework:
+4. Recreate the XCFramework (all three platform slices):
    ```bash
    xcodebuild -create-xcframework \
        -library target/aarch64-apple-ios/release/libpgp_mobile.a -headers bindings/ \
        -library target/aarch64-apple-ios-sim/release/libpgp_mobile.a -headers bindings/ \
+       -library target/aarch64-apple-darwin/release/libpgp_mobile.a -headers bindings/ \
        -output PgpMobile.xcframework
    ```
+
+**Recommended:** Use `./build-xcframework.sh --release` to automate Steps 1–4 in one command.
 
 5. Run tests to verify nothing broke:
    ```bash

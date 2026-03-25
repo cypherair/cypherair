@@ -144,13 +144,12 @@ Sources/
 │   ├── Common/
 │   │   └── PrivacyScreenModifier.swift
 │   ├── Onboarding/
-│   │   └── OnboardingView.swift
+│   │   ├── OnboardingView.swift
+│   │   └── TutorialView.swift
 │   ├── Encrypt/
-│   │   ├── EncryptView.swift
-│   │   └── FileEncryptView.swift
+│   │   └── EncryptView.swift
 │   ├── Decrypt/
-│   │   ├── DecryptView.swift
-│   │   └── FileDecryptView.swift
+│   │   └── DecryptView.swift
 │   ├── Sign/
 │   │   ├── SignView.swift
 │   │   └── VerifyView.swift
@@ -159,7 +158,8 @@ Sources/
 │   │   ├── KeyGenerationView.swift
 │   │   ├── KeyDetailView.swift
 │   │   ├── BackupKeyView.swift
-│   │   └── ImportKeyView.swift
+│   │   ├── ImportKeyView.swift
+│   │   └── PostGenerationPromptView.swift
 │   ├── Contacts/
 │   │   ├── ContactsView.swift
 │   │   ├── ContactDetailView.swift
@@ -170,7 +170,8 @@ Sources/
 │   └── Settings/
 │       ├── SettingsView.swift
 │       ├── SelfTestView.swift
-│       └── AboutView.swift
+│       ├── AboutView.swift
+│       └── AppIconPickerView.swift
 ├── PgpMobile/
 │   └── pgp_mobile.swift          # UniFFI-generated (do not edit)
 ├── Services/
@@ -180,7 +181,9 @@ Sources/
 │   ├── KeyManagementService.swift
 │   ├── ContactService.swift
 │   ├── QRService.swift
-│   └── SelfTestService.swift
+│   ├── SelfTestService.swift
+│   ├── FileProgressReporter.swift
+│   └── DiskSpaceChecker.swift
 ├── Security/
 │   ├── SecureEnclaveManager.swift
 │   ├── SecureEnclaveManageable.swift
@@ -195,9 +198,11 @@ Sources/
 │       ├── MockAuthenticator.swift
 │       ├── MockKeychain.swift
 │       ├── MockSecureEnclave.swift
-│       └── MockMemoryInfo.swift
+│       ├── MockMemoryInfo.swift
+│       └── MockDiskSpace.swift
 ├── Models/
 │   ├── CypherAirError.swift
+│   ├── ExportableFile.swift
 │   ├── PGPKeyIdentity.swift
 │   ├── Contact.swift
 │   ├── KeyProfile+App.swift

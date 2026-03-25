@@ -55,6 +55,8 @@ Orchestrates user-facing operations by coordinating the Security layer and the R
 | `ContactService` | Public key storage, update detection (same fingerprint vs different), flat list management |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing. **Security-critical: parses untrusted external input.** |
 | `SelfTestService` | One-tap diagnostic covering **both profiles**: key gen → encrypt/decrypt → sign/verify → tamper test → QR round-trip |
+| `FileProgressReporter` | Bridges Rust streaming progress callbacks to SwiftUI `@Observable` state. Implements UniFFI `ProgressReporter` protocol. Thread-safe via `OSAllocatedUnfairLock`. |
+| `DiskSpaceChecker` | Runtime disk space validation before file operations. Uses `volumeAvailableCapacityForImportantUsageKey` to prevent Jetsam termination during large file operations. Replaces the fixed 100 MB limit. |
 
 ### Security Layer (`Sources/Security/`)
 
@@ -86,6 +88,7 @@ pgp-mobile/
 │   ├── decrypt.rs    # SEIPDv1 + SEIPDv2 (OCB/GCM), AEAD hard-fail
 │   ├── sign.rs       # Signing (cleartext + detached)
 │   ├── verify.rs     # Signature verification with graded results
+│   ├── streaming.rs  # File-path-based streaming I/O with progress reporting and cancellation
 │   ├── armor.rs      # ASCII armor encode/decode
 │   └── error.rs      # PgpError enum (maps 1:1 to Swift throwing functions)
 ├── tests/            # Rust-side unit + integration tests
