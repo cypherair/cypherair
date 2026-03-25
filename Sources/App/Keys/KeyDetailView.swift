@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -19,6 +20,8 @@ struct KeyDetailView: View {
     @State private var showError = false
     @State private var armoredPublicKey: Data?
     @State private var showCopiedNotice = false
+    @State private var showPublicKeyExporter = false
+    @State private var showRevocationExporter = false
     @State private var showExpirySheet = false
     @State private var newExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
     @State private var isModifyingExpiry = false
@@ -112,12 +115,13 @@ struct KeyDetailView: View {
                     }
 
                     Section {
-                        if let armoredPublicKey,
-                           let pubKeyURL = armoredPublicKey.writeToShareTempFile(named: "\(key.shortKeyId).asc") {
-                            ShareLink(item: pubKeyURL) {
+                        if armoredPublicKey != nil {
+                            Button {
+                                showPublicKeyExporter = true
+                            } label: {
                                 Label(
-                                    String(localized: "keydetail.sharePublicKey", defaultValue: "Share Public Key"),
-                                    systemImage: "square.and.arrow.up"
+                                    String(localized: "keydetail.sharePublicKey", defaultValue: "Save Public Key"),
+                                    systemImage: "square.and.arrow.down"
                                 )
                             }
                         }
@@ -199,9 +203,10 @@ struct KeyDetailView: View {
                         }
                         #endif
 
-                        if !key.revocationCert.isEmpty,
-                           let revURL = key.revocationCert.writeToShareTempFile(named: "revocation-\(key.shortKeyId).asc") {
-                            ShareLink(item: revURL) {
+                        if !key.revocationCert.isEmpty {
+                            Button {
+                                showRevocationExporter = true
+                            } label: {
                                 Label(
                                     String(localized: "keydetail.exportRevocation", defaultValue: "Export Revocation Certificate"),
                                     systemImage: "xmark.seal"
@@ -372,6 +377,28 @@ struct KeyDetailView: View {
                 armoredPublicKey = try keyManagement.exportPublicKey(fingerprint: fingerprint)
             } catch {
                 // Non-critical — sharing buttons will be disabled
+            }
+        }
+        .fileExporter(
+            isPresented: $showPublicKeyExporter,
+            item: armoredPublicKey,
+            contentTypes: [UTType(filenameExtension: "asc") ?? .data],
+            defaultFilename: "\(key?.shortKeyId ?? "key").asc"
+        ) { result in
+            if case .failure(let exportError) = result {
+                error = CypherAirError.from(exportError) { .keychainError($0) }
+                showError = true
+            }
+        }
+        .fileExporter(
+            isPresented: $showRevocationExporter,
+            item: key?.revocationCert,
+            contentTypes: [UTType(filenameExtension: "asc") ?? .data],
+            defaultFilename: "revocation-\(key?.shortKeyId ?? "key").asc"
+        ) { result in
+            if case .failure(let exportError) = result {
+                error = CypherAirError.from(exportError) { .keychainError($0) }
+                showError = true
             }
         }
     }

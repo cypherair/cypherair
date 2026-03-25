@@ -1,8 +1,12 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// One-tap self-diagnostic view.
 struct SelfTestView: View {
     @Environment(SelfTestService.self) private var selfTestService
+
+    @State private var showReportExporter = false
+    @State private var reportData: Data?
 
     var body: some View {
         List {
@@ -89,16 +93,32 @@ struct SelfTestView: View {
         #endif
         .navigationTitle(String(localized: "selftest.title", defaultValue: "Self-Test"))
         .toolbar {
-            if case .completed = selfTestService.state, let reportURL = selfTestService.lastReportURL {
+            if case .completed = selfTestService.state, selfTestService.lastReportURL != nil {
                 ToolbarItem(placement: .automatic) {
-                    ShareLink(item: reportURL) {
+                    Button {
+                        if let url = selfTestService.lastReportURL {
+                            guard let data = try? Data(contentsOf: url) else {
+                                return
+                            }
+                            reportData = data
+                            showReportExporter = true
+                        }
+                    } label: {
                         Label(
-                            String(localized: "selftest.share", defaultValue: "Share Report"),
-                            systemImage: "square.and.arrow.up"
+                            String(localized: "selftest.share", defaultValue: "Save Report"),
+                            systemImage: "square.and.arrow.down"
                         )
                     }
                 }
             }
+        }
+        .fileExporter(
+            isPresented: $showReportExporter,
+            item: reportData,
+            contentTypes: [.plainText],
+            defaultFilename: "CypherAir-SelfTest-Report.txt"
+        ) { _ in
+            reportData = nil
         }
     }
 }
