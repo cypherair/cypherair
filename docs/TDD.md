@@ -1,7 +1,7 @@
 # Technical Design Document (TDD)
 
-> **Version:** v3.9  
-> **Companion to:** [PRD](PRD.md) v3.9  
+> **Version:** v4.0
+> **Companion to:** [PRD](PRD.md) v4.0
 > **Audience:** Developers, Security Auditors
 
 ## 1. OpenPGP Library: Sequoia PGP
@@ -178,7 +178,7 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 
 ### 2.5 Build Pipeline
 
-1. `cargo build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim`
+1. `cargo build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim` / `aarch64-apple-darwin`
 2. `uniffi-bindgen generate` → `.swift` + `.h` + `.modulemap`
 3. `lipo` (fat sim binary) → `xcodebuild -create-xcframework`
 4. Import XCFramework into Xcode + copy generated `.swift`
@@ -304,14 +304,19 @@ Generate: `CIQRCodeGenerator`. Decode from photo: PHPicker + CoreImage `CIDetect
 ## 6. Storage Architecture
 
 ```
-Keychain: SE key + salt + sealed-key per identity (both profiles)
+Keychain: SE key + salt + sealed-key + metadata per identity (both profiles)
 /Documents/: contacts/ (public keys), revocation/, self-test/
 /Library/Preferences/ (UserDefaults):
-  com.cypherair.preference.authMode           → "standard" | "highSecurity"
-  com.cypherair.preference.gracePeriod        → Int (0/60/180/300)
-  com.cypherair.preference.encryptToSelf      → Bool (default true)
-  com.cypherair.preference.clipboardNotice    → Bool (default true)
-  com.cypherair.internal.rewrapInProgress     → Bool (crash recovery)
+  com.cypherair.preference.authMode              → "standard" | "highSecurity"
+  com.cypherair.preference.gracePeriod           → Int (0/60/180/300)
+  com.cypherair.preference.encryptToSelf         → Bool (default true)
+  com.cypherair.preference.clipboardNotice       → Bool (default true)
+  com.cypherair.preference.requireAuthOnLaunch   → Bool (default true)
+  com.cypherair.preference.onboardingComplete    → Bool (default false)
+  com.cypherair.internal.rewrapInProgress        → Bool (crash recovery)
+  com.cypherair.internal.rewrapTargetMode        → String (target auth mode during re-wrap)
+  com.cypherair.internal.modifyExpiryInProgress  → Bool (crash recovery flag)
+  com.cypherair.internal.modifyExpiryFingerprint → String (key fingerprint during expiry modification)
 /tmp/decrypted/: ephemeral file previews
 ```
 

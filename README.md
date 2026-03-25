@@ -2,7 +2,7 @@
 
 **Fully offline OpenPGP encryption for iOS — zero network, zero permissions.**
 
-CypherAir is an open-source OpenPGP encryption tool for iOS 26.2+ / iPadOS 26.2+. It enables everyday users to communicate securely with friends, preventing message content from being monitored by third parties. The app operates with absolutely zero network access and requests no system permissions — data leakage is eliminated at the architectural level.
+CypherAir is an open-source OpenPGP encryption tool for iOS 26.2+ / iPadOS 26.2+ / macOS 26.2+. It enables everyday users to communicate securely with friends, preventing message content from being monitored by third parties. The app operates with absolutely zero network access and requests no system permissions — data leakage is eliminated at the architectural level.
 
 ## Key Features
 
@@ -44,12 +44,12 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 
 | Layer | Technology |
 |-------|------------|
-| Platform | iOS 26.2+ / iPadOS 26.2+, minimum 8 GB RAM |
+| Platform | iOS 26.2+ / iPadOS 26.2+ / macOS 26.2+, minimum 8 GB RAM |
 | Language | Swift 6.2, SwiftUI (Liquid Glass), UIKit for system pickers |
 | OpenPGP Engine | Sequoia PGP 2.2.0 (Rust), `crypto-openssl` backend (vendored) |
 | FFI Bridge | Mozilla UniFFI 0.31.x |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |
-| Build | Xcode 26, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` |
+| Build | Xcode 26, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` |
 | Localization | English + Simplified Chinese (.xcstrings) |
 
 ## Architecture
@@ -73,6 +73,7 @@ pgp-mobile/           # Rust wrapper crate (Sequoia PGP + UniFFI)
 │   ├── decrypt.rs    # SEIPDv1 + SEIPDv2, AEAD hard-fail
 │   ├── sign.rs       # Cleartext + detached signatures
 │   ├── verify.rs     # Graded signature verification
+│   ├── streaming.rs  # File-path-based streaming I/O with progress reporting
 │   ├── armor.rs      # ASCII armor encode/decode
 │   └── error.rs      # Error enum (maps 1:1 to Swift)
 └── tests/
@@ -85,7 +86,7 @@ docs/                 # Design documents
 ### Prerequisites
 
 - macOS (Apple Silicon) with Xcode 26
-- Rust stable (latest) with iOS targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim`
+- Rust stable (latest) with targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin`
 
 ### Commands
 
@@ -99,6 +100,10 @@ cargo build --release --target aarch64-apple-ios \
 cargo build --release --target aarch64-apple-ios-sim \
     --manifest-path pgp-mobile/Cargo.toml
 
+# Cross-compile for macOS Apple Silicon
+cargo build --release --target aarch64-apple-darwin \
+    --manifest-path pgp-mobile/Cargo.toml
+
 # Build host dylib for UniFFI bindgen
 cargo build --release --manifest-path pgp-mobile/Cargo.toml
 
@@ -107,10 +112,11 @@ cargo run --bin uniffi-bindgen generate \
     --library target/release/libpgp_mobile.dylib \
     --language swift --out-dir bindings/
 
-# Create XCFramework
+# Create XCFramework (all three platform slices)
 xcodebuild -create-xcframework \
     -library target/aarch64-apple-ios/release/libpgp_mobile.a -headers bindings/ \
     -library target/aarch64-apple-ios-sim/release/libpgp_mobile.a -headers bindings/ \
+    -library target/aarch64-apple-darwin/release/libpgp_mobile.a -headers bindings/ \
     -output PgpMobile.xcframework
 
 # Run Rust tests
@@ -136,7 +142,7 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 
 - **Key Exchange** — QR code (via system Camera + URL scheme), Share Sheet (.asc file), or clipboard paste.
 - **Text Encryption** — Select recipients, toggle encrypt-to-self and signature, encrypt, then copy or share the ciphertext.
-- **File Encryption** — Pick a file (up to 100 MB), same flow as text. Produces binary `.gpg` output. Cancellable with progress.
+- **File Encryption** — Pick a file, same flow as text. Produces binary `.gpg` output. Streaming I/O with progress reporting. Cancellable. File size validated against available disk space at runtime.
 - **Decryption** — Paste or import ciphertext → two-phase flow → biometric auth → plaintext displayed in memory only, cleared on dismiss.
 - **Signing & Verification** — Cleartext signatures for text, detached `.sig` for files. Auto-verification during decryption with graded results.
 - **Backup & Restore** — Export passphrase-protected private key via Share Sheet (S2K protection matches the key's profile). Import from `.asc` file.
@@ -153,6 +159,8 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [POC](docs/archive/POC.md) | Proof-of-concept test plan (archived) |
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards and SwiftUI patterns |
 | [LIQUID_GLASS](docs/LIQUID_GLASS.md) | iOS 26 Liquid Glass design adoption guide |
+| [CODE_REVIEW](docs/CODE_REVIEW.md) | Code review checklist by change type |
+| [CHANGELOG](docs/CHANGELOG.md) | PRD revision history |
 
 ## License
 

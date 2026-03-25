@@ -214,7 +214,7 @@ if showPrivacyScreen {
 
 **Note:** Verify the visual appearance of `.ultraThinMaterial` on iOS 26. Material rendering may differ from iOS 18 due to Liquid Glass engine changes. If the privacy screen does not adequately obscure content, consider using a fully opaque overlay with the app logo instead.
 
-## 7. Known Bugs and Workarounds (as of iOS 26.1)
+## 7. Known Bugs and Workarounds (as of iOS 26.2)
 
 | Bug | Workaround |
 |-----|-----------|
