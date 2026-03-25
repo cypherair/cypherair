@@ -126,7 +126,7 @@ Home → Encrypt → plaintext → recipients → encrypt-to-self (ON) → signa
 → signing identity if multi-key → Encrypt → Copy / Share
 ```
 
-**File:** Pick file (≤ 100 MB) → same flow. Binary .gpg default. Progress. Cancellable. Background task.
+**File:** Pick file → same flow. Binary .gpg default. Streaming I/O. Progress. Cancellable. Background task. File size validated against available disk space at runtime.
 
 - **Encrypt-to-self:** Default ON, configurable in Settings.
 - **Signing:** Default ON per message, no global off.
@@ -215,7 +215,7 @@ The App offers two authentication modes, selectable in Settings:
 
 ### 5.2 Encryption / Decryption
 
-- Text + file. Multi-recipient. Encrypt-to-self. Two-phase decryption. Cancellable. 100 MB limit.
+- Text + file. Multi-recipient. Encrypt-to-self. Two-phase decryption. Cancellable. Runtime disk space validation.
 - Message format auto-selected by recipient key version. Mixed v4+v6 recipients → SEIPDv1.
 - Device auth: Standard or High Security mode.
 
@@ -326,7 +326,7 @@ Full details in [TDD](TDD.md). Key decisions:
 - [x] Dual profile key generation (Profile A: Ed25519+X25519 v4 / Profile B: Ed448+X448 v6). Multi-key with default designation. Expiry modification. Revocation cert auto-generated.
 - [x] Profile-aware encryption (auto format selection by recipient key version).
 - [x] Key exchange: QR + Share Sheet + paste + photo QR. Public key update.
-- [x] Text + file encrypt/decrypt (≤ 100 MB, cancel). Encrypt-to-self. Two-phase decrypt.
+- [x] Text + file encrypt/decrypt (streaming I/O, cancel, runtime disk space validation). Encrypt-to-self. Two-phase decrypt.
 - [x] Signing/verification. Contact management. Backup & restore (Iterated+Salted / Argon2id).
 - [x] Device auth (Standard + High Security). SE wrapping.
 - [x] Compatibility check. Self-test (both profiles). File/URL registration. Clipboard notice.
@@ -363,7 +363,7 @@ Share Extension. Post-quantum cryptography (pending IETF PQC standard). Interop 
 
 **Scenario 6: Remote Exchange** — Alice sends her public key (.asc) to Bob via iMessage. Bob imports and verifies fingerprint by phone call.
 
-**Scenario 7: Encrypted File** — Alice encrypts a PDF (≤ 100 MB) → sends .gpg via AirDrop → Bob opens with "Open With" → CypherAir → two-phase decrypt + Face ID → preview/save.
+**Scenario 7: Encrypted File** — Alice encrypts a PDF → sends .gpg via AirDrop → Bob opens with "Open With" → CypherAir → two-phase decrypt + Face ID → preview/save.
 
 **Scenario 8: Key Compromise** — Alice discovers her key may be compromised. She exports and distributes her revocation certificate. Contacts mark the key as revoked. Alice generates a new key.
 
