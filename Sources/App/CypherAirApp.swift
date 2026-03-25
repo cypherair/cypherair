@@ -251,16 +251,11 @@ struct CypherAirApp: App {
 
     /// Delete any leftover temporary files on app launch.
     /// Per PRD Section 4.4: decrypted files deleted on exit + app launch.
-    /// Also cleans up tmp/share/ used by ShareLink for named file exports.
     private func cleanupTempDecryptedFiles() {
         let fm = FileManager.default
         let tmpDir = fm.temporaryDirectory.appendingPathComponent("decrypted", isDirectory: true)
         if fm.fileExists(atPath: tmpDir.path) {
             try? fm.removeItem(at: tmpDir)
-        }
-        let shareDir = fm.temporaryDirectory.appendingPathComponent("share", isDirectory: true)
-        if fm.fileExists(atPath: shareDir.path) {
-            try? fm.removeItem(at: shareDir)
         }
         let streamingDir = fm.temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
         if fm.fileExists(atPath: streamingDir.path) {

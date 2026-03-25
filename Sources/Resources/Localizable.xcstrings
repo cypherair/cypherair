@@ -770,6 +770,7 @@
       }
     },
     "common.share" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5347,6 +5348,7 @@
       }
     },
     "sign.share.preview" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

@@ -37,6 +37,8 @@ struct SignView: View {
     @State private var selectedFileName: String?
     @State private var currentTask: Task<Void, Never>?
     @State private var fileProgress: FileProgressReporter?
+    @State private var showTextExporter = false
+    @State private var showSigExporter = false
 
     var body: some View {
         Form {
@@ -134,13 +136,12 @@ struct SignView: View {
 
                             Spacer()
 
-                            ShareLink(
-                                item: signedMessage,
-                                preview: SharePreview(String(localized: "sign.share.preview", defaultValue: "Signed Message"))
-                            ) {
+                            Button {
+                                showTextExporter = true
+                            } label: {
                                 Label(
-                                    String(localized: "common.share", defaultValue: "Share"),
-                                    systemImage: "square.and.arrow.up"
+                                    String(localized: "common.save", defaultValue: "Save"),
+                                    systemImage: "square.and.arrow.down"
                                 )
                             }
                             .glassEffect()
@@ -151,13 +152,14 @@ struct SignView: View {
                 }
             }
 
-            if signMode == .file, let detachedSignature,
-               let sigURL = detachedSignature.writeToShareTempFile(named: (selectedFileName ?? "file") + ".sig") {
+            if signMode == .file, detachedSignature != nil {
                 Section {
-                    ShareLink(item: sigURL) {
+                    Button {
+                        showSigExporter = true
+                    } label: {
                         Label(
-                            String(localized: "sign.share.signature", defaultValue: "Share .sig File"),
-                            systemImage: "square.and.arrow.up"
+                            String(localized: "sign.share.signature", defaultValue: "Save .sig File"),
+                            systemImage: "square.and.arrow.down"
                         )
                     }
                 } header: {
@@ -200,6 +202,28 @@ struct SignView: View {
             if case .success(let urls) = result, let url = urls.first {
                 selectedFileURL = url
                 selectedFileName = url.lastPathComponent
+            }
+        }
+        .fileExporter(
+            isPresented: $showTextExporter,
+            item: signedMessage.flatMap { Data($0.utf8) },
+            contentTypes: [UTType(filenameExtension: "asc") ?? .data],
+            defaultFilename: "signed.asc"
+        ) { result in
+            if case .failure(let exportError) = result {
+                error = CypherAirError.from(exportError) { .signingFailed(reason: $0) }
+                showError = true
+            }
+        }
+        .fileExporter(
+            isPresented: $showSigExporter,
+            item: detachedSignature,
+            contentTypes: [UTType(filenameExtension: "sig") ?? .data],
+            defaultFilename: (selectedFileName ?? "file") + ".sig"
+        ) { result in
+            if case .failure(let exportError) = result {
+                error = CypherAirError.from(exportError) { .signingFailed(reason: $0) }
+                showError = true
             }
         }
         .onAppear {

@@ -45,6 +45,11 @@ struct EncryptView: View {
     @State private var currentTask: Task<Void, Never>?
     @State private var fileProgress: FileProgressReporter?
 
+    // File exporter state
+    @State private var showTextExporter = false
+    @State private var showFileExporter = false
+    @State private var exportableFile: ExportableFile?
+
     var body: some View {
         Form {
             Section {
@@ -194,13 +199,12 @@ struct EncryptView: View {
 
                             Spacer()
 
-                            ShareLink(
-                                item: ciphertextString,
-                                preview: SharePreview(String(localized: "encrypt.share.preview", defaultValue: "Encrypted Message"))
-                            ) {
+                            Button {
+                                showTextExporter = true
+                            } label: {
                                 Label(
-                                    String(localized: "common.share", defaultValue: "Share"),
-                                    systemImage: "square.and.arrow.up"
+                                    String(localized: "common.save", defaultValue: "Save"),
+                                    systemImage: "square.and.arrow.down"
                                 )
                             }
                             .glassEffect()
@@ -212,12 +216,22 @@ struct EncryptView: View {
             }
 
             // File mode result
-            if encryptMode == .file, let encryptedURL = encryptedFileURL {
+            if encryptMode == .file, encryptedFileURL != nil {
                 Section {
-                    ShareLink(item: encryptedURL) {
+                    Button {
+                        if let url = encryptedFileURL {
+                            guard FileManager.default.fileExists(atPath: url.path) else {
+                                error = .encryptionFailed(reason: String(localized: "fileEncrypt.readFailed", defaultValue: "Could not read encrypted file"))
+                                showError = true
+                                return
+                            }
+                            exportableFile = ExportableFile(url: url)
+                            showFileExporter = true
+                        }
+                    } label: {
                         Label(
-                            String(localized: "fileEncrypt.share", defaultValue: "Share Encrypted File"),
-                            systemImage: "square.and.arrow.up"
+                            String(localized: "fileEncrypt.share", defaultValue: "Save Encrypted File"),
+                            systemImage: "square.and.arrow.down"
                         )
                     }
                 }
@@ -259,6 +273,29 @@ struct EncryptView: View {
             }
         } message: {
             Text(String(localized: "clipboard.notice.message", defaultValue: "The encrypted message has been copied. Remember to clear your clipboard after pasting."))
+        }
+        .fileExporter(
+            isPresented: $showTextExporter,
+            item: ciphertext,
+            contentTypes: [UTType(filenameExtension: "asc") ?? .data],
+            defaultFilename: "encrypted.asc"
+        ) { result in
+            if case .failure(let exportError) = result {
+                error = CypherAirError.from(exportError) { .encryptionFailed(reason: $0) }
+                showError = true
+            }
+        }
+        .fileExporter(
+            isPresented: $showFileExporter,
+            item: exportableFile,
+            contentTypes: [UTType(filenameExtension: "gpg") ?? .data],
+            defaultFilename: (selectedFileName ?? "file") + ".gpg"
+        ) { result in
+            exportableFile = nil
+            if case .failure(let exportError) = result {
+                error = CypherAirError.from(exportError) { .encryptionFailed(reason: $0) }
+                showError = true
+            }
         }
         .onAppear {
             signerFingerprint = keyManagement.defaultKey?.fingerprint

@@ -38,6 +38,8 @@ struct DecryptView: View {
     @State private var currentTask: Task<Void, Never>?
     @State private var filePhase1Result: DecryptionService.FilePhase1Result?
     @State private var fileProgress: FileProgressReporter?
+    @State private var showFileExporter = false
+    @State private var exportableFile: ExportableFile?
 
     var body: some View {
         Form {
@@ -151,9 +153,19 @@ struct DecryptView: View {
             }
 
             // File mode result
-            if decryptMode == .file, let decryptedURL = decryptedFileURL {
+            if decryptMode == .file, decryptedFileURL != nil {
                 Section {
-                    ShareLink(item: decryptedURL) {
+                    Button {
+                        if let url = decryptedFileURL {
+                            guard FileManager.default.fileExists(atPath: url.path) else {
+                                error = .corruptData(reason: String(localized: "fileDecrypt.readFailed", defaultValue: "Could not read decrypted file"))
+                                showError = true
+                                return
+                            }
+                            exportableFile = ExportableFile(url: url)
+                            showFileExporter = true
+                        }
+                    } label: {
                         Label(
                             String(localized: "fileDecrypt.save", defaultValue: "Save Decrypted File"),
                             systemImage: "square.and.arrow.down"
@@ -207,6 +219,18 @@ struct DecryptView: View {
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: { err in
             Text(err.localizedDescription)
+        }
+        .fileExporter(
+            isPresented: $showFileExporter,
+            item: exportableFile,
+            contentTypes: [.data],
+            defaultFilename: decryptedFilename()
+        ) { result in
+            exportableFile = nil
+            if case .failure(let exportError) = result {
+                error = CypherAirError.from(exportError) { .corruptData(reason: $0) }
+                showError = true
+            }
         }
         .onDisappear {
             // PRD §4.4: Zeroize/delete decrypted data when leaving the view.

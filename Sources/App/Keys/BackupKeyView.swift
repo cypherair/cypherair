@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Passphrase-protected key export for backup.
 struct BackupKeyView: View {
@@ -16,6 +17,7 @@ struct BackupKeyView: View {
     @State private var exportedData: Data?
     @State private var error: CypherAirError?
     @State private var showError = false
+    @State private var showFileExporter = false
 
     var body: some View {
         Form {
@@ -60,13 +62,14 @@ struct BackupKeyView: View {
                 .disabled(passphrase.isEmpty || passphrase != passphraseConfirm || isExporting)
             }
 
-            if let exportedData,
-               let fileURL = exportedData.writeToShareTempFile(named: "\(fingerprint.prefix(16)).asc") {
+            if exportedData != nil {
                 Section {
-                    ShareLink(item: fileURL) {
+                    Button {
+                        showFileExporter = true
+                    } label: {
                         Label(
                             String(localized: "backup.share", defaultValue: "Save Backup File"),
-                            systemImage: "square.and.arrow.up"
+                            systemImage: "square.and.arrow.down"
                         )
                     }
                 } header: {
@@ -89,6 +92,17 @@ struct BackupKeyView: View {
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: { err in
             Text(err.localizedDescription)
+        }
+        .fileExporter(
+            isPresented: $showFileExporter,
+            item: exportedData,
+            contentTypes: [UTType(filenameExtension: "asc") ?? .data],
+            defaultFilename: "\(fingerprint.prefix(16)).asc"
+        ) { result in
+            if case .failure(let exportError) = result {
+                error = CypherAirError.from(exportError) { .encryptionFailed(reason: $0) }
+                showError = true
+            }
         }
     }
 
