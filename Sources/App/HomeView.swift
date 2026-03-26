@@ -3,6 +3,7 @@ import SwiftUI
 /// Home screen with quick-access actions for core operations.
 struct HomeView: View {
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(AppConfiguration.self) private var config
     @State private var path = NavigationPath()
     #if os(macOS)
     @State private var showKeyGeneration = false
@@ -124,25 +125,25 @@ struct HomeView: View {
             actionButton(
                 title: String(localized: "home.encrypt", defaultValue: "Encrypt"),
                 icon: "lock.fill",
-                tint: .blue,
+                tint: config.colorTheme.actionColors.encrypt,
                 route: .encrypt
             )
             actionButton(
                 title: String(localized: "home.decrypt", defaultValue: "Decrypt"),
                 icon: "lock.open.fill",
-                tint: .green,
+                tint: config.colorTheme.actionColors.decrypt,
                 route: .decrypt
             )
             actionButton(
                 title: String(localized: "home.sign", defaultValue: "Sign"),
                 icon: "signature",
-                tint: .orange,
+                tint: config.colorTheme.actionColors.sign,
                 route: .sign
             )
             actionButton(
                 title: String(localized: "home.verify", defaultValue: "Verify"),
                 icon: "checkmark.seal",
-                tint: .purple,
+                tint: config.colorTheme.actionColors.verify,
                 route: .verify
             )
         }
@@ -206,6 +207,8 @@ struct HomeView: View {
             #else
             Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
             #endif
+        case .themePicker:
+            ThemePickerView()
         }
     }
 }

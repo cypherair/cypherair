@@ -26,4 +26,5 @@ enum AppRoute: Hashable {
     case selfTest
     case about
     case appIcon
+    case themePicker
 }

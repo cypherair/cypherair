@@ -68,18 +68,24 @@ struct SettingsView: View {
                 Text(String(localized: "settings.encryption", defaultValue: "Encryption"))
             }
 
-            #if canImport(UIKit)
             Section {
+                NavigationLink(value: AppRoute.themePicker) {
+                    Label(
+                        String(localized: "settings.theme", defaultValue: "Color Theme"),
+                        systemImage: "paintpalette"
+                    )
+                }
+                #if canImport(UIKit)
                 NavigationLink(value: AppRoute.appIcon) {
                     Label(
                         String(localized: "settings.appIcon", defaultValue: "App Icon"),
                         systemImage: "app"
                     )
                 }
+                #endif
             } header: {
                 Text(String(localized: "settings.appearance", defaultValue: "Appearance"))
             }
-            #endif
 
             Section {
                 #if os(macOS)
@@ -142,6 +148,7 @@ struct SettingsView: View {
             switch route {
             case .selfTest: SelfTestView()
             case .about: AboutView()
+            case .themePicker: ThemePickerView()
             case .appIcon:
                 #if canImport(UIKit)
                 AppIconPickerView()
@@ -150,8 +157,7 @@ struct SettingsView: View {
                 #endif
             case .keyGeneration, .keyDetail, .backupKey, .importKey,
                  .contactDetail, .addContact, .qrDisplay, .qrPhotoImport,
-                 .encrypt, .decrypt,
-                 .sign, .verify:
+                 .encrypt, .decrypt, .sign, .verify:
                 let _ = assertionFailure("Unexpected route \(route) in SettingsView")
                 Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
             }

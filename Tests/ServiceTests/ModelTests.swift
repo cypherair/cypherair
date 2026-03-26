@@ -3,7 +3,7 @@ import SwiftUI
 @testable import CypherAir
 
 /// Tests for model types: CypherAirError, Contact, PGPKeyIdentity,
-/// KeyProfile+Codable, and SignatureVerification.
+/// KeyProfile+Codable, SignatureVerification, and ColorTheme.
 final class ModelTests: XCTestCase {
 
     // MARK: - CypherAirError: PgpError Mapping
@@ -437,5 +437,84 @@ final class ModelTests: XCTestCase {
             subkeyAlgo: "X25519",
             expiryDate: nil
         )
+    }
+
+    // MARK: - ColorTheme
+
+    func test_colorTheme_allCases_returnValidActionColors() {
+        for theme in ColorTheme.allCases {
+            let colors = theme.actionColors
+            // Verify all 4 named properties are accessible (compilation check + no crashes)
+            _ = colors.encrypt
+            _ = colors.decrypt
+            _ = colors.sign
+            _ = colors.verify
+        }
+    }
+
+    func test_colorTheme_allCases_haveAccentColor() {
+        for theme in ColorTheme.allCases {
+            // Verify accentColor is accessible for every theme
+            _ = theme.accentColor
+        }
+    }
+
+    func test_colorTheme_allCases_havePreviewColors() {
+        for theme in ColorTheme.allCases {
+            XCTAssertFalse(theme.previewColors.isEmpty, "\(theme) has empty previewColors")
+        }
+    }
+
+    func test_colorTheme_allCases_haveDisplayName() {
+        for theme in ColorTheme.allCases {
+            XCTAssertFalse(theme.displayName.isEmpty, "\(theme) has empty displayName")
+        }
+    }
+
+    func test_colorTheme_defaultBlue_preservesOriginalColors() {
+        let colors = ColorTheme.defaultBlue.actionColors
+        // Default theme should use the original hardcoded SwiftUI colors
+        XCTAssertEqual(colors.encrypt, .blue)
+        XCTAssertEqual(colors.decrypt, .green)
+        XCTAssertEqual(colors.sign, .orange)
+        XCTAssertEqual(colors.verify, .purple)
+    }
+
+    func test_colorTheme_multiColorThemes_areIdentified() {
+        XCTAssertTrue(ColorTheme.prideRainbow.isMultiColor)
+        XCTAssertTrue(ColorTheme.transPride.isMultiColor)
+        XCTAssertTrue(ColorTheme.bisexualPride.isMultiColor)
+        XCTAssertTrue(ColorTheme.nonBinary.isMultiColor)
+
+        XCTAssertFalse(ColorTheme.defaultBlue.isMultiColor)
+        XCTAssertFalse(ColorTheme.purple.isMultiColor)
+        XCTAssertFalse(ColorTheme.graphite.isMultiColor)
+    }
+
+    func test_appConfiguration_colorTheme_persistsToUserDefaults() {
+        let config = AppConfiguration()
+        config.colorTheme = .purple
+
+        // Read back from a fresh AppConfiguration instance
+        let config2 = AppConfiguration()
+        XCTAssertEqual(config2.colorTheme, .purple)
+
+        // Clean up: restore default
+        config.colorTheme = .defaultBlue
+    }
+
+    func test_appConfiguration_colorTheme_defaultsToDefaultBlue() {
+        // Remove the key to simulate fresh install
+        UserDefaults.standard.removeObject(forKey: "com.cypherair.preference.colorTheme")
+        let config = AppConfiguration()
+        XCTAssertEqual(config.colorTheme, .defaultBlue)
+    }
+
+    func test_colorTheme_rawValue_roundTrips() {
+        for theme in ColorTheme.allCases {
+            let raw = theme.rawValue
+            let restored = ColorTheme(rawValue: raw)
+            XCTAssertEqual(restored, theme, "Round-trip failed for \(theme)")
+        }
     }
 }
