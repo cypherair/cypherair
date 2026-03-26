@@ -143,3 +143,4 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 - **Before text replacement, verify match count.** Before executing any string replacement, check how many matches exist in the file. If multiple matches exist, handle each one individually to avoid unintended changes to other locations.
 - **After reverting changes, verify with `git diff`.** Never rely on memory to confirm a revert is complete. Always run `git diff` (or `git diff origin/main`) to confirm the file matches the expected state.
 - **After code changes, run tests — not just build.** A successful build does not guarantee correctness. Always run the relevant test suite to verify no regressions were introduced.
+- **Never run destructive git operations (checkout, reset, restore) on project files (*.pbxproj, *.entitlements, *.xctestplan, *.xcscheme) without explicit user approval.** These files are difficult to manually reconstruct if changes are lost.
