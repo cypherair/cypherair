@@ -37,8 +37,11 @@ struct SignView: View {
     @State private var selectedFileName: String?
     @State private var currentTask: Task<Void, Never>?
     @State private var fileProgress: FileProgressReporter?
-    @State private var showTextExporter = false
-    @State private var showSigExporter = false
+    private enum SignExportType {
+        case signedText
+        case detachedSig
+    }
+    @State private var activeSignExport: SignExportType?
 
     var body: some View {
         Form {
@@ -114,38 +117,30 @@ struct SignView: View {
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
 
-                    GlassEffectContainer(spacing: 8) {
-                        HStack {
-                            Button {
-                                #if canImport(UIKit)
-                                UIPasteboard.general.string = signedMessage
-                                #elseif canImport(AppKit)
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(signedMessage, forType: .string)
-                                #endif
-                                if config.clipboardNotice {
-                                    showClipboardNotice = true
-                                }
-                            } label: {
-                                Label(
-                                    String(localized: "common.copy", defaultValue: "Copy"),
-                                    systemImage: "doc.on.doc"
-                                )
-                            }
-                            .glassEffect()
-
-                            Spacer()
-
-                            Button {
-                                showTextExporter = true
-                            } label: {
-                                Label(
-                                    String(localized: "common.save", defaultValue: "Save"),
-                                    systemImage: "square.and.arrow.down"
-                                )
-                            }
-                            .glassEffect()
+                    Button {
+                        #if canImport(UIKit)
+                        UIPasteboard.general.string = signedMessage
+                        #elseif canImport(AppKit)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(signedMessage, forType: .string)
+                        #endif
+                        if config.clipboardNotice {
+                            showClipboardNotice = true
                         }
+                    } label: {
+                        Label(
+                            String(localized: "common.copy", defaultValue: "Copy"),
+                            systemImage: "doc.on.doc"
+                        )
+                    }
+
+                    Button {
+                        activeSignExport = .signedText
+                    } label: {
+                        Label(
+                            String(localized: "common.save", defaultValue: "Save"),
+                            systemImage: "square.and.arrow.down"
+                        )
                     }
                 } header: {
                     Text(String(localized: "sign.result", defaultValue: "Signed Message"))
@@ -155,7 +150,7 @@ struct SignView: View {
             if signMode == .file, detachedSignature != nil {
                 Section {
                     Button {
-                        showSigExporter = true
+                        activeSignExport = .detachedSig
                     } label: {
                         Label(
                             String(localized: "sign.share.signature", defaultValue: "Save .sig File"),
@@ -205,22 +200,15 @@ struct SignView: View {
             }
         }
         .fileExporter(
-            isPresented: $showTextExporter,
-            item: signedMessage.flatMap { Data($0.utf8) },
-            contentTypes: [UTType(filenameExtension: "asc") ?? .data],
-            defaultFilename: "signed.asc"
+            isPresented: Binding(
+                get: { activeSignExport != nil },
+                set: { if !$0 { activeSignExport = nil } }
+            ),
+            item: signExportItem,
+            contentTypes: [.data],
+            defaultFilename: signExportFilename
         ) { result in
-            if case .failure(let exportError) = result {
-                error = CypherAirError.from(exportError) { .signingFailed(reason: $0) }
-                showError = true
-            }
-        }
-        .fileExporter(
-            isPresented: $showSigExporter,
-            item: detachedSignature,
-            contentTypes: [UTType(filenameExtension: "sig") ?? .data],
-            defaultFilename: (selectedFileName ?? "file") + ".sig"
-        ) { result in
+            activeSignExport = nil
             if case .failure(let exportError) = result {
                 error = CypherAirError.from(exportError) { .signingFailed(reason: $0) }
                 showError = true
@@ -271,6 +259,22 @@ struct SignView: View {
     }
 
     // MARK: - State
+
+    private var signExportItem: Data? {
+        switch activeSignExport {
+        case .signedText: return signedMessage.flatMap { Data($0.utf8) }
+        case .detachedSig: return detachedSignature
+        case nil: return nil
+        }
+    }
+
+    private var signExportFilename: String {
+        switch activeSignExport {
+        case .signedText: return "signed.asc"
+        case .detachedSig: return (selectedFileName ?? "file") + ".sig"
+        case nil: return "export"
+        }
+    }
 
     private var signButtonDisabled: Bool {
         if isSigning { return true }

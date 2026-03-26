@@ -18,8 +18,10 @@ struct VerifyView: View {
     @State private var verifyMode: VerifyMode = .cleartext
     @State private var signedInput = ""
     @State private var isVerifying = false
-    @State private var originalText: String?
-    @State private var verification: SignatureVerification?
+    // Per-mode results (preserved when switching modes, cleared on view exit)
+    @State private var cleartextOriginalText: String?
+    @State private var cleartextVerification: SignatureVerification?
+    @State private var detachedVerification: SignatureVerification?
     @State private var error: CypherAirError?
     @State private var showError = false
 
@@ -88,21 +90,21 @@ struct VerifyView: View {
                 .disabled(verifyButtonDisabled)
             }
 
-            if let originalText {
+            if verifyMode == .cleartext, let cleartextOriginalText {
                 Section {
-                    Text(originalText)
+                    Text(cleartextOriginalText)
                         .textSelection(.enabled)
                 } header: {
                     Text(String(localized: "verify.originalText", defaultValue: "Original Message"))
                 }
             }
 
-            if let verification {
+            if let activeVerification {
                 Section {
                     HStack {
-                        Image(systemName: verification.symbolName)
-                            .foregroundStyle(verification.statusColor)
-                        Text(verification.statusDescription)
+                        Image(systemName: activeVerification.symbolName)
+                            .foregroundStyle(activeVerification.statusColor)
+                        Text(activeVerification.statusDescription)
                             .font(.subheadline)
                     }
                     .accessibilityElement(children: .combine)
@@ -211,6 +213,13 @@ struct VerifyView: View {
 
     // MARK: - State
 
+    private var activeVerification: SignatureVerification? {
+        switch verifyMode {
+        case .cleartext: return cleartextVerification
+        case .detached: return detachedVerification
+        }
+    }
+
     private var verifyButtonDisabled: Bool {
         if isVerifying { return true }
         switch verifyMode {
@@ -229,9 +238,9 @@ struct VerifyView: View {
             do {
                 let result = try await service.verifyCleartext(inputData)
                 if let content = result.text {
-                    originalText = String(data: content, encoding: .utf8)
+                    cleartextOriginalText = String(data: content, encoding: .utf8)
                 }
-                verification = result.verification
+                cleartextVerification = result.verification
             } catch {
                 self.error = CypherAirError.from(error) { _ in .badSignature }
                 showError = true
@@ -274,7 +283,7 @@ struct VerifyView: View {
                     progress: progress
                 )
                 try Task.checkCancellation()
-                verification = result
+                detachedVerification = result
             } catch is CancellationError {
                 // User cancelled — no error to show
             } catch {

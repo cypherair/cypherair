@@ -46,9 +46,9 @@ struct EncryptView: View {
     @State private var fileProgress: FileProgressReporter?
 
     // File exporter state
-    @State private var showTextExporter = false
     @State private var showFileExporter = false
     @State private var exportableFile: ExportableFile?
+    @State private var exportFilename: String = "encrypted"
 
     var body: some View {
         Form {
@@ -177,38 +177,40 @@ struct EncryptView: View {
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
 
-                    GlassEffectContainer(spacing: 8) {
-                        HStack {
-                            Button {
-                                #if canImport(UIKit)
-                                UIPasteboard.general.string = ciphertextString
-                                #elseif canImport(AppKit)
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(ciphertextString, forType: .string)
-                                #endif
-                                if config.clipboardNotice {
-                                    showClipboardNotice = true
-                                }
-                            } label: {
-                                Label(
-                                    String(localized: "common.copy", defaultValue: "Copy"),
-                                    systemImage: "doc.on.doc"
-                                )
-                            }
-                            .glassEffect()
-
-                            Spacer()
-
-                            Button {
-                                showTextExporter = true
-                            } label: {
-                                Label(
-                                    String(localized: "common.save", defaultValue: "Save"),
-                                    systemImage: "square.and.arrow.down"
-                                )
-                            }
-                            .glassEffect()
+                    Button {
+                        #if canImport(UIKit)
+                        UIPasteboard.general.string = ciphertextString
+                        #elseif canImport(AppKit)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(ciphertextString, forType: .string)
+                        #endif
+                        if config.clipboardNotice {
+                            showClipboardNotice = true
                         }
+                    } label: {
+                        Label(
+                            String(localized: "common.copy", defaultValue: "Copy"),
+                            systemImage: "doc.on.doc"
+                        )
+                    }
+
+                    Button {
+                        let tmpURL = FileManager.default.temporaryDirectory
+                            .appendingPathComponent("encrypted.asc")
+                        do {
+                            try ciphertext.write(to: tmpURL)
+                            exportableFile = ExportableFile(url: tmpURL)
+                            exportFilename = "encrypted.asc"
+                            showFileExporter = true
+                        } catch {
+                            self.error = .encryptionFailed(reason: String(localized: "fileEncrypt.readFailed", defaultValue: "Could not read encrypted file"))
+                            showError = true
+                        }
+                    } label: {
+                        Label(
+                            String(localized: "common.save", defaultValue: "Save"),
+                            systemImage: "square.and.arrow.down"
+                        )
                     }
                 } header: {
                     Text(String(localized: "encrypt.result", defaultValue: "Encrypted Message"))
@@ -226,6 +228,7 @@ struct EncryptView: View {
                                 return
                             }
                             exportableFile = ExportableFile(url: url)
+                            exportFilename = (selectedFileName ?? "file") + ".gpg"
                             showFileExporter = true
                         }
                     } label: {
@@ -275,21 +278,10 @@ struct EncryptView: View {
             Text(String(localized: "clipboard.notice.message", defaultValue: "The encrypted message has been copied. Remember to clear your clipboard after pasting."))
         }
         .fileExporter(
-            isPresented: $showTextExporter,
-            item: ciphertext,
-            contentTypes: [UTType(filenameExtension: "asc") ?? .data],
-            defaultFilename: "encrypted.asc"
-        ) { result in
-            if case .failure(let exportError) = result {
-                error = CypherAirError.from(exportError) { .encryptionFailed(reason: $0) }
-                showError = true
-            }
-        }
-        .fileExporter(
             isPresented: $showFileExporter,
             item: exportableFile,
-            contentTypes: [UTType(filenameExtension: "gpg") ?? .data],
-            defaultFilename: (selectedFileName ?? "file") + ".gpg"
+            contentTypes: [.data],
+            defaultFilename: exportFilename
         ) { result in
             exportableFile = nil
             if case .failure(let exportError) = result {
