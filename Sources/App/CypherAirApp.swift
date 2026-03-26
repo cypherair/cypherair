@@ -115,6 +115,7 @@ struct CypherAirApp: App {
         WindowGroup {
             ContentView()
                 .privacyScreen()
+                .tint(config.colorTheme.accentColor)
                 .environment(config)
                 .environment(keyManagement)
                 .environment(contactService)
@@ -209,6 +210,7 @@ struct CypherAirApp: App {
             NavigationStack {
                 SettingsView()
             }
+            .tint(config.colorTheme.accentColor)
             .environment(config)
             .environment(authManager)
             .environment(keyManagement)

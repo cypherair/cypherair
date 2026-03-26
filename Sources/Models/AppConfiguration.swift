@@ -50,6 +50,13 @@ final class AppConfiguration {
         }
     }
 
+    /// The selected color theme preset.
+    var colorTheme: ColorTheme {
+        didSet {
+            UserDefaults.standard.set(colorTheme.rawValue, forKey: Self.colorThemeKey)
+        }
+    }
+
     /// Incremented when decrypted content should be cleared (e.g., grace period expired).
     var contentClearGeneration: Int = 0
 
@@ -67,6 +74,7 @@ final class AppConfiguration {
     private static let clipboardNoticeKey = "com.cypherair.preference.clipboardNotice"
     private static let requireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
     private static let onboardingCompleteKey = "com.cypherair.preference.onboardingComplete"
+    private static let colorThemeKey = "com.cypherair.preference.colorTheme"
 
     // MARK: - Initialization
 
@@ -104,6 +112,14 @@ final class AppConfiguration {
 
         // Onboarding
         self.hasCompletedOnboarding = defaults.bool(forKey: Self.onboardingCompleteKey)
+
+        // Color theme (default: system blue)
+        if let themeRaw = defaults.string(forKey: Self.colorThemeKey),
+           let theme = ColorTheme(rawValue: themeRaw) {
+            self.colorTheme = theme
+        } else {
+            self.colorTheme = .defaultBlue
+        }
     }
 
     /// Check if the grace period has expired since last authentication.

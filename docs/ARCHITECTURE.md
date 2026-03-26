@@ -289,6 +289,7 @@ App Sandbox:
 │       ├── com.cypherair.preference.clipboardNotice        → Bool (default true)
 │       ├── com.cypherair.preference.requireAuthOnLaunch    → Bool (default true)
 │       ├── com.cypherair.preference.onboardingComplete     → Bool (default false)
+│       ├── com.cypherair.preference.colorTheme             → String (ColorTheme rawValue, default "defaultBlue")
 │       ├── com.cypherair.internal.rewrapInProgress         → Bool (crash recovery flag)
 │       ├── com.cypherair.internal.rewrapTargetMode         → String (target auth mode during re-wrap)
 │       ├── com.cypherair.internal.modifyExpiryInProgress   → Bool (crash recovery flag)
