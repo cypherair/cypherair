@@ -76,19 +76,29 @@ struct Argon2idMemoryGuard {
 }
 
 /// Production implementation of MemoryInfoProvidable.
-/// Calls os_proc_available_memory() via @_silgen_name.
+/// iOS: calls os_proc_available_memory() to check Jetsam headroom.
+/// macOS: returns total physical memory (no Jetsam on macOS).
 struct SystemMemoryInfo: MemoryInfoProvidable {
     func availableMemoryBytes() -> UInt64 {
-        UInt64(_os_proc_available_memory())
+        #if os(macOS)
+        // macOS has no Jetsam — use total physical memory.
+        // The guard still rejects malformed S2K parameters that exceed physical RAM.
+        return ProcessInfo.processInfo.physicalMemory
+        #else
+        return UInt64(_os_proc_available_memory())
+        #endif
     }
 }
 
 // os_proc_available_memory() is a C function from <os/proc.h>.
 // It returns the number of bytes available to the process before Jetsam
 // would terminate it. Available since iOS 13.0.
+// API_UNAVAILABLE(macos) — not applicable on macOS (no Jetsam).
 //
 // We use @_silgen_name because the function is not exposed in the
 // Darwin Swift module map, and adding a bridging header for a single
 // function would add unnecessary build complexity.
+#if !os(macOS)
 @_silgen_name("os_proc_available_memory")
 private func _os_proc_available_memory() -> UInt
+#endif
