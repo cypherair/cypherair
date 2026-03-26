@@ -20,8 +20,11 @@ struct KeyDetailView: View {
     @State private var showError = false
     @State private var armoredPublicKey: Data?
     @State private var showCopiedNotice = false
-    @State private var showPublicKeyExporter = false
-    @State private var showRevocationExporter = false
+    private enum ExportType {
+        case publicKey
+        case revocation
+    }
+    @State private var activeExport: ExportType?
     @State private var showExpirySheet = false
     @State private var newExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
     @State private var isModifyingExpiry = false
@@ -117,7 +120,7 @@ struct KeyDetailView: View {
                     Section {
                         if armoredPublicKey != nil {
                             Button {
-                                showPublicKeyExporter = true
+                                activeExport = .publicKey
                             } label: {
                                 Label(
                                     String(localized: "keydetail.sharePublicKey", defaultValue: "Save Public Key"),
@@ -205,7 +208,7 @@ struct KeyDetailView: View {
 
                         if !key.revocationCert.isEmpty {
                             Button {
-                                showRevocationExporter = true
+                                activeExport = .revocation
                             } label: {
                                 Label(
                                     String(localized: "keydetail.exportRevocation", defaultValue: "Export Revocation Certificate"),
@@ -380,26 +383,35 @@ struct KeyDetailView: View {
             }
         }
         .fileExporter(
-            isPresented: $showPublicKeyExporter,
-            item: armoredPublicKey,
-            contentTypes: [UTType(filenameExtension: "asc") ?? .data],
-            defaultFilename: "\(key?.shortKeyId ?? "key").asc"
+            isPresented: Binding(
+                get: { activeExport != nil },
+                set: { if !$0 { activeExport = nil } }
+            ),
+            item: exportItem,
+            contentTypes: [.data],
+            defaultFilename: exportFilename
         ) { result in
+            activeExport = nil
             if case .failure(let exportError) = result {
                 error = CypherAirError.from(exportError) { .keychainError($0) }
                 showError = true
             }
         }
-        .fileExporter(
-            isPresented: $showRevocationExporter,
-            item: key?.revocationCert,
-            contentTypes: [UTType(filenameExtension: "asc") ?? .data],
-            defaultFilename: "revocation-\(key?.shortKeyId ?? "key").asc"
-        ) { result in
-            if case .failure(let exportError) = result {
-                error = CypherAirError.from(exportError) { .keychainError($0) }
-                showError = true
-            }
+    }
+
+    private var exportItem: Data? {
+        switch activeExport {
+        case .publicKey: return armoredPublicKey
+        case .revocation: return key?.revocationCert
+        case nil: return nil
+        }
+    }
+
+    private var exportFilename: String {
+        switch activeExport {
+        case .publicKey: return "\(key?.shortKeyId ?? "key").asc"
+        case .revocation: return "revocation-\(key?.shortKeyId ?? "key").asc"
+        case nil: return "export.asc"
         }
     }
 

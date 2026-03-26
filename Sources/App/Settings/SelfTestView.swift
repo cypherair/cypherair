@@ -115,7 +115,7 @@ struct SelfTestView: View {
         .fileExporter(
             isPresented: $showReportExporter,
             item: reportData,
-            contentTypes: [.plainText],
+            contentTypes: [.data],
             defaultFilename: "CypherAir-SelfTest-Report.txt"
         ) { _ in
             reportData = nil

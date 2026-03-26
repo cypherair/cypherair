@@ -96,7 +96,7 @@ struct BackupKeyView: View {
         .fileExporter(
             isPresented: $showFileExporter,
             item: exportedData,
-            contentTypes: [UTType(filenameExtension: "asc") ?? .data],
+            contentTypes: [.data],
             defaultFilename: "\(fingerprint.prefix(16)).asc"
         ) { result in
             if case .failure(let exportError) = result {

@@ -14,5 +14,8 @@ struct ExportableFile: Transferable {
         FileRepresentation(exportedContentType: .data) { file in
             SentTransferredFile(file.url)
         }
+        .suggestedFileName { file in
+            file.url.lastPathComponent
+        }
     }
 }
