@@ -5,6 +5,8 @@
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
 			<key>CFBundleTypeName</key>
 			<string>PGP Encrypted File</string>
 			<key>LSHandlerRank</key>
@@ -16,6 +18,8 @@
 			</array>
 		</dict>
 		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
 			<key>CFBundleTypeName</key>
 			<string>PGP ASCII Armor</string>
 			<key>LSHandlerRank</key>
@@ -26,6 +30,8 @@
 			</array>
 		</dict>
 		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
 			<key>CFBundleTypeName</key>
 			<string>PGP Detached Signature</string>
 			<key>LSHandlerRank</key>

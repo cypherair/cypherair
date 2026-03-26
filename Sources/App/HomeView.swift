@@ -10,25 +10,12 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Status header
-                    if keyManagement.keys.isEmpty {
-                        noKeysPrompt
-                    } else {
-                        defaultKeyInfo
-                    }
-
-                    // Quick actions (iOS only — macOS uses sidebar navigation)
-                    #if canImport(UIKit)
-                    quickActionsGrid
-                    #else
-                    Text(String(localized: "home.macOS.hint", defaultValue: "Use the sidebar to encrypt, decrypt, sign, or verify messages."))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    #endif
+            Group {
+                if keyManagement.keys.isEmpty {
+                    noKeysContent
+                } else {
+                    hasKeysContent
                 }
-                .padding()
             }
             .navigationTitle(String(localized: "home.title", defaultValue: "CypherAir"))
             .navigationDestination(for: AppRoute.self) { route in
@@ -54,36 +41,44 @@ struct HomeView: View {
 
     // MARK: - Subviews
 
-    private var noKeysPrompt: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "key.slash")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-
-            Text(String(localized: "home.noKeys.title", defaultValue: "No Keys Yet"))
-                .font(.headline)
-
+    private var noKeysContent: some View {
+        ContentUnavailableView {
+            Label(
+                String(localized: "home.noKeys.title", defaultValue: "No Keys Yet"),
+                systemImage: "key.slash"
+            )
+        } description: {
             Text(String(localized: "home.noKeys.subtitle", defaultValue: "Generate a key to start encrypting and signing messages."))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Button {
-                #if os(macOS)
+        } actions: {
+            #if os(macOS)
+            Button(String(localized: "home.generateKey", defaultValue: "Generate Key")) {
                 showKeyGeneration = true
-                #else
-                path.append(AppRoute.keyGeneration)
-                #endif
-            } label: {
-                Label(
-                    String(localized: "home.generateKey", defaultValue: "Generate My Key"),
-                    systemImage: "plus.circle.fill"
-                )
             }
             .buttonStyle(.borderedProminent)
+            #else
+            NavigationLink(value: AppRoute.keyGeneration) {
+                Text(String(localized: "home.generateKey", defaultValue: "Generate Key"))
+            }
+            .buttonStyle(.borderedProminent)
+            #endif
         }
-        .padding(.vertical, 32)
+    }
+
+    private var hasKeysContent: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                defaultKeyInfo
+
+                #if canImport(UIKit)
+                quickActionsGrid
+                #else
+                Text(String(localized: "home.macOS.hint", defaultValue: "Use the sidebar to encrypt, decrypt, sign, or verify messages."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                #endif
+            }
+            .padding()
+        }
     }
 
     private var defaultKeyInfo: some View {
