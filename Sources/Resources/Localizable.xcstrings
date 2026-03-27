@@ -4946,6 +4946,22 @@
         }
       }
     },
+    "settings.appIcon.obsidian": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obsidian"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "黑曜"
+          }
+        }
+      }
+    },
     "settings.appearance": {
       "localizations": {
         "en": {
