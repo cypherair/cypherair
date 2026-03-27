@@ -471,9 +471,25 @@ final class ModelTests: XCTestCase {
         }
     }
 
+    func test_colorTheme_systemDefault_preservesOriginalColors() {
+        let colors = ColorTheme.systemDefault.actionColors
+        // System default uses the same original hardcoded SwiftUI colors
+        XCTAssertEqual(colors.encrypt, .blue)
+        XCTAssertEqual(colors.decrypt, .green)
+        XCTAssertEqual(colors.sign, .orange)
+        XCTAssertEqual(colors.verify, .purple)
+    }
+
+    func test_colorTheme_systemDefault_hasNilAccentColor() {
+        XCTAssertNil(ColorTheme.systemDefault.accentColor)
+    }
+
+    func test_colorTheme_defaultBlue_hasBlueAccentColor() {
+        XCTAssertEqual(ColorTheme.defaultBlue.accentColor, .blue)
+    }
+
     func test_colorTheme_defaultBlue_preservesOriginalColors() {
         let colors = ColorTheme.defaultBlue.actionColors
-        // Default theme should use the original hardcoded SwiftUI colors
         XCTAssertEqual(colors.encrypt, .blue)
         XCTAssertEqual(colors.decrypt, .green)
         XCTAssertEqual(colors.sign, .orange)
@@ -486,6 +502,7 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(ColorTheme.bisexualPride.isMultiColor)
         XCTAssertTrue(ColorTheme.nonBinary.isMultiColor)
 
+        XCTAssertFalse(ColorTheme.systemDefault.isMultiColor)
         XCTAssertFalse(ColorTheme.defaultBlue.isMultiColor)
         XCTAssertFalse(ColorTheme.purple.isMultiColor)
         XCTAssertFalse(ColorTheme.graphite.isMultiColor)
@@ -500,14 +517,14 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(config2.colorTheme, .purple)
 
         // Clean up: restore default
-        config.colorTheme = .defaultBlue
+        config.colorTheme = .systemDefault
     }
 
-    func test_appConfiguration_colorTheme_defaultsToDefaultBlue() {
+    func test_appConfiguration_colorTheme_defaultsToSystemDefault() {
         // Remove the key to simulate fresh install
         UserDefaults.standard.removeObject(forKey: "com.cypherair.preference.colorTheme")
         let config = AppConfiguration()
-        XCTAssertEqual(config.colorTheme, .defaultBlue)
+        XCTAssertEqual(config.colorTheme, .systemDefault)
     }
 
     func test_colorTheme_rawValue_roundTrips() {

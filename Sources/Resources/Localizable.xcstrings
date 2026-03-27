@@ -5015,13 +5015,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Default"
+            "value": "Blue"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "默认"
+            "value": "蓝色"
           }
         }
       }
@@ -5166,6 +5166,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "红色"
+          }
+        }
+      }
+    },
+    "theme.systemDefault": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认"
           }
         }
       }

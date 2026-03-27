@@ -4,6 +4,9 @@ import SwiftUI
 /// Themes affect decorative/accent colors only — semantic status colors
 /// (red=error, green=success, orange=warning) are never changed.
 enum ColorTheme: String, CaseIterable, Identifiable, Codable {
+    // System default (no tint override — uses Color.accentColor)
+    case systemDefault
+
     // Single-color
     case defaultBlue
     case indigo
@@ -27,8 +30,10 @@ enum ColorTheme: String, CaseIterable, Identifiable, Codable {
 
     var displayName: String {
         switch self {
+        case .systemDefault:
+            String(localized: "theme.systemDefault", defaultValue: "Default")
         case .defaultBlue:
-            String(localized: "theme.defaultBlue", defaultValue: "Default")
+            String(localized: "theme.defaultBlue", defaultValue: "Blue")
         case .indigo:
             String(localized: "theme.indigo", defaultValue: "Indigo")
         case .purple:
@@ -68,9 +73,11 @@ enum ColorTheme: String, CaseIterable, Identifiable, Codable {
     // MARK: - Global Accent Color
 
     /// The primary tint color applied at the app root level.
+    /// Returns `nil` for system default (no tint override — SwiftUI uses `Color.accentColor`).
     /// Affects navigation bars, toggles, pickers, `.borderedProminent` buttons.
-    var accentColor: Color {
+    var accentColor: Color? {
         switch self {
+        case .systemDefault: nil
         case .defaultBlue: .blue
         case .indigo: .indigo
         case .purple: .purple
@@ -93,8 +100,8 @@ enum ColorTheme: String, CaseIterable, Identifiable, Codable {
     /// Each button's `.tint()` overrides the global tint, providing per-button distinction.
     var actionColors: ActionColors {
         switch self {
-        // Default preserves the original hardcoded colors
-        case .defaultBlue:
+        // System default and blue both use the original hardcoded colors
+        case .systemDefault, .defaultBlue:
             ActionColors(encrypt: .blue, decrypt: .green, sign: .orange, verify: .purple)
 
         // Single-color themes: 4 hue-shifted variants within the palette
@@ -192,6 +199,7 @@ enum ColorTheme: String, CaseIterable, Identifiable, Codable {
     /// Colors shown in the theme picker as a preview swatch.
     var previewColors: [Color] {
         switch self {
+        case .systemDefault: [Color.accentColor]
         case .defaultBlue: [.blue]
         case .indigo: [.indigo]
         case .purple: [.purple]

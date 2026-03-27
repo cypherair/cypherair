@@ -115,7 +115,7 @@ struct CypherAirApp: App {
         WindowGroup {
             ContentView()
                 .privacyScreen()
-                .tint(config.colorTheme.accentColor)
+                .optionalTint(config.colorTheme.accentColor)
                 .environment(config)
                 .environment(keyManagement)
                 .environment(contactService)
@@ -210,7 +210,7 @@ struct CypherAirApp: App {
             NavigationStack {
                 SettingsView()
             }
-            .tint(config.colorTheme.accentColor)
+            .optionalTint(config.colorTheme.accentColor)
             .environment(config)
             .environment(authManager)
             .environment(keyManagement)
@@ -262,6 +262,21 @@ struct CypherAirApp: App {
         let streamingDir = fm.temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
         if fm.fileExists(atPath: streamingDir.path) {
             try? fm.removeItem(at: streamingDir)
+        }
+    }
+}
+
+// MARK: - Optional Tint
+
+private extension View {
+    /// Apply `.tint()` only when a color is provided; omit entirely for `nil`
+    /// so SwiftUI uses the system `Color.accentColor`.
+    @ViewBuilder
+    func optionalTint(_ color: Color?) -> some View {
+        if let color {
+            self.tint(color)
+        } else {
+            self
         }
     }
 }
