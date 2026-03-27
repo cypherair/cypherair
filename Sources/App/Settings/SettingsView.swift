@@ -155,10 +155,7 @@ struct SettingsView: View {
                     #else
                 Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
                 #endif
-            case .keyGeneration, .keyDetail, .backupKey, .importKey,
-                 .contactDetail, .addContact, .qrDisplay, .qrPhotoImport,
-                 .encrypt, .decrypt, .sign, .verify:
-                let _ = assertionFailure("Unexpected route \(route) in SettingsView")
+            default:
                 Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
             }
         }
