@@ -113,12 +113,12 @@ final class AppConfiguration {
         // Onboarding
         self.hasCompletedOnboarding = defaults.bool(forKey: Self.onboardingCompleteKey)
 
-        // Color theme (default: system blue)
+        // Color theme (default: system accent — no tint override)
         if let themeRaw = defaults.string(forKey: Self.colorThemeKey),
            let theme = ColorTheme(rawValue: themeRaw) {
             self.colorTheme = theme
         } else {
-            self.colorTheme = .defaultBlue
+            self.colorTheme = .systemDefault
         }
     }
 
