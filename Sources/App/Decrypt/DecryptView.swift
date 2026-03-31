@@ -19,6 +19,18 @@ struct DecryptView: View {
         }
     }
 
+    enum FileImportTarget {
+        case textCiphertextImport
+        case fileCiphertextImport
+    }
+
+    private struct PendingTextModeImport {
+        let fileURL: URL
+        let fileName: String
+        let data: Data
+        let text: String
+    }
+
     @State private var decryptMode: DecryptMode = .text
     @State private var ciphertextInput = ""
     @State private var decryptedText: String?
@@ -30,10 +42,14 @@ struct DecryptView: View {
 
     // File mode state
     @State private var showFileImporter = false
+    @State private var fileImportTarget: FileImportTarget?
     @State private var selectedFileURL: URL?
     @State private var selectedFileName: String?
     @State private var decryptedFileURL: URL?
     @State private var filePhase1Result: DecryptionService.FilePhase1Result?
+    @State private var importedCiphertext = ImportedTextInputState()
+    @State private var pendingTextModeImport: PendingTextModeImport?
+    @State private var showTextModeSuggestion = false
     @State private var exportController = FileExportController()
 
     var body: some View {
@@ -195,18 +211,40 @@ struct DecryptView: View {
         .navigationTitle(String(localized: "decrypt.title", defaultValue: "Decrypt"))
         .fileImporter(
             isPresented: $showFileImporter,
-            allowedContentTypes: [
-                UTType(filenameExtension: "gpg") ?? .data,
-                UTType(filenameExtension: "pgp") ?? .data,
-                UTType(filenameExtension: "asc") ?? .data,
-                .data
-            ],
+            allowedContentTypes: allowedImportContentTypes,
             allowsMultipleSelection: false
         ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                selectedFileURL = url
-                selectedFileName = url.lastPathComponent
+            let target = fileImportTarget
+            fileImportTarget = nil
+
+            if case .success(let urls) = result,
+               let url = urls.first,
+               let target {
+                handleImportedFile(url, target: target)
             }
+        }
+        .confirmationDialog(
+            String(localized: "decrypt.openAsText.title", defaultValue: "Open as Text?"),
+            isPresented: Binding(
+                get: { showTextModeSuggestion },
+                set: { newValue in
+                    showTextModeSuggestion = newValue
+                    if !newValue {
+                        pendingTextModeImport = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "decrypt.openAsText.action", defaultValue: "Open as Text")) {
+                openPendingFileAsText()
+            }
+            Button(String(localized: "decrypt.openAsText.keepFile", defaultValue: "Keep as File")) {
+                commitPendingFileSelection()
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "decrypt.openAsText.message", defaultValue: "This file looks like an armored text message. Open it in Text mode instead?"))
         }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
@@ -248,6 +286,9 @@ struct DecryptView: View {
             signatureVerification = nil
             phase1Result = nil
             filePhase1Result = nil
+            importedCiphertext.clear()
+            pendingTextModeImport = nil
+            fileImportTarget = nil
         }
         .onChange(of: config.contentClearGeneration) {
             // PRD §4.4: Clear decrypted content when grace period expires.
@@ -268,13 +309,42 @@ struct DecryptView: View {
     @ViewBuilder
     private var textInputContent: some View {
         Section {
-            TextEditor(text: $ciphertextInput)
+            TextEditor(text: ciphertextBinding)
                 .font(.system(.body, design: .monospaced))
                 #if canImport(UIKit)
                 .frame(minHeight: 100)
                 #else
                 .frame(minHeight: 250)
                 #endif
+
+            Button {
+                fileImportTarget = .textCiphertextImport
+                showFileImporter = true
+            } label: {
+                Label(
+                    String(localized: "decrypt.importTextFile", defaultValue: "Import .asc File"),
+                    systemImage: "doc.badge.plus"
+                )
+            }
+
+            if let importedFileName = importedCiphertext.fileName, importedCiphertext.hasImportedFile {
+                HStack {
+                    Label(importedFileName, systemImage: "doc.fill")
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Button {
+                        clearImportedCiphertext()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(String(localized: "decrypt.clearImportedFile", defaultValue: "Clear imported file"))
+                }
+            }
         } header: {
             Text(String(localized: "decrypt.input", defaultValue: "Encrypted Message"))
         }
@@ -284,6 +354,7 @@ struct DecryptView: View {
     private var fileInputContent: some View {
         Section {
             Button {
+                fileImportTarget = .fileCiphertextImport
                 showFileImporter = true
             } label: {
                 Label(
@@ -327,9 +398,39 @@ struct DecryptView: View {
         if operation.isRunning { return true }
         if hasPhase1Result { return true }
         switch decryptMode {
-        case .text: return ciphertextInput.isEmpty
+        case .text:
+            return ciphertextInput.isEmpty && importedCiphertext.rawData == nil
         case .file: return selectedFileURL == nil
         }
+    }
+
+    private var allowedImportContentTypes: [UTType] {
+        switch fileImportTarget {
+        case .textCiphertextImport:
+            return [
+                UTType(filenameExtension: "asc") ?? .plainText,
+                .plainText
+            ]
+        case .fileCiphertextImport, .none:
+            return [
+                UTType(filenameExtension: "gpg") ?? .data,
+                UTType(filenameExtension: "pgp") ?? .data,
+                UTType(filenameExtension: "asc") ?? .data,
+                .data
+            ]
+        }
+    }
+
+    private var ciphertextBinding: Binding<String> {
+        Binding(
+            get: { ciphertextInput },
+            set: { newValue in
+                guard newValue != ciphertextInput else { return }
+                ciphertextInput = newValue
+                _ = importedCiphertext.invalidateIfEditedTextDiffers(newValue)
+                invalidateTextInputState()
+            }
+        )
     }
 
     private func decryptedFilename() -> String {
@@ -348,7 +449,7 @@ struct DecryptView: View {
 
     private func parseRecipientsText() {
         let service = decryptionService
-        let inputData = Data(ciphertextInput.utf8)
+        let inputData = importedCiphertext.rawData ?? Data(ciphertextInput.utf8)
         decryptedText = nil
         signatureVerification = nil
         operation.run(mapError: mapDecryptError) {
@@ -360,8 +461,7 @@ struct DecryptView: View {
     private func parseRecipientsFile() {
         guard let fileURL = selectedFileURL else { return }
         let service = decryptionService
-        decryptedFileURL = nil
-        signatureVerification = nil
+        invalidateFileInputState(deleteTemporaryOutput: true)
         operation.run(mapError: mapDecryptError) {
             let result = try await SecurityScopedFileAccess.withAccess(
                 to: [
@@ -429,5 +529,158 @@ struct DecryptView: View {
 
     private func mapDecryptError(_ error: Error) -> CypherAirError {
         CypherAirError.from(error) { .corruptData(reason: $0) }
+    }
+
+    private func handleImportedFile(_ url: URL, target: FileImportTarget) {
+        switch target {
+        case .textCiphertextImport:
+            importCiphertextTextFile(from: url)
+        case .fileCiphertextImport:
+            inspectCiphertextFileSelection(url)
+        }
+    }
+
+    private func importCiphertextTextFile(from url: URL) {
+        do {
+            let data = try withSecurityScopedAccess(
+                to: url,
+                failure: .corruptData(
+                    reason: String(localized: "decrypt.importTextReadFailed",
+                                   defaultValue: "Could not read text message file")
+                )
+            ) {
+                try Data(contentsOf: url)
+            }
+
+            guard let text = String(data: data, encoding: .utf8) else {
+                throw CypherAirError.corruptData(
+                    reason: String(localized: "decrypt.importTextReadFailed",
+                                   defaultValue: "Could not read text message file")
+                )
+            }
+
+            importedCiphertext.setImportedFile(
+                data: data,
+                fileName: url.lastPathComponent,
+                text: text
+            )
+            ciphertextInput = text
+            invalidateTextInputState()
+        } catch let error as CypherAirError {
+            operation.present(error: error)
+        } catch {
+            operation.present(error: mapDecryptError(error))
+        }
+    }
+
+    private func clearImportedCiphertext() {
+        importedCiphertext.clear()
+        ciphertextInput = ""
+        invalidateTextInputState()
+    }
+
+    private func inspectCiphertextFileSelection(_ url: URL) {
+        let fileName = url.lastPathComponent
+
+        do {
+            let inspection: PendingTextModeImport? = try withSecurityScopedAccess(
+                to: url,
+                failure: .corruptData(
+                    reason: String(localized: "fileDecrypt.cannotAccess",
+                                   defaultValue: "Cannot access file")
+                )
+            ) {
+                let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+                let fileSize = attributes[.size] as? NSNumber
+                let fileSizeValue = fileSize?.intValue ?? 0
+
+                guard fileSizeValue <= ArmoredTextMessageClassifier.maxInspectableFileSize else {
+                    return nil
+                }
+
+                let data = try Data(contentsOf: url)
+                guard ArmoredTextMessageClassifier.classify(fileSize: fileSizeValue, data: data) == .encryptedTextMessage,
+                      let text = String(data: data, encoding: .utf8) else {
+                    return nil
+                }
+
+                return PendingTextModeImport(
+                    fileURL: url,
+                    fileName: fileName,
+                    data: data,
+                    text: text
+                )
+            }
+
+            if let inspection {
+                pendingTextModeImport = inspection
+                showTextModeSuggestion = true
+            } else {
+                commitFileSelection(url: url, fileName: fileName)
+            }
+        } catch let error as CypherAirError {
+            operation.present(error: error)
+        } catch {
+            operation.present(error: mapDecryptError(error))
+        }
+    }
+
+    private func openPendingFileAsText() {
+        guard let pendingTextModeImport else { return }
+
+        decryptMode = .text
+        importedCiphertext.setImportedFile(
+            data: pendingTextModeImport.data,
+            fileName: pendingTextModeImport.fileName,
+            text: pendingTextModeImport.text
+        )
+        ciphertextInput = pendingTextModeImport.text
+        invalidateTextInputState()
+        self.pendingTextModeImport = nil
+        showTextModeSuggestion = false
+    }
+
+    private func commitPendingFileSelection() {
+        guard let pendingTextModeImport else { return }
+        commitFileSelection(url: pendingTextModeImport.fileURL, fileName: pendingTextModeImport.fileName)
+        self.pendingTextModeImport = nil
+        showTextModeSuggestion = false
+    }
+
+    private func commitFileSelection(url: URL, fileName: String) {
+        selectedFileURL = url
+        selectedFileName = fileName
+        invalidateFileInputState(deleteTemporaryOutput: true)
+    }
+
+    private func invalidateTextInputState() {
+        decryptedText = ""
+        decryptedText = nil
+        signatureVerification = nil
+        phase1Result = nil
+    }
+
+    private func invalidateFileInputState(deleteTemporaryOutput: Bool) {
+        if deleteTemporaryOutput, let url = decryptedFileURL {
+            try? FileManager.default.removeItem(at: url)
+            decryptedFileURL = nil
+        } else if deleteTemporaryOutput {
+            decryptedFileURL = nil
+        }
+        signatureVerification = nil
+        filePhase1Result = nil
+    }
+
+    private func withSecurityScopedAccess<T>(
+        to url: URL,
+        failure: CypherAirError,
+        operation: () throws -> T
+    ) throws -> T {
+        guard url.startAccessingSecurityScopedResource() else {
+            throw failure
+        }
+
+        defer { url.stopAccessingSecurityScopedResource() }
+        return try operation()
     }
 }

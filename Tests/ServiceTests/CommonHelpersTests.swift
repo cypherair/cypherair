@@ -152,4 +152,93 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertFalse(merged?.contains("fingerprint") == true)
         XCTAssertFalse(merged?.contains("89abcdef") == true)
     }
+
+    func test_importedTextInputState_preservesRawData_untilVisibleTextChanges() {
+        var state = ImportedTextInputState()
+        let text = "-----BEGIN PGP MESSAGE-----\nVersion: Test\n\nabc\n-----END PGP MESSAGE-----"
+        let data = Data(text.utf8)
+
+        state.setImportedFile(data: data, fileName: "encrypted.asc", text: text)
+
+        XCTAssertTrue(state.hasImportedFile)
+        XCTAssertEqual(state.rawData, data)
+        XCTAssertEqual(state.fileName, "encrypted.asc")
+        XCTAssertEqual(state.textSnapshot, text)
+        XCTAssertFalse(state.invalidateIfEditedTextDiffers(text))
+        XCTAssertEqual(state.rawData, data)
+
+        XCTAssertTrue(state.invalidateIfEditedTextDiffers(text + "\n"))
+        XCTAssertFalse(state.hasImportedFile)
+        XCTAssertNil(state.rawData)
+        XCTAssertNil(state.fileName)
+        XCTAssertNil(state.textSnapshot)
+    }
+
+    func test_importedTextInputState_clear_removesAuthoritativeData() {
+        var state = ImportedTextInputState()
+        let text = "-----BEGIN PGP SIGNED MESSAGE-----\n\nhello"
+        state.setImportedFile(data: Data(text.utf8), fileName: "signed.asc", text: text)
+
+        state.clear()
+
+        XCTAssertFalse(state.hasImportedFile)
+        XCTAssertNil(state.rawData)
+        XCTAssertNil(state.fileName)
+        XCTAssertNil(state.textSnapshot)
+    }
+
+    func test_importedTextInputState_reimport_replacesPreviousBytesAndSnapshot() {
+        var state = ImportedTextInputState()
+        state.setImportedFile(
+            data: Data("old".utf8),
+            fileName: "old.asc",
+            text: "old"
+        )
+
+        state.setImportedFile(
+            data: Data("new".utf8),
+            fileName: "new.asc",
+            text: "new"
+        )
+
+        XCTAssertTrue(state.hasImportedFile)
+        XCTAssertEqual(state.rawData, Data("new".utf8))
+        XCTAssertEqual(state.fileName, "new.asc")
+        XCTAssertEqual(state.textSnapshot, "new")
+    }
+
+    func test_armoredTextMessageClassifier_armoredEncryptedMessage_matches() throws {
+        let data = try FixtureLoader.loadData("gpg_encrypted_message", ext: "asc")
+
+        let result = ArmoredTextMessageClassifier.classify(fileSize: data.count, data: data)
+
+        XCTAssertEqual(result, .encryptedTextMessage)
+    }
+
+    func test_armoredTextMessageClassifier_cleartextSignedMessage_doesNotMatch() throws {
+        let data = try FixtureLoader.loadData("gpg_cleartext_signed", ext: "asc")
+
+        let result = ArmoredTextMessageClassifier.classify(fileSize: data.count, data: data)
+
+        XCTAssertEqual(result, .other)
+    }
+
+    func test_armoredTextMessageClassifier_binaryMessage_doesNotMatch() throws {
+        let data = try FixtureLoader.loadData("gpg_encrypted_message", ext: "gpg")
+
+        let result = ArmoredTextMessageClassifier.classify(fileSize: data.count, data: data)
+
+        XCTAssertEqual(result, .other)
+    }
+
+    func test_armoredTextMessageClassifier_oversizedArmoredMessage_doesNotMatch() {
+        let oversizedText =
+            "-----BEGIN PGP MESSAGE-----\n"
+            + String(repeating: "A", count: ArmoredTextMessageClassifier.maxInspectableFileSize + 1)
+        let data = Data(oversizedText.utf8)
+
+        let result = ArmoredTextMessageClassifier.classify(fileSize: data.count, data: data)
+
+        XCTAssertEqual(result, .other)
+    }
 }

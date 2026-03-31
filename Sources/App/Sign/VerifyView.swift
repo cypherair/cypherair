@@ -24,9 +24,10 @@ struct VerifyView: View {
     @State private var operation = OperationController()
 
     // Detached mode state — single file importer with target tracking
-    enum FilePickerTarget { case original, signature }
+    enum FilePickerTarget { case cleartextSignedImport, original, signature }
     @State private var filePickerTarget: FilePickerTarget?
     @State private var showFileImporter = false
+    @State private var importedCleartext = ImportedTextInputState()
     @State private var originalFileURL: URL?
     @State private var originalFileName: String?
     @State private var signatureFileURL: URL?
@@ -127,13 +128,13 @@ struct VerifyView: View {
         }
         .fileImporter(
             isPresented: $showFileImporter,
-            allowedContentTypes: filePickerTarget == .signature
-                ? [UTType(filenameExtension: "sig") ?? .data, .data]
-                : [.data],
+            allowedContentTypes: allowedImportContentTypes,
             allowsMultipleSelection: false
         ) { result in
             if case .success(let urls) = result, let url = urls.first {
                 switch filePickerTarget {
+                case .cleartextSignedImport:
+                    importCleartextFile(from: url)
                 case .original:
                     originalFileURL = url
                     originalFileName = url.lastPathComponent
@@ -144,6 +145,11 @@ struct VerifyView: View {
                     break
                 }
             }
+            filePickerTarget = nil
+        }
+        .onDisappear {
+            importedCleartext.clear()
+            filePickerTarget = nil
         }
     }
 
@@ -152,13 +158,42 @@ struct VerifyView: View {
     @ViewBuilder
     private var cleartextContent: some View {
         Section {
-            TextEditor(text: $signedInput)
+            TextEditor(text: cleartextBinding)
                 .font(.system(.body, design: .monospaced))
                 #if canImport(UIKit)
                 .frame(minHeight: 100)
                 #else
                 .frame(minHeight: 250)
                 #endif
+
+            Button {
+                filePickerTarget = .cleartextSignedImport
+                showFileImporter = true
+            } label: {
+                Label(
+                    String(localized: "verify.importCleartextFile", defaultValue: "Import Signed File"),
+                    systemImage: "doc.badge.plus"
+                )
+            }
+
+            if let importedFileName = importedCleartext.fileName, importedCleartext.hasImportedFile {
+                HStack {
+                    Label(importedFileName, systemImage: "doc.fill")
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Button {
+                        clearImportedCleartext()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(String(localized: "verify.clearImportedFile", defaultValue: "Clear imported file"))
+                }
+            }
         } header: {
             Text(String(localized: "verify.input", defaultValue: "Signed Message"))
         }
@@ -219,18 +254,44 @@ struct VerifyView: View {
     private var verifyButtonDisabled: Bool {
         if operation.isRunning { return true }
         switch verifyMode {
-        case .cleartext: return signedInput.isEmpty
+        case .cleartext:
+            return signedInput.isEmpty && importedCleartext.rawData == nil
         case .detached: return originalFileURL == nil || signatureFileURL == nil
         }
+    }
+
+    private var allowedImportContentTypes: [UTType] {
+        switch filePickerTarget {
+        case .cleartextSignedImport:
+            return [
+                UTType(filenameExtension: "asc") ?? .plainText,
+                .plainText
+            ]
+        case .signature:
+            return [UTType(filenameExtension: "sig") ?? .data, .data]
+        case .original, .none:
+            return [.data]
+        }
+    }
+
+    private var cleartextBinding: Binding<String> {
+        Binding(
+            get: { signedInput },
+            set: { newValue in
+                guard newValue != signedInput else { return }
+                signedInput = newValue
+                _ = importedCleartext.invalidateIfEditedTextDiffers(newValue)
+                invalidateCleartextVerificationState()
+            }
+        )
     }
 
     // MARK: - Actions
 
     private func verifyCleartext() {
         let service = signingService
-        let inputData = Data(signedInput.utf8)
-        cleartextOriginalText = nil
-        cleartextVerification = nil
+        let inputData = importedCleartext.rawData ?? Data(signedInput.utf8)
+        invalidateCleartextVerificationState()
         operation.run(mapError: mapVerificationError) {
             let result = try await service.verifyCleartext(inputData)
             if let content = result.text {
@@ -284,5 +345,62 @@ struct VerifyView: View {
 
     private func mapVerificationError(_ error: Error) -> CypherAirError {
         CypherAirError.from(error) { _ in .badSignature }
+    }
+
+    private func importCleartextFile(from url: URL) {
+        do {
+            let data = try withSecurityScopedAccess(
+                to: url,
+                failure: .corruptData(
+                    reason: String(localized: "verify.importCleartextReadFailed",
+                                   defaultValue: "Could not read signed message file")
+                )
+            ) {
+                try Data(contentsOf: url)
+            }
+
+            guard let text = String(data: data, encoding: .utf8) else {
+                throw CypherAirError.corruptData(
+                    reason: String(localized: "verify.importCleartextReadFailed",
+                                   defaultValue: "Could not read signed message file")
+                )
+            }
+
+            importedCleartext.setImportedFile(
+                data: data,
+                fileName: url.lastPathComponent,
+                text: text
+            )
+            signedInput = text
+            invalidateCleartextVerificationState()
+        } catch let error as CypherAirError {
+            operation.present(error: error)
+        } catch {
+            operation.present(error: mapVerificationError(error))
+        }
+    }
+
+    private func clearImportedCleartext() {
+        importedCleartext.clear()
+        signedInput = ""
+        invalidateCleartextVerificationState()
+    }
+
+    private func invalidateCleartextVerificationState() {
+        cleartextOriginalText = nil
+        cleartextVerification = nil
+    }
+
+    private func withSecurityScopedAccess<T>(
+        to url: URL,
+        failure: CypherAirError,
+        operation: () throws -> T
+    ) throws -> T {
+        guard url.startAccessingSecurityScopedResource() else {
+            throw failure
+        }
+
+        defer { url.stopAccessingSecurityScopedResource() }
+        return try operation()
     }
 }
