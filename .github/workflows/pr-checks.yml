@@ -1,0 +1,37 @@
+name: PR Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  rust-fast-tests:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run Rust fast suite
+        run: |
+          cargo test --manifest-path pgp-mobile/Cargo.toml --lib
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test cross_profile_tests
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test gnupg_binary_tests
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test gnupg_interop_tests
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_a_tests
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test qr_url_tests
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test security_audit_tests
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test streaming_tests
+
+  swift-unit-tests:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run CypherAir unit tests
+        run: |
+          xcodebuild test \
+            -scheme CypherAir \
+            -project CypherAir.xcodeproj \
+            -testPlan CypherAir-UnitTests \
+            -destination 'platform=macOS'

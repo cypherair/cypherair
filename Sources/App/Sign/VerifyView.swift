@@ -17,13 +17,11 @@ struct VerifyView: View {
 
     @State private var verifyMode: VerifyMode = .cleartext
     @State private var signedInput = ""
-    @State private var isVerifying = false
     // Per-mode results (preserved when switching modes, cleared on view exit)
     @State private var cleartextOriginalText: String?
     @State private var cleartextVerification: SignatureVerification?
     @State private var detachedVerification: SignatureVerification?
-    @State private var error: CypherAirError?
-    @State private var showError = false
+    @State private var operation = OperationController()
 
     // Detached mode state — single file importer with target tracking
     enum FilePickerTarget { case original, signature }
@@ -33,8 +31,6 @@ struct VerifyView: View {
     @State private var originalFileName: String?
     @State private var signatureFileURL: URL?
     @State private var signatureFileName: String?
-    @State private var currentTask: Task<Void, Never>?
-    @State private var fileProgress: FileProgressReporter?
 
     var body: some View {
         Form {
@@ -61,9 +57,9 @@ struct VerifyView: View {
                         verifyDetached()
                     }
                 } label: {
-                    if isVerifying {
+                    if operation.isRunning {
                         HStack {
-                            if verifyMode == .detached, let progress = fileProgress {
+                            if verifyMode == .detached, let progress = operation.progress {
                                 ProgressView(value: progress.fractionCompleted)
                                     .progressViewStyle(.linear)
                                 Text(String(localized: "verify.verifying", defaultValue: "Verifying..."))
@@ -73,10 +69,7 @@ struct VerifyView: View {
                             if verifyMode == .detached {
                                 Spacer()
                                 Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                                    fileProgress?.cancel()
-                                    currentTask?.cancel()
-                                    currentTask = nil
-                                    isVerifying = false
+                                    operation.cancel()
                                 }
                             }
                         }
@@ -122,8 +115,11 @@ struct VerifyView: View {
         .navigationTitle(String(localized: "verify.title", defaultValue: "Verify"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
+            isPresented: Binding(
+                get: { operation.isShowingError },
+                set: { if !$0 { operation.dismissError() } }
+            ),
+            presenting: operation.error
         ) { _ in
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: { err in
@@ -221,7 +217,7 @@ struct VerifyView: View {
     }
 
     private var verifyButtonDisabled: Bool {
-        if isVerifying { return true }
+        if operation.isRunning { return true }
         switch verifyMode {
         case .cleartext: return signedInput.isEmpty
         case .detached: return originalFileURL == nil || signatureFileURL == nil
@@ -231,66 +227,62 @@ struct VerifyView: View {
     // MARK: - Actions
 
     private func verifyCleartext() {
-        isVerifying = true
         let service = signingService
         let inputData = Data(signedInput.utf8)
-        Task {
-            do {
-                let result = try await service.verifyCleartext(inputData)
-                if let content = result.text {
-                    cleartextOriginalText = String(data: content, encoding: .utf8)
-                }
-                cleartextVerification = result.verification
-            } catch {
-                self.error = CypherAirError.from(error) { _ in .badSignature }
-                showError = true
+        cleartextOriginalText = nil
+        cleartextVerification = nil
+        operation.run(mapError: mapVerificationError) {
+            let result = try await service.verifyCleartext(inputData)
+            if let content = result.text {
+                cleartextOriginalText = String(data: content, encoding: .utf8)
             }
-            isVerifying = false
+            cleartextVerification = result.verification
         }
     }
 
     private func verifyDetached() {
         guard let origURL = originalFileURL, let sigURL = signatureFileURL else { return }
         let service = signingService
-        let progress = FileProgressReporter()
-        fileProgress = progress
-
-        isVerifying = true
-        currentTask = Task {
-            defer {
-                fileProgress = nil
-                isVerifying = false
-                currentTask = nil
-            }
-            do {
-                guard origURL.startAccessingSecurityScopedResource() else {
-                    throw CypherAirError.internalError(reason: String(localized: "verify.cannotAccessOriginal", defaultValue: "Cannot access original file"))
-                }
-                defer { origURL.stopAccessingSecurityScopedResource() }
-
-                guard sigURL.startAccessingSecurityScopedResource() else {
-                    throw CypherAirError.internalError(reason: String(localized: "verify.cannotAccessSignature", defaultValue: "Cannot access signature file"))
-                }
-                defer { sigURL.stopAccessingSecurityScopedResource() }
-
+        detachedVerification = nil
+        operation.runFileOperation(mapError: mapVerificationError) { progress in
+            let result = try await SecurityScopedFileAccess.withAccess(
+                to: [
+                    SecurityScopedAccessRequest(
+                        resource: origURL,
+                        failure: .internalError(
+                            reason: String(
+                                localized: "verify.cannotAccessOriginal",
+                                defaultValue: "Cannot access original file"
+                            )
+                        )
+                    ),
+                    SecurityScopedAccessRequest(
+                        resource: sigURL,
+                        failure: .internalError(
+                            reason: String(
+                                localized: "verify.cannotAccessSignature",
+                                defaultValue: "Cannot access signature file"
+                            )
+                        )
+                    )
+                ]
+            ) {
                 // Load only the small .sig file into memory
                 let sigData = try Data(contentsOf: sigURL)
                 try Task.checkCancellation()
                 // Stream the original file for verification
-                let result = try await service.verifyDetachedStreaming(
+                return try await service.verifyDetachedStreaming(
                     fileURL: origURL,
                     signature: sigData,
                     progress: progress
                 )
-                try Task.checkCancellation()
-                detachedVerification = result
-            } catch is CancellationError {
-                // User cancelled — no error to show
-            } catch {
-                if case .operationCancelled = error as? CypherAirError { return }
-                self.error = CypherAirError.from(error) { _ in .badSignature }
-                showError = true
             }
+            try Task.checkCancellation()
+            detachedVerification = result
         }
+    }
+
+    private func mapVerificationError(_ error: Error) -> CypherAirError {
+        CypherAirError.from(error) { _ in .badSignature }
     }
 }

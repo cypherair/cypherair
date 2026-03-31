@@ -40,8 +40,8 @@ final class SelfTestService {
     // MARK: - Run Self-Test
 
     /// Run the complete self-test suite for both profiles.
-    /// Heavy crypto work runs via synchronous `runTest` calls which execute
-    /// on the caller's actor context, while state updates go via MainActor.
+    /// Heavy crypto work is delegated to `@concurrent` helpers so progress
+    /// updates remain responsive while crypto stays off the main actor.
     func runAllTests() async {
         state = .running(progress: 0)
 
@@ -53,21 +53,11 @@ final class SelfTestService {
 
         for profile in profiles {
             // Test 1: Key generation
-            let genResult = runTest(
+            let genResult = await runTest(
                 name: String(localized: "selftest.name.keyGeneration", defaultValue: "Key Generation"),
                 profile: profile
             ) {
-                let generated = try engine.generateKey(
-                    name: "Self-Test",
-                    email: "test@cypherair.local",
-                    expirySeconds: 3600,
-                    profile: profile
-                )
-                let info = try engine.parseKeyInfo(keyData: generated.publicKeyData)
-                guard info.keyVersion == profile.keyVersion else {
-                    throw CypherAirError.corruptData(reason: "Wrong key version: expected \(profile.keyVersion), got \(info.keyVersion)")
-                }
-                return generated
+                try await Self.runKeyGenerationTest(engine: engine, profile: profile)
             }
             results.append(genResult.result)
             completedTests += 1
@@ -82,117 +72,48 @@ final class SelfTestService {
             }
 
             // Test 2: Encrypt/Decrypt round-trip
-            let encDecResult = runTest(
+            let encDecResult = await runTest(
                 name: String(localized: "selftest.name.encryptDecrypt", defaultValue: "Encrypt/Decrypt"),
                 profile: profile
             ) {
-                let plaintext = Data("Self-test 自检 🔐".utf8)
-                let ciphertext = try engine.encrypt(
-                    plaintext: plaintext,
-                    recipients: [generated.publicKeyData],
-                    signingKey: generated.certData,
-                    encryptToSelf: nil
-                )
-                let decrypted = try engine.decrypt(
-                    ciphertext: ciphertext,
-                    secretKeys: [generated.certData],
-                    verificationKeys: [generated.publicKeyData]
-                )
-                guard decrypted.plaintext == plaintext else {
-                    throw CypherAirError.corruptData(reason: "Plaintext mismatch after round-trip")
-                }
-                return decrypted
+                try await Self.runEncryptDecryptTest(engine: engine, generated: generated)
             }
             results.append(encDecResult.result)
             completedTests += 1
             state = .running(progress: Double(completedTests) / Double(totalTests))
 
             // Test 3: Sign/Verify round-trip
-            let signResult = runTest(
+            let signResult = await runTest(
                 name: String(localized: "selftest.name.signVerify", defaultValue: "Sign/Verify"),
                 profile: profile
             ) {
-                let text = Data("Signed message 签名消息".utf8)
-                let signed = try engine.signCleartext(
-                    text: text,
-                    signerCert: generated.certData
-                )
-                let verified = try engine.verifyCleartext(
-                    signedMessage: signed,
-                    verificationKeys: [generated.publicKeyData]
-                )
-                guard verified.status == .valid else {
-                    throw CypherAirError.badSignature
-                }
-                return verified
+                try await Self.runSignVerifyTest(engine: engine, generated: generated)
             }
             results.append(signResult.result)
             completedTests += 1
             state = .running(progress: Double(completedTests) / Double(totalTests))
 
             // Test 4: Tamper detection (1-bit flip)
-            let tamperResult = runTest(
+            let tamperResult = await runTest(
                 name: String(localized: "selftest.name.tamperDetection", defaultValue: "Tamper Detection"),
                 profile: profile
             ) {
-                let plaintext = Data("Tamper test".utf8)
-                var ciphertext = try engine.encrypt(
-                    plaintext: plaintext,
-                    recipients: [generated.publicKeyData],
-                    signingKey: nil,
-                    encryptToSelf: nil
-                )
-
-                // Flip one bit near the middle
-                let midpoint = ciphertext.count / 2
-                ciphertext[midpoint] ^= 0x01
-
-                let decryptSucceeded: Bool
-                do {
-                    _ = try engine.decrypt(
-                        ciphertext: ciphertext,
-                        secretKeys: [generated.certData],
-                        verificationKeys: []
-                    )
-                    decryptSucceeded = true
-                } catch {
-                    // Any error = decryption correctly rejected tampered data
-                    decryptSucceeded = false
-                }
-                guard !decryptSucceeded else {
-                    throw CypherAirError.corruptData(reason: "Tampered ciphertext was not rejected")
-                }
-                return true
+                try await Self.runTamperDetectionTest(engine: engine, generated: generated)
             }
             results.append(tamperResult.result)
             completedTests += 1
             state = .running(progress: Double(completedTests) / Double(totalTests))
 
             // Test 5: Key export/import round-trip
-            let exportResult = runTest(
+            let exportResult = await runTest(
                 name: String(localized: "selftest.name.exportImport", defaultValue: "Export/Import"),
                 profile: profile
             ) {
-                let passphrase = "self-test-passphrase-2024"
-                var exported = try engine.exportSecretKey(
-                    certData: generated.certData,
-                    passphrase: passphrase,
+                try await Self.runExportImportTest(
+                    engine: engine,
+                    generated: generated,
                     profile: profile
                 )
-                var imported = try engine.importSecretKey(
-                    armoredData: exported,
-                    passphrase: passphrase
-                )
-                defer {
-                    exported.resetBytes(in: 0..<exported.count)
-                    imported.resetBytes(in: 0..<imported.count)
-                }
-                let originalInfo = try engine.parseKeyInfo(keyData: generated.certData)
-                let importedInfo = try engine.parseKeyInfo(keyData: imported)
-                guard originalInfo.fingerprint == importedInfo.fingerprint else {
-                    throw CypherAirError.corruptData(reason: "Fingerprint mismatch after export/import")
-                }
-                return importedInfo
             }
             results.append(exportResult.result)
             completedTests += 1
@@ -200,26 +121,11 @@ final class SelfTestService {
         }
 
         // QR URL round-trip test (profile-agnostic, use first generated key)
-        let qrResult = runTest(name: String(localized: "selftest.name.qrRoundTrip", defaultValue: "QR URL Encode/Decode"), profile: nil) {
-            // Generate a fresh key for QR test
-            var generated = try engine.generateKey(
-                name: "QR-Test",
-                email: nil,
-                expirySeconds: 3600,
-                profile: .universal
-            )
-            defer {
-                generated.certData.resetBytes(in: 0..<generated.certData.count)
-                generated.revocationCert.resetBytes(in: 0..<generated.revocationCert.count)
-            }
-            let url = try engine.encodeQrUrl(publicKeyData: generated.publicKeyData)
-            let decoded = try engine.decodeQrUrl(url: url)
-            let originalInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
-            let decodedInfo = try engine.parseKeyInfo(keyData: decoded)
-            guard originalInfo.fingerprint == decodedInfo.fingerprint else {
-                throw CypherAirError.corruptData(reason: "QR round-trip fingerprint mismatch")
-            }
-            return decodedInfo
+        let qrResult = await runTest(
+            name: String(localized: "selftest.name.qrRoundTrip", defaultValue: "QR URL Encode/Decode"),
+            profile: nil
+        ) {
+            try await Self.runQrRoundTripTest(engine: engine)
         }
         results.append(qrResult.result)
         completedTests += 1
@@ -241,11 +147,11 @@ final class SelfTestService {
     private func runTest<T>(
         name: String,
         profile: KeyProfile?,
-        operation: () throws -> T
-    ) -> TestOutput<T> {
+        operation: () async throws -> T
+    ) async -> TestOutput<T> {
         let start = Date()
         do {
-            let value = try operation()
+            let value = try await operation()
             let duration = Date().timeIntervalSince(start)
             let result = TestResult(
                 name: name,
@@ -266,6 +172,154 @@ final class SelfTestService {
             )
             return TestOutput(result: result, passed: false, value: nil)
         }
+    }
+
+    @concurrent
+    private static func runKeyGenerationTest(
+        engine: PgpEngine,
+        profile: KeyProfile
+    ) async throws -> GeneratedKey {
+        let generated = try engine.generateKey(
+            name: "Self-Test",
+            email: "test@cypherair.local",
+            expirySeconds: 3600,
+            profile: profile
+        )
+        let info = try engine.parseKeyInfo(keyData: generated.publicKeyData)
+        guard info.keyVersion == profile.keyVersion else {
+            throw CypherAirError.corruptData(
+                reason: "Wrong key version: expected \(profile.keyVersion), got \(info.keyVersion)"
+            )
+        }
+        return generated
+    }
+
+    @concurrent
+    private static func runEncryptDecryptTest(
+        engine: PgpEngine,
+        generated: GeneratedKey
+    ) async throws -> DecryptResult {
+        let plaintext = Data("Self-test 自检 🔐".utf8)
+        let ciphertext = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [generated.publicKeyData],
+            signingKey: generated.certData,
+            encryptToSelf: nil
+        )
+        let decrypted = try engine.decrypt(
+            ciphertext: ciphertext,
+            secretKeys: [generated.certData],
+            verificationKeys: [generated.publicKeyData]
+        )
+        guard decrypted.plaintext == plaintext else {
+            throw CypherAirError.corruptData(reason: "Plaintext mismatch after round-trip")
+        }
+        return decrypted
+    }
+
+    @concurrent
+    private static func runSignVerifyTest(
+        engine: PgpEngine,
+        generated: GeneratedKey
+    ) async throws -> VerifyResult {
+        let text = Data("Signed message 签名消息".utf8)
+        let signed = try engine.signCleartext(
+            text: text,
+            signerCert: generated.certData
+        )
+        let verified = try engine.verifyCleartext(
+            signedMessage: signed,
+            verificationKeys: [generated.publicKeyData]
+        )
+        guard verified.status == .valid else {
+            throw CypherAirError.badSignature
+        }
+        return verified
+    }
+
+    @concurrent
+    private static func runTamperDetectionTest(
+        engine: PgpEngine,
+        generated: GeneratedKey
+    ) async throws -> Bool {
+        let plaintext = Data("Tamper test".utf8)
+        var ciphertext = try engine.encrypt(
+            plaintext: plaintext,
+            recipients: [generated.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        let midpoint = ciphertext.count / 2
+        ciphertext[midpoint] ^= 0x01
+
+        let decryptSucceeded: Bool
+        do {
+            _ = try engine.decrypt(
+                ciphertext: ciphertext,
+                secretKeys: [generated.certData],
+                verificationKeys: []
+            )
+            decryptSucceeded = true
+        } catch {
+            decryptSucceeded = false
+        }
+
+        guard !decryptSucceeded else {
+            throw CypherAirError.corruptData(reason: "Tampered ciphertext was not rejected")
+        }
+
+        return true
+    }
+
+    @concurrent
+    private static func runExportImportTest(
+        engine: PgpEngine,
+        generated: GeneratedKey,
+        profile: KeyProfile
+    ) async throws -> KeyInfo {
+        let passphrase = "self-test-passphrase-2024"
+        var exported = try engine.exportSecretKey(
+            certData: generated.certData,
+            passphrase: passphrase,
+            profile: profile
+        )
+        var imported = try engine.importSecretKey(
+            armoredData: exported,
+            passphrase: passphrase
+        )
+        defer {
+            exported.resetBytes(in: 0..<exported.count)
+            imported.resetBytes(in: 0..<imported.count)
+        }
+        let originalInfo = try engine.parseKeyInfo(keyData: generated.certData)
+        let importedInfo = try engine.parseKeyInfo(keyData: imported)
+        guard originalInfo.fingerprint == importedInfo.fingerprint else {
+            throw CypherAirError.corruptData(reason: "Fingerprint mismatch after export/import")
+        }
+        return importedInfo
+    }
+
+    @concurrent
+    private static func runQrRoundTripTest(engine: PgpEngine) async throws -> KeyInfo {
+        var generated = try engine.generateKey(
+            name: "QR-Test",
+            email: nil,
+            expirySeconds: 3600,
+            profile: .universal
+        )
+        defer {
+            generated.certData.resetBytes(in: 0..<generated.certData.count)
+            generated.revocationCert.resetBytes(in: 0..<generated.revocationCert.count)
+        }
+        let url = try engine.encodeQrUrl(publicKeyData: generated.publicKeyData)
+        let decoded = try engine.decodeQrUrl(url: url)
+        let originalInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
+        let decodedInfo = try engine.parseKeyInfo(keyData: decoded)
+        guard originalInfo.fingerprint == decodedInfo.fingerprint else {
+            throw CypherAirError.corruptData(reason: "QR round-trip fingerprint mismatch")
+        }
+        return decodedInfo
     }
 
     private func saveReport(results: [TestResult]) {

@@ -16,9 +16,9 @@ final class KeyManagementService {
     private let keychain: any KeychainManageable
     private let authenticator: any AuthenticationEvaluable
     private let memoryInfo: any MemoryInfoProvidable
-
-    private let jsonEncoder = JSONEncoder()
-    private let jsonDecoder = JSONDecoder()
+    private let bundleStore: KeyBundleStore
+    private let metadataStore: KeyMetadataStore
+    private let migrationCoordinator: KeyMigrationCoordinator
 
     init(
         engine: PgpEngine,
@@ -32,6 +32,10 @@ final class KeyManagementService {
         self.keychain = keychain
         self.authenticator = authenticator
         self.memoryInfo = memoryInfo
+        let bundleStore = KeyBundleStore(keychain: keychain)
+        self.bundleStore = bundleStore
+        self.metadataStore = KeyMetadataStore(keychain: keychain)
+        self.migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
     }
 
     // MARK: - Key Enumeration
@@ -39,27 +43,7 @@ final class KeyManagementService {
     /// Load all key identities from Keychain metadata items.
     /// Called on cold launch — does NOT require SE authentication.
     func loadKeys() throws {
-        let metadataServices = try keychain.listItems(
-            servicePrefix: KeychainConstants.metadataPrefix,
-            account: KeychainConstants.defaultAccount
-        )
-
-        var loadedKeys: [PGPKeyIdentity] = []
-        for service in metadataServices {
-            do {
-                let data = try keychain.load(
-                    service: service,
-                    account: KeychainConstants.defaultAccount
-                )
-                let identity = try jsonDecoder.decode(PGPKeyIdentity.self, from: data)
-                loadedKeys.append(identity)
-            } catch {
-                // Skip corrupted metadata items silently
-                continue
-            }
-        }
-
-        keys = loadedKeys
+        keys = try metadataStore.loadAll()
     }
 
     // MARK: - Key Generation
@@ -105,7 +89,7 @@ final class KeyManagementService {
 
         // Store all three Keychain items atomically (rollback on partial failure).
         let fp = keyInfo.fingerprint
-        try saveWrappedKeyBundle(bundle, fingerprint: fp)
+        try bundleStore.saveBundle(bundle, fingerprint: fp)
 
         let identity = PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
@@ -129,9 +113,9 @@ final class KeyManagementService {
         // Persist metadata for cold-launch enumeration.
         // If metadata save fails, roll back the SE bundle too.
         do {
-            try saveMetadata(identity)
+            try metadataStore.save(identity)
         } catch {
-            rollbackKeychainBundle(fingerprint: fp)
+            bundleStore.rollbackPermanentBundle(fingerprint: fp)
             throw error
         }
 
@@ -191,7 +175,7 @@ final class KeyManagementService {
 
         // Store all three Keychain items atomically (rollback on partial failure).
         let fp = keyInfo.fingerprint
-        try saveWrappedKeyBundle(bundle, fingerprint: fp)
+        try bundleStore.saveBundle(bundle, fingerprint: fp)
 
         let identity = PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
@@ -215,9 +199,9 @@ final class KeyManagementService {
         // Persist metadata for cold-launch enumeration.
         // If metadata save fails, roll back the SE bundle too.
         do {
-            try saveMetadata(identity)
+            try metadataStore.save(identity)
         } catch {
-            rollbackKeychainBundle(fingerprint: fp)
+            bundleStore.rollbackPermanentBundle(fingerprint: fp)
             throw error
         }
 
@@ -259,7 +243,7 @@ final class KeyManagementService {
         // the successful export.
         if let index = keys.firstIndex(where: { $0.fingerprint == fingerprint }) {
             keys[index].isBackedUp = true
-            try? updateMetadata(keys[index])
+            try? metadataStore.update(keys[index])
         }
 
         return exported
@@ -312,25 +296,24 @@ final class KeyManagementService {
         )
 
         do {
-            try savePendingKeyBundle(bundle, fingerprint: fingerprint)
+            try bundleStore.saveBundle(
+                bundle,
+                fingerprint: fingerprint,
+                namespace: .pending
+            )
         } catch {
-            cleanupPendingItems(fingerprint: fingerprint)
+            bundleStore.cleanupPendingBundle(fingerprint: fingerprint)
             throw error
         }
 
         // 5. Verify all pending items stored successfully.
         do {
-            _ = try keychain.load(
-                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount)
-            _ = try keychain.load(
-                service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount)
-            _ = try keychain.load(
-                service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount)
+            _ = try bundleStore.loadBundle(
+                fingerprint: fingerprint,
+                namespace: .pending
+            )
         } catch {
-            cleanupPendingItems(fingerprint: fingerprint)
+            bundleStore.cleanupPendingBundle(fingerprint: fingerprint)
             throw error
         }
 
@@ -341,11 +324,16 @@ final class KeyManagementService {
         UserDefaults.standard.set(fingerprint, forKey: AuthPreferences.modifyExpiryFingerprintKey)
 
         // 7. Delete old permanent items. Pending items are confirmed stored.
-        rollbackKeychainBundle(fingerprint: fingerprint)
+        do {
+            try bundleStore.deleteBundle(fingerprint: fingerprint)
+        } catch {
+            // Pending items remain. Leave the crash-recovery flag set.
+            throw error
+        }
 
         // 8. Promote pending → permanent.
         do {
-            try promotePendingToPermanent(fingerprint: fingerprint)
+            try bundleStore.promotePendingToPermanent(fingerprint: fingerprint)
         } catch {
             // If promotion fails, pending items remain. They are the only copy.
             // Leave the flag set so crash recovery can handle it on next launch.
@@ -365,7 +353,7 @@ final class KeyManagementService {
         }
 
         // 11. Persist metadata and update in-memory state
-        try updateMetadata(updated)
+        try metadataStore.update(updated)
         keys[index] = updated
 
         return updated
@@ -404,7 +392,7 @@ final class KeyManagementService {
             // Persist the promoted default so it survives cold restart.
             // try? because key deletion already succeeded — failing to persist
             // the new default only affects the next cold launch (user sees no default).
-            try? updateMetadata(keys[0])
+            try? metadataStore.update(keys[0])
         }
 
         // Report partial deletion failure to the caller.
@@ -429,7 +417,7 @@ final class KeyManagementService {
             }
         }
         for i in changedIndices {
-            try updateMetadata(keys[i])
+            try metadataStore.update(keys[i])
         }
     }
 
@@ -476,41 +464,7 @@ final class KeyManagementService {
             return
         }
 
-        let account = KeychainConstants.defaultAccount
-        let oldExists = keychain.exists(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account
-        )
-        let pendingExists = keychain.exists(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: account
-        )
-
-        if oldExists && pendingExists {
-            // Case 1: Interrupted before old items deleted.
-            // Delete temporary items. Original keys are intact.
-            cleanupPendingItems(fingerprint: fingerprint)
-
-        } else if !oldExists && pendingExists {
-            // Case 2: Interrupted after old deletion but before promotion.
-            // Verify all 3 pending items exist before attempting promotion.
-            let pendingSaltExists = keychain.exists(
-                service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-                account: account
-            )
-            let pendingSealedExists = keychain.exists(
-                service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-                account: account
-            )
-
-            if pendingSaltExists && pendingSealedExists {
-                // All 3 pending items present — safe to promote.
-                try? promotePendingToPermanent(fingerprint: fingerprint)
-            }
-            // else: Incomplete pending set — catastrophic partial write.
-            // Cannot promote. User must restore from backup.
-        }
-        // Case 3: Neither exists — catastrophic loss. Nothing we can do.
+        _ = migrationCoordinator.recoverInterruptedMigration(for: fingerprint)
 
         // Always clear the flags after recovery attempt.
         defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
@@ -602,253 +556,8 @@ final class KeyManagementService {
     /// The caller MUST zeroize the returned data after use.
     func unwrapPrivateKey(fingerprint: String) throws -> Data {
         let fp = fingerprint
-        let seKeyData = try keychain.load(
-            service: KeychainConstants.seKeyService(fingerprint: fp),
-            account: KeychainConstants.defaultAccount)
-        let salt = try keychain.load(
-            service: KeychainConstants.saltService(fingerprint: fp),
-            account: KeychainConstants.defaultAccount)
-        let sealedBox = try keychain.load(
-            service: KeychainConstants.sealedKeyService(fingerprint: fp),
-            account: KeychainConstants.defaultAccount)
-
-        let handle = try secureEnclave.reconstructKey(from: seKeyData)
-        let bundle = WrappedKeyBundle(seKeyData: seKeyData, salt: salt, sealedBox: sealedBox)
+        let bundle = try bundleStore.loadBundle(fingerprint: fp)
+        let handle = try secureEnclave.reconstructKey(from: bundle.seKeyData)
         return try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fp)
     }
-
-    // MARK: - Keychain Bundle Helpers
-
-    /// Save the three SE-wrapped key items to Keychain.
-    /// If any write fails, rolls back the ones that succeeded.
-    private func saveWrappedKeyBundle(_ bundle: WrappedKeyBundle, fingerprint: String) throws {
-        do {
-            try keychain.save(
-                bundle.seKeyData,
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount,
-                accessControl: nil
-            )
-        } catch {
-            throw error
-        }
-
-        do {
-            try keychain.save(
-                bundle.salt,
-                service: KeychainConstants.saltService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount,
-                accessControl: nil
-            )
-        } catch {
-            try? keychain.delete(
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount
-            )
-            throw error
-        }
-
-        do {
-            try keychain.save(
-                bundle.sealedBox,
-                service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount,
-                accessControl: nil
-            )
-        } catch {
-            try? keychain.delete(
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount
-            )
-            try? keychain.delete(
-                service: KeychainConstants.saltService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount
-            )
-            throw error
-        }
-    }
-
-    /// Save the three SE-wrapped key items under PENDING Keychain names.
-    /// If any write fails, rolls back the ones that succeeded.
-    private func savePendingKeyBundle(_ bundle: WrappedKeyBundle, fingerprint: String) throws {
-        do {
-            try keychain.save(
-                bundle.seKeyData,
-                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount,
-                accessControl: nil
-            )
-        } catch {
-            throw error
-        }
-
-        do {
-            try keychain.save(
-                bundle.salt,
-                service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount,
-                accessControl: nil
-            )
-        } catch {
-            try? keychain.delete(
-                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount
-            )
-            throw error
-        }
-
-        do {
-            try keychain.save(
-                bundle.sealedBox,
-                service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount,
-                accessControl: nil
-            )
-        } catch {
-            try? keychain.delete(
-                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount
-            )
-            try? keychain.delete(
-                service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount
-            )
-            throw error
-        }
-    }
-
-    /// Promote pending Keychain items to permanent names for one identity.
-    /// Sequence: load all pending → save as permanent → delete pending.
-    ///
-    /// - Note: `AuthenticationManager.promoteFromPending` is a parallel implementation
-    ///   of the same pending→permanent promotion pattern for auth mode switching.
-    ///   They are kept separate to avoid a circular dependency between KMS and AuthManager.
-    ///   If the promotion logic changes, update both implementations.
-    private func promotePendingToPermanent(fingerprint: String) throws {
-        let account = KeychainConstants.defaultAccount
-
-        // Load all 3 pending items first.
-        let seKeyData = try keychain.load(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: account
-        )
-        let saltData = try keychain.load(
-            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-            account: account
-        )
-        let sealedData = try keychain.load(
-            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-            account: account
-        )
-
-        // Save under permanent names, rolling back on partial failure.
-        var savedPermanentServices: [String] = []
-
-        do {
-            try keychain.save(
-                seKeyData,
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-                account: account,
-                accessControl: nil
-            )
-            savedPermanentServices.append(KeychainConstants.seKeyService(fingerprint: fingerprint))
-
-            try keychain.save(
-                saltData,
-                service: KeychainConstants.saltService(fingerprint: fingerprint),
-                account: account,
-                accessControl: nil
-            )
-            savedPermanentServices.append(KeychainConstants.saltService(fingerprint: fingerprint))
-
-            try keychain.save(
-                sealedData,
-                service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-                account: account,
-                accessControl: nil
-            )
-        } catch {
-            for service in savedPermanentServices {
-                try? keychain.delete(service: service, account: account)
-            }
-            throw error
-        }
-
-        // All 3 permanent items saved. Delete pending items.
-        try? keychain.delete(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: account
-        )
-        try? keychain.delete(
-            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-            account: account
-        )
-        try? keychain.delete(
-            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-            account: account
-        )
-    }
-
-    /// Best-effort cleanup of pending Keychain items for one identity.
-    private func cleanupPendingItems(fingerprint: String) {
-        let account = KeychainConstants.defaultAccount
-        try? keychain.delete(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: account
-        )
-        try? keychain.delete(
-            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-            account: account
-        )
-        try? keychain.delete(
-            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-            account: account
-        )
-    }
-
-    /// Best-effort rollback: remove all three SE bundle items from Keychain.
-    private func rollbackKeychainBundle(fingerprint: String) {
-        try? keychain.delete(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount
-        )
-        try? keychain.delete(
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount
-        )
-        try? keychain.delete(
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount
-        )
-    }
-
-    // MARK: - Metadata Persistence
-
-    /// Save key identity metadata to Keychain (no sensitive data).
-    /// Used for cold-launch key enumeration.
-    private func saveMetadata(_ identity: PGPKeyIdentity) throws {
-        let data = try jsonEncoder.encode(identity)
-        try keychain.save(
-            data,
-            service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
-    }
-
-    /// Update existing metadata (delete + re-save).
-    /// Used when mutable properties like isBackedUp change.
-    private func updateMetadata(_ identity: PGPKeyIdentity) throws {
-        do {
-            try keychain.delete(
-                service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
-                account: KeychainConstants.defaultAccount
-            )
-        } catch KeychainError.itemNotFound {
-            // Benign: first-time save, nothing to delete.
-        }
-        try saveMetadata(identity)
-    }
-
-
 }

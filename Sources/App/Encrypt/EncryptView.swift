@@ -29,26 +29,17 @@ struct EncryptView: View {
     @State private var selectedRecipients: Set<String> = []
     @State private var signMessage = true
     @State private var signerFingerprint: String?
-    @State private var isEncrypting = false
     @State private var ciphertext: Data?
-    @State private var error: CypherAirError?
-    @State private var showError = false
-    @State private var showClipboardNotice = false
     @State private var encryptToSelf: Bool?
     @State private var encryptToSelfFingerprint: String?
+    @State private var operation = OperationController()
 
     // File mode state
     @State private var showFileImporter = false
     @State private var selectedFileURL: URL?
     @State private var selectedFileName: String?
     @State private var encryptedFileURL: URL?
-    @State private var currentTask: Task<Void, Never>?
-    @State private var fileProgress: FileProgressReporter?
-
-    // File exporter state
-    @State private var showFileExporter = false
-    @State private var exportableFile: ExportableFile?
-    @State private var exportFilename: String = "encrypted"
+    @State private var exportController = FileExportController()
 
     var body: some View {
         Form {
@@ -141,9 +132,9 @@ struct EncryptView: View {
                         encryptFile()
                     }
                 } label: {
-                    if isEncrypting {
+                    if operation.isRunning {
                         HStack {
-                            if encryptMode == .file, let progress = fileProgress {
+                            if encryptMode == .file, let progress = operation.progress {
                                 ProgressView(value: progress.fractionCompleted)
                                     .progressViewStyle(.linear)
                                 Text(String(localized: "fileEncrypt.encrypting", defaultValue: "Encrypting..."))
@@ -153,10 +144,7 @@ struct EncryptView: View {
                             if encryptMode == .file {
                                 Spacer()
                                 Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                                    fileProgress?.cancel()
-                                    currentTask?.cancel()
-                                    currentTask = nil
-                                    isEncrypting = false
+                                    operation.cancel()
                                 }
                             }
                         }
@@ -178,15 +166,7 @@ struct EncryptView: View {
                         .textSelection(.enabled)
 
                     Button {
-                        #if canImport(UIKit)
-                        UIPasteboard.general.string = ciphertextString
-                        #elseif canImport(AppKit)
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(ciphertextString, forType: .string)
-                        #endif
-                        if config.clipboardNotice {
-                            showClipboardNotice = true
-                        }
+                        operation.copyToClipboard(ciphertextString, config: config)
                     } label: {
                         Label(
                             String(localized: "common.copy", defaultValue: "Copy"),
@@ -195,16 +175,20 @@ struct EncryptView: View {
                     }
 
                     Button {
-                        let tmpURL = FileManager.default.temporaryDirectory
-                            .appendingPathComponent("encrypted.asc")
                         do {
-                            try ciphertext.write(to: tmpURL)
-                            exportableFile = ExportableFile(url: tmpURL)
-                            exportFilename = "encrypted.asc"
-                            showFileExporter = true
+                            try exportController.prepareDataExport(
+                                ciphertext,
+                                suggestedFilename: "encrypted.asc"
+                            )
                         } catch {
-                            self.error = .encryptionFailed(reason: String(localized: "fileEncrypt.readFailed", defaultValue: "Could not read encrypted file"))
-                            showError = true
+                            operation.present(
+                                error: .encryptionFailed(
+                                    reason: String(
+                                        localized: "fileEncrypt.readFailed",
+                                        defaultValue: "Could not read encrypted file"
+                                    )
+                                )
+                            )
                         }
                     } label: {
                         Label(
@@ -223,13 +207,20 @@ struct EncryptView: View {
                     Button {
                         if let url = encryptedFileURL {
                             guard FileManager.default.fileExists(atPath: url.path) else {
-                                error = .encryptionFailed(reason: String(localized: "fileEncrypt.readFailed", defaultValue: "Could not read encrypted file"))
-                                showError = true
+                                operation.present(
+                                    error: .encryptionFailed(
+                                        reason: String(
+                                            localized: "fileEncrypt.readFailed",
+                                            defaultValue: "Could not read encrypted file"
+                                        )
+                                    )
+                                )
                                 return
                             }
-                            exportableFile = ExportableFile(url: url)
-                            exportFilename = (selectedFileName ?? "file") + ".gpg"
-                            showFileExporter = true
+                            exportController.prepareFileExport(
+                                fileURL: url,
+                                suggestedFilename: (selectedFileName ?? "file") + ".gpg"
+                            )
                         }
                     } label: {
                         Label(
@@ -259,8 +250,11 @@ struct EncryptView: View {
         }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
+            isPresented: Binding(
+                get: { operation.isShowingError },
+                set: { if !$0 { operation.dismissError() } }
+            ),
+            presenting: operation.error
         ) { _ in
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: { err in
@@ -268,25 +262,32 @@ struct EncryptView: View {
         }
         .alert(
             String(localized: "clipboard.notice.title", defaultValue: "Copied to Clipboard"),
-            isPresented: $showClipboardNotice
+            isPresented: Binding(
+                get: { operation.isShowingClipboardNotice },
+                set: { if !$0 { operation.dismissClipboardNotice() } }
+            )
         ) {
-            Button(String(localized: "clipboard.notice.dismiss", defaultValue: "OK")) {}
+            Button(String(localized: "clipboard.notice.dismiss", defaultValue: "OK")) {
+                operation.dismissClipboardNotice()
+            }
             Button(String(localized: "clipboard.notice.dontShow", defaultValue: "Don't Show Again")) {
-                config.clipboardNotice = false
+                operation.dismissClipboardNotice(disableFutureNoticesIn: config)
             }
         } message: {
             Text(String(localized: "clipboard.notice.message", defaultValue: "The encrypted message has been copied. Remember to clear your clipboard after pasting."))
         }
         .fileExporter(
-            isPresented: $showFileExporter,
-            item: exportableFile,
+            isPresented: Binding(
+                get: { exportController.isPresented },
+                set: { if !$0 { exportController.finish() } }
+            ),
+            item: exportController.payload,
             contentTypes: [.data],
-            defaultFilename: exportFilename
+            defaultFilename: exportController.defaultFilename
         ) { result in
-            exportableFile = nil
+            exportController.finish()
             if case .failure(let exportError) = result {
-                error = CypherAirError.from(exportError) { .encryptionFailed(reason: $0) }
-                showError = true
+                operation.present(error: mapEncryptionError(exportError))
             }
         }
         .onAppear {
@@ -355,7 +356,7 @@ struct EncryptView: View {
     }
 
     private var encryptButtonDisabled: Bool {
-        if isEncrypting { return true }
+        if operation.isRunning { return true }
         if selectedRecipients.isEmpty { return true }
         switch encryptMode {
         case .text: return plaintext.isEmpty
@@ -366,15 +367,14 @@ struct EncryptView: View {
     // MARK: - Actions
 
     private func encryptText() {
-        isEncrypting = true
         let service = encryptionService
         let text = plaintext
         let recipients = Array(selectedRecipients)
         let signerFp = signMessage ? signerFingerprint : nil
         let selfEncrypt = encryptToSelf ?? config.encryptToSelf
         let selfEncryptFp = selfEncrypt ? encryptToSelfFingerprint : nil
-        Task {
-            do {
+        ciphertext = nil
+        operation.run(mapError: mapEncryptionError) {
                 let result = try await service.encryptText(
                     text,
                     recipientFingerprints: recipients,
@@ -383,11 +383,6 @@ struct EncryptView: View {
                     encryptToSelfFingerprint: selfEncryptFp
                 )
                 ciphertext = result
-            } catch {
-                self.error = CypherAirError.from(error) { .encryptionFailed(reason: $0) }
-                showError = true
-            }
-            isEncrypting = false
         }
     }
 
@@ -398,38 +393,22 @@ struct EncryptView: View {
         let signerFp = signMessage ? signerFingerprint : nil
         let selfEncrypt = encryptToSelf ?? config.encryptToSelf
         let selfEncryptFp = selfEncrypt ? encryptToSelfFingerprint : nil
-
-        let progress = FileProgressReporter()
-        fileProgress = progress
-
-        isEncrypting = true
-        currentTask = Task {
-            #if canImport(UIKit)
-            var bgTaskID = UIBackgroundTaskIdentifier.invalid
-            bgTaskID = UIApplication.shared.beginBackgroundTask {
-                UIApplication.shared.endBackgroundTask(bgTaskID)
-                bgTaskID = .invalid
-            }
-            #endif
-            defer {
-                #if canImport(UIKit)
-                if bgTaskID != .invalid {
-                    UIApplication.shared.endBackgroundTask(bgTaskID)
-                }
-                #endif
-                fileProgress = nil
-                isEncrypting = false
-                currentTask = nil
-            }
-            do {
-                guard fileURL.startAccessingSecurityScopedResource() else {
-                    error = .corruptData(reason: String(localized: "fileEncrypt.cannotAccess", defaultValue: "Cannot access file"))
-                    showError = true
-                    return
-                }
-                defer { fileURL.stopAccessingSecurityScopedResource() }
-
-                let result = try await service.encryptFileStreaming(
+        encryptedFileURL = nil
+        operation.runFileOperation(mapError: mapEncryptionError) { progress in
+            let result = try await SecurityScopedFileAccess.withAccess(
+                to: [
+                    SecurityScopedAccessRequest(
+                        resource: fileURL,
+                        failure: .corruptData(
+                            reason: String(
+                                localized: "fileEncrypt.cannotAccess",
+                                defaultValue: "Cannot access file"
+                            )
+                        )
+                    )
+                ]
+            ) {
+                try await service.encryptFileStreaming(
                     inputURL: fileURL,
                     recipientFingerprints: recipients,
                     signWithFingerprint: signerFp,
@@ -437,15 +416,13 @@ struct EncryptView: View {
                     encryptToSelfFingerprint: selfEncryptFp,
                     progress: progress
                 )
-                try Task.checkCancellation()
-                encryptedFileURL = result
-            } catch is CancellationError {
-                // User cancelled — no error to show
-            } catch {
-                if case .operationCancelled = error as? CypherAirError { return }
-                self.error = CypherAirError.from(error) { .encryptionFailed(reason: $0) }
-                showError = true
             }
+            try Task.checkCancellation()
+            encryptedFileURL = result
         }
+    }
+
+    private func mapEncryptionError(_ error: Error) -> CypherAirError {
+        CypherAirError.from(error) { .encryptionFailed(reason: $0) }
     }
 }

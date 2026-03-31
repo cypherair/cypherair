@@ -51,10 +51,7 @@ struct ImportConfirmView: View {
                         Text(formatted)
                             .font(.system(.body, design: .monospaced))
                             .accessibilityLabel(
-                                formatted
-                                    .split(separator: " ")
-                                    .map { $0.map(String.init).joined(separator: " ") }
-                                    .joined(separator: ", ")
+                                IdentityPresentation.fingerprintAccessibilityLabel(keyInfo.fingerprint)
                             )
                     }
                 }

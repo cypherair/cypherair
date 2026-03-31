@@ -44,10 +44,7 @@ struct ContactDetailView: View {
                         Text(contact.formattedFingerprint)
                             .font(.system(.body, design: .monospaced))
                             .accessibilityLabel(
-                                contact.formattedFingerprint
-                                    .split(separator: " ")
-                                    .map { $0.map(String.init).joined(separator: " ") }
-                                    .joined(separator: ", ")
+                                IdentityPresentation.fingerprintAccessibilityLabel(contact.fingerprint)
                             )
                     } header: {
                         Text(String(localized: "contactdetail.fingerprint", defaultValue: "Fingerprint"))
