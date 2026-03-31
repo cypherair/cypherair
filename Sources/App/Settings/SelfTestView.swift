@@ -19,10 +19,10 @@ struct SelfTestView: View {
                             await service.runAllTests()
                         }
                     } label: {
-                        Label(
-                            String(localized: "selftest.run", defaultValue: "Run Self-Test"),
-                            systemImage: "play.circle.fill"
-                        )
+                        HStack(spacing: 8) {
+                            Image(systemName: "play.circle.fill")
+                            Text(String(localized: "selftest.run", defaultValue: "Run Self-Test"))
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                 }

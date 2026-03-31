@@ -7,15 +7,25 @@ struct ContactsView: View {
     @State private var deleteError: String?
     @State private var showDeleteError = false
     #if os(macOS)
+    @State private var selectedContactFingerprint: String?
     @State private var showAddContact = false
     #endif
 
     var body: some View {
         List {
             ForEach(contactService.contacts) { contact in
+                #if os(macOS)
+                Button {
+                    selectedContactFingerprint = contact.fingerprint
+                } label: {
+                    ContactRowView(contact: contact)
+                }
+                .buttonStyle(.plain)
+                #else
                 NavigationLink(value: AppRoute.contactDetail(fingerprint: contact.fingerprint)) {
                     ContactRowView(contact: contact)
                 }
+                #endif
             }
             .onDelete { indexSet in
                 for index in indexSet {
@@ -93,6 +103,24 @@ struct ContactsView: View {
             }
         }
         #if os(macOS)
+        .sheet(isPresented: Binding(
+            get: { selectedContactFingerprint != nil },
+            set: { if !$0 { selectedContactFingerprint = nil } }
+        )) {
+            if let selectedContactFingerprint {
+                NavigationStack {
+                    ContactDetailView(fingerprint: selectedContactFingerprint)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(String(localized: "common.done", defaultValue: "Done")) {
+                                    self.selectedContactFingerprint = nil
+                                }
+                            }
+                        }
+                }
+                .frame(minWidth: 500, minHeight: 420)
+            }
+        }
         .sheet(isPresented: $showAddContact) {
             NavigationStack {
                 AddContactView()

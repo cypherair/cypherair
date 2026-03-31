@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var showTutorial = false
     @State private var riskAcknowledged = false
     #if os(macOS)
+    @State private var showThemePicker = false
     @State private var showSelfTest = false
     @State private var showAbout = false
     #endif
@@ -69,12 +70,23 @@ struct SettingsView: View {
             }
 
             Section {
+                #if os(macOS)
+                Button {
+                    showThemePicker = true
+                } label: {
+                    Label(
+                        String(localized: "settings.theme", defaultValue: "Color Theme"),
+                        systemImage: "paintpalette"
+                    )
+                }
+                #else
                 NavigationLink(value: AppRoute.themePicker) {
                     Label(
                         String(localized: "settings.theme", defaultValue: "Color Theme"),
                         systemImage: "paintpalette"
                     )
                 }
+                #endif
                 #if canImport(UIKit)
                 NavigationLink(value: AppRoute.appIcon) {
                     Label(
@@ -245,6 +257,19 @@ struct SettingsView: View {
             TutorialView()
         }
         #if os(macOS)
+        .sheet(isPresented: $showThemePicker) {
+            NavigationStack {
+                ThemePickerView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                                showThemePicker = false
+                            }
+                        }
+                    }
+            }
+            .frame(minWidth: 500, minHeight: 420)
+        }
         .sheet(isPresented: $showSelfTest) {
             NavigationStack {
                 SelfTestView()
