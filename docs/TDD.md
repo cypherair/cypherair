@@ -117,6 +117,8 @@ The App decrypts all supported formats regardless of the user's own key profile:
 
 Targets: `aarch64-apple-ios` (device) + `aarch64-apple-ios-sim` (Apple Silicon sim) + `aarch64-apple-darwin` (macOS Apple Silicon). Tier 2 in Rust. `getrandom` uses SecRandomCopyBytes on iOS/macOS. LTO and strip are **disabled** in the release profile (`lto = false`, `strip = "none"`) — enabling them causes linker failures with vendored OpenSSL. Binary size is managed via `codegen-units = 1` and Xcode dead code elimination. Estimated app binary contribution: ~6–8 MB.
 
+The current deployment baseline for the app targets is `iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+`.
+
 ---
 
 ## 2. Rust-to-Swift FFI: UniFFI
@@ -325,7 +327,7 @@ Keychain: SE key + salt + sealed-key + metadata per identity (both profiles)
 
 ## 7. UI Framework
 
-SwiftUI (iOS 26.2+). UIKit: UIActivityViewController, UIDocumentPickerViewController, PHPickerViewController, beginBackgroundTask.
+SwiftUI (iOS 26.4+). UIKit: UIActivityViewController, UIDocumentPickerViewController, PHPickerViewController, beginBackgroundTask.
 
 ---
 

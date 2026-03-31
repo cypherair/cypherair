@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD)
 
 > **Version:** v4.0
-> **Platform:** iOS 26.2+ / iPadOS 26.2+ / macOS 26.2+
+> **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+
 > **License:** GPLv3  
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
 
@@ -20,7 +20,7 @@ A fully offline OpenPGP encryption tool that enables everyday users to communica
 
 ### 1.3 Supported Platforms
 
-iOS 26.2+ / iPadOS 26.2+ / macOS 26.2+ (same codebase). Minimum device: 8 GB RAM.
+iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ (same codebase). Minimum device: 8 GB RAM.
 
 ### 1.4 Explicit Exclusions
 
@@ -341,7 +341,7 @@ Full details in [TDD](TDD.md). Key decisions:
 
 ### 10.3 v1.2 — Completed
 
-- [x] macOS 26.2+ support (same codebase). Separate entitlements for macOS sandbox and file access. Conditional compilation for platform-specific APIs (clipboard, background tasks, biometric icons). XCFramework extended with `aarch64-apple-darwin` slice.
+- [x] macOS 26.4+ support (same codebase). Separate entitlements for macOS sandbox and file access. Conditional compilation for platform-specific APIs (clipboard, background tasks, biometric icons). XCFramework extended with `aarch64-apple-darwin` slice.
 
 ### 10.4 v2.0
 

@@ -7,7 +7,7 @@
 
 Liquid Glass is Apple's iOS 26 design language. It is a translucent, refracting material that replaces the blur-based materials used since iOS 7. Glass belongs exclusively on the **navigation and controls layer** — floating above content, never applied to content itself.
 
-**CypherAir targets iOS 26.2+ exclusively.** There is no need for backward compatibility with older design languages. Do not use `UIDesignRequiresCompatibility`. Fully embrace Liquid Glass.
+**CypherAir targets iOS 26.4+ exclusively.** There is no need for backward compatibility with older design languages. Do not use `UIDesignRequiresCompatibility`. Fully embrace Liquid Glass.
 
 ## 2. Automatic Adoption
 
@@ -214,7 +214,7 @@ if showPrivacyScreen {
 
 **Note:** Verify the visual appearance of `.ultraThinMaterial` on iOS 26. Material rendering may differ from iOS 18 due to Liquid Glass engine changes. If the privacy screen does not adequately obscure content, consider using a fully opaque overlay with the app logo instead.
 
-## 7. Known Bugs and Workarounds (as of iOS 26.2)
+## 7. Known Bugs and Workarounds (as of iOS 26.4)
 
 | Bug | Workaround |
 |-----|-----------|

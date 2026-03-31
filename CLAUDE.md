@@ -4,7 +4,7 @@ Offline OpenPGP encryption tool for iOS, iPadOS, and macOS. GPLv3. Zero network 
 
 ## Tech Stack
 
-- **Platform:** iOS 26.2+ / iPadOS 26.2+ / macOS 26.2+. Minimum device: 8 GB RAM.
+- **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+. Minimum device: 8 GB RAM.
 - **Language:** Swift 6.2, SwiftUI (iOS 26 Liquid Glass design). UIKit only for system pickers.
 - **OpenPGP:** Sequoia PGP 2.2.0 (Rust, LGPL-2.0-or-later, compatible with App's GPLv3) with `crypto-openssl` backend (vendored static linking).
 - **Profiles:** Profile A (Universal): v4 keys, Ed25519+X25519, SEIPDv1. Profile B (Advanced): v6 keys, Ed448+X448, SEIPDv2 AEAD. See @docs/PRD.md Section 3.
@@ -129,6 +129,7 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
 - MIE: test on iPhone 17 or iPhone Air (A19/A19 Pro) with Hardware Memory Tagging diagnostics enabled.
 - Test plans: `CypherAir-UnitTests.xctestplan` (simulator/CI), `CypherAir-DeviceTests.xctestplan` (physical device).
+- **GitHub Actions caveat:** the hosted `macos-26` runner image may still report macOS 26.3, which is older than the project's current 26.4 deployment target. When that happens, hosted Swift tests can fail before execution even though local macOS validation passes.
 - Full testing guide: @docs/TESTING.md
 - Code review checklist: @docs/CODE_REVIEW.md
 
