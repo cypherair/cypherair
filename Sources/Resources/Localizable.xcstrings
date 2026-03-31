@@ -1186,6 +1186,54 @@
         }
       }
     },
+    "decrypt.clearImportedFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear imported file"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除已导入文件"
+          }
+        }
+      }
+    },
+    "decrypt.importTextFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import .asc File"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入 .asc 文件"
+          }
+        }
+      }
+    },
+    "decrypt.importTextReadFailed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not read text message file"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取文本消息文件"
+          }
+        }
+      }
+    },
     "decrypt.matchedKey": {
       "localizations": {
         "en": {
@@ -1278,6 +1326,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "文本"
+          }
+        }
+      }
+    },
+    "decrypt.openAsText.action": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open as Text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按文本打开"
+          }
+        }
+      }
+    },
+    "decrypt.openAsText.keepFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep as File"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续按文件处理"
+          }
+        }
+      }
+    },
+    "decrypt.openAsText.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This file looks like an armored text message. Open it in Text mode instead?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此文件看起来像一条带 ASCII 装甲的文本消息。要改用文本模式打开吗？"
+          }
+        }
+      }
+    },
+    "decrypt.openAsText.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open as Text?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按文本打开？"
           }
         }
       }
@@ -6384,6 +6496,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "签名消息"
+          }
+        }
+      }
+    },
+    "verify.clearImportedFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear imported file"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除已导入文件"
+          }
+        }
+      }
+    },
+    "verify.importCleartextFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Signed File"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入签名文件"
+          }
+        }
+      }
+    },
+    "verify.importCleartextReadFailed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not read signed message file"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取签名消息文件"
           }
         }
       }
