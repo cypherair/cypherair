@@ -38,9 +38,26 @@ graph TB
 
 ### App Layer (`Sources/App/`)
 
-SwiftUI views, navigation routing, and onboarding. No business logic. Views call into the Services layer for all operations. Uses iOS 26 Liquid Glass design language — standard components auto-adopt; custom floating controls apply `.glassEffect()`.
+SwiftUI views, navigation routing, onboarding, and application composition. Views remain thin and call into the Services layer for all operations. Uses iOS 26 Liquid Glass design language — standard components auto-adopt; custom floating controls apply `.glassEffect()`.
 
-Key files: `CypherAirApp.swift` (entry point, scene configuration, URL scheme handling), `ContentView.swift` (root navigation), `OnboardingView.swift`, navigation route enum.
+Key files:
+
+- `CypherAirApp.swift` — app entry point and scene configuration
+- `AppContainer.swift` — centralized dependency construction
+- `AppStartupCoordinator.swift` — cold-start loading, crash recovery, temporary file cleanup, startup warning aggregation
+- `ContentView.swift` — root navigation
+- `OnboardingView.swift` — first-run flow
+
+### App Common Helpers (`Sources/App/Common/`)
+
+Shared presentation-layer infrastructure used across multiple views.
+
+| Helper | Responsibility |
+|--------|---------------|
+| `OperationController` | Shared task lifecycle, cancellation, progress state, error presentation, and clipboard notice handling for encrypt/decrypt/sign/verify flows |
+| `SecurityScopedFileAccess` | Uniform wrapper around security-scoped file URL access |
+| `FileExportController` | Shared `fileExporter` state for exporting generated data or existing files |
+| `PrivacyScreenModifier` | Background blur + re-authentication gating |
 
 ### Services Layer (`Sources/Services/`)
 
@@ -66,13 +83,20 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 |-----------|---------------|
 | `SecureEnclaveManager` | P-256 key generation in SE, self-ECDH + HKDF + AES-GCM wrapping/unwrapping, key deletion. Same wrapping scheme for Ed25519/X25519/Ed448/X448. |
 | `KeychainManager` | CRUD for Keychain items (SE key blob, salt, sealed box), access control flag configuration |
-| `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, crash recovery for interrupted re-wrap |
+| `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, and auth-mode crash recovery |
+| `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
+| `KeyMetadataStore` | Shared persistence helper for non-sensitive key metadata items |
+| `KeyMigrationCoordinator` | Shared migration state machine for pending/permanent recovery, including safe/retryable/unrecoverable outcomes |
 | `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K memory requirements before key import. 75% threshold prevents Jetsam termination. No-op for Profile A (Iterated+Salted S2K). |
 | `MemoryZeroingUtility` | Extensions on `Data` and `Array<UInt8>` for secure clearing |
 
 ### Models (`Sources/Models/`)
 
-Pure data types with no side effects. Includes Swift representations of PGP keys, error enums mapping from `PgpError`, user-facing error messages per PRD Section 4.7, and configuration types (auth mode, grace period).
+Pure data types with no side effects. Includes Swift representations of PGP keys, error enums mapping from `PgpError`, user-facing error messages per PRD Section 4.7, configuration types (auth mode, grace period), and shared identity presentation helpers.
+
+| Helper | Responsibility |
+|--------|---------------|
+| `IdentityPresentation` | Shared fingerprint formatting, short key ID derivation, user ID parsing, email extraction, and accessibility label generation |
 
 ### Rust Engine (`pgp-mobile/`)
 
@@ -239,13 +263,13 @@ sequenceDiagram
 
     AM->>AM: Verify all new items stored successfully
     AM->>KC: Delete OLD Keychain items (original keys)
-    AM->>KC: Rename temporary items to permanent key names
+    AM->>KC: Promote temporary items to permanent key names
     AM->>AM: Persist mode preference
     AM->>AM: Clear rewrapInProgress flag
     AM-->>U: Mode switched successfully
 
     Note over AM: If any step fails before deletion: delete temp items, clear flag, report error. Original keys remain intact.
-    Note over AM: On app launch: if rewrapInProgress flag exists, run crash recovery (see SECURITY.md Section 4).
+    Note over AM: On app launch: if rewrapInProgress flag exists, run shared crash recovery via KeyMigrationCoordinator (see SECURITY.md Section 4).
 ```
 
 ## 4. Tightly Coupled Modules
@@ -271,7 +295,7 @@ iOS Keychain (kSecClassGenericPassword, WhenUnlockedThisDeviceOnly):
 │   ├── com.cypherair.v1.sealed-key.<fingerprint>     → AES-GCM sealed private key
 │   └── com.cypherair.v1.metadata.<fingerprint>       → PGPKeyIdentity JSON (Codable, no SE auth needed)
 │
-├── During mode switch (temporary, deleted after successful switch):
+├── During mode switch / modify-expiry recovery (temporary, deleted after successful promotion or stale cleanup):
 │   ├── com.cypherair.v1.pending-se-key.<fingerprint>
 │   ├── com.cypherair.v1.pending-salt.<fingerprint>
 │   └── com.cypherair.v1.pending-sealed-key.<fingerprint>
@@ -302,7 +326,7 @@ App Sandbox:
 - All keys prefixed with `com.cypherair.v1.` — the `v1` segment enables future data migration if the wrapping scheme changes.
 - `<fingerprint>` is the full key fingerprint in lowercase hexadecimal, no spaces or separators (e.g., `a1b2c3d4...`).
 - Metadata items use `metadata.` prefix and store `PGPKeyIdentity` as JSON. These items have no access control (no SE authentication required) and are used for cold-launch key enumeration via `KeyManagementService.loadKeys()`.
-- Temporary keys during mode switch use `pending-` prefix and are cleaned up on app launch if the `rewrapInProgress` flag is set.
+- Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Crash recovery prefers any complete bundle over a partial bundle and leaves retry flags set if recovery fails for a retryable reason.
 
 ## 6. Memory Integrity Enforcement
 

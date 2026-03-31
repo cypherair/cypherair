@@ -137,12 +137,17 @@ File name matches the type name: `EncryptionService.swift`, `CypherAirError.swif
 ```
 Sources/
 ├── App/
+│   ├── AppContainer.swift
+│   ├── AppStartupCoordinator.swift
 │   ├── CypherAirApp.swift
 │   ├── AppRoute.swift
 │   ├── ContentView.swift
 │   ├── HomeView.swift
 │   ├── Common/
-│   │   └── PrivacyScreenModifier.swift
+│   │   ├── FileExportController.swift
+│   │   ├── OperationController.swift
+│   │   ├── PrivacyScreenModifier.swift
+│   │   └── SecurityScopedFileAccess.swift
 │   ├── Onboarding/
 │   │   ├── OnboardingView.swift
 │   │   └── TutorialView.swift
@@ -190,6 +195,9 @@ Sources/
 │   ├── KeychainManager.swift
 │   ├── KeychainManageable.swift
 │   ├── AuthenticationManager.swift
+│   ├── KeyBundleStore.swift
+│   ├── KeyMetadataStore.swift
+│   ├── KeyMigrationCoordinator.swift
 │   ├── AuthenticationEvaluable.swift
 │   ├── MemoryZeroingUtility.swift
 │   ├── Argon2idMemoryGuard.swift
@@ -203,6 +211,7 @@ Sources/
 ├── Models/
 │   ├── CypherAirError.swift
 │   ├── ExportableFile.swift
+│   ├── IdentityPresentation.swift
 │   ├── PGPKeyIdentity.swift
 │   ├── Contact.swift
 │   ├── KeyProfile+App.swift
@@ -216,6 +225,8 @@ Sources/
     ├── Localizable.xcstrings
     └── Info.plist
 ```
+
+When multiple screens share the same lifecycle/platform behavior, prefer extracting common infrastructure (`OperationController`, `SecurityScopedFileAccess`, `FileExportController`) instead of re-implementing per-view task/progress/export state machines.
 
 ## 5. Localization
 

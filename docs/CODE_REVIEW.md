@@ -25,6 +25,9 @@ Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`
 - [ ] No network APIs introduced (URLSession, NWConnection, HTTP)
 - [ ] Secure random only (`SecRandomCopyBytes` / `getrandom`)
 - [ ] Human review obtained for files listed in [SECURITY.md](SECURITY.md) §7
+- [ ] Crash recovery distinguishes safe cleanup, retryable failure, and unrecoverable failure correctly
+- [ ] Retryable recovery failures keep retry flags set; unrecoverable states clear flags and surface a generic warning
+- [ ] Startup diagnostics remain generic and do not leak fingerprints or key identifiers
 
 ## Rust API Changes
 

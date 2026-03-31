@@ -19,10 +19,15 @@ cargo test --manifest-path pgp-mobile/Cargo.toml
 
 ### Layer 2: Swift Unit Tests
 
-**Run on:** iOS Simulator (Apple Silicon), CI.
+**Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
 **What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic. Uses protocol-based mocks for Keychain and SE.
 
 ```bash
+# Practical local path used in this repository
+xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
+    -destination 'platform=macOS'
+
+# Simulator path (also valid when the host/runtime supports it)
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
@@ -67,6 +72,21 @@ Configure two Xcode Test Plans:
 
 **All test commands in CLAUDE.md and CI configuration must use `-testPlan` to ensure consistent scope.**
 
+## 2.1 GitHub Actions Hosted macOS Limitation
+
+The repository workflows target `macos-26`, but GitHub's hosted runner image may still lag the app's minimum deployment target.
+
+At the time of writing:
+
+- Project deployment target: **macOS 26.4**
+- Hosted GitHub runner image: **macOS 26.3**
+
+Impact:
+
+- Rust CI remains valid.
+- The hosted Swift unit-test job can fail before test execution because the runner OS is older than the app/test deployment target.
+- Local macOS validation remains the source of truth until GitHub's hosted image catches up or a self-hosted macOS runner is used.
+
 ## 3. Profile Test Matrix
 
 **Every crypto test must run for both profiles unless explicitly scoped.**
@@ -108,6 +128,8 @@ class MockKeychain: KeychainManageable {
     // ... record calls for verification
 }
 ```
+
+**Current repository note:** `MockKeychain` also supports deterministic failure injection for delete operations so crash-recovery retry semantics can be tested (`retryableFailure` vs `unrecoverable`).
 
 ### Secure Enclave Mock
 
@@ -258,6 +280,17 @@ func test_decrypt_highSecurityMode_biometricsUnavailable_throwsAuthError() async
     }
 }
 ```
+
+## 7. Recovery-Specific Tests
+
+Crash-recovery logic now distinguishes safe cleanup, successful promotion, retryable failure, and unrecoverable states. Tests should cover:
+
+- complete permanent + stale pending -> cleanup only
+- partial permanent + complete pending -> replace permanent from pending
+- missing permanent + complete pending -> promote pending
+- delete/write failure during recovery -> retryable failure, keep flags set
+- no complete bundle in either namespace -> unrecoverable, clear flags, surface startup warning
+- startup warning text remains generic and does not leak fingerprints
 
 ### Memory Zeroing Test
 

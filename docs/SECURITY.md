@@ -168,6 +168,8 @@ When the user changes mode in Settings:
 - If the permanent bundle is missing and the temporary bundle is complete, promote the temporary bundle to permanent names.
 - If neither namespace contains a complete three-item bundle, recovery is **unrecoverable**. Clear the flag, surface a generic startup warning, and require the user to restore from backup if private-key operations fail.
 - If deletion or promotion fails for a retryable reason (for example, transient Keychain write/delete failure), preserve the in-progress flag so the app retries recovery on next launch.
+- Startup diagnostics are surfaced through the app's existing startup warning path and must remain generic — never include fingerprints or other key identifiers.
+- Persist the new auth mode only after a full successful promotion of complete pending bundles. Cleaning stale pending items alone must not change auth mode.
 - This ensures the app prefers a complete bundle over a partial one and avoids silently finalizing an inconsistent state.
 
 ### LAPolicy Selection

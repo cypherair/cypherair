@@ -2,7 +2,7 @@
 
 **Fully offline OpenPGP encryption for iOS — zero network, zero permissions.**
 
-CypherAir is an open-source OpenPGP encryption tool for iOS 26.2+ / iPadOS 26.2+ / macOS 26.2+. It enables everyday users to communicate securely with friends, preventing message content from being monitored by third parties. The app operates with absolutely zero network access and requests no system permissions — data leakage is eliminated at the architectural level.
+CypherAir is an open-source OpenPGP encryption tool for iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+. It enables everyday users to communicate securely with friends, preventing message content from being monitored by third parties. The app operates with absolutely zero network access and requests no system permissions — data leakage is eliminated at the architectural level.
 
 ## Key Features
 
@@ -44,7 +44,7 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 
 | Layer | Technology |
 |-------|------------|
-| Platform | iOS 26.2+ / iPadOS 26.2+ / macOS 26.2+, minimum 8 GB RAM |
+| Platform | iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+, minimum 8 GB RAM |
 | Language | Swift 6.2, SwiftUI (Liquid Glass), UIKit for system pickers |
 | OpenPGP Engine | Sequoia PGP 2.2.0 (Rust), `crypto-openssl` backend (vendored) |
 | FFI Bridge | Mozilla UniFFI 0.31.x |
@@ -80,6 +80,17 @@ pgp-mobile/           # Rust wrapper crate (Sequoia PGP + UniFFI)
 
 docs/                 # Design documents
 ```
+
+## Recent Internal Improvements
+
+Recent refactors focused on maintainability and safety without changing the app's user-facing cryptographic behavior:
+
+- **Shared recovery infrastructure** — Secure Enclave / Keychain migration and crash-recovery logic now runs through shared transaction helpers instead of being duplicated across services.
+- **Safer recovery semantics** — Crash recovery now explicitly prefers complete bundles over partial ones, distinguishes retryable vs unrecoverable recovery failures, and feeds generic startup diagnostics into the existing warning surface.
+- **Shared operation controllers** — Encrypt, decrypt, sign, and verify flows now reuse common helpers for security-scoped file access, export, cancellation, progress, and clipboard behavior.
+- **Cleaner startup wiring** — App dependency construction and startup recovery live in a dedicated container/coordinator instead of the app entry point.
+- **Shared identity presentation helpers** — Fingerprint formatting and accessibility labels are defined once and reused across the UI.
+- **Expanded validation** — Recovery-specific tests now cover stale pending cleanup, partial permanent replacement, retryable Keychain failures, startup diagnostics, and generalized warning hygiene.
 
 ## Build
 
@@ -124,6 +135,14 @@ cargo test --manifest-path pgp-mobile/Cargo.toml
 ```
 
 Then open the Xcode project and build normally.
+
+### CI Note
+
+The GitHub Actions workflows in this repository currently target `macos-26`, but GitHub's hosted runner image may still lag the project's minimum deployment target. At the time of writing, the hosted image reports **macOS 26.3**, while the project and test targets require **macOS 26.4**. In that situation:
+
+- Rust CI can still pass normally.
+- The hosted Swift unit-test job may fail before tests start because the runner OS is older than the app's deployment target.
+- Local validation using `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'` should be treated as the source of truth until GitHub's hosted macOS image catches up.
 
 ## Security Model
 
