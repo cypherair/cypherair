@@ -7,7 +7,7 @@ on:
 
 jobs:
   full-validation:
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -20,4 +20,4 @@ jobs:
             -scheme CypherAir \
             -project CypherAir.xcodeproj \
             -testPlan CypherAir-UnitTests \
-            -destination 'platform=macOS'
+            -destination 'platform=macOS,arch=arm64'
