@@ -450,10 +450,10 @@ final class KeyManagementService {
     /// - Old + pending both exist: interrupted before old deletion. Delete pending. Originals intact.
     /// - Only pending exists: interrupted after old deletion. Promote pending to permanent.
     /// - Neither exists: catastrophic loss. Clear flag. User must restore from backup.
-    func checkAndRecoverFromInterruptedModifyExpiry() {
+    func checkAndRecoverFromInterruptedModifyExpiry() -> KeyMigrationRecoveryOutcome? {
         let defaults = UserDefaults.standard
         guard defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey) else {
-            return
+            return nil
         }
 
         guard let fingerprint = defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey),
@@ -461,14 +461,17 @@ final class KeyManagementService {
             // No fingerprint recorded — cannot recover. Clear flag.
             defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
             defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
-            return
+            return .unrecoverable
         }
 
-        _ = migrationCoordinator.recoverInterruptedMigration(for: fingerprint)
+        let recoveryOutcome = migrationCoordinator.recoverInterruptedMigration(for: fingerprint)
 
-        // Always clear the flags after recovery attempt.
-        defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        if recoveryOutcome.shouldClearRecoveryFlag {
+            defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
+            defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        }
+
+        return recoveryOutcome
     }
 
     // MARK: - Off-Main-Actor Engine Helpers

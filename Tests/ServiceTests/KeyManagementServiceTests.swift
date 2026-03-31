@@ -492,9 +492,10 @@ final class KeyManagementServiceTests: XCTestCase {
                         account: account, accessControl: nil)
 
         // Run recovery
-        service.checkAndRecoverFromInterruptedModifyExpiry()
+        let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
 
         // Verify: flags cleared
+        XCTAssertEqual(outcome, .cleanedPendingSafe)
         XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey),
                        "In-progress flag should be cleared after recovery")
         XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey),
@@ -549,9 +550,10 @@ final class KeyManagementServiceTests: XCTestCase {
         UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
 
         // Run recovery
-        service.checkAndRecoverFromInterruptedModifyExpiry()
+        let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
 
         // Verify: flags cleared
+        XCTAssertEqual(outcome, .promotedPendingSafe)
         XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
 
         // Verify: permanent items restored from pending
@@ -579,9 +581,10 @@ final class KeyManagementServiceTests: XCTestCase {
         let deleteCountBefore = mockKC.deleteCallCount
 
         // Run recovery — should be a no-op
-        service.checkAndRecoverFromInterruptedModifyExpiry()
+        let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
 
         // Verify: no Keychain operations performed
+        XCTAssertNil(outcome)
         XCTAssertEqual(mockKC.saveCallCount, saveCountBefore,
                        "No Keychain saves should occur when flag is not set")
         XCTAssertEqual(mockKC.deleteCallCount, deleteCountBefore,
@@ -590,6 +593,89 @@ final class KeyManagementServiceTests: XCTestCase {
         // Verify: original key still intact
         XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp),
                                     account: account))
+    }
+
+    func test_modifyExpiryCrashRecovery_partialPermanentAndCompletePending_replacesPermanent() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Partial Promote Test")
+        let fp = identity.fingerprint
+        let account = KeychainConstants.defaultAccount
+
+        let seKeyData = try mockKC.load(
+            service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
+        let saltData = try mockKC.load(
+            service: KeychainConstants.saltService(fingerprint: fp), account: account)
+        let sealedData = try mockKC.load(
+            service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
+
+        try mockKC.save(seKeyData, service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+                        account: account, accessControl: nil)
+        try mockKC.save(saltData, service: KeychainConstants.pendingSaltService(fingerprint: fp),
+                        account: account, accessControl: nil)
+        try mockKC.save(sealedData, service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
+                        account: account, accessControl: nil)
+
+        try mockKC.delete(service: KeychainConstants.saltService(fingerprint: fp), account: account)
+        try mockKC.delete(service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
+
+        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
+        let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
+
+        XCTAssertEqual(outcome, .promotedPendingSafe)
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp), account: account))
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.saltService(fingerprint: fp), account: account))
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account))
+        XCTAssertFalse(mockKC.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp), account: account))
+    }
+
+    func test_modifyExpiryCrashRecovery_retryableFailure_keepsFlags() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Retry Test")
+        let fp = identity.fingerprint
+        let account = KeychainConstants.defaultAccount
+
+        try mockKC.save(Data([0xAA]), service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+                        account: account, accessControl: nil)
+        try mockKC.save(Data([0xBB]), service: KeychainConstants.pendingSaltService(fingerprint: fp),
+                        account: account, accessControl: nil)
+        try mockKC.save(Data([0xCC]), service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
+                        account: account, accessControl: nil)
+
+        try mockKC.delete(service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
+        mockKC.failOnSaveNumber = mockKC.saveCallCount + 1
+
+        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
+        let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
+
+        XCTAssertEqual(outcome, .retryableFailure)
+        XCTAssertTrue(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey),
+            fp
+        )
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp), account: account))
+    }
+
+    func test_modifyExpiryCrashRecovery_unrecoverable_clearsFlags() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Unrecoverable Test")
+        let fp = identity.fingerprint
+        let account = KeychainConstants.defaultAccount
+
+        try mockKC.delete(service: KeychainConstants.saltService(fingerprint: fp), account: account)
+        try mockKC.save(Data([0xAA]), service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+                        account: account, accessControl: nil)
+
+        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
+        let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
+
+        XCTAssertEqual(outcome, .unrecoverable)
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+        XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey))
     }
 
     // MARK: - Delete Key Default Persistence

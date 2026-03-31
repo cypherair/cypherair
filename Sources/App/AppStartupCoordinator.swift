@@ -8,6 +8,7 @@ struct AppStartupCoordinator {
 
     func performStartup(using container: AppContainer) -> Result {
         var errors: [String] = []
+        var recoveryDiagnostics: [String] = []
 
         do {
             try container.keyManagement.loadKeys()
@@ -15,10 +16,15 @@ struct AppStartupCoordinator {
             errors.append(error.localizedDescription)
         }
 
-        container.authManager.checkAndRecoverFromInterruptedRewrap(
+        let authRecovery = container.authManager.checkAndRecoverFromInterruptedRewrap(
             fingerprints: container.keyManagement.keys.map(\.fingerprint)
         )
-        container.keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
+        recoveryDiagnostics.append(contentsOf: authRecovery?.startupDiagnostics ?? [])
+
+        let modifyExpiryRecovery = container.keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
+        if let diagnostic = modifyExpiryRecovery?.startupDiagnostic {
+            recoveryDiagnostics.append(diagnostic)
+        }
 
         do {
             try container.contactService.loadContacts()
@@ -28,7 +34,12 @@ struct AppStartupCoordinator {
 
         cleanupTemporaryFiles()
 
-        return Result(loadError: errors.isEmpty ? nil : errors.joined(separator: "\n"))
+        return Result(
+            loadError: mergedStartupMessages(
+                loadErrors: errors,
+                recoveryDiagnostics: recoveryDiagnostics
+            )
+        )
     }
 
     func cleanupTemporaryFiles(fileManager: FileManager = .default) {
@@ -43,5 +54,19 @@ struct AppStartupCoordinator {
         if fileManager.fileExists(atPath: streamingDir.path) {
             try? fileManager.removeItem(at: streamingDir)
         }
+    }
+
+    func mergedStartupMessages(
+        loadErrors: [String],
+        recoveryDiagnostics: [String]
+    ) -> String? {
+        var messages: [String] = []
+        messages.append(contentsOf: loadErrors)
+
+        for diagnostic in recoveryDiagnostics where !messages.contains(diagnostic) {
+            messages.append(diagnostic)
+        }
+
+        return messages.isEmpty ? nil : messages.joined(separator: "\n")
     }
 }

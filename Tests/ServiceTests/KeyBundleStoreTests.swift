@@ -44,6 +44,123 @@ final class KeyBundleStoreTests: XCTestCase {
         )
     }
 
+    func test_replacePermanentWithPending_residualSeKey_replacesBundle() throws {
+        try keychain.save(
+            Data([0xAA]),
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint, namespace: .pending)
+
+        try bundleStore.replacePermanentWithPending(fingerprint: fingerprint)
+
+        XCTAssertEqual(
+            try bundleStore.loadBundle(fingerprint: fingerprint).seKeyData,
+            makeBundle().seKeyData
+        )
+        XCTAssertEqual(
+            bundleStore.bundleState(fingerprint: fingerprint, namespace: .pending),
+            .missing
+        )
+    }
+
+    func test_replacePermanentWithPending_residualSalt_replacesBundle() throws {
+        try keychain.save(
+            Data([0xAA]),
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint, namespace: .pending)
+
+        try bundleStore.replacePermanentWithPending(fingerprint: fingerprint)
+
+        XCTAssertEqual(
+            try bundleStore.loadBundle(fingerprint: fingerprint).salt,
+            makeBundle().salt
+        )
+        XCTAssertEqual(
+            bundleStore.bundleState(fingerprint: fingerprint, namespace: .pending),
+            .missing
+        )
+    }
+
+    func test_replacePermanentWithPending_residualSealed_replacesBundle() throws {
+        try keychain.save(
+            Data([0xAA]),
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint, namespace: .pending)
+
+        try bundleStore.replacePermanentWithPending(fingerprint: fingerprint)
+
+        XCTAssertEqual(
+            try bundleStore.loadBundle(fingerprint: fingerprint).sealedBox,
+            makeBundle().sealedBox
+        )
+        XCTAssertEqual(
+            bundleStore.bundleState(fingerprint: fingerprint, namespace: .pending),
+            .missing
+        )
+    }
+
+    func test_replacePermanentWithPending_deleteFailure_keepsPendingAndRemainingPermanent() throws {
+        let account = KeychainConstants.defaultAccount
+        try keychain.save(
+            Data([0x01]),
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try keychain.save(
+            Data([0x02]),
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint, namespace: .pending)
+
+        keychain.failOnDeleteNumber = 2
+
+        XCTAssertThrowsError(try bundleStore.replacePermanentWithPending(fingerprint: fingerprint))
+        XCTAssertTrue(
+            keychain.exists(
+                service: KeychainConstants.saltService(fingerprint: fingerprint),
+                account: account
+            )
+        )
+        XCTAssertEqual(
+            bundleStore.bundleState(fingerprint: fingerprint, namespace: .pending),
+            .complete
+        )
+    }
+
+    func test_replacePermanentWithPending_saveFailure_rollsBackNewPermanentAndKeepsPending() throws {
+        let account = KeychainConstants.defaultAccount
+        try keychain.save(
+            Data([0x01]),
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint, namespace: .pending)
+
+        keychain.failOnSaveNumber = keychain.saveCallCount + 2
+
+        XCTAssertThrowsError(try bundleStore.replacePermanentWithPending(fingerprint: fingerprint))
+        XCTAssertEqual(
+            bundleStore.bundleState(fingerprint: fingerprint, namespace: .pending),
+            .complete
+        )
+        XCTAssertEqual(
+            bundleStore.bundleState(fingerprint: fingerprint, namespace: .permanent),
+            .missing
+        )
+    }
+
     func test_bundleState_whenOnlyOneItemExists_returnsPartial() throws {
         try keychain.save(
             Data([0x01]),

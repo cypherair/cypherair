@@ -345,9 +345,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
     ///   but before rename. Promote temporary items to permanent names with
     ///   correct access control flags, and update the persisted auth mode.
     /// - Neither exists: catastrophic. Clear flag. User must restore from backup.
-    func checkAndRecoverFromInterruptedRewrap(fingerprints: [String]) {
+    func checkAndRecoverFromInterruptedRewrap(
+        fingerprints: [String]
+    ) -> KeyMigrationRecoverySummary? {
         guard defaults.bool(forKey: AuthPreferences.rewrapInProgressKey) else {
-            return
+            return nil
         }
 
         // Read the target mode that was being switched to.
@@ -360,29 +362,32 @@ final class AuthenticationManager: AuthenticationEvaluable {
             targetMode = currentMode
         }
 
-        var anyPromotionOccurred = false
+        let recoverySummary = migrationCoordinator.recoverInterruptedMigrations(
+            for: fingerprints,
+            seKeyAccessControl: nil
+        )
 
-        for fingerprint in fingerprints {
-            let recoveryOutcome = migrationCoordinator.recoverInterruptedMigration(
-                for: fingerprint,
-                seKeyAccessControl: nil
-            )
-            if recoveryOutcome == .promotedPending {
-                anyPromotionOccurred = true
-            }
+        // If the metadata set is empty but a recovery flag was present, we cannot
+        // identify which bundles need recovery. Treat that as unrecoverable.
+        let effectiveSummary: KeyMigrationRecoverySummary
+        if fingerprints.isEmpty {
+            effectiveSummary = KeyMigrationRecoverySummary(outcomes: [.unrecoverable])
+        } else {
+            effectiveSummary = recoverySummary
         }
 
-        // Only persist targetMode if Case 2 promotion actually occurred.
-        // In Case 1, old keys are intact with the ORIGINAL mode's access control
-        // flags — changing the persisted mode would create a mismatch between the
-        // UI and the actual SE key ACLs. In Case 3, keys are lost entirely.
-        if anyPromotionOccurred {
+        // Persist target mode only when promotion fully succeeded and no
+        // unrecoverable / retryable states remain.
+        if effectiveSummary.shouldUpdateAuthMode {
             defaults.set(targetMode.rawValue, forKey: AuthPreferences.authModeKey)
         }
 
-        // Always clear the flags after recovery attempt.
-        defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
-        defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
+        if effectiveSummary.shouldClearRecoveryFlag {
+            defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
+            defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
+        }
+
+        return effectiveSummary
     }
 
 }

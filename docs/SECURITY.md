@@ -163,9 +163,12 @@ When the user changes mode in Settings:
 **Atomicity:** Old Keychain items are kept intact until ALL new items are confirmed stored (step 5). If any step fails before step 6, the original keys are unaffected — delete the temporary items and report the error.
 
 **Crash recovery:** On app launch, check for the in-progress flag. If present:
-- Check whether temporary items exist → if yes, the re-wrap was partially completed. Delete temporary items and clear the flag. The user's original keys are still intact under the old mode.
-- Check whether old items are missing but temporary items exist → promote temporary items to permanent names and clear the flag.
-- This ensures the app never enters an inconsistent state, regardless of when the crash occurred.
+- If the permanent bundle is complete and temporary items exist, the permanent bundle is treated as authoritative. Delete the temporary items and keep the original mode.
+- If the permanent bundle is partial but the temporary bundle is complete, the temporary bundle is treated as authoritative. Delete the residual permanent items, then promote the temporary bundle to permanent names.
+- If the permanent bundle is missing and the temporary bundle is complete, promote the temporary bundle to permanent names.
+- If neither namespace contains a complete three-item bundle, recovery is **unrecoverable**. Clear the flag, surface a generic startup warning, and require the user to restore from backup if private-key operations fail.
+- If deletion or promotion fails for a retryable reason (for example, transient Keychain write/delete failure), preserve the in-progress flag so the app retries recovery on next launch.
+- This ensures the app prefers a complete bundle over a partial one and avoids silently finalizing an inconsistent state.
 
 ### LAPolicy Selection
 

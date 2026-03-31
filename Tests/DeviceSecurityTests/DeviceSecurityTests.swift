@@ -683,9 +683,10 @@ final class DeviceSecurityTests: XCTestCase {
             secureEnclave: secureEnclave,
             keychain: keychain
         )
-        authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
         // Verify: flag cleared.
+        XCTAssertEqual(summary?.outcomes, [.cleanedPendingSafe])
         XCTAssertFalse(
             UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey),
             "rewrapInProgress flag must be cleared"
@@ -730,9 +731,10 @@ final class DeviceSecurityTests: XCTestCase {
             secureEnclave: secureEnclave,
             keychain: keychain
         )
-        authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
         // Verify: flag cleared.
+        XCTAssertEqual(summary?.outcomes, [.promotedPendingSafe])
         XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey))
 
         // Verify: items promoted to permanent names.
@@ -769,10 +771,106 @@ final class DeviceSecurityTests: XCTestCase {
             secureEnclave: secureEnclave,
             keychain: keychain
         )
-        authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
         // Pending items should still be there (recovery did not run).
+        XCTAssertNil(summary)
         XCTAssertTrue(keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
+    }
+
+    func test_crashRecovery_partialPermanentAndCompletePending_replacesPermanent() throws {
+        let fingerprint = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+
+        let oldData = Data("original-se-key".utf8)
+        try keychain.save(oldData, service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+
+        let pendingSEKey = Data("promoted-se-key".utf8)
+        let pendingSalt = Data("promoted-salt".utf8)
+        let pendingSealed = Data("promoted-sealed".utf8)
+        try keychain.save(pendingSEKey, service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+        try keychain.save(pendingSalt, service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
+        try keychain.save(pendingSealed, service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+
+        UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
+        UserDefaults.standard.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
+        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+
+        let authManager = AuthenticationManager(
+            secureEnclave: secureEnclave,
+            keychain: keychain
+        )
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(summary?.outcomes, [.promotedPendingSafe])
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertEqual(
+            try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account),
+            pendingSEKey
+        )
+        XCTAssertEqual(
+            try keychain.load(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account),
+            pendingSalt
+        )
+        XCTAssertEqual(
+            try keychain.load(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account),
+            pendingSealed
+        )
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
+    }
+
+    func test_crashRecovery_unrecoverable_clearsFlagAndLeavesAuthModeUnchanged() {
+        let fingerprint = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+
+        try? keychain.save(Data("partial-old".utf8), service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+        try? keychain.save(Data("partial-pending".utf8), service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+
+        UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
+        UserDefaults.standard.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
+        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+
+        let authManager = AuthenticationManager(
+            secureEnclave: secureEnclave,
+            keychain: keychain
+        )
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(summary?.outcomes, [.unrecoverable])
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertEqual(authManager.currentMode, .standard)
+    }
+
+    func test_crashRecovery_retryableFailure_keepsFlagAndDoesNotUpdateAuthMode() {
+        let testDefaults = UserDefaults(suiteName: "com.cypherair.retryable")!
+        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.retryable") }
+
+        let mockKeychain = MockKeychain()
+        let mockSecureEnclave = MockSecureEnclave()
+        let fingerprint = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+
+        try? mockKeychain.save(Data("pending-se-key".utf8), service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+        try? mockKeychain.save(Data("pending-salt".utf8), service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
+        try? mockKeychain.save(Data("pending-sealed".utf8), service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+
+        mockKeychain.failOnSaveNumber = mockKeychain.saveCallCount + 1
+
+        testDefaults.set(true, forKey: AuthPreferences.rewrapInProgressKey)
+        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
+        testDefaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+
+        let authManager = AuthenticationManager(
+            secureEnclave: mockSecureEnclave,
+            keychain: mockKeychain,
+            defaults: testDefaults
+        )
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(summary?.outcomes, [.retryableFailure])
+        XCTAssertTrue(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertEqual(authManager.currentMode, .standard)
+        XCTAssertTrue(mockKeychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
     }
 
     // MARK: - C7.4: Mode Switch with Mock SE (Logic Test)

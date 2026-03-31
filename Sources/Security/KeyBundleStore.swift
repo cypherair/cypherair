@@ -110,6 +110,24 @@ struct KeyBundleStore {
         try keychain.delete(service: services.sealed, account: KeychainConstants.defaultAccount)
     }
 
+    /// Delete the three bundle items, ignoring only item-not-found errors.
+    /// Any other delete failure is surfaced to the caller.
+    func deleteBundleAllowingMissing(
+        fingerprint: String,
+        namespace: KeyBundleNamespace = .permanent
+    ) throws {
+        let services = serviceNames(for: fingerprint, namespace: namespace)
+        for service in [services.seKey, services.salt, services.sealed] {
+            do {
+                try keychain.delete(service: service, account: KeychainConstants.defaultAccount)
+            } catch {
+                guard Self.isItemNotFound(error) else {
+                    throw error
+                }
+            }
+        }
+    }
+
     /// Promote a complete pending bundle into the permanent namespace.
     /// Permanent writes are rolled back on partial failure to preserve pending-only state.
     func promotePendingToPermanent(
@@ -117,13 +135,41 @@ struct KeyBundleStore {
         seKeyAccessControl: SecAccessControl? = nil
     ) throws {
         let pending = try loadBundle(fingerprint: fingerprint, namespace: .pending)
-        let permanentServices = serviceNames(for: fingerprint, namespace: .permanent)
+        try persistPermanentBundle(
+            pending,
+            fingerprint: fingerprint,
+            seKeyAccessControl: seKeyAccessControl
+        )
+        cleanupPendingBundle(fingerprint: fingerprint)
+    }
 
+    /// Replace any residual permanent bundle items with the complete pending bundle.
+    /// Residual permanent entries are deleted first, tolerating only item-not-found.
+    func replacePermanentWithPending(
+        fingerprint: String,
+        seKeyAccessControl: SecAccessControl? = nil
+    ) throws {
+        let pending = try loadBundle(fingerprint: fingerprint, namespace: .pending)
+        try deleteBundleAllowingMissing(fingerprint: fingerprint, namespace: .permanent)
+        try persistPermanentBundle(
+            pending,
+            fingerprint: fingerprint,
+            seKeyAccessControl: seKeyAccessControl
+        )
+        cleanupPendingBundle(fingerprint: fingerprint)
+    }
+
+    private func persistPermanentBundle(
+        _ bundle: WrappedKeyBundle,
+        fingerprint: String,
+        seKeyAccessControl: SecAccessControl?
+    ) throws {
+        let permanentServices = serviceNames(for: fingerprint, namespace: .permanent)
         var savedPermanentServices: [String] = []
 
         do {
             try keychain.save(
-                pending.seKeyData,
+                bundle.seKeyData,
                 service: permanentServices.seKey,
                 account: KeychainConstants.defaultAccount,
                 accessControl: seKeyAccessControl
@@ -131,7 +177,7 @@ struct KeyBundleStore {
             savedPermanentServices.append(permanentServices.seKey)
 
             try keychain.save(
-                pending.salt,
+                bundle.salt,
                 service: permanentServices.salt,
                 account: KeychainConstants.defaultAccount,
                 accessControl: nil
@@ -139,7 +185,7 @@ struct KeyBundleStore {
             savedPermanentServices.append(permanentServices.salt)
 
             try keychain.save(
-                pending.sealedBox,
+                bundle.sealedBox,
                 service: permanentServices.sealed,
                 account: KeychainConstants.defaultAccount,
                 accessControl: nil
@@ -150,8 +196,6 @@ struct KeyBundleStore {
             }
             throw error
         }
-
-        cleanupPendingBundle(fingerprint: fingerprint)
     }
 
     /// Best-effort cleanup of pending bundle items.
@@ -210,5 +254,17 @@ struct KeyBundleStore {
                 KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint)
             )
         }
+    }
+
+    private static func isItemNotFound(_ error: Error) -> Bool {
+        if let keychainError = error as? KeychainError,
+           case .itemNotFound = keychainError {
+            return true
+        }
+        if let mockError = error as? MockKeychainError,
+           case .itemNotFound = mockError {
+            return true
+        }
+        return false
     }
 }
