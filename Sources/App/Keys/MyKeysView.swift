@@ -5,6 +5,7 @@ struct MyKeysView: View {
     @Environment(KeyManagementService.self) private var keyManagement
 
     #if os(macOS)
+    @State private var selectedKeyFingerprint: String?
     @State private var showKeyGeneration = false
     @State private var showImportKey = false
     #endif
@@ -12,9 +13,18 @@ struct MyKeysView: View {
     var body: some View {
         List {
             ForEach(keyManagement.keys) { key in
+                #if os(macOS)
+                Button {
+                    selectedKeyFingerprint = key.fingerprint
+                } label: {
+                    KeyRowView(key: key)
+                }
+                .buttonStyle(.plain)
+                #else
                 NavigationLink(value: AppRoute.keyDetail(fingerprint: key.fingerprint)) {
                     KeyRowView(key: key)
                 }
+                #endif
             }
         }
         .overlay {
@@ -92,6 +102,24 @@ struct MyKeysView: View {
             }
         }
         #if os(macOS)
+        .sheet(isPresented: Binding(
+            get: { selectedKeyFingerprint != nil },
+            set: { if !$0 { selectedKeyFingerprint = nil } }
+        )) {
+            if let selectedKeyFingerprint {
+                NavigationStack {
+                    KeyDetailView(fingerprint: selectedKeyFingerprint)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(String(localized: "common.done", defaultValue: "Done")) {
+                                    self.selectedKeyFingerprint = nil
+                                }
+                            }
+                        }
+                }
+                .frame(minWidth: 560, minHeight: 520)
+            }
+        }
         .sheet(isPresented: $showKeyGeneration) {
             NavigationStack {
                 KeyGenerationView()

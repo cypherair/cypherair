@@ -6,9 +6,10 @@ struct PostGenerationPromptView: View {
     let identity: PGPKeyIdentity
 
     @Environment(\.dismiss) private var dismiss
+    @State private var path = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 Section {
                     VStack(spacing: 12) {
@@ -30,6 +31,34 @@ struct PostGenerationPromptView: View {
                 }
 
                 Section {
+                    #if os(macOS)
+                    Button {
+                        path.append(AppRoute.backupKey(fingerprint: identity.fingerprint))
+                    } label: {
+                        Label(
+                            String(localized: "postgen.backup", defaultValue: "Back Up Private Key"),
+                            systemImage: "lock.doc"
+                        )
+                    }
+
+                    Button {
+                        path.append(AppRoute.qrDisplay(publicKeyData: identity.publicKeyData, displayName: identity.userId ?? identity.shortKeyId))
+                    } label: {
+                        Label(
+                            String(localized: "postgen.shareQR", defaultValue: "Share Public Key via QR"),
+                            systemImage: "qrcode"
+                        )
+                    }
+
+                    Button {
+                        path.append(AppRoute.keyDetail(fingerprint: identity.fingerprint))
+                    } label: {
+                        Label(
+                            String(localized: "postgen.viewKey", defaultValue: "View Key Details"),
+                            systemImage: "key"
+                        )
+                    }
+                    #else
                     NavigationLink(value: AppRoute.backupKey(fingerprint: identity.fingerprint)) {
                         Label(
                             String(localized: "postgen.backup", defaultValue: "Back Up Private Key"),
@@ -50,6 +79,7 @@ struct PostGenerationPromptView: View {
                             systemImage: "key"
                         )
                     }
+                    #endif
                 } header: {
                     Text(String(localized: "postgen.nextSteps", defaultValue: "Next Steps"))
                 }
