@@ -1,0 +1,23 @@
+name: Nightly Full Validation
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  full-validation:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run full Rust suite
+        run: cargo test --manifest-path pgp-mobile/Cargo.toml
+      - name: Run CypherAir unit tests
+        run: |
+          xcodebuild test \
+            -scheme CypherAir \
+            -project CypherAir.xcodeproj \
+            -testPlan CypherAir-UnitTests \
+            -destination 'platform=macOS,arch=arm64'

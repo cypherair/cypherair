@@ -71,6 +71,8 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private let secureEnclave: any SecureEnclaveManageable
     private let keychain: any KeychainManageable
     private let defaults: UserDefaults
+    private let bundleStore: KeyBundleStore
+    private let migrationCoordinator: KeyMigrationCoordinator
 
     // MARK: - State
 
@@ -105,6 +107,9 @@ final class AuthenticationManager: AuthenticationEvaluable {
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.defaults = defaults
+        let bundleStore = KeyBundleStore(keychain: keychain)
+        self.bundleStore = bundleStore
+        self.migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
     }
 
     // MARK: - AuthenticationEvaluable
@@ -233,30 +238,13 @@ final class AuthenticationManager: AuthenticationEvaluable {
             // Step 2: Re-wrap each identity under temporary Keychain names.
             for fingerprint in fingerprints {
                 // 2a. Load existing wrapped bundle from permanent Keychain items.
-                let existingSEKeyData = try keychain.load(
-                    service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
-                )
-                let existingSalt = try keychain.load(
-                    service: KeychainConstants.saltService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
-                )
-                let existingSealedBox = try keychain.load(
-                    service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
-                )
+                let existingBundle = try bundleStore.loadBundle(fingerprint: fingerprint)
 
                 // 2b. Reconstruct SE key. Passes the pre-authenticated LAContext from
                 // Step 0 to avoid triggering another Face ID prompt for each key.
                 let existingHandle = try secureEnclave.reconstructKey(
-                    from: existingSEKeyData,
+                    from: existingBundle.seKeyData,
                     authenticationContext: authenticator.lastEvaluatedContext
-                )
-
-                let existingBundle = WrappedKeyBundle(
-                    seKeyData: existingSEKeyData,
-                    salt: existingSalt,
-                    sealedBox: existingSealedBox
                 )
 
                 // 2c. Unwrap to get raw private key bytes.
@@ -285,44 +273,23 @@ final class AuthenticationManager: AuthenticationEvaluable {
                 )
 
                 // 2d. Store new items under TEMPORARY (pending-*) Keychain names.
-                try keychain.save(
-                    newBundle.seKeyData,
-                    service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount,
-                    accessControl: nil
-                )
-                try keychain.save(
-                    newBundle.salt,
-                    service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount,
-                    accessControl: nil
-                )
-                try keychain.save(
-                    newBundle.sealedBox,
-                    service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount,
-                    accessControl: nil
+                try bundleStore.saveBundle(
+                    newBundle,
+                    fingerprint: fingerprint,
+                    namespace: .pending
                 )
             }
 
             // Step 3: Verify all new items stored successfully by loading each one.
             for fingerprint in fingerprints {
-                _ = try keychain.load(
-                    service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
-                )
-                _ = try keychain.load(
-                    service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
-                )
-                _ = try keychain.load(
-                    service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
+                _ = try bundleStore.loadBundle(
+                    fingerprint: fingerprint,
+                    namespace: .pending
                 )
             }
         } catch {
             // Phase A failed: old items are intact. Safe to clean up pending and abort.
-            cleanupPendingItems(fingerprints: fingerprints)
+            fingerprints.forEach { bundleStore.cleanupPendingBundle(fingerprint: $0) }
             defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
             defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
             throw AuthenticationError.modeSwitchFailed(underlying: error)
@@ -335,18 +302,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         do {
             // Step 4: Delete OLD Keychain items. All new items are confirmed stored.
             for fingerprint in fingerprints {
-                try keychain.delete(
-                    service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
-                )
-                try keychain.delete(
-                    service: KeychainConstants.saltService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
-                )
-                try keychain.delete(
-                    service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
-                )
+                try bundleStore.deleteBundle(fingerprint: fingerprint)
             }
 
             // Step 5: Rename temporary items to permanent names (load + save + delete).
@@ -355,7 +311,10 @@ final class AuthenticationManager: AuthenticationEvaluable {
             // in Phase A with the correct biometric/passcode flags, and
             // reconstructKey(from:) enforces those flags in hardware.
             for fingerprint in fingerprints {
-                try promoteFromPending(fingerprint: fingerprint, seKeyAccessControl: nil)
+                try bundleStore.promotePendingToPermanent(
+                    fingerprint: fingerprint,
+                    seKeyAccessControl: nil
+                )
             }
 
             // Step 6: Persist mode preference.
@@ -386,9 +345,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
     ///   but before rename. Promote temporary items to permanent names with
     ///   correct access control flags, and update the persisted auth mode.
     /// - Neither exists: catastrophic. Clear flag. User must restore from backup.
-    func checkAndRecoverFromInterruptedRewrap(fingerprints: [String]) {
+    func checkAndRecoverFromInterruptedRewrap(
+        fingerprints: [String]
+    ) -> KeyMigrationRecoverySummary? {
         guard defaults.bool(forKey: AuthPreferences.rewrapInProgressKey) else {
-            return
+            return nil
         }
 
         // Read the target mode that was being switched to.
@@ -401,170 +362,34 @@ final class AuthenticationManager: AuthenticationEvaluable {
             targetMode = currentMode
         }
 
-        var anyPromotionOccurred = false
+        let recoverySummary = migrationCoordinator.recoverInterruptedMigrations(
+            for: fingerprints,
+            seKeyAccessControl: nil
+        )
 
-        for fingerprint in fingerprints {
-            let oldExists = keychain.exists(
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount
-            )
-            let pendingSeKeyExists = keychain.exists(
-                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount
-            )
-
-            if oldExists && pendingSeKeyExists {
-                // Case 1: Interrupted before old items deleted.
-                // Delete temporary items. Original keys are intact.
-                cleanupPendingItems(fingerprints: [fingerprint])
-
-            } else if !oldExists && pendingSeKeyExists {
-                // Case 2: Interrupted after old deletion but before rename.
-                // Verify all 3 pending items exist before attempting promotion.
-                // If only some pending items were written (partial write crash),
-                // promotion will fail and the user must restore from backup.
-                let pendingSaltExists = keychain.exists(
-                    service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
-                )
-                let pendingSealedExists = keychain.exists(
-                    service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-                    account: KeychainConstants.defaultAccount
-                )
-
-                if pendingSaltExists && pendingSealedExists {
-                    // All 3 pending items present — safe to promote.
-                    // The SE key item is saved without Keychain-level access control.
-                    // The primary enforcement is at the SE level (the SE key was
-                    // generated with the correct biometric flags in Phase A).
-                    do {
-                        try promoteFromPending(fingerprint: fingerprint, seKeyAccessControl: nil)
-                        anyPromotionOccurred = true
-                    } catch {
-                        // If promotion fails, the pending items remain in Keychain
-                        // for manual recovery. The user will need to restore from backup.
-                    }
-                }
-                // else: Incomplete pending set — catastrophic partial write.
-                // Cannot promote. The user must restore from backup.
-                // Leave the incomplete pending items as-is for forensics.
-
-            }
-            // Case 3: Neither exists — catastrophic loss. Nothing we can do here.
-            // The user must restore from backup. Clear the flag below.
+        // If the metadata set is empty but a recovery flag was present, we cannot
+        // identify which bundles need recovery. Treat that as unrecoverable.
+        let effectiveSummary: KeyMigrationRecoverySummary
+        if fingerprints.isEmpty {
+            effectiveSummary = KeyMigrationRecoverySummary(outcomes: [.unrecoverable])
+        } else {
+            effectiveSummary = recoverySummary
         }
 
-        // Only persist targetMode if Case 2 promotion actually occurred.
-        // In Case 1, old keys are intact with the ORIGINAL mode's access control
-        // flags — changing the persisted mode would create a mismatch between the
-        // UI and the actual SE key ACLs. In Case 3, keys are lost entirely.
-        if anyPromotionOccurred {
+        // Persist target mode only when promotion fully succeeded and no
+        // unrecoverable / retryable states remain.
+        if effectiveSummary.shouldUpdateAuthMode {
             defaults.set(targetMode.rawValue, forKey: AuthPreferences.authModeKey)
         }
 
-        // Always clear the flags after recovery attempt.
-        defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
-        defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
-    }
-
-    // MARK: - Private Helpers
-
-    /// Promote pending Keychain items to permanent names for one identity.
-    /// Sequence: load all pending → save as permanent → delete pending.
-    ///
-    /// The SE key item is saved with the provided access control (defense-in-depth
-    /// at the Keychain layer). Salt and sealed box use no access control.
-    ///
-    /// If saving permanent items partially fails, any already-saved permanent
-    /// items are rolled back (deleted) to preserve the pending-only state.
-    /// This prevents crash recovery from seeing partial permanent data.
-    private func promoteFromPending(fingerprint: String, seKeyAccessControl: SecAccessControl?) throws {
-        let account = KeychainConstants.defaultAccount
-
-        // Load all 3 pending items first (validates completeness before writing).
-        let seKeyData = try keychain.load(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: account
-        )
-        let saltData = try keychain.load(
-            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-            account: account
-        )
-        let sealedData = try keychain.load(
-            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-            account: account
-        )
-
-        // Save under permanent names, rolling back on partial failure.
-        // Track which permanent items were successfully saved.
-        var savedPermanentServices: [String] = []
-
-        do {
-            // SE key item gets access control flags for defense-in-depth.
-            try keychain.save(
-                seKeyData,
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-                account: account,
-                accessControl: seKeyAccessControl
-            )
-            savedPermanentServices.append(KeychainConstants.seKeyService(fingerprint: fingerprint))
-
-            try keychain.save(
-                saltData,
-                service: KeychainConstants.saltService(fingerprint: fingerprint),
-                account: account,
-                accessControl: nil
-            )
-            savedPermanentServices.append(KeychainConstants.saltService(fingerprint: fingerprint))
-
-            try keychain.save(
-                sealedData,
-                service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-                account: account,
-                accessControl: nil
-            )
-        } catch {
-            // Partial save failure: rollback any permanent items we just created.
-            // This restores the pending-only state so crash recovery works correctly.
-            for service in savedPermanentServices {
-                try? keychain.delete(service: service, account: account)
-            }
-            throw error
+        if effectiveSummary.shouldClearRecoveryFlag {
+            defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
+            defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
         }
 
-        // All 3 permanent items saved successfully. Delete pending items.
-        try? keychain.delete(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: account
-        )
-        try? keychain.delete(
-            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-            account: account
-        )
-        try? keychain.delete(
-            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-            account: account
-        )
+        return effectiveSummary
     }
 
-    /// Best-effort cleanup of all pending Keychain items.
-    private func cleanupPendingItems(fingerprints: [String]) {
-        let account = KeychainConstants.defaultAccount
-        for fingerprint in fingerprints {
-            try? keychain.delete(
-                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-                account: account
-            )
-            try? keychain.delete(
-                service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-                account: account
-            )
-            try? keychain.delete(
-                service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-                account: account
-            )
-        }
-    }
 }
 
 // MARK: - UserDefaults Helper

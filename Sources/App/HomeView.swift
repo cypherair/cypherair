@@ -108,10 +108,7 @@ struct HomeView: View {
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                         .accessibilityLabel(
-                            defaultKey.formattedFingerprint
-                                .split(separator: " ")
-                                .map { $0.map(String.init).joined(separator: " ") }
-                                .joined(separator: ", ")
+                            IdentityPresentation.fingerprintAccessibilityLabel(defaultKey.fingerprint)
                         )
                 }
                 .padding()

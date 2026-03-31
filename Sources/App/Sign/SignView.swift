@@ -26,22 +26,13 @@ struct SignView: View {
     @State private var signMode: SignMode = .text
     @State private var text = ""
     @State private var signerFingerprint: String?
-    @State private var isSigning = false
     @State private var signedMessage: String?
     @State private var detachedSignature: Data?
-    @State private var error: CypherAirError?
-    @State private var showError = false
-    @State private var showClipboardNotice = false
     @State private var showFileImporter = false
     @State private var selectedFileURL: URL?
     @State private var selectedFileName: String?
-    @State private var currentTask: Task<Void, Never>?
-    @State private var fileProgress: FileProgressReporter?
-    private enum SignExportType {
-        case signedText
-        case detachedSig
-    }
-    @State private var activeSignExport: SignExportType?
+    @State private var operation = OperationController()
+    @State private var exportController = FileExportController()
 
     var body: some View {
         Form {
@@ -82,9 +73,9 @@ struct SignView: View {
                         signFile()
                     }
                 } label: {
-                    if isSigning {
+                    if operation.isRunning {
                         HStack {
-                            if signMode == .file, let progress = fileProgress {
+                            if signMode == .file, let progress = operation.progress {
                                 ProgressView(value: progress.fractionCompleted)
                                     .progressViewStyle(.linear)
                                 Text(String(localized: "sign.signing", defaultValue: "Signing..."))
@@ -94,10 +85,7 @@ struct SignView: View {
                             if signMode == .file {
                                 Spacer()
                                 Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                                    fileProgress?.cancel()
-                                    currentTask?.cancel()
-                                    currentTask = nil
-                                    isSigning = false
+                                    operation.cancel()
                                 }
                             }
                         }
@@ -118,15 +106,7 @@ struct SignView: View {
                         .textSelection(.enabled)
 
                     Button {
-                        #if canImport(UIKit)
-                        UIPasteboard.general.string = signedMessage
-                        #elseif canImport(AppKit)
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(signedMessage, forType: .string)
-                        #endif
-                        if config.clipboardNotice {
-                            showClipboardNotice = true
-                        }
+                        operation.copyToClipboard(signedMessage, config: config)
                     } label: {
                         Label(
                             String(localized: "common.copy", defaultValue: "Copy"),
@@ -135,7 +115,14 @@ struct SignView: View {
                     }
 
                     Button {
-                        activeSignExport = .signedText
+                        do {
+                            try exportController.prepareDataExport(
+                                Data(signedMessage.utf8),
+                                suggestedFilename: "signed.asc"
+                            )
+                        } catch {
+                            operation.present(error: mapSigningError(error))
+                        }
                     } label: {
                         Label(
                             String(localized: "common.save", defaultValue: "Save"),
@@ -150,7 +137,15 @@ struct SignView: View {
             if signMode == .file, detachedSignature != nil {
                 Section {
                     Button {
-                        activeSignExport = .detachedSig
+                        guard let detachedSignature else { return }
+                        do {
+                            try exportController.prepareDataExport(
+                                detachedSignature,
+                                suggestedFilename: (selectedFileName ?? "file") + ".sig"
+                            )
+                        } catch {
+                            operation.present(error: mapSigningError(error))
+                        }
                     } label: {
                         Label(
                             String(localized: "sign.share.signature", defaultValue: "Save .sig File"),
@@ -171,8 +166,11 @@ struct SignView: View {
         .navigationTitle(String(localized: "sign.title", defaultValue: "Sign"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
+            isPresented: Binding(
+                get: { operation.isShowingError },
+                set: { if !$0 { operation.dismissError() } }
+            ),
+            presenting: operation.error
         ) { _ in
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: { err in
@@ -180,11 +178,16 @@ struct SignView: View {
         }
         .alert(
             String(localized: "clipboard.notice.title", defaultValue: "Copied to Clipboard"),
-            isPresented: $showClipboardNotice
+            isPresented: Binding(
+                get: { operation.isShowingClipboardNotice },
+                set: { if !$0 { operation.dismissClipboardNotice() } }
+            )
         ) {
-            Button(String(localized: "clipboard.notice.dismiss", defaultValue: "OK")) {}
+            Button(String(localized: "clipboard.notice.dismiss", defaultValue: "OK")) {
+                operation.dismissClipboardNotice()
+            }
             Button(String(localized: "clipboard.notice.dontShow", defaultValue: "Don't Show Again")) {
-                config.clipboardNotice = false
+                operation.dismissClipboardNotice(disableFutureNoticesIn: config)
             }
         } message: {
             Text(String(localized: "clipboard.notice.message", defaultValue: "The signed message has been copied. Remember to clear your clipboard after pasting."))
@@ -201,17 +204,16 @@ struct SignView: View {
         }
         .fileExporter(
             isPresented: Binding(
-                get: { activeSignExport != nil },
-                set: { if !$0 { activeSignExport = nil } }
+                get: { exportController.isPresented },
+                set: { if !$0 { exportController.finish() } }
             ),
-            item: signExportItem,
+            item: exportController.payload,
             contentTypes: [.data],
-            defaultFilename: signExportFilename
+            defaultFilename: exportController.defaultFilename
         ) { result in
-            activeSignExport = nil
+            exportController.finish()
             if case .failure(let exportError) = result {
-                error = CypherAirError.from(exportError) { .signingFailed(reason: $0) }
-                showError = true
+                operation.present(error: mapSigningError(exportError))
             }
         }
         .onAppear {
@@ -260,24 +262,8 @@ struct SignView: View {
 
     // MARK: - State
 
-    private var signExportItem: Data? {
-        switch activeSignExport {
-        case .signedText: return signedMessage.flatMap { Data($0.utf8) }
-        case .detachedSig: return detachedSignature
-        case nil: return nil
-        }
-    }
-
-    private var signExportFilename: String {
-        switch activeSignExport {
-        case .signedText: return "signed.asc"
-        case .detachedSig: return (selectedFileName ?? "file") + ".sig"
-        case nil: return "export"
-        }
-    }
-
     private var signButtonDisabled: Bool {
-        if isSigning { return true }
+        if operation.isRunning { return true }
         if keyManagement.defaultKey == nil && signerFingerprint == nil { return true }
         switch signMode {
         case .text: return text.isEmpty
@@ -289,18 +275,12 @@ struct SignView: View {
 
     private func signText() {
         guard let signerFp = signerFingerprint ?? keyManagement.defaultKey?.fingerprint else { return }
-        isSigning = true
         let service = signingService
         let message = text
-        Task {
-            do {
-                let signed = try await service.signCleartext(message, signerFingerprint: signerFp)
-                signedMessage = String(data: signed, encoding: .utf8)
-            } catch {
-                self.error = CypherAirError.from(error) { .signingFailed(reason: $0) }
-                showError = true
-            }
-            isSigning = false
+        signedMessage = nil
+        operation.run(mapError: mapSigningError) {
+            let signed = try await service.signCleartext(message, signerFingerprint: signerFp)
+            signedMessage = String(data: signed, encoding: .utf8)
         }
     }
 
@@ -308,47 +288,33 @@ struct SignView: View {
         guard let fileURL = selectedFileURL,
               let signerFp = signerFingerprint ?? keyManagement.defaultKey?.fingerprint else { return }
         let service = signingService
-        let progress = FileProgressReporter()
-        fileProgress = progress
-
-        isSigning = true
-        currentTask = Task {
-            #if canImport(UIKit)
-            var bgTaskID = UIBackgroundTaskIdentifier.invalid
-            bgTaskID = UIApplication.shared.beginBackgroundTask {
-                UIApplication.shared.endBackgroundTask(bgTaskID)
-                bgTaskID = .invalid
-            }
-            #endif
-            defer {
-                #if canImport(UIKit)
-                if bgTaskID != .invalid {
-                    UIApplication.shared.endBackgroundTask(bgTaskID)
-                }
-                #endif
-                fileProgress = nil
-                isSigning = false
-                currentTask = nil
-            }
-            do {
-                guard fileURL.startAccessingSecurityScopedResource() else {
-                    throw CypherAirError.internalError(reason: String(localized: "sign.cannotAccessFile", defaultValue: "Cannot access selected file"))
-                }
-                defer { fileURL.stopAccessingSecurityScopedResource() }
-                let sig = try await service.signDetachedStreaming(
+        detachedSignature = nil
+        operation.runFileOperation(mapError: mapSigningError) { progress in
+            let sig = try await SecurityScopedFileAccess.withAccess(
+                to: [
+                    SecurityScopedAccessRequest(
+                        resource: fileURL,
+                        failure: .internalError(
+                            reason: String(
+                                localized: "sign.cannotAccessFile",
+                                defaultValue: "Cannot access selected file"
+                            )
+                        )
+                    )
+                ]
+            ) {
+                try await service.signDetachedStreaming(
                     fileURL: fileURL,
                     signerFingerprint: signerFp,
                     progress: progress
                 )
-                try Task.checkCancellation()
-                detachedSignature = sig
-            } catch is CancellationError {
-                // User cancelled — no error to show
-            } catch {
-                if case .operationCancelled = error as? CypherAirError { return }
-                self.error = CypherAirError.from(error) { .signingFailed(reason: $0) }
-                showError = true
             }
+            try Task.checkCancellation()
+            detachedSignature = sig
         }
+    }
+
+    private func mapSigningError(_ error: Error) -> CypherAirError {
+        CypherAirError.from(error) { .signingFailed(reason: $0) }
     }
 }

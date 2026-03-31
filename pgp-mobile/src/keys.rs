@@ -297,7 +297,25 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
 }
 
 /// Encrypt a secret key using Argon2id S2K (Profile B).
-/// Uses explicit Argon2id parameters per PRD: encoded_m=19 (512 MB), p=4, t=3.
+/// Uses an explicit export strategy rather than inline magic numbers so Swift-side
+/// calibration can later plug into the same path without rewriting the export flow.
+struct ProfileBExportS2kStrategy {
+    time_passes: u8,
+    parallelism: u8,
+    memory_exponent: u8,
+}
+
+impl ProfileBExportS2kStrategy {
+    fn interactive_default() -> Self {
+        Self {
+            // PRD target: roughly 3 seconds on contemporary hardware.
+            time_passes: 3,
+            parallelism: 4,
+            memory_exponent: 19, // 2^19 KiB = 512 MiB
+        }
+    }
+}
+
 fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
     key: openpgp::packet::Key<openpgp::packet::key::SecretParts, R>,
     password: &openpgp::crypto::Password,
@@ -308,19 +326,16 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
     let mut salt = [0u8; 16];
     openpgp::crypto::random(&mut salt)?;
 
-    // PRD parameters: 512 MB (m=19, meaning 2^19 KiB), p=4, t=3
-    // HARDCODED: t=3 is a reasonable default yielding ~3s on A17+ iOS devices.
-    // For exact PRD compliance ("Time: Calibrated (~3s)"), the Swift side should:
-    // 1. On first Profile B export, measure wall-clock time of this function.
-    // 2. If significantly off from 3s target, expose a calibration API that adjusts `t`.
-    // 3. Store calibrated `t` in UserDefaults for subsequent exports.
-    // This is deferred to the Swift integration layer (not a Rust-side concern).
-    // Verify actual timing in POC test C10.8 on physical device.
+    let strategy = ProfileBExportS2kStrategy::interactive_default();
+
+    // The default export strategy is intentionally explicit and centralized.
+    // Future device calibration can override these fields via the same strategy model
+    // without touching the encryption pipeline below.
     let s2k = openpgp::crypto::S2K::Argon2 {
         salt,
-        t: 3,   // time passes — TODO: calibrate on device for ~3s target
-        p: 4,   // parallelism lanes
-        m: 19,  // memory exponent: 2^19 KiB = 512 MB
+        t: strategy.time_passes,
+        p: strategy.parallelism,
+        m: strategy.memory_exponent,
     };
 
     let (key_pub, mut secret) = key.take_secret();

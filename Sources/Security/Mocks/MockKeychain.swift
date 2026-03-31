@@ -27,6 +27,8 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
     var saveError: Error?
     /// If set, the next load operation will throw this error (one-shot).
     var loadError: Error?
+    /// If set, the next delete operation will throw this error (one-shot).
+    var deleteError: Error?
 
     /// If non-zero, the save at this call count (1-based) will throw `saveError ?? MockKeychainError.saveFailed`.
     /// Example: `failOnSaveNumber = 4` means the 4th save call will fail.
@@ -36,6 +38,10 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
     /// matching real Keychain behavior (`errSecDuplicateItem`).
     /// Set to false only when testing code that intentionally overwrites.
     var throwOnDuplicate = true
+
+    /// If non-zero, the delete at this call count (1-based) will throw
+    /// `deleteError ?? MockKeychainError.deleteFailed`.
+    var failOnDeleteNumber: Int = 0
 
     private func storageKey(service: String, account: String) -> String {
         "\(service):\(account)"
@@ -77,6 +83,13 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
 
     func delete(service: String, account: String) throws {
         deleteCallCount += 1
+        if let error = deleteError {
+            deleteError = nil
+            throw error
+        }
+        if failOnDeleteNumber > 0 && deleteCallCount == failOnDeleteNumber {
+            throw MockKeychainError.deleteFailed
+        }
         lastDeletedService = service
         let key = storageKey(service: service, account: account)
         // Match real Keychain behavior: throw if item doesn't exist (errSecItemNotFound)
@@ -109,8 +122,10 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
         lastDeletedService = nil
         saveError = nil
         loadError = nil
+        deleteError = nil
         throwOnDuplicate = true
         failOnSaveNumber = 0
+        failOnDeleteNumber = 0
     }
 }
 
@@ -118,4 +133,5 @@ enum MockKeychainError: Error {
     case itemNotFound
     case duplicateItem
     case saveFailed
+    case deleteFailed
 }

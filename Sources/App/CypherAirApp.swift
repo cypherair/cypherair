@@ -5,25 +5,7 @@ struct CypherAirApp: App {
 
     // MARK: - Shared Dependencies
 
-    /// Security layer (protocols allow mock injection in tests).
-    @State private var secureEnclave: HardwareSecureEnclave = HardwareSecureEnclave()
-    @State private var keychain: SystemKeychain = SystemKeychain()
-    @State private var authManager: AuthenticationManager
-
-    /// App configuration (persisted in UserDefaults).
-    @State private var config = AppConfiguration()
-
-    /// PGP engine (shared across services).
-    private let engine: PgpEngine
-
-    /// Core services.
-    @State private var keyManagement: KeyManagementService
-    @State private var contactService: ContactService
-    @State private var encryptionService: EncryptionService
-    @State private var decryptionService: DecryptionService
-    @State private var signingService: SigningService
-    @State private var qrService: QRService
-    @State private var selfTestService: SelfTestService
+    @State private var container: AppContainer
 
     /// Pending public key import awaiting user confirmation (Issue #3).
     @State private var pendingImport: PendingImport?
@@ -40,73 +22,11 @@ struct CypherAirApp: App {
     // MARK: - Init
 
     init() {
-        let se = HardwareSecureEnclave()
-        let kc = SystemKeychain()
-        let auth = AuthenticationManager(secureEnclave: se, keychain: kc)
+        let container = AppContainer.makeDefault()
+        let startupResult = AppStartupCoordinator().performStartup(using: container)
 
-        let engine = PgpEngine()
-        let keyMgmt = KeyManagementService(
-            engine: engine,
-            secureEnclave: se,
-            keychain: kc,
-            authenticator: auth
-        )
-        let contacts = ContactService(engine: engine)
-        let encryption = EncryptionService(
-            engine: engine,
-            keyManagement: keyMgmt,
-            contactService: contacts
-        )
-        let decryption = DecryptionService(
-            engine: engine,
-            keyManagement: keyMgmt,
-            contactService: contacts
-        )
-        let signing = SigningService(
-            engine: engine,
-            keyManagement: keyMgmt,
-            contactService: contacts
-        )
-        let qr = QRService(engine: engine)
-        let selfTest = SelfTestService(engine: engine)
-
-        self.engine = engine
-        _secureEnclave = State(initialValue: se)
-        _keychain = State(initialValue: kc)
-        _authManager = State(initialValue: auth)
-        _keyManagement = State(initialValue: keyMgmt)
-        _contactService = State(initialValue: contacts)
-        _encryptionService = State(initialValue: encryption)
-        _decryptionService = State(initialValue: decryption)
-        _signingService = State(initialValue: signing)
-        _qrService = State(initialValue: qr)
-        _selfTestService = State(initialValue: selfTest)
-
-        // Load stored key identities from Keychain metadata (no SE auth needed).
-        do {
-            try keyMgmt.loadKeys()
-        } catch {
-            // Non-fatal: keys will appear empty. Store error for diagnostic display.
-            _loadError = State(initialValue: error.localizedDescription)
-        }
-
-        // Crash recovery: check for interrupted auth mode switch.
-        auth.checkAndRecoverFromInterruptedRewrap(fingerprints: keyMgmt.keys.map(\.fingerprint))
-
-        // Crash recovery: check for interrupted modifyExpiry operation.
-        keyMgmt.checkAndRecoverFromInterruptedModifyExpiry()
-
-        // Load contacts from disk.
-        do {
-            try contacts.loadContacts()
-        } catch {
-            // Non-fatal: contacts will appear empty. Append to diagnostic info.
-            let existing = _loadError.wrappedValue ?? ""
-            _loadError = State(initialValue: existing.isEmpty ? error.localizedDescription : "\(existing)\n\(error.localizedDescription)")
-        }
-
-        // Clean up any leftover decrypted files from tmp/.
-        cleanupTempDecryptedFiles()
+        _container = State(initialValue: container)
+        _loadError = State(initialValue: startupResult.loadError)
     }
 
     // MARK: - Scene
@@ -115,19 +35,19 @@ struct CypherAirApp: App {
         WindowGroup {
             ContentView()
                 .privacyScreen()
-                .optionalTint(config.colorTheme.accentColor)
-                .environment(config)
-                .environment(keyManagement)
-                .environment(contactService)
-                .environment(encryptionService)
-                .environment(decryptionService)
-                .environment(signingService)
-                .environment(qrService)
-                .environment(selfTestService)
-                .environment(authManager)
+                .optionalTint(container.config.colorTheme.accentColor)
+                .environment(container.config)
+                .environment(container.keyManagement)
+                .environment(container.contactService)
+                .environment(container.encryptionService)
+                .environment(container.decryptionService)
+                .environment(container.signingService)
+                .environment(container.qrService)
+                .environment(container.selfTestService)
+                .environment(container.authManager)
                 .sheet(isPresented: showOnboarding) {
                     OnboardingView()
-                        .environment(config)
+                        .environment(container.config)
                         .interactiveDismissDisabled()
                 }
                 .sheet(isPresented: Binding(
@@ -140,10 +60,10 @@ struct CypherAirApp: App {
                             detectedProfile: pending.profile,
                             onConfirm: {
                                 do {
-                                    let result = try contactService.addContact(publicKeyData: pending.keyData)
+                                    let result = try container.contactService.addContact(publicKeyData: pending.keyData)
                                     if case .keyUpdateDetected(let newContact, let existingContact, let keyData) = result {
                                         // User confirmed import via ImportConfirmView — proceed with replacement.
-                                        try contactService.confirmKeyUpdate(
+                                        try container.contactService.confirmKeyUpdate(
                                             existingFingerprint: existingContact.fingerprint,
                                             newContact: newContact,
                                             keyData: keyData
@@ -210,21 +130,21 @@ struct CypherAirApp: App {
             NavigationStack {
                 SettingsView()
             }
-            .optionalTint(config.colorTheme.accentColor)
-            .environment(config)
-            .environment(authManager)
-            .environment(keyManagement)
-            .environment(selfTestService)
+            .optionalTint(container.config.colorTheme.accentColor)
+            .environment(container.config)
+            .environment(container.authManager)
+            .environment(container.keyManagement)
+            .environment(container.selfTestService)
         }
         #endif
     }
 
     private var showOnboarding: Binding<Bool> {
         Binding(
-            get: { !config.hasCompletedOnboarding },
+            get: { !container.config.hasCompletedOnboarding },
             set: { newValue in
                 if !newValue {
-                    config.hasCompletedOnboarding = true
+                    container.config.hasCompletedOnboarding = true
                 }
             }
         )
@@ -239,29 +159,13 @@ struct CypherAirApp: App {
         guard url.scheme == "cypherair" else { return }
 
         do {
-            let publicKeyData = try qrService.parseImportURL(url)
-            let keyInfo = try qrService.inspectKeyInfo(keyData: publicKeyData)
-            let profile = try qrService.detectKeyProfile(keyData: publicKeyData)
+            let publicKeyData = try container.qrService.parseImportURL(url)
+            let keyInfo = try container.qrService.inspectKeyInfo(keyData: publicKeyData)
+            let profile = try container.qrService.detectKeyProfile(keyData: publicKeyData)
             // Show confirmation sheet — do NOT add directly (PRD Section 4.2).
             pendingImport = PendingImport(keyData: publicKeyData, keyInfo: keyInfo, profile: profile)
         } catch {
             importError = CypherAirError.from(error) { _ in .invalidQRCode }
-        }
-    }
-
-    // MARK: - Temp File Cleanup
-
-    /// Delete any leftover temporary files on app launch.
-    /// Per PRD Section 4.4: decrypted files deleted on exit + app launch.
-    private func cleanupTempDecryptedFiles() {
-        let fm = FileManager.default
-        let tmpDir = fm.temporaryDirectory.appendingPathComponent("decrypted", isDirectory: true)
-        if fm.fileExists(atPath: tmpDir.path) {
-            try? fm.removeItem(at: tmpDir)
-        }
-        let streamingDir = fm.temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
-        if fm.fileExists(atPath: streamingDir.path) {
-            try? fm.removeItem(at: streamingDir)
         }
     }
 }

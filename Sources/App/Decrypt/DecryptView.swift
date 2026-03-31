@@ -21,11 +21,9 @@ struct DecryptView: View {
 
     @State private var decryptMode: DecryptMode = .text
     @State private var ciphertextInput = ""
-    @State private var isDecrypting = false
     @State private var decryptedText: String?
     @State private var signatureVerification: SignatureVerification?
-    @State private var error: CypherAirError?
-    @State private var showError = false
+    @State private var operation = OperationController()
 
     // Phase 1 result — shown to user before authentication
     @State private var phase1Result: DecryptionService.Phase1Result?
@@ -35,11 +33,8 @@ struct DecryptView: View {
     @State private var selectedFileURL: URL?
     @State private var selectedFileName: String?
     @State private var decryptedFileURL: URL?
-    @State private var currentTask: Task<Void, Never>?
     @State private var filePhase1Result: DecryptionService.FilePhase1Result?
-    @State private var fileProgress: FileProgressReporter?
-    @State private var showFileExporter = false
-    @State private var exportableFile: ExportableFile?
+    @State private var exportController = FileExportController()
 
     var body: some View {
         Form {
@@ -67,7 +62,7 @@ struct DecryptView: View {
                         parseRecipientsFile()
                     }
                 } label: {
-                    if isDecrypting && !hasPhase1Result {
+                    if operation.isRunning && !hasPhase1Result {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                     } else {
@@ -94,10 +89,7 @@ struct DecryptView: View {
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .accessibilityLabel(
-                            matchedKey.formattedFingerprint
-                                .split(separator: " ")
-                                .map { $0.map(String.init).joined(separator: " ") }
-                                .joined(separator: ", ")
+                            IdentityPresentation.fingerprintAccessibilityLabel(matchedKey.fingerprint)
                         )
                 } header: {
                     Text(String(localized: "decrypt.matchedKey", defaultValue: "Matched Key"))
@@ -112,9 +104,9 @@ struct DecryptView: View {
                             decryptFile(phase1: filePhase1)
                         }
                     } label: {
-                        if isDecrypting {
+                        if operation.isRunning {
                             HStack {
-                                if decryptMode == .file, let progress = fileProgress {
+                                if decryptMode == .file, let progress = operation.progress {
                                     ProgressView(value: progress.fractionCompleted)
                                         .progressViewStyle(.linear)
                                     Text(String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting..."))
@@ -124,10 +116,7 @@ struct DecryptView: View {
                                 if decryptMode == .file {
                                     Spacer()
                                     Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                                        fileProgress?.cancel()
-                                        currentTask?.cancel()
-                                        currentTask = nil
-                                        isDecrypting = false
+                                        operation.cancel()
                                     }
                                 }
                             }
@@ -138,7 +127,7 @@ struct DecryptView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isDecrypting)
+                    .disabled(operation.isRunning)
                 }
             }
 
@@ -158,12 +147,20 @@ struct DecryptView: View {
                     Button {
                         if let url = decryptedFileURL {
                             guard FileManager.default.fileExists(atPath: url.path) else {
-                                error = .corruptData(reason: String(localized: "fileDecrypt.readFailed", defaultValue: "Could not read decrypted file"))
-                                showError = true
+                                operation.present(
+                                    error: .corruptData(
+                                        reason: String(
+                                            localized: "fileDecrypt.readFailed",
+                                            defaultValue: "Could not read decrypted file"
+                                        )
+                                    )
+                                )
                                 return
                             }
-                            exportableFile = ExportableFile(url: url)
-                            showFileExporter = true
+                            exportController.prepareFileExport(
+                                fileURL: url,
+                                suggestedFilename: decryptedFilename()
+                            )
                         }
                     } label: {
                         Label(
@@ -213,23 +210,28 @@ struct DecryptView: View {
         }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
+            isPresented: Binding(
+                get: { operation.isShowingError },
+                set: { if !$0 { operation.dismissError() } }
+            ),
+            presenting: operation.error
         ) { _ in
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: { err in
             Text(err.localizedDescription)
         }
         .fileExporter(
-            isPresented: $showFileExporter,
-            item: exportableFile,
+            isPresented: Binding(
+                get: { exportController.isPresented },
+                set: { if !$0 { exportController.finish() } }
+            ),
+            item: exportController.payload,
             contentTypes: [.data],
-            defaultFilename: decryptedFilename()
+            defaultFilename: exportController.defaultFilename
         ) { result in
-            exportableFile = nil
+            exportController.finish()
             if case .failure(let exportError) = result {
-                error = CypherAirError.from(exportError) { .corruptData(reason: $0) }
-                showError = true
+                operation.present(error: mapDecryptError(exportError))
             }
         }
         .onDisappear {
@@ -322,7 +324,7 @@ struct DecryptView: View {
     }
 
     private var decryptButtonDisabled: Bool {
-        if isDecrypting { return true }
+        if operation.isRunning { return true }
         if hasPhase1Result { return true }
         switch decryptMode {
         case .text: return ciphertextInput.isEmpty
@@ -345,116 +347,87 @@ struct DecryptView: View {
     // Phase 1: Parse recipients (no authentication)
 
     private func parseRecipientsText() {
-        isDecrypting = true
         let service = decryptionService
         let inputData = Data(ciphertextInput.utf8)
-        Task {
-            do {
-                let result = try await service.parseRecipients(ciphertext: inputData)
-                phase1Result = result
-            } catch {
-                self.error = CypherAirError.from(error) { .corruptData(reason: $0) }
-                showError = true
-            }
-            isDecrypting = false
+        decryptedText = nil
+        signatureVerification = nil
+        operation.run(mapError: mapDecryptError) {
+            let result = try await service.parseRecipients(ciphertext: inputData)
+            phase1Result = result
         }
     }
 
     private func parseRecipientsFile() {
         guard let fileURL = selectedFileURL else { return }
         let service = decryptionService
-        isDecrypting = true
-        Task {
-            do {
-                guard fileURL.startAccessingSecurityScopedResource() else {
-                    error = .corruptData(reason: String(localized: "fileDecrypt.cannotAccess", defaultValue: "Cannot access file"))
-                    showError = true
-                    isDecrypting = false
-                    return
-                }
-                defer { fileURL.stopAccessingSecurityScopedResource() }
-                let result = try await service.parseRecipientsFromFile(fileURL: fileURL)
-                filePhase1Result = result
-            } catch {
-                self.error = CypherAirError.from(error) { .corruptData(reason: $0) }
-                showError = true
+        decryptedFileURL = nil
+        signatureVerification = nil
+        operation.run(mapError: mapDecryptError) {
+            let result = try await SecurityScopedFileAccess.withAccess(
+                to: [
+                    SecurityScopedAccessRequest(
+                        resource: fileURL,
+                        failure: .corruptData(
+                            reason: String(
+                                localized: "fileDecrypt.cannotAccess",
+                                defaultValue: "Cannot access file"
+                            )
+                        )
+                    )
+                ]
+            ) {
+                try await service.parseRecipientsFromFile(fileURL: fileURL)
             }
-            isDecrypting = false
+            filePhase1Result = result
         }
     }
 
     // Phase 2: Decrypt with authentication
 
     private func decryptText(phase1: DecryptionService.Phase1Result) {
-        isDecrypting = true
         let service = decryptionService
-        Task {
-            do {
-                let result = try await service.decrypt(phase1: phase1)
+        operation.run(mapError: mapDecryptError) {
+            let result = try await service.decrypt(phase1: phase1)
 
-                if let text = String(data: result.plaintext, encoding: .utf8) {
-                    decryptedText = text
-                }
-                signatureVerification = result.signature
-
-                // Zeroize plaintext data
-                var mutablePlaintext = result.plaintext
-                mutablePlaintext.resetBytes(in: 0..<mutablePlaintext.count)
-            } catch {
-                self.error = CypherAirError.from(error) { .corruptData(reason: $0) }
-                showError = true
+            if let text = String(data: result.plaintext, encoding: .utf8) {
+                decryptedText = text
             }
-            isDecrypting = false
+            signatureVerification = result.signature
+
+            var mutablePlaintext = result.plaintext
+            mutablePlaintext.resetBytes(in: 0..<mutablePlaintext.count)
         }
     }
 
     private func decryptFile(phase1: DecryptionService.FilePhase1Result) {
+        guard let fileURL = selectedFileURL else { return }
         let service = decryptionService
-        let progress = FileProgressReporter()
-        fileProgress = progress
-
-        isDecrypting = true
-        currentTask = Task {
-            #if canImport(UIKit)
-            var bgTaskID = UIBackgroundTaskIdentifier.invalid
-            bgTaskID = UIApplication.shared.beginBackgroundTask {
-                UIApplication.shared.endBackgroundTask(bgTaskID)
-                bgTaskID = .invalid
-            }
-            #endif
-            defer {
-                #if canImport(UIKit)
-                if bgTaskID != .invalid {
-                    UIApplication.shared.endBackgroundTask(bgTaskID)
-                }
-                #endif
-                fileProgress = nil
-                isDecrypting = false
-                currentTask = nil
-            }
-            do {
-                // Re-acquire security-scoped resource (Phase 1 released it)
-                guard selectedFileURL?.startAccessingSecurityScopedResource() == true else {
-                    error = .corruptData(reason: String(localized: "fileDecrypt.cannotAccess", defaultValue: "Cannot access file"))
-                    showError = true
-                    return
-                }
-                defer { selectedFileURL?.stopAccessingSecurityScopedResource() }
-
-                let result = try await service.decryptFileStreaming(
+        operation.runFileOperation(mapError: mapDecryptError) { progress in
+            let result = try await SecurityScopedFileAccess.withAccess(
+                to: [
+                    SecurityScopedAccessRequest(
+                        resource: fileURL,
+                        failure: .corruptData(
+                            reason: String(
+                                localized: "fileDecrypt.cannotAccess",
+                                defaultValue: "Cannot access file"
+                            )
+                        )
+                    )
+                ]
+            ) {
+                try await service.decryptFileStreaming(
                     phase1: phase1,
                     progress: progress
                 )
-                try Task.checkCancellation()
-                decryptedFileURL = result.outputURL
-                signatureVerification = result.signature
-            } catch is CancellationError {
-                // User cancelled — no error to show
-            } catch {
-                if case .operationCancelled = error as? CypherAirError { return }
-                self.error = CypherAirError.from(error) { .corruptData(reason: $0) }
-                showError = true
             }
+            try Task.checkCancellation()
+            decryptedFileURL = result.outputURL
+            signatureVerification = result.signature
         }
+    }
+
+    private func mapDecryptError(_ error: Error) -> CypherAirError {
+        CypherAirError.from(error) { .corruptData(reason: $0) }
     }
 }

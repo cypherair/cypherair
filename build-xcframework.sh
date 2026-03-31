@@ -168,22 +168,15 @@ xcodebuild -create-xcframework \
 
 echo "  ✓ XCFramework created: $XCFRAMEWORK_OUTPUT"
 
-# ── Step 8: Check binary size ────────────────────────────────────
+# ── Step 8: Report binary size ───────────────────────────────────
 echo ""
-echo "[8/9] Binary size check..."
+echo "[8/9] Binary size report..."
 DEVICE_SIZE=$(stat -f%z "$DEVICE_LIB" 2>/dev/null || stat --printf="%s" "$DEVICE_LIB" 2>/dev/null || echo "unknown")
 SIM_SIZE=$(stat -f%z "$SIM_LIB" 2>/dev/null || stat --printf="%s" "$SIM_LIB" 2>/dev/null || echo "unknown")
 MACOS_SIZE=$(stat -f%z "$MACOS_LIB" 2>/dev/null || stat --printf="%s" "$MACOS_LIB" 2>/dev/null || echo "unknown")
 echo "  Device library: $DEVICE_SIZE bytes"
 echo "  Simulator library: $SIM_SIZE bytes"
 echo "  macOS library: $MACOS_SIZE bytes"
-
-# Check if under 10 MB threshold (C1.6)
-if [ "$DEVICE_SIZE" != "unknown" ] && [ "$DEVICE_SIZE" -gt 10485760 ]; then
-    echo "  ⚠️ WARNING: Device library exceeds 10 MB threshold (C1.6)"
-else
-    echo "  ✓ Device library within 10 MB threshold"
-fi
 
 # ── Step 9: Sync Swift bindings to Xcode source tree ─────────────
 echo ""

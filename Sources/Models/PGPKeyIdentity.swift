@@ -56,20 +56,16 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
 
     /// Short Key ID (last 16 hex chars of fingerprint). De-emphasized in UI.
     var shortKeyId: String {
-        String(fingerprint.suffix(16))
+        IdentityPresentation.shortKeyId(from: fingerprint)
     }
 
     /// Formatted fingerprint for display (groups of 4 characters).
     var formattedFingerprint: String {
-        Self.formatFingerprint(fingerprint)
+        IdentityPresentation.formattedFingerprint(fingerprint)
     }
 
     /// Format a hex fingerprint string into groups of 4 characters separated by spaces.
     static func formatFingerprint(_ hex: String) -> String {
-        stride(from: 0, to: hex.count, by: 4).map { offset in
-            let start = hex.index(hex.startIndex, offsetBy: offset)
-            let end = hex.index(start, offsetBy: min(4, hex.count - offset))
-            return String(hex[start..<end])
-        }.joined(separator: " ")
+        IdentityPresentation.formattedFingerprint(hex)
     }
 }
