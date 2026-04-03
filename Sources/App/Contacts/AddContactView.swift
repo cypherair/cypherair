@@ -39,7 +39,8 @@ struct AddContactView: View {
         }
     }
 
-    private struct PendingImportPreview {
+    private struct PendingImportPreview: Identifiable {
+        let id = UUID()
         let keyData: Data
         let keyInfo: KeyInfo
         let profile: KeyProfile
@@ -118,31 +119,26 @@ struct AddContactView: View {
         } message: { err in
             Text(err.localizedDescription)
         }
-        .sheet(isPresented: Binding(
-            get: { pendingImportPreview != nil },
-            set: { if !$0 { pendingImportPreview = nil } }
-        )) {
-            if let pendingImportPreview {
-                ImportConfirmView(
-                    keyInfo: pendingImportPreview.keyInfo,
-                    detectedProfile: pendingImportPreview.profile,
-                    onImportVerified: {
-                        completeAddContact(
-                            pendingImportPreview,
-                            verificationState: .verified
-                        )
-                    },
-                    onImportUnverified: configuration.verificationPolicy == .allowUnverified ? {
-                        completeAddContact(
-                            pendingImportPreview,
-                            verificationState: .unverified
-                        )
-                    } : nil,
-                    onCancel: {
-                        self.pendingImportPreview = nil
-                    }
-                )
-            }
+        .sheet(item: $pendingImportPreview) { pendingImportPreview in
+            ImportConfirmView(
+                keyInfo: pendingImportPreview.keyInfo,
+                detectedProfile: pendingImportPreview.profile,
+                onImportVerified: {
+                    completeAddContact(
+                        pendingImportPreview,
+                        verificationState: .verified
+                    )
+                },
+                onImportUnverified: configuration.verificationPolicy == .allowUnverified ? {
+                    completeAddContact(
+                        pendingImportPreview,
+                        verificationState: .unverified
+                    )
+                } : nil,
+                onCancel: {
+                    self.pendingImportPreview = nil
+                }
+            )
         }
         .alert(
             String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),

@@ -11,12 +11,19 @@ struct TutorialView: View {
     var body: some View {
         #if canImport(UIKit)
         if sizeClass == .compact {
-            if tutorialStore.session.isShellPresented {
-                TutorialMirrorShellView()
-                    .environment(tutorialStore)
-            } else {
-                tutorialHome
+            ZStack {
+                if !tutorialStore.session.isShellPresented {
+                    tutorialHome
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
+
+                if tutorialStore.session.isShellPresented {
+                    TutorialMirrorShellView()
+                        .environment(tutorialStore)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
             }
+            .animation(.easeInOut(duration: 0.22), value: tutorialStore.session.isShellPresented)
         } else {
             tutorialHome
                 .fullScreenCover(

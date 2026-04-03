@@ -76,31 +76,26 @@ struct QRPhotoImportView: View {
                 Text(contact.displayName)
             }
         }
-        .sheet(isPresented: Binding(
-            get: { pendingConfirm != nil },
-            set: { if !$0 { pendingConfirm = nil } }
-        )) {
-            if let pending = pendingConfirm {
-                ImportConfirmView(
-                    keyInfo: pending.keyInfo,
-                    detectedProfile: pending.profile,
-                    onImportVerified: {
-                        confirmImport(
-                            pending,
-                            verificationState: .verified
-                        )
-                    },
-                    onImportUnverified: {
-                        confirmImport(
-                            pending,
-                            verificationState: .unverified
-                        )
-                    },
-                    onCancel: {
-                        pendingConfirm = nil
-                    }
-                )
-            }
+        .sheet(item: $pendingConfirm) { pending in
+            ImportConfirmView(
+                keyInfo: pending.keyInfo,
+                detectedProfile: pending.profile,
+                onImportVerified: {
+                    confirmImport(
+                        pending,
+                        verificationState: .verified
+                    )
+                },
+                onImportUnverified: {
+                    confirmImport(
+                        pending,
+                        verificationState: .unverified
+                    )
+                },
+                onCancel: {
+                    pendingConfirm = nil
+                }
+            )
         }
         .alert(
             String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
@@ -205,7 +200,8 @@ struct QRPhotoImportView: View {
 }
 
 /// Holds parsed key data pending user confirmation via ImportConfirmView.
-private struct PendingQRImport {
+private struct PendingQRImport: Identifiable {
+    let id = UUID()
     let keyData: Data
     let keyInfo: KeyInfo
     let profile: KeyProfile
