@@ -103,7 +103,7 @@ CypherAir targets iOS 26 exclusively and fully adopts Liquid Glass. See `docs/LI
 Swift 6.2 defaults to main-actor isolation for new Xcode 26 projects (SE-0466).
 
 - `@MainActor` is implicit for views and view models. Do not annotate explicitly unless needed for clarity.
-- Use `@concurrent` to opt into the cooperative thread pool for CPU-intensive work (Argon2id calibration, file encryption progress).
+- Use `@concurrent` to opt into the cooperative thread pool for CPU-intensive work (Argon2id key import/export, file encryption progress).
 - All types that cross actor boundaries must conform to `Sendable`. `@Observable` classes are implicitly `@MainActor`; use `nonisolated` for properties/methods that need to be accessed from other actors.
 - Use `actor` for shared mutable state that is not UI-bound (e.g., a cache or in-progress operation tracker).
 - Perform PGP operations (encrypt, decrypt, sign, verify) on a background actor or `@concurrent` function to avoid blocking the UI. Return results to the main actor for display.

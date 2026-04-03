@@ -280,7 +280,7 @@ SE keys destroyed by: device erase, iCloud restore, backup restore. App detects 
 |-----------|-------|-------------------|-----------|
 | Memory | 512 MB | encoded_m = 19 | ~6% of 8 GB min RAM |
 | Parallelism | 4 | p = 4 | 128 MB per lane |
-| Time | Calibrated (~3s) | t = calibrated | Measured on first export |
+| Time | Fixed at 3 passes (~3s target on contemporary hardware) | t = 3 | Stable, explicit export profile |
 
 **Not used by Profile A.** Profile A uses Iterated+Salted S2K (mode 3) for key export, which is universally supported by GnuPG.
 
