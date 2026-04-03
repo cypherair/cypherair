@@ -5,6 +5,9 @@ struct SettingsView: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(AuthenticationManager.self) private var authManager
     @Environment(KeyManagementService.self) private var keyManagement
+    #if canImport(UIKit)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
     @State private var pendingMode: AuthenticationMode?
     @State private var showModeWarning = false
@@ -261,9 +264,22 @@ struct SettingsView: View {
         .sheet(isPresented: $showOnboarding) {
             OnboardingView()
         }
+        #if canImport(UIKit)
+        .if(sizeClass == .compact) { view in
+            view.fullScreenCover(isPresented: $showTutorial) {
+                TutorialView()
+            }
+        }
+        .if(sizeClass != .compact) { view in
+            view.sheet(isPresented: $showTutorial) {
+                TutorialView()
+            }
+        }
+        #else
         .sheet(isPresented: $showTutorial) {
             TutorialView()
         }
+        #endif
         #if os(macOS)
         .sheet(isPresented: $showThemePicker) {
             NavigationStack {
@@ -375,6 +391,20 @@ struct SettingsView: View {
             }
             pendingMode = nil
             isSwitching = false
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func `if`<Content: View>(
+        _ condition: Bool,
+        transform: (Self) -> Content
+    ) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
         }
     }
 }

@@ -3,8 +3,48 @@ import SwiftUI
 struct TutorialView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(TutorialSessionStore.self) private var tutorialStore
+    #if canImport(UIKit)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
+    @ViewBuilder
     var body: some View {
+        #if canImport(UIKit)
+        if sizeClass == .compact {
+            if tutorialStore.session.isShellPresented {
+                TutorialMirrorShellView()
+                    .environment(tutorialStore)
+            } else {
+                tutorialHome
+            }
+        } else {
+            tutorialHome
+                .fullScreenCover(
+                    isPresented: Binding(
+                        get: { tutorialStore.session.isShellPresented },
+                        set: { if !$0 { tutorialStore.dismissShell() } }
+                    )
+                ) {
+                    TutorialMirrorShellView()
+                        .environment(tutorialStore)
+                }
+        }
+        #else
+        tutorialHome
+            .sheet(
+                isPresented: Binding(
+                    get: { tutorialStore.session.isShellPresented },
+                    set: { if !$0 { tutorialStore.dismissShell() } }
+                )
+            ) {
+                TutorialMirrorShellView()
+                    .environment(tutorialStore)
+                    .frame(minWidth: 880, minHeight: 640)
+            }
+        #endif
+    }
+
+    private var tutorialHome: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -27,28 +67,6 @@ struct TutorialView: View {
             .task {
                 tutorialStore.ensureSession()
             }
-            #if canImport(UIKit)
-            .fullScreenCover(
-                isPresented: Binding(
-                    get: { tutorialStore.session.isShellPresented },
-                    set: { if !$0 { tutorialStore.dismissShell() } }
-                )
-            ) {
-                TutorialMirrorShellView()
-                    .environment(tutorialStore)
-            }
-            #else
-            .sheet(
-                isPresented: Binding(
-                    get: { tutorialStore.session.isShellPresented },
-                    set: { if !$0 { tutorialStore.dismissShell() } }
-                )
-            ) {
-                TutorialMirrorShellView()
-                    .environment(tutorialStore)
-                    .frame(minWidth: 880, minHeight: 640)
-            }
-            #endif
         }
     }
 

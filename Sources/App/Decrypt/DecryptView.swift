@@ -118,6 +118,9 @@ struct DecryptView: View {
                     )
                     Text(matchedKey.formattedFingerprint)
                         .font(.system(.caption, design: .monospaced))
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(.secondary)
                         .accessibilityLabel(
                             IdentityPresentation.fingerprintAccessibilityLabel(matchedKey.fingerprint)

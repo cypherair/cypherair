@@ -93,7 +93,7 @@
 		CE1CB7942F6F762F00F7ABFC /* SelfTestServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1CB7932F6F762E00F7ABFC /* SelfTestServiceTests.swift */; };
 		CE2EF9EFF914194BF2BE37DC /* ColorTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE9E921CFE0A043E4958585 /* ColorTheme.swift */; };
 		CE396398BAC10E4878B2C914 /* ThemePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED01ED569C1B04F7399092E /* ThemePickerView.swift */; };
-			CE4958B22F6D797000BF03E2 /* TutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE4958B12F6D797000BF03E2 /* TutorialView.swift */; };
+		CE4958B22F6D797000BF03E2 /* TutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE4958B12F6D797000BF03E2 /* TutorialView.swift */; };
 		CE94DB982F761557005D50B4 /* AppIconDPreview.png in Resources */ = {isa = PBXBuildFile; fileRef = CE94DB972F761557005D50B4 /* AppIconDPreview.png */; };
 		CEE730DC2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DB2F62B5F6007CA4A8 /* MemoryInfoProvidable.swift */; };
 		CEE730DE2F62B602007CA4A8 /* MockMemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE730DD2F62B602007CA4A8 /* MockMemoryInfo.swift */; };
@@ -109,13 +109,13 @@
 		D10000062F80000100000001 /* OpenSourceNoticeStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000162F80000100000001 /* OpenSourceNoticeStoreTests.swift */; };
 		D10000072F80000100000001 /* OpenSourceNotices in Resources */ = {isa = PBXBuildFile; fileRef = D10000172F80000100000001 /* OpenSourceNotices */; };
 		D10000082F80000100000001 /* OpenSourceNotices in Resources */ = {isa = PBXBuildFile; fileRef = D10000172F80000100000001 /* OpenSourceNotices */; };
-			D20000012F80000100000001 /* TutorialSandboxContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000112F80000100000001 /* TutorialSandboxContainer.swift */; };
-			D20000022F80000100000001 /* TutorialSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000122F80000100000001 /* TutorialSessionStore.swift */; };
-			D20000032F80000100000001 /* TutorialMirrorShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000132F80000100000001 /* TutorialMirrorShellView.swift */; };
-			D20000042F80000100000001 /* TutorialSessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000142F80000100000001 /* TutorialSessionStoreTests.swift */; };
-			D20000052F80000100000001 /* TutorialSpotlightOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000152F80000100000001 /* TutorialSpotlightOverlay.swift */; };
-			D20000062F80000100000001 /* TutorialTaskHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000162F80000100000001 /* TutorialTaskHostView.swift */; };
-			D20000072F80000100000001 /* AppShellComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000172F80000100000001 /* AppShellComposition.swift */; };
+		D20000012F80000100000001 /* TutorialSandboxContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000112F80000100000001 /* TutorialSandboxContainer.swift */; };
+		D20000022F80000100000001 /* TutorialSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000122F80000100000001 /* TutorialSessionStore.swift */; };
+		D20000032F80000100000001 /* TutorialMirrorShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000132F80000100000001 /* TutorialMirrorShellView.swift */; };
+		D20000042F80000100000001 /* TutorialSessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000142F80000100000001 /* TutorialSessionStoreTests.swift */; };
+		D20000052F80000100000001 /* TutorialSpotlightOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000152F80000100000001 /* TutorialSpotlightOverlay.swift */; };
+		D20000062F80000100000001 /* TutorialTaskHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000162F80000100000001 /* TutorialTaskHostView.swift */; };
+		D20000072F80000100000001 /* AppShellComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000172F80000100000001 /* AppShellComposition.swift */; };
 		D23054BDE48D49E2A1E356EE /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95207D70D3548829BD54615 /* AppContainer.swift */; };
 		D41DF0584CC24CBD842B3E11 /* KeyMigrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98EDD88E9F17461FBD5B8F0B /* KeyMigrationCoordinator.swift */; };
 		D51BC34AD2554DB6BFC8C105 /* OperationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DE8EE27179A4C1DA68BB476 /* OperationController.swift */; };
@@ -244,13 +244,13 @@
 		D10000152F80000100000001 /* RepositoryURLCopyAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryURLCopyAction.swift; sourceTree = "<group>"; };
 		D10000162F80000100000001 /* OpenSourceNoticeStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenSourceNoticeStoreTests.swift; sourceTree = "<group>"; };
 		D10000172F80000100000001 /* OpenSourceNotices */ = {isa = PBXFileReference; lastKnownFileType = folder; path = OpenSourceNotices; sourceTree = "<group>"; };
-			D20000112F80000100000001 /* TutorialSandboxContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialSandboxContainer.swift; sourceTree = "<group>"; };
-			D20000122F80000100000001 /* TutorialSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialSessionStore.swift; sourceTree = "<group>"; };
-			D20000132F80000100000001 /* TutorialMirrorShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialMirrorShellView.swift; sourceTree = "<group>"; };
-			D20000142F80000100000001 /* TutorialSessionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialSessionStoreTests.swift; sourceTree = "<group>"; };
-			D20000152F80000100000001 /* TutorialSpotlightOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialSpotlightOverlay.swift; sourceTree = "<group>"; };
-			D20000162F80000100000001 /* TutorialTaskHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialTaskHostView.swift; sourceTree = "<group>"; };
-			D20000172F80000100000001 /* AppShellComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellComposition.swift; sourceTree = "<group>"; };
+		D20000112F80000100000001 /* TutorialSandboxContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialSandboxContainer.swift; sourceTree = "<group>"; };
+		D20000122F80000100000001 /* TutorialSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialSessionStore.swift; sourceTree = "<group>"; };
+		D20000132F80000100000001 /* TutorialMirrorShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialMirrorShellView.swift; sourceTree = "<group>"; };
+		D20000142F80000100000001 /* TutorialSessionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialSessionStoreTests.swift; sourceTree = "<group>"; };
+		D20000152F80000100000001 /* TutorialSpotlightOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialSpotlightOverlay.swift; sourceTree = "<group>"; };
+		D20000162F80000100000001 /* TutorialTaskHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialTaskHostView.swift; sourceTree = "<group>"; };
+		D20000172F80000100000001 /* AppShellComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellComposition.swift; sourceTree = "<group>"; };
 		D35F4B8C8B4CAB4FB248E04F /* SecureEnclaveManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SecureEnclaveManager.swift; path = Sources/Security/SecureEnclaveManager.swift; sourceTree = SOURCE_ROOT; };
 		F0C071311C874F0AB58A0092 /* CommonHelpersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonHelpersTests.swift; sourceTree = "<group>"; };
 		F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Data+Zeroing.swift"; path = "Sources/Extensions/Data+Zeroing.swift"; sourceTree = SOURCE_ROOT; };
@@ -463,27 +463,27 @@
 			path = Common;
 			sourceTree = "<group>";
 		};
-			CE0064EA2F649730008604AB /* Onboarding */ = {
-				isa = PBXGroup;
-				children = (
-					CE0064EB2F64975C008604AB /* OnboardingView.swift */,
-					CE4958B12F6D797000BF03E2 /* TutorialView.swift */,
-					D20000112F80000100000001 /* TutorialSandboxContainer.swift */,
-					D20000122F80000100000001 /* TutorialSessionStore.swift */,
-					D20000132F80000100000001 /* TutorialMirrorShellView.swift */,
-					D20000152F80000100000001 /* TutorialSpotlightOverlay.swift */,
-					D20000162F80000100000001 /* TutorialTaskHostView.swift */,
-				);
-				path = Onboarding;
-				sourceTree = "<group>";
-			};
+		CE0064EA2F649730008604AB /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				CE0064EB2F64975C008604AB /* OnboardingView.swift */,
+				CE4958B12F6D797000BF03E2 /* TutorialView.swift */,
+				D20000112F80000100000001 /* TutorialSandboxContainer.swift */,
+				D20000122F80000100000001 /* TutorialSessionStore.swift */,
+				D20000132F80000100000001 /* TutorialMirrorShellView.swift */,
+				D20000152F80000100000001 /* TutorialSpotlightOverlay.swift */,
+				D20000162F80000100000001 /* TutorialTaskHostView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
 		CE0064F52F64B185008604AB /* ServiceTests */ = {
 			isa = PBXGroup;
 			children = (
 				F0C071311C874F0AB58A0092 /* CommonHelpersTests.swift */,
 				C4D2CE3B45864258BB0EEDD0 /* KeyBundleStoreTests.swift */,
 				196FD824442E49D4A8E9436D /* KeyMigrationCoordinatorTests.swift */,
-					D20000142F80000100000001 /* TutorialSessionStoreTests.swift */,
+				D20000142F80000100000001 /* TutorialSessionStoreTests.swift */,
 				D10000162F80000100000001 /* OpenSourceNoticeStoreTests.swift */,
 				CE0064F62F64B199008604AB /* TestHelpers.swift */,
 				CE0064F82F64B1C4008604AB /* QRServiceTests.swift */,
@@ -705,7 +705,7 @@
 				CE0065052F64D0D5008604AB /* ContactServiceTests.swift in Sources */,
 				CE0065072F64D9B9008604AB /* FixtureLoader.swift in Sources */,
 				19BBF5512C344A2B864ACBDD /* KeyBundleStoreTests.swift in Sources */,
-					D20000042F80000100000001 /* TutorialSessionStoreTests.swift in Sources */,
+				D20000042F80000100000001 /* TutorialSessionStoreTests.swift in Sources */,
 				D10000062F80000100000001 /* OpenSourceNoticeStoreTests.swift in Sources */,
 				28B947F8AAAFFB1BF3B9F796 /* DeviceSecurityTests.swift in Sources */,
 				CE0064FD2F64B219008604AB /* DecryptionServiceTests.swift in Sources */,
@@ -732,17 +732,17 @@
 				CE0064B62F649455008604AB /* QRService.swift in Sources */,
 				CE0064A42F6492D8008604AB /* Contact.swift in Sources */,
 				CE00651B2F673ADE008604AB /* FileProgressReporter.swift in Sources */,
-					9E3C8A660DFD403D80A1AF40 /* AppStartupCoordinator.swift in Sources */,
-					CE0064E92F64972D008604AB /* QRPhotoImportView.swift in Sources */,
-					9F4284F9BEE858C4C9110D9B /* CypherAirApp.swift in Sources */,
-					D23054BDE48D49E2A1E356EE /* AppContainer.swift in Sources */,
-					D20000012F80000100000001 /* TutorialSandboxContainer.swift in Sources */,
-					D20000022F80000100000001 /* TutorialSessionStore.swift in Sources */,
-					D20000032F80000100000001 /* TutorialMirrorShellView.swift in Sources */,
-					CE4958B22F6D797000BF03E2 /* TutorialView.swift in Sources */,
-					D20000052F80000100000001 /* TutorialSpotlightOverlay.swift in Sources */,
-					D20000062F80000100000001 /* TutorialTaskHostView.swift in Sources */,
-					D20000072F80000100000001 /* AppShellComposition.swift in Sources */,
+				9E3C8A660DFD403D80A1AF40 /* AppStartupCoordinator.swift in Sources */,
+				CE0064E92F64972D008604AB /* QRPhotoImportView.swift in Sources */,
+				9F4284F9BEE858C4C9110D9B /* CypherAirApp.swift in Sources */,
+				D23054BDE48D49E2A1E356EE /* AppContainer.swift in Sources */,
+				D20000012F80000100000001 /* TutorialSandboxContainer.swift in Sources */,
+				D20000022F80000100000001 /* TutorialSessionStore.swift in Sources */,
+				D20000032F80000100000001 /* TutorialMirrorShellView.swift in Sources */,
+				CE4958B22F6D797000BF03E2 /* TutorialView.swift in Sources */,
+				D20000052F80000100000001 /* TutorialSpotlightOverlay.swift in Sources */,
+				D20000062F80000100000001 /* TutorialTaskHostView.swift in Sources */,
+				D20000072F80000100000001 /* AppShellComposition.swift in Sources */,
 				CE0064E72F64972D008604AB /* QRDisplayView.swift in Sources */,
 				174304A352D9A283F7CB3E53 /* KeychainManageable.swift in Sources */,
 				6F25017F340541D84E52FB11 /* MockAuthenticator.swift in Sources */,
@@ -893,7 +893,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1128,7 +1128,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
