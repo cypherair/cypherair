@@ -16,6 +16,7 @@ final class KeyManagementService {
     private let keychain: any KeychainManageable
     private let authenticator: any AuthenticationEvaluable
     private let memoryInfo: any MemoryInfoProvidable
+    private let defaults: UserDefaults
     private let bundleStore: KeyBundleStore
     private let metadataStore: KeyMetadataStore
     private let migrationCoordinator: KeyMigrationCoordinator
@@ -25,13 +26,15 @@ final class KeyManagementService {
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         authenticator: any AuthenticationEvaluable,
-        memoryInfo: any MemoryInfoProvidable = SystemMemoryInfo()
+        memoryInfo: any MemoryInfoProvidable = SystemMemoryInfo(),
+        defaults: UserDefaults = .standard
     ) {
         self.engine = engine
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.authenticator = authenticator
         self.memoryInfo = memoryInfo
+        self.defaults = defaults
         let bundleStore = KeyBundleStore(keychain: keychain)
         self.bundleStore = bundleStore
         self.metadataStore = KeyMetadataStore(keychain: keychain)
@@ -320,8 +323,8 @@ final class KeyManagementService {
         // 6. Set crash recovery flag before entering the danger zone.
         // If the app crashes between here and the flag-clear below,
         // checkAndRecoverFromInterruptedModifyExpiry() runs on next launch.
-        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.set(fingerprint, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        defaults.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        defaults.set(fingerprint, forKey: AuthPreferences.modifyExpiryFingerprintKey)
 
         // 7. Delete old permanent items. Pending items are confirmed stored.
         do {
@@ -341,8 +344,8 @@ final class KeyManagementService {
         }
 
         // 9. Clear crash recovery flag — danger zone complete.
-        UserDefaults.standard.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
 
         // 10. Update identity metadata
         var updated = existingIdentity
@@ -451,7 +454,6 @@ final class KeyManagementService {
     /// - Only pending exists: interrupted after old deletion. Promote pending to permanent.
     /// - Neither exists: catastrophic loss. Clear flag. User must restore from backup.
     func checkAndRecoverFromInterruptedModifyExpiry() -> KeyMigrationRecoveryOutcome? {
-        let defaults = UserDefaults.standard
         guard defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey) else {
             return nil
         }

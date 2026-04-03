@@ -1,59 +1,92 @@
-import SwiftUI
 import PhotosUI
+import SwiftUI
 import UniformTypeIdentifiers
 
 /// Unified contact import: paste public key, QR photo, or file.
 struct AddContactView: View {
+    struct Configuration {
+        enum VerificationPolicy: Equatable {
+            case verifiedOnly
+            case allowUnverified
+        }
+
+        var allowedImportModes: [ImportMode] = ImportMode.allCases
+        var prefilledArmoredText: String?
+        var verificationPolicy: VerificationPolicy = .allowUnverified
+        var onImported: (@MainActor (Contact) -> Void)?
+
+        static let `default` = Configuration()
+    }
+
     @Environment(ContactService.self) private var contactService
     @Environment(QRService.self) private var qrService
     @Environment(\.dismiss) private var dismiss
 
     enum ImportMode: String, CaseIterable {
-        case paste, qrPhoto, file
+        case paste
+        case qrPhoto
+        case file
+
         var label: String {
             switch self {
-            case .paste: String(localized: "addcontact.mode.paste", defaultValue: "Paste")
-            case .qrPhoto: String(localized: "addcontact.mode.qrPhoto", defaultValue: "QR Photo")
-            case .file: String(localized: "addcontact.mode.file", defaultValue: "File")
+            case .paste:
+                String(localized: "addcontact.mode.paste", defaultValue: "Paste")
+            case .qrPhoto:
+                String(localized: "addcontact.mode.qrPhoto", defaultValue: "QR Photo")
+            case .file:
+                String(localized: "addcontact.mode.file", defaultValue: "File")
             }
         }
     }
+
+    private struct PendingImportPreview {
+        let keyData: Data
+        let keyInfo: KeyInfo
+        let profile: KeyProfile
+    }
+
+    private struct PendingKeyUpdate {
+        let newContact: Contact
+        let existingContact: Contact
+        let keyData: Data
+    }
+
+    let configuration: Configuration
 
     @State private var importMode: ImportMode = .paste
     @State private var armoredText = ""
     @State private var error: CypherAirError?
     @State private var showError = false
+    @State private var pendingImportPreview: PendingImportPreview?
     @State private var pendingKeyUpdate: PendingKeyUpdate?
     @State private var showKeyUpdateAlert = false
-
-    // QR Photo state
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var isProcessingQR = false
-
-    // File import state
     @State private var showFileImporter = false
-    /// Raw key data for binary .gpg/.pgp files that cannot be represented as a String.
     @State private var importedKeyData: Data?
     @State private var importedFileName: String?
+
+    init(configuration: Configuration = .default) {
+        self.configuration = configuration
+    }
 
     var body: some View {
         Form {
             Section {
                 Picker(String(localized: "addcontact.mode", defaultValue: "Import Method"), selection: $importMode) {
-                    ForEach(ImportMode.allCases, id: \.self) { mode in
+                    ForEach(configuration.allowedImportModes, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
+                .disabled(configuration.allowedImportModes.count == 1)
             }
 
             switch importMode {
             case .paste:
                 pasteContent
-
             case .qrPhoto:
                 qrPhotoContent
-
             case .file:
                 fileContent
             }
@@ -84,6 +117,32 @@ struct AddContactView: View {
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: { err in
             Text(err.localizedDescription)
+        }
+        .sheet(isPresented: Binding(
+            get: { pendingImportPreview != nil },
+            set: { if !$0 { pendingImportPreview = nil } }
+        )) {
+            if let pendingImportPreview {
+                ImportConfirmView(
+                    keyInfo: pendingImportPreview.keyInfo,
+                    detectedProfile: pendingImportPreview.profile,
+                    onImportVerified: {
+                        completeAddContact(
+                            pendingImportPreview,
+                            verificationState: .verified
+                        )
+                    },
+                    onImportUnverified: configuration.verificationPolicy == .allowUnverified ? {
+                        completeAddContact(
+                            pendingImportPreview,
+                            verificationState: .unverified
+                        )
+                    } : nil,
+                    onCancel: {
+                        self.pendingImportPreview = nil
+                    }
+                )
+            }
         }
         .alert(
             String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
@@ -123,17 +182,20 @@ struct AddContactView: View {
             }
         }
         .onChange(of: importMode) { _, _ in
-            // Clear stale binary data when switching modes
             importedKeyData = nil
             importedFileName = nil
+        }
+        .onAppear {
+            importMode = configuration.allowedImportModes.first ?? .paste
+            if armoredText.isEmpty, let prefilled = configuration.prefilledArmoredText {
+                armoredText = prefilled
+            }
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
             guard let newItem else { return }
             processQRPhoto(newItem)
         }
     }
-
-    // MARK: - Subviews
 
     @ViewBuilder
     private var pasteContent: some View {
@@ -207,26 +269,53 @@ struct AddContactView: View {
         }
     }
 
-    // MARK: - State
-
     private var addButtonDisabled: Bool {
         switch importMode {
-        case .paste: return armoredText.isEmpty
-        case .qrPhoto: return (armoredText.isEmpty && importedKeyData == nil) || isProcessingQR
-        case .file: return armoredText.isEmpty && importedKeyData == nil
+        case .paste:
+            armoredText.isEmpty
+        case .qrPhoto:
+            (armoredText.isEmpty && importedKeyData == nil) || isProcessingQR
+        case .file:
+            armoredText.isEmpty && importedKeyData == nil
         }
     }
-
-    // MARK: - Actions
 
     private func addContact() {
         do {
             let data = importedKeyData ?? Data(armoredText.utf8)
-            let result = try contactService.addContact(publicKeyData: data)
+            let keyInfo = try qrService.inspectKeyInfo(keyData: data)
+            let profile = try qrService.detectKeyProfile(keyData: data)
+            pendingImportPreview = PendingImportPreview(
+                keyData: data,
+                keyInfo: keyInfo,
+                profile: profile
+            )
+        } catch {
+            self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+            showError = true
+        }
+    }
+
+    private func completeAddContact(
+        _ pendingImportPreview: PendingImportPreview,
+        verificationState: ContactVerificationState
+    ) {
+        do {
+            let result = try contactService.addContact(
+                publicKeyData: pendingImportPreview.keyData,
+                verificationState: verificationState
+            )
             switch result {
-            case .added, .duplicate:
-                dismiss()
+            case .added(let contact), .duplicate(let contact):
+                self.pendingImportPreview = nil
+                Task { @MainActor in
+                    configuration.onImported?(contact)
+                }
+                if configuration.onImported == nil {
+                    dismiss()
+                }
             case .keyUpdateDetected(let newContact, let existingContact, let keyData):
+                self.pendingImportPreview = nil
                 pendingKeyUpdate = PendingKeyUpdate(
                     newContact: newContact,
                     existingContact: existingContact,
@@ -236,6 +325,7 @@ struct AddContactView: View {
             }
         } catch {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+            self.pendingImportPreview = nil
             showError = true
         }
     }
@@ -268,14 +358,11 @@ struct AddContactView: View {
                 }
 
                 let publicKeyData = try service.parseImportURL(url)
-                // Populate armoredText so the user must confirm via the "Add Contact" button
-                // rather than bypassing the confirmation flow (PRD Section 4.2).
                 if let armoredString = String(data: publicKeyData, encoding: .utf8) {
                     armoredText = armoredString
                     importedKeyData = nil
                     importedFileName = nil
                 } else {
-                    // Binary key data — store raw Data, bypass String conversion
                     importedKeyData = publicKeyData
                     importedFileName = String(localized: "addcontact.qr.binaryKey", defaultValue: "Binary key from QR")
                     armoredText = ""
@@ -288,30 +375,41 @@ struct AddContactView: View {
     }
 
     private func loadFileContents(from url: URL) {
-        guard url.startAccessingSecurityScopedResource() else { return }
-        defer { url.stopAccessingSecurityScopedResource() }
         do {
-            let data = try Data(contentsOf: url)
-            if let text = String(data: data, encoding: .utf8) {
-                armoredText = text
-                importedKeyData = nil
-                importedFileName = nil
-            } else {
-                // Binary .gpg/.pgp key — store raw Data, bypass String conversion
-                importedKeyData = data
-                importedFileName = url.lastPathComponent
-                armoredText = ""
+            let data = try withSecurityScopedAccess(
+                to: url,
+                failure: .invalidKeyData(reason: String(localized: "addcontact.file.readFailed", defaultValue: "Could not read key file"))
+            ) {
+                try Data(contentsOf: url)
             }
+
+            if let armoredString = String(data: data, encoding: .utf8) {
+                armoredText = armoredString
+                importedKeyData = nil
+            } else {
+                armoredText = ""
+                importedKeyData = data
+            }
+            importedFileName = url.lastPathComponent
+        } catch let error as CypherAirError {
+            self.error = error
+            showError = true
         } catch {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
             showError = true
         }
     }
-}
 
-/// Holds state for a pending key update confirmation.
-private struct PendingKeyUpdate {
-    let newContact: Contact
-    let existingContact: Contact
-    let keyData: Data
+    private func withSecurityScopedAccess<T>(
+        to url: URL,
+        failure: CypherAirError,
+        operation: () throws -> T
+    ) throws -> T {
+        guard url.startAccessingSecurityScopedResource() else {
+            throw failure
+        }
+
+        defer { url.stopAccessingSecurityScopedResource() }
+        return try operation()
+    }
 }

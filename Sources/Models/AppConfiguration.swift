@@ -4,6 +4,8 @@ import Foundation
 /// Uses the key names defined in ARCHITECTURE.md Section 5.
 @Observable
 final class AppConfiguration {
+    private let defaults: UserDefaults
+
     /// Current authentication mode.
     /// Note: UserDefaults persistence is handled by AuthenticationManager.switchMode()
     /// and crash recovery — not by didSet — to ensure the write occurs only after
@@ -18,42 +20,42 @@ final class AppConfiguration {
             if !validValues.contains(gracePeriod) {
                 gracePeriod = AuthPreferences.defaultGracePeriod
             }
-            UserDefaults.standard.set(gracePeriod, forKey: AuthPreferences.gracePeriodKey)
+            defaults.set(gracePeriod, forKey: AuthPreferences.gracePeriodKey)
         }
     }
 
     /// Whether to encrypt messages to self by default.
     var encryptToSelf: Bool {
         didSet {
-            UserDefaults.standard.set(encryptToSelf, forKey: Self.encryptToSelfKey)
+            defaults.set(encryptToSelf, forKey: Self.encryptToSelfKey)
         }
     }
 
     /// Whether to show the clipboard safety notice on first copy.
     var clipboardNotice: Bool {
         didSet {
-            UserDefaults.standard.set(clipboardNotice, forKey: Self.clipboardNoticeKey)
+            defaults.set(clipboardNotice, forKey: Self.clipboardNoticeKey)
         }
     }
 
     /// Whether to require device authentication on cold launch (default true).
     var requireAuthOnLaunch: Bool {
         didSet {
-            UserDefaults.standard.set(requireAuthOnLaunch, forKey: Self.requireAuthOnLaunchKey)
+            defaults.set(requireAuthOnLaunch, forKey: Self.requireAuthOnLaunchKey)
         }
     }
 
     /// Whether the user has completed onboarding.
     var hasCompletedOnboarding: Bool {
         didSet {
-            UserDefaults.standard.set(hasCompletedOnboarding, forKey: Self.onboardingCompleteKey)
+            defaults.set(hasCompletedOnboarding, forKey: Self.onboardingCompleteKey)
         }
     }
 
     /// The selected color theme preset.
     var colorTheme: ColorTheme {
         didSet {
-            UserDefaults.standard.set(colorTheme.rawValue, forKey: Self.colorThemeKey)
+            defaults.set(colorTheme.rawValue, forKey: Self.colorThemeKey)
         }
     }
 
@@ -78,8 +80,8 @@ final class AppConfiguration {
 
     // MARK: - Initialization
 
-    init() {
-        let defaults = UserDefaults.standard
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
 
         // Auth mode
         let modeString = defaults.string(forKey: AuthPreferences.authModeKey) ?? AuthenticationMode.standard.rawValue

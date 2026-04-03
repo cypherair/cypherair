@@ -4,43 +4,18 @@ import SwiftUI
 struct HomeView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
-    @State private var path = NavigationPath()
-    #if os(macOS)
-    @State private var showKeyGeneration = false
-    #endif
+    @Environment(\.appRouteNavigator) private var routeNavigator
 
     var body: some View {
-        NavigationStack(path: $path) {
-            Group {
-                if keyManagement.keys.isEmpty {
-                    noKeysContent
-                } else {
-                    hasKeysContent
-                }
+        Group {
+            if keyManagement.keys.isEmpty {
+                noKeysContent
+            } else {
+                hasKeysContent
             }
-            .navigationTitle(String(localized: "home.title", defaultValue: "CypherAir"))
-            .navigationDestination(for: AppRoute.self) { route in
-                destinationView(for: route)
-            }
-            #if os(macOS)
-            .sheet(isPresented: $showKeyGeneration) {
-                NavigationStack {
-                    KeyGenerationView()
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                                    showKeyGeneration = false
-                                }
-                            }
-                        }
-                }
-                .frame(minWidth: 450, minHeight: 400)
-            }
-            #endif
         }
+        .navigationTitle(String(localized: "home.title", defaultValue: "CypherAir"))
     }
-
-    // MARK: - Subviews
 
     private var noKeysContent: some View {
         ContentUnavailableView {
@@ -51,17 +26,12 @@ struct HomeView: View {
         } description: {
             Text(String(localized: "home.noKeys.subtitle", defaultValue: "Generate a key to start encrypting and signing messages."))
         } actions: {
-            #if os(macOS)
-            Button(String(localized: "home.generateKey", defaultValue: "Generate Key")) {
-                showKeyGeneration = true
-            }
-            .buttonStyle(.borderedProminent)
-            #else
-            NavigationLink(value: AppRoute.keyGeneration) {
+            Button {
+                routeNavigator.open(.keyGeneration)
+            } label: {
                 Text(String(localized: "home.generateKey", defaultValue: "Generate Key"))
             }
             .buttonStyle(.borderedProminent)
-            #endif
         }
     }
 
@@ -123,13 +93,15 @@ struct HomeView: View {
                 title: String(localized: "home.encrypt", defaultValue: "Encrypt"),
                 icon: "lock.fill",
                 tint: config.colorTheme.actionColors.encrypt,
-                route: .encrypt
+                route: .encrypt,
+                anchor: .homeEncryptAction
             )
             actionButton(
                 title: String(localized: "home.decrypt", defaultValue: "Decrypt"),
                 icon: "lock.open.fill",
                 tint: config.colorTheme.actionColors.decrypt,
-                route: .decrypt
+                route: .decrypt,
+                anchor: .homeDecryptAction
             )
             actionButton(
                 title: String(localized: "home.sign", defaultValue: "Sign"),
@@ -146,10 +118,14 @@ struct HomeView: View {
         }
     }
 
-    private func actionButton(title: String, icon: String, tint: Color, route: AppRoute) -> some View {
-        Button {
-            path.append(route)
-        } label: {
+    private func actionButton(
+        title: String,
+        icon: String,
+        tint: Color,
+        route: AppRoute,
+        anchor: TutorialAnchorID? = nil
+    ) -> some View {
+        NavigationLink(value: route) {
             VStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.title2)
@@ -162,52 +138,6 @@ struct HomeView: View {
         .buttonStyle(.glass)
         .tint(tint)
         .accessibilityLabel(title)
-    }
-
-    // MARK: - Navigation Destinations
-
-    @ViewBuilder
-    private func destinationView(for route: AppRoute) -> some View {
-        switch route {
-        case .keyGeneration:
-            KeyGenerationView()
-        case .keyDetail(let fp):
-            KeyDetailView(fingerprint: fp)
-        case .backupKey(let fp):
-            BackupKeyView(fingerprint: fp)
-        case .importKey:
-            ImportKeyView()
-        case .encrypt:
-            EncryptView()
-        case .decrypt:
-            DecryptView()
-
-        case .sign:
-            SignView()
-        case .verify:
-            VerifyView()
-        case .contactDetail(let fp):
-            ContactDetailView(fingerprint: fp)
-        case .addContact:
-            AddContactView()
-        case .qrDisplay(let data, let name):
-            QRDisplayView(publicKeyData: data, displayName: name)
-        case .qrPhotoImport:
-            QRPhotoImportView()
-        case .selfTest:
-            SelfTestView()
-        case .about:
-            AboutView()
-        case .license:
-            LicenseListView()
-        case .appIcon:
-            #if canImport(UIKit)
-            AppIconPickerView()
-            #else
-            Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
-            #endif
-        case .themePicker:
-            ThemePickerView()
-        }
+        .tutorialAnchor(anchor)
     }
 }

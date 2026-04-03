@@ -128,12 +128,19 @@ final class SigningService {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
+        let signerContact = result.signerFingerprint.flatMap {
+            contactService.contact(forFingerprint: $0)
+        }
+        let signerIdentity = SignatureVerification.SignerIdentity.resolve(
+            fingerprint: result.signerFingerprint,
+            contacts: contactService.contacts,
+            ownKeys: keyManagement.keys
+        )
         let sigVerification = SignatureVerification(
             status: result.status,
             signerFingerprint: result.signerFingerprint,
-            signerContact: result.signerFingerprint.flatMap {
-                contactService.contact(forFingerprint: $0)
-            }
+            signerContact: signerContact,
+            signerIdentity: signerIdentity
         )
 
         return (text: result.content, verification: sigVerification)
@@ -158,12 +165,19 @@ final class SigningService {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
+        let signerContact = result.signerFingerprint.flatMap {
+            contactService.contact(forFingerprint: $0)
+        }
+        let signerIdentity = SignatureVerification.SignerIdentity.resolve(
+            fingerprint: result.signerFingerprint,
+            contacts: contactService.contacts,
+            ownKeys: keyManagement.keys
+        )
         return SignatureVerification(
             status: result.status,
             signerFingerprint: result.signerFingerprint,
-            signerContact: result.signerFingerprint.flatMap {
-                contactService.contact(forFingerprint: $0)
-            }
+            signerContact: signerContact,
+            signerIdentity: signerIdentity
         )
     }
 
@@ -194,12 +208,19 @@ final class SigningService {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
+        let signerContact = result.signerFingerprint.flatMap {
+            contactService.contact(forFingerprint: $0)
+        }
+        let signerIdentity = SignatureVerification.SignerIdentity.resolve(
+            fingerprint: result.signerFingerprint,
+            contacts: contactService.contacts,
+            ownKeys: keyManagement.keys
+        )
         return SignatureVerification(
             status: result.status,
             signerFingerprint: result.signerFingerprint,
-            signerContact: result.signerFingerprint.flatMap {
-                contactService.contact(forFingerprint: $0)
-            }
+            signerContact: signerContact,
+            signerIdentity: signerIdentity
         )
     }
 

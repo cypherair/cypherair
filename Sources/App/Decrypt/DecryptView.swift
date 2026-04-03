@@ -6,15 +6,26 @@ import UniformTypeIdentifiers
 
 /// Unified two-phase decryption view for text and files.
 struct DecryptView: View {
-    @Environment(DecryptionService.self) private var decryptionService
-    @Environment(AppConfiguration.self) private var config
+    struct Configuration {
+        var allowedModes: [DecryptMode] = DecryptMode.allCases
+        var prefilledCiphertext: String?
+        var initialPhase1Result: DecryptionService.Phase1Result?
+        var onParsed: (@MainActor (DecryptionService.Phase1Result) -> Void)?
+        var onDecrypted: (@MainActor (Data, SignatureVerification) -> Void)?
+
+        static let `default` = Configuration()
+    }
 
     enum DecryptMode: String, CaseIterable {
-        case text, file
+        case text
+        case file
+
         var label: String {
             switch self {
-            case .text: String(localized: "decrypt.mode.text", defaultValue: "Text")
-            case .file: String(localized: "decrypt.mode.file", defaultValue: "File")
+            case .text:
+                String(localized: "decrypt.mode.text", defaultValue: "Text")
+            case .file:
+                String(localized: "decrypt.mode.file", defaultValue: "File")
             }
         }
     }
@@ -31,16 +42,17 @@ struct DecryptView: View {
         let text: String
     }
 
+    @Environment(DecryptionService.self) private var decryptionService
+    @Environment(AppConfiguration.self) private var config
+
+    let configuration: Configuration
+
     @State private var decryptMode: DecryptMode = .text
     @State private var ciphertextInput = ""
     @State private var decryptedText: String?
     @State private var signatureVerification: SignatureVerification?
     @State private var operation = OperationController()
-
-    // Phase 1 result — shown to user before authentication
     @State private var phase1Result: DecryptionService.Phase1Result?
-
-    // File mode state
     @State private var showFileImporter = false
     @State private var fileImportTarget: FileImportTarget?
     @State private var selectedFileURL: URL?
@@ -52,15 +64,20 @@ struct DecryptView: View {
     @State private var showTextModeSuggestion = false
     @State private var exportController = FileExportController()
 
+    init(configuration: Configuration = .default) {
+        self.configuration = configuration
+    }
+
     var body: some View {
         Form {
             Section {
                 Picker(String(localized: "decrypt.mode", defaultValue: "Mode"), selection: $decryptMode) {
-                    ForEach(DecryptMode.allCases, id: \.self) { mode in
+                    ForEach(configuration.allowedModes, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
+                .disabled(configuration.allowedModes.count == 1)
             }
 
             if decryptMode == .text {
@@ -69,7 +86,6 @@ struct DecryptView: View {
                 fileInputContent
             }
 
-            // Phase 1: Parse recipients (no authentication)
             Section {
                 Button {
                     if decryptMode == .text {
@@ -90,7 +106,6 @@ struct DecryptView: View {
                 .disabled(decryptButtonDisabled || hasPhase1Result)
             }
 
-            // Phase 1 result: show matched key before authentication
             if let matchedKey = activeMatchedKey {
                 Section {
                     LabeledContent(
@@ -111,7 +126,6 @@ struct DecryptView: View {
                     Text(String(localized: "decrypt.matchedKey", defaultValue: "Matched Key"))
                 }
 
-                // Phase 2: Decrypt with authentication
                 Section {
                     Button {
                         if decryptMode == .text, let phase1 = phase1Result {
@@ -147,7 +161,6 @@ struct DecryptView: View {
                 }
             }
 
-            // Text mode result
             if decryptMode == .text, let decryptedText {
                 Section {
                     Text(decryptedText)
@@ -157,7 +170,6 @@ struct DecryptView: View {
                 }
             }
 
-            // File mode result
             if decryptMode == .file, decryptedFileURL != nil {
                 Section {
                     Button {
@@ -187,7 +199,6 @@ struct DecryptView: View {
                 }
             }
 
-            // Signature verification (shared by both modes)
             if let sigVerification = signatureVerification {
                 Section {
                     HStack {
@@ -199,6 +210,14 @@ struct DecryptView: View {
                     .accessibilityElement(children: .combine)
                 } header: {
                     Text(String(localized: "decrypt.signature", defaultValue: "Signature"))
+                }
+
+                if sigVerification.shouldShowSignerIdentity {
+                    Section {
+                        SignatureIdentityCardView(verification: sigVerification)
+                    } header: {
+                        Text(String(localized: "decrypt.signer", defaultValue: "Signer"))
+                    }
                 }
             }
         }
@@ -273,12 +292,8 @@ struct DecryptView: View {
             }
         }
         .onDisappear {
-            // PRD §4.4: Zeroize/delete decrypted data when leaving the view.
-            // Note: Swift String cannot be reliably zeroized (SECURITY.md §7.1).
-            // Assigning empty string before nil reduces the old string's reference lifetime.
             decryptedText = ""
             decryptedText = nil
-            // Delete streaming decrypted file from disk
             if let url = decryptedFileURL {
                 try? FileManager.default.removeItem(at: url)
                 decryptedFileURL = nil
@@ -291,7 +306,6 @@ struct DecryptView: View {
             fileImportTarget = nil
         }
         .onChange(of: config.contentClearGeneration) {
-            // PRD §4.4: Clear decrypted content when grace period expires.
             decryptedText = ""
             decryptedText = nil
             if let url = decryptedFileURL {
@@ -302,20 +316,27 @@ struct DecryptView: View {
             phase1Result = nil
             filePhase1Result = nil
         }
+        .onAppear {
+            decryptMode = configuration.allowedModes.first ?? .text
+            if ciphertextInput.isEmpty, let prefilledCiphertext = configuration.prefilledCiphertext {
+                ciphertextInput = prefilledCiphertext
+            }
+            if let initialPhase1Result = configuration.initialPhase1Result {
+                phase1Result = initialPhase1Result
+            }
+        }
     }
-
-    // MARK: - Subviews
 
     @ViewBuilder
     private var textInputContent: some View {
         Section {
             TextEditor(text: ciphertextBinding)
                 .font(.system(.body, design: .monospaced))
-                #if canImport(UIKit)
-                .frame(minHeight: 100)
-                #else
-                .frame(minHeight: 250)
-                #endif
+                .frame(
+                    minHeight: editorHeightRange.min,
+                    idealHeight: editorHeightRange.ideal,
+                    maxHeight: editorHeightRange.max
+                )
 
             Button {
                 fileImportTarget = .textCiphertextImport
@@ -376,21 +397,19 @@ struct DecryptView: View {
         }
     }
 
-    // MARK: - State
-
     private var activeMatchedKey: PGPKeyIdentity? {
         if decryptMode == .text {
-            return phase1Result?.matchedKey
+            phase1Result?.matchedKey
         } else {
-            return filePhase1Result?.matchedKey
+            filePhase1Result?.matchedKey
         }
     }
 
     private var hasPhase1Result: Bool {
         if decryptMode == .text {
-            return phase1Result != nil
+            phase1Result != nil
         } else {
-            return filePhase1Result != nil
+            filePhase1Result != nil
         }
     }
 
@@ -400,23 +419,32 @@ struct DecryptView: View {
         switch decryptMode {
         case .text:
             return ciphertextInput.isEmpty && importedCiphertext.rawData == nil
-        case .file: return selectedFileURL == nil
+        case .file:
+            return selectedFileURL == nil
         }
+    }
+
+    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
+        #if canImport(UIKit)
+        (110, 160, 240)
+        #else
+        (150, 220, 320)
+        #endif
     }
 
     private var allowedImportContentTypes: [UTType] {
         switch fileImportTarget {
         case .textCiphertextImport:
-            return [
+            [
                 UTType(filenameExtension: "asc") ?? .plainText,
-                .plainText
+                .plainText,
             ]
         case .fileCiphertextImport, .none:
-            return [
+            [
                 UTType(filenameExtension: "gpg") ?? .data,
                 UTType(filenameExtension: "pgp") ?? .data,
                 UTType(filenameExtension: "asc") ?? .data,
-                .data
+                .data,
             ]
         }
     }
@@ -443,10 +471,6 @@ struct DecryptView: View {
         return name
     }
 
-    // MARK: - Actions
-
-    // Phase 1: Parse recipients (no authentication)
-
     private func parseRecipientsText() {
         let service = decryptionService
         let inputData = importedCiphertext.rawData ?? Data(ciphertextInput.utf8)
@@ -455,6 +479,7 @@ struct DecryptView: View {
         operation.run(mapError: mapDecryptError) {
             let result = try await service.parseRecipients(ciphertext: inputData)
             phase1Result = result
+            configuration.onParsed?(result)
         }
     }
 
@@ -482,8 +507,6 @@ struct DecryptView: View {
         }
     }
 
-    // Phase 2: Decrypt with authentication
-
     private func decryptText(phase1: DecryptionService.Phase1Result) {
         let service = decryptionService
         operation.run(mapError: mapDecryptError) {
@@ -493,6 +516,7 @@ struct DecryptView: View {
                 decryptedText = text
             }
             signatureVerification = result.signature
+            configuration.onDecrypted?(result.plaintext, result.signature)
 
             var mutablePlaintext = result.plaintext
             mutablePlaintext.resetBytes(in: 0..<mutablePlaintext.count)

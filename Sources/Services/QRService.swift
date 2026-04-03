@@ -93,7 +93,7 @@ final class QRService {
     /// This is a read-only inspection — no keys are stored.
     func inspectKeyInfo(keyData: Data) throws -> KeyInfo {
         do {
-            return try engine.parseKeyInfo(keyData: keyData)
+            return try engine.parseKeyInfo(keyData: normalizePublicKeyData(keyData))
         } catch {
             throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
         }
@@ -102,7 +102,19 @@ final class QRService {
     /// Detect the encryption profile of a public key.
     func detectKeyProfile(keyData: Data) throws -> KeyProfile {
         do {
-            return try engine.detectProfile(certData: keyData)
+            return try engine.detectProfile(certData: normalizePublicKeyData(keyData))
+        } catch {
+            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+        }
+    }
+
+    private func normalizePublicKeyData(_ keyData: Data) throws -> Data {
+        guard let firstByte = keyData.first, firstByte == 0x2D else {
+            return keyData
+        }
+
+        do {
+            return try engine.dearmor(armored: keyData)
         } catch {
             throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
         }

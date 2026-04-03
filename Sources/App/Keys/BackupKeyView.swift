@@ -3,14 +3,29 @@ import UniformTypeIdentifiers
 
 /// Passphrase-protected key export for backup.
 struct BackupKeyView: View {
+    struct Configuration {
+        enum ResultPresentation {
+            case fileExporter
+            case inline
+        }
+
+        var resultPresentation: ResultPresentation = .fileExporter
+        var onExported: (@MainActor (Data) -> Void)?
+
+        static let `default` = Configuration()
+    }
+
     let fingerprint: String
+    let configuration: Configuration
 
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(\.dismiss) private var dismiss
 
-    enum Field { case passphrase, confirm }
+    enum Field {
+        case passphrase
+        case confirm
+    }
+
     @FocusState private var focusedField: Field?
-
     @State private var passphrase = ""
     @State private var passphraseConfirm = ""
     @State private var isExporting = false
@@ -18,6 +33,14 @@ struct BackupKeyView: View {
     @State private var error: CypherAirError?
     @State private var showError = false
     @State private var showFileExporter = false
+
+    init(
+        fingerprint: String,
+        configuration: Configuration = .default
+    ) {
+        self.fingerprint = fingerprint
+        self.configuration = configuration
+    }
 
     var body: some View {
         Form {
@@ -62,7 +85,18 @@ struct BackupKeyView: View {
                 .disabled(passphrase.isEmpty || passphrase != passphraseConfirm || isExporting)
             }
 
-            if exportedData != nil {
+            if configuration.resultPresentation == .inline,
+               let exportedData,
+               let exportedString = String(data: exportedData, encoding: .utf8) {
+                Section {
+                    Text(exportedString)
+                        .font(.system(.footnote, design: .monospaced))
+                        .textSelection(.enabled)
+                        .lineLimit(10)
+                } header: {
+                    Text(String(localized: "backup.ready", defaultValue: "Backup Ready"))
+                }
+            } else if exportedData != nil {
                 Section {
                     Button {
                         showFileExporter = true
@@ -111,6 +145,7 @@ struct BackupKeyView: View {
         let service = keyManagement
         let fp = fingerprint
         let pass = passphrase
+
         Task {
             do {
                 let data = try await service.exportKey(
@@ -118,9 +153,7 @@ struct BackupKeyView: View {
                     passphrase: pass
                 )
                 exportedData = data
-                // Clear sensitive state after successful export.
-                // Note: Swift String cannot be reliably zeroized (SECURITY.md §7.1),
-                // but we minimize lifetime by clearing references immediately.
+                configuration.onExported?(data)
                 passphrase = ""
                 passphraseConfirm = ""
             } catch {

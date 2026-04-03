@@ -41,11 +41,11 @@ struct ImportKeyView: View {
                 } else {
                     TextEditor(text: $armoredText)
                         .font(.system(.body, design: .monospaced))
-                        #if canImport(UIKit)
-                        .frame(minHeight: 120)
-                        #else
-                        .frame(minHeight: 200)
-                        #endif
+                        .frame(
+                            minHeight: editorHeightRange.min,
+                            idealHeight: editorHeightRange.ideal,
+                            maxHeight: editorHeightRange.max
+                        )
                 }
             } header: {
                 Text(String(localized: "import.paste.header", defaultValue: "Paste armored private key"))
@@ -119,6 +119,14 @@ struct ImportKeyView: View {
                 loadFileContents(from: url)
             }
         }
+    }
+
+    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
+        #if canImport(UIKit)
+        return (120, 170, 250)
+        #else
+        return (140, 210, 300)
+        #endif
     }
 
     private func loadFileContents(from url: URL) {

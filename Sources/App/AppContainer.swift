@@ -57,7 +57,8 @@ final class AppContainer {
             engine: engine,
             secureEnclave: secureEnclave,
             keychain: keychain,
-            authenticator: authManager
+            authenticator: authManager,
+            defaults: .standard
         )
         let contactService = ContactService(engine: engine)
         let encryptionService = EncryptionService(

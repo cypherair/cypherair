@@ -1,5 +1,14 @@
 import Foundation
 
+enum ContactVerificationState: String, Codable, Hashable {
+    case verified
+    case unverified
+
+    var isVerified: Bool {
+        self == .verified
+    }
+}
+
 /// A contact whose public key has been imported.
 struct Contact: Identifiable, Hashable {
     /// Unique identifier — the full fingerprint in lowercase hex.
@@ -36,6 +45,9 @@ struct Contact: Identifiable, Hashable {
     /// Whether the key has an encryption subkey.
     let hasEncryptionSubkey: Bool
 
+    /// Whether the user has verified the contact's fingerprint out-of-band.
+    var verificationState: ContactVerificationState
+
     /// Public key data in binary OpenPGP format.
     let publicKeyData: Data
 
@@ -53,6 +65,10 @@ struct Contact: Identifiable, Hashable {
     /// Whether this contact's key can receive encrypted messages.
     var canEncryptTo: Bool {
         hasEncryptionSubkey && !isRevoked && !isExpired
+    }
+
+    var isVerified: Bool {
+        verificationState.isVerified
     }
 
     /// Formatted fingerprint for display (groups of 4 characters).

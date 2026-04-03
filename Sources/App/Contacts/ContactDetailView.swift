@@ -20,6 +20,31 @@ struct ContactDetailView: View {
             if let contact {
                 List {
                     Section {
+                        if !contact.isVerified {
+                            Label(
+                                String(
+                                    localized: "contactdetail.unverified",
+                                    defaultValue: "This contact has not been verified yet. Confirm the fingerprint with the key owner before relying on it."
+                                ),
+                                systemImage: "exclamationmark.triangle.fill"
+                            )
+                            .foregroundStyle(.orange)
+
+                            Button {
+                                do {
+                                    try contactService.setVerificationState(.verified, for: fingerprint)
+                                } catch {
+                                    deleteError = error.localizedDescription
+                                    showDeleteError = true
+                                }
+                            } label: {
+                                Label(
+                                    String(localized: "contactdetail.markVerified", defaultValue: "I Verified This Fingerprint"),
+                                    systemImage: "checkmark.shield"
+                                )
+                            }
+                        }
+
                         LabeledContent(
                             String(localized: "contactdetail.name", defaultValue: "Name"),
                             value: contact.displayName
@@ -33,6 +58,10 @@ struct ContactDetailView: View {
                         LabeledContent(
                             String(localized: "contactdetail.profile", defaultValue: "Profile"),
                             value: contact.profile.displayName
+                        )
+                        LabeledContent(
+                            String(localized: "contactdetail.shortKeyId", defaultValue: "Short Key ID"),
+                            value: contact.shortKeyId
                         )
                         LabeledContent(
                             String(localized: "contactdetail.algo", defaultValue: "Algorithm"),

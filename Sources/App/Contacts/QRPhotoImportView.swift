@@ -84,8 +84,17 @@ struct QRPhotoImportView: View {
                 ImportConfirmView(
                     keyInfo: pending.keyInfo,
                     detectedProfile: pending.profile,
-                    onConfirm: {
-                        confirmImport(pending)
+                    onImportVerified: {
+                        confirmImport(
+                            pending,
+                            verificationState: .verified
+                        )
+                    },
+                    onImportUnverified: {
+                        confirmImport(
+                            pending,
+                            verificationState: .unverified
+                        )
                     },
                     onCancel: {
                         pendingConfirm = nil
@@ -164,9 +173,15 @@ struct QRPhotoImportView: View {
         }
     }
 
-    private func confirmImport(_ pending: PendingQRImport) {
+    private func confirmImport(
+        _ pending: PendingQRImport,
+        verificationState: ContactVerificationState
+    ) {
         do {
-            let result = try contactService.addContact(publicKeyData: pending.keyData)
+            let result = try contactService.addContact(
+                publicKeyData: pending.keyData,
+                verificationState: verificationState
+            )
             switch result {
             case .added(let contact), .duplicate(let contact):
                 importedContact = contact

@@ -142,7 +142,7 @@ struct OnboardingPageThree: View {
             Button {
                 showTutorial = true
             } label: {
-                Text(String(localized: "onboarding.viewTutorial", defaultValue: "View Usage Tutorial"))
+                Text(String(localized: "guidedTutorial.onboarding.entry", defaultValue: "Open Guided Tutorial"))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)

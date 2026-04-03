@@ -3,6 +3,85 @@ import SwiftUI
 /// App-level signature verification result for display in the UI.
 /// Wraps the UniFFI `SignatureStatus` with user-facing information.
 struct SignatureVerification {
+    enum SignerSource: Equatable {
+        case contact
+        case ownKey
+        case unknown
+    }
+
+    struct SignerIdentity: Equatable {
+        let source: SignerSource
+        let displayName: String
+        let secondaryText: String?
+        let shortKeyId: String?
+        let fingerprint: String
+        let isVerifiedContact: Bool
+
+        var formattedFingerprint: String {
+            IdentityPresentation.formattedFingerprint(fingerprint)
+        }
+
+        var sourceLabel: String {
+            switch source {
+            case .contact:
+                return isVerifiedContact
+                    ? String(localized: "signature.identity.contact", defaultValue: "Contact")
+                    : String(localized: "signature.identity.contact.unverified", defaultValue: "Unverified Contact")
+            case .ownKey:
+                return String(localized: "signature.identity.ownKey", defaultValue: "Your Key")
+            case .unknown:
+                return String(localized: "signature.identity.unknown", defaultValue: "Unknown Signer")
+            }
+        }
+
+        var verificationNote: String? {
+            guard source == .contact, !isVerifiedContact else { return nil }
+            return String(
+                localized: "signature.identity.contact.unverified.note",
+                defaultValue: "This signer matches a contact in your address book, but you have not verified that contact's fingerprint yet."
+            )
+        }
+
+        static func resolve(
+            fingerprint: String?,
+            contacts: [Contact],
+            ownKeys: [PGPKeyIdentity]
+        ) -> SignerIdentity? {
+            guard let fingerprint else { return nil }
+
+            if let contact = contacts.first(where: { $0.fingerprint == fingerprint }) {
+                return SignerIdentity(
+                    source: .contact,
+                    displayName: contact.displayName,
+                    secondaryText: contact.email ?? contact.userId,
+                    shortKeyId: contact.shortKeyId,
+                    fingerprint: contact.fingerprint,
+                    isVerifiedContact: contact.isVerified
+                )
+            }
+
+            if let ownKey = ownKeys.first(where: { $0.fingerprint == fingerprint }) {
+                return SignerIdentity(
+                    source: .ownKey,
+                    displayName: String(localized: "signature.identity.ownKey", defaultValue: "Your Key"),
+                    secondaryText: ownKey.userId ?? ownKey.shortKeyId,
+                    shortKeyId: ownKey.shortKeyId,
+                    fingerprint: ownKey.fingerprint,
+                    isVerifiedContact: true
+                )
+            }
+
+            return SignerIdentity(
+                source: .unknown,
+                displayName: String(localized: "signature.identity.unknown", defaultValue: "Unknown Signer"),
+                secondaryText: nil,
+                shortKeyId: IdentityPresentation.shortKeyId(from: fingerprint),
+                fingerprint: fingerprint,
+                isVerifiedContact: false
+            )
+        }
+    }
+
     /// The graded verification result.
     let status: SignatureStatus
 
@@ -10,7 +89,39 @@ struct SignatureVerification {
     let signerFingerprint: String?
 
     /// The contact who signed (resolved from fingerprint), if available.
-    var signerContact: Contact?
+    let signerContact: Contact?
+
+    let signerIdentity: SignerIdentity?
+
+    init(
+        status: SignatureStatus,
+        signerFingerprint: String?,
+        signerContact: Contact?,
+        signerIdentity: SignerIdentity? = nil
+    ) {
+        self.status = status
+        self.signerFingerprint = signerFingerprint
+        self.signerContact = signerContact
+        self.signerIdentity = signerIdentity ?? signerContact.map {
+            SignerIdentity(
+                source: .contact,
+                displayName: $0.displayName,
+                secondaryText: $0.email ?? $0.userId,
+                shortKeyId: $0.shortKeyId,
+                fingerprint: $0.fingerprint,
+                isVerifiedContact: $0.isVerified
+            )
+        } ?? signerFingerprint.map {
+            SignerIdentity(
+                source: .unknown,
+                displayName: String(localized: "signature.identity.unknown", defaultValue: "Unknown Signer"),
+                secondaryText: nil,
+                shortKeyId: IdentityPresentation.shortKeyId(from: $0),
+                fingerprint: $0,
+                isVerifiedContact: false
+            )
+        }
+    }
 
     /// SF Symbol name for the status indicator.
     var symbolName: String {
@@ -38,9 +149,9 @@ struct SignatureVerification {
     var statusDescription: String {
         switch status {
         case .valid:
-            if let contact = signerContact {
+            if let signerIdentity {
                 String(localized: "signature.valid.known",
-                       defaultValue: "Valid signature from \(contact.displayName)")
+                       defaultValue: "Valid signature from \(signerIdentity.displayName)")
             } else if let fp = signerFingerprint {
                 String(localized: "signature.valid.fingerprint",
                        defaultValue: "Valid signature from \(String(fp.suffix(16)))")
@@ -65,6 +176,91 @@ struct SignatureVerification {
         case .unknownSigner: true
         case .expired: true
         default: false
+        }
+    }
+
+    var shouldShowSignerIdentity: Bool {
+        status != .notSigned && signerIdentity != nil
+    }
+}
+
+struct SignatureIdentityCardView: View {
+    let verification: SignatureVerification
+
+    var body: some View {
+        if let signerIdentity = verification.signerIdentity {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top) {
+                    Text(signerIdentity.sourceLabel)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(badgeBackgroundColor(for: signerIdentity), in: Capsule())
+                        .foregroundStyle(badgeForegroundColor(for: signerIdentity))
+
+                    Spacer()
+                }
+
+                Text(signerIdentity.displayName)
+                    .font(.headline)
+
+                if let secondaryText = signerIdentity.secondaryText, !secondaryText.isEmpty {
+                    Text(secondaryText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let shortKeyId = signerIdentity.shortKeyId {
+                    LabeledContent(
+                        String(localized: "signature.shortKeyId", defaultValue: "Short Key ID"),
+                        value: shortKeyId
+                    )
+                    .font(.caption)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(localized: "signature.fingerprint", defaultValue: "Fingerprint"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(signerIdentity.formattedFingerprint)
+                        .font(.system(.footnote, design: .monospaced))
+                        .textSelection(.enabled)
+                        .accessibilityLabel(
+                            IdentityPresentation.fingerprintAccessibilityLabel(signerIdentity.fingerprint)
+                        )
+                }
+
+                if let verificationNote = signerIdentity.verificationNote {
+                    Label(verificationNote, systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func badgeBackgroundColor(for signerIdentity: SignatureVerification.SignerIdentity) -> Color {
+        switch signerIdentity.source {
+        case .contact:
+            return signerIdentity.isVerifiedContact
+                ? Color.secondary.opacity(0.12)
+                : Color.orange.opacity(0.16)
+        case .ownKey:
+            return Color.blue.opacity(0.14)
+        case .unknown:
+            return Color.orange.opacity(0.16)
+        }
+    }
+
+    private func badgeForegroundColor(for signerIdentity: SignatureVerification.SignerIdentity) -> Color {
+        switch signerIdentity.source {
+        case .contact:
+            return signerIdentity.isVerifiedContact ? .secondary : .orange
+        case .ownKey:
+            return .blue
+        case .unknown:
+            return .orange
         }
     }
 }

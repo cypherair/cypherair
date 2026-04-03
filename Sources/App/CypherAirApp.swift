@@ -11,6 +11,7 @@ struct CypherAirApp: App {
     @State private var pendingImport: PendingImport?
     @State private var importError: CypherAirError?
     @State private var loadError: String?
+    @State private var tutorialStore = TutorialSessionStore()
 
     /// Holds parsed key data and info for the import confirmation sheet.
     private struct PendingImport {
@@ -45,9 +46,11 @@ struct CypherAirApp: App {
                 .environment(container.qrService)
                 .environment(container.selfTestService)
                 .environment(container.authManager)
+                .environment(tutorialStore)
                 .sheet(isPresented: showOnboarding) {
                     OnboardingView()
                         .environment(container.config)
+                        .environment(tutorialStore)
                         .interactiveDismissDisabled()
                 }
                 .sheet(isPresented: Binding(
@@ -58,21 +61,17 @@ struct CypherAirApp: App {
                         ImportConfirmView(
                             keyInfo: pending.keyInfo,
                             detectedProfile: pending.profile,
-                            onConfirm: {
-                                do {
-                                    let result = try container.contactService.addContact(publicKeyData: pending.keyData)
-                                    if case .keyUpdateDetected(let newContact, let existingContact, let keyData) = result {
-                                        // User confirmed import via ImportConfirmView — proceed with replacement.
-                                        try container.contactService.confirmKeyUpdate(
-                                            existingFingerprint: existingContact.fingerprint,
-                                            newContact: newContact,
-                                            keyData: keyData
-                                        )
-                                    }
-                                } catch {
-                                    importError = CypherAirError.from(error) { _ in .invalidQRCode }
-                                }
-                                pendingImport = nil
+                            onImportVerified: {
+                                completePendingImport(
+                                    pending,
+                                    verificationState: .verified
+                                )
+                            },
+                            onImportUnverified: {
+                                completePendingImport(
+                                    pending,
+                                    verificationState: .unverified
+                                )
                             },
                             onCancel: {
                                 pendingImport = nil
@@ -127,7 +126,7 @@ struct CypherAirApp: App {
 
         #if os(macOS)
         Settings {
-            NavigationStack {
+            AppRouteHost(resolver: .production) {
                 SettingsView()
             }
             .optionalTint(container.config.colorTheme.accentColor)
@@ -135,6 +134,7 @@ struct CypherAirApp: App {
             .environment(container.authManager)
             .environment(container.keyManagement)
             .environment(container.selfTestService)
+            .environment(tutorialStore)
         }
         #endif
     }
@@ -167,6 +167,29 @@ struct CypherAirApp: App {
         } catch {
             importError = CypherAirError.from(error) { _ in .invalidQRCode }
         }
+    }
+
+    private func completePendingImport(
+        _ pending: PendingImport,
+        verificationState: ContactVerificationState
+    ) {
+        do {
+            let result = try container.contactService.addContact(
+                publicKeyData: pending.keyData,
+                verificationState: verificationState
+            )
+            if case .keyUpdateDetected(let newContact, let existingContact, let keyData) = result {
+                // User confirmed import via ImportConfirmView — proceed with replacement.
+                try container.contactService.confirmKeyUpdate(
+                    existingFingerprint: existingContact.fingerprint,
+                    newContact: newContact,
+                    keyData: keyData
+                )
+            }
+        } catch {
+            importError = CypherAirError.from(error) { _ in .invalidQRCode }
+        }
+        pendingImport = nil
     }
 }
 

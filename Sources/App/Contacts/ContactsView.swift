@@ -3,29 +3,17 @@ import SwiftUI
 /// Lists imported contacts (public keys).
 struct ContactsView: View {
     @Environment(ContactService.self) private var contactService
+    @Environment(\.appRouteNavigator) private var routeNavigator
 
     @State private var deleteError: String?
     @State private var showDeleteError = false
-    #if os(macOS)
-    @State private var selectedContactFingerprint: String?
-    @State private var showAddContact = false
-    #endif
 
     var body: some View {
         List {
             ForEach(contactService.contacts) { contact in
-                #if os(macOS)
-                Button {
-                    selectedContactFingerprint = contact.fingerprint
-                } label: {
-                    ContactRowView(contact: contact)
-                }
-                .buttonStyle(.plain)
-                #else
                 NavigationLink(value: AppRoute.contactDetail(fingerprint: contact.fingerprint)) {
                     ContactRowView(contact: contact)
                 }
-                #endif
             }
             .onDelete { indexSet in
                 for index in indexSet {
@@ -49,44 +37,25 @@ struct ContactsView: View {
                 } description: {
                     Text(String(localized: "contacts.empty.description", defaultValue: "Add a friend's public key to start encrypting messages to them."))
                 } actions: {
-                    #if os(macOS)
-                    Button(String(localized: "contacts.add", defaultValue: "Add Contact")) {
-                        showAddContact = true
-                    }
-                    .buttonStyle(.borderedProminent)
-                    #else
-                    NavigationLink(value: AppRoute.addContact) {
+                    Button {
+                        routeNavigator.open(.addContact)
+                    } label: {
                         Text(String(localized: "contacts.add", defaultValue: "Add Contact"))
                     }
                     .buttonStyle(.borderedProminent)
-                    #endif
+                    .tutorialAnchor(.contactsAddButton)
                 }
             }
         }
         .navigationTitle(String(localized: "contacts.title", defaultValue: "Contacts"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                #if os(macOS)
                 Button {
-                    showAddContact = true
+                    routeNavigator.open(.addContact)
                 } label: {
                     Image(systemName: "plus")
                 }
-                #else
-                NavigationLink(value: AppRoute.addContact) {
-                    Image(systemName: "plus")
-                }
-                #endif
-            }
-        }
-        .navigationDestination(for: AppRoute.self) { route in
-            switch route {
-            case .contactDetail(let fp):
-                ContactDetailView(fingerprint: fp)
-            case .addContact:
-                AddContactView()
-            default:
-                Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
+                .tutorialAnchor(.contactsAddButton)
             }
         }
         .task {
@@ -102,39 +71,6 @@ struct ContactsView: View {
                 Text(deleteError)
             }
         }
-        #if os(macOS)
-        .sheet(isPresented: Binding(
-            get: { selectedContactFingerprint != nil },
-            set: { if !$0 { selectedContactFingerprint = nil } }
-        )) {
-            if let selectedContactFingerprint {
-                NavigationStack {
-                    ContactDetailView(fingerprint: selectedContactFingerprint)
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button(String(localized: "common.done", defaultValue: "Done")) {
-                                    self.selectedContactFingerprint = nil
-                                }
-                            }
-                        }
-                }
-                .frame(minWidth: 500, minHeight: 420)
-            }
-        }
-        .sheet(isPresented: $showAddContact) {
-            NavigationStack {
-                AddContactView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                                showAddContact = false
-                            }
-                        }
-                    }
-            }
-            .frame(minWidth: 450, minHeight: 400)
-        }
-        #endif
     }
 }
 
@@ -146,6 +82,14 @@ private struct ContactRowView: View {
             HStack {
                 Text(contact.displayName)
                     .font(.body.weight(.medium))
+                if !contact.isVerified {
+                    Text(String(localized: "contacts.unverified", defaultValue: "Unverified"))
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.14), in: Capsule())
+                        .foregroundStyle(.orange)
+                }
                 Spacer()
                 Text(contact.profile.displayName)
                     .font(.caption)
