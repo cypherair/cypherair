@@ -26,7 +26,6 @@ thiserror = "2"
 
 [dev-dependencies]
 tempfile = "3"
-rand = "0.8" # Test-only: NOT used in production code
 
 [build-dependencies]
 uniffi = { version = "0.31", features = ["build"] }
