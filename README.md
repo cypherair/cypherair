@@ -35,7 +35,7 @@ Designed for maximum security using RFC 9580. Not compatible with GnuPG.
 | Key format | v6 (RFC 9580) |
 | Signing / Encryption | Ed448 / X448 |
 | Message format | SEIPDv2 (AEAD OCB) |
-| S2K (key export) | Argon2id (512 MB / p=4) |
+| S2K (key export) | Argon2id (512 MB / p=4 / t=3) |
 | Security level | ~224 bit |
 
 Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+.

@@ -149,7 +149,7 @@ Text: cleartext sig. File: detached .sig. Auto-verify during decryption. Graded 
 ### 4.6 Backup & Restore
 
 - **Profile A backup:** Auth → passphrase → Iterated+Salted S2K → .asc → Share Sheet.
-- **Profile B backup:** Auth → passphrase → Argon2id S2K (512 MB / p=4 / ~3s) → .asc → Share Sheet.
+- **Profile B backup:** Auth → passphrase → Argon2id S2K (512 MB / p=4 / t=3, ~3s target on contemporary hardware) → .asc → Share Sheet.
 - **Restore:** Import .asc → enter passphrase → stored with SE protection.
 - **Revocation cert:** Can be exported separately from key detail page via Share Sheet.
 

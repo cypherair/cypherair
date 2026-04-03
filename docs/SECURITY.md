@@ -189,7 +189,7 @@ Used only for private key export (backup) and for importing/unlocking passphrase
 |-----------|-------|-------------------|
 | Memory | 512 MB (524,288 KiB) | `encoded_m = 19` (2^19 KiB) |
 | Parallelism | 4 lanes | `p = 4` |
-| Time | Calibrated (~3s) | `t = calibrated on first export` |
+| Time | Fixed at 3 passes (~3s target on contemporary hardware) | `t = 3` |
 
 ### iOS Memory Safety Guard
 
@@ -199,7 +199,7 @@ Before Argon2id derivation **when importing or unlocking a passphrase-protected 
 2. Calculate required memory: `2^encoded_m` KiB.
 3. Query `os_proc_available_memory()`.
 4. If required > 75% of available memory: **refuse** with error message: _"This key uses memory-intensive protection that exceeds this device's capacity."_
-5. Log the refused parameters (never the key material) for diagnostics.
+5. Return a user-facing refusal error before Argon2id derivation begins.
 
 This prevents iOS Jetsam from killing the app. The 75% threshold provides a safety margin.
 
