@@ -1,0 +1,2030 @@
+[
+  {
+    "id": "cypherair",
+    "displayName": "CypherAir",
+    "version": "Unspecified",
+    "repositoryURL": "https://github.com/cypherair/cypherair",
+    "licenseName": "GPL-3.0-or-later",
+    "licenseFileResourceName": "CypherAir-LICENSE.txt",
+    "kind": "app",
+    "isDirectDependency": false,
+    "licenseSourceKind": "projectFile",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "adler2@2.0.1",
+    "displayName": "adler2",
+    "version": "2.0.1",
+    "repositoryURL": "https://github.com/oyvindln/adler2",
+    "licenseName": "0BSD OR MIT OR Apache-2.0",
+    "licenseFileResourceName": "adler2-2.0.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-0BSD",
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "aho-corasick@1.1.4",
+    "displayName": "aho-corasick",
+    "version": "1.1.4",
+    "repositoryURL": "https://github.com/BurntSushi/aho-corasick",
+    "licenseName": "Unlicense OR MIT",
+    "licenseFileResourceName": "aho-corasick-1.1.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "UNLICENSE",
+      "COPYING",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "android_system_properties@0.1.5",
+    "displayName": "android_system_properties",
+    "version": "0.1.5",
+    "repositoryURL": "https://github.com/nical/android_system_properties",
+    "licenseName": "MIT/Apache-2.0",
+    "licenseFileResourceName": "android_system_properties-0.1.5.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "anstyle@1.0.13",
+    "displayName": "anstyle",
+    "version": "1.0.13",
+    "repositoryURL": "https://github.com/rust-cli/anstyle",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "anstyle-1.0.13.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "anyhow@1.0.102",
+    "displayName": "anyhow",
+    "version": "1.0.102",
+    "repositoryURL": "https://github.com/dtolnay/anyhow",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "anyhow-1.0.102.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "argon2@0.5.3",
+    "displayName": "argon2",
+    "version": "0.5.3",
+    "repositoryURL": "https://github.com/RustCrypto/password-hashes/tree/master/argon2",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "argon2-0.5.3.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "askama@0.14.0",
+    "displayName": "askama",
+    "version": "0.14.0",
+    "repositoryURL": "https://github.com/askama-rs/askama",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "askama-0.14.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "base64@0.22.1",
+    "displayName": "base64",
+    "version": "0.22.1",
+    "repositoryURL": "https://github.com/marshallpierce/rust-base64",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "base64-0.22.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": true,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "base64ct@1.8.3",
+    "displayName": "base64ct",
+    "version": "1.8.3",
+    "repositoryURL": "https://github.com/RustCrypto/formats",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "base64ct-1.8.3.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "bitflags@2.11.0",
+    "displayName": "bitflags",
+    "version": "2.11.0",
+    "repositoryURL": "https://github.com/bitflags/bitflags",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "bitflags-2.11.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "blake2@0.10.6",
+    "displayName": "blake2",
+    "version": "0.10.6",
+    "repositoryURL": "https://github.com/RustCrypto/hashes",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "blake2-0.10.6.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "block-buffer@0.10.4",
+    "displayName": "block-buffer",
+    "version": "0.10.4",
+    "repositoryURL": "https://github.com/RustCrypto/utils",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "block-buffer-0.10.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "buffered-reader@1.4.0",
+    "displayName": "buffered-reader",
+    "version": "1.4.0",
+    "repositoryURL": "https://gitlab.com/sequoia-pgp/sequoia",
+    "licenseName": "LGPL-2.0-or-later",
+    "licenseFileResourceName": "buffered-reader-1.4.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE.txt"
+    ]
+  },
+  {
+    "id": "bytes@1.11.1",
+    "displayName": "bytes",
+    "version": "1.11.1",
+    "repositoryURL": "https://github.com/tokio-rs/bytes",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "bytes-1.11.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "camino@1.2.2",
+    "displayName": "camino",
+    "version": "1.2.2",
+    "repositoryURL": "https://github.com/camino-rs/camino",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "camino-1.2.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "cargo-platform@0.1.9",
+    "displayName": "cargo-platform",
+    "version": "0.1.9",
+    "repositoryURL": "https://github.com/rust-lang/cargo",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "cargo-platform-0.1.9.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "cargo_metadata@0.19.2",
+    "displayName": "cargo_metadata",
+    "version": "0.19.2",
+    "repositoryURL": "https://github.com/oli-obk/cargo_metadata",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "cargo_metadata-0.19.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "cfg-if@1.0.4",
+    "displayName": "cfg-if",
+    "version": "1.0.4",
+    "repositoryURL": "https://github.com/rust-lang/cfg-if",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "cfg-if-1.0.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "chrono@0.4.44",
+    "displayName": "chrono",
+    "version": "0.4.44",
+    "repositoryURL": "https://github.com/chronotope/chrono",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "chrono-0.4.44.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE.txt"
+    ]
+  },
+  {
+    "id": "clap@4.5.60",
+    "displayName": "clap",
+    "version": "4.5.60",
+    "repositoryURL": "https://github.com/clap-rs/clap",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "clap-4.5.60.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "clap_builder@4.5.60",
+    "displayName": "clap_builder",
+    "version": "4.5.60",
+    "repositoryURL": "https://github.com/clap-rs/clap",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "clap_builder-4.5.60.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "clap_lex@1.0.0",
+    "displayName": "clap_lex",
+    "version": "1.0.0",
+    "repositoryURL": "https://github.com/clap-rs/clap",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "clap_lex-1.0.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "core-foundation-sys@0.8.7",
+    "displayName": "core-foundation-sys",
+    "version": "0.8.7",
+    "repositoryURL": "https://github.com/servo/core-foundation-rs",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "core-foundation-sys-0.8.7.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "cpufeatures@0.2.17",
+    "displayName": "cpufeatures",
+    "version": "0.2.17",
+    "repositoryURL": "https://github.com/RustCrypto/utils",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "cpufeatures-0.2.17.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "crc32fast@1.5.0",
+    "displayName": "crc32fast",
+    "version": "1.5.0",
+    "repositoryURL": "https://github.com/srijs/rust-crc32fast",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "crc32fast-1.5.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "crypto-common@0.1.7",
+    "displayName": "crypto-common",
+    "version": "0.1.7",
+    "repositoryURL": "https://github.com/RustCrypto/traits",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "crypto-common-0.1.7.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "digest@0.10.7",
+    "displayName": "digest",
+    "version": "0.10.7",
+    "repositoryURL": "https://github.com/RustCrypto/traits",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "digest-0.10.7.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "dyn-clone@1.0.20",
+    "displayName": "dyn-clone",
+    "version": "1.0.20",
+    "repositoryURL": "https://github.com/dtolnay/dyn-clone",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "dyn-clone-1.0.20.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "equivalent@1.0.2",
+    "displayName": "equivalent",
+    "version": "1.0.2",
+    "repositoryURL": "https://github.com/indexmap-rs/equivalent",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "equivalent-1.0.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "errno@0.3.14",
+    "displayName": "errno",
+    "version": "0.3.14",
+    "repositoryURL": "https://github.com/lambda-fairy/rust-errno",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "errno-0.3.14.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "fastrand@2.3.0",
+    "displayName": "fastrand",
+    "version": "2.3.0",
+    "repositoryURL": "https://github.com/smol-rs/fastrand",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "fastrand-2.3.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "flate2@1.1.9",
+    "displayName": "flate2",
+    "version": "1.1.9",
+    "repositoryURL": "https://github.com/rust-lang/flate2-rs",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "flate2-1.1.9.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "foreign-types@0.3.2",
+    "displayName": "foreign-types",
+    "version": "0.3.2",
+    "repositoryURL": "https://github.com/sfackler/foreign-types",
+    "licenseName": "MIT/Apache-2.0",
+    "licenseFileResourceName": "foreign-types-0.3.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "foreign-types-shared@0.1.1",
+    "displayName": "foreign-types-shared",
+    "version": "0.1.1",
+    "repositoryURL": "https://github.com/sfackler/foreign-types",
+    "licenseName": "MIT/Apache-2.0",
+    "licenseFileResourceName": "foreign-types-shared-0.1.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "fs-err@2.11.0",
+    "displayName": "fs-err",
+    "version": "2.11.0",
+    "repositoryURL": "https://github.com/andrewhickman/fs-err",
+    "licenseName": "MIT/Apache-2.0",
+    "licenseFileResourceName": "fs-err-2.11.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "generic-array@0.14.7",
+    "displayName": "generic-array",
+    "version": "0.14.7",
+    "repositoryURL": "https://github.com/fizyk20/generic-array",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "generic-array-0.14.7.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "generic-array@1.3.5",
+    "displayName": "generic-array",
+    "version": "1.3.5",
+    "repositoryURL": "https://github.com/fizyk20/generic-array",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "generic-array-1.3.5.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "getrandom@0.2.17",
+    "displayName": "getrandom",
+    "version": "0.2.17",
+    "repositoryURL": "https://github.com/rust-random/getrandom",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "getrandom-0.2.17.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "getrandom@0.4.2",
+    "displayName": "getrandom",
+    "version": "0.4.2",
+    "repositoryURL": "https://github.com/rust-random/getrandom",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "getrandom-0.4.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "glob@0.3.3",
+    "displayName": "glob",
+    "version": "0.3.3",
+    "repositoryURL": "https://github.com/rust-lang/glob",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "glob-0.3.3.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "goblin@0.8.2",
+    "displayName": "goblin",
+    "version": "0.8.2",
+    "repositoryURL": "https://github.com/m4b/goblin",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "goblin-0.8.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "hashbrown@0.16.1",
+    "displayName": "hashbrown",
+    "version": "0.16.1",
+    "repositoryURL": "https://github.com/rust-lang/hashbrown",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "hashbrown-0.16.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "heck@0.5.0",
+    "displayName": "heck",
+    "version": "0.5.0",
+    "repositoryURL": "https://github.com/withoutboats/heck",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "heck-0.5.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "iana-time-zone@0.1.65",
+    "displayName": "iana-time-zone",
+    "version": "0.1.65",
+    "repositoryURL": "https://github.com/strawlab/iana-time-zone",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "iana-time-zone-0.1.65.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "iana-time-zone-haiku@0.1.2",
+    "displayName": "iana-time-zone-haiku",
+    "version": "0.1.2",
+    "repositoryURL": "https://github.com/strawlab/iana-time-zone",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "iana-time-zone-haiku-0.1.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "icu_collections@2.1.1",
+    "displayName": "icu_collections",
+    "version": "2.1.1",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "icu_collections-2.1.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "icu_locale_core@2.1.1",
+    "displayName": "icu_locale_core",
+    "version": "2.1.1",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "icu_locale_core-2.1.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "icu_normalizer@2.1.1",
+    "displayName": "icu_normalizer",
+    "version": "2.1.1",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "icu_normalizer-2.1.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "icu_normalizer_data@2.1.1",
+    "displayName": "icu_normalizer_data",
+    "version": "2.1.1",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "icu_normalizer_data-2.1.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "icu_properties@2.1.2",
+    "displayName": "icu_properties",
+    "version": "2.1.2",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "icu_properties-2.1.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "icu_properties_data@2.1.2",
+    "displayName": "icu_properties_data",
+    "version": "2.1.2",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "icu_properties_data-2.1.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "icu_provider@2.1.1",
+    "displayName": "icu_provider",
+    "version": "2.1.1",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "icu_provider-2.1.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "idna@1.1.0",
+    "displayName": "idna",
+    "version": "1.1.0",
+    "repositoryURL": "https://github.com/servo/rust-url",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "idna-1.1.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "idna_adapter@1.2.1",
+    "displayName": "idna_adapter",
+    "version": "1.2.1",
+    "repositoryURL": "https://github.com/hsivonen/idna_adapter",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "idna_adapter-1.2.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "indexmap@2.13.0",
+    "displayName": "indexmap",
+    "version": "2.13.0",
+    "repositoryURL": "https://github.com/indexmap-rs/indexmap",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "indexmap-2.13.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "itoa@1.0.17",
+    "displayName": "itoa",
+    "version": "1.0.17",
+    "repositoryURL": "https://github.com/dtolnay/itoa",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "itoa-1.0.17.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "js-sys@0.3.91",
+    "displayName": "js-sys",
+    "version": "0.3.91",
+    "repositoryURL": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/js-sys",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "js-sys-0.3.91.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "lalrpop-util@0.22.2",
+    "displayName": "lalrpop-util",
+    "version": "0.22.2",
+    "repositoryURL": "https://github.com/lalrpop/lalrpop",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "lalrpop-util-0.22.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "libc@0.2.183",
+    "displayName": "libc",
+    "version": "0.2.183",
+    "repositoryURL": "https://github.com/rust-lang/libc",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "libc-0.2.183.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "linux-raw-sys@0.12.1",
+    "displayName": "linux-raw-sys",
+    "version": "0.12.1",
+    "repositoryURL": "https://github.com/sunfishcode/linux-raw-sys",
+    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+    "licenseFileResourceName": "linux-raw-sys-0.12.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "litemap@0.8.1",
+    "displayName": "litemap",
+    "version": "0.8.1",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "litemap-0.8.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "log@0.4.29",
+    "displayName": "log",
+    "version": "0.4.29",
+    "repositoryURL": "https://github.com/rust-lang/log",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "log-0.4.29.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "memchr@2.8.0",
+    "displayName": "memchr",
+    "version": "2.8.0",
+    "repositoryURL": "https://github.com/BurntSushi/memchr",
+    "licenseName": "Unlicense OR MIT",
+    "licenseFileResourceName": "memchr-2.8.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "UNLICENSE",
+      "COPYING",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "memsec@0.7.0",
+    "displayName": "memsec",
+    "version": "0.7.0",
+    "repositoryURL": "https://github.com/quininer/memsec",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "memsec-0.7.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "minimal-lexical@0.2.1",
+    "displayName": "minimal-lexical",
+    "version": "0.2.1",
+    "repositoryURL": "https://github.com/Alexhuszagh/minimal-lexical",
+    "licenseName": "MIT/Apache-2.0",
+    "licenseFileResourceName": "minimal-lexical-0.2.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "miniz_oxide@0.8.9",
+    "displayName": "miniz_oxide",
+    "version": "0.8.9",
+    "repositoryURL": "https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide",
+    "licenseName": "MIT OR Zlib OR Apache-2.0",
+    "licenseFileResourceName": "miniz_oxide-0.8.9.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "nom@7.1.3",
+    "displayName": "nom",
+    "version": "7.1.3",
+    "repositoryURL": "https://github.com/Geal/nom",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "nom-7.1.3.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "num-traits@0.2.19",
+    "displayName": "num-traits",
+    "version": "0.2.19",
+    "repositoryURL": "https://github.com/rust-num/num-traits",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "num-traits-0.2.19.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "once_cell@1.21.3",
+    "displayName": "once_cell",
+    "version": "1.21.3",
+    "repositoryURL": "https://github.com/matklad/once_cell",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "once_cell-1.21.3.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "openssl@0.10.76",
+    "displayName": "openssl",
+    "version": "0.10.76",
+    "repositoryURL": "https://github.com/rust-openssl/rust-openssl",
+    "licenseName": "Apache-2.0",
+    "licenseFileResourceName": "openssl-0.10.76.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": true,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "openssl-src@300.5.5+3.5.5",
+    "displayName": "openssl-src",
+    "version": "300.5.5+3.5.5",
+    "repositoryURL": "https://github.com/alexcrichton/openssl-src-rs",
+    "licenseName": "MIT/Apache-2.0",
+    "licenseFileResourceName": "openssl-src-300.5.5-3.5.5.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "openssl-sys@0.9.112",
+    "displayName": "openssl-sys",
+    "version": "0.9.112",
+    "repositoryURL": "https://github.com/rust-openssl/rust-openssl",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "openssl-sys-0.9.112.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "password-hash@0.5.0",
+    "displayName": "password-hash",
+    "version": "0.5.0",
+    "repositoryURL": "https://github.com/RustCrypto/traits/tree/master/password-hash",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "password-hash-0.5.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "percent-encoding@2.3.2",
+    "displayName": "percent-encoding",
+    "version": "2.3.2",
+    "repositoryURL": "https://github.com/servo/rust-url",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "percent-encoding-2.3.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "plain@0.2.3",
+    "displayName": "plain",
+    "version": "0.2.3",
+    "repositoryURL": "https://github.com/randomites/plain",
+    "licenseName": "MIT/Apache-2.0",
+    "licenseFileResourceName": "plain-0.2.3.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "potential_utf@0.1.4",
+    "displayName": "potential_utf",
+    "version": "0.1.4",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "potential_utf-0.1.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "r-efi@6.0.0",
+    "displayName": "r-efi",
+    "version": "6.0.0",
+    "repositoryURL": "https://github.com/r-efi/r-efi",
+    "licenseName": "MIT OR Apache-2.0 OR LGPL-2.1-or-later",
+    "licenseFileResourceName": "r-efi-6.0.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "spdxFallback",
+    "licenseSourceItems": [
+      "MIT: canonical text from LICENSE-MIT",
+      "Apache-2.0: canonical text from LICENSE-APACHE",
+      "LGPL-2.1-or-later: standard text from https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt"
+    ]
+  },
+  {
+    "id": "rand_core@0.6.4",
+    "displayName": "rand_core",
+    "version": "0.6.4",
+    "repositoryURL": "https://github.com/rust-random/rand",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "rand_core-0.6.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "regex@1.12.3",
+    "displayName": "regex",
+    "version": "1.12.3",
+    "repositoryURL": "https://github.com/rust-lang/regex",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "regex-1.12.3.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "regex-automata@0.4.14",
+    "displayName": "regex-automata",
+    "version": "0.4.14",
+    "repositoryURL": "https://github.com/rust-lang/regex",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "regex-automata-0.4.14.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "regex-syntax@0.8.10",
+    "displayName": "regex-syntax",
+    "version": "0.8.10",
+    "repositoryURL": "https://github.com/rust-lang/regex",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "regex-syntax-0.8.10.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "rustix@1.1.4",
+    "displayName": "rustix",
+    "version": "1.1.4",
+    "repositoryURL": "https://github.com/bytecodealliance/rustix",
+    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+    "licenseFileResourceName": "rustix-1.1.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "scroll@0.12.0",
+    "displayName": "scroll",
+    "version": "0.12.0",
+    "repositoryURL": "https://github.com/m4b/scroll",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "scroll-0.12.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "semver@1.0.27",
+    "displayName": "semver",
+    "version": "1.0.27",
+    "repositoryURL": "https://github.com/dtolnay/semver",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "semver-1.0.27.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "sequoia-openpgp@2.2.0",
+    "displayName": "sequoia-openpgp",
+    "version": "2.2.0",
+    "repositoryURL": "https://gitlab.com/sequoia-pgp/sequoia",
+    "licenseName": "LGPL-2.0-or-later",
+    "licenseFileResourceName": "sequoia-openpgp-2.2.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": true,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE.txt"
+    ]
+  },
+  {
+    "id": "serde@1.0.228",
+    "displayName": "serde",
+    "version": "1.0.228",
+    "repositoryURL": "https://github.com/serde-rs/serde",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "serde-1.0.228.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "serde_core@1.0.228",
+    "displayName": "serde_core",
+    "version": "1.0.228",
+    "repositoryURL": "https://github.com/serde-rs/serde",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "serde_core-1.0.228.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "serde_json@1.0.149",
+    "displayName": "serde_json",
+    "version": "1.0.149",
+    "repositoryURL": "https://github.com/serde-rs/json",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "serde_json-1.0.149.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "serde_spanned@1.0.4",
+    "displayName": "serde_spanned",
+    "version": "1.0.4",
+    "repositoryURL": "https://github.com/toml-rs/toml",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "serde_spanned-1.0.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "sha1collisiondetection@0.3.4",
+    "displayName": "sha1collisiondetection",
+    "version": "0.3.4",
+    "repositoryURL": "https://gitlab.com/sequoia-pgp/sha1collisiondetection",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "sha1collisiondetection-0.3.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE.txt"
+    ]
+  },
+  {
+    "id": "simd-adler32@0.3.8",
+    "displayName": "simd-adler32",
+    "version": "0.3.8",
+    "repositoryURL": "https://github.com/mcountryman/simd-adler32",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "simd-adler32-0.3.8.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE.md"
+    ]
+  },
+  {
+    "id": "siphasher@1.0.2",
+    "displayName": "siphasher",
+    "version": "1.0.2",
+    "repositoryURL": "https://github.com/jedisct1/rust-siphash",
+    "licenseName": "MIT/Apache-2.0",
+    "licenseFileResourceName": "siphasher-1.0.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "COPYING"
+    ]
+  },
+  {
+    "id": "smallvec@1.15.1",
+    "displayName": "smallvec",
+    "version": "1.15.1",
+    "repositoryURL": "https://github.com/servo/rust-smallvec",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "smallvec-1.15.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "smawk@0.3.2",
+    "displayName": "smawk",
+    "version": "0.3.2",
+    "repositoryURL": "https://github.com/mgeisler/smawk",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "smawk-0.3.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "stable_deref_trait@1.2.1",
+    "displayName": "stable_deref_trait",
+    "version": "1.2.1",
+    "repositoryURL": "https://github.com/storyyeller/stable_deref_trait",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "stable_deref_trait-1.2.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "static_assertions@1.1.0",
+    "displayName": "static_assertions",
+    "version": "1.1.0",
+    "repositoryURL": "https://github.com/nvzqz/static-assertions-rs",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "static_assertions-1.1.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "strsim@0.11.1",
+    "displayName": "strsim",
+    "version": "0.11.1",
+    "repositoryURL": "https://github.com/rapidfuzz/strsim-rs",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "strsim-0.11.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "subtle@2.6.1",
+    "displayName": "subtle",
+    "version": "2.6.1",
+    "repositoryURL": "https://github.com/dalek-cryptography/subtle",
+    "licenseName": "BSD-3-Clause",
+    "licenseFileResourceName": "subtle-2.6.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "tempfile@3.27.0",
+    "displayName": "tempfile",
+    "version": "3.27.0",
+    "repositoryURL": "https://github.com/Stebalien/tempfile",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "tempfile-3.27.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "textwrap@0.16.2",
+    "displayName": "textwrap",
+    "version": "0.16.2",
+    "repositoryURL": "https://github.com/mgeisler/textwrap",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "textwrap-0.16.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "thiserror@2.0.18",
+    "displayName": "thiserror",
+    "version": "2.0.18",
+    "repositoryURL": "https://github.com/dtolnay/thiserror",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "thiserror-2.0.18.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": true,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "tinystr@0.8.2",
+    "displayName": "tinystr",
+    "version": "0.8.2",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "tinystr-0.8.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "toml@0.9.12+spec-1.1.0",
+    "displayName": "toml",
+    "version": "0.9.12+spec-1.1.0",
+    "repositoryURL": "https://github.com/toml-rs/toml",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "toml-0.9.12-spec-1.1.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "toml_datetime@0.7.5+spec-1.1.0",
+    "displayName": "toml_datetime",
+    "version": "0.7.5+spec-1.1.0",
+    "repositoryURL": "https://github.com/toml-rs/toml",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "toml_datetime-0.7.5-spec-1.1.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "toml_parser@1.0.9+spec-1.1.0",
+    "displayName": "toml_parser",
+    "version": "1.0.9+spec-1.1.0",
+    "repositoryURL": "https://github.com/toml-rs/toml",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "toml_parser-1.0.9-spec-1.1.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "toml_writer@1.0.6+spec-1.1.0",
+    "displayName": "toml_writer",
+    "version": "1.0.6+spec-1.1.0",
+    "repositoryURL": "https://github.com/toml-rs/toml",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "toml_writer-1.0.6-spec-1.1.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "typenum@1.19.0",
+    "displayName": "typenum",
+    "version": "1.19.0",
+    "repositoryURL": "https://github.com/paholg/typenum",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "typenum-1.19.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "unicode-ident@1.0.24",
+    "displayName": "unicode-ident",
+    "version": "1.0.24",
+    "repositoryURL": "https://github.com/dtolnay/unicode-ident",
+    "licenseName": "(MIT OR Apache-2.0) AND Unicode-3.0",
+    "licenseFileResourceName": "unicode-ident-1.0.24.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE",
+      "LICENSE-UNICODE"
+    ]
+  },
+  {
+    "id": "uniffi@0.31.0",
+    "displayName": "uniffi",
+    "version": "0.31.0",
+    "repositoryURL": "https://github.com/mozilla/uniffi-rs",
+    "licenseName": "MPL-2.0",
+    "licenseFileResourceName": "uniffi-0.31.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": true,
+    "licenseSourceKind": "repositoryArchive",
+    "licenseSourceItems": [
+      "v0.31.0:LICENSE"
+    ]
+  },
+  {
+    "id": "uniffi_bindgen@0.31.0",
+    "displayName": "uniffi_bindgen",
+    "version": "0.31.0",
+    "repositoryURL": "https://github.com/mozilla/uniffi-rs",
+    "licenseName": "MPL-2.0",
+    "licenseFileResourceName": "uniffi_bindgen-0.31.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "repositoryArchive",
+    "licenseSourceItems": [
+      "v0.31.0:LICENSE"
+    ]
+  },
+  {
+    "id": "uniffi_build@0.31.0",
+    "displayName": "uniffi_build",
+    "version": "0.31.0",
+    "repositoryURL": "https://github.com/mozilla/uniffi-rs",
+    "licenseName": "MPL-2.0",
+    "licenseFileResourceName": "uniffi_build-0.31.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "repositoryArchive",
+    "licenseSourceItems": [
+      "v0.31.0:LICENSE"
+    ]
+  },
+  {
+    "id": "uniffi_core@0.31.0",
+    "displayName": "uniffi_core",
+    "version": "0.31.0",
+    "repositoryURL": "https://github.com/mozilla/uniffi-rs",
+    "licenseName": "MPL-2.0",
+    "licenseFileResourceName": "uniffi_core-0.31.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "repositoryArchive",
+    "licenseSourceItems": [
+      "v0.31.0:LICENSE"
+    ]
+  },
+  {
+    "id": "uniffi_meta@0.31.0",
+    "displayName": "uniffi_meta",
+    "version": "0.31.0",
+    "repositoryURL": "https://github.com/mozilla/uniffi-rs",
+    "licenseName": "MPL-2.0",
+    "licenseFileResourceName": "uniffi_meta-0.31.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "repositoryArchive",
+    "licenseSourceItems": [
+      "v0.31.0:LICENSE"
+    ]
+  },
+  {
+    "id": "uniffi_pipeline@0.31.0",
+    "displayName": "uniffi_pipeline",
+    "version": "0.31.0",
+    "repositoryURL": "https://github.com/mozilla/uniffi-rs",
+    "licenseName": "MPL-2.0",
+    "licenseFileResourceName": "uniffi_pipeline-0.31.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "repositoryArchive",
+    "licenseSourceItems": [
+      "v0.31.0:LICENSE"
+    ]
+  },
+  {
+    "id": "uniffi_udl@0.31.0",
+    "displayName": "uniffi_udl",
+    "version": "0.31.0",
+    "repositoryURL": "https://github.com/mozilla/uniffi-rs",
+    "licenseName": "MPL-2.0",
+    "licenseFileResourceName": "uniffi_udl-0.31.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "repositoryArchive",
+    "licenseSourceItems": [
+      "v0.31.0:LICENSE"
+    ]
+  },
+  {
+    "id": "utf8_iter@1.0.4",
+    "displayName": "utf8_iter",
+    "version": "1.0.4",
+    "repositoryURL": "https://github.com/hsivonen/utf8_iter",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "utf8_iter-1.0.4.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "wasi@0.11.1+wasi-snapshot-preview1",
+    "displayName": "wasi",
+    "version": "0.11.1+wasi-snapshot-preview1",
+    "repositoryURL": "https://github.com/bytecodealliance/wasi",
+    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+    "licenseFileResourceName": "wasi-0.11.1-wasi-snapshot-preview1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "wasip2@1.0.2+wasi-0.2.9",
+    "displayName": "wasip2",
+    "version": "1.0.2+wasi-0.2.9",
+    "repositoryURL": "https://github.com/bytecodealliance/wasi-rs",
+    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+    "licenseFileResourceName": "wasip2-1.0.2-wasi-0.2.9.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "repositoryArchive",
+    "licenseSourceItems": [
+      "wasip2-1.0.2:LICENSE-APACHE",
+      "wasip2-1.0.2:LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "wasip3@0.4.0+wasi-0.3.0-rc-2026-01-06",
+    "displayName": "wasip3",
+    "version": "0.4.0+wasi-0.3.0-rc-2026-01-06",
+    "repositoryURL": "https://github.com/bytecodealliance/wasi-rs",
+    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+    "licenseFileResourceName": "wasip3-0.4.0-wasi-0.3.0-rc-2026-01-06.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "repositoryArchive",
+    "licenseSourceItems": [
+      "wasip3-0.4.0:LICENSE-APACHE",
+      "wasip3-0.4.0:LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "wasm-bindgen@0.2.114",
+    "displayName": "wasm-bindgen",
+    "version": "0.2.114",
+    "repositoryURL": "https://github.com/wasm-bindgen/wasm-bindgen",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "wasm-bindgen-0.2.114.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "wasm-bindgen-shared@0.2.114",
+    "displayName": "wasm-bindgen-shared",
+    "version": "0.2.114",
+    "repositoryURL": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/shared",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "wasm-bindgen-shared-0.2.114.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE"
+    ]
+  },
+  {
+    "id": "weedle2@5.0.0",
+    "displayName": "weedle2",
+    "version": "5.0.0",
+    "repositoryURL": "https://github.com/mozilla/uniffi-rs",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "weedle2-5.0.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE.md"
+    ]
+  },
+  {
+    "id": "windows-core@0.62.2",
+    "displayName": "windows-core",
+    "version": "0.62.2",
+    "repositoryURL": "https://github.com/microsoft/windows-rs",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "windows-core-0.62.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE-2.0"
+    ]
+  },
+  {
+    "id": "windows-link@0.2.1",
+    "displayName": "windows-link",
+    "version": "0.2.1",
+    "repositoryURL": "https://github.com/microsoft/windows-rs",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "windows-link-0.2.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE-2.0"
+    ]
+  },
+  {
+    "id": "windows-result@0.4.1",
+    "displayName": "windows-result",
+    "version": "0.4.1",
+    "repositoryURL": "https://github.com/microsoft/windows-rs",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "windows-result-0.4.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE-2.0"
+    ]
+  },
+  {
+    "id": "windows-strings@0.5.1",
+    "displayName": "windows-strings",
+    "version": "0.5.1",
+    "repositoryURL": "https://github.com/microsoft/windows-rs",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "windows-strings-0.5.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE-2.0"
+    ]
+  },
+  {
+    "id": "windows-sys@0.61.2",
+    "displayName": "windows-sys",
+    "version": "0.61.2",
+    "repositoryURL": "https://github.com/microsoft/windows-rs",
+    "licenseName": "MIT OR Apache-2.0",
+    "licenseFileResourceName": "windows-sys-0.61.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT",
+      "LICENSE-APACHE-2.0"
+    ]
+  },
+  {
+    "id": "winnow@0.7.15",
+    "displayName": "winnow",
+    "version": "0.7.15",
+    "repositoryURL": "https://github.com/winnow-rs/winnow",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "winnow-0.7.15.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "wit-bindgen@0.51.0",
+    "displayName": "wit-bindgen",
+    "version": "0.51.0",
+    "repositoryURL": "https://github.com/bytecodealliance/wit-bindgen",
+    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+    "licenseFileResourceName": "wit-bindgen-0.51.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "writeable@0.6.2",
+    "displayName": "writeable",
+    "version": "0.6.2",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "writeable-0.6.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "xxhash-rust@0.8.15",
+    "displayName": "xxhash-rust",
+    "version": "0.8.15",
+    "repositoryURL": "https://github.com/DoumanAsh/xxhash-rust",
+    "licenseName": "BSL-1.0",
+    "licenseFileResourceName": "xxhash-rust-0.8.15.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "yoke@0.8.1",
+    "displayName": "yoke",
+    "version": "0.8.1",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "yoke-0.8.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "zerofrom@0.1.6",
+    "displayName": "zerofrom",
+    "version": "0.1.6",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "zerofrom-0.1.6.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "zeroize@1.8.2",
+    "displayName": "zeroize",
+    "version": "1.8.2",
+    "repositoryURL": "https://github.com/RustCrypto/utils",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "zeroize-1.8.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": true,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "zerotrie@0.2.3",
+    "displayName": "zerotrie",
+    "version": "0.2.3",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "zerotrie-0.2.3.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "zerovec@0.11.5",
+    "displayName": "zerovec",
+    "version": "0.11.5",
+    "repositoryURL": "https://github.com/unicode-org/icu4x",
+    "licenseName": "Unicode-3.0",
+    "licenseFileResourceName": "zerovec-0.11.5.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "zmij@1.0.21",
+    "displayName": "zmij",
+    "version": "1.0.21",
+    "repositoryURL": "https://github.com/dtolnay/zmij",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "zmij-1.0.21.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT"
+    ]
+  }
+]

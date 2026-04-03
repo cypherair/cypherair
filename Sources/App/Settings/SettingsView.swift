@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var showThemePicker = false
     @State private var showSelfTest = false
     @State private var showAbout = false
+    @State private var showLicense = false
     #endif
 
     var body: some View {
@@ -135,6 +136,23 @@ struct SettingsView: View {
                 }
                 #if os(macOS)
                 Button {
+                    showLicense = true
+                } label: {
+                    Label(
+                        String(localized: "settings.license", defaultValue: "Licenses"),
+                        systemImage: "doc.text"
+                    )
+                }
+                #else
+                NavigationLink(value: AppRoute.license) {
+                    Label(
+                        String(localized: "settings.license", defaultValue: "Licenses"),
+                        systemImage: "doc.text"
+                    )
+                }
+                #endif
+                #if os(macOS)
+                Button {
                     showAbout = true
                 } label: {
                     Label(
@@ -160,6 +178,7 @@ struct SettingsView: View {
             switch route {
             case .selfTest: SelfTestView()
             case .about: AboutView()
+            case .license: LicenseListView()
             case .themePicker: ThemePickerView()
             case .appIcon:
                 #if canImport(UIKit)
@@ -295,6 +314,19 @@ struct SettingsView: View {
                     }
             }
             .frame(minWidth: 400, minHeight: 350)
+        }
+        .sheet(isPresented: $showLicense) {
+            NavigationStack {
+                LicenseListView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(String(localized: "common.done", defaultValue: "Done")) {
+                                showLicense = false
+                            }
+                        }
+                    }
+            }
+            .frame(minWidth: 700, minHeight: 600)
         }
         #endif
     }
