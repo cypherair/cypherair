@@ -198,6 +198,8 @@ struct HomeView: View {
             SelfTestView()
         case .about:
             AboutView()
+        case .license:
+            LicenseListView()
         case .appIcon:
             #if canImport(UIKit)
             AppIconPickerView()

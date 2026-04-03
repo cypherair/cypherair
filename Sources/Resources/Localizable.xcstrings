@@ -1,6 +1,16 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ • %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ • %2$@"
+          }
+        }
+      }
+    },
     "about.app": {
       "localizations": {
         "en": {
@@ -18,6 +28,7 @@
       }
     },
     "about.base64": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -34,6 +45,7 @@
       }
     },
     "about.dependencies": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -66,6 +78,7 @@
       }
     },
     "about.ffi": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -98,6 +111,7 @@
       }
     },
     "about.openssl": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -114,6 +128,7 @@
       }
     },
     "about.pgp": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -130,6 +145,7 @@
       }
     },
     "about.thiserror": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -178,6 +194,7 @@
       }
     },
     "about.zeroize": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -1170,22 +1187,6 @@
         }
       }
     },
-    "decrypt.input": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Encrypted Message"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "加密消息"
-          }
-        }
-      }
-    },
     "decrypt.clearImportedFile": {
       "localizations": {
         "en": {
@@ -1230,6 +1231,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法读取文本消息文件"
+          }
+        }
+      }
+    },
+    "decrypt.input": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Encrypted Message"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加密消息"
           }
         }
       }
@@ -2082,6 +2099,22 @@
         }
       }
     },
+    "error.keychain": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed to access secure storage."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法访问安全存储。"
+          }
+        }
+      }
+    },
     "error.keyExpired": {
       "localizations": {
         "en": {
@@ -2126,22 +2159,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "此密钥数据量过大，无法生成二维码。请改用文件或文本方式分享公钥。"
-          }
-        }
-      }
-    },
-    "error.keychain": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Failed to access secure storage."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法访问安全存储。"
           }
         }
       }
@@ -2466,22 +2483,6 @@
         }
       }
     },
-    "fileDecrypt.selectFile": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select Encrypted File"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择加密文件"
-          }
-        }
-      }
-    },
     "fileDecrypt.selectedFile": {
       "localizations": {
         "en": {
@@ -2494,6 +2495,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "已选择"
+          }
+        }
+      }
+    },
+    "fileDecrypt.selectFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select Encrypted File"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择加密文件"
           }
         }
       }
@@ -2578,22 +2595,6 @@
         }
       }
     },
-    "fileEncrypt.selectFile": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select File"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择文件"
-          }
-        }
-      }
-    },
     "fileEncrypt.selectedFile": {
       "localizations": {
         "en": {
@@ -2606,6 +2607,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "已选择"
+          }
+        }
+      }
+    },
+    "fileEncrypt.selectFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select File"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择文件"
           }
         }
       }
@@ -4050,6 +4067,294 @@
         }
       }
     },
+    "license.detail.copied": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已复制"
+          }
+        }
+      }
+    },
+    "license.detail.copy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Repository URL"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制仓库链接"
+          }
+        }
+      }
+    },
+    "license.detail.license": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "License"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "许可证"
+          }
+        }
+      }
+    },
+    "license.detail.repository": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repository"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仓库"
+          }
+        }
+      }
+    },
+    "license.detail.text": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "License Text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "许可证原文"
+          }
+        }
+      }
+    },
+    "license.detail.version": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本"
+          }
+        }
+      }
+    },
+    "license.empty.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try a different search term."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请尝试其他搜索词。"
+          }
+        }
+      }
+    },
+    "license.empty.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Matching Components"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的组件"
+          }
+        }
+      }
+    },
+    "license.error.manifestDecoding": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open source notice list is invalid."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开源组件清单格式无效。"
+          }
+        }
+      }
+    },
+    "license.error.manifestMissing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open source notice list is missing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开源组件清单缺失。"
+          }
+        }
+      }
+    },
+    "license.error.manifestUnreadable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open source notice list could not be read."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取开源组件清单。"
+          }
+        }
+      }
+    },
+    "license.error.textEncoding": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "License text is not valid UTF-8 for %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 的许可证文本不是有效的 UTF-8。"
+          }
+        }
+      }
+    },
+    "license.error.textMissing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "License text is missing for %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 的许可证文本缺失。"
+          }
+        }
+      }
+    },
+    "license.error.textUnreadable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "License text could not be read for %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取 %@ 的许可证文本。"
+          }
+        }
+      }
+    },
+    "license.search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search components"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索组件"
+          }
+        }
+      }
+    },
+    "license.section.app": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CypherAir"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CypherAir"
+          }
+        }
+      }
+    },
+    "license.section.thirdParty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Third-Party Components"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第三方组件"
+          }
+        }
+      }
+    },
+    "license.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licenses"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "许可证"
+          }
+        }
+      }
+    },
     "onboarding.back": {
       "localizations": {
         "en": {
@@ -4978,6 +5283,22 @@
         }
       }
     },
+    "settings.appearance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外观"
+          }
+        }
+      }
+    },
     "settings.appIcon": {
       "localizations": {
         "en": {
@@ -5026,6 +5347,22 @@
         }
       }
     },
+    "settings.appIcon.obsidian": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obsidian"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "黑曜"
+          }
+        }
+      }
+    },
     "settings.appIcon.silver": {
       "localizations": {
         "en": {
@@ -5054,278 +5391,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "石板灰"
-          }
-        }
-      }
-    },
-    "settings.appIcon.obsidian": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Obsidian"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "黑曜"
-          }
-        }
-      }
-    },
-    "settings.appearance": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Appearance"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "外观"
-          }
-        }
-      }
-    },
-    "settings.theme": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Color Theme"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "颜色主题"
-          }
-        }
-      }
-    },
-    "theme.bisexualPride": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bisexual"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "暮光"
-          }
-        }
-      }
-    },
-    "theme.defaultBlue": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Blue"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "蓝色"
-          }
-        }
-      }
-    },
-    "theme.graphite": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Graphite"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "石墨"
-          }
-        }
-      }
-    },
-    "theme.indigo": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Indigo"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "靛蓝"
-          }
-        }
-      }
-    },
-    "theme.mint": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mint"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "薄荷绿"
-          }
-        }
-      }
-    },
-    "theme.nonBinary": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Non-Binary"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "星光"
-          }
-        }
-      }
-    },
-    "theme.orange": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Orange"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "橙色"
-          }
-        }
-      }
-    },
-    "theme.pink": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pink"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "粉色"
-          }
-        }
-      }
-    },
-    "theme.prideRainbow": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pride"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "彩虹"
-          }
-        }
-      }
-    },
-    "theme.purple": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Purple"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "紫色"
-          }
-        }
-      }
-    },
-    "theme.red": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Red"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "红色"
-          }
-        }
-      }
-    },
-    "theme.systemDefault": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Default"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "默认"
-          }
-        }
-      }
-    },
-    "theme.teal": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Teal"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "青色"
-          }
-        }
-      }
-    },
-    "theme.transPride": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trans"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "天空"
           }
         }
       }
@@ -5394,22 +5459,6 @@
         }
       }
     },
-    "settings.encryptToSelf": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Encrypt to Self"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "同时加密给自己"
-          }
-        }
-      }
-    },
     "settings.encryption": {
       "localizations": {
         "en": {
@@ -5426,6 +5475,22 @@
         }
       }
     },
+    "settings.encryptToSelf": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Encrypt to Self"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同时加密给自己"
+          }
+        }
+      }
+    },
     "settings.gracePeriod": {
       "localizations": {
         "en": {
@@ -5438,6 +5503,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新认证"
+          }
+        }
+      }
+    },
+    "settings.license": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licenses"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "许可证"
           }
         }
       }
@@ -5667,6 +5748,22 @@
         }
       }
     },
+    "settings.theme": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Color Theme"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "颜色主题"
+          }
+        }
+      }
+    },
     "settings.title": {
       "localizations": {
         "en": {
@@ -5859,22 +5956,6 @@
         }
       }
     },
-    "sign.selectFile": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select File"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择文件"
-          }
-        }
-      }
-    },
     "sign.selectedFile": {
       "localizations": {
         "en": {
@@ -5887,6 +5968,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "已选择"
+          }
+        }
+      }
+    },
+    "sign.selectFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select File"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择文件"
           }
         }
       }
@@ -6160,6 +6257,230 @@
           "stringUnit": {
             "state": "translated",
             "value": "设置"
+          }
+        }
+      }
+    },
+    "theme.bisexualPride": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bisexual"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暮光"
+          }
+        }
+      }
+    },
+    "theme.defaultBlue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "蓝色"
+          }
+        }
+      }
+    },
+    "theme.graphite": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Graphite"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "石墨"
+          }
+        }
+      }
+    },
+    "theme.indigo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indigo"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "靛蓝"
+          }
+        }
+      }
+    },
+    "theme.mint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mint"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "薄荷绿"
+          }
+        }
+      }
+    },
+    "theme.nonBinary": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non-Binary"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "星光"
+          }
+        }
+      }
+    },
+    "theme.orange": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orange"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "橙色"
+          }
+        }
+      }
+    },
+    "theme.pink": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pink"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粉色"
+          }
+        }
+      }
+    },
+    "theme.prideRainbow": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pride"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "彩虹"
+          }
+        }
+      }
+    },
+    "theme.purple": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Purple"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "紫色"
+          }
+        }
+      }
+    },
+    "theme.red": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Red"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "红色"
+          }
+        }
+      }
+    },
+    "theme.systemDefault": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认"
+          }
+        }
+      }
+    },
+    "theme.teal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "青色"
+          }
+        }
+      }
+    },
+    "theme.transPride": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trans"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "天空"
           }
         }
       }
@@ -6452,6 +6773,22 @@
         }
       }
     },
+    "verify.clearImportedFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear imported file"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除已导入文件"
+          }
+        }
+      }
+    },
     "verify.detached.original": {
       "localizations": {
         "en": {
@@ -6484,38 +6821,6 @@
         }
       }
     },
-    "verify.input": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Signed Message"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "签名消息"
-          }
-        }
-      }
-    },
-    "verify.clearImportedFile": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Clear imported file"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "清除已导入文件"
-          }
-        }
-      }
-    },
     "verify.importCleartextFile": {
       "localizations": {
         "en": {
@@ -6544,6 +6849,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法读取签名消息文件"
+          }
+        }
+      }
+    },
+    "verify.input": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signed Message"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "签名消息"
           }
         }
       }
@@ -6720,6 +7041,118 @@
           "stringUnit": {
             "state": "translated",
             "value": "验证中…"
+          }
+        }
+      }
+    },
+    "license.section.core": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Core Dependencies"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "核心依赖"
+          }
+        }
+      }
+    },
+    "license.detail.source": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "License Source"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "许可证来源"
+          }
+        }
+      }
+    },
+    "license.detail.sourceItems": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source Details"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来源详情"
+          }
+        }
+      }
+    },
+    "license.source.projectFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project file"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "项目文件"
+          }
+        }
+      }
+    },
+    "license.source.cratePackage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crate package"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "crate 发布包"
+          }
+        }
+      }
+    },
+    "license.source.repositoryArchive": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repository archive"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仓库归档"
+          }
+        }
+      }
+    },
+    "license.source.spdxFallback": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SPDX fallback"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SPDX 回退文本"
           }
         }
       }
