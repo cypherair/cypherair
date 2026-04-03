@@ -224,6 +224,10 @@ struct SignatureIdentityCardView: View {
                         .foregroundStyle(.secondary)
                     Text(signerIdentity.formattedFingerprint)
                         .font(.system(.footnote, design: .monospaced))
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .multilineTextAlignment(.leading)
                         .textSelection(.enabled)
                         .accessibilityLabel(
                             IdentityPresentation.fingerprintAccessibilityLabel(signerIdentity.fingerprint)

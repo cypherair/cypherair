@@ -3,7 +3,6 @@ import SwiftUI
 @MainActor
 struct TutorialMirrorShellView: View {
     @Environment(TutorialSessionStore.self) private var tutorialStore
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var selectedTab: AppShellTab = .home
@@ -12,11 +11,7 @@ struct TutorialMirrorShellView: View {
         if let container = tutorialStore.container {
             TutorialShellTabsView(
                 selectedTab: $selectedTab,
-                sizeClass: sizeClass,
-                dismissAction: {
-                    tutorialStore.dismissShell()
-                    dismiss()
-                }
+                sizeClass: sizeClass
             )
             .environment(tutorialStore)
             .environment(container.config)
@@ -46,7 +41,6 @@ struct TutorialMirrorShellView: View {
             } actions: {
                 Button(String(localized: "common.done", defaultValue: "Done")) {
                     tutorialStore.dismissShell()
-                    dismiss()
                 }
             }
         }
@@ -76,7 +70,6 @@ private struct TutorialShellTabsView: View {
 
     @Binding var selectedTab: AppShellTab
     let sizeClass: UserInterfaceSizeClass?
-    let dismissAction: () -> Void
 
     var body: some View {
         if sizeClass == .compact {
@@ -87,7 +80,12 @@ private struct TutorialShellTabsView: View {
     }
 
     private var currentGuidance: TutorialGuidance? {
-        tutorialStore.guidance(
+        if let activeTask = tutorialStore.session.activeTask,
+           tutorialStore.isCompleted(activeTask) {
+            return nil
+        }
+
+        return tutorialStore.guidance(
             sizeClass: sizeClass,
             selectedTab: selectedTab
         )
@@ -97,15 +95,16 @@ private struct TutorialShellTabsView: View {
         VStack(spacing: 0) {
             compactTabBar
             Divider()
+            compactReturnBar
+            Divider()
+            if let currentGuidance {
+                compactGuidanceBanner(currentGuidance)
+                Divider()
+            }
             tabRoot(for: selectedTab)
         }
         .overlay {
             TutorialSpotlightOverlay(target: currentGuidance?.target)
-        }
-        .safeAreaInset(edge: .bottom) {
-            if let currentGuidance {
-                guidanceCard(currentGuidance)
-            }
         }
     }
 
@@ -351,8 +350,8 @@ private struct TutorialShellTabsView: View {
 
                 Spacer()
 
-                Button(String(localized: "guidedTutorial.return", defaultValue: "Return")) {
-                    dismissAction()
+                Button(String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial")) {
+                    tutorialStore.dismissShell()
                 }
                 .buttonStyle(.bordered)
             }
@@ -368,6 +367,51 @@ private struct TutorialShellTabsView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    private func compactGuidanceBanner(_ guidance: TutorialGuidance) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(
+                String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Sandbox"),
+                systemImage: "testtube.2"
+            )
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.orange)
+
+            Text(guidance.title)
+                .font(.subheadline.weight(.semibold))
+
+            Text(guidance.body)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.regularMaterial)
+    }
+
+    private var compactReturnBar: some View {
+        HStack {
+            Button {
+                tutorialStore.dismissShell()
+            } label: {
+                Label(
+                    String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial"),
+                    systemImage: "chevron.left"
+                )
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.bar)
     }
 }
 

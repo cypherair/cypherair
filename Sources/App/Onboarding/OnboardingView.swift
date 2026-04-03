@@ -118,6 +118,9 @@ struct OnboardingPageTwo: View {
 struct OnboardingPageThree: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
+    #if canImport(UIKit)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
     @State private var showTutorial = false
 
@@ -162,8 +165,35 @@ struct OnboardingPageThree: View {
 
             Spacer()
         }
+        #if canImport(UIKit)
+        .if(sizeClass == .compact) { view in
+            view.fullScreenCover(isPresented: $showTutorial) {
+                TutorialView()
+            }
+        }
+        .if(sizeClass != .compact) { view in
+            view.sheet(isPresented: $showTutorial) {
+                TutorialView()
+            }
+        }
+        #else
         .sheet(isPresented: $showTutorial) {
             TutorialView()
+        }
+        #endif
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func `if`<Content: View>(
+        _ condition: Bool,
+        transform: (Self) -> Content
+    ) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
         }
     }
 }
