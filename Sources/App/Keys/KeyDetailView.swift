@@ -20,18 +20,15 @@ struct KeyDetailView: View {
     @State private var showError = false
     @State private var armoredPublicKey: Data?
     @State private var showCopiedNotice = false
-    private enum ExportType {
-        case publicKey
-        case revocation
-    }
     @State private var activeExport: ExportType?
     @State private var showExpirySheet = false
     @State private var newExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
     @State private var isModifyingExpiry = false
-    #if os(macOS)
-    @State private var showQRDisplay = false
-    @State private var showBackupKey = false
-    #endif
+
+    private enum ExportType {
+        case publicKey
+        case revocation
+    }
 
     private var key: PGPKeyIdentity? {
         keyManagement.keys.first { $0.fingerprint == fingerprint }
@@ -126,23 +123,12 @@ struct KeyDetailView: View {
                             }
                         }
 
-                        #if os(macOS)
-                        Button {
-                            showQRDisplay = true
-                        } label: {
-                            Label(
-                                String(localized: "keydetail.showQR", defaultValue: "Show QR Code"),
-                                systemImage: "qrcode"
-                            )
-                        }
-                        #else
                         NavigationLink(value: AppRoute.qrDisplay(publicKeyData: key.publicKeyData, displayName: key.userId ?? key.shortKeyId)) {
                             Label(
                                 String(localized: "keydetail.showQR", defaultValue: "Show QR Code"),
                                 systemImage: "qrcode"
                             )
                         }
-                        #endif
 
                         Button {
                             if let armoredPublicKey,
@@ -185,23 +171,13 @@ struct KeyDetailView: View {
                             }
                         }
 
-                        #if os(macOS)
-                        Button {
-                            showBackupKey = true
-                        } label: {
-                            Label(
-                                String(localized: "keydetail.exportBackup", defaultValue: "Export Backup"),
-                                systemImage: "square.and.arrow.up"
-                            )
-                        }
-                        #else
                         NavigationLink(value: AppRoute.backupKey(fingerprint: fingerprint)) {
                             Label(
                                 String(localized: "keydetail.exportBackup", defaultValue: "Export Backup"),
                                 systemImage: "square.and.arrow.up"
                             )
                         }
-                        #endif
+                        .tutorialAnchor(.keyDetailBackupButton)
 
                         if !key.revocationCert.isEmpty {
                             Button {
@@ -342,41 +318,11 @@ struct KeyDetailView: View {
             .presentationDetents([.medium])
             #endif
         }
-        #if os(macOS)
-        .sheet(isPresented: $showQRDisplay) {
-            if let key {
-                NavigationStack {
-                    QRDisplayView(publicKeyData: key.publicKeyData, displayName: key.userId ?? key.shortKeyId)
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button(String(localized: "common.done", defaultValue: "Done")) {
-                                    showQRDisplay = false
-                                }
-                            }
-                        }
-                }
-                .frame(minWidth: 400, minHeight: 450)
-            }
-        }
-        .sheet(isPresented: $showBackupKey) {
-            NavigationStack {
-                BackupKeyView(fingerprint: fingerprint)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                                showBackupKey = false
-                            }
-                        }
-                    }
-            }
-            .frame(minWidth: 450, minHeight: 350)
-        }
-        #endif
         .task {
             do {
                 armoredPublicKey = try keyManagement.exportPublicKey(fingerprint: fingerprint)
             } catch {
-                // Non-critical — sharing buttons will be disabled
+                // Non-critical — sharing buttons will be disabled.
             }
         }
         .fileExporter(
@@ -398,17 +344,23 @@ struct KeyDetailView: View {
 
     private var exportItem: Data? {
         switch activeExport {
-        case .publicKey: return armoredPublicKey
-        case .revocation: return key?.revocationCert
-        case nil: return nil
+        case .publicKey:
+            armoredPublicKey
+        case .revocation:
+            key?.revocationCert
+        case nil:
+            nil
         }
     }
 
     private var exportFilename: String {
         switch activeExport {
-        case .publicKey: return "\(key?.shortKeyId ?? "key").asc"
-        case .revocation: return "revocation-\(key?.shortKeyId ?? "key").asc"
-        case nil: return "export.asc"
+        case .publicKey:
+            "\(key?.shortKeyId ?? "key").asc"
+        case .revocation:
+            "revocation-\(key?.shortKeyId ?? "key").asc"
+        case nil:
+            "export.asc"
         }
     }
 
@@ -424,7 +376,6 @@ struct KeyDetailView: View {
                     newExpirySeconds: seconds,
                     authMode: authMode
                 )
-                // Re-export public key since it changed (new binding signatures)
                 armoredPublicKey = try? service.exportPublicKey(fingerprint: fp)
                 showExpirySheet = false
             } catch {

@@ -373,6 +373,52 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(verification.statusColor, .secondary)
     }
 
+    func test_signatureVerification_signerIdentity_prefersVerifiedContact() {
+        let contact = makeContact(
+            fingerprint: "abcdef1234567890abcdef1234567890",
+            userId: "Alice <alice@example.com>"
+        )
+
+        let identity = SignatureVerification.SignerIdentity.resolve(
+            fingerprint: contact.fingerprint,
+            contacts: [contact],
+            ownKeys: []
+        )
+
+        XCTAssertEqual(identity?.source, .contact)
+        XCTAssertEqual(identity?.displayName, "Alice")
+        XCTAssertEqual(identity?.secondaryText, "alice@example.com")
+        XCTAssertTrue(identity?.isVerifiedContact == true)
+    }
+
+    func test_signatureVerification_signerIdentity_resolvesOwnKey() {
+        let ownKey = makeIdentity(fingerprint: "1234567890abcdef1234567890abcdef")
+
+        let identity = SignatureVerification.SignerIdentity.resolve(
+            fingerprint: ownKey.fingerprint,
+            contacts: [],
+            ownKeys: [ownKey]
+        )
+
+        XCTAssertEqual(identity?.source, .ownKey)
+        XCTAssertEqual(identity?.displayName, "Your Key")
+        XCTAssertEqual(identity?.secondaryText, ownKey.userId)
+    }
+
+    func test_signatureVerification_signerIdentity_unknownFallback_keepsFingerprint() {
+        let fingerprint = "fedcba0987654321fedcba0987654321"
+
+        let identity = SignatureVerification.SignerIdentity.resolve(
+            fingerprint: fingerprint,
+            contacts: [],
+            ownKeys: []
+        )
+
+        XCTAssertEqual(identity?.source, .unknown)
+        XCTAssertEqual(identity?.shortKeyId, "fedcba0987654321")
+        XCTAssertEqual(identity?.fingerprint, fingerprint)
+    }
+
     // MARK: - AppConfiguration: Grace Period Validation
 
     func test_appConfiguration_gracePeriod_validValuePersists() {
@@ -412,6 +458,7 @@ final class ModelTests: XCTestCase {
             isRevoked: isRevoked,
             isExpired: isExpired,
             hasEncryptionSubkey: hasEncryptionSubkey,
+            verificationState: .verified,
             publicKeyData: Data(),
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519"

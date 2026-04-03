@@ -227,11 +227,11 @@ struct SignView: View {
     private var textSigningContent: some View {
         Section {
             TextEditor(text: $text)
-                #if canImport(UIKit)
-                .frame(minHeight: 100)
-                #else
-                .frame(minHeight: 250)
-                #endif
+                .frame(
+                    minHeight: editorHeightRange.min,
+                    idealHeight: editorHeightRange.ideal,
+                    maxHeight: editorHeightRange.max
+                )
         } header: {
             Text(String(localized: "sign.input", defaultValue: "Message to Sign"))
         }
@@ -269,6 +269,14 @@ struct SignView: View {
         case .text: return text.isEmpty
         case .file: return selectedFileURL == nil
         }
+    }
+
+    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
+        #if canImport(UIKit)
+        return (110, 160, 240)
+        #else
+        return (150, 220, 320)
+        #endif
     }
 
     // MARK: - Actions

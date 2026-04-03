@@ -42,6 +42,7 @@ struct SettingsView: View {
                     Text(String(localized: "settings.authMode.high", defaultValue: "High Security"))
                         .tag(AuthenticationMode.highSecurity)
                 }
+                .tutorialAnchor(.settingsAuthModePicker)
                 .disabled(isSwitching)
 
                 Picker(
@@ -52,7 +53,6 @@ struct SettingsView: View {
                         Text(option.label).tag(option.value)
                     }
                 }
-
             } header: {
                 Text(String(localized: "settings.security", defaultValue: "Security"))
             }
@@ -130,8 +130,8 @@ struct SettingsView: View {
                     showTutorial = true
                 } label: {
                     Label(
-                        String(localized: "settings.viewTutorial", defaultValue: "Usage Tutorial"),
-                        systemImage: "list.number"
+                        String(localized: "guidedTutorial.settings.entry", defaultValue: "Guided Tutorial"),
+                        systemImage: "testtube.2"
                     )
                 }
                 #if os(macOS)
@@ -174,29 +174,15 @@ struct SettingsView: View {
         .formStyle(.grouped)
         #endif
         .navigationTitle(String(localized: "settings.title", defaultValue: "Settings"))
-        .navigationDestination(for: AppRoute.self) { route in
-            switch route {
-            case .selfTest: SelfTestView()
-            case .about: AboutView()
-            case .license: LicenseListView()
-            case .themePicker: ThemePickerView()
-            case .appIcon:
-                #if canImport(UIKit)
-                AppIconPickerView()
-                    #else
-                Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
-                #endif
-            default:
-                Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
-            }
-        }
         .confirmationDialog(
             modeWarningTitle,
-            isPresented: $showModeWarning,
+            isPresented: Binding(
+                get: { showModeWarning && !shouldUseModeSheet },
+                set: { showModeWarning = $0 }
+            ),
             titleVisibility: .visible
         ) {
             if pendingMode == .highSecurity && !hasBackup {
-                // Risk acknowledgment required — handled by the sheet below instead
                 Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {
                     pendingMode = nil
                 }
@@ -216,7 +202,7 @@ struct SettingsView: View {
             }
         }
         .sheet(isPresented: Binding(
-            get: { pendingMode == .highSecurity && !hasBackup && showModeWarning },
+            get: { shouldUseModeSheet && showModeWarning },
             set: { if !$0 { pendingMode = nil; riskAcknowledged = false } }
         )) {
             NavigationStack {
@@ -226,10 +212,12 @@ struct SettingsView: View {
                             .font(.callout)
                     }
 
-                    Section {
-                        Toggle(isOn: $riskAcknowledged) {
-                            Text(String(localized: "settings.mode.riskAck", defaultValue: "I understand that if biometrics become unavailable, I will lose access to my private keys"))
-                                .font(.callout)
+                    if pendingMode == .highSecurity && !hasBackup {
+                        Section {
+                            Toggle(isOn: $riskAcknowledged) {
+                                Text(String(localized: "settings.mode.riskAck", defaultValue: "I understand that if biometrics become unavailable, I will lose access to my private keys"))
+                                    .font(.callout)
+                            }
                         }
                     }
 
@@ -238,7 +226,8 @@ struct SettingsView: View {
                             showModeWarning = false
                             performModeSwitch()
                         }
-                        .disabled(!riskAcknowledged)
+                        .tutorialAnchor(.settingsModeConfirmButton)
+                        .disabled((pendingMode == .highSecurity && !hasBackup) && !riskAcknowledged)
                         .frame(maxWidth: .infinity)
                     }
                 }
@@ -331,10 +320,12 @@ struct SettingsView: View {
         #endif
     }
 
-    // MARK: - Mode Switch Warnings
-
     private var hasBackup: Bool {
         keyManagement.keys.contains(where: \.isBackedUp)
+    }
+
+    private var shouldUseModeSheet: Bool {
+        pendingMode == .highSecurity && !hasBackup
     }
 
     private var modeWarningTitle: String {
@@ -362,14 +353,13 @@ struct SettingsView: View {
         return String(localized: "settings.mode.standardWarning.message", defaultValue: "Switching to Standard Mode will allow device passcode as a fallback for authentication. Biometric authentication is required to confirm this change.")
     }
 
-    // MARK: - Mode Switch
-
     private func performModeSwitch() {
         guard let newMode = pendingMode else { return }
         isSwitching = true
         let fingerprints = keyManagement.keys.map(\.fingerprint)
         let backed = hasBackup
         let manager = authManager
+
         Task {
             do {
                 try await manager.switchMode(

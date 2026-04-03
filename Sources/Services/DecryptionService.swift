@@ -204,12 +204,19 @@ final class DecryptionService {
         }
 
         // Build signature verification result
+        let signerContact = result.signerFingerprint.flatMap {
+            contactService.contact(forFingerprint: $0)
+        }
+        let signerIdentity = SignatureVerification.SignerIdentity.resolve(
+            fingerprint: result.signerFingerprint,
+            contacts: contactService.contacts,
+            ownKeys: keyManagement.keys
+        )
         let sigVerification = SignatureVerification(
             status: result.signatureStatus ?? .notSigned,
             signerFingerprint: result.signerFingerprint,
-            signerContact: result.signerFingerprint.flatMap {
-                contactService.contact(forFingerprint: $0)
-            }
+            signerContact: signerContact,
+            signerIdentity: signerIdentity
         )
 
         return (plaintext: result.plaintext, signature: sigVerification)
@@ -284,12 +291,19 @@ final class DecryptionService {
         }
 
         // Build signature verification result
+        let signerContact = fileResult.signerFingerprint.flatMap {
+            contactService.contact(forFingerprint: $0)
+        }
+        let signerIdentity = SignatureVerification.SignerIdentity.resolve(
+            fingerprint: fileResult.signerFingerprint,
+            contacts: contactService.contacts,
+            ownKeys: keyManagement.keys
+        )
         let sigVerification = SignatureVerification(
             status: fileResult.signatureStatus ?? .notSigned,
             signerFingerprint: fileResult.signerFingerprint,
-            signerContact: fileResult.signerFingerprint.flatMap {
-                contactService.contact(forFingerprint: $0)
-            }
+            signerContact: signerContact,
+            signerIdentity: signerIdentity
         )
 
         return (outputURL: outputURL, signature: sigVerification)

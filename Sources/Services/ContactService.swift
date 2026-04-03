@@ -18,11 +18,16 @@ enum AddContactResult {
 @Observable
 final class ContactService {
 
+    private struct ContactMetadataManifest: Codable {
+        var verificationStates: [String: ContactVerificationState]
+    }
+
     /// All imported contacts.
     private(set) var contacts: [Contact] = []
 
     private let engine: PgpEngine
     private let contactsDirectory: URL
+    private var verificationStates: [String: ContactVerificationState] = [:]
 
     init(engine: PgpEngine, contactsDirectory: URL? = nil) {
         self.engine = engine
@@ -32,6 +37,10 @@ final class ContactService {
             let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             self.contactsDirectory = documentsDir.appendingPathComponent("contacts", isDirectory: true)
         }
+    }
+
+    private var metadataURL: URL {
+        contactsDirectory.appendingPathComponent("contact-metadata.json")
     }
 
     // MARK: - Load Contacts
@@ -44,6 +53,8 @@ final class ContactService {
         if !fm.fileExists(atPath: contactsDirectory.path) {
             try fm.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
         }
+
+        verificationStates = loadVerificationStates()
 
         let files = try fm.contentsOfDirectory(
             at: contactsDirectory,
@@ -59,6 +70,13 @@ final class ContactService {
         }
 
         contacts = loadedContacts
+
+        let loadedFingerprints = Set(loadedContacts.map(\.fingerprint))
+        let filteredStates = verificationStates.filter { loadedFingerprints.contains($0.key) }
+        if filteredStates != verificationStates {
+            verificationStates = filteredStates
+            try saveVerificationStates()
+        }
     }
 
     // MARK: - Add Contact
@@ -72,23 +90,31 @@ final class ContactService {
     /// - Parameter publicKeyData: The public key data (binary or armored).
     /// - Returns: The result of the add operation.
     @discardableResult
-    func addContact(publicKeyData: Data) throws -> AddContactResult {
+    func addContact(
+        publicKeyData: Data,
+        verificationState: ContactVerificationState = .verified
+    ) throws -> AddContactResult {
         // Try to dearmor if it looks like ASCII armor
         let binaryData: Data
-        let contact: Contact
+        var contact: Contact
         do {
             if let firstChar = publicKeyData.first, firstChar == 0x2D { // '-' = ASCII armor header
                 binaryData = try engine.dearmor(armored: publicKeyData)
             } else {
                 binaryData = publicKeyData
             }
-            contact = try parseContact(from: binaryData)
+            contact = try parseContact(from: binaryData, verificationState: verificationState)
         } catch {
             throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
         }
 
         // Check for duplicate
         if let existingIndex = contacts.firstIndex(where: { $0.fingerprint == contact.fingerprint }) {
+            if verificationState == .verified && !contacts[existingIndex].isVerified {
+                contacts[existingIndex].verificationState = .verified
+                verificationStates[contact.fingerprint] = .verified
+                try saveVerificationStates()
+            }
             // Same fingerprint = same key, no update needed
             return .duplicate(contacts[existingIndex])
         }
@@ -96,6 +122,7 @@ final class ContactService {
         // Check for same userId but different fingerprint (key update)
         if let userId = contact.userId,
            let existingIndex = contacts.firstIndex(where: { $0.userId == userId && $0.fingerprint != contact.fingerprint }) {
+            contact.verificationState = .verified
             // Different fingerprint = key regenerated — caller must confirm before replacing.
             return .keyUpdateDetected(
                 newContact: contact,
@@ -105,10 +132,15 @@ final class ContactService {
         }
 
         // Save to filesystem
+        if !FileManager.default.fileExists(atPath: contactsDirectory.path) {
+            try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
+        }
         let filename = "\(contact.fingerprint).gpg"
         let fileURL = contactsDirectory.appendingPathComponent(filename)
         try binaryData.write(to: fileURL, options: .atomic)
 
+        verificationStates[contact.fingerprint] = contact.verificationState
+        try saveVerificationStates()
         contacts.append(contact)
         return .added(contact)
     }
@@ -128,7 +160,11 @@ final class ContactService {
 
         // Now safe to remove old contact
         try removeContact(fingerprint: existingFingerprint)
-        contacts.append(newContact)
+        var verifiedContact = newContact
+        verifiedContact.verificationState = .verified
+        verificationStates[verifiedContact.fingerprint] = .verified
+        try saveVerificationStates()
+        contacts.append(verifiedContact)
     }
 
     // MARK: - Remove Contact
@@ -144,6 +180,23 @@ final class ContactService {
         }
 
         contacts.removeAll { $0.fingerprint == fingerprint }
+        verificationStates.removeValue(forKey: fingerprint)
+        try saveVerificationStates()
+    }
+
+    func setVerificationState(
+        _ verificationState: ContactVerificationState,
+        for fingerprint: String
+    ) throws {
+        guard let index = contacts.firstIndex(where: { $0.fingerprint == fingerprint }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+
+        contacts[index].verificationState = verificationState
+        verificationStates[fingerprint] = verificationState
+        try saveVerificationStates()
     }
 
     // MARK: - Lookup
@@ -178,9 +231,15 @@ final class ContactService {
 
     // MARK: - Private
 
-    private func parseContact(from binaryData: Data) throws -> Contact {
+    private func parseContact(
+        from binaryData: Data,
+        verificationState: ContactVerificationState? = nil
+    ) throws -> Contact {
         let keyInfo = try engine.parseKeyInfo(keyData: binaryData)
         let profile = try engine.detectProfile(certData: binaryData)
+        let resolvedVerificationState = verificationState
+            ?? verificationStates[keyInfo.fingerprint]
+            ?? .verified
 
         return Contact(
             fingerprint: keyInfo.fingerprint,
@@ -190,9 +249,24 @@ final class ContactService {
             isRevoked: keyInfo.isRevoked,
             isExpired: keyInfo.isExpired,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
+            verificationState: resolvedVerificationState,
             publicKeyData: binaryData,
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo
         )
+    }
+
+    private func loadVerificationStates() -> [String: ContactVerificationState] {
+        guard let data = try? Data(contentsOf: metadataURL),
+              let manifest = try? JSONDecoder().decode(ContactMetadataManifest.self, from: data) else {
+            return [:]
+        }
+        return manifest.verificationStates
+    }
+
+    private func saveVerificationStates() throws {
+        let manifest = ContactMetadataManifest(verificationStates: verificationStates)
+        let data = try JSONEncoder().encode(manifest)
+        try data.write(to: metadataURL, options: .atomic)
     }
 }

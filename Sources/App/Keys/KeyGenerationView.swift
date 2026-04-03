@@ -2,13 +2,34 @@ import SwiftUI
 
 /// Key generation form: profile selection, name, email, expiry.
 struct KeyGenerationView: View {
+    struct Configuration {
+        enum PostGenerationBehavior: Equatable {
+            case showPrompt
+            case suppressPrompt
+        }
+
+        var prefilledName: String?
+        var prefilledEmail: String?
+        var lockedProfile: KeyProfile?
+        var lockedExpiryMonths: Int?
+        var postGenerationBehavior: PostGenerationBehavior = .showPrompt
+        var onGenerated: (@MainActor (PGPKeyIdentity) -> Void)?
+
+        static let `default` = Configuration()
+    }
+
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
 
-    enum Field { case name, email }
-    @FocusState private var focusedField: Field?
+    enum Field {
+        case name
+        case email
+    }
 
+    let configuration: Configuration
+
+    @FocusState private var focusedField: Field?
     @State private var name = ""
     @State private var email = ""
     @State private var profile: KeyProfile = .universal
@@ -19,6 +40,10 @@ struct KeyGenerationView: View {
     @State private var generatedIdentity: PGPKeyIdentity?
 
     private let expiryOptions = [12, 24, 36, 48, 60]
+
+    init(configuration: Configuration = .default) {
+        self.configuration = configuration
+    }
 
     var body: some View {
         Form {
@@ -31,6 +56,7 @@ struct KeyGenerationView: View {
                     Text(KeyProfile.advanced.displayName).tag(KeyProfile.advanced)
                 }
                 .pickerStyle(.segmented)
+                .disabled(configuration.lockedProfile != nil)
 
                 Text(profile.shortDescription)
                     .font(.caption)
@@ -75,6 +101,7 @@ struct KeyGenerationView: View {
                             .tag(months)
                     }
                 }
+                .disabled(configuration.lockedExpiryMonths != nil)
             } header: {
                 Text(String(localized: "keygen.expiry.header", defaultValue: "Validity"))
             }
@@ -112,9 +139,25 @@ struct KeyGenerationView: View {
             Text(err.localizedDescription)
         }
         .sheet(item: $generatedIdentity) { identity in
-            PostGenerationPromptView(identity: identity)
-                .environment(keyManagement)
-                .interactiveDismissDisabled(false)
+            AppRouteHost(resolver: .production) {
+                PostGenerationPromptView(identity: identity)
+                    .environment(keyManagement)
+                    .interactiveDismissDisabled(false)
+            }
+        }
+        .onAppear {
+            if name.isEmpty, let prefilledName = configuration.prefilledName {
+                name = prefilledName
+            }
+            if email.isEmpty, let prefilledEmail = configuration.prefilledEmail {
+                email = prefilledEmail
+            }
+            if let lockedProfile = configuration.lockedProfile {
+                profile = lockedProfile
+            }
+            if let lockedExpiryMonths = configuration.lockedExpiryMonths {
+                expiryMonths = lockedExpiryMonths
+            }
         }
     }
 
@@ -136,7 +179,11 @@ struct KeyGenerationView: View {
                     profile: profile,
                     authMode: authMode
                 )
-                generatedIdentity = identity
+                configuration.onGenerated?(identity)
+
+                if configuration.postGenerationBehavior == .showPrompt {
+                    generatedIdentity = identity
+                }
             } catch {
                 self.error = CypherAirError.from(error) { .keyGenerationFailed(reason: $0) }
                 showError = true

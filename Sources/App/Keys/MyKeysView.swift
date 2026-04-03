@@ -3,28 +3,15 @@ import SwiftUI
 /// Lists the user's own PGP key identities.
 struct MyKeysView: View {
     @Environment(KeyManagementService.self) private var keyManagement
-
-    #if os(macOS)
-    @State private var selectedKeyFingerprint: String?
-    @State private var showKeyGeneration = false
-    @State private var showImportKey = false
-    #endif
+    @Environment(\.appRouteNavigator) private var routeNavigator
 
     var body: some View {
         List {
             ForEach(keyManagement.keys) { key in
-                #if os(macOS)
-                Button {
-                    selectedKeyFingerprint = key.fingerprint
-                } label: {
-                    KeyRowView(key: key)
-                }
-                .buttonStyle(.plain)
-                #else
                 NavigationLink(value: AppRoute.keyDetail(fingerprint: key.fingerprint)) {
                     KeyRowView(key: key)
                 }
-                #endif
+                .tutorialAnchor(.keyRow(fingerprint: key.fingerprint))
             }
         }
         .overlay {
@@ -37,17 +24,13 @@ struct MyKeysView: View {
                 } description: {
                     Text(String(localized: "keys.empty.description", defaultValue: "Generate or import a key to get started."))
                 } actions: {
-                    #if os(macOS)
-                    Button(String(localized: "keys.generate", defaultValue: "Generate Key")) {
-                        showKeyGeneration = true
-                    }
-                    .buttonStyle(.borderedProminent)
-                    #else
-                    NavigationLink(value: AppRoute.keyGeneration) {
+                    Button {
+                        routeNavigator.open(.keyGeneration)
+                    } label: {
                         Text(String(localized: "keys.generate", defaultValue: "Generate Key"))
                     }
                     .buttonStyle(.borderedProminent)
-                    #endif
+                    .tutorialAnchor(.keysGenerateButton)
                 }
             }
         }
@@ -55,98 +38,29 @@ struct MyKeysView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    #if os(macOS)
                     Button {
-                        showKeyGeneration = true
+                        routeNavigator.open(.keyGeneration)
                     } label: {
                         Label(
                             String(localized: "keys.action.generate", defaultValue: "Generate Key"),
                             systemImage: "plus"
                         )
                     }
+                    .tutorialAnchor(.keysGenerateButton)
+
                     Button {
-                        showImportKey = true
+                        routeNavigator.open(.importKey)
                     } label: {
                         Label(
                             String(localized: "keys.action.import", defaultValue: "Import Key"),
                             systemImage: "square.and.arrow.down"
                         )
                     }
-                    #else
-                    NavigationLink(value: AppRoute.keyGeneration) {
-                        Label(
-                            String(localized: "keys.action.generate", defaultValue: "Generate Key"),
-                            systemImage: "plus"
-                        )
-                    }
-                    NavigationLink(value: AppRoute.importKey) {
-                        Label(
-                            String(localized: "keys.action.import", defaultValue: "Import Key"),
-                            systemImage: "square.and.arrow.down"
-                        )
-                    }
-                    #endif
                 } label: {
                     Image(systemName: "plus")
                 }
             }
         }
-        .navigationDestination(for: AppRoute.self) { route in
-            switch route {
-            case .keyGeneration: KeyGenerationView()
-            case .keyDetail(let fp): KeyDetailView(fingerprint: fp)
-            case .backupKey(let fp): BackupKeyView(fingerprint: fp)
-            case .importKey: ImportKeyView()
-            case .qrDisplay(let data, let name): QRDisplayView(publicKeyData: data, displayName: name)
-            default: Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
-            }
-        }
-        #if os(macOS)
-        .sheet(isPresented: Binding(
-            get: { selectedKeyFingerprint != nil },
-            set: { if !$0 { selectedKeyFingerprint = nil } }
-        )) {
-            if let selectedKeyFingerprint {
-                NavigationStack {
-                    KeyDetailView(fingerprint: selectedKeyFingerprint)
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button(String(localized: "common.done", defaultValue: "Done")) {
-                                    self.selectedKeyFingerprint = nil
-                                }
-                            }
-                        }
-                }
-                .frame(minWidth: 560, minHeight: 520)
-            }
-        }
-        .sheet(isPresented: $showKeyGeneration) {
-            NavigationStack {
-                KeyGenerationView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                                showKeyGeneration = false
-                            }
-                        }
-                    }
-            }
-            .frame(minWidth: 450, minHeight: 400)
-        }
-        .sheet(isPresented: $showImportKey) {
-            NavigationStack {
-                ImportKeyView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                                showImportKey = false
-                            }
-                        }
-                    }
-            }
-            .frame(minWidth: 450, minHeight: 400)
-        }
-        #endif
     }
 }
 

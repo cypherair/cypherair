@@ -105,6 +105,14 @@ struct VerifyView: View {
                 } header: {
                     Text(String(localized: "verify.result", defaultValue: "Verification Result"))
                 }
+
+                if activeVerification.shouldShowSignerIdentity {
+                    Section {
+                        SignatureIdentityCardView(verification: activeVerification)
+                    } header: {
+                        Text(String(localized: "verify.signer", defaultValue: "Signer"))
+                    }
+                }
             }
         }
         #if canImport(UIKit)
@@ -160,11 +168,11 @@ struct VerifyView: View {
         Section {
             TextEditor(text: cleartextBinding)
                 .font(.system(.body, design: .monospaced))
-                #if canImport(UIKit)
-                .frame(minHeight: 100)
-                #else
-                .frame(minHeight: 250)
-                #endif
+                .frame(
+                    minHeight: editorHeightRange.min,
+                    idealHeight: editorHeightRange.ideal,
+                    maxHeight: editorHeightRange.max
+                )
 
             Button {
                 filePickerTarget = .cleartextSignedImport
@@ -284,6 +292,14 @@ struct VerifyView: View {
                 invalidateCleartextVerificationState()
             }
         )
+    }
+
+    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
+        #if canImport(UIKit)
+        return (110, 160, 240)
+        #else
+        return (150, 220, 320)
+        #endif
     }
 
     // MARK: - Actions

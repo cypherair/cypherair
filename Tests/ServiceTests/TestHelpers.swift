@@ -23,12 +23,14 @@ enum TestHelpers {
             service = KeyManagementService(
                 engine: engine, secureEnclave: mockSE,
                 keychain: mockKC, authenticator: mockAuth,
-                memoryInfo: memInfo
+                memoryInfo: memInfo,
+                defaults: .standard
             )
         } else {
             service = KeyManagementService(
                 engine: engine, secureEnclave: mockSE,
-                keychain: mockKC, authenticator: mockAuth
+                keychain: mockKC, authenticator: mockAuth,
+                defaults: .standard
             )
         }
 

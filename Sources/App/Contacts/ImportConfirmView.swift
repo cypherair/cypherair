@@ -2,28 +2,52 @@ import SwiftUI
 
 /// Confirmation sheet displayed when importing a public key via URL scheme.
 /// Shows key details and requires explicit user confirmation before adding to contacts.
-///
-/// Per PRD Section 4.2: URL scheme import requires user confirmation before adding key.
 struct ImportConfirmView: View {
     let keyInfo: KeyInfo
     let detectedProfile: KeyProfile
-    let onConfirm: () -> Void
+    let onImportVerified: () -> Void
+    let onImportUnverified: (() -> Void)?
     let onCancel: () -> Void
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    if let userId = keyInfo.userId {
-                        LabeledContent(String(localized: "import.userId", defaultValue: "User ID"), value: userId)
+                    LabeledContent(
+                        String(localized: "import.name", defaultValue: "Name"),
+                        value: IdentityPresentation.displayName(from: keyInfo.userId)
+                    )
+
+                    if let email = IdentityPresentation.email(from: keyInfo.userId) {
+                        LabeledContent(
+                            String(localized: "import.email", defaultValue: "Email"),
+                            value: email
+                        )
                     }
 
-                    let profileLabel = (detectedProfile == .advanced)
+                    if let userId = keyInfo.userId {
+                        LabeledContent(
+                            String(localized: "import.userId", defaultValue: "User ID"),
+                            value: userId
+                        )
+                    }
+
+                    let profileLabel = detectedProfile == .advanced
                         ? String(localized: "import.profileB", defaultValue: "Advanced Security (Profile B)")
                         : String(localized: "import.profileA", defaultValue: "Universal Compatible (Profile A)")
                     LabeledContent(String(localized: "import.profile", defaultValue: "Profile"), value: profileLabel)
 
                     LabeledContent(String(localized: "import.algorithm", defaultValue: "Algorithm"), value: keyInfo.primaryAlgo)
+                    LabeledContent(
+                        String(localized: "import.shortKeyId", defaultValue: "Short Key ID"),
+                        value: IdentityPresentation.shortKeyId(from: keyInfo.fingerprint)
+                    )
+                    LabeledContent(
+                        String(localized: "import.canEncrypt", defaultValue: "Can Encrypt To"),
+                        value: (keyInfo.hasEncryptionSubkey && !keyInfo.isRevoked && !keyInfo.isExpired)
+                            ? String(localized: "common.yes", defaultValue: "Yes")
+                            : String(localized: "common.no", defaultValue: "No")
+                    )
 
                     if keyInfo.isRevoked {
                         Label(
@@ -60,6 +84,15 @@ struct ImportConfirmView: View {
                     Text(String(localized: "import.verifyWarning", defaultValue: "Verify this fingerprint with the key owner before adding."))
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                } footer: {
+                    if onImportUnverified != nil {
+                        Text(
+                            String(
+                                localized: "import.unverified.warning",
+                                defaultValue: "You can add this key without verifying it now, but it will remain marked as unverified until you confirm the fingerprint later."
+                            )
+                        )
+                    }
                 }
             }
             .navigationTitle(String(localized: "import.confirm.title", defaultValue: "Import Public Key"))
@@ -71,14 +104,24 @@ struct ImportConfirmView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button(action: onConfirm) {
-                    Text(String(localized: "import.addToContacts", defaultValue: "Add to Contacts"))
-                        .frame(maxWidth: .infinity)
+                VStack(spacing: 12) {
+                    Button(action: onImportVerified) {
+                        Text(String(localized: "import.addVerified", defaultValue: "Verify and Add to Contacts"))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    if let onImportUnverified {
+                        Button(action: onImportUnverified) {
+                            Text(String(localized: "import.addUnverified", defaultValue: "Add as Unverified"))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
                 .padding()
+                .background(.bar)
             }
         }
     }
-
 }

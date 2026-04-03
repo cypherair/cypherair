@@ -275,4 +275,72 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(newService.contacts.first?.fingerprint, originalFingerprint,
                        "Fingerprint should match after restart")
     }
+
+    func test_addContact_unverified_persistsAcrossRestart() throws {
+        let generated = try engine.generateKey(
+            name: "Unverified Persist", email: "pending@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+
+        let addResult = try contactService.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .unverified
+        )
+        guard case .added(let contact) = addResult else {
+            XCTFail("Expected .added"); return
+        }
+        XCTAssertFalse(contact.isVerified)
+
+        let newService = ContactService(engine: engine, contactsDirectory: tempDir)
+        try newService.loadContacts()
+
+        XCTAssertEqual(newService.contacts.count, 1)
+        XCTAssertEqual(newService.contacts.first?.fingerprint, contact.fingerprint)
+        XCTAssertFalse(newService.contacts.first?.isVerified ?? true)
+    }
+
+    func test_setVerificationState_promotesContactToVerified_andPersists() throws {
+        let generated = try engine.generateKey(
+            name: "Manual Verify", email: "manual@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+
+        let addResult = try contactService.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .unverified
+        )
+        guard case .added(let contact) = addResult else {
+            XCTFail("Expected .added"); return
+        }
+
+        try contactService.setVerificationState(.verified, for: contact.fingerprint)
+        XCTAssertTrue(contactService.contact(forFingerprint: contact.fingerprint)?.isVerified == true)
+
+        let newService = ContactService(engine: engine, contactsDirectory: tempDir)
+        try newService.loadContacts()
+        XCTAssertTrue(newService.contact(forFingerprint: contact.fingerprint)?.isVerified == true)
+    }
+
+    func test_addContact_duplicateVerifiedImport_upgradesExistingUnverifiedContact() throws {
+        let generated = try engine.generateKey(
+            name: "Duplicate Upgrade", email: "upgrade@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+
+        _ = try contactService.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .unverified
+        )
+
+        let duplicateResult = try contactService.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .verified
+        )
+        guard case .duplicate(let upgradedContact) = duplicateResult else {
+            XCTFail("Expected .duplicate"); return
+        }
+
+        XCTAssertTrue(upgradedContact.isVerified)
+        XCTAssertTrue(contactService.contact(forFingerprint: upgradedContact.fingerprint)?.isVerified == true)
+    }
 }

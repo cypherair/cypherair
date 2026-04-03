@@ -9,20 +9,60 @@ import UniformTypeIdentifiers
 
 /// Unified text and file encryption view with segmented mode picker.
 struct EncryptView: View {
+    struct Configuration {
+        enum TogglePolicy {
+            case appDefault
+            case initial(Bool)
+            case fixed(Bool)
+
+            func initialValue(appDefault: Bool) -> Bool {
+                switch self {
+                case .appDefault:
+                    appDefault
+                case .initial(let value), .fixed(let value):
+                    value
+                }
+            }
+
+            var isLocked: Bool {
+                if case .fixed = self {
+                    return true
+                }
+                return false
+            }
+        }
+
+        var allowedModes: [EncryptMode] = EncryptMode.allCases
+        var prefilledPlaintext: String?
+        var initialRecipientFingerprints: [String] = []
+        var initialSignerFingerprint: String?
+        var signingPolicy: TogglePolicy = .initial(true)
+        var encryptToSelfPolicy: TogglePolicy = .appDefault
+        var onEncrypted: (@MainActor (Data) -> Void)?
+
+        static let `default` = Configuration()
+    }
+
+    enum EncryptMode: String, CaseIterable {
+        case text
+        case file
+
+        var label: String {
+            switch self {
+            case .text:
+                String(localized: "encrypt.mode.text", defaultValue: "Text")
+            case .file:
+                String(localized: "encrypt.mode.file", defaultValue: "File")
+            }
+        }
+    }
+
     @Environment(EncryptionService.self) private var encryptionService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(ContactService.self) private var contactService
     @Environment(AppConfiguration.self) private var config
 
-    enum EncryptMode: String, CaseIterable {
-        case text, file
-        var label: String {
-            switch self {
-            case .text: String(localized: "encrypt.mode.text", defaultValue: "Text")
-            case .file: String(localized: "encrypt.mode.file", defaultValue: "File")
-            }
-        }
-    }
+    let configuration: Configuration
 
     @State private var encryptMode: EncryptMode = .text
     @State private var plaintext = ""
@@ -33,23 +73,27 @@ struct EncryptView: View {
     @State private var encryptToSelf: Bool?
     @State private var encryptToSelfFingerprint: String?
     @State private var operation = OperationController()
-
-    // File mode state
     @State private var showFileImporter = false
     @State private var selectedFileURL: URL?
     @State private var selectedFileName: String?
     @State private var encryptedFileURL: URL?
     @State private var exportController = FileExportController()
+    @State private var showUnverifiedRecipientsWarning = false
+
+    init(configuration: Configuration = .default) {
+        self.configuration = configuration
+    }
 
     var body: some View {
         Form {
             Section {
                 Picker(String(localized: "encrypt.mode", defaultValue: "Mode"), selection: $encryptMode) {
-                    ForEach(EncryptMode.allCases, id: \.self) { mode in
+                    ForEach(configuration.allowedModes, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
+                .disabled(configuration.allowedModes.count == 1)
             }
 
             if encryptMode == .text {
@@ -74,12 +118,34 @@ struct EncryptView: View {
                             compatibilityIndicator(for: contact)
                             VStack(alignment: .leading) {
                                 Text(contact.displayName)
-                                Text(contact.profile.displayName)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                HStack(spacing: 6) {
+                                    Text(contact.profile.displayName)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    if !contact.isVerified {
+                                        Text(String(localized: "encrypt.contact.unverified", defaultValue: "Unverified"))
+                                            .font(.caption2.weight(.semibold))
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.orange.opacity(0.14), in: Capsule())
+                                            .foregroundStyle(.orange)
+                                    }
+                                }
                             }
                         }
                     }
+                }
+
+                if !selectedUnverifiedContacts.isEmpty {
+                    Label(
+                        String(
+                            localized: "encrypt.unverified.warning",
+                            defaultValue: "One or more selected recipients are still unverified. Verify their fingerprints before relying on them."
+                        ),
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
                 }
             } header: {
                 Text(String(localized: "encrypt.recipients", defaultValue: "Recipients"))
@@ -93,6 +159,7 @@ struct EncryptView: View {
                         set: { encryptToSelf = $0 }
                     )
                 )
+                .disabled(configuration.encryptToSelfPolicy.isLocked)
 
                 if (encryptToSelf ?? config.encryptToSelf) && keyManagement.keys.count > 1 {
                     Picker(
@@ -110,6 +177,7 @@ struct EncryptView: View {
                     String(localized: "encrypt.sign", defaultValue: "Sign Message"),
                     isOn: $signMessage
                 )
+                .disabled(configuration.signingPolicy.isLocked)
 
                 if signMessage && keyManagement.keys.count > 1 {
                     Picker(
@@ -126,11 +194,7 @@ struct EncryptView: View {
 
             Section {
                 Button {
-                    if encryptMode == .text {
-                        encryptText()
-                    } else {
-                        encryptFile()
-                    }
+                    requestEncrypt()
                 } label: {
                     if operation.isRunning {
                         HStack {
@@ -158,7 +222,6 @@ struct EncryptView: View {
                 .disabled(encryptButtonDisabled)
             }
 
-            // Text mode result
             if encryptMode == .text, let ciphertext, let ciphertextString = String(data: ciphertext, encoding: .utf8) {
                 Section {
                     Text(ciphertextString)
@@ -201,7 +264,6 @@ struct EncryptView: View {
                 }
             }
 
-            // File mode result
             if encryptMode == .file, encryptedFileURL != nil {
                 Section {
                     Button {
@@ -290,23 +352,53 @@ struct EncryptView: View {
                 operation.present(error: mapEncryptionError(exportError))
             }
         }
+        .confirmationDialog(
+            String(localized: "encrypt.unverified.confirm.title", defaultValue: "Use Unverified Recipients?"),
+            isPresented: $showUnverifiedRecipientsWarning,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "encrypt.unverified.confirm.action", defaultValue: "Encrypt Anyway")) {
+                performEncrypt()
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) { }
+        } message: {
+            Text(
+                String.localizedStringWithFormat(
+                    String(
+                        localized: "encrypt.unverified.confirm.message",
+                        defaultValue: "These recipients are not verified yet: %@. Continue only if you trust these keys."
+                    ),
+                    selectedUnverifiedContacts.map(\.displayName).joined(separator: ", ")
+                )
+            )
+        }
         .onAppear {
-            signerFingerprint = keyManagement.defaultKey?.fingerprint
-            encryptToSelfFingerprint = keyManagement.defaultKey?.fingerprint
+            encryptMode = configuration.allowedModes.first ?? .text
+
+            if plaintext.isEmpty, let prefilledPlaintext = configuration.prefilledPlaintext {
+                plaintext = prefilledPlaintext
+            }
+            if !configuration.initialRecipientFingerprints.isEmpty {
+                selectedRecipients = Set(configuration.initialRecipientFingerprints)
+            }
+
+            let defaultSigner = configuration.initialSignerFingerprint ?? keyManagement.defaultKey?.fingerprint
+            signerFingerprint = defaultSigner
+            encryptToSelfFingerprint = defaultSigner
+            signMessage = configuration.signingPolicy.initialValue(appDefault: true)
+            encryptToSelf = configuration.encryptToSelfPolicy.initialValue(appDefault: config.encryptToSelf)
         }
     }
-
-    // MARK: - Subviews
 
     @ViewBuilder
     private var textInputContent: some View {
         Section {
             TextEditor(text: $plaintext)
-                #if canImport(UIKit)
-                .frame(minHeight: 100)
-                #else
-                .frame(minHeight: 250)
-                #endif
+                .frame(
+                    minHeight: editorHeightRange.min,
+                    idealHeight: editorHeightRange.ideal,
+                    maxHeight: editorHeightRange.max
+                )
         } header: {
             Text(String(localized: "encrypt.plaintext", defaultValue: "Message"))
         }
@@ -335,8 +427,6 @@ struct EncryptView: View {
         }
     }
 
-    // MARK: - State
-
     private func compatibilityIndicator(for contact: Contact) -> some View {
         Group {
             if contact.isExpired || contact.isRevoked {
@@ -359,12 +449,42 @@ struct EncryptView: View {
         if operation.isRunning { return true }
         if selectedRecipients.isEmpty { return true }
         switch encryptMode {
-        case .text: return plaintext.isEmpty
-        case .file: return selectedFileURL == nil
+        case .text:
+            return plaintext.isEmpty
+        case .file:
+            return selectedFileURL == nil
         }
     }
 
-    // MARK: - Actions
+    private var selectedUnverifiedContacts: [Contact] {
+        contactService.contacts
+            .filter { selectedRecipients.contains($0.fingerprint) && !$0.isVerified }
+    }
+
+    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
+        #if canImport(UIKit)
+        (110, 160, 240)
+        #else
+        (150, 220, 320)
+        #endif
+    }
+
+    private func requestEncrypt() {
+        if !selectedUnverifiedContacts.isEmpty {
+            showUnverifiedRecipientsWarning = true
+            return
+        }
+
+        performEncrypt()
+    }
+
+    private func performEncrypt() {
+        if encryptMode == .text {
+            encryptText()
+        } else {
+            encryptFile()
+        }
+    }
 
     private func encryptText() {
         let service = encryptionService
@@ -375,14 +495,15 @@ struct EncryptView: View {
         let selfEncryptFp = selfEncrypt ? encryptToSelfFingerprint : nil
         ciphertext = nil
         operation.run(mapError: mapEncryptionError) {
-                let result = try await service.encryptText(
-                    text,
-                    recipientFingerprints: recipients,
-                    signWithFingerprint: signerFp,
-                    encryptToSelf: selfEncrypt,
-                    encryptToSelfFingerprint: selfEncryptFp
-                )
-                ciphertext = result
+            let result = try await service.encryptText(
+                text,
+                recipientFingerprints: recipients,
+                signWithFingerprint: signerFp,
+                encryptToSelf: selfEncrypt,
+                encryptToSelfFingerprint: selfEncryptFp
+            )
+            ciphertext = result
+            configuration.onEncrypted?(result)
         }
     }
 
