@@ -14,7 +14,8 @@ struct CypherAirApp: App {
     @State private var tutorialStore = TutorialSessionStore()
 
     /// Holds parsed key data and info for the import confirmation sheet.
-    private struct PendingImport {
+    private struct PendingImport: Identifiable {
+        let id = UUID()
         let keyData: Data
         let keyInfo: KeyInfo
         let profile: KeyProfile
@@ -53,31 +54,26 @@ struct CypherAirApp: App {
                         .environment(tutorialStore)
                         .interactiveDismissDisabled()
                 }
-                .sheet(isPresented: Binding(
-                    get: { pendingImport != nil },
-                    set: { if !$0 { pendingImport = nil } }
-                )) {
-                    if let pending = pendingImport {
-                        ImportConfirmView(
-                            keyInfo: pending.keyInfo,
-                            detectedProfile: pending.profile,
-                            onImportVerified: {
-                                completePendingImport(
-                                    pending,
-                                    verificationState: .verified
-                                )
-                            },
-                            onImportUnverified: {
-                                completePendingImport(
-                                    pending,
-                                    verificationState: .unverified
-                                )
-                            },
-                            onCancel: {
-                                pendingImport = nil
-                            }
-                        )
-                    }
+                .sheet(item: $pendingImport) { pending in
+                    ImportConfirmView(
+                        keyInfo: pending.keyInfo,
+                        detectedProfile: pending.profile,
+                        onImportVerified: {
+                            completePendingImport(
+                                pending,
+                                verificationState: .verified
+                            )
+                        },
+                        onImportUnverified: {
+                            completePendingImport(
+                                pending,
+                                verificationState: .unverified
+                            )
+                        },
+                        onCancel: {
+                            pendingImport = nil
+                        }
+                    )
                 }
                 .alert(
                     String(localized: "import.error.alertTitle", defaultValue: "Import Failed"),
