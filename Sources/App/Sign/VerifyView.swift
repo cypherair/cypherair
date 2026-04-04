@@ -32,6 +32,7 @@ struct VerifyView: View {
     @State private var originalFileName: String?
     @State private var signatureFileURL: URL?
     @State private var signatureFileName: String?
+    @State private var textInputSectionEpoch = 0
 
     var body: some View {
         Form {
@@ -207,6 +208,7 @@ struct VerifyView: View {
         } header: {
             Text(String(localized: "verify.input", defaultValue: "Signed Message"))
         }
+        .id(textInputSectionEpoch)
     }
 
     @ViewBuilder
@@ -316,6 +318,7 @@ struct VerifyView: View {
                 cleartextOriginalText = String(data: content, encoding: .utf8)
             }
             cleartextVerification = result.verification
+            textInputSectionEpoch &+= 1
         }
     }
 
@@ -407,6 +410,7 @@ struct VerifyView: View {
     private func invalidateCleartextVerificationState() {
         cleartextOriginalText = nil
         cleartextVerification = nil
+        textInputSectionEpoch &+= 1
     }
 
     private func withSecurityScopedAccess<T>(
