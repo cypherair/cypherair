@@ -33,6 +33,7 @@ struct SignView: View {
     @State private var selectedFileName: String?
     @State private var operation = OperationController()
     @State private var exportController = FileExportController()
+    @State private var textInputSectionEpoch = 0
 
     var body: some View {
         Form {
@@ -238,6 +239,7 @@ struct SignView: View {
         } header: {
             Text(String(localized: "sign.input", defaultValue: "Message to Sign"))
         }
+        .id(textInputSectionEpoch)
     }
 
     @ViewBuilder
@@ -292,6 +294,7 @@ struct SignView: View {
         operation.run(mapError: mapSigningError) {
             let signed = try await service.signCleartext(message, signerFingerprint: signerFp)
             signedMessage = String(data: signed, encoding: .utf8)
+            textInputSectionEpoch &+= 1
         }
     }
 

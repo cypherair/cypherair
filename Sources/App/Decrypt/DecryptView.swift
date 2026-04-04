@@ -63,6 +63,7 @@ struct DecryptView: View {
     @State private var pendingTextModeImport: PendingTextModeImport?
     @State private var showTextModeSuggestion = false
     @State private var exportController = FileExportController()
+    @State private var textInputSectionEpoch = 0
 
     init(configuration: Configuration = .default) {
         self.configuration = configuration
@@ -374,6 +375,7 @@ struct DecryptView: View {
         } header: {
             Text(String(localized: "decrypt.input", defaultValue: "Encrypted Message"))
         }
+        .id(textInputSectionEpoch)
     }
 
     @ViewBuilder
@@ -484,6 +486,7 @@ struct DecryptView: View {
         operation.run(mapError: mapDecryptError) {
             let result = try await service.parseRecipients(ciphertext: inputData)
             phase1Result = result
+            textInputSectionEpoch &+= 1
             configuration.onParsed?(result)
         }
     }
@@ -687,6 +690,7 @@ struct DecryptView: View {
         decryptedText = nil
         signatureVerification = nil
         phase1Result = nil
+        textInputSectionEpoch &+= 1
     }
 
     private func invalidateFileInputState(deleteTemporaryOutput: Bool) {

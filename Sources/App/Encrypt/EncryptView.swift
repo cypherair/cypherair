@@ -79,6 +79,7 @@ struct EncryptView: View {
     @State private var encryptedFileURL: URL?
     @State private var exportController = FileExportController()
     @State private var showUnverifiedRecipientsWarning = false
+    @State private var textInputSectionEpoch = 0
 
     init(configuration: Configuration = .default) {
         self.configuration = configuration
@@ -405,6 +406,7 @@ struct EncryptView: View {
         } header: {
             Text(String(localized: "encrypt.plaintext", defaultValue: "Message"))
         }
+        .id(textInputSectionEpoch)
     }
 
     @ViewBuilder
@@ -506,6 +508,7 @@ struct EncryptView: View {
                 encryptToSelfFingerprint: selfEncryptFp
             )
             ciphertext = result
+            textInputSectionEpoch &+= 1
             configuration.onEncrypted?(result)
         }
     }
