@@ -14,6 +14,7 @@ struct AddContactView: View {
         var prefilledArmoredText: String?
         var verificationPolicy: VerificationPolicy = .allowUnverified
         var onImported: (@MainActor (Contact) -> Void)?
+        var onImportConfirmationRequested: (@MainActor (ImportConfirmationRequest) -> Void)?
 
         static let `default` = Configuration()
     }
@@ -21,6 +22,7 @@ struct AddContactView: View {
     @Environment(ContactService.self) private var contactService
     @Environment(QRService.self) private var qrService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.importConfirmationCoordinator) private var importConfirmationCoordinator
 
     enum ImportMode: String, CaseIterable {
         case paste
@@ -39,13 +41,6 @@ struct AddContactView: View {
         }
     }
 
-    private struct PendingImportPreview: Identifiable {
-        let id = UUID()
-        let keyData: Data
-        let keyInfo: KeyInfo
-        let profile: KeyProfile
-    }
-
     private struct PendingKeyUpdate {
         let newContact: Contact
         let existingContact: Contact
@@ -58,7 +53,6 @@ struct AddContactView: View {
     @State private var armoredText = ""
     @State private var error: CypherAirError?
     @State private var showError = false
-    @State private var pendingImportPreview: PendingImportPreview?
     @State private var pendingKeyUpdate: PendingKeyUpdate?
     @State private var showKeyUpdateAlert = false
     @State private var selectedPhotoItem: PhotosPickerItem?
@@ -66,12 +60,24 @@ struct AddContactView: View {
     @State private var showFileImporter = false
     @State private var importedKeyData: Data?
     @State private var importedFileName: String?
+    @State private var fallbackImportConfirmationCoordinator = ImportConfirmationCoordinator()
 
     init(configuration: Configuration = .default) {
         self.configuration = configuration
     }
 
     var body: some View {
+        if importConfirmationCoordinator == nil,
+           configuration.onImportConfirmationRequested == nil {
+            ImportConfirmationSheetHost(coordinator: fallbackImportConfirmationCoordinator) {
+                formContent
+            }
+        } else {
+            formContent
+        }
+    }
+
+    private var formContent: some View {
         Form {
             Section {
                 Picker(String(localized: "addcontact.mode", defaultValue: "Import Method"), selection: $importMode) {
@@ -118,27 +124,6 @@ struct AddContactView: View {
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: { err in
             Text(err.localizedDescription)
-        }
-        .sheet(item: $pendingImportPreview) { pendingImportPreview in
-            ImportConfirmView(
-                keyInfo: pendingImportPreview.keyInfo,
-                detectedProfile: pendingImportPreview.profile,
-                onImportVerified: {
-                    completeAddContact(
-                        pendingImportPreview,
-                        verificationState: .verified
-                    )
-                },
-                onImportUnverified: configuration.verificationPolicy == .allowUnverified ? {
-                    completeAddContact(
-                        pendingImportPreview,
-                        verificationState: .unverified
-                    )
-                } : nil,
-                onCancel: {
-                    self.pendingImportPreview = nil
-                }
-            )
         }
         .alert(
             String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
@@ -281,11 +266,31 @@ struct AddContactView: View {
             let data = importedKeyData ?? Data(armoredText.utf8)
             let keyInfo = try qrService.inspectKeyInfo(keyData: data)
             let profile = try qrService.detectKeyProfile(keyData: data)
-            pendingImportPreview = PendingImportPreview(
+            let request = ImportConfirmationRequest(
                 keyData: data,
                 keyInfo: keyInfo,
-                profile: profile
+                profile: profile,
+                allowsUnverifiedImport: configuration.verificationPolicy == .allowUnverified,
+                onImportVerified: {
+                    completeAddContact(
+                        keyData: data,
+                        verificationState: .verified
+                    )
+                },
+                onImportUnverified: {
+                    completeAddContact(
+                        keyData: data,
+                        verificationState: .unverified
+                    )
+                },
+                onCancel: { }
             )
+
+            if let onImportConfirmationRequested = configuration.onImportConfirmationRequested {
+                onImportConfirmationRequested(request)
+            } else {
+                activeImportConfirmationCoordinator.present(request)
+            }
         } catch {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
             showError = true
@@ -293,17 +298,17 @@ struct AddContactView: View {
     }
 
     private func completeAddContact(
-        _ pendingImportPreview: PendingImportPreview,
+        keyData: Data,
         verificationState: ContactVerificationState
     ) {
         do {
             let result = try contactService.addContact(
-                publicKeyData: pendingImportPreview.keyData,
+                publicKeyData: keyData,
                 verificationState: verificationState
             )
             switch result {
             case .added(let contact), .duplicate(let contact):
-                self.pendingImportPreview = nil
+                activeImportConfirmationCoordinator.dismiss()
                 Task { @MainActor in
                     configuration.onImported?(contact)
                 }
@@ -311,7 +316,7 @@ struct AddContactView: View {
                     dismiss()
                 }
             case .keyUpdateDetected(let newContact, let existingContact, let keyData):
-                self.pendingImportPreview = nil
+                activeImportConfirmationCoordinator.dismiss()
                 pendingKeyUpdate = PendingKeyUpdate(
                     newContact: newContact,
                     existingContact: existingContact,
@@ -321,9 +326,13 @@ struct AddContactView: View {
             }
         } catch {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-            self.pendingImportPreview = nil
+            activeImportConfirmationCoordinator.dismiss()
             showError = true
         }
+    }
+
+    private var activeImportConfirmationCoordinator: ImportConfirmationCoordinator {
+        importConfirmationCoordinator ?? fallbackImportConfirmationCoordinator
     }
 
     private func processQRPhoto(_ item: PhotosPickerItem) {

@@ -7,19 +7,10 @@ struct CypherAirApp: App {
 
     @State private var container: AppContainer
 
-    /// Pending public key import awaiting user confirmation (Issue #3).
-    @State private var pendingImport: PendingImport?
     @State private var importError: CypherAirError?
     @State private var loadError: String?
     @State private var tutorialStore = TutorialSessionStore()
-
-    /// Holds parsed key data and info for the import confirmation sheet.
-    private struct PendingImport: Identifiable {
-        let id = UUID()
-        let keyData: Data
-        let keyInfo: KeyInfo
-        let profile: KeyProfile
-    }
+    @State private var importConfirmationCoordinator = ImportConfirmationCoordinator()
 
     // MARK: - Init
 
@@ -35,45 +26,26 @@ struct CypherAirApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .privacyScreen()
-                .optionalTint(container.config.colorTheme.accentColor)
-                .environment(container.config)
-                .environment(container.keyManagement)
-                .environment(container.contactService)
-                .environment(container.encryptionService)
-                .environment(container.decryptionService)
-                .environment(container.signingService)
-                .environment(container.qrService)
-                .environment(container.selfTestService)
-                .environment(container.authManager)
-                .environment(tutorialStore)
+            ImportConfirmationSheetHost(coordinator: importConfirmationCoordinator) {
+                ContentView()
+                    .privacyScreen()
+                    .optionalTint(container.config.colorTheme.accentColor)
+                    .environment(container.config)
+                    .environment(container.keyManagement)
+                    .environment(container.contactService)
+                    .environment(container.encryptionService)
+                    .environment(container.decryptionService)
+                    .environment(container.signingService)
+                    .environment(container.qrService)
+                    .environment(container.selfTestService)
+                    .environment(container.authManager)
+                    .environment(tutorialStore)
+            }
                 .sheet(isPresented: showOnboarding) {
                     OnboardingView()
                         .environment(container.config)
                         .environment(tutorialStore)
                         .interactiveDismissDisabled()
-                }
-                .sheet(item: $pendingImport) { pending in
-                    ImportConfirmView(
-                        keyInfo: pending.keyInfo,
-                        detectedProfile: pending.profile,
-                        onImportVerified: {
-                            completePendingImport(
-                                pending,
-                                verificationState: .verified
-                            )
-                        },
-                        onImportUnverified: {
-                            completePendingImport(
-                                pending,
-                                verificationState: .unverified
-                            )
-                        },
-                        onCancel: {
-                            pendingImport = nil
-                        }
-                    )
                 }
                 .alert(
                     String(localized: "import.error.alertTitle", defaultValue: "Import Failed"),
@@ -158,20 +130,39 @@ struct CypherAirApp: App {
             let publicKeyData = try container.qrService.parseImportURL(url)
             let keyInfo = try container.qrService.inspectKeyInfo(keyData: publicKeyData)
             let profile = try container.qrService.detectKeyProfile(keyData: publicKeyData)
-            // Show confirmation sheet — do NOT add directly (PRD Section 4.2).
-            pendingImport = PendingImport(keyData: publicKeyData, keyInfo: keyInfo, profile: profile)
+            importConfirmationCoordinator.present(
+                ImportConfirmationRequest(
+                    keyData: publicKeyData,
+                    keyInfo: keyInfo,
+                    profile: profile,
+                    allowsUnverifiedImport: true,
+                    onImportVerified: {
+                        completePendingImport(
+                            keyData: publicKeyData,
+                            verificationState: .verified
+                        )
+                    },
+                    onImportUnverified: {
+                        completePendingImport(
+                            keyData: publicKeyData,
+                            verificationState: .unverified
+                        )
+                    },
+                    onCancel: { }
+                )
+            )
         } catch {
             importError = CypherAirError.from(error) { _ in .invalidQRCode }
         }
     }
 
     private func completePendingImport(
-        _ pending: PendingImport,
+        keyData: Data,
         verificationState: ContactVerificationState
     ) {
         do {
             let result = try container.contactService.addContact(
-                publicKeyData: pending.keyData,
+                publicKeyData: keyData,
                 verificationState: verificationState
             )
             if case .keyUpdateDetected(let newContact, let existingContact, let keyData) = result {
@@ -185,7 +176,7 @@ struct CypherAirApp: App {
         } catch {
             importError = CypherAirError.from(error) { _ in .invalidQRCode }
         }
-        pendingImport = nil
+        importConfirmationCoordinator.dismiss()
     }
 }
 

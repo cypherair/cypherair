@@ -1,7 +1,24 @@
 import SwiftUI
 
+@MainActor
+struct AuthModeChangeConfirmationRequest: Identifiable {
+    let id = UUID()
+    let pendingMode: AuthenticationMode
+    let title: String
+    let message: String
+    let requiresRiskAcknowledgement: Bool
+    let onConfirm: @MainActor () -> Void
+    let onCancel: @MainActor () -> Void
+}
+
 /// Settings screen with auth mode, grace period, and other preferences.
 struct SettingsView: View {
+    struct Configuration {
+        var onAuthModeConfirmationRequested: (@MainActor (AuthModeChangeConfirmationRequest) -> Void)?
+
+        static let `default` = Configuration()
+    }
+
     @Environment(AppConfiguration.self) private var config
     @Environment(AuthenticationManager.self) private var authManager
     @Environment(KeyManagementService.self) private var keyManagement
@@ -15,7 +32,7 @@ struct SettingsView: View {
     @State private var switchError: String?
     @State private var showSwitchError = false
     @State private var showOnboarding = false
-    @State private var showTutorial = false
+    @State private var showTutorialOnboarding = false
     @State private var riskAcknowledged = false
     #if os(macOS)
     @State private var showThemePicker = false
@@ -23,6 +40,12 @@ struct SettingsView: View {
     @State private var showAbout = false
     @State private var showLicense = false
     #endif
+
+    let configuration: Configuration
+
+    init(configuration: Configuration = .default) {
+        self.configuration = configuration
+    }
 
     var body: some View {
         @Bindable var config = config
@@ -35,8 +58,7 @@ struct SettingsView: View {
                         get: { config.authMode },
                         set: { newMode in
                             guard newMode != config.authMode else { return }
-                            pendingMode = newMode
-                            showModeWarning = true
+                            handleAuthModeSelection(newMode)
                         }
                     )
                 ) {
@@ -130,10 +152,10 @@ struct SettingsView: View {
                     )
                 }
                 Button {
-                    showTutorial = true
+                    showTutorialOnboarding = true
                 } label: {
                     Label(
-                        String(localized: "guidedTutorial.settings.entry", defaultValue: "Guided Tutorial"),
+                        guidedTutorialEntryTitle,
                         systemImage: "testtube.2"
                     )
                 }
@@ -264,22 +286,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showOnboarding) {
             OnboardingView()
         }
-        #if canImport(UIKit)
-        .if(sizeClass == .compact) { view in
-            view.fullScreenCover(isPresented: $showTutorial) {
-                TutorialView()
-            }
+        .sheet(isPresented: $showTutorialOnboarding) {
+            OnboardingView(initialPage: 2)
         }
-        .if(sizeClass != .compact) { view in
-            view.sheet(isPresented: $showTutorial) {
-                TutorialView()
-            }
-        }
-        #else
-        .sheet(isPresented: $showTutorial) {
-            TutorialView()
-        }
-        #endif
         #if os(macOS)
         .sheet(isPresented: $showThemePicker) {
             NavigationStack {
@@ -340,37 +349,35 @@ struct SettingsView: View {
         keyManagement.keys.contains(where: \.isBackedUp)
     }
 
+    private var guidedTutorialEntryTitle: String {
+        switch config.guidedTutorialCompletionState {
+        case .neverCompleted:
+            String(localized: "guidedTutorial.settings.entry", defaultValue: "Guided Tutorial")
+        case .completedCurrentVersion:
+            String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
+        case .completedPreviousVersion:
+            String(localized: "guidedTutorial.updated.entry", defaultValue: "Updated Guided Tutorial Available")
+        }
+    }
+
     private var shouldUseModeSheet: Bool {
         pendingMode == .highSecurity && !hasBackup
     }
 
     private var modeWarningTitle: String {
-        if pendingMode == .highSecurity {
-            return String(localized: "settings.mode.highWarning.title", defaultValue: "Enable High Security Mode")
-        }
-        return String(localized: "settings.mode.standardWarning.title", defaultValue: "Switch to Standard Mode")
+        warningTitle(for: pendingMode ?? config.authMode)
     }
 
     private var modeWarningMessage: String {
-        if pendingMode == .highSecurity {
-            if !hasBackup {
-                #if os(macOS)
-                return String(localized: "settings.mode.highWarning.noBackup.mac", defaultValue: "WARNING: In High Security mode, if Touch ID becomes unavailable, you will be unable to access your private keys. You have NOT backed up any keys. If biometrics fail, your keys will be permanently inaccessible. Back up your keys first, or proceed at your own risk.")
-                #else
-                return String(localized: "settings.mode.highWarning.noBackup", defaultValue: "WARNING: In High Security mode, if Face ID / Touch ID becomes unavailable, you will be unable to access your private keys. You have NOT backed up any keys. If biometrics fail, your keys will be permanently inaccessible. Back up your keys first, or proceed at your own risk.")
-                #endif
-            }
-            #if os(macOS)
-            return String(localized: "settings.mode.highWarning.message.mac", defaultValue: "In High Security mode, if Touch ID becomes unavailable, you will be unable to access your private keys. Ensure you have a current backup. Biometric authentication is required to confirm this change.")
-            #else
-            return String(localized: "settings.mode.highWarning.message", defaultValue: "In High Security mode, if Face ID / Touch ID becomes unavailable, you will be unable to access your private keys. Ensure you have a current backup. Biometric authentication is required to confirm this change.")
-            #endif
-        }
-        return String(localized: "settings.mode.standardWarning.message", defaultValue: "Switching to Standard Mode will allow device passcode as a fallback for authentication. Biometric authentication is required to confirm this change.")
+        warningMessage(for: pendingMode ?? config.authMode, hasBackup: hasBackup)
     }
 
     private func performModeSwitch() {
         guard let newMode = pendingMode else { return }
+        performModeSwitch(to: newMode)
+    }
+
+    private func performModeSwitch(to newMode: AuthenticationMode) {
         isSwitching = true
         let fingerprints = keyManagement.keys.map(\.fingerprint)
         let backed = hasBackup
@@ -392,6 +399,57 @@ struct SettingsView: View {
             pendingMode = nil
             isSwitching = false
         }
+    }
+
+    private func handleAuthModeSelection(_ newMode: AuthenticationMode) {
+        if let onAuthModeConfirmationRequested = configuration.onAuthModeConfirmationRequested {
+            onAuthModeConfirmationRequested(makeAuthModeChangeRequest(for: newMode))
+        } else {
+            pendingMode = newMode
+            showModeWarning = true
+        }
+    }
+
+    private func makeAuthModeChangeRequest(for newMode: AuthenticationMode) -> AuthModeChangeConfirmationRequest {
+        AuthModeChangeConfirmationRequest(
+            pendingMode: newMode,
+            title: warningTitle(for: newMode),
+            message: warningMessage(for: newMode, hasBackup: hasBackup),
+            requiresRiskAcknowledgement: newMode == .highSecurity && !hasBackup,
+            onConfirm: {
+                pendingMode = newMode
+                performModeSwitch(to: newMode)
+            },
+            onCancel: {
+                pendingMode = nil
+                riskAcknowledged = false
+            }
+        )
+    }
+
+    private func warningTitle(for mode: AuthenticationMode) -> String {
+        if mode == .highSecurity {
+            return String(localized: "settings.mode.highWarning.title", defaultValue: "Enable High Security Mode")
+        }
+        return String(localized: "settings.mode.standardWarning.title", defaultValue: "Switch to Standard Mode")
+    }
+
+    private func warningMessage(for mode: AuthenticationMode, hasBackup: Bool) -> String {
+        if mode == .highSecurity {
+            if !hasBackup {
+                #if os(macOS)
+                return String(localized: "settings.mode.highWarning.noBackup.mac", defaultValue: "WARNING: In High Security mode, if Touch ID becomes unavailable, you will be unable to access your private keys. You have NOT backed up any keys. If biometrics fail, your keys will be permanently inaccessible. Back up your keys first, or proceed at your own risk.")
+                #else
+                return String(localized: "settings.mode.highWarning.noBackup", defaultValue: "WARNING: In High Security mode, if Face ID / Touch ID becomes unavailable, you will be unable to access your private keys. You have NOT backed up any keys. If biometrics fail, your keys will be permanently inaccessible. Back up your keys first, or proceed at your own risk.")
+                #endif
+            }
+            #if os(macOS)
+            return String(localized: "settings.mode.highWarning.message.mac", defaultValue: "In High Security mode, if Touch ID becomes unavailable, you will be unable to access your private keys. Ensure you have a current backup. Biometric authentication is required to confirm this change.")
+            #else
+            return String(localized: "settings.mode.highWarning.message", defaultValue: "In High Security mode, if Face ID / Touch ID becomes unavailable, you will be unable to access your private keys. Ensure you have a current backup. Biometric authentication is required to confirm this change.")
+            #endif
+        }
+        return String(localized: "settings.mode.standardWarning.message", defaultValue: "Switching to Standard Mode will allow device passcode as a fallback for authentication. Biometric authentication is required to confirm this change.")
     }
 }
 

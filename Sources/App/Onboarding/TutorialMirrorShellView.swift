@@ -5,12 +5,11 @@ struct TutorialMirrorShellView: View {
     @Environment(TutorialSessionStore.self) private var tutorialStore
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    @State private var selectedTab: AppShellTab = .home
-
     var body: some View {
         if let container = tutorialStore.container {
             TutorialShellTabsView(
-                selectedTab: $selectedTab,
+                selectedTab: selectedTabBinding,
+                routePath: routePathBinding,
                 sizeClass: sizeClass
             )
             .environment(tutorialStore)
@@ -24,11 +23,45 @@ struct TutorialMirrorShellView: View {
             .environment(container.selfTestService)
             .environment(container.authManager)
             .onAppear {
-                selectedTab = initialSelection
-                tutorialStore.noteVisibleSurface(tab: selectedTab, route: nil)
+                tutorialStore.noteVisibleSurface(
+                    tab: tutorialStore.selectedTab,
+                    route: tutorialStore.routePath.last
+                )
             }
-            .onChange(of: selectedTab) { _, newTab in
-                tutorialStore.noteVisibleSurface(tab: newTab, route: nil)
+            .sheet(item: activeModalBinding) { modal in
+                switch modal {
+                case .importConfirmation(let request):
+                    ImportConfirmView(
+                        keyInfo: request.keyInfo,
+                        detectedProfile: request.profile,
+                        onImportVerified: {
+                            let action = request.onImportVerified
+                            tutorialStore.dismissModal()
+                            action()
+                        },
+                        onImportUnverified: request.allowsUnverifiedImport ? {
+                            let action = request.onImportUnverified
+                            tutorialStore.dismissModal()
+                            action()
+                        } : nil,
+                        onCancel: {
+                            let action = request.onCancel
+                            tutorialStore.dismissModal()
+                            action()
+                        }
+                    )
+                case .postGenerationPrompt(let identity):
+                    AppRouteHost(resolver: routeResolver(for: tutorialStore.selectedTab)) {
+                        PostGenerationPromptView(identity: identity)
+                    }
+                case .authModeConfirmation(let request):
+                    NavigationStack {
+                        TutorialAuthModeConfirmationView(request: request)
+                    }
+                    #if canImport(UIKit)
+                    .presentationDetents([.medium, .large])
+                    #endif
+                }
             }
         } else {
             ContentUnavailableView {
@@ -46,20 +79,36 @@ struct TutorialMirrorShellView: View {
         }
     }
 
-    private var initialSelection: AppShellTab {
-        guard let task = tutorialStore.session.activeTask else { return .home }
+    private var selectedTabBinding: Binding<AppShellTab> {
+        Binding(
+            get: { tutorialStore.selectedTab },
+            set: { tutorialStore.selectTab($0) }
+        )
+    }
 
-        switch task {
-        case .generateAliceKey, .exportBackup:
-            return .keys
-        case .importBobKey:
-            return .contacts
-        case .composeAndEncryptMessage, .parseRecipients, .decryptMessage:
-            return .home
-        case .enableHighSecurity:
-            return .settings
-        case .understandSandbox:
-            return .home
+    private var routePathBinding: Binding<[AppRoute]> {
+        Binding(
+            get: { tutorialStore.routePath },
+            set: { tutorialStore.setRoutePath($0) }
+        )
+    }
+
+    private var activeModalBinding: Binding<TutorialModal?> {
+        Binding(
+            get: { tutorialStore.activeModal },
+            set: { if $0 == nil { tutorialStore.dismissModal() } }
+        )
+    }
+
+    private func routeResolver(for selectedTab: AppShellTab) -> AppRouteDestinationResolver {
+        AppRouteDestinationResolver { route in
+            AnyView(
+                TutorialRouteDestinationView(
+                    route: route,
+                    selectedTab: selectedTab,
+                    sizeClass: sizeClass
+                )
+            )
         }
     }
 }
@@ -69,6 +118,7 @@ private struct TutorialShellTabsView: View {
     @Environment(TutorialSessionStore.self) private var tutorialStore
 
     @Binding var selectedTab: AppShellTab
+    @Binding var routePath: [AppRoute]
     let sizeClass: UserInterfaceSizeClass?
 
     var body: some View {
@@ -80,6 +130,9 @@ private struct TutorialShellTabsView: View {
     }
 
     private var currentGuidance: TutorialGuidance? {
+        if tutorialStore.activeModal != nil {
+            return nil
+        }
         if let activeTask = tutorialStore.session.activeTask,
            tutorialStore.isCompleted(activeTask) {
             return nil
@@ -228,7 +281,7 @@ private struct TutorialShellTabsView: View {
         switch (tutorialStore.session.activeTask, tab) {
         case (.composeAndEncryptMessage?, .encrypt) where sizeClass != .compact:
             return AnyView(
-                AppRouteHost(resolver: routeResolver) {
+                AppRouteHost(resolver: routeResolver, path: $routePath) {
                     TutorialSurfaceView(tab: tab, route: nil) {
                         TutorialTaskHostView(task: .composeAndEncryptMessage) {
                             EncryptView(configuration: tutorialStore.encryptConfiguration())
@@ -238,7 +291,7 @@ private struct TutorialShellTabsView: View {
             )
         case (.parseRecipients?, .decrypt) where sizeClass != .compact:
             return AnyView(
-                AppRouteHost(resolver: routeResolver) {
+                AppRouteHost(resolver: routeResolver, path: $routePath) {
                     TutorialSurfaceView(tab: tab, route: nil) {
                         TutorialTaskHostView(task: .parseRecipients) {
                             DecryptView(configuration: tutorialStore.decryptConfiguration(for: .parseRecipients))
@@ -248,7 +301,7 @@ private struct TutorialShellTabsView: View {
             )
         case (.decryptMessage?, .decrypt) where sizeClass != .compact:
             return AnyView(
-                AppRouteHost(resolver: routeResolver) {
+                AppRouteHost(resolver: routeResolver, path: $routePath) {
                     TutorialSurfaceView(tab: tab, route: nil) {
                         TutorialTaskHostView(task: .decryptMessage) {
                             DecryptView(configuration: tutorialStore.decryptConfiguration(for: .decryptMessage))
@@ -258,7 +311,7 @@ private struct TutorialShellTabsView: View {
             )
         case (.enableHighSecurity?, .settings):
             return AnyView(
-                AppRouteHost(resolver: routeResolver) {
+                AppRouteHost(resolver: routeResolver, path: $routePath) {
                     TutorialSurfaceView(tab: tab, route: nil) {
                         TutorialSettingsTaskView()
                     }
@@ -274,7 +327,7 @@ private struct TutorialShellTabsView: View {
         case .home:
             return AnyView(
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver) {
+                    AppRouteHost(resolver: routeResolver, path: $routePath) {
                         HomeView()
                     }
                 }
@@ -282,7 +335,7 @@ private struct TutorialShellTabsView: View {
         case .keys:
             return AnyView(
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver) {
+                    AppRouteHost(resolver: routeResolver, path: $routePath) {
                         MyKeysView()
                     }
                 }
@@ -290,7 +343,7 @@ private struct TutorialShellTabsView: View {
         case .contacts:
             return AnyView(
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver) {
+                    AppRouteHost(resolver: routeResolver, path: $routePath) {
                         ContactsView()
                     }
                 }
@@ -298,7 +351,7 @@ private struct TutorialShellTabsView: View {
         case .settings:
             return AnyView(
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver) {
+                    AppRouteHost(resolver: routeResolver, path: $routePath) {
                         SettingsView()
                     }
                 }
@@ -306,7 +359,7 @@ private struct TutorialShellTabsView: View {
         case .encrypt:
             return AnyView(
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver) {
+                    AppRouteHost(resolver: routeResolver, path: $routePath) {
                         EncryptView()
                     }
                 }
@@ -314,7 +367,7 @@ private struct TutorialShellTabsView: View {
         case .decrypt:
             return AnyView(
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver) {
+                    AppRouteHost(resolver: routeResolver, path: $routePath) {
                         DecryptView()
                     }
                 }
@@ -322,7 +375,7 @@ private struct TutorialShellTabsView: View {
         case .sign:
             return AnyView(
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver) {
+                    AppRouteHost(resolver: routeResolver, path: $routePath) {
                         SignView()
                     }
                 }
@@ -330,7 +383,7 @@ private struct TutorialShellTabsView: View {
         case .verify:
             return AnyView(
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver) {
+                    AppRouteHost(resolver: routeResolver, path: $routePath) {
                         VerifyView()
                     }
                 }
@@ -555,12 +608,59 @@ private struct TutorialSettingsTaskView: View {
 
     var body: some View {
         TutorialTaskHostView(task: .enableHighSecurity) {
-            SettingsView()
+            SettingsView(configuration: tutorialStore.settingsConfiguration())
                 .onChange(of: config.authMode) { _, newMode in
                     if newMode == .highSecurity {
                         tutorialStore.noteHighSecurityEnabled(newMode)
                     }
                 }
+        }
+    }
+}
+
+@MainActor
+private struct TutorialAuthModeConfirmationView: View {
+    @Environment(TutorialSessionStore.self) private var tutorialStore
+
+    let request: AuthModeChangeConfirmationRequest
+    @State private var riskAcknowledged = false
+
+    var body: some View {
+        Form {
+            Section {
+                Text(request.message)
+                    .font(.callout)
+            }
+
+            if request.requiresRiskAcknowledgement {
+                Section {
+                    Toggle(isOn: $riskAcknowledged) {
+                        Text(String(localized: "settings.mode.riskAck", defaultValue: "I understand that if biometrics become unavailable, I will lose access to my private keys"))
+                            .font(.callout)
+                    }
+                }
+            }
+
+            Section {
+                Button(String(localized: "settings.mode.confirm", defaultValue: "Switch Mode"), role: .destructive) {
+                    tutorialStore.dismissModal()
+                    request.onConfirm()
+                }
+                .disabled(request.requiresRiskAcknowledgement && !riskAcknowledged)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .navigationTitle(request.title)
+        #if canImport(UIKit)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                    tutorialStore.dismissModal()
+                    request.onCancel()
+                }
+            }
         }
     }
 }

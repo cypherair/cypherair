@@ -134,4 +134,110 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertTrue(store.isCompleted(.enableHighSecurity))
         XCTAssertEqual(store.session.artifacts.authMode, .highSecurity)
     }
+
+    func test_tutorialSessionStore_finalCompletion_marksCurrentTutorialVersion() {
+        let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
+        let config = AppConfiguration(defaults: defaults)
+        let store = TutorialSessionStore()
+        store.configurePersistence(appConfiguration: config)
+
+        completeTutorialFlow(store: store)
+
+        XCTAssertEqual(config.guidedTutorialCompletedVersion, GuidedTutorialVersion.current)
+        XCTAssertTrue(config.hasCompletedCurrentGuidedTutorialVersion)
+    }
+
+    func test_tutorialSessionStore_incompleteFlowDoesNotMarkTutorialCompleted() async throws {
+        let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
+        let config = AppConfiguration(defaults: defaults)
+        let store = TutorialSessionStore()
+        store.configurePersistence(appConfiguration: config)
+
+        store.ensureSession()
+        let container = try XCTUnwrap(store.container)
+        let alice = try await container.keyManagement.generateKey(
+            name: "Alice Demo",
+            email: "alice@demo.invalid",
+            expirySeconds: nil,
+            profile: .advanced,
+            authMode: .standard
+        )
+        await store.noteAliceGenerated(alice)
+        store.dismissShell()
+
+        XCTAssertEqual(config.guidedTutorialCompletedVersion, 0)
+        XCTAssertEqual(config.guidedTutorialCompletionState, .neverCompleted)
+    }
+
+    func test_tutorialSessionStore_dismissShellAfterFinalTaskShowsCompletionView() async {
+        let store = TutorialSessionStore()
+        store.ensureSession()
+        completeTutorialFlow(store: store)
+        await store.openTask(.enableHighSecurity)
+
+        store.dismissShell()
+
+        XCTAssertFalse(store.session.isShellPresented)
+        XCTAssertTrue(store.isShowingCompletionView)
+    }
+
+    func test_tutorialSessionStore_selectTabClearsRouteAndModalState() {
+        let store = TutorialSessionStore()
+        store.ensureSession()
+
+        store.setRoutePath([.addContact])
+        store.presentImportConfirmation(makeImportConfirmationRequest())
+
+        XCTAssertEqual(store.routePath, [.addContact])
+        XCTAssertNotNil(store.activeModal)
+
+        store.selectTab(.contacts)
+
+        XCTAssertEqual(store.selectedTab, .contacts)
+        XCTAssertTrue(store.routePath.isEmpty)
+        XCTAssertNil(store.activeModal)
+    }
+
+    func test_tutorialSessionStore_dismissShellClearsTutorialNavigationState() async {
+        let store = TutorialSessionStore()
+        await store.openTask(.importBobKey)
+        store.setRoutePath([.addContact])
+        store.presentImportConfirmation(makeImportConfirmationRequest())
+
+        store.dismissShell()
+
+        XCTAssertFalse(store.session.isShellPresented)
+        XCTAssertEqual(store.selectedTab, .home)
+        XCTAssertTrue(store.routePath.isEmpty)
+        XCTAssertNil(store.activeModal)
+    }
+
+    private func completeTutorialFlow(store: TutorialSessionStore) {
+        for task in TutorialTaskID.allCases {
+            store.markCompletedForTesting(task)
+        }
+    }
+
+    private func makeImportConfirmationRequest() -> ImportConfirmationRequest {
+        ImportConfirmationRequest(
+            keyData: Data("demo".utf8),
+            keyInfo: KeyInfo(
+                fingerprint: "abcdef1234567890",
+                keyVersion: 6,
+                userId: "Bob Demo <bob@demo.invalid>",
+                hasEncryptionSubkey: true,
+                isRevoked: false,
+                isExpired: false,
+                profile: .advanced,
+                primaryAlgo: "Ed448",
+                subkeyAlgo: "X448",
+                expiryTimestamp: nil
+            ),
+            profile: .advanced,
+            allowsUnverifiedImport: false,
+            onImportVerified: { },
+            onImportUnverified: { },
+            onCancel: { }
+        )
+    }
 }

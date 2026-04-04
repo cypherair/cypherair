@@ -3878,6 +3878,125 @@
         }
       }
     },
+    "guidedTutorial.complete.enterApp" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Using CypherAir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始使用 CypherAir"
+          }
+        }
+      }
+    },
+    "guidedTutorial.completion.badge" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutorial Complete"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "教程已完成"
+          }
+        }
+      }
+    },
+    "guidedTutorial.completion.body" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You completed the Guided Tutorial in a safe sandbox. The real app is ready for your own keys and messages, and none of the tutorial data was saved into your real workspace."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已经在安全的沙箱环境中完成了引导教程。现在可以开始使用真实应用创建自己的密钥和消息，而且教程数据没有保存到你的真实空间中。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.completion.next.header" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Steps"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一步"
+          }
+        }
+      }
+    },
+    "guidedTutorial.completion.next.realKey" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create your real encryption key from the Keys tab when you're ready."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准备好后，可以从“密钥”标签页创建你的真实加密密钥。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.completion.next.replay" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can replay the Guided Tutorial any time from Settings."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你可以随时从“设置”中重新体验引导教程。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.completion.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're ready to start using CypherAir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已经可以开始使用 CypherAir"
+          }
+        }
+      }
+    },
     "guidedTutorial.contacts.entry" : {
       "localizations" : {
         "en" : {
@@ -4022,6 +4141,23 @@
         }
       }
     },
+    "guidedTutorial.finish" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finish Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成教程"
+          }
+        }
+      }
+    },
     "guidedTutorial.hero.body" : {
       "localizations" : {
         "en" : {
@@ -4102,6 +4238,22 @@
         }
       }
     },
+    "guidedTutorial.keepExploring" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Exploring"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续查看"
+          }
+        }
+      }
+    },
     "guidedTutorial.keys.alice" : {
       "localizations" : {
         "en" : {
@@ -4146,22 +4298,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "检查预填的 Alice 身份信息并生成密钥。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.keepExploring" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keep Exploring"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "继续查看"
           }
         }
       }
@@ -4406,6 +4542,23 @@
         }
       }
     },
+    "guidedTutorial.replay" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replay Guided Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新体验引导教程"
+          }
+        }
+      }
+    },
     "guidedTutorial.reset" : {
       "localizations" : {
         "en" : {
@@ -4582,6 +4735,23 @@
         }
       }
     },
+    "guidedTutorial.task.complete.final" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Final step complete. Finish the guided tutorial when you're ready."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最后一步已完成。准备好后即可结束引导教程。"
+          }
+        }
+      }
+    },
     "guidedTutorial.task.decrypt" : {
       "localizations" : {
         "en" : {
@@ -4706,6 +4876,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "引导教程"
+          }
+        }
+      }
+    },
+    "guidedTutorial.updated.entry" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updated Guided Tutorial Available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引导教程已有更新"
+          }
+        }
+      }
+    },
+    "guidedTutorial.updated.start" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Updated Guided Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始更新后的引导教程"
           }
         }
       }
@@ -4871,38 +5075,6 @@
         }
       }
     },
-    "import.algorithm" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Algorithm"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "算法"
-          }
-        }
-      }
-    },
-    "import.button" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导入密钥"
-          }
-        }
-      }
-    },
     "import.addUnverified" : {
       "localizations" : {
         "en" : {
@@ -4931,6 +5103,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "核实后添加到通讯录"
+          }
+        }
+      }
+    },
+    "import.algorithm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algorithm"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "算法"
+          }
+        }
+      }
+    },
+    "import.button" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入密钥"
           }
         }
       }
@@ -5207,6 +5411,22 @@
         }
       }
     },
+    "import.unverified.warning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can add this key without verifying it now, but it will remain marked as unverified until you confirm the fingerprint later."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你现在也可以先添加此密钥，但在之后核实指纹之前，它都会保持为未核实状态。"
+          }
+        }
+      }
+    },
     "import.userId" : {
       "localizations" : {
         "en" : {
@@ -5235,22 +5455,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加前请与密钥所有者核实此指纹。"
-          }
-        }
-      }
-    },
-    "import.unverified.warning" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You can add this key without verifying it now, but it will remain marked as unverified until you confirm the fingerprint later."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你现在也可以先添加此密钥，但在之后核实指纹之前，它都会保持为未核实状态。"
           }
         }
       }

@@ -434,6 +434,35 @@ final class ModelTests: XCTestCase {
                        "Invalid gracePeriod should be clamped to the default (180)")
     }
 
+    func test_appConfiguration_guidedTutorial_defaultsToNeverCompleted() {
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfiguration(defaults: defaults)
+
+        XCTAssertEqual(config.guidedTutorialCompletedVersion, 0)
+        XCTAssertEqual(config.guidedTutorialCompletionState, .neverCompleted)
+        XCTAssertTrue(config.hasNeverCompletedGuidedTutorial)
+    }
+
+    func test_appConfiguration_guidedTutorial_currentVersionPersists() {
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfiguration(defaults: defaults)
+        config.markGuidedTutorialCompletedCurrentVersion()
+
+        let reloaded = AppConfiguration(defaults: defaults)
+        XCTAssertEqual(reloaded.guidedTutorialCompletedVersion, GuidedTutorialVersion.current)
+        XCTAssertEqual(reloaded.guidedTutorialCompletionState, .completedCurrentVersion)
+        XCTAssertTrue(reloaded.hasCompletedCurrentGuidedTutorialVersion)
+    }
+
+    func test_appConfiguration_guidedTutorial_oldVersionIsRecognized() {
+        let defaults = makeIsolatedDefaults()
+        defaults.set(GuidedTutorialVersion.current - 1, forKey: "com.cypherair.preference.guidedTutorialCompletedVersion")
+
+        let config = AppConfiguration(defaults: defaults)
+        XCTAssertEqual(config.guidedTutorialCompletionState, .completedPreviousVersion)
+        XCTAssertTrue(config.hasCompletedPreviousGuidedTutorialVersion)
+    }
+
     // MARK: - Contact: Formatted Fingerprint
 
     func test_contact_formattedFingerprint_groupsOf4() {
@@ -484,6 +513,13 @@ final class ModelTests: XCTestCase {
             subkeyAlgo: "X25519",
             expiryDate: nil
         )
+    }
+
+    private func makeIsolatedDefaults() -> UserDefaults {
+        let suiteName = "com.cypherair.tests.model.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
     }
 
     // MARK: - ColorTheme

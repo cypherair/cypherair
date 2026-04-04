@@ -108,6 +108,7 @@ struct TutorialSessionState {
     var artifacts = TutorialArtifacts()
     var activeTask: TutorialTaskID?
     var isShellPresented = false
+    var isShowingCompletionView = false
 
     var completedCount: Int {
         taskStates.values.filter(\.isCompleted).count
@@ -120,6 +121,10 @@ struct TutorialSessionState {
     var nextIncompleteTask: TutorialTaskID? {
         TutorialTaskID.allCases.first { taskStates[$0]?.isCompleted != true }
     }
+
+    var hasCompletedAllTasks: Bool {
+        nextIncompleteTask == nil
+    }
 }
 
 struct TutorialGuidance {
@@ -128,11 +133,34 @@ struct TutorialGuidance {
     let target: TutorialAnchorID?
 }
 
+enum TutorialModal: Identifiable {
+    case importConfirmation(ImportConfirmationRequest)
+    case postGenerationPrompt(PGPKeyIdentity)
+    case authModeConfirmation(AuthModeChangeConfirmationRequest)
+
+    var id: String {
+        switch self {
+        case .importConfirmation(let request):
+            "import-\(request.id.uuidString)"
+        case .postGenerationPrompt(let identity):
+            "postgen-\(identity.fingerprint)"
+        case .authModeConfirmation(let request):
+            "auth-\(request.id.uuidString)"
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class TutorialSessionStore {
+    @ObservationIgnored
+    private weak var appConfiguration: AppConfiguration?
+
     private(set) var session = TutorialSessionState()
     private(set) var container: TutorialSandboxContainer?
+    private(set) var selectedTab: AppShellTab = .home
+    private(set) var routePath: [AppRoute] = []
+    private(set) var activeModal: TutorialModal?
     private(set) var visibleTab: AppShellTab = .home
     private(set) var visibleRoute: AppRoute?
     private(set) var errorMessage: String?
@@ -141,8 +169,20 @@ final class TutorialSessionStore {
         session.nextIncompleteTask
     }
 
+    var hasCompletedAllTasks: Bool {
+        session.hasCompletedAllTasks
+    }
+
+    var isShowingCompletionView: Bool {
+        session.isShowingCompletionView
+    }
+
     func isCompleted(_ task: TutorialTaskID) -> Bool {
         session.taskStates[task]?.isCompleted == true
+    }
+
+    func configurePersistence(appConfiguration: AppConfiguration) {
+        self.appConfiguration = appConfiguration
     }
 
     func ensureSession() {
@@ -166,20 +206,59 @@ final class TutorialSessionStore {
             await ensureBobPrepared()
         }
 
+        resetNavigationState(for: task)
         session.activeTask = task
         session.isShellPresented = true
+        session.isShowingCompletionView = false
         errorMessage = nil
     }
 
     func dismissShell() {
         session.isShellPresented = false
         session.activeTask = nil
-        visibleRoute = nil
+        clearNavigationState()
+        if session.hasCompletedAllTasks {
+            session.isShowingCompletionView = true
+        }
+    }
+
+    func dismissCompletionView() {
+        session.isShowingCompletionView = false
     }
 
     func resetTutorial() {
         container?.cleanup()
         recreateContainer()
+    }
+
+    func selectTab(_ tab: AppShellTab) {
+        guard selectedTab != tab else { return }
+        selectedTab = tab
+        routePath.removeAll()
+        activeModal = nil
+        visibleTab = tab
+        visibleRoute = nil
+    }
+
+    func setRoutePath(_ path: [AppRoute]) {
+        routePath = path
+        visibleRoute = path.last
+    }
+
+    func presentImportConfirmation(_ request: ImportConfirmationRequest) {
+        activeModal = .importConfirmation(request)
+    }
+
+    func presentPostGenerationPrompt(_ identity: PGPKeyIdentity) {
+        activeModal = .postGenerationPrompt(identity)
+    }
+
+    func presentAuthModeConfirmation(_ request: AuthModeChangeConfirmationRequest) {
+        activeModal = .authModeConfirmation(request)
+    }
+
+    func dismissModal() {
+        activeModal = nil
     }
 
     func noteVisibleSurface(tab: AppShellTab, route: AppRoute?) {
@@ -233,11 +312,14 @@ final class TutorialSessionStore {
             prefilledEmail: "alice@demo.invalid",
             lockedProfile: .advanced,
             lockedExpiryMonths: 24,
-            postGenerationBehavior: .suppressPrompt,
+            postGenerationBehavior: .externalPrompt,
             onGenerated: { [weak self] identity in
                 Task { @MainActor in
                     await self?.noteAliceGenerated(identity)
                 }
+            },
+            onPostGenerationPromptRequested: { [weak self] identity in
+                self?.presentPostGenerationPrompt(identity)
             }
         )
     }
@@ -249,6 +331,9 @@ final class TutorialSessionStore {
             verificationPolicy: .verifiedOnly,
             onImported: { [weak self] contact in
                 self?.noteBobImported(contact)
+            },
+            onImportConfirmationRequested: { [weak self] request in
+                self?.presentImportConfirmation(request)
             }
         )
     }
@@ -293,10 +378,19 @@ final class TutorialSessionStore {
         )
     }
 
+    func settingsConfiguration() -> SettingsView.Configuration {
+        SettingsView.Configuration(
+            onAuthModeConfirmationRequested: { [weak self] request in
+                self?.presentAuthModeConfirmation(request)
+            }
+        )
+    }
+
     func guidance(
         sizeClass: UserInterfaceSizeClass?,
         selectedTab: AppShellTab
     ) -> TutorialGuidance? {
+        guard activeModal == nil else { return nil }
         guard let task = session.activeTask else { return nil }
 
         switch task {
@@ -483,19 +577,65 @@ final class TutorialSessionStore {
 
     private func complete(_ task: TutorialTaskID) {
         session.taskStates[task]?.isCompleted = true
+        if session.hasCompletedAllTasks {
+            appConfiguration?.markGuidedTutorialCompletedCurrentVersion()
+        }
     }
+
+    #if DEBUG
+    func markCompletedForTesting(_ task: TutorialTaskID) {
+        complete(task)
+    }
+    #endif
 
     private func recreateContainer() {
         do {
             container = try TutorialSandboxContainer()
             session = TutorialSessionState()
+            selectedTab = .home
+            routePath = []
+            activeModal = nil
             visibleTab = .home
             visibleRoute = nil
             errorMessage = nil
         } catch {
             container = nil
             session = TutorialSessionState()
+            selectedTab = .home
+            routePath = []
+            activeModal = nil
+            visibleTab = .home
+            visibleRoute = nil
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func resetNavigationState(for task: TutorialTaskID) {
+        selectedTab = initialSelection(for: task)
+        routePath.removeAll()
+        activeModal = nil
+        visibleTab = selectedTab
+        visibleRoute = nil
+    }
+
+    private func clearNavigationState() {
+        selectedTab = .home
+        routePath.removeAll()
+        activeModal = nil
+        visibleTab = .home
+        visibleRoute = nil
+    }
+
+    private func initialSelection(for task: TutorialTaskID) -> AppShellTab {
+        switch task {
+        case .generateAliceKey, .exportBackup:
+            .keys
+        case .importBobKey:
+            .contacts
+        case .composeAndEncryptMessage, .parseRecipients, .decryptMessage, .understandSandbox:
+            .home
+        case .enableHighSecurity:
+            .settings
         }
     }
 
