@@ -62,11 +62,22 @@ extension EnvironmentValues {
 
 struct AppRouteHost<Root: View>: View {
     let resolver: AppRouteDestinationResolver
+    private let externalPath: Binding<[AppRoute]>?
     @ViewBuilder let root: () -> Root
-    @State private var path = NavigationPath()
+    @State private var path: [AppRoute] = []
+
+    init(
+        resolver: AppRouteDestinationResolver,
+        path: Binding<[AppRoute]>? = nil,
+        @ViewBuilder root: @escaping () -> Root
+    ) {
+        self.resolver = resolver
+        self.externalPath = path
+        self.root = root
+    }
 
     var body: some View {
-        let pathBinding = $path
+        let pathBinding = externalPath ?? $path
 
         return NavigationStack(path: pathBinding) {
             root()

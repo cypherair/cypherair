@@ -5,6 +5,7 @@ struct KeyGenerationView: View {
     struct Configuration {
         enum PostGenerationBehavior: Equatable {
             case showPrompt
+            case externalPrompt
             case suppressPrompt
         }
 
@@ -14,6 +15,7 @@ struct KeyGenerationView: View {
         var lockedExpiryMonths: Int?
         var postGenerationBehavior: PostGenerationBehavior = .showPrompt
         var onGenerated: (@MainActor (PGPKeyIdentity) -> Void)?
+        var onPostGenerationPromptRequested: (@MainActor (PGPKeyIdentity) -> Void)?
 
         static let `default` = Configuration()
     }
@@ -181,8 +183,13 @@ struct KeyGenerationView: View {
                 )
                 configuration.onGenerated?(identity)
 
-                if configuration.postGenerationBehavior == .showPrompt {
+                switch configuration.postGenerationBehavior {
+                case .showPrompt:
                     generatedIdentity = identity
+                case .externalPrompt:
+                    configuration.onPostGenerationPromptRequested?(identity)
+                case .suppressPrompt:
+                    break
                 }
             } catch {
                 self.error = CypherAirError.from(error) { .keyGenerationFailed(reason: $0) }

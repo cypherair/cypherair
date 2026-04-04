@@ -5,7 +5,11 @@ import SwiftUI
 struct OnboardingView: View {
     @Environment(AppConfiguration.self) private var config
 
-    @State private var currentPage = 0
+    @State private var currentPage: Int
+
+    init(initialPage: Int = 0) {
+        _currentPage = State(initialValue: min(max(initialPage, 0), 2))
+    }
 
     var body: some View {
         #if canImport(UIKit)
@@ -145,7 +149,7 @@ struct OnboardingPageThree: View {
             Button {
                 showTutorial = true
             } label: {
-                Text(String(localized: "guidedTutorial.onboarding.entry", defaultValue: "Open Guided Tutorial"))
+                Text(guidedTutorialEntryTitle)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -168,19 +172,39 @@ struct OnboardingPageThree: View {
         #if canImport(UIKit)
         .if(sizeClass == .compact) { view in
             view.fullScreenCover(isPresented: $showTutorial) {
-                TutorialView()
+                TutorialView(presentationContext: .onboardingFirstRun) {
+                    showTutorial = false
+                    dismiss()
+                }
             }
         }
         .if(sizeClass != .compact) { view in
             view.sheet(isPresented: $showTutorial) {
-                TutorialView()
+                TutorialView(presentationContext: .onboardingFirstRun) {
+                    showTutorial = false
+                    dismiss()
+                }
             }
         }
         #else
         .sheet(isPresented: $showTutorial) {
-            TutorialView()
+            TutorialView(presentationContext: .onboardingFirstRun) {
+                showTutorial = false
+                dismiss()
+            }
         }
         #endif
+    }
+
+    private var guidedTutorialEntryTitle: String {
+        switch config.guidedTutorialCompletionState {
+        case .neverCompleted:
+            String(localized: "guidedTutorial.onboarding.entry", defaultValue: "Open Guided Tutorial")
+        case .completedCurrentVersion:
+            String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
+        case .completedPreviousVersion:
+            String(localized: "guidedTutorial.updated.entry", defaultValue: "Updated Guided Tutorial Available")
+        }
     }
 }
 

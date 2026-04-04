@@ -41,12 +41,13 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         }
 
         let bundledLicense = try store.loadLicenseText(for: appNotice)
-        let repositoryLicense = try String(
-            contentsOf: repositoryRoot().appendingPathComponent("LICENSE"),
-            encoding: .utf8
-        )
-
-        XCTAssertEqual(bundledLicense, repositoryLicense)
+        if let repositoryLicense = try repositoryLicenseTextIfAvailable() {
+            XCTAssertEqual(bundledLicense, repositoryLicense)
+        } else {
+            XCTAssertEqual(appNotice.licenseFileResourceName, "CypherAir-LICENSE.txt")
+            XCTAssertTrue(appNotice.licenseSourceItems.contains("LICENSE"))
+            XCTAssertFalse(bundledLicense.isEmpty)
+        }
     }
 
     func test_sections_searchAndSorting_filtersThirdPartyBySearchText() throws {
@@ -126,5 +127,14 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+
+    private func repositoryLicenseTextIfAvailable() throws -> String? {
+        let licenseURL = repositoryRoot().appendingPathComponent("LICENSE")
+        guard FileManager.default.isReadableFile(atPath: licenseURL.path) else {
+            return nil
+        }
+
+        return try String(contentsOf: licenseURL, encoding: .utf8)
     }
 }

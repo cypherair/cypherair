@@ -1,5 +1,15 @@
 import Foundation
 
+enum GuidedTutorialVersion {
+    static let current = 2
+}
+
+enum GuidedTutorialCompletionState: Equatable {
+    case neverCompleted
+    case completedCurrentVersion
+    case completedPreviousVersion
+}
+
 /// App-wide configuration stored in UserDefaults.
 /// Uses the key names defined in ARCHITECTURE.md Section 5.
 @Observable
@@ -52,6 +62,13 @@ final class AppConfiguration {
         }
     }
 
+    /// The latest Guided Tutorial version the user has completed.
+    var guidedTutorialCompletedVersion: Int {
+        didSet {
+            defaults.set(guidedTutorialCompletedVersion, forKey: Self.guidedTutorialCompletedVersionKey)
+        }
+    }
+
     /// The selected color theme preset.
     var colorTheme: ColorTheme {
         didSet {
@@ -76,6 +93,7 @@ final class AppConfiguration {
     private static let clipboardNoticeKey = "com.cypherair.preference.clipboardNotice"
     private static let requireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
     private static let onboardingCompleteKey = "com.cypherair.preference.onboardingComplete"
+    private static let guidedTutorialCompletedVersionKey = "com.cypherair.preference.guidedTutorialCompletedVersion"
     private static let colorThemeKey = "com.cypherair.preference.colorTheme"
 
     // MARK: - Initialization
@@ -115,6 +133,9 @@ final class AppConfiguration {
         // Onboarding
         self.hasCompletedOnboarding = defaults.bool(forKey: Self.onboardingCompleteKey)
 
+        // Guided Tutorial completion
+        self.guidedTutorialCompletedVersion = defaults.integer(forKey: Self.guidedTutorialCompletedVersionKey)
+
         // Color theme (default: system accent — no tint override)
         if let themeRaw = defaults.string(forKey: Self.colorThemeKey),
            let theme = ColorTheme(rawValue: themeRaw) {
@@ -133,6 +154,32 @@ final class AppConfiguration {
     /// Record a successful authentication.
     func recordAuthentication() {
         lastAuthenticationDate = Date()
+    }
+
+    var guidedTutorialCompletionState: GuidedTutorialCompletionState {
+        if guidedTutorialCompletedVersion >= GuidedTutorialVersion.current {
+            return .completedCurrentVersion
+        }
+        if guidedTutorialCompletedVersion > 0 {
+            return .completedPreviousVersion
+        }
+        return .neverCompleted
+    }
+
+    var hasCompletedCurrentGuidedTutorialVersion: Bool {
+        guidedTutorialCompletionState == .completedCurrentVersion
+    }
+
+    var hasCompletedPreviousGuidedTutorialVersion: Bool {
+        guidedTutorialCompletionState == .completedPreviousVersion
+    }
+
+    var hasNeverCompletedGuidedTutorial: Bool {
+        guidedTutorialCompletionState == .neverCompleted
+    }
+
+    func markGuidedTutorialCompletedCurrentVersion() {
+        guidedTutorialCompletedVersion = GuidedTutorialVersion.current
     }
 
     /// Available grace period options (in seconds).
