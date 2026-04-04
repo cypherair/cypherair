@@ -166,8 +166,10 @@ struct VerifyView: View {
     @ViewBuilder
     private var cleartextContent: some View {
         Section {
-            TextEditor(text: cleartextBinding)
-                .font(.system(.body, design: .monospaced))
+            CypherMultilineTextInput(
+                text: cleartextBinding,
+                mode: .machineText
+            )
                 .frame(
                     minHeight: editorHeightRange.min,
                     idealHeight: editorHeightRange.ideal,

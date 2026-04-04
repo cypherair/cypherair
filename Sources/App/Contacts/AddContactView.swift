@@ -181,8 +181,10 @@ struct AddContactView: View {
     @ViewBuilder
     private var pasteContent: some View {
         Section {
-            TextEditor(text: $armoredText)
-                .font(.system(.body, design: .monospaced))
+            CypherMultilineTextInput(
+                text: $armoredText,
+                mode: .machineText
+            )
                 #if canImport(UIKit)
                 .frame(minHeight: 120)
                 #else

@@ -73,6 +73,11 @@ struct KeyGenerationView: View {
                     text: $name
                 )
                 .textContentType(.name)
+                .autocorrectionDisabled(true)
+                .applyMacWritingToolsPolicy()
+                #if canImport(UIKit)
+                .textInputAutocapitalization(.words)
+                #endif
                 .focused($focusedField, equals: .name)
                 .submitLabel(.next)
                 .onSubmit { focusedField = .email }
@@ -82,6 +87,8 @@ struct KeyGenerationView: View {
                     text: $email
                 )
                 .textContentType(.emailAddress)
+                .autocorrectionDisabled(true)
+                .applyMacWritingToolsPolicy()
                 #if canImport(UIKit)
                 .keyboardType(.emailAddress)
                 .textInputAutocapitalization(.never)

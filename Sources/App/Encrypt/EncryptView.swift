@@ -393,7 +393,10 @@ struct EncryptView: View {
     @ViewBuilder
     private var textInputContent: some View {
         Section {
-            TextEditor(text: $plaintext)
+            CypherMultilineTextInput(
+                text: $plaintext,
+                mode: .prose
+            )
                 .frame(
                     minHeight: editorHeightRange.min,
                     idealHeight: editorHeightRange.ideal,

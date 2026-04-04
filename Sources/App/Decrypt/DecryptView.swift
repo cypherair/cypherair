@@ -333,8 +333,10 @@ struct DecryptView: View {
     @ViewBuilder
     private var textInputContent: some View {
         Section {
-            TextEditor(text: ciphertextBinding)
-                .font(.system(.body, design: .monospaced))
+            CypherMultilineTextInput(
+                text: ciphertextBinding,
+                mode: .machineText
+            )
                 .frame(
                     minHeight: editorHeightRange.min,
                     idealHeight: editorHeightRange.ideal,

@@ -39,8 +39,10 @@ struct ImportKeyView: View {
                         .accessibilityLabel(String(localized: "import.clearFile", defaultValue: "Clear file"))
                     }
                 } else {
-                    TextEditor(text: $armoredText)
-                        .font(.system(.body, design: .monospaced))
+                    CypherMultilineTextInput(
+                        text: $armoredText,
+                        mode: .machineText
+                    )
                         .frame(
                             minHeight: editorHeightRange.min,
                             idealHeight: editorHeightRange.ideal,
@@ -69,6 +71,11 @@ struct ImportKeyView: View {
                     String(localized: "import.passphrase", defaultValue: "Passphrase"),
                     text: $passphrase
                 )
+                .autocorrectionDisabled(true)
+                .applyMacWritingToolsPolicy()
+                #if canImport(UIKit)
+                .textInputAutocapitalization(.never)
+                #endif
             } header: {
                 Text(String(localized: "import.passphrase.header", defaultValue: "Key Passphrase"))
             }
