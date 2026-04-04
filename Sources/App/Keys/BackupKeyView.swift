@@ -49,6 +49,11 @@ struct BackupKeyView: View {
                     String(localized: "backup.passphrase", defaultValue: "Passphrase"),
                     text: $passphrase
                 )
+                .autocorrectionDisabled(true)
+                .applyMacWritingToolsPolicy()
+                #if canImport(UIKit)
+                .textInputAutocapitalization(.never)
+                #endif
                 .focused($focusedField, equals: .passphrase)
                 .submitLabel(.next)
                 .onSubmit { focusedField = .confirm }
@@ -57,6 +62,11 @@ struct BackupKeyView: View {
                     String(localized: "backup.confirm", defaultValue: "Confirm Passphrase"),
                     text: $passphraseConfirm
                 )
+                .autocorrectionDisabled(true)
+                .applyMacWritingToolsPolicy()
+                #if canImport(UIKit)
+                .textInputAutocapitalization(.never)
+                #endif
                 .focused($focusedField, equals: .confirm)
                 .submitLabel(.done)
                 .onSubmit { focusedField = nil }

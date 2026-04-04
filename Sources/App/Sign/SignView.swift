@@ -226,7 +226,10 @@ struct SignView: View {
     @ViewBuilder
     private var textSigningContent: some View {
         Section {
-            TextEditor(text: $text)
+            CypherMultilineTextInput(
+                text: $text,
+                mode: .prose
+            )
                 .frame(
                     minHeight: editorHeightRange.min,
                     idealHeight: editorHeightRange.ideal,

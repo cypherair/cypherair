@@ -1,7 +1,14 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 @main
 struct CypherAirApp: App {
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(CypherAirKeyboardPolicyDelegate.self)
+    private var keyboardPolicyDelegate
+    #endif
 
     // MARK: - Shared Dependencies
 
@@ -179,6 +186,17 @@ struct CypherAirApp: App {
         importConfirmationCoordinator.dismiss()
     }
 }
+
+#if os(iOS)
+private final class CypherAirKeyboardPolicyDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        shouldAllowExtensionPointIdentifier extensionPointIdentifier: UIApplication.ExtensionPointIdentifier
+    ) -> Bool {
+        extensionPointIdentifier != .keyboard
+    }
+}
+#endif
 
 // MARK: - Optional Tint
 
