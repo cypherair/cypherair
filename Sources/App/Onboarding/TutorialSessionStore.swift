@@ -28,8 +28,20 @@ final class TutorialSessionStore {
         session.hasCompletedAllTasks
     }
 
+    var flowPhase: TutorialFlowPhase {
+        session.flowPhase
+    }
+
     var isShowingCompletionView: Bool {
         session.isShowingCompletionView
+    }
+
+    var isShowingSandboxAcknowledgement: Bool {
+        session.flowPhase == .sandboxAcknowledgement
+    }
+
+    var pendingCompletionPromptTask: TutorialTaskID? {
+        session.pendingCompletionPromptTask
     }
 
     func isCompleted(_ task: TutorialTaskID) -> Bool {
@@ -46,39 +58,87 @@ final class TutorialSessionStore {
         }
     }
 
+    func prepareForPresentation() {
+        ensureSession()
+        navigation.activeModal = nil
+        errorMessage = nil
+        session.pendingCompletionPromptTask = nil
+        session.flowPhase = .overview
+        clearNavigationState()
+    }
+
     func openTask(_ requestedTask: TutorialTaskID) async {
         ensureSession()
 
-        let task: TutorialTaskID
-        if !isCompleted(.understandSandbox) {
-            complete(.understandSandbox)
-            task = requestedTask == .understandSandbox ? .generateAliceKey : requestedTask
-        } else {
-            task = requestedTask == .understandSandbox ? (nextTask ?? .generateAliceKey) : requestedTask
+        if requestedTask == .understandSandbox {
+            openSandboxAcknowledgement()
+            return
         }
 
+        let task = requestedTask
         if task == .importBobKey {
             await ensureBobPrepared()
         }
 
         resetNavigationState(for: task)
-        session.activeTask = task
-        session.isShellPresented = true
-        session.isShowingCompletionView = false
+        session.pendingCompletionPromptTask = nil
+        session.flowPhase = .sandbox(task: task)
         errorMessage = nil
     }
 
-    func dismissShell() {
-        session.isShellPresented = false
-        session.activeTask = nil
+    func openSandboxAcknowledgement() {
+        ensureSession()
+        navigation.activeModal = nil
+        errorMessage = nil
+        session.pendingCompletionPromptTask = nil
         clearNavigationState()
-        if session.hasCompletedAllTasks {
-            session.isShowingCompletionView = true
+        session.flowPhase = .sandboxAcknowledgement
+    }
+
+    func confirmSandboxAcknowledgement() {
+        complete(.understandSandbox)
+        returnToOverview()
+    }
+
+    func returnToOverview() {
+        navigation.activeModal = nil
+        errorMessage = nil
+        session.pendingCompletionPromptTask = nil
+        clearNavigationState()
+        session.flowPhase = .overview
+    }
+
+    func showCompletionView() {
+        guard session.hasCompletedAllTasks else {
+            returnToOverview()
+            return
         }
+
+        navigation.activeModal = nil
+        errorMessage = nil
+        session.pendingCompletionPromptTask = nil
+        clearNavigationState()
+        session.flowPhase = .completion
     }
 
     func dismissCompletionView() {
-        session.isShowingCompletionView = false
+        session.pendingCompletionPromptTask = nil
+        session.flowPhase = .overview
+    }
+
+    func dismissCompletionPrompt() {
+        session.pendingCompletionPromptTask = nil
+    }
+
+    func handlePrimaryCompletionPromptAction() {
+        guard let promptTask = session.pendingCompletionPromptTask else { return }
+        session.pendingCompletionPromptTask = nil
+
+        if promptTask == TutorialTaskID.allCases.last {
+            showCompletionView()
+        } else {
+            returnToOverview()
+        }
     }
 
     func resetTutorial() {
@@ -86,17 +146,43 @@ final class TutorialSessionStore {
         recreateContainer()
     }
 
+    func finishAndCleanupTutorial() {
+        container?.cleanup()
+        container = nil
+        session = TutorialSessionState()
+        navigation = TutorialNavigationState()
+        errorMessage = nil
+    }
+
     func selectTab(_ tab: AppShellTab) {
         guard navigation.selectedTab != tab else { return }
         navigation.selectedTab = tab
         navigation.activeModal = nil
         navigation.visibleSurface.tab = tab
-        navigation.visibleSurface.route = navigation.path(for: tab).last
+        navigation.visibleSurface.route = routePath(for: tab).last
     }
 
     func setRoutePath(_ path: [AppRoute]) {
-        navigation.pathsByTab[navigation.selectedTab] = path
-        navigation.visibleSurface.route = path.last
+        setRoutePath(path, for: navigation.selectedTab)
+    }
+
+    func routePath(for tab: AppShellTab) -> [AppRoute] {
+        navigation.path(for: tab)
+    }
+
+    func setRoutePath(_ path: [AppRoute], for tab: AppShellTab) {
+        navigation.pathsByTab[tab] = path
+        if navigation.selectedTab == tab {
+            navigation.visibleSurface.tab = tab
+            navigation.visibleSurface.route = path.last
+        }
+    }
+
+    func routePathBinding(for tab: AppShellTab) -> Binding<[AppRoute]> {
+        Binding(
+            get: { self.routePath(for: tab) },
+            set: { self.setRoutePath($0, for: tab) }
+        )
     }
 
     func presentImportConfirmation(_ request: ImportConfirmationRequest) {
@@ -167,6 +253,9 @@ final class TutorialSessionStore {
 
     private func complete(_ task: TutorialTaskID) {
         session.taskStates[task]?.isCompleted = true
+        if task != .understandSandbox {
+            session.pendingCompletionPromptTask = task
+        }
         if session.hasCompletedAllTasks {
             appConfiguration?.markGuidedTutorialCompletedCurrentVersion()
         }
@@ -234,9 +323,8 @@ final class TutorialSessionStore {
     }
 
     func navigateToPostGenerationPrompt(_ identity: PGPKeyIdentity) {
-        var path = navigation.path(for: navigation.selectedTab)
+        var path = routePath(for: navigation.selectedTab)
         path.append(.postGenerationPrompt(identity: identity))
-        navigation.pathsByTab[navigation.selectedTab] = path
-        navigation.visibleSurface.route = path.last
+        setRoutePath(path, for: navigation.selectedTab)
     }
 }

@@ -5,7 +5,7 @@ struct TutorialRouteDestinationView: View {
     @Environment(TutorialSessionStore.self) private var tutorialStore
 
     let route: AppRoute
-    let selectedTab: AppShellTab
+    let definitionTab: AppShellTab
     let sizeClass: UserInterfaceSizeClass?
 
     var body: some View {
@@ -18,7 +18,7 @@ struct TutorialRouteDestinationView: View {
         switch route {
         case .keyGeneration:
             return AnyView(
-                TutorialSurfaceView(tab: selectedTab, route: route) {
+                TutorialSurfaceView(tab: definitionTab, route: route) {
                     if tutorialStore.session.activeTask == .generateAliceKey {
                         TutorialTaskHostView(task: .generateAliceKey) {
                             KeyGenerationView(configuration: factory.keyGenerationConfiguration())
@@ -30,13 +30,13 @@ struct TutorialRouteDestinationView: View {
             )
         case .postGenerationPrompt(let identity):
             return AnyView(
-                TutorialSurfaceView(tab: selectedTab, route: route) {
+                TutorialSurfaceView(tab: definitionTab, route: route) {
                     PostGenerationPromptView(identity: identity)
                 }
             )
         case .addContact:
             return AnyView(
-                TutorialSurfaceView(tab: selectedTab, route: route) {
+                TutorialSurfaceView(tab: definitionTab, route: route) {
                     if tutorialStore.session.activeTask == .importBobKey {
                         TutorialTaskHostView(task: .importBobKey) {
                             AddContactView(configuration: factory.addContactConfiguration())
@@ -48,7 +48,7 @@ struct TutorialRouteDestinationView: View {
             )
         case .encrypt:
             return AnyView(
-                TutorialSurfaceView(tab: selectedTab, route: route) {
+                TutorialSurfaceView(tab: definitionTab, route: route) {
                     if tutorialStore.session.activeTask == .composeAndEncryptMessage {
                         TutorialTaskHostView(task: .composeAndEncryptMessage) {
                             EncryptView(configuration: factory.encryptConfiguration())
@@ -60,7 +60,7 @@ struct TutorialRouteDestinationView: View {
             )
         case .decrypt:
             return AnyView(
-                TutorialSurfaceView(tab: selectedTab, route: route) {
+                TutorialSurfaceView(tab: definitionTab, route: route) {
                     if tutorialStore.session.activeTask == .parseRecipients {
                         TutorialTaskHostView(task: .parseRecipients) {
                             DecryptView(configuration: factory.decryptConfiguration(for: .parseRecipients))
@@ -76,7 +76,7 @@ struct TutorialRouteDestinationView: View {
             )
         case .backupKey(let fingerprint):
             return AnyView(
-                TutorialSurfaceView(tab: selectedTab, route: route) {
+                TutorialSurfaceView(tab: definitionTab, route: route) {
                     if tutorialStore.session.activeTask == .exportBackup {
                         TutorialTaskHostView(task: .exportBackup) {
                             BackupKeyView(
@@ -90,37 +90,40 @@ struct TutorialRouteDestinationView: View {
                 }
             )
         case .keyDetail(let fingerprint):
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { KeyDetailView(fingerprint: fingerprint) })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { KeyDetailView(fingerprint: fingerprint) })
         case .contactDetail(let fingerprint):
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { ContactDetailView(fingerprint: fingerprint) })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ContactDetailView(fingerprint: fingerprint) })
         case .qrDisplay(let publicKeyData, let displayName):
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { QRDisplayView(publicKeyData: publicKeyData, displayName: displayName) })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { QRDisplayView(publicKeyData: publicKeyData, displayName: displayName) })
         case .qrPhotoImport:
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { QRPhotoImportView() })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { QRPhotoImportView() })
         case .importKey:
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { ImportKeyView() })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ImportKeyView() })
         case .sign:
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { SignView() })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { SignView() })
         case .verify:
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { VerifyView() })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { VerifyView() })
         case .selfTest:
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { SelfTestView() })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { SelfTestView() })
         case .about:
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { AboutView() })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { AboutView() })
         case .license:
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { LicenseListView() })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { LicenseListView() })
         case .appIcon:
             return AnyView(
-                TutorialSurfaceView(tab: selectedTab, route: route) {
-                    #if canImport(UIKit)
-                    AppIconPickerView()
-                    #else
-                    Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
-                    #endif
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    TutorialDisabledSettingView(
+                        title: String(localized: "settings.appIcon", defaultValue: "App Icon"),
+                        message: String(
+                            localized: "guidedTutorial.settings.restricted.appIcon",
+                            defaultValue: "App Icon changes affect the real app and are unavailable inside the tutorial sandbox."
+                        ),
+                        systemImage: "app"
+                    )
                 }
             )
         case .themePicker:
-            return AnyView(TutorialSurfaceView(tab: selectedTab, route: route) { ThemePickerView() })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ThemePickerView() })
         }
     }
 }

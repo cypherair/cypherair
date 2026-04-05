@@ -11,6 +11,7 @@ struct QRPhotoImportView: View {
     @Environment(ContactService.self) private var contactService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.importConfirmationCoordinator) private var importConfirmationCoordinator
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     @State private var selectedItem: PhotosPickerItem?
     @State private var isProcessing = false
@@ -41,34 +42,20 @@ struct QRPhotoImportView: View {
     }
 
     private var content: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "qrcode.viewfinder")
-                .font(.system(size: 64))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-
-            Text(String(localized: "qrImport.instruction", defaultValue: "Select a photo containing a CypherAir QR code."))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-
-            PhotosPicker(
-                selection: $selectedItem,
-                matching: .images
-            ) {
-                Label(
-                    String(localized: "qrImport.selectPhoto", defaultValue: "Choose Photo"),
-                    systemImage: "photo.on.rectangle"
-                )
-            }
-            .buttonStyle(.borderedProminent)
-
-            if isProcessing {
-                ProgressView(String(localized: "qrImport.processing", defaultValue: "Scanning QR code..."))
+        Group {
+            if tutorialInlineHeaderContext != nil {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        tutorialInlineHeader
+                        contentBody
+                    }
+                    .padding()
+                }
+            } else {
+                contentBody
+                    .padding()
             }
         }
-        .padding()
         .navigationTitle(String(localized: "qrImport.title", defaultValue: "QR from Photo"))
         .onChange(of: selectedItem) { _, newItem in
             guard let newItem else { return }
@@ -111,6 +98,43 @@ struct QRPhotoImportView: View {
         } message: { request in
             Text(String(localized: "addcontact.keyUpdate.message",
                         defaultValue: "This contact (\(request.pendingUpdate.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
+        }
+    }
+
+    private var contentBody: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "qrcode.viewfinder")
+                .font(.system(size: 64))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+
+            Text(String(localized: "qrImport.instruction", defaultValue: "Select a photo containing a CypherAir QR code."))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            PhotosPicker(
+                selection: $selectedItem,
+                matching: .images
+            ) {
+                Label(
+                    String(localized: "qrImport.selectPhoto", defaultValue: "Choose Photo"),
+                    systemImage: "photo.on.rectangle"
+                )
+            }
+            .buttonStyle(.borderedProminent)
+
+            if isProcessing {
+                ProgressView(String(localized: "qrImport.processing", defaultValue: "Scanning QR code..."))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var tutorialInlineHeader: some View {
+        if let tutorialInlineHeaderContext {
+            TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
         }
     }
 

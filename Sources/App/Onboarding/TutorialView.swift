@@ -7,54 +7,83 @@ enum TutorialPresentationContext {
 
 struct TutorialView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(AppConfiguration.self) private var config
     @Environment(TutorialSessionStore.self) private var tutorialStore
 
     let presentationContext: TutorialPresentationContext
+    let initialTask: TutorialTaskID?
     let onTutorialFinished: (@MainActor () -> Void)?
+    @State private var hasPreparedPresentation = false
 
     init(
         presentationContext: TutorialPresentationContext = .inApp,
+        initialTask: TutorialTaskID? = nil,
         onTutorialFinished: (@MainActor () -> Void)? = nil
     ) {
         self.presentationContext = presentationContext
+        self.initialTask = initialTask
         self.onTutorialFinished = onTutorialFinished
     }
 
     @ViewBuilder
     var body: some View {
-        #if canImport(UIKit)
-        rootContent
-            .fullScreenCover(
-                isPresented: Binding(
-                    get: { tutorialStore.session.isShellPresented },
-                    set: { if !$0 { tutorialStore.dismissShell() } }
-                )
-            ) {
-                TutorialMirrorShellView()
-                    .environment(tutorialStore)
+        Group {
+            #if canImport(UIKit)
+            rootContent
+            #else
+            macOSRootContent
+            #endif
+        }
+            .task {
+                guard !hasPreparedPresentation else { return }
+                hasPreparedPresentation = true
+                tutorialStore.ensureSession()
+                tutorialStore.configurePersistence(appConfiguration: config)
+                tutorialStore.prepareForPresentation()
+                if let initialTask {
+                    await tutorialStore.openTask(initialTask)
+                }
             }
-        #else
-        rootContent
-            .sheet(
-                isPresented: Binding(
-                    get: { tutorialStore.session.isShellPresented },
-                    set: { if !$0 { tutorialStore.dismissShell() } }
-                )
-            ) {
-                TutorialMirrorShellView()
-                    .environment(tutorialStore)
-                    .frame(minWidth: 880, minHeight: 640)
-            }
-        #endif
     }
+
+    #if !canImport(UIKit)
+    private var macOSRootContent: some View {
+        Group {
+            switch tutorialStore.flowPhase {
+            case .sandboxAcknowledgement:
+                TutorialSandboxAcknowledgementView()
+            case .completion:
+                completionView
+            case .overview, .sandbox:
+                tutorialHome
+            }
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { tutorialStore.session.isShellPresented },
+                set: { if !$0 { tutorialStore.returnToOverview() } }
+            )
+        ) {
+            TutorialMirrorShellView()
+                .environment(tutorialStore)
+                .frame(minWidth: 880, minHeight: 640)
+        }
+    }
+    #endif
 
     @ViewBuilder
     private var rootContent: some View {
-        if tutorialStore.isShowingCompletionView {
-            completionView
-        } else {
+        switch tutorialStore.flowPhase {
+        case .overview:
             tutorialHome
+        case .sandboxAcknowledgement:
+            TutorialSandboxAcknowledgementView()
+        case .sandbox:
+            TutorialMirrorShellView()
+                .environment(tutorialStore)
+        case .completion:
+            completionView
         }
     }
 
@@ -74,13 +103,9 @@ struct TutorialView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(String(localized: "common.done", defaultValue: "Done")) {
-                        dismissTutorial()
+                        closeTutorial()
                     }
                 }
-            }
-            .task {
-                tutorialStore.ensureSession()
-                tutorialStore.configurePersistence(appConfiguration: config)
             }
             .screenReady("tutorial.ready")
         }
@@ -175,7 +200,7 @@ struct TutorialView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(String(localized: "common.done", defaultValue: "Done")) {
-                        dismissTutorial()
+                        finishTutorial()
                     }
                 }
             }
@@ -272,8 +297,7 @@ struct TutorialView: View {
     private func handlePrimaryHeroAction() async {
         if tutorialStore.session.completedCount > 0,
            let nextTask = tutorialStore.nextTask {
-            let task = nextTask == .understandSandbox ? TutorialTaskID.generateAliceKey : nextTask
-            await tutorialStore.openTask(task)
+            await tutorialStore.openTask(nextTask)
             return
         }
 
@@ -288,20 +312,37 @@ struct TutorialView: View {
 
     private func finishTutorial() {
         tutorialStore.dismissCompletionView()
+        tutorialStore.finishAndCleanupTutorial()
 
         if presentationContext == .onboardingFirstRun {
             config.hasCompletedOnboarding = true
         }
 
-        if let onTutorialFinished {
+        if let iosPresentationController {
+            iosPresentationController.dismiss()
+        } else if let onTutorialFinished {
             onTutorialFinished()
         } else {
             dismiss()
         }
     }
 
-    private func dismissTutorial() {
-        tutorialStore.dismissCompletionView()
-        dismiss()
+    private func closeTutorial() {
+        tutorialStore.returnToOverview()
+
+        switch presentationContext {
+        case .onboardingFirstRun:
+            if let iosPresentationController {
+                iosPresentationController.present(.onboarding(initialPage: 2, context: .firstRun))
+            } else {
+                dismiss()
+            }
+        case .inApp:
+            if let iosPresentationController {
+                iosPresentationController.dismiss()
+            } else {
+                dismiss()
+            }
+        }
     }
 }

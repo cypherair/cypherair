@@ -51,6 +51,20 @@ struct AppRouteDestinationView: View {
 
 @MainActor
 enum AppShellComposition {
+    static func definition(
+        for tab: AppShellTab,
+        content: AnyView
+    ) -> AppShellTabDefinition {
+        AppShellTabDefinition(
+            tab: tab,
+            title: title(for: tab),
+            systemImage: systemImage(for: tab),
+            section: section(for: tab),
+            visibleInCompact: visibleInCompact(tab),
+            content: content
+        )
+    }
+
     static func title(for tab: AppShellTab) -> String {
         switch tab {
         case .home:
@@ -186,12 +200,8 @@ enum AppShellComposition {
         rootDecorator: (AppShellTab, AnyView) -> AnyView = { _, root in root }
     ) -> [AppShellTabDefinition] {
         AppShellTab.allCases.map { tab in
-            AppShellTabDefinition(
-                tab: tab,
-                title: title(for: tab),
-                systemImage: systemImage(for: tab),
-                section: section(for: tab),
-                visibleInCompact: visibleInCompact(tab),
+            definition(
+                for: tab,
                 content: content(for: tab, resolver: resolver, rootDecorator: rootDecorator)
             )
         }

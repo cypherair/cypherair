@@ -20,6 +20,9 @@ struct CypherAirApp: App {
     @State private var tutorialStore = TutorialSessionStore()
     @State private var importConfirmationCoordinator = ImportConfirmationCoordinator()
     @State private var launchConfiguration: AppLaunchConfiguration
+    #if os(iOS)
+    @State private var activeIOSPresentation: IOSPresentation?
+    #endif
 
     // MARK: - Init
 
@@ -65,13 +68,37 @@ struct CypherAirApp: App {
                     .environment(container.selfTestService)
                     .environment(container.authManager)
                     .environment(tutorialStore)
+                    #if os(iOS)
+                    .environment(
+                        \.iosPresentationController,
+                        IOSPresentationController(
+                            present: { presentation in
+                                activeIOSPresentation = presentation
+                            },
+                            dismiss: {
+                                activeIOSPresentation = nil
+                            }
+                        )
+                    )
+                    #endif
             }
-                .sheet(isPresented: showOnboarding) {
-                    OnboardingView()
-                        .environment(container.config)
-                        .environment(tutorialStore)
-                        .interactiveDismissDisabled()
+                #if os(iOS)
+                .sheet(item: onboardingPresentationBinding) { presentation in
+                    onboardingPresentationView(for: presentation)
                 }
+                .fullScreenCover(item: tutorialPresentationBinding) { presentation in
+                    tutorialPresentationView(for: presentation)
+                }
+                .task {
+                    presentInitialIOSFlowIfNeeded()
+                }
+                .onChange(of: container.config.hasCompletedOnboarding) { _, hasCompletedOnboarding in
+                    if !hasCompletedOnboarding,
+                       activeIOSPresentation == nil {
+                        activeIOSPresentation = .onboarding(initialPage: 0, context: .firstRun)
+                    }
+                }
+                #endif
                 .alert(
                     String(localized: "import.error.alertTitle", defaultValue: "Import Failed"),
                     isPresented: Binding(
@@ -150,17 +177,6 @@ struct CypherAirApp: App {
         #endif
     }
 
-    private var showOnboarding: Binding<Bool> {
-        Binding(
-            get: { !container.config.hasCompletedOnboarding },
-            set: { newValue in
-                if !newValue {
-                    container.config.hasCompletedOnboarding = true
-                }
-            }
-        )
-    }
-
     @ViewBuilder
     private var mainWindowContent: some View {
         #if os(macOS)
@@ -172,17 +188,91 @@ struct CypherAirApp: App {
                 launchConfiguration: launchConfiguration
             )
         case .tutorial:
-            TutorialView(presentationContext: .inApp)
-                .task {
-                    if let tutorialTask = launchConfiguration.tutorialTask {
-                        await tutorialStore.openTask(tutorialTask)
-                    }
-                }
+            TutorialView(
+                presentationContext: .inApp,
+                initialTask: launchConfiguration.tutorialTask
+            )
         }
         #else
         ContentView()
         #endif
     }
+
+    #if os(iOS)
+    private var onboardingPresentationBinding: Binding<IOSPresentation?> {
+        Binding(
+            get: {
+                guard case .onboarding? = activeIOSPresentation else {
+                    return nil
+                }
+                return activeIOSPresentation
+            },
+            set: { newValue in
+                if let newValue {
+                    activeIOSPresentation = newValue
+                } else if case .onboarding? = activeIOSPresentation {
+                    activeIOSPresentation = nil
+                }
+            }
+        )
+    }
+
+    private var tutorialPresentationBinding: Binding<IOSPresentation?> {
+        Binding(
+            get: {
+                guard case .tutorial? = activeIOSPresentation else {
+                    return nil
+                }
+                return activeIOSPresentation
+            },
+            set: { newValue in
+                if let newValue {
+                    activeIOSPresentation = newValue
+                } else if case .tutorial? = activeIOSPresentation {
+                    activeIOSPresentation = nil
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func onboardingPresentationView(for presentation: IOSPresentation) -> some View {
+        if case .onboarding(let initialPage, let context) = presentation {
+            OnboardingView(
+                initialPage: initialPage,
+                presentationContext: context
+            )
+            .environment(container.config)
+            .environment(tutorialStore)
+            .interactiveDismissDisabled(context == .firstRun && !container.config.hasCompletedOnboarding)
+        }
+    }
+
+    @ViewBuilder
+    private func tutorialPresentationView(for presentation: IOSPresentation) -> some View {
+        if case .tutorial(let presentationContext) = presentation {
+            TutorialView(
+                presentationContext: presentationContext,
+                initialTask: launchConfiguration.root == .tutorial ? launchConfiguration.tutorialTask : nil
+            )
+                .environment(container.config)
+                .environment(tutorialStore)
+        }
+    }
+
+    private func presentInitialIOSFlowIfNeeded() {
+        guard activeIOSPresentation == nil else { return }
+
+        switch launchConfiguration.root {
+        case .tutorial:
+            activeIOSPresentation = .tutorial(presentationContext: .inApp)
+        case .main, .settings:
+            if !container.config.hasCompletedOnboarding {
+                activeIOSPresentation = .onboarding(initialPage: 0, context: .firstRun)
+            }
+        }
+    }
+    #endif
 
     // MARK: - URL Scheme Handling
 

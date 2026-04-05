@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 /// Signature verification view — supports cleartext and detached signatures.
 struct VerifyView: View {
     @Environment(SigningService.self) private var signingService
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     enum VerifyMode: String, CaseIterable {
         case cleartext, detached
@@ -36,6 +37,12 @@ struct VerifyView: View {
 
     var body: some View {
         Form {
+            if let tutorialInlineHeaderContext {
+                Section {
+                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+                }
+            }
+
             Section {
                 Picker(String(localized: "verify.mode", defaultValue: "Mode"), selection: $verifyMode) {
                     ForEach(VerifyMode.allCases, id: \.self) { mode in

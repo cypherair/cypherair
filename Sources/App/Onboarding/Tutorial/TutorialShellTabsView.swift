@@ -5,18 +5,13 @@ struct TutorialShellTabsView: View {
     @Environment(TutorialSessionStore.self) private var tutorialStore
 
     @Binding var selectedTab: AppShellTab
-    @Binding var routePath: [AppRoute]
     let sizeClass: UserInterfaceSizeClass?
 
     var body: some View {
         #if os(macOS)
         AnyView(macOSLayout)
         #else
-        if sizeClass == .compact {
-            AnyView(compactLayout)
-        } else {
-            AnyView(regularLayout)
-        }
+        AnyView(iOSLayout)
         #endif
     }
 
@@ -37,38 +32,14 @@ struct TutorialShellTabsView: View {
         )
     }
 
-    private var compactLayout: some View {
-        VStack(spacing: 0) {
-            compactTabBar
-            Divider()
-            compactReturnBar
-            Divider()
-            if let currentGuidance {
-                compactGuidanceBanner(currentGuidance)
-                Divider()
-            }
-            tabRoot(for: selectedTab)
-        }
-        .overlay {
-            TutorialSpotlightOverlay(target: currentGuidance?.target)
-        }
-    }
-
-    private var regularLayout: some View {
-        HStack(spacing: 0) {
-            sidebar
-            Divider()
-            tabRoot(for: selectedTab)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .overlay {
-            TutorialSpotlightOverlay(target: currentGuidance?.target)
-        }
-        .safeAreaInset(edge: .trailing) {
-            if let currentGuidance {
-                guidanceCard(currentGuidance)
-            }
-        }
+    private var iOSLayout: some View {
+        SharedIOSTabShellView(
+            selectedTab: $selectedTab,
+            definitions: TutorialShellDefinitionsBuilder(
+                store: tutorialStore,
+                sizeClass: sizeClass
+            ).definitions()
+        )
     }
 
     #if os(macOS)
@@ -88,22 +59,8 @@ struct TutorialShellTabsView: View {
     }
     #endif
 
-    private var compactTabBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                compactTabButton(.home)
-                compactTabButton(.keys)
-                compactTabButton(.contacts)
-                compactTabButton(.settings)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-        }
-        .background(.bar)
-    }
-
+    #if os(macOS)
     private var sidebar: some View {
-        #if os(macOS)
         List(selection: $selectedTab) {
             Section {
                 sidebarSelectionRow(.home)
@@ -115,71 +72,13 @@ struct TutorialShellTabsView: View {
             Section(String(localized: "tab.section.tools", defaultValue: "Tools")) {
                 sidebarSelectionRow(.encrypt)
                 sidebarSelectionRow(.decrypt)
+                sidebarSelectionRow(.sign)
+                sidebarSelectionRow(.verify)
             }
         }
         .frame(minWidth: 220, idealWidth: 240, maxWidth: 260)
-        #else
-        List {
-            Section {
-                sidebarLink(.home)
-                sidebarLink(.keys)
-                sidebarLink(.contacts)
-                sidebarLink(.settings)
-            }
-
-            Section(String(localized: "tab.section.tools", defaultValue: "Tools")) {
-                sidebarLink(.encrypt)
-                sidebarLink(.decrypt)
-            }
-        }
-        .frame(minWidth: 220, idealWidth: 240, maxWidth: 260)
-        #endif
     }
-
-    private func compactTabButton(_ tab: AppShellTab) -> some View {
-        Group {
-            if selectedTab == tab {
-                Button {
-                    selectedTab = tab
-                } label: {
-                    Label(
-                        AppShellComposition.title(for: tab),
-                        systemImage: AppShellComposition.systemImage(for: tab)
-                    )
-                    .lineLimit(1)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.borderedProminent)
-            } else {
-                Button {
-                    selectedTab = tab
-                } label: {
-                    Label(
-                        AppShellComposition.title(for: tab),
-                        systemImage: AppShellComposition.systemImage(for: tab)
-                    )
-                    .lineLimit(1)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.bordered)
-            }
-        }
-    }
-
-    private func sidebarLink(_ tab: AppShellTab) -> some View {
-        Button {
-            selectedTab = tab
-        } label: {
-            Label(
-                AppShellComposition.title(for: tab),
-                systemImage: AppShellComposition.systemImage(for: tab)
-            )
-        }
-        .buttonStyle(.plain)
-        .tag(tab)
-    }
+    #endif
 
     #if os(macOS)
     private func sidebarSelectionRow(_ tab: AppShellTab) -> some View {
@@ -190,130 +89,14 @@ struct TutorialShellTabsView: View {
         .tag(tab)
         .accessibilityIdentifier("tutorial.sidebar.\(tab.rawValue)")
     }
-    #endif
-
-    private var routeResolver: AppRouteDestinationResolver {
-        AppRouteDestinationResolver { route in
-            AnyView(TutorialRouteDestinationView(route: route, selectedTab: selectedTab, sizeClass: sizeClass))
-        }
-    }
 
     private func tabRoot(for tab: AppShellTab) -> AnyView {
-        let factory = tutorialStore.configurationFactory
-
-        switch (tutorialStore.session.activeTask, tab) {
-        case (.composeAndEncryptMessage?, .encrypt) where sizeClass != .compact:
-            return AnyView(
-                AppRouteHost(resolver: routeResolver, path: $routePath) {
-                    TutorialSurfaceView(tab: tab, route: nil) {
-                        TutorialTaskHostView(task: .composeAndEncryptMessage) {
-                            EncryptView(configuration: factory.encryptConfiguration())
-                        }
-                    }
-                }
-            )
-        case (.parseRecipients?, .decrypt) where sizeClass != .compact:
-            return AnyView(
-                AppRouteHost(resolver: routeResolver, path: $routePath) {
-                    TutorialSurfaceView(tab: tab, route: nil) {
-                        TutorialTaskHostView(task: .parseRecipients) {
-                            DecryptView(configuration: factory.decryptConfiguration(for: .parseRecipients))
-                        }
-                    }
-                }
-            )
-        case (.decryptMessage?, .decrypt) where sizeClass != .compact:
-            return AnyView(
-                AppRouteHost(resolver: routeResolver, path: $routePath) {
-                    TutorialSurfaceView(tab: tab, route: nil) {
-                        TutorialTaskHostView(task: .decryptMessage) {
-                            DecryptView(configuration: factory.decryptConfiguration(for: .decryptMessage))
-                        }
-                    }
-                }
-            )
-        case (.enableHighSecurity?, .settings):
-            return AnyView(
-                AppRouteHost(resolver: routeResolver, path: $routePath) {
-                    TutorialSurfaceView(tab: tab, route: nil) {
-                        TutorialSettingsTaskView()
-                    }
-                }
-            )
-        default:
-            return defaultRoot(for: tab)
-        }
+        TutorialShellDefinitionsBuilder(
+            store: tutorialStore,
+            sizeClass: sizeClass
+        ).definitions().first(where: { $0.tab == tab })?.content ?? AnyView(EmptyView())
     }
-
-    private func defaultRoot(for tab: AppShellTab) -> AnyView {
-        switch tab {
-        case .home:
-            return AnyView(
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver, path: $routePath) {
-                        HomeView()
-                    }
-                }
-            )
-        case .keys:
-            return AnyView(
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver, path: $routePath) {
-                        MyKeysView()
-                    }
-                }
-            )
-        case .contacts:
-            return AnyView(
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver, path: $routePath) {
-                        ContactsView()
-                    }
-                }
-            )
-        case .settings:
-            return AnyView(
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver, path: $routePath) {
-                        SettingsView()
-                    }
-                }
-            )
-        case .encrypt:
-            return AnyView(
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver, path: $routePath) {
-                        EncryptView()
-                    }
-                }
-            )
-        case .decrypt:
-            return AnyView(
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver, path: $routePath) {
-                        DecryptView()
-                    }
-                }
-            )
-        case .sign:
-            return AnyView(
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver, path: $routePath) {
-                        SignView()
-                    }
-                }
-            )
-        case .verify:
-            return AnyView(
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    AppRouteHost(resolver: routeResolver, path: $routePath) {
-                        VerifyView()
-                    }
-                }
-            )
-        }
-    }
-
+    #endif
     private func guidanceCard(_ guidance: TutorialGuidance) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -327,7 +110,7 @@ struct TutorialShellTabsView: View {
                 Spacer()
 
                 Button(String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial")) {
-                    tutorialStore.dismissShell()
+                    tutorialStore.returnToOverview()
                 }
                 .buttonStyle(.bordered)
             }
@@ -401,7 +184,7 @@ struct TutorialShellTabsView: View {
     private var compactReturnBar: some View {
         HStack {
             Button {
-                tutorialStore.dismissShell()
+                tutorialStore.returnToOverview()
             } label: {
                 Label(
                     String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial"),

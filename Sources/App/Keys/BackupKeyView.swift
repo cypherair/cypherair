@@ -19,6 +19,7 @@ struct BackupKeyView: View {
     let configuration: Configuration
 
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     enum Field {
         case passphrase
@@ -44,6 +45,12 @@ struct BackupKeyView: View {
 
     var body: some View {
         Form {
+            if let tutorialInlineHeaderContext {
+                Section {
+                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+                }
+            }
+
             Section {
                 SecureField(
                     String(localized: "backup.passphrase", defaultValue: "Passphrase"),

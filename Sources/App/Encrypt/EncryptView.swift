@@ -61,6 +61,7 @@ struct EncryptView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(ContactService.self) private var contactService
     @Environment(AppConfiguration.self) private var config
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     let configuration: Configuration
 
@@ -87,6 +88,12 @@ struct EncryptView: View {
 
     var body: some View {
         Form {
+            if let tutorialInlineHeaderContext {
+                Section {
+                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+                }
+            }
+
             Section {
                 Picker(String(localized: "encrypt.mode", defaultValue: "Mode"), selection: $encryptMode) {
                     ForEach(configuration.allowedModes, id: \.self) { mode in
