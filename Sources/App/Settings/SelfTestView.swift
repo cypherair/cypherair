@@ -4,19 +4,11 @@ import UniformTypeIdentifiers
 /// One-tap self-diagnostic view.
 struct SelfTestView: View {
     @Environment(SelfTestService.self) private var selfTestService
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
-
     @State private var showReportExporter = false
     @State private var reportData: Data?
 
     var body: some View {
         List {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                }
-            }
-
             switch selfTestService.state {
             case .idle:
                 Section {

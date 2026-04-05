@@ -4655,6 +4655,22 @@
         }
       }
     },
+    "guidedTutorial.return.hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Return to the guided tutorial overview."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回引导教程总览。"
+          }
+        }
+      }
+    },
     "guidedTutorial.sandbox.badge" : {
       "localizations" : {
         "en" : {

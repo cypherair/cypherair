@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct LicenseDetailView: View {
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
-
     private let notice: OpenSourceNotice
     private let store: OpenSourceNoticeStore
     private let repositoryURLCopyAction: RepositoryURLCopyAction
@@ -23,12 +21,6 @@ struct LicenseDetailView: View {
 
     var body: some View {
         List {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                }
-            }
-
             Section {
                 LabeledContent(
                     String(localized: "license.detail.version", defaultValue: "Version"),

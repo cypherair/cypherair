@@ -23,7 +23,6 @@ struct AddContactView: View {
     @Environment(QRService.self) private var qrService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.importConfirmationCoordinator) private var importConfirmationCoordinator
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     enum ImportMode: String, CaseIterable {
         case paste
@@ -82,12 +81,6 @@ struct AddContactView: View {
 
     private var formContent: some View {
         Form {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                }
-            }
-
             Section {
                 Picker(String(localized: "addcontact.mode", defaultValue: "Import Method"), selection: $importMode) {
                     ForEach(configuration.allowedImportModes, id: \.self) { mode in

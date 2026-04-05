@@ -6,7 +6,6 @@ struct ContactDetailView: View {
 
     @Environment(ContactService.self) private var contactService
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     @State private var showDeleteConfirmation = false
     @State private var deleteError: String?
@@ -20,12 +19,6 @@ struct ContactDetailView: View {
         Group {
             if let contact {
                 List {
-                    if let tutorialInlineHeaderContext {
-                        Section {
-                            TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                        }
-                    }
-
                     Section {
                         if !contact.isVerified {
                             Label(
@@ -106,19 +99,6 @@ struct ContactDetailView: View {
                                 systemImage: "trash"
                             )
                         }
-                    }
-                }
-            } else if let tutorialInlineHeaderContext {
-                List {
-                    Section {
-                        TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                    }
-
-                    Section {
-                        ContentUnavailableView(
-                            String(localized: "contactdetail.notFound", defaultValue: "Contact Not Found"),
-                            systemImage: "person.slash"
-                        )
                     }
                 }
             } else {

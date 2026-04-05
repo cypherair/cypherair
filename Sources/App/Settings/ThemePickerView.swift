@@ -4,8 +4,6 @@ import SwiftUI
 /// Works on both iOS and macOS (pure SwiftUI, no UIKit dependency).
 struct ThemePickerView: View {
     @Environment(AppConfiguration.self) private var config
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
-
     #if os(macOS)
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 20), count: 4)
     #else
@@ -16,25 +14,17 @@ struct ThemePickerView: View {
         @Bindable var config = config
 
         ScrollView {
-            VStack(spacing: 20) {
-                if let tutorialInlineHeaderContext {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                        .padding(.horizontal)
-                        .padding(.top)
-                }
-
-                LazyVGrid(columns: columns, spacing: 20) {
-                    ForEach(ColorTheme.allCases) { theme in
-                        ThemeCell(
-                            theme: theme,
-                            isSelected: config.colorTheme == theme
-                        ) {
-                            config.colorTheme = theme
-                        }
+            LazyVGrid(columns: columns, spacing: 20) {
+                ForEach(ColorTheme.allCases) { theme in
+                    ThemeCell(
+                        theme: theme,
+                        isSelected: config.colorTheme == theme
+                    ) {
+                        config.colorTheme = theme
                     }
                 }
-                .padding()
             }
+            .padding()
         }
         .accessibilityIdentifier("theme.root")
         .screenReady("theme.ready")

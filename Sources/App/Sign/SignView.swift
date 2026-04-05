@@ -12,7 +12,6 @@ struct SignView: View {
     @Environment(SigningService.self) private var signingService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     enum SignMode: String, CaseIterable {
         case text, file
@@ -38,12 +37,6 @@ struct SignView: View {
 
     var body: some View {
         Form {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                }
-            }
-
             Section {
                 Picker(String(localized: "sign.mode", defaultValue: "Mode"), selection: $signMode) {
                     ForEach(SignMode.allCases, id: \.self) { mode in

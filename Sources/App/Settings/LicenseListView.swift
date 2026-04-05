@@ -2,7 +2,6 @@ import SwiftUI
 
 struct LicenseListView: View {
     private let store: OpenSourceNoticeStore
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     @State private var notices: [OpenSourceNotice] = []
     @State private var hasLoaded = false
@@ -15,10 +14,37 @@ struct LicenseListView: View {
 
     var body: some View {
         Group {
-            if tutorialInlineHeaderContext != nil {
-                tutorialContent
+            if let loadError {
+                ContentUnavailableView {
+                    Label(
+                        String(localized: "license.title", defaultValue: "Licenses"),
+                        systemImage: "doc.text.magnifyingglass"
+                    )
+                } description: {
+                    Text(loadError)
+                }
+            } else if !hasLoaded {
+                ProgressView()
+            } else if sections.isEmpty {
+                ContentUnavailableView {
+                    Label(
+                        String(localized: "license.empty.title", defaultValue: "No Matching Components"),
+                        systemImage: "doc.text.magnifyingglass"
+                    )
+                } description: {
+                    Text(String(localized: "license.empty.message", defaultValue: "Try a different search term."))
+                }
             } else {
-                standardContent
+                List {
+                    noticeListSections
+                }
+                .searchable(
+                    text: $searchText,
+                    prompt: Text(String(localized: "license.search", defaultValue: "Search components"))
+                )
+                #if os(macOS)
+                .listStyle(.inset)
+                #endif
             }
         }
         .accessibilityIdentifier("license.root")
@@ -28,125 +54,6 @@ struct LicenseListView: View {
             guard !hasLoaded, loadError == nil else { return }
             loadNotices()
         }
-    }
-
-    @ViewBuilder
-    private var standardContent: some View {
-        if let loadError {
-            ContentUnavailableView {
-                Label(
-                    String(localized: "license.title", defaultValue: "Licenses"),
-                    systemImage: "doc.text.magnifyingglass"
-                )
-            } description: {
-                Text(loadError)
-            }
-        } else if !hasLoaded {
-            ProgressView()
-        } else if sections.isEmpty {
-            ContentUnavailableView {
-                Label(
-                    String(localized: "license.empty.title", defaultValue: "No Matching Components"),
-                    systemImage: "doc.text.magnifyingglass"
-                )
-            } description: {
-                Text(String(localized: "license.empty.message", defaultValue: "Try a different search term."))
-            }
-        } else {
-            noticeList
-                .searchable(
-                    text: $searchText,
-                    prompt: Text(String(localized: "license.search", defaultValue: "Search components"))
-                )
-        }
-    }
-
-    @ViewBuilder
-    private var tutorialContent: some View {
-        if let loadError {
-            tutorialStateList {
-                ContentUnavailableView {
-                    Label(
-                        String(localized: "license.title", defaultValue: "Licenses"),
-                        systemImage: "doc.text.magnifyingglass"
-                    )
-                } description: {
-                    Text(loadError)
-                }
-            }
-        } else if !hasLoaded {
-            tutorialStateList {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                }
-            }
-        } else if sections.isEmpty {
-            tutorialStateList {
-                ContentUnavailableView {
-                    Label(
-                        String(localized: "license.empty.title", defaultValue: "No Matching Components"),
-                        systemImage: "doc.text.magnifyingglass"
-                    )
-                } description: {
-                    Text(String(localized: "license.empty.message", defaultValue: "Try a different search term."))
-                }
-            }
-            .searchable(
-                text: $searchText,
-                prompt: Text(String(localized: "license.search", defaultValue: "Search components"))
-            )
-        } else {
-            tutorialNoticeList
-                .searchable(
-                    text: $searchText,
-                    prompt: Text(String(localized: "license.search", defaultValue: "Search components"))
-                )
-        }
-    }
-
-    private var noticeList: some View {
-        List {
-            noticeListSections
-        }
-        #if os(macOS)
-        .listStyle(.inset)
-        #endif
-    }
-
-    private var tutorialNoticeList: some View {
-        List {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                }
-            }
-
-            noticeListSections
-        }
-        #if os(macOS)
-        .listStyle(.inset)
-        #endif
-    }
-
-    private func tutorialStateList<Content: View>(
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        List {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                }
-            }
-
-            Section {
-                content()
-            }
-        }
-        #if os(macOS)
-        .listStyle(.inset)
-        #endif
     }
 
     private var sections: OpenSourceNoticeStore.Sections {

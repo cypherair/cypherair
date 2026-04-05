@@ -44,7 +44,6 @@ struct DecryptView: View {
 
     @Environment(DecryptionService.self) private var decryptionService
     @Environment(AppConfiguration.self) private var config
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     let configuration: Configuration
 
@@ -72,12 +71,6 @@ struct DecryptView: View {
 
     var body: some View {
         Form {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                }
-            }
-
             Section {
                 Picker(String(localized: "decrypt.mode", defaultValue: "Mode"), selection: $decryptMode) {
                     ForEach(configuration.allowedModes, id: \.self) { mode in

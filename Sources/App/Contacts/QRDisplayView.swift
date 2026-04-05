@@ -4,8 +4,6 @@ import SwiftUI
 /// Format: cypherair://import/v1/<base64url binary key, no padding>
 struct QRDisplayView: View {
     @Environment(QRService.self) private var qrService
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
-
     let publicKeyData: Data
     let displayName: String
 
@@ -14,20 +12,8 @@ struct QRDisplayView: View {
     @State private var showError = false
 
     var body: some View {
-        Group {
-            if tutorialInlineHeaderContext != nil {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        tutorialInlineHeader
-                        qrContent
-                    }
-                    .padding()
-                }
-            } else {
-                qrContent
-                    .padding()
-            }
-        }
+        qrContent
+            .padding()
         .accessibilityIdentifier("qr.root")
         .screenReady("qr.ready")
         .navigationTitle(String(localized: "qr.title", defaultValue: "My Public Key"))
@@ -69,13 +55,6 @@ struct QRDisplayView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-        }
-    }
-
-    @ViewBuilder
-    private var tutorialInlineHeader: some View {
-        if let tutorialInlineHeaderContext {
-            TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
         }
     }
 

@@ -10,6 +10,13 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .safeAreaInset(edge: .top, spacing: 0) {
+                #if os(macOS)
+                if isActiveSandboxTab {
+                    macOSTopChrome
+                }
+                #endif
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let promptTask = visibleCompletionPromptTask,
                    tutorialStore.activeModal == nil {
@@ -49,6 +56,30 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
         guard tutorialStore.session.activeTask == promptTask else { return nil }
         return promptTask
     }
+
+    #if os(macOS)
+    private var macOSTopChrome: some View {
+        HStack {
+            Button {
+                tutorialStore.returnToOverview()
+            } label: {
+                Label(
+                    String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial"),
+                    systemImage: "chevron.left"
+                )
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+    #endif
 
     @ViewBuilder
     private func completionPrompt(for task: TutorialTaskID) -> some View {
