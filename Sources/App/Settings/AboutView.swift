@@ -2,8 +2,16 @@ import SwiftUI
 
 /// About page with app-level metadata only.
 struct AboutView: View {
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
+
     var body: some View {
         List {
+            if let tutorialInlineHeaderContext {
+                Section {
+                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+                }
+            }
+
             Section {
                 LabeledContent(
                     String(localized: "about.app", defaultValue: "App"),

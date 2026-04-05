@@ -9,7 +9,6 @@ struct TutorialMirrorShellView: View {
         if let container = tutorialStore.container {
             TutorialShellTabsView(
                 selectedTab: selectedTabBinding,
-                routePath: routePathBinding,
                 sizeClass: sizeClass
             )
             .environment(tutorialStore)
@@ -72,7 +71,7 @@ struct TutorialMirrorShellView: View {
                 Text(tutorialStore.errorMessage ?? String(localized: "guidedTutorial.error.defaults", defaultValue: "Could not prepare the sandbox tutorial environment."))
             } actions: {
                 Button(String(localized: "common.done", defaultValue: "Done")) {
-                    tutorialStore.dismissShell()
+                    tutorialStore.returnToOverview()
                 }
             }
         }
@@ -84,14 +83,6 @@ struct TutorialMirrorShellView: View {
             set: { tutorialStore.selectTab($0) }
         )
     }
-
-    private var routePathBinding: Binding<[AppRoute]> {
-        Binding(
-            get: { tutorialStore.routePath },
-            set: { tutorialStore.setRoutePath($0) }
-        )
-    }
-
     private var activeModalBinding: Binding<TutorialModal?> {
         Binding(
             get: { tutorialStore.activeModal },

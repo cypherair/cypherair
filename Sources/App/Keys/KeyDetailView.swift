@@ -14,6 +14,7 @@ struct KeyDetailView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.dismiss) private var dismiss
     @Environment(\.macPresentationController) private var macPresentationController
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     @State private var showDeleteConfirmation = false
     @State private var error: CypherAirError?
@@ -37,6 +38,12 @@ struct KeyDetailView: View {
         Group {
             if let key {
                 List {
+                    if let tutorialInlineHeaderContext {
+                        Section {
+                            TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+                        }
+                    }
+
                     Section {
                         LabeledContent(
                             String(localized: "keydetail.name", defaultValue: "Name"),
@@ -218,6 +225,19 @@ struct KeyDetailView: View {
                                 systemImage: "trash"
                             )
                         }
+                    }
+                }
+            } else if let tutorialInlineHeaderContext {
+                List {
+                    Section {
+                        TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+                    }
+
+                    Section {
+                        ContentUnavailableView(
+                            String(localized: "keydetail.notFound", defaultValue: "Key Not Found"),
+                            systemImage: "key.slash"
+                        )
                     }
                 }
             } else {

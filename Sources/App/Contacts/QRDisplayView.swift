@@ -4,6 +4,7 @@ import SwiftUI
 /// Format: cypherair://import/v1/<base64url binary key, no padding>
 struct QRDisplayView: View {
     @Environment(QRService.self) private var qrService
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     let publicKeyData: Data
     let displayName: String
@@ -13,6 +14,38 @@ struct QRDisplayView: View {
     @State private var showError = false
 
     var body: some View {
+        Group {
+            if tutorialInlineHeaderContext != nil {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        tutorialInlineHeader
+                        qrContent
+                    }
+                    .padding()
+                }
+            } else {
+                qrContent
+                    .padding()
+            }
+        }
+        .accessibilityIdentifier("qr.root")
+        .screenReady("qr.ready")
+        .navigationTitle(String(localized: "qr.title", defaultValue: "My Public Key"))
+        .task {
+            generateQR()
+        }
+        .alert(
+            String(localized: "error.title", defaultValue: "Error"),
+            isPresented: $showError,
+            presenting: error
+        ) { _ in
+            Button(String(localized: "error.ok", defaultValue: "OK")) {}
+        } message: { err in
+            Text(err.localizedDescription)
+        }
+    }
+
+    private var qrContent: some View {
         VStack(spacing: 24) {
             if let qrCGImage {
                 Image(decorative: qrCGImage, scale: 1.0)
@@ -37,21 +70,12 @@ struct QRDisplayView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
         }
-        .padding()
-        .accessibilityIdentifier("qr.root")
-        .screenReady("qr.ready")
-        .navigationTitle(String(localized: "qr.title", defaultValue: "My Public Key"))
-        .task {
-            generateQR()
-        }
-        .alert(
-            String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
-        ) { _ in
-            Button(String(localized: "error.ok", defaultValue: "OK")) {}
-        } message: { err in
-            Text(err.localizedDescription)
+    }
+
+    @ViewBuilder
+    private var tutorialInlineHeader: some View {
+        if let tutorialInlineHeaderContext {
+            TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
         }
     }
 

@@ -4,6 +4,12 @@ import SwiftUI
 struct SettingsView: View {
     struct Configuration {
         var onAuthModeConfirmationRequested: (@MainActor (AuthModeChangeConfirmationRequest) -> Void)?
+        var isOnboardingEntryEnabled = true
+        var isGuidedTutorialEntryEnabled = true
+        var isThemePickerEnabled = true
+        var isAppIconEntryEnabled = true
+        var navigationEducationFooter: String?
+        var appearanceEducationFooter: String?
 
         static let `default` = Configuration()
     }
@@ -11,7 +17,9 @@ struct SettingsView: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(AuthenticationManager.self) private var authManager
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     @State private var pendingMode: AuthenticationMode?
     @State private var showModeWarning = false
@@ -31,6 +39,12 @@ struct SettingsView: View {
         @Bindable var config = config
 
         Form {
+            if let tutorialInlineHeaderContext {
+                Section {
+                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+                }
+            }
+
             Section {
                 Picker(
                     String(localized: "settings.authMode", defaultValue: "Authentication Mode"),
@@ -84,6 +98,7 @@ struct SettingsView: View {
                     )
                 }
                 .accessibilityIdentifier("settings.theme")
+                .disabled(!configuration.isThemePickerEnabled)
                 #if canImport(UIKit)
                 NavigationLink(value: AppRoute.appIcon) {
                     Label(
@@ -91,9 +106,14 @@ struct SettingsView: View {
                         systemImage: "app"
                     )
                 }
+                .disabled(!configuration.isAppIconEntryEnabled)
                 #endif
             } header: {
                 Text(String(localized: "settings.appearance", defaultValue: "Appearance"))
+            } footer: {
+                if let appearanceEducationFooter = configuration.appearanceEducationFooter {
+                    Text(appearanceEducationFooter)
+                }
             }
 
             Section {
@@ -107,21 +127,25 @@ struct SettingsView: View {
                 Button {
                     presentOnboarding()
                 } label: {
-                    Label(
+                    settingsActionRow(
                         String(localized: "settings.viewOnboarding", defaultValue: "View Onboarding"),
                         systemImage: "book"
                     )
                 }
                 .accessibilityIdentifier("settings.onboarding")
+                .buttonStyle(.plain)
+                .disabled(!configuration.isOnboardingEntryEnabled)
                 Button {
                     presentTutorial()
                 } label: {
-                    Label(
+                    settingsActionRow(
                         guidedTutorialEntryTitle,
                         systemImage: "testtube.2"
                     )
                 }
                 .accessibilityIdentifier("settings.tutorial")
+                .buttonStyle(.plain)
+                .disabled(!configuration.isGuidedTutorialEntryEnabled)
                 NavigationLink(value: AppRoute.license) {
                     Label(
                         String(localized: "settings.license", defaultValue: "Licenses"),
@@ -136,6 +160,10 @@ struct SettingsView: View {
                     )
                 }
                 .accessibilityIdentifier("settings.about")
+            } footer: {
+                if let navigationEducationFooter = configuration.navigationEducationFooter {
+                    Text(navigationEducationFooter)
+                }
             }
         }
         #if os(macOS)
@@ -185,12 +213,14 @@ struct SettingsView: View {
                 Text(switchError)
             }
         }
+        #if !os(iOS)
         .sheet(isPresented: $showOnboarding) {
-            OnboardingView()
+            OnboardingView(presentationContext: .inApp)
         }
         .sheet(isPresented: $showTutorialOnboarding) {
-            OnboardingView(initialPage: 2)
+            TutorialView(presentationContext: .inApp)
         }
+        #endif
     }
 
     private var hasBackup: Bool {
@@ -267,19 +297,55 @@ struct SettingsView: View {
     }
 
     private func presentOnboarding() {
+        guard configuration.isOnboardingEntryEnabled else { return }
+        #if !os(iOS)
         if let macPresentationController {
             macPresentationController.present(.onboarding(initialPage: 0))
+        } else if let iosPresentationController {
+            iosPresentationController.present(.onboarding(initialPage: 0, context: .inApp))
         } else {
             showOnboarding = true
         }
+        #else
+        if let macPresentationController {
+            macPresentationController.present(.onboarding(initialPage: 0))
+        } else if let iosPresentationController {
+            iosPresentationController.present(.onboarding(initialPage: 0, context: .inApp))
+        }
+        #endif
     }
 
     private func presentTutorial() {
+        guard configuration.isGuidedTutorialEntryEnabled else { return }
+        #if !os(iOS)
         if let macPresentationController {
             macPresentationController.present(.tutorial(presentationContext: .inApp))
+        } else if let iosPresentationController {
+            iosPresentationController.present(.tutorial(presentationContext: .inApp))
         } else {
             showTutorialOnboarding = true
         }
+        #else
+        if let macPresentationController {
+            macPresentationController.present(.tutorial(presentationContext: .inApp))
+        } else if let iosPresentationController {
+            iosPresentationController.present(.tutorial(presentationContext: .inApp))
+        }
+        #endif
+    }
+
+    private func settingsActionRow(
+        _ title: String,
+        systemImage: String
+    ) -> some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
     }
 
     private func makeAuthModeChangeRequest(for newMode: AuthenticationMode) -> AuthModeChangeConfirmationRequest {

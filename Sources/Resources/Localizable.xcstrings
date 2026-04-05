@@ -4671,6 +4671,118 @@
         }
       }
     },
+    "guidedTutorial.sandbox.confirm.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Guided Tutorial runs in a separate sandbox. The keys, contacts, settings, messages, exports, and temporary data created here never affect your real workspace, and the sandbox data is cleaned up when you reset or finish the tutorial."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引导教程会在独立的沙箱中运行。你在这里创建的密钥、联系人、设置、消息、导出文件和临时数据都不会影响真实工作区；当你重置或完成教程时，这些沙箱数据也会被清理。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.sandbox.confirm.points" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Before You Continue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续之前"
+          }
+        }
+      }
+    },
+    "guidedTutorial.sandbox.confirm.primary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I Understand, Continue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我已了解，继续"
+          }
+        }
+      }
+    },
+    "guidedTutorial.sandbox.confirm.realData" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your real keys, contacts, settings, and files stay unchanged."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的真实密钥、联系人、设置和文件都不会被更改。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.sandbox.confirm.realUI" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You will use the real app interface inside the sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你会在沙箱中直接使用真实的应用界面。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.sandbox.confirm.temporaryData" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everything you create in the sandbox is temporary and can be cleared."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你在沙箱中创建的一切都是临时数据，之后可以被清除。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.sandbox.confirm.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm the Sandbox"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认沙箱说明"
+          }
+        }
+      }
+    },
     "guidedTutorial.settings.auth" : {
       "localizations" : {
         "en" : {
@@ -4699,6 +4811,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "引导教程"
+          }
+        }
+      }
+    },
+    "guidedTutorial.settings.restricted.appIcon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Icon changes affect the real app and are unavailable inside the tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 图标修改会影响真实应用，因此在教程沙盒中不可用。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.settings.restricted.navigation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onboarding and Guided Tutorial are unavailable inside the tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在教程沙盒中无法再次打开新手引导或引导教程。"
           }
         }
       }

@@ -7,6 +7,7 @@ struct PostGenerationPromptView: View {
     let onDone: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     init(
         identity: PGPKeyIdentity,
@@ -18,6 +19,12 @@ struct PostGenerationPromptView: View {
 
     var body: some View {
         List {
+            if let tutorialInlineHeaderContext {
+                Section {
+                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+                }
+            }
+
             Section {
                 VStack(spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")

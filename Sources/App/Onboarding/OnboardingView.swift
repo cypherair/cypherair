@@ -5,9 +5,14 @@ import SwiftUI
 struct OnboardingView: View {
     @Environment(AppConfiguration.self) private var config
 
+    let presentationContext: OnboardingPresentationContext
     @State private var currentPage: Int
 
-    init(initialPage: Int = 0) {
+    init(
+        initialPage: Int = 0,
+        presentationContext: OnboardingPresentationContext = .firstRun
+    ) {
+        self.presentationContext = presentationContext
         _currentPage = State(initialValue: min(max(initialPage, 0), 2))
     }
 
@@ -20,7 +25,7 @@ struct OnboardingView: View {
             OnboardingPageTwo()
                 .tag(1)
 
-            OnboardingPageThree()
+            OnboardingPageThree(presentationContext: presentationContext)
                 .tag(2)
         }
         .tabViewStyle(.page(indexDisplayMode: .always))
@@ -31,7 +36,7 @@ struct OnboardingView: View {
                 switch currentPage {
                 case 0: OnboardingPageOne()
                 case 1: OnboardingPageTwo()
-                case 2: OnboardingPageThree()
+                case 2: OnboardingPageThree(presentationContext: presentationContext)
                 default: OnboardingPageOne()
                 }
             }
@@ -122,11 +127,12 @@ struct OnboardingPageTwo: View {
 struct OnboardingPageThree: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
-    #if canImport(UIKit)
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    #endif
+    @Environment(\.iosPresentationController) private var iosPresentationController
 
+    let presentationContext: OnboardingPresentationContext
+    #if !os(iOS)
     @State private var showTutorial = false
+    #endif
 
     var body: some View {
         VStack(spacing: 24) {
@@ -147,7 +153,7 @@ struct OnboardingPageThree: View {
                 .padding(.horizontal, 40)
 
             Button {
-                showTutorial = true
+                presentTutorial()
             } label: {
                 Text(guidedTutorialEntryTitle)
                     .frame(maxWidth: .infinity)
@@ -169,24 +175,7 @@ struct OnboardingPageThree: View {
 
             Spacer()
         }
-        #if canImport(UIKit)
-        .if(sizeClass == .compact) { view in
-            view.fullScreenCover(isPresented: $showTutorial) {
-                TutorialView(presentationContext: .onboardingFirstRun) {
-                    showTutorial = false
-                    dismiss()
-                }
-            }
-        }
-        .if(sizeClass != .compact) { view in
-            view.sheet(isPresented: $showTutorial) {
-                TutorialView(presentationContext: .onboardingFirstRun) {
-                    showTutorial = false
-                    dismiss()
-                }
-            }
-        }
-        #else
+        #if !os(iOS)
         .sheet(isPresented: $showTutorial) {
             TutorialView(presentationContext: .onboardingFirstRun) {
                 showTutorial = false
@@ -205,6 +194,20 @@ struct OnboardingPageThree: View {
         case .completedPreviousVersion:
             String(localized: "guidedTutorial.updated.entry", defaultValue: "Updated Guided Tutorial Available")
         }
+    }
+
+    private func presentTutorial() {
+        #if os(iOS)
+        if let iosPresentationController {
+            iosPresentationController.present(.tutorial(presentationContext: .onboardingFirstRun))
+        }
+        #else
+        if let iosPresentationController {
+            iosPresentationController.present(.tutorial(presentationContext: .onboardingFirstRun))
+        } else {
+            showTutorial = true
+        }
+        #endif
     }
 }
 

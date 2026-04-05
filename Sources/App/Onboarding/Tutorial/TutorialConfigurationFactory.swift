@@ -78,7 +78,19 @@ struct TutorialConfigurationFactory {
         SettingsView.Configuration(
             onAuthModeConfirmationRequested: { [weak store] request in
                 store?.presentAuthModeConfirmation(request)
-            }
+            },
+            isOnboardingEntryEnabled: false,
+            isGuidedTutorialEntryEnabled: false,
+            isThemePickerEnabled: true,
+            isAppIconEntryEnabled: false,
+            navigationEducationFooter: String(
+                localized: "guidedTutorial.settings.restricted.navigation",
+                defaultValue: "Onboarding and Guided Tutorial are unavailable inside the tutorial sandbox."
+            ),
+            appearanceEducationFooter: String(
+                localized: "guidedTutorial.settings.restricted.appIcon",
+                defaultValue: "App Icon changes affect the real app and are unavailable inside the tutorial sandbox."
+            )
         )
     }
 }

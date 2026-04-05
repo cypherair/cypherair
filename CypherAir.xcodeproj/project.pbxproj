@@ -88,11 +88,14 @@
 				App/Onboarding/Tutorial/TutorialGuidanceResolver.swift,
 				App/Onboarding/Tutorial/TutorialModels.swift,
 				App/Onboarding/Tutorial/TutorialRouteDestinationView.swift,
+				App/Onboarding/Tutorial/TutorialSandboxChromeView.swift,
+				App/Onboarding/Tutorial/TutorialShellDefinitionsBuilder.swift,
 				App/Onboarding/Tutorial/TutorialShellTabsView.swift,
 				App/Onboarding/Tutorial/TutorialSurfaceView.swift,
 				App/Onboarding/TutorialAuthModeConfirmationView.swift,
 				App/Onboarding/TutorialChrome.swift,
 				App/Onboarding/TutorialMirrorShellView.swift,
+				App/Onboarding/TutorialSandboxAcknowledgementView.swift,
 				App/Onboarding/TutorialSandboxContainer.swift,
 				App/Onboarding/TutorialSessionStore.swift,
 				App/Onboarding/TutorialSpotlightOverlay.swift,
@@ -111,10 +114,12 @@
 				App/Settings/ThemePickerView.swift,
 				App/Shell/AppRouteNavigation.swift,
 				App/Shell/AppShellTabs.swift,
+				App/Shell/IOSPresentation.swift,
 				App/Shell/MacPresentation.swift,
 				App/Shell/MacPresentationHost.swift,
 				App/Shell/MacShellNavigationState.swift,
 				App/Shell/ScreenReadyModifier.swift,
+				App/Shell/SharedIOSTabShellView.swift,
 				App/Sign/SignView.swift,
 				App/Sign/VerifyView.swift,
 				"Extensions/Data+Zeroing.swift",
@@ -493,7 +498,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -535,7 +540,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.2.1;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -728,7 +733,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -770,7 +775,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.2.1;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",

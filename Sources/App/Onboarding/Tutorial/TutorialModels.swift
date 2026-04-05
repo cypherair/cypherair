@@ -105,6 +105,13 @@ struct TutorialVisibleSurface {
     var route: AppRoute?
 }
 
+enum TutorialFlowPhase: Equatable {
+    case overview
+    case sandboxAcknowledgement
+    case sandbox(task: TutorialTaskID)
+    case completion
+}
+
 struct TutorialNavigationState {
     var selectedTab: AppShellTab = .home
     var pathsByTab: [AppShellTab: [AppRoute]] = Dictionary(
@@ -124,9 +131,26 @@ struct TutorialSessionState {
         uniqueKeysWithValues: TutorialTaskID.allCases.map { ($0, TutorialTaskState()) }
     )
     var artifacts = TutorialArtifacts()
-    var activeTask: TutorialTaskID?
-    var isShellPresented = false
-    var isShowingCompletionView = false
+    var flowPhase: TutorialFlowPhase = .overview
+    var pendingCompletionPromptTask: TutorialTaskID?
+
+    var activeTask: TutorialTaskID? {
+        if case .sandbox(let task) = flowPhase {
+            return task
+        }
+        return nil
+    }
+
+    var isShellPresented: Bool {
+        if case .sandbox = flowPhase {
+            return true
+        }
+        return false
+    }
+
+    var isShowingCompletionView: Bool {
+        flowPhase == .completion
+    }
 
     var completedCount: Int {
         taskStates.values.filter(\.isCompleted).count

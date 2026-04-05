@@ -4,35 +4,32 @@ import SwiftUI
 struct MyKeysView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.appRouteNavigator) private var routeNavigator
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     var body: some View {
         List {
-            ForEach(keyManagement.keys) { key in
-                NavigationLink(value: AppRoute.keyDetail(fingerprint: key.fingerprint)) {
-                    KeyRowView(key: key)
+            if let tutorialInlineHeaderContext {
+                Section {
+                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
                 }
-                .tutorialAnchor(.keyRow(fingerprint: key.fingerprint))
+            }
+
+            if tutorialInlineHeaderContext != nil && keyManagement.keys.isEmpty {
+                Section {
+                    emptyStateContent
+                }
+            } else {
+                ForEach(keyManagement.keys) { key in
+                    NavigationLink(value: AppRoute.keyDetail(fingerprint: key.fingerprint)) {
+                        KeyRowView(key: key)
+                    }
+                    .tutorialAnchor(.keyRow(fingerprint: key.fingerprint))
+                }
             }
         }
         .overlay {
-            if keyManagement.keys.isEmpty {
-                ContentUnavailableView {
-                    Label(
-                        String(localized: "keys.empty.title", defaultValue: "No Keys"),
-                        systemImage: "key.slash"
-                    )
-                } description: {
-                    Text(String(localized: "keys.empty.description", defaultValue: "Generate or import a key to get started."))
-                } actions: {
-                    Button {
-                        routeNavigator.open(.keyGeneration)
-                    } label: {
-                        Text(String(localized: "keys.generate", defaultValue: "Generate Key"))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tutorialAnchor(.keysGenerateButton)
-                    .accessibilityIdentifier("keys.generate")
-                }
+            if tutorialInlineHeaderContext == nil && keyManagement.keys.isEmpty {
+                emptyStateContent
             }
         }
         .navigationTitle(String(localized: "keys.title", defaultValue: "My Keys"))
@@ -63,6 +60,26 @@ struct MyKeysView: View {
                 .accessibilityLabel(String(localized: "keys.actions.menu", defaultValue: "Key Actions"))
                 .accessibilityHint(String(localized: "keys.actions.menu.hint", defaultValue: "Open actions to generate or import a key."))
             }
+        }
+    }
+
+    private var emptyStateContent: some View {
+        ContentUnavailableView {
+            Label(
+                String(localized: "keys.empty.title", defaultValue: "No Keys"),
+                systemImage: "key.slash"
+            )
+        } description: {
+            Text(String(localized: "keys.empty.description", defaultValue: "Generate or import a key to get started."))
+        } actions: {
+            Button {
+                routeNavigator.open(.keyGeneration)
+            } label: {
+                Text(String(localized: "keys.generate", defaultValue: "Generate Key"))
+            }
+            .buttonStyle(.borderedProminent)
+            .tutorialAnchor(.keysGenerateButton)
+            .accessibilityIdentifier("keys.generate")
         }
     }
 }

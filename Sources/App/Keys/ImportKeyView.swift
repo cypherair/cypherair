@@ -6,6 +6,7 @@ struct ImportKeyView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     @State private var armoredText = ""
     @State private var passphrase = ""
@@ -19,6 +20,12 @@ struct ImportKeyView: View {
 
     var body: some View {
         Form {
+            if let tutorialInlineHeaderContext {
+                Section {
+                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+                }
+            }
+
             Section {
                 if let fileName = importedFileName, importedKeyData != nil {
                     HStack {
