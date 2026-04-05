@@ -43,12 +43,15 @@ struct VerifyView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .disabled(operation.isRunning)
             }
 
             if verifyMode == .cleartext {
                 cleartextContent
+                    .disabled(operation.isRunning)
             } else {
                 detachedContent
+                    .disabled(operation.isRunning)
             }
 
             Section {
@@ -64,14 +67,15 @@ struct VerifyView: View {
                             if verifyMode == .detached, let progress = operation.progress {
                                 ProgressView(value: progress.fractionCompleted)
                                     .progressViewStyle(.linear)
-                                Text(String(localized: "verify.verifying", defaultValue: "Verifying..."))
+                                Text(
+                                    operation.isCancelling
+                                        ? String(localized: "common.cancelling", defaultValue: "Cancelling...")
+                                        : String(localized: "verify.verifying", defaultValue: "Verifying...")
+                                )
                             } else {
                                 ProgressView()
-                            }
-                            if verifyMode == .detached {
-                                Spacer()
-                                Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                                    operation.cancel()
+                                if operation.isCancelling {
+                                    Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
                                 }
                             }
                         }
@@ -83,6 +87,23 @@ struct VerifyView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(verifyButtonDisabled)
+            }
+
+            if showsDetachedCancelAction {
+                Section {
+                    if operation.isCancelling {
+                        LabeledContent {
+                            Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
+                                .foregroundStyle(.secondary)
+                        } label: {
+                            Text(String(localized: "common.cancel", defaultValue: "Cancel"))
+                        }
+                    } else {
+                        Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
+                            operation.cancel()
+                        }
+                    }
+                }
             }
 
             if verifyMode == .cleartext, let cleartextOriginalText {
@@ -304,6 +325,10 @@ struct VerifyView: View {
         #else
         return (150, 220, 320)
         #endif
+    }
+
+    private var showsDetachedCancelAction: Bool {
+        verifyMode == .detached && operation.isRunning && operation.progress != nil
     }
 
     // MARK: - Actions

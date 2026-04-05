@@ -225,7 +225,6 @@ struct CypherAirApp: App {
     }
 }
 
-#if os(macOS)
 struct AppLaunchConfiguration {
     enum Root: String {
         case main
@@ -262,7 +261,6 @@ struct AppLaunchConfiguration {
         }
     }
 }
-#endif
 
 #if os(iOS)
 private final class CypherAirKeyboardPolicyDelegate: NSObject, UIApplicationDelegate {

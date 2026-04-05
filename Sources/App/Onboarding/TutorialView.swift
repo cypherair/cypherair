@@ -121,7 +121,7 @@ struct TutorialView: View {
             }
         }
         .padding(20)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .tutorialCardChrome(.hero)
     }
 
     private var completionView: some View {
@@ -148,7 +148,7 @@ struct TutorialView: View {
                         .buttonStyle(.borderedProminent)
                     }
                     .padding(20)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .tutorialCardChrome(.hero)
 
                     VStack(alignment: .leading, spacing: 14) {
                         Text(String(localized: "guidedTutorial.completion.next.header", defaultValue: "Next Steps"))
@@ -167,7 +167,7 @@ struct TutorialView: View {
                         .foregroundStyle(.secondary)
                     }
                     .padding(20)
-                    .background(.background.secondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .tutorialCardChrome(.standard)
                 }
                 .padding()
             }
@@ -218,7 +218,7 @@ struct TutorialView: View {
             }
         }
         .padding(20)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .tutorialCardChrome(.standard)
     }
 
     private func canOpen(_ task: TutorialTaskID) -> Bool {

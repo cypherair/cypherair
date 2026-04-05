@@ -786,6 +786,22 @@
         }
       }
     },
+    "common.cancelling" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelling..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在取消..."
+          }
+        }
+      }
+    },
     "common.comingSoon" : {
       "localizations" : {
         "en" : {
@@ -834,6 +850,22 @@
         }
       }
     },
+    "common.no" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "否"
+          }
+        }
+      }
+    },
     "common.save" : {
       "localizations" : {
         "en" : {
@@ -846,6 +878,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存"
+          }
+        }
+      }
+    },
+    "common.yes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "是"
           }
         }
       }
@@ -1423,6 +1471,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "检查收件人"
+          }
+        }
+      }
+    },
+    "decrypt.parse.checking" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking recipients..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查收件人..."
           }
         }
       }
@@ -4963,6 +5027,7 @@
       }
     },
     "home.macOS.hint" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5135,6 +5200,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "导入密钥"
+          }
+        }
+      }
+    },
+    "import.canEncrypt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can Encrypt To"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可用于加密"
           }
         }
       }
@@ -5391,6 +5472,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此密钥已被吊销"
+          }
+        }
+      }
+    },
+    "import.shortKeyId" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short Key ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "短密钥 ID"
           }
         }
       }
@@ -6223,6 +6320,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "导入密钥"
+          }
+        }
+      }
+    },
+    "keys.actions.menu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Actions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥操作"
+          }
+        }
+      }
+    },
+    "keys.actions.menu.hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open actions to generate or import a key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开菜单以生成或导入密钥。"
           }
         }
       }

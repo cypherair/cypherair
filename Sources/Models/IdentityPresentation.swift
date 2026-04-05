@@ -7,19 +7,24 @@ enum IdentityPresentation {
     }
 
     static func formattedFingerprint(_ fingerprint: String) -> String {
+        fingerprintGroups(fingerprint).joined(separator: " ")
+    }
+
+    static func fingerprintGroups(_ fingerprint: String) -> [String] {
         stride(from: 0, to: fingerprint.count, by: 4).map { offset in
             let start = fingerprint.index(fingerprint.startIndex, offsetBy: offset)
             let end = fingerprint.index(start, offsetBy: min(4, fingerprint.count - offset))
             return String(fingerprint[start..<end])
-        }.joined(separator: " ")
+        }
+    }
+
+    static func fingerprintAccessibilityGroupLabel(_ group: String) -> String {
+        group.map(String.init).joined(separator: " ")
     }
 
     static func fingerprintAccessibilityLabel(_ fingerprint: String) -> String {
-        formattedFingerprint(fingerprint)
-            .split(separator: " ")
-            .map { group in
-                group.map(String.init).joined(separator: " ")
-            }
+        fingerprintGroups(fingerprint)
+            .map(fingerprintAccessibilityGroupLabel(_:))
             .joined(separator: ", ")
     }
 

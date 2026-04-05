@@ -44,12 +44,15 @@ struct SignView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .disabled(operation.isRunning)
             }
 
             if signMode == .text {
                 textSigningContent
+                    .disabled(operation.isRunning)
             } else {
                 fileSigningContent
+                    .disabled(operation.isRunning)
             }
 
             Section {
@@ -65,6 +68,7 @@ struct SignView: View {
                     }
                 }
             }
+            .disabled(operation.isRunning)
 
             Section {
                 Button {
@@ -79,14 +83,15 @@ struct SignView: View {
                             if signMode == .file, let progress = operation.progress {
                                 ProgressView(value: progress.fractionCompleted)
                                     .progressViewStyle(.linear)
-                                Text(String(localized: "sign.signing", defaultValue: "Signing..."))
+                                Text(
+                                    operation.isCancelling
+                                        ? String(localized: "common.cancelling", defaultValue: "Cancelling...")
+                                        : String(localized: "sign.signing", defaultValue: "Signing...")
+                                )
                             } else {
                                 ProgressView()
-                            }
-                            if signMode == .file {
-                                Spacer()
-                                Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                                    operation.cancel()
+                                if operation.isCancelling {
+                                    Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
                                 }
                             }
                         }
@@ -98,6 +103,23 @@ struct SignView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(signButtonDisabled)
+            }
+
+            if showsFileCancelAction {
+                Section {
+                    if operation.isCancelling {
+                        LabeledContent {
+                            Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
+                                .foregroundStyle(.secondary)
+                        } label: {
+                            Text(String(localized: "common.cancel", defaultValue: "Cancel"))
+                        }
+                    } else {
+                        Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
+                            operation.cancel()
+                        }
+                    }
+                }
             }
 
             if signMode == .text, let signedMessage {
@@ -282,6 +304,10 @@ struct SignView: View {
         #else
         return (150, 220, 320)
         #endif
+    }
+
+    private var showsFileCancelAction: Bool {
+        signMode == .file && operation.isRunning && operation.progress != nil
     }
 
     // MARK: - Actions

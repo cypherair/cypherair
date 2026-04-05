@@ -104,11 +104,7 @@ struct KeyDetailView: View {
                     }
 
                     Section {
-                        Text(key.formattedFingerprint)
-                            .font(.system(.body, design: .monospaced))
-                            .accessibilityLabel(
-                                IdentityPresentation.fingerprintAccessibilityLabel(key.fingerprint)
-                            )
+                        FingerprintView(fingerprint: key.fingerprint)
                     } header: {
                         Text(String(localized: "keydetail.fingerprint", defaultValue: "Fingerprint"))
                     }

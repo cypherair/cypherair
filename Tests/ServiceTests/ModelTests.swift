@@ -284,6 +284,27 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(identity.formattedFingerprint, "abcd ef12 3456 7890")
     }
 
+    func test_identityPresentation_fingerprintGroups_groupsInChunksOfFour() {
+        XCTAssertEqual(
+            IdentityPresentation.fingerprintGroups("abcdef1234567890"),
+            ["abcd", "ef12", "3456", "7890"]
+        )
+    }
+
+    func test_identityPresentation_fingerprintGroups_preservesShortFinalGroup() {
+        XCTAssertEqual(
+            IdentityPresentation.fingerprintGroups("abcdef12345"),
+            ["abcd", "ef12", "345"]
+        )
+    }
+
+    func test_identityPresentation_fingerprintAccessibilityGroupLabel_spellsCharacters() {
+        XCTAssertEqual(
+            IdentityPresentation.fingerprintAccessibilityGroupLabel("ab12"),
+            "a b 1 2"
+        )
+    }
+
     // MARK: - KeyProfile+Codable
 
     func test_keyProfile_encodeDecode_universal_roundTrip() throws {
