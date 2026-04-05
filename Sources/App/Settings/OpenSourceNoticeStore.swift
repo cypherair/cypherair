@@ -59,10 +59,9 @@ struct OpenSourceNoticeStore {
     }
 
     func loadNotices() throws -> [OpenSourceNotice] {
-        guard let manifestURL = bundle.url(
+        guard let manifestURL = bundledResourceURL(
             forResource: Self.manifestName,
-            withExtension: Self.manifestExtension,
-            subdirectory: subdirectory
+            withExtension: Self.manifestExtension
         ) else {
             throw StoreError.noticesFileMissing
         }
@@ -89,10 +88,9 @@ struct OpenSourceNoticeStore {
         let resourceName = (notice.licenseFileResourceName as NSString).deletingPathExtension
         let resourceExtension = (notice.licenseFileResourceName as NSString).pathExtension
 
-        guard let licenseURL = bundle.url(
+        guard let licenseURL = bundledResourceURL(
             forResource: resourceName,
-            withExtension: resourceExtension.isEmpty ? nil : resourceExtension,
-            subdirectory: subdirectory
+            withExtension: resourceExtension.isEmpty ? nil : resourceExtension
         ) else {
             throw StoreError.licenseFileMissing(fileName: notice.licenseFileResourceName)
         }
@@ -135,6 +133,14 @@ struct OpenSourceNoticeStore {
                 token.localizedCaseInsensitiveContains(trimmed)
             }
         }
+    }
+
+    private func bundledResourceURL(forResource name: String, withExtension ext: String?) -> URL? {
+        if let nestedURL = bundle.url(forResource: name, withExtension: ext, subdirectory: subdirectory) {
+            return nestedURL
+        }
+
+        return bundle.url(forResource: name, withExtension: ext)
     }
 
     private func noticeSort(lhs: OpenSourceNotice, rhs: OpenSourceNotice) -> Bool {
