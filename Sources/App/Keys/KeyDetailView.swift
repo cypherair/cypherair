@@ -12,7 +12,6 @@ struct KeyDetailView: View {
     let fingerprint: String
 
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
     @Environment(\.macPresentationController) private var macPresentationController
 
@@ -24,7 +23,6 @@ struct KeyDetailView: View {
     @State private var activeExport: ExportType?
     @State private var showExpirySheet = false
     @State private var newExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
-    @State private var isModifyingExpiry = false
 
     private enum ExportType {
         case publicKey
@@ -271,50 +269,7 @@ struct KeyDetailView: View {
         }
         .sheet(isPresented: $showExpirySheet) {
             NavigationStack {
-                Form {
-                    Section {
-                        DatePicker(
-                            String(localized: "keydetail.expiry.newDate", defaultValue: "New Expiry Date"),
-                            selection: $newExpiryDate,
-                            in: (Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date())...(Calendar.current.date(byAdding: .year, value: 10, to: Date()) ?? Date()),
-                            displayedComponents: .date
-                        )
-                    } header: {
-                        Text(String(localized: "keydetail.expiry.setDate", defaultValue: "Set Expiry Date"))
-                    }
-
-                    Section {
-                        Button {
-                            performModifyExpiry(seconds: nil)
-                        } label: {
-                            Label(
-                                String(localized: "keydetail.expiry.removeExpiry", defaultValue: "Remove Expiry (Never Expire)"),
-                                systemImage: "infinity"
-                            )
-                        }
-                    }
-                }
-                .navigationTitle(String(localized: "keydetail.expiry.title", defaultValue: "Modify Expiry"))
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(String(localized: "keydetail.expiry.cancel", defaultValue: "Cancel")) {
-                            showExpirySheet = false
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(String(localized: "keydetail.expiry.save", defaultValue: "Save")) {
-                            let seconds = UInt64(max(0, newExpiryDate.timeIntervalSinceNow))
-                            performModifyExpiry(seconds: seconds)
-                        }
-                        .disabled(isModifyingExpiry)
-                    }
-                }
-                .overlay {
-                    if isModifyingExpiry {
-                        ProgressView()
-                    }
-                }
-                .disabled(isModifyingExpiry)
+                ModifyExpirySheetView(request: modifyExpiryRequest)
             }
             #if os(macOS)
             .frame(minWidth: 500, idealWidth: 540, minHeight: 320, idealHeight: 380)
@@ -369,146 +324,23 @@ struct KeyDetailView: View {
         }
     }
 
-    private func performModifyExpiry(seconds: UInt64?) {
-        isModifyingExpiry = true
-        let service = keyManagement
-        let fp = fingerprint
-        let authMode = config.authMode
-        Task {
-            do {
-                _ = try await service.modifyExpiry(
-                    fingerprint: fp,
-                    newExpirySeconds: seconds,
-                    authMode: authMode
-                )
-                armoredPublicKey = try? service.exportPublicKey(fingerprint: fp)
-                showExpirySheet = false
-            } catch {
-                self.error = CypherAirError.from(error) { .keychainError($0) }
-                showError = true
-            }
-            isModifyingExpiry = false
+    private var modifyExpiryRequest: ModifyExpiryRequest {
+        ModifyExpiryRequest(
+            fingerprint: fingerprint,
+            initialDate: newExpiryDate
+        ) {
+            armoredPublicKey = try? keyManagement.exportPublicKey(fingerprint: fingerprint)
+            showExpirySheet = false
         }
     }
 
     private func presentModifyExpiry() {
         if let macPresentationController {
             macPresentationController.present(
-                .modifyExpiry(
-                    ModifyExpiryRequest(
-                        fingerprint: fingerprint,
-                        initialDate: newExpiryDate
-                    )
-                )
+                .modifyExpiry(modifyExpiryRequest)
             )
         } else {
             showExpirySheet = true
-        }
-    }
-}
-
-@MainActor
-struct ModifyExpiryRequest: Identifiable {
-    let id = UUID()
-    let fingerprint: String
-    let initialDate: Date
-}
-
-struct ModifyExpirySheetView: View {
-    let request: ModifyExpiryRequest
-
-    @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppConfiguration.self) private var config
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var newExpiryDate: Date
-    @State private var isModifyingExpiry = false
-    @State private var error: CypherAirError?
-    @State private var showError = false
-
-    init(request: ModifyExpiryRequest) {
-        self.request = request
-        _newExpiryDate = State(initialValue: request.initialDate)
-    }
-
-    var body: some View {
-        Form {
-            Section {
-                DatePicker(
-                    String(localized: "keydetail.expiry.newDate", defaultValue: "New Expiry Date"),
-                    selection: $newExpiryDate,
-                    in: (Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date())...(Calendar.current.date(byAdding: .year, value: 10, to: Date()) ?? Date()),
-                    displayedComponents: .date
-                )
-            } header: {
-                Text(String(localized: "keydetail.expiry.setDate", defaultValue: "Set Expiry Date"))
-            }
-
-            Section {
-                Button {
-                    performModifyExpiry(seconds: nil)
-                } label: {
-                    Label(
-                        String(localized: "keydetail.expiry.removeExpiry", defaultValue: "Remove Expiry (Never Expire)"),
-                        systemImage: "infinity"
-                    )
-                }
-            }
-        }
-        .accessibilityIdentifier("modifyexpiry.root")
-        .screenReady("modifyexpiry.ready")
-        .navigationTitle(String(localized: "keydetail.expiry.title", defaultValue: "Modify Expiry"))
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button(String(localized: "keydetail.expiry.cancel", defaultValue: "Cancel")) {
-                    dismiss()
-                }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button(String(localized: "keydetail.expiry.save", defaultValue: "Save")) {
-                    let seconds = UInt64(max(0, newExpiryDate.timeIntervalSinceNow))
-                    performModifyExpiry(seconds: seconds)
-                }
-                .accessibilityIdentifier("modifyexpiry.save")
-                .disabled(isModifyingExpiry)
-            }
-        }
-        .overlay {
-            if isModifyingExpiry {
-                ProgressView()
-            }
-        }
-        .disabled(isModifyingExpiry)
-        .alert(
-            String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
-        ) { _ in
-            Button(String(localized: "error.ok", defaultValue: "OK")) {}
-        } message: { err in
-            Text(err.localizedDescription)
-        }
-    }
-
-    private func performModifyExpiry(seconds: UInt64?) {
-        isModifyingExpiry = true
-        let service = keyManagement
-        let fingerprint = request.fingerprint
-        let authMode = config.authMode
-
-        Task {
-            do {
-                _ = try await service.modifyExpiry(
-                    fingerprint: fingerprint,
-                    newExpirySeconds: seconds,
-                    authMode: authMode
-                )
-                dismiss()
-            } catch {
-                self.error = CypherAirError.from(error) { .keychainError($0) }
-                showError = true
-            }
-            isModifyingExpiry = false
         }
     }
 }

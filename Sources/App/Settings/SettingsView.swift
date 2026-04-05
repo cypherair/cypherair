@@ -1,16 +1,5 @@
 import SwiftUI
 
-@MainActor
-struct AuthModeChangeConfirmationRequest: Identifiable {
-    let id = UUID()
-    let pendingMode: AuthenticationMode
-    let title: String
-    let message: String
-    let requiresRiskAcknowledgement: Bool
-    let onConfirm: @MainActor () -> Void
-    let onCancel: @MainActor () -> Void
-}
-
 /// Settings screen with auth mode, grace period, and other preferences.
 struct SettingsView: View {
     struct Configuration {
@@ -23,9 +12,6 @@ struct SettingsView: View {
     @Environment(AuthenticationManager.self) private var authManager
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.macPresentationController) private var macPresentationController
-    #if canImport(UIKit)
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    #endif
 
     @State private var pendingMode: AuthenticationMode?
     @State private var showModeWarning = false
@@ -34,7 +20,6 @@ struct SettingsView: View {
     @State private var showSwitchError = false
     @State private var showOnboarding = false
     @State private var showTutorialOnboarding = false
-    @State private var riskAcknowledged = false
 
     let configuration: Configuration
 
@@ -167,67 +152,21 @@ struct SettingsView: View {
             ),
             titleVisibility: .visible
         ) {
-            if pendingMode == .highSecurity && !hasBackup {
-                Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {
-                    pendingMode = nil
-                }
-            } else {
-                Button(String(localized: "settings.mode.confirm", defaultValue: "Switch Mode"), role: .destructive) {
-                    performModeSwitch()
-                }
-                Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {
-                    pendingMode = nil
-                }
+            Button(String(localized: "settings.mode.confirm", defaultValue: "Switch Mode"), role: .destructive) {
+                performModeSwitch()
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {
+                pendingMode = nil
             }
         } message: {
-            if pendingMode == .highSecurity && !hasBackup {
-                Text(String(localized: "settings.mode.highWarning.noBackup.useSheet", defaultValue: "You have not backed up any keys. A separate confirmation is required."))
-            } else {
-                Text(modeWarningMessage)
-            }
+            Text(modeWarningMessage)
         }
         .sheet(isPresented: Binding(
             get: { shouldUseModeSheet && showModeWarning },
-            set: { if !$0 { pendingMode = nil; riskAcknowledged = false } }
+            set: { if !$0 { pendingMode = nil } }
         )) {
             NavigationStack {
-                Form {
-                    Section {
-                        Text(modeWarningMessage)
-                            .font(.callout)
-                    }
-
-                    if pendingMode == .highSecurity && !hasBackup {
-                        Section {
-                            Toggle(isOn: $riskAcknowledged) {
-                                Text(String(localized: "settings.mode.riskAck", defaultValue: "I understand that if biometrics become unavailable, I will lose access to my private keys"))
-                                    .font(.callout)
-                            }
-                        }
-                    }
-
-                    Section {
-                        Button(String(localized: "settings.mode.confirm", defaultValue: "Switch Mode"), role: .destructive) {
-                            showModeWarning = false
-                            performModeSwitch()
-                        }
-                        .tutorialAnchor(.settingsModeConfirmButton)
-                        .disabled((pendingMode == .highSecurity && !hasBackup) && !riskAcknowledged)
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-                .navigationTitle(String(localized: "settings.mode.highWarning.title", defaultValue: "Enable High Security Mode"))
-                #if canImport(UIKit)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                            pendingMode = nil
-                            riskAcknowledged = false
-                        }
-                    }
-                }
+                SettingsAuthModeConfirmationSheetView(request: activeAuthModeChangeRequest)
             }
             #if os(macOS)
             .frame(minWidth: 500, idealWidth: 540, minHeight: 360, idealHeight: 420)
@@ -279,6 +218,10 @@ struct SettingsView: View {
 
     private var modeWarningMessage: String {
         warningMessage(for: pendingMode ?? config.authMode, hasBackup: hasBackup)
+    }
+
+    private var activeAuthModeChangeRequest: AuthModeChangeConfirmationRequest {
+        makeAuthModeChangeRequest(for: pendingMode ?? config.authMode)
     }
 
     private func performModeSwitch() {
@@ -351,7 +294,6 @@ struct SettingsView: View {
             },
             onCancel: {
                 pendingMode = nil
-                riskAcknowledged = false
             }
         )
     }
@@ -425,65 +367,3 @@ struct MacSettingsRootView: View {
     }
 }
 #endif
-
-struct SettingsAuthModeConfirmationSheetView: View {
-    let request: AuthModeChangeConfirmationRequest
-
-    @State private var riskAcknowledged = false
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        Form {
-            Section {
-                Text(request.message)
-                    .font(.callout)
-            }
-
-            if request.requiresRiskAcknowledgement {
-                Section {
-                    Toggle(isOn: $riskAcknowledged) {
-                        Text(String(localized: "settings.mode.riskAck", defaultValue: "I understand that if biometrics become unavailable, I will lose access to my private keys"))
-                            .font(.callout)
-                    }
-                }
-            }
-
-            Section {
-                Button(String(localized: "settings.mode.confirm", defaultValue: "Switch Mode"), role: .destructive) {
-                    dismiss()
-                    request.onConfirm()
-                }
-                .accessibilityIdentifier("settings.mode.confirm")
-                .disabled(request.requiresRiskAcknowledgement && !riskAcknowledged)
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .screenReady("settings.authmode.ready")
-        .navigationTitle(request.title)
-        #if canImport(UIKit)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                    dismiss()
-                    request.onCancel()
-                }
-            }
-        }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func `if`<Content: View>(
-        _ condition: Bool,
-        transform: (Self) -> Content
-    ) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
-        }
-    }
-}

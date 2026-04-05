@@ -18,9 +18,17 @@ struct QRPhotoImportView: View {
     @State private var error: CypherAirError?
     @State private var showError = false
     @State private var showSuccess = false
-    @State private var pendingKeyUpdate: PendingQRKeyUpdate?
+    @State private var pendingKeyUpdateRequest: ContactKeyUpdateConfirmationRequest?
     @State private var showKeyUpdateAlert = false
     @State private var fallbackImportConfirmationCoordinator = ImportConfirmationCoordinator()
+
+    private var importLoader: PublicKeyImportLoader {
+        PublicKeyImportLoader(qrService: qrService)
+    }
+
+    private var importWorkflow: ContactImportWorkflow {
+        ContactImportWorkflow(contactService: contactService)
+    }
 
     var body: some View {
         if importConfirmationCoordinator == nil {
@@ -90,81 +98,49 @@ struct QRPhotoImportView: View {
         .alert(
             String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
             isPresented: $showKeyUpdateAlert,
-            presenting: pendingKeyUpdate
-        ) { update in
+            presenting: pendingKeyUpdateRequest
+        ) { request in
             Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
-                do {
-                    try contactService.confirmKeyUpdate(
-                        existingFingerprint: update.existingContact.fingerprint,
-                        newContact: update.newContact,
-                        keyData: update.keyData
-                    )
-                    importedContact = update.newContact
-                    showSuccess = true
-                } catch {
-                    self.error = CypherAirError.from(error) { _ in .invalidQRCode }
-                    showError = true
-                }
+                pendingKeyUpdateRequest = nil
+                request.onConfirm()
             }
-            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {}
-        } message: { update in
+            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
+                pendingKeyUpdateRequest = nil
+                request.onCancel()
+            }
+        } message: { request in
             Text(String(localized: "addcontact.keyUpdate.message",
-                        defaultValue: "This contact (\(update.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
+                        defaultValue: "This contact (\(request.pendingUpdate.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
         }
     }
 
     private func processSelectedPhoto(_ item: PhotosPickerItem) {
         isProcessing = true
-        let service = qrService
         Task {
             defer { isProcessing = false }
             do {
-                guard let data = try await item.loadTransferable(type: Data.self) else {
-                    error = .invalidQRCode
-                    showError = true
-                    return
-                }
-
-                guard let ciImage = CIImage(data: data) else {
-                    error = .invalidQRCode
-                    showError = true
-                    return
-                }
-
-                let qrStrings = try await service.decodeQRCodes(from: ciImage)
-
-                // Find the first cypherair:// URL
-                guard let urlString = qrStrings.first(where: { $0.hasPrefix("cypherair://") }),
-                      let url = URL(string: urlString) else {
-                    error = .invalidQRCode
-                    showError = true
-                    return
-                }
-
-                let publicKeyData = try service.parseImportURL(url)
-
-                // PRD §4.2: Show confirmation with fingerprint verification before adding.
-                let keyInfo = try service.inspectKeyInfo(keyData: publicKeyData)
-                let profile = try service.detectKeyProfile(keyData: publicKeyData)
-                activeImportConfirmationCoordinator.present(ImportConfirmationRequest(
-                    keyData: publicKeyData,
-                    keyInfo: keyInfo,
-                    profile: profile,
-                    allowsUnverifiedImport: true,
-                    onImportVerified: {
-                        confirmImport(
-                            keyData: publicKeyData,
-                            verificationState: .verified
-                        )
-                    },
-                    onImportUnverified: {
-                        confirmImport(
-                            keyData: publicKeyData,
-                            verificationState: .unverified
-                        )
-                    },
-                    onCancel: { }
-                ))
+                let inspection = try await importLoader.loadFromQRPhoto(item)
+                activeImportConfirmationCoordinator.present(
+                    importWorkflow.makeImportConfirmationRequest(
+                        inspection: inspection,
+                        allowsUnverifiedImport: true,
+                        onSuccess: { contact in
+                            activeImportConfirmationCoordinator.dismiss()
+                            importedContact = contact
+                            showSuccess = true
+                        },
+                        onReplaceRequested: { request in
+                            activeImportConfirmationCoordinator.dismiss()
+                            pendingKeyUpdateRequest = request
+                            showKeyUpdateAlert = true
+                        },
+                        onFailure: { importError in
+                            error = importError
+                            activeImportConfirmationCoordinator.dismiss()
+                            showError = true
+                        }
+                    )
+                )
             } catch {
                 self.error = CypherAirError.from(error) { _ in .invalidQRCode }
                 showError = true
@@ -172,44 +148,7 @@ struct QRPhotoImportView: View {
         }
     }
 
-    private func confirmImport(
-        keyData: Data,
-        verificationState: ContactVerificationState
-    ) {
-        do {
-            let result = try contactService.addContact(
-                publicKeyData: keyData,
-                verificationState: verificationState
-            )
-            switch result {
-            case .added(let contact), .duplicate(let contact):
-                importedContact = contact
-                activeImportConfirmationCoordinator.dismiss()
-                showSuccess = true
-            case .keyUpdateDetected(let newContact, let existingContact, let keyData):
-                activeImportConfirmationCoordinator.dismiss()
-                pendingKeyUpdate = PendingQRKeyUpdate(
-                    newContact: newContact,
-                    existingContact: existingContact,
-                    keyData: keyData
-                )
-                showKeyUpdateAlert = true
-            }
-        } catch {
-            self.error = CypherAirError.from(error) { _ in .invalidQRCode }
-            activeImportConfirmationCoordinator.dismiss()
-            showError = true
-        }
-    }
-
     private var activeImportConfirmationCoordinator: ImportConfirmationCoordinator {
         importConfirmationCoordinator ?? fallbackImportConfirmationCoordinator
     }
-}
-
-/// Holds state for a pending key update confirmation via QR import.
-private struct PendingQRKeyUpdate {
-    let newContact: Contact
-    let existingContact: Contact
-    let keyData: Data
 }

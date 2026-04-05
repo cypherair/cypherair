@@ -15,6 +15,7 @@ struct CypherAirApp: App {
     @State private var container: AppContainer
 
     @State private var importError: CypherAirError?
+    @State private var pendingKeyUpdateRequest: ContactKeyUpdateConfirmationRequest?
     @State private var loadError: String?
     @State private var tutorialStore = TutorialSessionStore()
     @State private var importConfirmationCoordinator = ImportConfirmationCoordinator()
@@ -85,6 +86,26 @@ struct CypherAirApp: App {
                     if let importError {
                         Text(importError.localizedDescription)
                     }
+                }
+                .alert(
+                    String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
+                    isPresented: Binding(
+                        get: { pendingKeyUpdateRequest != nil },
+                        set: { if !$0 { pendingKeyUpdateRequest = nil } }
+                    ),
+                    presenting: pendingKeyUpdateRequest
+                ) { request in
+                    Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
+                        pendingKeyUpdateRequest = nil
+                        request.onConfirm()
+                    }
+                    Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
+                        pendingKeyUpdateRequest = nil
+                        request.onCancel()
+                    }
+                } message: { request in
+                    Text(String(localized: "addcontact.keyUpdate.message",
+                                defaultValue: "This contact (\(request.pendingUpdate.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
                 }
                 .alert(
                     String(localized: "app.loadError.title", defaultValue: "Load Warning"),
@@ -172,56 +193,28 @@ struct CypherAirApp: App {
         guard url.scheme == "cypherair" else { return }
 
         do {
-            let publicKeyData = try container.qrService.parseImportURL(url)
-            let keyInfo = try container.qrService.inspectKeyInfo(keyData: publicKeyData)
-            let profile = try container.qrService.detectKeyProfile(keyData: publicKeyData)
+            let inspection = try PublicKeyImportLoader(qrService: container.qrService).loadFromURL(url)
+            let workflow = ContactImportWorkflow(contactService: container.contactService)
             importConfirmationCoordinator.present(
-                ImportConfirmationRequest(
-                    keyData: publicKeyData,
-                    keyInfo: keyInfo,
-                    profile: profile,
+                workflow.makeImportConfirmationRequest(
+                    inspection: inspection,
                     allowsUnverifiedImport: true,
-                    onImportVerified: {
-                        completePendingImport(
-                            keyData: publicKeyData,
-                            verificationState: .verified
-                        )
+                    onSuccess: { _ in
+                        importConfirmationCoordinator.dismiss()
                     },
-                    onImportUnverified: {
-                        completePendingImport(
-                            keyData: publicKeyData,
-                            verificationState: .unverified
-                        )
+                    onReplaceRequested: { request in
+                        importConfirmationCoordinator.dismiss()
+                        pendingKeyUpdateRequest = request
                     },
-                    onCancel: { }
+                    onFailure: { importError in
+                        self.importError = importError
+                        importConfirmationCoordinator.dismiss()
+                    }
                 )
             )
         } catch {
             importError = CypherAirError.from(error) { _ in .invalidQRCode }
         }
-    }
-
-    private func completePendingImport(
-        keyData: Data,
-        verificationState: ContactVerificationState
-    ) {
-        do {
-            let result = try container.contactService.addContact(
-                publicKeyData: keyData,
-                verificationState: verificationState
-            )
-            if case .keyUpdateDetected(let newContact, let existingContact, let keyData) = result {
-                // User confirmed import via ImportConfirmView — proceed with replacement.
-                try container.contactService.confirmKeyUpdate(
-                    existingFingerprint: existingContact.fingerprint,
-                    newContact: newContact,
-                    keyData: keyData
-                )
-            }
-        } catch {
-            importError = CypherAirError.from(error) { _ in .invalidQRCode }
-        }
-        importConfirmationCoordinator.dismiss()
     }
 }
 
