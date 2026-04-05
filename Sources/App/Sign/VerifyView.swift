@@ -395,7 +395,7 @@ struct VerifyView: View {
 
     private func importCleartextFile(from url: URL) {
         do {
-            let data = try withSecurityScopedAccess(
+            let data = try SecurityScopedFileAccess.withAccess(
                 to: url,
                 failure: .corruptData(
                     reason: String(localized: "verify.importCleartextReadFailed",
@@ -436,18 +436,5 @@ struct VerifyView: View {
         cleartextOriginalText = nil
         cleartextVerification = nil
         textInputSectionEpoch &+= 1
-    }
-
-    private func withSecurityScopedAccess<T>(
-        to url: URL,
-        failure: CypherAirError,
-        operation: () throws -> T
-    ) throws -> T {
-        guard url.startAccessingSecurityScopedResource() else {
-            throw failure
-        }
-
-        defer { url.stopAccessingSecurityScopedResource() }
-        return try operation()
     }
 }

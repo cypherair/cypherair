@@ -41,19 +41,13 @@ struct AddContactView: View {
         }
     }
 
-    private struct PendingKeyUpdate {
-        let newContact: Contact
-        let existingContact: Contact
-        let keyData: Data
-    }
-
     let configuration: Configuration
 
     @State private var importMode: ImportMode = .paste
     @State private var armoredText = ""
     @State private var error: CypherAirError?
     @State private var showError = false
-    @State private var pendingKeyUpdate: PendingKeyUpdate?
+    @State private var pendingKeyUpdateRequest: ContactKeyUpdateConfirmationRequest?
     @State private var showKeyUpdateAlert = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var isProcessingQR = false
@@ -64,6 +58,14 @@ struct AddContactView: View {
 
     init(configuration: Configuration = .default) {
         self.configuration = configuration
+    }
+
+    private var importLoader: PublicKeyImportLoader {
+        PublicKeyImportLoader(qrService: qrService)
+    }
+
+    private var importWorkflow: ContactImportWorkflow {
+        ContactImportWorkflow(contactService: contactService)
     }
 
     var body: some View {
@@ -129,25 +131,19 @@ struct AddContactView: View {
         .alert(
             String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
             isPresented: $showKeyUpdateAlert,
-            presenting: pendingKeyUpdate
-        ) { update in
+            presenting: pendingKeyUpdateRequest
+        ) { request in
             Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
-                do {
-                    try contactService.confirmKeyUpdate(
-                        existingFingerprint: update.existingContact.fingerprint,
-                        newContact: update.newContact,
-                        keyData: update.keyData
-                    )
-                    dismiss()
-                } catch {
-                    self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-                    showError = true
-                }
+                pendingKeyUpdateRequest = nil
+                request.onConfirm()
             }
-            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {}
-        } message: { update in
+            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
+                pendingKeyUpdateRequest = nil
+                request.onCancel()
+            }
+        } message: { request in
             Text(String(localized: "addcontact.keyUpdate.message",
-                        defaultValue: "This contact (\(update.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
+                        defaultValue: "This contact (\(request.pendingUpdate.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
         }
         .fileImporter(
             isPresented: $showFileImporter,
@@ -267,26 +263,27 @@ struct AddContactView: View {
     private func addContact() {
         do {
             let data = importedKeyData ?? Data(armoredText.utf8)
-            let keyInfo = try qrService.inspectKeyInfo(keyData: data)
-            let profile = try qrService.detectKeyProfile(keyData: data)
-            let request = ImportConfirmationRequest(
-                keyData: data,
-                keyInfo: keyInfo,
-                profile: profile,
+            let inspection = try importLoader.inspect(keyData: data)
+            let request = importWorkflow.makeImportConfirmationRequest(
+                inspection: inspection,
                 allowsUnverifiedImport: configuration.verificationPolicy == .allowUnverified,
-                onImportVerified: {
-                    completeAddContact(
-                        keyData: data,
-                        verificationState: .verified
-                    )
+                onSuccess: { contact in
+                    activeImportConfirmationCoordinator.dismiss()
+                    configuration.onImported?(contact)
+                    if configuration.onImported == nil {
+                        dismiss()
+                    }
                 },
-                onImportUnverified: {
-                    completeAddContact(
-                        keyData: data,
-                        verificationState: .unverified
-                    )
+                onReplaceRequested: { request in
+                    activeImportConfirmationCoordinator.dismiss()
+                    pendingKeyUpdateRequest = request
+                    showKeyUpdateAlert = true
                 },
-                onCancel: { }
+                onFailure: { importError in
+                    error = importError
+                    activeImportConfirmationCoordinator.dismiss()
+                    showError = true
+                }
             )
 
             if let onImportConfirmationRequested = configuration.onImportConfirmationRequested {
@@ -300,72 +297,16 @@ struct AddContactView: View {
         }
     }
 
-    private func completeAddContact(
-        keyData: Data,
-        verificationState: ContactVerificationState
-    ) {
-        do {
-            let result = try contactService.addContact(
-                publicKeyData: keyData,
-                verificationState: verificationState
-            )
-            switch result {
-            case .added(let contact), .duplicate(let contact):
-                activeImportConfirmationCoordinator.dismiss()
-                Task { @MainActor in
-                    configuration.onImported?(contact)
-                }
-                if configuration.onImported == nil {
-                    dismiss()
-                }
-            case .keyUpdateDetected(let newContact, let existingContact, let keyData):
-                activeImportConfirmationCoordinator.dismiss()
-                pendingKeyUpdate = PendingKeyUpdate(
-                    newContact: newContact,
-                    existingContact: existingContact,
-                    keyData: keyData
-                )
-                showKeyUpdateAlert = true
-            }
-        } catch {
-            self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-            activeImportConfirmationCoordinator.dismiss()
-            showError = true
-        }
-    }
-
     private var activeImportConfirmationCoordinator: ImportConfirmationCoordinator {
         importConfirmationCoordinator ?? fallbackImportConfirmationCoordinator
     }
 
     private func processQRPhoto(_ item: PhotosPickerItem) {
         isProcessingQR = true
-        let service = qrService
         Task {
             defer { isProcessingQR = false }
             do {
-                guard let data = try await item.loadTransferable(type: Data.self) else {
-                    error = .invalidQRCode
-                    showError = true
-                    return
-                }
-
-                guard let ciImage = CIImage(data: data) else {
-                    error = .invalidQRCode
-                    showError = true
-                    return
-                }
-
-                let qrStrings = try await service.decodeQRCodes(from: ciImage)
-
-                guard let urlString = qrStrings.first(where: { $0.hasPrefix("cypherair://") }),
-                      let url = URL(string: urlString) else {
-                    error = .invalidQRCode
-                    showError = true
-                    return
-                }
-
-                let publicKeyData = try service.parseImportURL(url)
+                let publicKeyData = try await importLoader.loadKeyDataFromQRPhoto(item)
                 if let armoredString = String(data: publicKeyData, encoding: .utf8) {
                     armoredText = armoredString
                     importedKeyData = nil
@@ -384,21 +325,19 @@ struct AddContactView: View {
 
     private func loadFileContents(from url: URL) {
         do {
-            let data = try withSecurityScopedAccess(
-                to: url,
+            let loadedFile = try importLoader.loadFromFile(
+                url: url,
                 failure: .invalidKeyData(reason: String(localized: "addcontact.file.readFailed", defaultValue: "Could not read key file"))
-            ) {
-                try Data(contentsOf: url)
-            }
+            )
 
-            if let armoredString = String(data: data, encoding: .utf8) {
+            if let armoredString = loadedFile.text {
                 armoredText = armoredString
                 importedKeyData = nil
             } else {
                 armoredText = ""
-                importedKeyData = data
+                importedKeyData = loadedFile.data
             }
-            importedFileName = url.lastPathComponent
+            importedFileName = loadedFile.fileName
         } catch let error as CypherAirError {
             self.error = error
             showError = true
@@ -406,18 +345,5 @@ struct AddContactView: View {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
             showError = true
         }
-    }
-
-    private func withSecurityScopedAccess<T>(
-        to url: URL,
-        failure: CypherAirError,
-        operation: () throws -> T
-    ) throws -> T {
-        guard url.startAccessingSecurityScopedResource() else {
-            throw failure
-        }
-
-        defer { url.stopAccessingSecurityScopedResource() }
-        return try operation()
     }
 }

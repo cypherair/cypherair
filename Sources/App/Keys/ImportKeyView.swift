@@ -137,10 +137,16 @@ struct ImportKeyView: View {
     }
 
     private func loadFileContents(from url: URL) {
-        guard url.startAccessingSecurityScopedResource() else { return }
-        defer { url.stopAccessingSecurityScopedResource() }
         do {
-            let data = try Data(contentsOf: url)
+            let data = try SecurityScopedFileAccess.withAccess(
+                to: url,
+                failure: .invalidKeyData(
+                    reason: String(localized: "import.file.readFailed", defaultValue: "Could not read key file")
+                )
+            ) {
+                try Data(contentsOf: url)
+            }
+
             if let text = String(data: data, encoding: .utf8) {
                 armoredText = text
                 importedKeyData = nil

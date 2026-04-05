@@ -597,7 +597,7 @@ struct DecryptView: View {
 
     private func importCiphertextTextFile(from url: URL) {
         do {
-            let data = try withSecurityScopedAccess(
+            let data = try SecurityScopedFileAccess.withAccess(
                 to: url,
                 failure: .corruptData(
                     reason: String(localized: "decrypt.importTextReadFailed",
@@ -638,7 +638,7 @@ struct DecryptView: View {
         let fileName = url.lastPathComponent
 
         do {
-            let inspection: PendingTextModeImport? = try withSecurityScopedAccess(
+            let inspection: PendingTextModeImport? = try SecurityScopedFileAccess.withAccess(
                 to: url,
                 failure: .corruptData(
                     reason: String(localized: "fileDecrypt.cannotAccess",
@@ -725,18 +725,5 @@ struct DecryptView: View {
         }
         signatureVerification = nil
         filePhase1Result = nil
-    }
-
-    private func withSecurityScopedAccess<T>(
-        to url: URL,
-        failure: CypherAirError,
-        operation: () throws -> T
-    ) throws -> T {
-        guard url.startAccessingSecurityScopedResource() else {
-            throw failure
-        }
-
-        defer { url.stopAccessingSecurityScopedResource() }
-        return try operation()
     }
 }
