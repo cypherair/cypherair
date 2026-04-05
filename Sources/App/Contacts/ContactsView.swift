@@ -58,6 +58,7 @@ struct ContactsView: View {
                 }
                 .tutorialAnchor(.contactsAddButton)
                 .accessibilityIdentifier("contacts.add.toolbar")
+                .accessibilityLabel(String(localized: "contacts.add", defaultValue: "Add Contact"))
             }
         }
         .task {

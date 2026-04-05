@@ -100,7 +100,7 @@ struct TutorialTaskHostView<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(.regularMaterial)
+        .tutorialBannerChrome()
     }
 
     private var completionCard: some View {
@@ -118,6 +118,6 @@ struct TutorialTaskHostView<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .tutorialCardChrome(.overlay)
     }
 }

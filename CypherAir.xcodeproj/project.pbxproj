@@ -123,6 +123,10 @@
 		D51BC34AD2554DB6BFC8C105 /* OperationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DE8EE27179A4C1DA68BB476 /* OperationController.swift */; };
 		EC56AD596A794B9789747FA6 /* KeyMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06B61D1815D941D3BA9552C0 /* KeyMetadataStore.swift */; };
 		F0260E1FA58DA39B13A0AEDA /* SecureEnclaveManageable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D527A8404F04C0FE814B11 /* SecureEnclaveManageable.swift */; };
+		F10000012FA1000100000001 /* FingerprintView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000112FA1000100000001 /* FingerprintView.swift */; };
+		F10000022FA1000100000001 /* SignatureIdentityCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000122FA1000100000001 /* SignatureIdentityCardView.swift */; };
+		F10000032FA1000100000001 /* TutorialChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000132FA1000100000001 /* TutorialChrome.swift */; };
+		F10000042FA1000100000001 /* TutorialAuthModeConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000142FA1000100000001 /* TutorialAuthModeConfirmationView.swift */; };
 		F4C7117224EB4C58B7D84A23 /* CommonHelpersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C071311C874F0AB58A0092 /* CommonHelpersTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -265,6 +269,10 @@
 		D40000112F80000100000001 /* CypherMultilineTextInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CypherMultilineTextInput.swift; sourceTree = "<group>"; };
 		E10000012F90000100000001 /* CypherAirMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CypherAirMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F0C071311C874F0AB58A0092 /* CommonHelpersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonHelpersTests.swift; sourceTree = "<group>"; };
+		F10000112FA1000100000001 /* FingerprintView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FingerprintView.swift; sourceTree = "<group>"; };
+		F10000122FA1000100000001 /* SignatureIdentityCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureIdentityCardView.swift; sourceTree = "<group>"; };
+		F10000132FA1000100000001 /* TutorialChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialChrome.swift; sourceTree = "<group>"; };
+		F10000142FA1000100000001 /* TutorialAuthModeConfirmationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialAuthModeConfirmationView.swift; sourceTree = "<group>"; };
 		F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Data+Zeroing.swift"; path = "Sources/Extensions/Data+Zeroing.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -477,9 +485,11 @@
 			children = (
 				D40000112F80000100000001 /* CypherMultilineTextInput.swift */,
 				097D157D94974ADFA3B2AA95 /* FileExportController.swift */,
+				F10000112FA1000100000001 /* FingerprintView.swift */,
 				4DE8EE27179A4C1DA68BB476 /* OperationController.swift */,
 				CE0064E42F64972D008604AB /* PrivacyScreenModifier.swift */,
 				35254399486C4D719E83A0A4 /* SecurityScopedFileAccess.swift */,
+				F10000122FA1000100000001 /* SignatureIdentityCardView.swift */,
 			);
 			path = Common;
 			sourceTree = "<group>";
@@ -488,6 +498,8 @@
 			isa = PBXGroup;
 			children = (
 				CE0064EB2F64975C008604AB /* OnboardingView.swift */,
+				F10000142FA1000100000001 /* TutorialAuthModeConfirmationView.swift */,
+				F10000132FA1000100000001 /* TutorialChrome.swift */,
 				CE4958B12F6D797000BF03E2 /* TutorialView.swift */,
 				D20000112F80000100000001 /* TutorialSandboxContainer.swift */,
 				D20000122F80000100000001 /* TutorialSessionStore.swift */,
@@ -796,12 +808,16 @@
 				D20000012F80000100000001 /* TutorialSandboxContainer.swift in Sources */,
 				D20000022F80000100000001 /* TutorialSessionStore.swift in Sources */,
 				D20000032F80000100000001 /* TutorialMirrorShellView.swift in Sources */,
+				F10000042FA1000100000001 /* TutorialAuthModeConfirmationView.swift in Sources */,
+				F10000032FA1000100000001 /* TutorialChrome.swift in Sources */,
 				CE4958B22F6D797000BF03E2 /* TutorialView.swift in Sources */,
 				D20000052F80000100000001 /* TutorialSpotlightOverlay.swift in Sources */,
 				D20000062F80000100000001 /* TutorialTaskHostView.swift in Sources */,
 				D20000072F80000100000001 /* AppShellComposition.swift in Sources */,
 				D30000012F80000100000001 /* ImportConfirmationCoordinator.swift in Sources */,
 				D40000012F80000100000001 /* CypherMultilineTextInput.swift in Sources */,
+				F10000012FA1000100000001 /* FingerprintView.swift in Sources */,
+				F10000022FA1000100000001 /* SignatureIdentityCardView.swift in Sources */,
 				CE0064E72F64972D008604AB /* QRDisplayView.swift in Sources */,
 				174304A352D9A283F7CB3E53 /* KeychainManageable.swift in Sources */,
 				6F25017F340541D84E52FB11 /* MockAuthenticator.swift in Sources */,
@@ -972,7 +988,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 6;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1207,7 +1223,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 6;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;

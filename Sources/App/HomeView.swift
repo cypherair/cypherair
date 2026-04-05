@@ -69,12 +69,12 @@ struct HomeView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    Text(defaultKey.formattedFingerprint)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(
-                            IdentityPresentation.fingerprintAccessibilityLabel(defaultKey.fingerprint)
-                        )
+                    FingerprintView(
+                        fingerprint: defaultKey.fingerprint,
+                        font: .caption.monospaced(),
+                        foregroundColor: .secondary,
+                        expandsHorizontally: false
+                    )
                 }
                 .padding()
                 .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))

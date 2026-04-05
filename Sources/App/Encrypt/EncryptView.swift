@@ -94,13 +94,15 @@ struct EncryptView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(configuration.allowedModes.count == 1)
+                .disabled(configuration.allowedModes.count == 1 || operation.isRunning)
             }
 
             if encryptMode == .text {
                 textInputContent
+                    .disabled(operation.isRunning)
             } else {
                 fileInputContent
+                    .disabled(operation.isRunning)
             }
 
             Section {
@@ -151,6 +153,7 @@ struct EncryptView: View {
             } header: {
                 Text(String(localized: "encrypt.recipients", defaultValue: "Recipients"))
             }
+            .disabled(operation.isRunning)
 
             Section {
                 Toggle(
@@ -192,6 +195,7 @@ struct EncryptView: View {
                     }
                 }
             }
+            .disabled(operation.isRunning)
 
             Section {
                 Button {
@@ -202,14 +206,15 @@ struct EncryptView: View {
                             if encryptMode == .file, let progress = operation.progress {
                                 ProgressView(value: progress.fractionCompleted)
                                     .progressViewStyle(.linear)
-                                Text(String(localized: "fileEncrypt.encrypting", defaultValue: "Encrypting..."))
+                                Text(
+                                    operation.isCancelling
+                                        ? String(localized: "common.cancelling", defaultValue: "Cancelling...")
+                                        : String(localized: "fileEncrypt.encrypting", defaultValue: "Encrypting...")
+                                )
                             } else {
                                 ProgressView()
-                            }
-                            if encryptMode == .file {
-                                Spacer()
-                                Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                                    operation.cancel()
+                                if operation.isCancelling {
+                                    Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
                                 }
                             }
                         }
@@ -221,6 +226,23 @@ struct EncryptView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(encryptButtonDisabled)
+            }
+
+            if showsFileCancelAction {
+                Section {
+                    if operation.isCancelling {
+                        LabeledContent {
+                            Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
+                                .foregroundStyle(.secondary)
+                        } label: {
+                            Text(String(localized: "common.cancel", defaultValue: "Cancel"))
+                        }
+                    } else {
+                        Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
+                            operation.cancel()
+                        }
+                    }
+                }
             }
 
             if encryptMode == .text, let ciphertext, let ciphertextString = String(data: ciphertext, encoding: .utf8) {
@@ -472,6 +494,10 @@ struct EncryptView: View {
         #else
         (150, 220, 320)
         #endif
+    }
+
+    private var showsFileCancelAction: Bool {
+        encryptMode == .file && operation.isRunning && operation.progress != nil
     }
 
     private func requestEncrypt() {

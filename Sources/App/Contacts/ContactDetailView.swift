@@ -70,11 +70,7 @@ struct ContactDetailView: View {
                     }
 
                     Section {
-                        Text(contact.formattedFingerprint)
-                            .font(.system(.body, design: .monospaced))
-                            .accessibilityLabel(
-                                IdentityPresentation.fingerprintAccessibilityLabel(contact.fingerprint)
-                            )
+                        FingerprintView(fingerprint: contact.fingerprint)
                     } header: {
                         Text(String(localized: "contactdetail.fingerprint", defaultValue: "Fingerprint"))
                     }

@@ -78,13 +78,15 @@ struct DecryptView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(configuration.allowedModes.count == 1)
+                .disabled(configuration.allowedModes.count == 1 || operation.isRunning)
             }
 
             if decryptMode == .text {
                 textInputContent
+                    .disabled(operation.isRunning)
             } else {
                 fileInputContent
+                    .disabled(operation.isRunning)
             }
 
             Section {
@@ -96,8 +98,11 @@ struct DecryptView: View {
                     }
                 } label: {
                     if operation.isRunning && !hasPhase1Result {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
+                        HStack {
+                            ProgressView()
+                            Text(String(localized: "decrypt.parse.checking", defaultValue: "Checking recipients..."))
+                        }
+                        .frame(maxWidth: .infinity)
                     } else {
                         Text(String(localized: "decrypt.parse.button", defaultValue: "Check Recipients"))
                             .frame(maxWidth: .infinity)
@@ -117,15 +122,11 @@ struct DecryptView: View {
                         String(localized: "decrypt.matchedKey.profile", defaultValue: "Profile"),
                         value: matchedKey.profile.displayName
                     )
-                    Text(matchedKey.formattedFingerprint)
-                        .font(.system(.caption, design: .monospaced))
-                        .lineLimit(nil)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(
-                            IdentityPresentation.fingerprintAccessibilityLabel(matchedKey.fingerprint)
-                        )
+                    FingerprintView(
+                        fingerprint: matchedKey.fingerprint,
+                        font: .system(.caption, design: .monospaced),
+                        foregroundColor: .secondary
+                    )
                 } header: {
                     Text(String(localized: "decrypt.matchedKey", defaultValue: "Matched Key"))
                 }
@@ -143,14 +144,15 @@ struct DecryptView: View {
                                 if decryptMode == .file, let progress = operation.progress {
                                     ProgressView(value: progress.fractionCompleted)
                                         .progressViewStyle(.linear)
-                                    Text(String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting..."))
+                                    Text(
+                                        operation.isCancelling
+                                            ? String(localized: "common.cancelling", defaultValue: "Cancelling...")
+                                            : String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting...")
+                                    )
                                 } else {
                                     ProgressView()
-                                }
-                                if decryptMode == .file {
-                                    Spacer()
-                                    Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                                        operation.cancel()
+                                    if operation.isCancelling {
+                                        Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
                                     }
                                 }
                             }
@@ -162,6 +164,23 @@ struct DecryptView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(operation.isRunning)
+                }
+
+                if showsFileDecryptCancelAction {
+                    Section {
+                        if operation.isCancelling {
+                            LabeledContent {
+                                Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
+                                    .foregroundStyle(.secondary)
+                            } label: {
+                                Text(String(localized: "common.cancel", defaultValue: "Cancel"))
+                            }
+                        } else {
+                            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
+                                operation.cancel()
+                            }
+                        }
+                    }
                 }
             }
 
@@ -437,6 +456,10 @@ struct DecryptView: View {
         #else
         (150, 220, 320)
         #endif
+    }
+
+    private var showsFileDecryptCancelAction: Bool {
+        decryptMode == .file && operation.isRunning && operation.progress != nil
     }
 
     private var allowedImportContentTypes: [UTType] {

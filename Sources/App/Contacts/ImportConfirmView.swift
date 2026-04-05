@@ -122,14 +122,10 @@ struct ImportConfirmView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                Text(IdentityPresentation.formattedFingerprint(keyInfo.fingerprint))
-                    .font(.system(.body, design: .monospaced))
-                    .lineLimit(nil)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                    .accessibilityLabel(
-                        IdentityPresentation.fingerprintAccessibilityLabel(keyInfo.fingerprint)
-                    )
+                FingerprintView(
+                    fingerprint: keyInfo.fingerprint,
+                    textSelectionEnabled: true
+                )
             }
         }
     }
@@ -199,7 +195,7 @@ struct ImportConfirmView: View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(18)
-            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .tutorialCardChrome(.standard)
     }
 
     @ViewBuilder

@@ -16,12 +16,15 @@ final class OperationController {
     private let progressFactory: () -> FileProgressReporter
 
     private(set) var isRunning = false
+    private(set) var isCancelling = false
     private(set) var progress: FileProgressReporter?
     private(set) var error: CypherAirError?
     var isShowingError = false
     var isShowingClipboardNotice = false
 
     private var currentTask: Task<Void, Never>?
+    private var currentOperationID: UInt64 = 0
+    private var nextOperationID: UInt64 = 0
 
     init(
         backgroundRunner: @escaping BackgroundOperationRunner = PlatformBackgroundActivity.perform,
@@ -58,10 +61,10 @@ final class OperationController {
     }
 
     func cancel() {
+        guard currentTask != nil else { return }
         progress?.cancel()
         currentTask?.cancel()
-        currentTask = nil
-        isRunning = false
+        isCancelling = true
     }
 
     func dismissError() {
@@ -94,19 +97,24 @@ final class OperationController {
         mapError: @MainActor @Sendable @escaping (Error) -> CypherAirError,
         operation: @MainActor @escaping () async throws -> Void
     ) {
-        cancel()
+        progress?.reset()
+        self.progress?.cancel()
+        currentTask?.cancel()
         dismissError()
         isShowingClipboardNotice = false
+
+        nextOperationID &+= 1
+        let operationID = nextOperationID
+        currentOperationID = operationID
         self.progress = progress
         isRunning = true
+        isCancelling = false
 
         currentTask = Task { @MainActor [weak self] in
             guard let self else { return }
 
             defer {
-                self.progress = nil
-                self.isRunning = false
-                self.currentTask = nil
+                self.finishOperation(operationID: operationID)
             }
 
             do {
@@ -121,9 +129,18 @@ final class OperationController {
                 if Self.shouldIgnore(error) {
                     return
                 }
+                guard self.currentOperationID == operationID else { return }
                 self.present(error: mapError(error))
             }
         }
+    }
+
+    private func finishOperation(operationID: UInt64) {
+        guard currentOperationID == operationID else { return }
+        progress = nil
+        isRunning = false
+        isCancelling = false
+        currentTask = nil
     }
 
     private static func shouldIgnore(_ error: Error) -> Bool {
