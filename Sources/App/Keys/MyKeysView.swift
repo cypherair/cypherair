@@ -4,31 +4,17 @@ import SwiftUI
 struct MyKeysView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.appRouteNavigator) private var routeNavigator
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
-
     var body: some View {
         List {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+            ForEach(keyManagement.keys) { key in
+                NavigationLink(value: AppRoute.keyDetail(fingerprint: key.fingerprint)) {
+                    KeyRowView(key: key)
                 }
-            }
-
-            if tutorialInlineHeaderContext != nil && keyManagement.keys.isEmpty {
-                Section {
-                    emptyStateContent
-                }
-            } else {
-                ForEach(keyManagement.keys) { key in
-                    NavigationLink(value: AppRoute.keyDetail(fingerprint: key.fingerprint)) {
-                        KeyRowView(key: key)
-                    }
-                    .tutorialAnchor(.keyRow(fingerprint: key.fingerprint))
-                }
+                .tutorialAnchor(.keyRow(fingerprint: key.fingerprint))
             }
         }
         .overlay {
-            if tutorialInlineHeaderContext == nil && keyManagement.keys.isEmpty {
+            if keyManagement.keys.isEmpty {
                 emptyStateContent
             }
         }

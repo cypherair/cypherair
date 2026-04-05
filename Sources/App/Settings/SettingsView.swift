@@ -19,7 +19,6 @@ struct SettingsView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     @State private var pendingMode: AuthenticationMode?
     @State private var showModeWarning = false
@@ -39,12 +38,6 @@ struct SettingsView: View {
         @Bindable var config = config
 
         Form {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                }
-            }
-
             Section {
                 Picker(
                     String(localized: "settings.authMode", defaultValue: "Authentication Mode"),

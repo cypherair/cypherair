@@ -24,7 +24,6 @@ struct KeyGenerationView: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appRouteNavigator) private var routeNavigator
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
 
     enum Field {
         case name
@@ -51,12 +50,6 @@ struct KeyGenerationView: View {
 
     var body: some View {
         Form {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
-                }
-            }
-
             Section {
                 Picker(
                     String(localized: "keygen.profile", defaultValue: "Profile"),

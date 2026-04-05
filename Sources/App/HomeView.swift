@@ -5,32 +5,15 @@ struct HomeView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
     @Environment(\.appRouteNavigator) private var routeNavigator
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
-
     var body: some View {
         Group {
             if keyManagement.keys.isEmpty {
-                noKeysContainer
+                noKeysContent
             } else {
                 hasKeysContent
             }
         }
         .navigationTitle(String(localized: "home.title", defaultValue: "CypherAir"))
-    }
-
-    @ViewBuilder
-    private var noKeysContainer: some View {
-        if tutorialInlineHeaderContext != nil {
-            ScrollView {
-                VStack(spacing: 20) {
-                    tutorialInlineHeader
-                    noKeysContent
-                }
-                .padding()
-            }
-        } else {
-            noKeysContent
-        }
     }
 
     private var noKeysContent: some View {
@@ -55,19 +38,11 @@ struct HomeView: View {
     private var hasKeysContent: some View {
         ScrollView {
             VStack(spacing: 20) {
-                tutorialInlineHeader
                 defaultKeyInfo
 
                 quickActionsGrid
             }
             .padding()
-        }
-    }
-
-    @ViewBuilder
-    private var tutorialInlineHeader: some View {
-        if let tutorialInlineHeaderContext {
-            TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
         }
     }
 

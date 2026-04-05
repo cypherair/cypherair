@@ -4,44 +4,30 @@ import SwiftUI
 struct ContactsView: View {
     @Environment(ContactService.self) private var contactService
     @Environment(\.appRouteNavigator) private var routeNavigator
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
-
     @State private var deleteError: String?
     @State private var showDeleteError = false
 
     var body: some View {
         List {
-            if let tutorialInlineHeaderContext {
-                Section {
-                    TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
+            ForEach(contactService.contacts) { contact in
+                NavigationLink(value: AppRoute.contactDetail(fingerprint: contact.fingerprint)) {
+                    ContactRowView(contact: contact)
                 }
             }
-
-            if tutorialInlineHeaderContext != nil && contactService.contacts.isEmpty {
-                Section {
-                    emptyStateContent
-                }
-            } else {
-                ForEach(contactService.contacts) { contact in
-                    NavigationLink(value: AppRoute.contactDetail(fingerprint: contact.fingerprint)) {
-                        ContactRowView(contact: contact)
-                    }
-                }
-                .onDelete { indexSet in
-                    for index in indexSet {
-                        let contact = contactService.contacts[index]
-                        do {
-                            try contactService.removeContact(fingerprint: contact.fingerprint)
-                        } catch {
-                            deleteError = error.localizedDescription
-                            showDeleteError = true
-                        }
+            .onDelete { indexSet in
+                for index in indexSet {
+                    let contact = contactService.contacts[index]
+                    do {
+                        try contactService.removeContact(fingerprint: contact.fingerprint)
+                    } catch {
+                        deleteError = error.localizedDescription
+                        showDeleteError = true
                     }
                 }
             }
         }
         .overlay {
-            if tutorialInlineHeaderContext == nil && contactService.contacts.isEmpty {
+            if contactService.contacts.isEmpty {
                 emptyStateContent
             }
         }

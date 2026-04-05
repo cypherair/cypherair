@@ -11,8 +11,6 @@ struct QRPhotoImportView: View {
     @Environment(ContactService.self) private var contactService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.importConfirmationCoordinator) private var importConfirmationCoordinator
-    @Environment(\.tutorialInlineHeaderContext) private var tutorialInlineHeaderContext
-
     @State private var selectedItem: PhotosPickerItem?
     @State private var isProcessing = false
     @State private var importedContact: Contact?
@@ -42,20 +40,8 @@ struct QRPhotoImportView: View {
     }
 
     private var content: some View {
-        Group {
-            if tutorialInlineHeaderContext != nil {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        tutorialInlineHeader
-                        contentBody
-                    }
-                    .padding()
-                }
-            } else {
-                contentBody
-                    .padding()
-            }
-        }
+        contentBody
+            .padding()
         .navigationTitle(String(localized: "qrImport.title", defaultValue: "QR from Photo"))
         .onChange(of: selectedItem) { _, newItem in
             guard let newItem else { return }
@@ -128,13 +114,6 @@ struct QRPhotoImportView: View {
             if isProcessing {
                 ProgressView(String(localized: "qrImport.processing", defaultValue: "Scanning QR code..."))
             }
-        }
-    }
-
-    @ViewBuilder
-    private var tutorialInlineHeader: some View {
-        if let tutorialInlineHeaderContext {
-            TutorialInlineHeaderView(context: tutorialInlineHeaderContext)
         }
     }
 
