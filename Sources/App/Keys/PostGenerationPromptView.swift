@@ -4,8 +4,17 @@ import SwiftUI
 /// Per PRD Section 4.1: "Done → Prompt: back up private key & share public key"
 struct PostGenerationPromptView: View {
     let identity: PGPKeyIdentity
+    let onDone: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
+
+    init(
+        identity: PGPKeyIdentity,
+        onDone: (() -> Void)? = nil
+    ) {
+        self.identity = identity
+        self.onDone = onDone
+    }
 
     var body: some View {
         List {
@@ -35,6 +44,7 @@ struct PostGenerationPromptView: View {
                         systemImage: "lock.doc"
                     )
                 }
+                .accessibilityIdentifier("postgen.backup")
 
                 NavigationLink(value: AppRoute.qrDisplay(publicKeyData: identity.publicKeyData, displayName: identity.userId ?? identity.shortKeyId)) {
                     Label(
@@ -42,6 +52,7 @@ struct PostGenerationPromptView: View {
                         systemImage: "qrcode"
                     )
                 }
+                .accessibilityIdentifier("postgen.qr")
 
                 NavigationLink(value: AppRoute.keyDetail(fingerprint: identity.fingerprint)) {
                     Label(
@@ -49,17 +60,29 @@ struct PostGenerationPromptView: View {
                         systemImage: "key"
                     )
                 }
+                .accessibilityIdentifier("postgen.keyDetail")
             } header: {
                 Text(String(localized: "postgen.nextSteps", defaultValue: "Next Steps"))
             }
         }
+        .accessibilityIdentifier("postgen.root")
+        .screenReady("postgen.ready")
         .navigationTitle(String(localized: "postgen.title", defaultValue: "Key Ready"))
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button(String(localized: "postgen.done", defaultValue: "Done")) {
-                    dismiss()
+                    handleDone()
                 }
+                .accessibilityIdentifier("postgen.done")
             }
+        }
+    }
+
+    private func handleDone() {
+        if let onDone {
+            onDone()
+        } else {
+            dismiss()
         }
     }
 }

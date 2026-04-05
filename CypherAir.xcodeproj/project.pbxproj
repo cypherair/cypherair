@@ -134,6 +134,13 @@
 			remoteGlobalIDString = 8054D4FD1FA30AED22F9BF1B;
 			remoteInfo = CypherAir;
 		};
+		E10000032F90000100000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 987D9FF41AF85DBF5445FC9C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8054D4FD1FA30AED22F9BF1B;
+			remoteInfo = CypherAir;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -256,6 +263,7 @@
 		D30000112F80000100000001 /* ImportConfirmationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportConfirmationCoordinator.swift; sourceTree = "<group>"; };
 		D35F4B8C8B4CAB4FB248E04F /* SecureEnclaveManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SecureEnclaveManager.swift; path = Sources/Security/SecureEnclaveManager.swift; sourceTree = SOURCE_ROOT; };
 		D40000112F80000100000001 /* CypherMultilineTextInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CypherMultilineTextInput.swift; sourceTree = "<group>"; };
+		E10000012F90000100000001 /* CypherAirMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CypherAirMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F0C071311C874F0AB58A0092 /* CommonHelpersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonHelpersTests.swift; sourceTree = "<group>"; };
 		F2E74CB396D27D17F9B09FA7 /* Data+Zeroing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Data+Zeroing.swift"; path = "Sources/Extensions/Data+Zeroing.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
@@ -264,6 +272,11 @@
 		CE2F973D2F74687D00232BC9 /* Fixtures */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Fixtures;
+			sourceTree = "<group>";
+		};
+		E10000022F90000100000001 /* UITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = UITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -290,6 +303,7 @@
 				CE0065102F6502B4008604AB /* CypherAir-Info.plist */,
 				F3EC8935DF44293B377AB6CB /* Sources */,
 				A1C9AAA2B5ED04BDA656105D /* Tests */,
+				E10000022F90000100000001 /* UITests */,
 				87A0C373A5702D60FD4DC48F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -299,6 +313,7 @@
 			children = (
 				9379668011500E781695A4AC /* CypherAir.app */,
 				108F8485D41E1065D3C9268A /* CypherAirTests.xctest */,
+				E10000012F90000100000001 /* CypherAirMacUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -617,6 +632,28 @@
 			productReference = 108F8485D41E1065D3C9268A /* CypherAirTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		E10000042F90000100000001 /* CypherAirMacUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E10000082F90000100000001 /* Build configuration list for PBXNativeTarget "CypherAirMacUITests" */;
+			buildPhases = (
+				E10000052F90000100000001 /* Sources */,
+				E10000062F90000100000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E10000072F90000100000001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E10000022F90000100000001 /* UITests */,
+			);
+			name = CypherAirMacUITests;
+			packageProductDependencies = (
+			);
+			productName = CypherAirMacUITests;
+			productReference = E10000012F90000100000001 /* CypherAirMacUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -625,6 +662,12 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					E10000042F90000100000001 = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = 8054D4FD1FA30AED22F9BF1B;
+					};
+				};
 			};
 			buildConfigurationList = 55F48F6BE6300530916BF414 /* Build configuration list for PBXProject "CypherAir" */;
 			developmentRegion = en;
@@ -643,6 +686,7 @@
 			targets = (
 				8054D4FD1FA30AED22F9BF1B /* CypherAir */,
 				8561964DF0A7E2575A3799D6 /* CypherAirTests */,
+				E10000042F90000100000001 /* CypherAirMacUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -673,6 +717,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				D10000082F80000100000001 /* OpenSourceNotices in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E10000062F90000100000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -818,6 +869,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E10000052F90000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -825,6 +883,11 @@
 			isa = PBXTargetDependency;
 			target = 8054D4FD1FA30AED22F9BF1B /* CypherAir */;
 			targetProxy = 32C730DD6EFCF294DA3EC493 /* PBXContainerItemProxy */;
+		};
+		E10000072F90000100000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8054D4FD1FA30AED22F9BF1B /* CypherAir */;
+			targetProxy = E10000032F90000100000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -909,7 +972,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -951,7 +1014,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.1.9;
+				MARKETING_VERSION = 1.2.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -1144,7 +1207,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1186,7 +1249,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.1.9;
+				MARKETING_VERSION = 1.2.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -1212,6 +1275,48 @@
 				XROS_DEPLOYMENT_TARGET = 26.4;
 			};
 			name = Debug;
+		};
+		E10000092F90000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y2ZPV6SKBT;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.CypherAirMacUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = CypherAir;
+			};
+			name = Debug;
+		};
+		E100000A2F90000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y2ZPV6SKBT;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.CypherAirMacUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = CypherAir;
+			};
+			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
@@ -1239,6 +1344,15 @@
 			buildConfigurations = (
 				C323F444EE97F048F7C4938B /* Debug */,
 				AA45A02A118F55C4CF92A72A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E10000082F90000100000001 /* Build configuration list for PBXNativeTarget "CypherAirMacUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E10000092F90000100000001 /* Debug */,
+				E100000A2F90000100000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -127,6 +127,8 @@ struct BackupKeyView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .accessibilityIdentifier("backup.root")
+        .screenReady("backup.ready")
         .navigationTitle(String(localized: "backup.title", defaultValue: "Backup Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

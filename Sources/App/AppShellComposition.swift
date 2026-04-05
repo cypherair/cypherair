@@ -60,19 +60,123 @@ extension EnvironmentValues {
     }
 }
 
+@MainActor
+enum MacPresentation: Identifiable {
+    case importConfirmation(ImportConfirmationRequest)
+    case authModeConfirmation(AuthModeChangeConfirmationRequest)
+    case modifyExpiry(ModifyExpiryRequest)
+    case onboarding(initialPage: Int)
+    case tutorial(presentationContext: TutorialPresentationContext)
+
+    var id: String {
+        switch self {
+        case .importConfirmation(let request):
+            "import-\(request.id.uuidString)"
+        case .authModeConfirmation(let request):
+            "auth-\(request.id.uuidString)"
+        case .modifyExpiry(let request):
+            "expiry-\(request.id.uuidString)"
+        case .onboarding(let initialPage):
+            "onboarding-\(initialPage)"
+        case .tutorial(let presentationContext):
+            switch presentationContext {
+            case .onboardingFirstRun:
+                "tutorial-onboarding"
+            case .inApp:
+                "tutorial-in-app"
+            }
+        }
+    }
+}
+
+@MainActor
+enum MacInspector {
+    case tutorialGuidance(TutorialGuidance)
+}
+
+struct MacPresentationController {
+    let present: @MainActor (MacPresentation) -> Void
+}
+
+private struct MacPresentationControllerKey: EnvironmentKey {
+    static let defaultValue: MacPresentationController? = nil
+}
+
+extension EnvironmentValues {
+    var macPresentationController: MacPresentationController? {
+        get { self[MacPresentationControllerKey.self] }
+        set { self[MacPresentationControllerKey.self] = newValue }
+    }
+}
+
+@MainActor
+@Observable
+final class MacShellNavigationState {
+    var selectedTab: AppShellTab = .home
+    var pathsByTab: [AppShellTab: [AppRoute]] = Dictionary(
+        uniqueKeysWithValues: AppShellTab.allCases.map { ($0, []) }
+    )
+    var activePresentation: MacPresentation?
+    var activeInspector: MacInspector?
+    var isInspectorPresented = true
+    var visibleRouteByTab: [AppShellTab: AppRoute?] = Dictionary(
+        uniqueKeysWithValues: AppShellTab.allCases.map { ($0, nil) }
+    )
+    var columnVisibility: NavigationSplitViewVisibility = .automatic
+    var preferredCompactColumn: NavigationSplitViewColumn = .detail
+
+    func path(for tab: AppShellTab) -> [AppRoute] {
+        pathsByTab[tab] ?? []
+    }
+
+    func setPath(_ path: [AppRoute], for tab: AppShellTab) {
+        pathsByTab[tab] = path
+        visibleRouteByTab[tab] = path.last
+    }
+
+    func push(_ route: AppRoute, for tab: AppShellTab) {
+        var path = path(for: tab)
+        path.append(route)
+        setPath(path, for: tab)
+    }
+
+    func visibleRoute(for tab: AppShellTab) -> AppRoute? {
+        visibleRouteByTab[tab] ?? nil
+    }
+}
+
 struct AppRouteHost<Root: View>: View {
+    struct MacSheetSizing {
+        let minWidth: CGFloat
+        let idealWidth: CGFloat
+        let minHeight: CGFloat
+        let idealHeight: CGFloat
+
+        static var routedModal: MacSheetSizing {
+            MacSheetSizing(
+                minWidth: 640,
+                idealWidth: 720,
+                minHeight: 560,
+                idealHeight: 640
+            )
+        }
+    }
+
     let resolver: AppRouteDestinationResolver
     private let externalPath: Binding<[AppRoute]>?
+    private let macSheetSizing: MacSheetSizing?
     @ViewBuilder let root: () -> Root
     @State private var path: [AppRoute] = []
 
     init(
         resolver: AppRouteDestinationResolver,
         path: Binding<[AppRoute]>? = nil,
+        macSheetSizing: MacSheetSizing? = nil,
         @ViewBuilder root: @escaping () -> Root
     ) {
         self.resolver = resolver
         self.externalPath = path
+        self.macSheetSizing = macSheetSizing
         self.root = root
     }
 
@@ -85,6 +189,14 @@ struct AppRouteHost<Root: View>: View {
                     resolver.destination(for: route)
                 }
         }
+        #if os(macOS)
+        .frame(
+            minWidth: macSheetSizing?.minWidth,
+            idealWidth: macSheetSizing?.idealWidth,
+            minHeight: macSheetSizing?.minHeight,
+            idealHeight: macSheetSizing?.idealHeight
+        )
+        #endif
         .environment(
             \.appRouteNavigator,
             AppRouteNavigator { route in
@@ -101,6 +213,8 @@ struct AppRouteDestinationView: View {
         switch route {
         case .keyGeneration:
             KeyGenerationView()
+        case .postGenerationPrompt(let identity):
+            PostGenerationPromptView(identity: identity)
         case .keyDetail(let fingerprint):
             KeyDetailView(fingerprint: fingerprint)
         case .backupKey(let fingerprint):
@@ -137,6 +251,76 @@ struct AppRouteDestinationView: View {
             #endif
         case .themePicker:
             ThemePickerView()
+        }
+    }
+}
+
+private struct MacPresentationHostModifier: ViewModifier {
+    @Binding var activePresentation: MacPresentation?
+
+    @Environment(AppConfiguration.self) private var config
+    @Environment(TutorialSessionStore.self) private var tutorialStore
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: $activePresentation) { presentation in
+                switch presentation {
+                case .importConfirmation(let request):
+                    ImportConfirmView(
+                        keyInfo: request.keyInfo,
+                        detectedProfile: request.profile,
+                        onImportVerified: {
+                            activePresentation = nil
+                            request.onImportVerified()
+                        },
+                        onImportUnverified: request.allowsUnverifiedImport ? {
+                            activePresentation = nil
+                            request.onImportUnverified()
+                        } : nil,
+                        onCancel: {
+                            activePresentation = nil
+                            request.onCancel()
+                        }
+                    )
+                    .presentationSizing(.form)
+                case .authModeConfirmation(let request):
+                    NavigationStack {
+                        SettingsAuthModeConfirmationSheetView(request: request)
+                    }
+                    .presentationSizing(.form)
+                case .modifyExpiry(let request):
+                    NavigationStack {
+                        ModifyExpirySheetView(request: request)
+                    }
+                    .presentationSizing(.form)
+                case .onboarding(let initialPage):
+                    OnboardingView(initialPage: initialPage)
+                        .environment(config)
+                        .environment(tutorialStore)
+                        .interactiveDismissDisabled(!config.hasCompletedOnboarding)
+                        .presentationSizing(.page)
+                case .tutorial(let presentationContext):
+                    TutorialView(presentationContext: presentationContext)
+                        .environment(config)
+                        .environment(tutorialStore)
+                        .presentationSizing(.page)
+                }
+            }
+    }
+}
+
+extension View {
+    func macPresentationHost(_ activePresentation: Binding<MacPresentation?>) -> some View {
+        modifier(MacPresentationHostModifier(activePresentation: activePresentation))
+    }
+
+    func screenReady(_ identifier: String) -> some View {
+        overlay(alignment: .topLeading) {
+            Text(identifier)
+                .font(.system(size: 1))
+                .foregroundStyle(.clear)
+                .accessibilityIdentifier(identifier)
+                .allowsHitTesting(false)
         }
     }
 }

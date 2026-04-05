@@ -28,6 +28,7 @@ struct ImportConfirmView: View {
                 actionBar
             }
             .navigationTitle(String(localized: "import.confirm.title", defaultValue: "Import Public Key"))
+            .accessibilityIdentifier("importconfirm.root")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "import.cancel", defaultValue: "Cancel")) {
@@ -163,6 +164,7 @@ struct ImportConfirmView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("importconfirm.verified")
 
             if let onImportUnverified {
                 Button(action: onImportUnverified) {
@@ -170,6 +172,7 @@ struct ImportConfirmView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .accessibilityIdentifier("importconfirm.unverified")
             }
         }
         .padding(20)

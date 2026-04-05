@@ -50,14 +50,13 @@ struct TutorialMirrorShellView: View {
                             action()
                         }
                     )
-                case .postGenerationPrompt(let identity):
-                    AppRouteHost(resolver: routeResolver(for: tutorialStore.selectedTab)) {
-                        PostGenerationPromptView(identity: identity)
-                    }
                 case .authModeConfirmation(let request):
                     NavigationStack {
                         TutorialAuthModeConfirmationView(request: request)
                     }
+                    #if os(macOS)
+                    .frame(minWidth: 500, idealWidth: 540, minHeight: 360, idealHeight: 420)
+                    #endif
                     #if canImport(UIKit)
                     .presentationDetents([.medium, .large])
                     #endif
@@ -122,11 +121,15 @@ private struct TutorialShellTabsView: View {
     let sizeClass: UserInterfaceSizeClass?
 
     var body: some View {
+        #if os(macOS)
+        AnyView(macOSLayout)
+        #else
         if sizeClass == .compact {
             AnyView(compactLayout)
         } else {
             AnyView(regularLayout)
         }
+        #endif
     }
 
     private var currentGuidance: TutorialGuidance? {
@@ -178,6 +181,23 @@ private struct TutorialShellTabsView: View {
         }
     }
 
+    #if os(macOS)
+    private var macOSLayout: some View {
+        NavigationSplitView {
+            sidebar
+        } detail: {
+            tabRoot(for: selectedTab)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .inspector(isPresented: inspectorBinding) {
+            if let currentGuidance {
+                guidanceInspector(currentGuidance)
+                    .inspectorColumnWidth(min: 260, ideal: 300, max: 360)
+            }
+        }
+    }
+    #endif
+
     private var compactTabBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
@@ -196,15 +216,15 @@ private struct TutorialShellTabsView: View {
         #if os(macOS)
         List(selection: $selectedTab) {
             Section {
-                sidebarLink(.home)
-                sidebarLink(.keys)
-                sidebarLink(.contacts)
-                sidebarLink(.settings)
+                sidebarSelectionRow(.home)
+                sidebarSelectionRow(.keys)
+                sidebarSelectionRow(.contacts)
+                sidebarSelectionRow(.settings)
             }
 
             Section(String(localized: "tab.section.tools", defaultValue: "Tools")) {
-                sidebarLink(.encrypt)
-                sidebarLink(.decrypt)
+                sidebarSelectionRow(.encrypt)
+                sidebarSelectionRow(.decrypt)
             }
         }
         .frame(minWidth: 220, idealWidth: 240, maxWidth: 260)
@@ -270,6 +290,17 @@ private struct TutorialShellTabsView: View {
         .buttonStyle(.plain)
         .tag(tab)
     }
+
+    #if os(macOS)
+    private func sidebarSelectionRow(_ tab: AppShellTab) -> some View {
+        Label(
+            AppShellComposition.title(for: tab),
+            systemImage: AppShellComposition.systemImage(for: tab)
+        )
+        .tag(tab)
+        .accessibilityIdentifier("tutorial.sidebar.\(tab.rawValue)")
+    }
+    #endif
 
     private var routeResolver: AppRouteDestinationResolver {
         AppRouteDestinationResolver { route in
@@ -422,6 +453,36 @@ private struct TutorialShellTabsView: View {
         .padding(.vertical, 12)
     }
 
+    #if os(macOS)
+    private var inspectorBinding: Binding<Bool> {
+        Binding(
+            get: { tutorialStore.isInspectorPresented && currentGuidance != nil },
+            set: { tutorialStore.setInspectorPresented($0) }
+        )
+    }
+
+    private func guidanceInspector(_ guidance: TutorialGuidance) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(
+                String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Sandbox"),
+                systemImage: "testtube.2"
+            )
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.orange)
+
+            Text(guidance.title)
+                .font(.headline)
+
+            Text(guidance.body)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+    }
+    #endif
+
     private func compactGuidanceBanner(_ guidance: TutorialGuidance) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(
@@ -492,6 +553,12 @@ private struct TutorialRouteDestinationView: View {
                     } else {
                         KeyGenerationView()
                     }
+                }
+            )
+        case .postGenerationPrompt(let identity):
+            AnyView(
+                TutorialSurfaceView(tab: selectedTab, route: route) {
+                    PostGenerationPromptView(identity: identity)
                 }
             )
         case .addContact:

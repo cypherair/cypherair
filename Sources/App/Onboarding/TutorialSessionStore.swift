@@ -101,6 +101,25 @@ struct TutorialTaskState {
     var isCompleted = false
 }
 
+struct TutorialVisibleSurface {
+    var tab: AppShellTab = .home
+    var route: AppRoute?
+}
+
+struct TutorialNavigationState {
+    var selectedTab: AppShellTab = .home
+    var pathsByTab: [AppShellTab: [AppRoute]] = Dictionary(
+        uniqueKeysWithValues: AppShellTab.allCases.map { ($0, []) }
+    )
+    var activeModal: TutorialModal?
+    var visibleSurface = TutorialVisibleSurface()
+    var isInspectorPresented = true
+
+    func path(for tab: AppShellTab) -> [AppRoute] {
+        pathsByTab[tab] ?? []
+    }
+}
+
 struct TutorialSessionState {
     var taskStates: [TutorialTaskID: TutorialTaskState] = Dictionary(
         uniqueKeysWithValues: TutorialTaskID.allCases.map { ($0, TutorialTaskState()) }
@@ -135,15 +154,12 @@ struct TutorialGuidance {
 
 enum TutorialModal: Identifiable {
     case importConfirmation(ImportConfirmationRequest)
-    case postGenerationPrompt(PGPKeyIdentity)
     case authModeConfirmation(AuthModeChangeConfirmationRequest)
 
     var id: String {
         switch self {
         case .importConfirmation(let request):
             "import-\(request.id.uuidString)"
-        case .postGenerationPrompt(let identity):
-            "postgen-\(identity.fingerprint)"
         case .authModeConfirmation(let request):
             "auth-\(request.id.uuidString)"
         }
@@ -158,12 +174,15 @@ final class TutorialSessionStore {
 
     private(set) var session = TutorialSessionState()
     private(set) var container: TutorialSandboxContainer?
-    private(set) var selectedTab: AppShellTab = .home
-    private(set) var routePath: [AppRoute] = []
-    private(set) var activeModal: TutorialModal?
-    private(set) var visibleTab: AppShellTab = .home
-    private(set) var visibleRoute: AppRoute?
+    private(set) var navigation = TutorialNavigationState()
     private(set) var errorMessage: String?
+
+    var selectedTab: AppShellTab { navigation.selectedTab }
+    var routePath: [AppRoute] { navigation.path(for: navigation.selectedTab) }
+    var activeModal: TutorialModal? { navigation.activeModal }
+    var visibleTab: AppShellTab { navigation.visibleSurface.tab }
+    var visibleRoute: AppRoute? { navigation.visibleSurface.route }
+    var isInspectorPresented: Bool { navigation.isInspectorPresented }
 
     var nextTask: TutorialTaskID? {
         session.nextIncompleteTask
@@ -232,38 +251,36 @@ final class TutorialSessionStore {
     }
 
     func selectTab(_ tab: AppShellTab) {
-        guard selectedTab != tab else { return }
-        selectedTab = tab
-        routePath.removeAll()
-        activeModal = nil
-        visibleTab = tab
-        visibleRoute = nil
+        guard navigation.selectedTab != tab else { return }
+        navigation.selectedTab = tab
+        navigation.activeModal = nil
+        navigation.visibleSurface.tab = tab
+        navigation.visibleSurface.route = navigation.path(for: tab).last
     }
 
     func setRoutePath(_ path: [AppRoute]) {
-        routePath = path
-        visibleRoute = path.last
+        navigation.pathsByTab[navigation.selectedTab] = path
+        navigation.visibleSurface.route = path.last
     }
 
     func presentImportConfirmation(_ request: ImportConfirmationRequest) {
-        activeModal = .importConfirmation(request)
-    }
-
-    func presentPostGenerationPrompt(_ identity: PGPKeyIdentity) {
-        activeModal = .postGenerationPrompt(identity)
+        navigation.activeModal = .importConfirmation(request)
     }
 
     func presentAuthModeConfirmation(_ request: AuthModeChangeConfirmationRequest) {
-        activeModal = .authModeConfirmation(request)
+        navigation.activeModal = .authModeConfirmation(request)
     }
 
     func dismissModal() {
-        activeModal = nil
+        navigation.activeModal = nil
     }
 
     func noteVisibleSurface(tab: AppShellTab, route: AppRoute?) {
-        visibleTab = tab
-        visibleRoute = route
+        navigation.visibleSurface = TutorialVisibleSurface(tab: tab, route: route)
+    }
+
+    func setInspectorPresented(_ isPresented: Bool) {
+        navigation.isInspectorPresented = isPresented
     }
 
     func noteAliceGenerated(_ identity: PGPKeyIdentity) async {
@@ -312,14 +329,12 @@ final class TutorialSessionStore {
             prefilledEmail: "alice@demo.invalid",
             lockedProfile: .advanced,
             lockedExpiryMonths: 24,
-            postGenerationBehavior: .externalPrompt,
+            postGenerationBehavior: .suppressPrompt,
             onGenerated: { [weak self] identity in
                 Task { @MainActor in
                     await self?.noteAliceGenerated(identity)
+                    self?.navigateToPostGenerationPrompt(identity)
                 }
-            },
-            onPostGenerationPromptRequested: { [weak self] identity in
-                self?.presentPostGenerationPrompt(identity)
             }
         )
     }
@@ -390,7 +405,7 @@ final class TutorialSessionStore {
         sizeClass: UserInterfaceSizeClass?,
         selectedTab: AppShellTab
     ) -> TutorialGuidance? {
-        guard activeModal == nil else { return nil }
+        guard navigation.activeModal == nil else { return nil }
         guard let task = session.activeTask else { return nil }
 
         switch task {
@@ -592,38 +607,24 @@ final class TutorialSessionStore {
         do {
             container = try TutorialSandboxContainer()
             session = TutorialSessionState()
-            selectedTab = .home
-            routePath = []
-            activeModal = nil
-            visibleTab = .home
-            visibleRoute = nil
+            navigation = TutorialNavigationState()
             errorMessage = nil
         } catch {
             container = nil
             session = TutorialSessionState()
-            selectedTab = .home
-            routePath = []
-            activeModal = nil
-            visibleTab = .home
-            visibleRoute = nil
+            navigation = TutorialNavigationState()
             errorMessage = error.localizedDescription
         }
     }
 
     private func resetNavigationState(for task: TutorialTaskID) {
-        selectedTab = initialSelection(for: task)
-        routePath.removeAll()
-        activeModal = nil
-        visibleTab = selectedTab
-        visibleRoute = nil
+        navigation = TutorialNavigationState()
+        navigation.selectedTab = initialSelection(for: task)
+        navigation.visibleSurface.tab = navigation.selectedTab
     }
 
     private func clearNavigationState() {
-        selectedTab = .home
-        routePath.removeAll()
-        activeModal = nil
-        visibleTab = .home
-        visibleRoute = nil
+        navigation = TutorialNavigationState()
     }
 
     private func initialSelection(for task: TutorialTaskID) -> AppShellTab {
@@ -661,5 +662,12 @@ final class TutorialSessionStore {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func navigateToPostGenerationPrompt(_ identity: PGPKeyIdentity) {
+        var path = navigation.path(for: navigation.selectedTab)
+        path.append(.postGenerationPrompt(identity: identity))
+        navigation.pathsByTab[navigation.selectedTab] = path
+        navigation.visibleSurface.route = path.last
     }
 }

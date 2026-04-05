@@ -107,6 +107,7 @@ struct AddContactView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(addButtonDisabled)
+                .accessibilityIdentifier("addcontact.add")
             }
         }
         #if canImport(UIKit)

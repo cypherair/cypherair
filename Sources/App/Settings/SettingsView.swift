@@ -22,6 +22,7 @@ struct SettingsView: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(AuthenticationManager.self) private var authManager
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(\.macPresentationController) private var macPresentationController
     #if canImport(UIKit)
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
@@ -34,12 +35,6 @@ struct SettingsView: View {
     @State private var showOnboarding = false
     @State private var showTutorialOnboarding = false
     @State private var riskAcknowledged = false
-    #if os(macOS)
-    @State private var showThemePicker = false
-    @State private var showSelfTest = false
-    @State private var showAbout = false
-    @State private var showLicense = false
-    #endif
 
     let configuration: Configuration
 
@@ -67,6 +62,7 @@ struct SettingsView: View {
                     Text(String(localized: "settings.authMode.high", defaultValue: "High Security"))
                         .tag(AuthenticationMode.highSecurity)
                 }
+                .accessibilityIdentifier("settings.authMode")
                 .tutorialAnchor(.settingsAuthModePicker)
                 .disabled(isSwitching)
 
@@ -96,23 +92,13 @@ struct SettingsView: View {
             }
 
             Section {
-                #if os(macOS)
-                Button {
-                    showThemePicker = true
-                } label: {
-                    Label(
-                        String(localized: "settings.theme", defaultValue: "Color Theme"),
-                        systemImage: "paintpalette"
-                    )
-                }
-                #else
                 NavigationLink(value: AppRoute.themePicker) {
                     Label(
                         String(localized: "settings.theme", defaultValue: "Color Theme"),
                         systemImage: "paintpalette"
                     )
                 }
-                #endif
+                .accessibilityIdentifier("settings.theme")
                 #if canImport(UIKit)
                 NavigationLink(value: AppRoute.appIcon) {
                     Label(
@@ -126,78 +112,52 @@ struct SettingsView: View {
             }
 
             Section {
-                #if os(macOS)
-                Button {
-                    showSelfTest = true
-                } label: {
-                    Label(
-                        String(localized: "settings.selfTest", defaultValue: "Self-Test"),
-                        systemImage: "checkmark.circle"
-                    )
-                }
-                #else
                 NavigationLink(value: AppRoute.selfTest) {
                     Label(
                         String(localized: "settings.selfTest", defaultValue: "Self-Test"),
                         systemImage: "checkmark.circle"
                     )
                 }
-                #endif
+                .accessibilityIdentifier("settings.selfTest")
                 Button {
-                    showOnboarding = true
+                    presentOnboarding()
                 } label: {
                     Label(
                         String(localized: "settings.viewOnboarding", defaultValue: "View Onboarding"),
                         systemImage: "book"
                     )
                 }
+                .accessibilityIdentifier("settings.onboarding")
                 Button {
-                    showTutorialOnboarding = true
+                    presentTutorial()
                 } label: {
                     Label(
                         guidedTutorialEntryTitle,
                         systemImage: "testtube.2"
                     )
                 }
-                #if os(macOS)
-                Button {
-                    showLicense = true
-                } label: {
-                    Label(
-                        String(localized: "settings.license", defaultValue: "Licenses"),
-                        systemImage: "doc.text"
-                    )
-                }
-                #else
+                .accessibilityIdentifier("settings.tutorial")
                 NavigationLink(value: AppRoute.license) {
                     Label(
                         String(localized: "settings.license", defaultValue: "Licenses"),
                         systemImage: "doc.text"
                     )
                 }
-                #endif
-                #if os(macOS)
-                Button {
-                    showAbout = true
-                } label: {
-                    Label(
-                        String(localized: "settings.about", defaultValue: "About"),
-                        systemImage: "info.circle"
-                    )
-                }
-                #else
+                .accessibilityIdentifier("settings.license")
                 NavigationLink(value: AppRoute.about) {
                     Label(
                         String(localized: "settings.about", defaultValue: "About"),
                         systemImage: "info.circle"
                     )
                 }
-                #endif
+                .accessibilityIdentifier("settings.about")
             }
         }
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .accessibilityIdentifier("settings.root")
+        .screenReady("settings.ready")
         .navigationTitle(String(localized: "settings.title", defaultValue: "Settings"))
         .confirmationDialog(
             modeWarningTitle,
@@ -269,6 +229,9 @@ struct SettingsView: View {
                     }
                 }
             }
+            #if os(macOS)
+            .frame(minWidth: 500, idealWidth: 540, minHeight: 360, idealHeight: 420)
+            #endif
             #if canImport(UIKit)
             .presentationDetents([.medium, .large])
             #endif
@@ -289,60 +252,6 @@ struct SettingsView: View {
         .sheet(isPresented: $showTutorialOnboarding) {
             OnboardingView(initialPage: 2)
         }
-        #if os(macOS)
-        .sheet(isPresented: $showThemePicker) {
-            NavigationStack {
-                ThemePickerView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                                showThemePicker = false
-                            }
-                        }
-                    }
-            }
-            .frame(minWidth: 500, minHeight: 420)
-        }
-        .sheet(isPresented: $showSelfTest) {
-            NavigationStack {
-                SelfTestView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                                showSelfTest = false
-                            }
-                        }
-                    }
-            }
-            .frame(minWidth: 500, minHeight: 450)
-        }
-        .sheet(isPresented: $showAbout) {
-            NavigationStack {
-                AboutView()
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(String(localized: "common.done", defaultValue: "Done")) {
-                                showAbout = false
-                            }
-                        }
-                    }
-            }
-            .frame(minWidth: 400, minHeight: 350)
-        }
-        .sheet(isPresented: $showLicense) {
-            NavigationStack {
-                LicenseListView()
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(String(localized: "common.done", defaultValue: "Done")) {
-                                showLicense = false
-                            }
-                        }
-                    }
-            }
-            .frame(minWidth: 700, minHeight: 600)
-        }
-        #endif
     }
 
     private var hasBackup: Bool {
@@ -404,9 +313,29 @@ struct SettingsView: View {
     private func handleAuthModeSelection(_ newMode: AuthenticationMode) {
         if let onAuthModeConfirmationRequested = configuration.onAuthModeConfirmationRequested {
             onAuthModeConfirmationRequested(makeAuthModeChangeRequest(for: newMode))
+        } else if let macPresentationController {
+            macPresentationController.present(
+                .authModeConfirmation(makeAuthModeChangeRequest(for: newMode))
+            )
         } else {
             pendingMode = newMode
             showModeWarning = true
+        }
+    }
+
+    private func presentOnboarding() {
+        if let macPresentationController {
+            macPresentationController.present(.onboarding(initialPage: 0))
+        } else {
+            showOnboarding = true
+        }
+    }
+
+    private func presentTutorial() {
+        if let macPresentationController {
+            macPresentationController.present(.tutorial(presentationContext: .inApp))
+        } else {
+            showTutorialOnboarding = true
         }
     }
 
@@ -450,6 +379,98 @@ struct SettingsView: View {
             #endif
         }
         return String(localized: "settings.mode.standardWarning.message", defaultValue: "Switching to Standard Mode will allow device passcode as a fallback for authentication. Biometric authentication is required to confirm this change.")
+    }
+}
+
+#if os(macOS)
+struct MacSettingsRootView: View {
+    let launchConfiguration: AppLaunchConfiguration?
+
+    @State private var path: [AppRoute] = []
+    @State private var activePresentation: MacPresentation?
+
+    init(launchConfiguration: AppLaunchConfiguration? = nil) {
+        self.launchConfiguration = launchConfiguration
+    }
+
+    var body: some View {
+        AppRouteHost(
+            resolver: .production,
+            path: $path
+        ) {
+            SettingsView()
+        }
+        .environment(
+            \.macPresentationController,
+            MacPresentationController { presentation in
+                activePresentation = presentation
+            }
+        )
+        .task {
+            if launchConfiguration?.opensAuthModeConfirmation == true,
+               activePresentation == nil {
+                activePresentation = .authModeConfirmation(
+                    AuthModeChangeConfirmationRequest(
+                        pendingMode: .highSecurity,
+                        title: String(localized: "settings.mode.highWarning.title", defaultValue: "Enable High Security Mode"),
+                        message: String(localized: "settings.mode.highWarning.message.mac", defaultValue: "In High Security mode, if Touch ID becomes unavailable, you will be unable to access your private keys. Ensure you have a current backup. Biometric authentication is required to confirm this change."),
+                        requiresRiskAcknowledgement: false,
+                        onConfirm: { },
+                        onCancel: { }
+                    )
+                )
+            }
+        }
+        .macPresentationHost($activePresentation)
+    }
+}
+#endif
+
+struct SettingsAuthModeConfirmationSheetView: View {
+    let request: AuthModeChangeConfirmationRequest
+
+    @State private var riskAcknowledged = false
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Form {
+            Section {
+                Text(request.message)
+                    .font(.callout)
+            }
+
+            if request.requiresRiskAcknowledgement {
+                Section {
+                    Toggle(isOn: $riskAcknowledged) {
+                        Text(String(localized: "settings.mode.riskAck", defaultValue: "I understand that if biometrics become unavailable, I will lose access to my private keys"))
+                            .font(.callout)
+                    }
+                }
+            }
+
+            Section {
+                Button(String(localized: "settings.mode.confirm", defaultValue: "Switch Mode"), role: .destructive) {
+                    dismiss()
+                    request.onConfirm()
+                }
+                .accessibilityIdentifier("settings.mode.confirm")
+                .disabled(request.requiresRiskAcknowledgement && !riskAcknowledged)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .screenReady("settings.authmode.ready")
+        .navigationTitle(request.title)
+        #if canImport(UIKit)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                    dismiss()
+                    request.onCancel()
+                }
+            }
+        }
     }
 }
 

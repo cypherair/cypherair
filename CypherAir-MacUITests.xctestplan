@@ -1,0 +1,28 @@
+{
+  "configurations" : [
+    {
+      "id" : "BDA7F159-ED7C-44A5-BE2A-5EC39B690E9C",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:CypherAir.xcodeproj",
+      "identifier" : "8054D4FD1FA30AED22F9BF1B",
+      "name" : "CypherAir"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:CypherAir.xcodeproj",
+        "identifier" : "E10000042F90000100000001",
+        "name" : "CypherAirMacUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

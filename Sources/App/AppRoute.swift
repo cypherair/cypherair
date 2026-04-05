@@ -4,6 +4,7 @@ import Foundation
 enum AppRoute: Hashable {
     // Keys
     case keyGeneration
+    case postGenerationPrompt(identity: PGPKeyIdentity)
     case keyDetail(fingerprint: String)
     case backupKey(fingerprint: String)
     case importKey

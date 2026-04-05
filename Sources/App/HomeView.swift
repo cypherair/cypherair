@@ -32,6 +32,7 @@ struct HomeView: View {
                 Text(String(localized: "home.generateKey", defaultValue: "Generate Key"))
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("home.generate")
         }
     }
 
@@ -40,13 +41,7 @@ struct HomeView: View {
             VStack(spacing: 20) {
                 defaultKeyInfo
 
-                #if canImport(UIKit)
                 quickActionsGrid
-                #else
-                Text(String(localized: "home.macOS.hint", defaultValue: "Use the sidebar to encrypt, decrypt, sign, or verify messages."))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                #endif
             }
             .padding()
         }

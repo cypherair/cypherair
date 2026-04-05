@@ -32,6 +32,9 @@
             reference = "container:CypherAir-UnitTests.xctestplan">
          </TestPlanReference>
          <TestPlanReference
+            reference = "container:CypherAir-MacUITests.xctestplan">
+         </TestPlanReference>
+         <TestPlanReference
             reference = "container:CypherAir-DeviceTests.xctestplan"
             default = "YES">
          </TestPlanReference>

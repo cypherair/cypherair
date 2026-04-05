@@ -38,6 +38,8 @@ struct QRDisplayView: View {
                 .padding(.horizontal)
         }
         .padding()
+        .accessibilityIdentifier("qr.root")
+        .screenReady("qr.ready")
         .navigationTitle(String(localized: "qr.title", defaultValue: "My Public Key"))
         .task {
             generateQR()

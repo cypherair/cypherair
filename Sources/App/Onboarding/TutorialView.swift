@@ -82,6 +82,7 @@ struct TutorialView: View {
                 tutorialStore.ensureSession()
                 tutorialStore.configurePersistence(appConfiguration: config)
             }
+            .screenReady("tutorial.ready")
         }
     }
 
@@ -110,6 +111,7 @@ struct TutorialView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("tutorial.primaryAction")
                 }
 
                 Button(String(localized: "guidedTutorial.reset", defaultValue: "Reset Tutorial")) {
