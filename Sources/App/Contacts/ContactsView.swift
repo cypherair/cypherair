@@ -44,6 +44,7 @@ struct ContactsView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tutorialAnchor(.contactsAddButton)
+                    .accessibilityIdentifier("contacts.add")
                 }
             }
         }
@@ -56,6 +57,7 @@ struct ContactsView: View {
                     Image(systemName: "plus")
                 }
                 .tutorialAnchor(.contactsAddButton)
+                .accessibilityIdentifier("contacts.add.toolbar")
             }
         }
         .task {

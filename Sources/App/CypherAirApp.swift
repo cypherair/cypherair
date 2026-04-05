@@ -18,13 +18,30 @@ struct CypherAirApp: App {
     @State private var loadError: String?
     @State private var tutorialStore = TutorialSessionStore()
     @State private var importConfirmationCoordinator = ImportConfirmationCoordinator()
+    @State private var launchConfiguration: AppLaunchConfiguration
 
     // MARK: - Init
 
     init() {
-        let container = AppContainer.makeDefault()
+        let launchConfiguration = AppLaunchConfiguration()
+        let container: AppContainer
+        if launchConfiguration.isUITestMode {
+            container = AppContainer.makeUITest(
+                requiresManualAuthentication: launchConfiguration.requiresManualAuthentication
+            )
+        } else {
+            container = AppContainer.makeDefault()
+        }
+        if launchConfiguration.isUITestMode && !launchConfiguration.requiresManualAuthentication {
+            container.config.requireAuthOnLaunch = false
+            container.config.recordAuthentication()
+        }
+        if launchConfiguration.shouldSkipOnboarding {
+            container.config.hasCompletedOnboarding = true
+        }
         let startupResult = AppStartupCoordinator().performStartup(using: container)
 
+        _launchConfiguration = State(initialValue: launchConfiguration)
         _container = State(initialValue: container)
         _loadError = State(initialValue: startupResult.loadError)
     }
@@ -34,7 +51,7 @@ struct CypherAirApp: App {
     var body: some Scene {
         WindowGroup {
             ImportConfirmationSheetHost(coordinator: importConfirmationCoordinator) {
-                ContentView()
+                mainWindowContent
                     .privacyScreen()
                     .optionalTint(container.config.colorTheme.accentColor)
                     .environment(container.config)
@@ -101,9 +118,7 @@ struct CypherAirApp: App {
 
         #if os(macOS)
         Settings {
-            AppRouteHost(resolver: .production) {
-                SettingsView()
-            }
+            MacSettingsRootView()
             .optionalTint(container.config.colorTheme.accentColor)
             .environment(container.config)
             .environment(container.authManager)
@@ -123,6 +138,29 @@ struct CypherAirApp: App {
                 }
             }
         )
+    }
+
+    @ViewBuilder
+    private var mainWindowContent: some View {
+        #if os(macOS)
+        switch launchConfiguration.root {
+        case .main:
+            MacAppShellView()
+        case .settings:
+            MacSettingsRootView(
+                launchConfiguration: launchConfiguration
+            )
+        case .tutorial:
+            TutorialView(presentationContext: .inApp)
+                .task {
+                    if let tutorialTask = launchConfiguration.tutorialTask {
+                        await tutorialStore.openTask(tutorialTask)
+                    }
+                }
+        }
+        #else
+        ContentView()
+        #endif
     }
 
     // MARK: - URL Scheme Handling
@@ -186,6 +224,45 @@ struct CypherAirApp: App {
         importConfirmationCoordinator.dismiss()
     }
 }
+
+#if os(macOS)
+struct AppLaunchConfiguration {
+    enum Root: String {
+        case main
+        case settings
+        case tutorial
+    }
+
+    let root: Root
+    let shouldSkipOnboarding: Bool
+    let tutorialTask: TutorialTaskID?
+    let isUITestMode: Bool
+    let requiresManualAuthentication: Bool
+    let opensAuthModeConfirmation: Bool
+
+    init(processInfo: ProcessInfo = .processInfo) {
+        let environment = processInfo.environment
+        self.root = Root(rawValue: environment["UITEST_ROOT"] ?? "main") ?? .main
+        self.isUITestMode = environment["UITEST_ROOT"] != nil || environment["UITEST_SKIP_ONBOARDING"] != nil
+        self.requiresManualAuthentication = environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
+        self.opensAuthModeConfirmation = environment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] == "1"
+        self.shouldSkipOnboarding = environment["UITEST_SKIP_ONBOARDING"] == "1" || root != .main
+        self.tutorialTask = environment["UITEST_TUTORIAL_TASK"].flatMap { value in
+            switch value {
+            case "understandSandbox": .understandSandbox
+            case "generateAliceKey": .generateAliceKey
+            case "importBobKey": .importBobKey
+            case "composeAndEncryptMessage": .composeAndEncryptMessage
+            case "parseRecipients": .parseRecipients
+            case "decryptMessage": .decryptMessage
+            case "exportBackup": .exportBackup
+            case "enableHighSecurity": .enableHighSecurity
+            default: nil
+            }
+        }
+    }
+}
+#endif
 
 #if os(iOS)
 private final class CypherAirKeyboardPolicyDelegate: NSObject, UIApplicationDelegate {

@@ -63,6 +63,8 @@ struct LicenseListView: View {
                 #endif
             }
         }
+        .accessibilityIdentifier("license.root")
+        .screenReady("license.ready")
         .navigationTitle(String(localized: "license.title", defaultValue: "Licenses"))
         .task {
             guard !hasLoaded, loadError == nil else { return }

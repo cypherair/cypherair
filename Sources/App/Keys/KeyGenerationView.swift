@@ -23,6 +23,7 @@ struct KeyGenerationView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appRouteNavigator) private var routeNavigator
 
     enum Field {
         case name
@@ -72,6 +73,7 @@ struct KeyGenerationView: View {
                     String(localized: "keygen.name", defaultValue: "Name"),
                     text: $name
                 )
+                .accessibilityIdentifier("keygen.name")
                 .textContentType(.name)
                 .autocorrectionDisabled(true)
                 .applyMacWritingToolsPolicy()
@@ -86,6 +88,7 @@ struct KeyGenerationView: View {
                     String(localized: "keygen.email", defaultValue: "Email (optional)"),
                     text: $email
                 )
+                .accessibilityIdentifier("keygen.email")
                 .textContentType(.emailAddress)
                 .autocorrectionDisabled(true)
                 .applyMacWritingToolsPolicy()
@@ -129,6 +132,7 @@ struct KeyGenerationView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isGenerating)
+                .accessibilityIdentifier("keygen.generate")
             }
         }
         #if canImport(UIKit)
@@ -137,6 +141,8 @@ struct KeyGenerationView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .accessibilityIdentifier("keygen.root")
+        .screenReady("keygen.ready")
         .navigationTitle(String(localized: "keygen.title", defaultValue: "Generate Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
@@ -148,7 +154,10 @@ struct KeyGenerationView: View {
             Text(err.localizedDescription)
         }
         .sheet(item: $generatedIdentity) { identity in
-            AppRouteHost(resolver: .production) {
+            AppRouteHost(
+                resolver: .production,
+                macSheetSizing: .routedModal
+            ) {
                 PostGenerationPromptView(identity: identity)
                     .environment(keyManagement)
                     .interactiveDismissDisabled(false)
@@ -192,7 +201,11 @@ struct KeyGenerationView: View {
 
                 switch configuration.postGenerationBehavior {
                 case .showPrompt:
+                    #if os(macOS)
+                    routeNavigator.open(.postGenerationPrompt(identity: identity))
+                    #else
                     generatedIdentity = identity
+                    #endif
                 case .externalPrompt:
                     configuration.onPostGenerationPromptRequested?(identity)
                 case .suppressPrompt:

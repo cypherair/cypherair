@@ -65,6 +65,9 @@ enum AuthenticationError: Error, LocalizedError {
 /// See SECURITY.md Section 4 and Section 7.
 @Observable
 final class AuthenticationManager: AuthenticationEvaluable {
+    private enum UITestPreferences {
+        static let bypassAuthenticationKey = "com.cypherair.preference.uiTestBypassAuthentication"
+    }
 
     // MARK: - Dependencies
 
@@ -133,6 +136,10 @@ final class AuthenticationManager: AuthenticationEvaluable {
     }
 
     func evaluate(mode: AuthenticationMode, reason: String) async throws -> Bool {
+        if defaults.bool(forKey: UITestPreferences.bypassAuthenticationKey) {
+            return true
+        }
+
         let context = LAContext()
         let success: Bool
 

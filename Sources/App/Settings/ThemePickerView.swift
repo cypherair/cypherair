@@ -27,6 +27,8 @@ struct ThemePickerView: View {
             }
             .padding()
         }
+        .accessibilityIdentifier("theme.root")
+        .screenReady("theme.ready")
         .navigationTitle(String(localized: "settings.theme", defaultValue: "Color Theme"))
         #if canImport(UIKit)
         .navigationBarTitleDisplayMode(.inline)

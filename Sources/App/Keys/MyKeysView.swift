@@ -31,6 +31,7 @@ struct MyKeysView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tutorialAnchor(.keysGenerateButton)
+                    .accessibilityIdentifier("keys.generate")
                 }
             }
         }

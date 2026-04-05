@@ -91,6 +91,8 @@ struct SelfTestView: View {
         #if os(macOS)
         .listStyle(.inset)
         #endif
+        .accessibilityIdentifier("selftest.root")
+        .screenReady("selftest.ready")
         .navigationTitle(String(localized: "selftest.title", defaultValue: "Self-Test"))
         .toolbar {
             if case .completed = selfTestService.state, selfTestService.lastReportURL != nil {

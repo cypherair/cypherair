@@ -181,7 +181,7 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertTrue(store.isShowingCompletionView)
     }
 
-    func test_tutorialSessionStore_selectTabClearsRouteAndModalState() {
+    func test_tutorialSessionStore_selectTabPreservesPerTabRouteAndClearsModalState() {
         let store = TutorialSessionStore()
         store.ensureSession()
 
@@ -196,6 +196,50 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertEqual(store.selectedTab, .contacts)
         XCTAssertTrue(store.routePath.isEmpty)
         XCTAssertNil(store.activeModal)
+
+        store.selectTab(.home)
+
+        XCTAssertEqual(store.routePath, [.addContact])
+    }
+
+    func test_tutorialSessionStore_postGenerationPrompt_appendsRouteOnSelectedTab() {
+        let store = TutorialSessionStore()
+        store.ensureSession()
+        store.selectTab(.keys)
+
+        let identity = makeIdentity(
+            fingerprint: "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678",
+            userId: "Alice Demo <alice@demo.invalid>"
+        )
+
+        store.navigateToPostGenerationPrompt(identity)
+
+        XCTAssertEqual(store.routePath, [.postGenerationPrompt(identity: identity)])
+        XCTAssertEqual(store.visibleRoute, .postGenerationPrompt(identity: identity))
+    }
+
+    func test_tutorialSessionStore_postGenerationPrompt_routePreservesCompletedKeyTaskAndArtifacts() async throws {
+        let store = TutorialSessionStore()
+        store.ensureSession()
+        let container = try XCTUnwrap(store.container)
+
+        let alice = try await container.keyManagement.generateKey(
+            name: "Alice Demo",
+            email: "alice@demo.invalid",
+            expirySeconds: nil,
+            profile: .advanced,
+            authMode: .standard
+        )
+        await store.noteAliceGenerated(alice)
+        await store.openTask(.generateAliceKey)
+        store.navigateToPostGenerationPrompt(alice)
+
+        XCTAssertTrue(store.isCompleted(.generateAliceKey))
+        XCTAssertEqual(store.session.artifacts.aliceIdentity?.fingerprint, alice.fingerprint)
+        XCTAssertNotNil(store.session.artifacts.bobArmoredPublicKey)
+        XCTAssertTrue(store.session.isShellPresented)
+        XCTAssertEqual(store.session.activeTask, .generateAliceKey)
+        XCTAssertEqual(store.routePath, [.postGenerationPrompt(identity: alice)])
     }
 
     func test_tutorialSessionStore_dismissShellClearsTutorialNavigationState() async {
@@ -238,6 +282,28 @@ final class TutorialSessionStoreTests: XCTestCase {
             onImportVerified: { },
             onImportUnverified: { },
             onCancel: { }
+        )
+    }
+
+    private func makeIdentity(
+        fingerprint: String,
+        userId: String
+    ) -> PGPKeyIdentity {
+        PGPKeyIdentity(
+            fingerprint: fingerprint,
+            keyVersion: 6,
+            profile: .advanced,
+            userId: userId,
+            hasEncryptionSubkey: true,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: false,
+            isBackedUp: false,
+            publicKeyData: Data("demo-public-key".utf8),
+            revocationCert: Data(),
+            primaryAlgo: "Ed448",
+            subkeyAlgo: "X448",
+            expiryDate: nil
         )
     }
 }
