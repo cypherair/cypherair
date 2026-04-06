@@ -1,19 +1,21 @@
 # Tutorial Rebuild Specification
 
-> Purpose: Define the ideal end-state guided tutorial product for CypherAir across iPhone, iPad, and macOS.
+> Purpose: Define the target guided tutorial product for CypherAir across iPhone, iPad, and macOS.
 > Audience: Human developers, designers, product owners, and AI coding tools.
-> Companion documents: [TUTORIAL_MODE_ISSUES](TUTORIAL_MODE_ISSUES.md) · [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [LIQUID_GLASS](LIQUID_GLASS.md) · [TESTING](TESTING.md)
-> Spec posture: This document defines the target tutorial product, not a patch plan for the current implementation. It is written from the ideal end-state backward. The final tutorial may diverge materially from the current code wherever needed to satisfy CypherAir's privacy, offline, security, accessibility, and cross-platform product goals. Current code may inform problem framing, reusable seams, and low-intrusion implementation direction, but it does not constrain the correctness of this target-state specification.
+> Companion documents: [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [LIQUID_GLASS](LIQUID_GLASS.md) · [TESTING](TESTING.md)
+> Spec posture: This document defines the target tutorial product, not a patch plan for the current implementation. It is written from the ideal end-state backward. The final tutorial may diverge materially from the current code wherever needed to satisfy CypherAir's privacy, offline, security, accessibility, and cross-platform product goals.
 
 ## 1. Product Intent
 
 ### 1.1 Why The Tutorial Exists
 
-The guided tutorial exists to help a first-time CypherAir user reach confidence before they touch their real workspace. It must teach the minimum mental model required to understand what the app does, why it is safe, and how the core encryption workflow fits together.
+The guided tutorial exists to help a first-time CypherAir user reach confidence before they touch their real workspace. It must teach the minimum mental model required to understand what the app does, why it is safe, where core features live, and how the encryption workflow fits together.
 
-The tutorial is not a marketing carousel and not a fake demo. It is a sandboxed learning experience that uses isolated tutorial data and isolated tutorial security plumbing while keeping the user close to the real app's UI, structure, and workflow.
+The tutorial is not a marketing carousel and not a fake demo. It is a sandboxed learning experience that keeps the user close to the real app's pages, navigation positions, and interaction flow while isolating all tutorial data and tutorial security state from the user's real workspace.
 
-The intended outcome is: "I understand what this app does, I trust the boundaries, I know where things live, and I know what to do next in the real app."
+The intended outcome is:
+
+"I understand what this app does, I trust the boundaries, I know where things live, and I know what to do next in the real app."
 
 ### 1.2 Product Goals
 
@@ -22,8 +24,9 @@ The intended outcome is: "I understand what this app does, I trust the boundarie
 - Keep the first-run learning path short, focused, and deterministic.
 - Let the user learn the real app's UI, real navigation locations, and real workflow sequence inside an isolated sandbox.
 - Use real tutorial-sandbox operations wherever safe: real key generation, real contact import into sandbox, real encryption, real decryption, real backup generation, and real auth-mode changes in sandbox.
-- Restrict only the parts of the experience that would otherwise affect real user data or launch real-world side effects.
-- Produce one coherent tutorial product across iPhone, iPad, and macOS, with platform adaptations but not separate tutorial philosophies.
+- Restrict only the parts of the experience that would otherwise affect real user data or launch forbidden real-world side effects.
+- Keep production pages tutorial-agnostic where possible; tutorial behavior should be imposed by the host, by isolated dependencies, and by generic page configuration seams rather than by pervasive tutorial-only branches.
+- Produce one coherent tutorial product across iPhone, iPad, and macOS, with platform adaptations but not different tutorial philosophies.
 
 ### 1.3 Success Criteria
 
@@ -37,13 +40,13 @@ The intended outcome is: "I understand what this app does, I trust the boundarie
   - High Security changes operational behavior
   - the real app is where they create and manage their own real key afterward
 - The user can skip the tutorial at first run without broken state and replay it later from Settings.
-- The tutorial never performs a real file import, real file export, real share sheet export, real clipboard write, photo-picker import, URL handoff, or real workspace mutation.
 - The tutorial keeps the user close enough to real UI and navigation that the learning transfers directly into the real app.
+- The tutorial never performs a real file import, real file export, real share sheet export, real clipboard write, photo-picker import, URL handoff, or real workspace mutation.
 
 ### 1.4 Non-Goals
 
 - The tutorial is not a full manual.
-- The tutorial is not a fake slideshow detached from the app.
+- The tutorial is not a detached slideshow.
 - The tutorial does not need final marketing copy or final localization strings in this specification.
 - The tutorial is not the place to exercise real-world file exchange, QR photo workflows, or system-level export flows.
 - The tutorial is not required to expose every production feature during the learning path.
@@ -54,7 +57,7 @@ The intended outcome is: "I understand what this app does, I trust the boundarie
 |------|------|
 | First-time non-technical user | Understand the app safely and reach first confidence without touching real data |
 | Returning user who skipped first run | Take the tutorial later from Settings |
-| User who wants to learn backup and stronger security concepts | Practice those concepts in the same isolated tutorial flow |
+| User who wants to learn backup and stronger security concepts | Practice those concepts in the same unified tutorial flow |
 
 ## 2. Tutorial Product Model
 
@@ -62,11 +65,11 @@ The intended outcome is: "I understand what this app does, I trust the boundarie
 
 CypherAir has one guided tutorial product, not separate "core" and "advanced" tutorial layers.
 
-The tutorial is a single modular learning path inside one tutorial hub and one tutorial sandbox session model. Some modules may appear later in the sequence because they depend on earlier sandbox state, but they are still part of the same tutorial product.
+The tutorial is a single modular learning path inside one tutorial hub and one tutorial session model.
 
 ### 2.2 Module Sequence
 
-The tutorial contains these seven modules in fixed order:
+The tutorial contains these seven modules in fixed first-run order:
 
 1. Understand the tutorial sandbox
 2. Create a demo identity
@@ -84,14 +87,14 @@ The tutorial ends only when the user explicitly finishes from the final completi
 |------------|----------|
 | First-run onboarding | Offers the tutorial as a primary learning path and allows skip |
 | Settings replay | Opens the tutorial hub and allows replay |
-| Completion surface | Ends the tutorial and hands the user to the app context; it does not branch into a separate advanced-tutorial product |
+| Completion surface | Ends the tutorial and hands the user to the app context |
 
 ### 2.4 Replay Rules
 
 - First-run always enters the same unified tutorial product.
-- Settings replay opens the tutorial hub.
-- Replaying starts a fresh sandbox session.
-- The tutorial may show module-level progress for the current spec version, but it remains one product and one completion model.
+- Replay from Settings opens the tutorial hub.
+- If the user has already completed the tutorial at least once, the replay hub may enter any module directly for review.
+- Replaying always uses a fresh sandbox session.
 
 ### 2.5 Skip Rules
 
@@ -106,7 +109,7 @@ The product distinguishes these states:
 | State | Meaning |
 |------|---------|
 | Not Started | No tutorial run has begun for the current spec version |
-| In Progress | A tutorial sandbox session exists and the user is inside the tutorial |
+| In Progress | A tutorial session exists and the user is inside the tutorial |
 | Steps Completed | All tutorial modules are complete, but the user has not yet explicitly finished from the completion surface |
 | Finished | The user explicitly finished the tutorial; only here is the tutorial version recorded as complete |
 
@@ -114,8 +117,10 @@ Rules:
 
 - Completing modules does not by itself write the global tutorial completion version.
 - The global tutorial completion version is written only when the user explicitly finishes from the completion surface.
-- If module-level progress is persisted for the current spec version, it is unified tutorial progress, not a separate advanced-module system.
-- Resetting a sandbox session clears tutorial-local artifacts only; it does not erase tutorial completion history for the current spec version.
+- A tutorial run lives only for the lifetime of the current app process.
+- If the user leaves the tutorial and returns to it during the same app run, the tutorial may resume the in-memory tutorial progress for that run.
+- If the app process exits and the user later reopens the tutorial, the tutorial starts from the beginning with a fresh sandbox session.
+- Across app restarts, the only tutorial fact that must persist is whether the current tutorial version has been finished.
 
 ### 2.7 Mapping Tutorial Learning To Real App Use
 
@@ -123,8 +128,9 @@ The tutorial must continuously explain where each lesson maps in the real app.
 
 Rules:
 
-- Each module shows the corresponding real app area label, such as `Keys`, `Contacts`, `Encrypt`, `Decrypt`, or `Settings`.
-- Guidance and completion states explain how the tutorial action maps to the real app.
+- Learning should happen in the real page and real navigation location whenever possible.
+- Labels such as `Keys`, `Contacts`, `Encrypt`, `Decrypt`, or `Settings` may appear in guidance overlays, guidance rails, or helper explanations as auxiliary context only.
+- Those labels must not replace the real page structure, real navigation location, or real page chrome.
 - The final completion state ends with one explicit real-world next step: create a real key in the real app.
 
 ## 3. Cross-Platform Host Model
@@ -133,8 +139,8 @@ Rules:
 
 - The tutorial is one product across platforms.
 - The tutorial host owns sandbox isolation, navigation limits, exit semantics, and guidance presentation.
-- The tutorial host should keep the user close to the real app's page structure and navigation locations while still enforcing tutorial restrictions.
-- The tutorial host is responsible for isolating tutorial data and intercepting dangerous side effects; production pages should remain tutorial-agnostic where possible.
+- The tutorial host should keep the user close to the real app's page structure and navigation locations while enforcing tutorial restrictions.
+- The tutorial host is responsible for isolating tutorial data and intercepting dangerous side effects. Production pages should remain tutorial-agnostic where possible.
 
 ### 3.2 Onboarding Tutorial Decision Page
 
@@ -164,7 +170,7 @@ The final marketing wording may change later, but the page intent and action sem
   - this is a one-way handoff; onboarding is not preserved as a return surface
 - The tutorial CTA must not attempt to switch to tutorial mode from inside the still-present onboarding surface.
 - Success means the user clearly sees onboarding disappear and then sees the tutorial page appear.
-- If the user leaves or closes the tutorial after that one-way handoff, the app returns to the post-onboarding app-owned context, not to onboarding itself.
+- If the user leaves or closes the tutorial after that one-way handoff, the app goes directly to the main app context. The tutorial remains unfinished.
 - Replay from Settings launches the tutorial as a dedicated full-screen experience and closing returns to the app context that launched it.
 
 ### 3.4 macOS Host
@@ -216,28 +222,32 @@ Tutorial safety is enforced at the tutorial-host level, not merely by injecting 
 The host must:
 
 - provide an isolated tutorial data container
-- restrict tutorial routes
+- block only routes and actions that would break isolation or meaningfully distort the learning path
 - intercept dangerous side effects
 - preserve guidance while the user moves through real app pages inside the sandbox
 
-### 4.3 Capability Whitelist
+### 4.3 Unsafe Route And Action Blocking
 
-The tutorial host may allow only these capability classes:
+The tutorial host must not use a broad allowlist model for task pages or task navigation.
 
-- tutorial-local identities, contacts, messages, backup artifacts, and auth-mode state
-- tutorial-local settings needed to drive sandbox behavior
-- tutorial-owned navigation between hub, tutorial task states, completion, and leave confirmation
-- guidance overlays, rails, anchors, and tutorial-owned helper surfaces
-- tutorial-security simulation plumbing
+Default rule:
 
-Everything else is disallowed unless explicitly reintroduced as a tutorial-safe mechanism.
+- Preserve the real page and real navigation structure.
+- Block only tutorial-unsafe routes, actions, or side effects.
+
+The implementation must define two separate host-level mechanisms:
+
+| Interface | Responsibility |
+|-----------|----------------|
+| `TutorialUnsafeRouteBlocklist` | Blocks only routes that break sandbox isolation, launch forbidden real-world workflows, or create a false tutorial learning path |
+| `TutorialSideEffectInterceptor` | Intercepts only dangerous side effects such as real file import/export, share, clipboard, URL handoff, or real workspace writes |
 
 ### 4.4 Disallowed Real-World Side Effects
 
 The tutorial must not expose any of the following real-world side effects:
 
 - system file importer against the user's real workspace
-- system file exporter that writes real tutorial output into user-chosen destinations
+- system file exporter that writes tutorial output into user-chosen real destinations
 - photo picker import
 - share sheet export
 - clipboard write actions
@@ -245,7 +255,7 @@ The tutorial must not expose any of the following real-world side effects:
 - real app icon changes
 - real onboarding management actions
 - real app settings mutation outside the isolated tutorial container
-- any use of the user's real Keychain items, real Secure Enclave tutorial keys, or real private-key storage path
+- any use of the user's real Keychain items, real Secure Enclave private-key path, or real private-key storage path
 
 ### 4.5 Authentication And Security Simulation
 
@@ -253,7 +263,7 @@ The tutorial should preserve the real app's authentication feel as much as possi
 
 Default contract:
 
-- Use real system LocalAuthentication prompts where platform behavior permits.
+- On supported real devices, use real system LocalAuthentication prompts.
 - Route the authenticated tutorial flow into isolated tutorial security plumbing:
   - mock secure enclave
   - mock keychain
@@ -261,6 +271,16 @@ Default contract:
 - Do not use the user's real tutorial-unrelated Keychain items or real Secure Enclave-wrapped private keys.
 - Tutorial-owned explanatory modals may stage or resume context around the system biometric prompt, but they must not replace the default authentication path.
 - Only when a platform or test environment cannot reliably present the real system biometric interaction may the tutorial fall back to an explanatory confirmation.
+
+Runtime defaults:
+
+| Runtime | Default behavior |
+|---------|------------------|
+| Physical iPhone / iPad | Real system biometric interaction is required |
+| Physical macOS device with supported biometrics | Real system biometric interaction is required |
+| Physical device without supported biometrics | Device is out of support for this tutorial path; no alternate non-biometric production default is required |
+| Simulator | Explicit tutorial fallback path allowed |
+| UI automation / CI | Explicit tutorial fallback path allowed |
 
 ### 4.6 Safe Replacements
 
@@ -276,7 +296,7 @@ When a real app action would create a dangerous real-world side effect, the tuto
 ### 4.7 Scope Of Sandbox Guarantees
 
 - The entire tutorial uses the same safety contract.
-- A tutorial replay creates a fresh tutorial sandbox session.
+- A tutorial replay creates a fresh sandbox session.
 - Tutorial keys, contacts, settings, and messages are ephemeral sandbox artifacts.
 - The tutorial may use real cryptographic and service flows inside the sandbox, but it must clearly separate those from the user's real workspace.
 
@@ -285,7 +305,7 @@ When a real app action would create a dangerous real-world side effect, the tuto
 ### 5.1 Guidance Principles
 
 - Guidance must stay close to the current task.
-- Guidance must survive context changes, especially around tutorial-owned modals and system biometric prompts.
+- Guidance must survive context changes, especially around tutorial-owned helper modals and system biometric prompts.
 - Guidance must explain one next action at a time.
 - Guidance must indicate where the current lesson maps in the real app.
 - Guidance must be recoverable if an auxiliary guidance surface is collapsed.
@@ -310,15 +330,19 @@ The hub is not a large marketing hero page. It is a structured learning dashboar
 
 ### 5.3 Navigation Rules
 
-- Modules unlock sequentially.
+- During a first unfinished tutorial run, modules unlock sequentially.
 - The user may return to the hub between modules.
+- After the tutorial has been finished at least once, replay from Settings may enter any module directly from the hub.
 - The host may guide the user through real navigation locations, but dangerous routes and dangerous side effects must be filtered.
 - The tutorial should prefer real page locations and real page structure over tutorial-exclusive replacements.
 
 ### 5.4 iPhone Guidance Placement
 
 - Use a single-column layout.
-- Show persistent task context at the top of the task state.
+- On iPhone, the tutorial host must render a persistent inline task header at the top of the active tutorial workspace surface.
+- This header remains part of the task page while the current task is in progress and updates as the user moves through real pages within the same task.
+- Persistence here means the task header is present on each active task surface; it is not required to remain pinned to the viewport during scrolling.
+- At minimum it shows the sandbox state, current module or task identity, the current next-action instruction, and a way to return to the tutorial hub.
 - Guidance may use spotlighting when there is exactly one current target.
 - The guidance should overlay or frame the real page, not replace it.
 
@@ -336,7 +360,7 @@ The hub is not a large marketing hero page. It is a structured learning dashboar
 
 ### 5.7 Modal Continuity Contract
 
-Tutorial-owned modals must preserve minimum task context:
+Tutorial-owned helper modals must preserve minimum task context:
 
 - current module title
 - why this modal exists
@@ -349,7 +373,7 @@ If the actual authentication interaction is a system biometric prompt, the tutor
 
 - Tutorial anchors are required for guidance that points to a specific actionable control.
 - The tutorial may highlight at most one primary target at a time.
-- If a guidance step spans a tutorial-owned modal and then a real system prompt, anchor coverage must still make the user path legible.
+- If a guidance step spans a tutorial-owned helper modal and then a real system prompt, anchor coverage must still make the user path legible.
 
 ## 6. Experience Contract By Tutorial Segment
 
@@ -386,9 +410,10 @@ The guided tutorial is a single learning path to first confidence.
   - keys represent the user's identity
   - the tutorial uses a sandbox identity so the user can learn safely
 - Interaction contract:
-  - use the real key-generation page or a target-state equivalent that keeps the same structure and location expectations
+  - use the real key-generation page
   - the key must be generated in the sandbox at runtime
   - any tutorial defaults or locked values must be injected through generic configuration, not a tutorial-exclusive page
+  - only if the real page still cannot safely or clearly carry the flow after host-level isolation and interception may a narrowly scoped helper surface be introduced
 
 ### 6.4 Module: Add A Demo Contact
 
@@ -396,9 +421,10 @@ The guided tutorial is a single learning path to first confidence.
 - Teaching goal:
   - contacts provide public keys used for encryption
 - Interaction contract:
-  - use the real contact-import page or a target-state equivalent that keeps the same structure and location expectations
+  - use the real contact-import page
   - the imported contact must be stored in sandbox data only
   - dangerous import surfaces such as photo picker or real file importer must be disabled or intercepted by the host or configuration
+  - only if the real page still cannot safely or clearly carry the flow after host-level isolation and interception may a narrowly scoped helper surface be introduced
 
 ### 6.5 Module: Encrypt A Demo Message
 
@@ -408,9 +434,10 @@ The guided tutorial is a single learning path to first confidence.
   - write a message
   - produce protected output
 - Interaction contract:
-  - use the real encrypt page or a target-state equivalent that keeps the same structure and location expectations
+  - use the real encrypt page
   - encryption must run through the real service path in sandbox
   - dangerous side effects such as share, clipboard, or real export must be intercepted
+  - only if the real page still cannot safely or clearly carry the flow after host-level isolation and interception may a narrowly scoped helper surface be introduced
 
 ### 6.6 Module: Decrypt And Verify
 
@@ -420,9 +447,11 @@ The guided tutorial is a single learning path to first confidence.
   - decryption reveals the message
   - signature verification communicates trust
 - Interaction contract:
-  - use the real decrypt page or a target-state equivalent that keeps the same structure and location expectations
+  - use the real decrypt page
   - the decrypt flow must run through the real service path in sandbox
   - when authentication is required, the default target-state experience should preserve the real system biometric prompt while routing the secured operation through tutorial-isolated security plumbing
+  - tutorial-owned helper modal context may frame the auth step, but must not replace the real-page auth trigger path
+  - only if the real page still cannot safely or clearly carry the flow after host-level isolation and interception may a narrowly scoped helper surface be introduced
 
 ### 6.7 Module: Back Up A Key
 
@@ -431,9 +460,10 @@ The guided tutorial is a single learning path to first confidence.
   - a private key backup is protected with a passphrase
   - backup status matters before stronger security decisions
 - Interaction contract:
-  - use the real backup page or a target-state equivalent that keeps the same structure and location expectations
+  - use the real backup page
   - backup generation must run through the real service path in sandbox
   - the real exporter sink must be intercepted and replaced with a tutorial-local artifact
+  - only if the real page still cannot safely or clearly carry the flow after host-level isolation and interception may a narrowly scoped helper surface be introduced
 
 ### 6.8 Module: Enable High Security
 
@@ -443,9 +473,11 @@ The guided tutorial is a single learning path to first confidence.
   - backup matters before enabling it
   - confirmation is a meaningful security decision
 - Interaction contract:
-  - use the real settings/auth-mode flow or a target-state equivalent that keeps the same structure and location expectations
+  - use the real settings/auth-mode flow
   - the mode-switch path must use isolated tutorial security plumbing
   - the biometric interaction should remain as close as possible to the real app's experience while still isolating the user's real security assets
+  - tutorial-owned helper modal context may frame the auth step, but must not replace the real-page auth trigger path
+  - only if the real page still cannot safely or clearly carry the flow after host-level isolation and interception may a narrowly scoped helper surface be introduced
 
 ### 6.9 Completion Surface
 
@@ -463,7 +495,7 @@ The global tutorial completion version is written only when the user explicitly 
 
 - All tutorial text uses system text styles.
 - All interactive elements meet 44x44 minimum target size.
-- VoiceOver labels are required for all CTAs, step indicators, status badges, and tutorial-owned controls.
+- VoiceOver labels are required for all CTAs, step indicators, status badges, and tutorial-owned helper controls.
 - Security-sensitive content remains fully readable and never depends on color alone.
 
 ### 7.2 Dynamic Type Rules
@@ -510,8 +542,8 @@ The implementation must introduce clear contract-level boundaries equivalent to 
 |-----------|----------------|
 | `TutorialSandboxHost` | Owns onboarding handoff, replay launch, host lifecycle, exit semantics, and tutorial-level UI surfaces |
 | `TutorialSandboxContainer` | Provides isolated tutorial storage, isolated tutorial services, and tutorial-scoped runtime artifacts |
-| `TutorialRouteFilter` | Whitelists tutorial-safe routes and blocks unsafe production routes inside the tutorial host |
-| `TutorialSideEffectInterceptor` | Intercepts dangerous side effects such as real import/export, share, clipboard, and URL handoff |
+| `TutorialUnsafeRouteBlocklist` | Blocks only routes that break sandbox isolation, launch forbidden side effects, or distort the intended learning path |
+| `TutorialSideEffectInterceptor` | Intercepts dangerous side effects such as real import/export, share, clipboard, URL handoff, or real workspace writes |
 | `TutorialSurfaceConfiguration` | Passes generic page-level constraints or defaults into real production pages without making them tutorial-aware |
 | `TutorialGuidanceOverlayModel` | Provides guidance rails, overlays, anchors, target context, and modal continuity |
 | `TutorialSecuritySimulationStack` | Combines real LocalAuthentication interaction with isolated mock secure enclave, mock keychain, and tutorial-only private-key security flow |
@@ -524,7 +556,7 @@ Concrete type names may differ, but these responsibilities may not collapse into
 This specification prefers a low-intrusion implementation direction:
 
 - production pages remain tutorial-agnostic
-- tutorial behavior is introduced through host control, route filtering, side-effect interception, isolated dependency injection, and generic configuration seams
+- tutorial behavior is introduced through host control, unsafe-route blocking, side-effect interception, isolated dependency injection, and generic configuration seams
 - the tutorial should avoid pervasive `if tutorial mode` branches inside real pages
 - tutorial-owned helper surfaces are allowed only where a real page cannot safely or clearly carry the required behavior
 
@@ -536,22 +568,22 @@ The tutorial state model must include, at minimum:
 - launch origin
 - active module identifier
 - lifecycle state
-- current tutorial sandbox session identifier
-- per-module progress for the current run
+- current tutorial session identifier for the current app run
+- in-memory per-module progress for the current app run
 - current guidance payload
 
 ### 8.5 Persistence Boundaries
 
-- Only tutorial completion history and any explicitly chosen lightweight progress facts may persist outside the tutorial sandbox.
-- Tutorial demo keys, demo contacts, demo settings, and demo messages are ephemeral.
+- Only tutorial completion history persists across app restarts.
+- Tutorial demo keys, demo contacts, demo settings, tutorial messages, and unfinished module progress are ephemeral.
 - A tutorial replay starts a fresh sandbox session.
 - No real app workspace state is passed into tutorial mode except the minimal routing context needed to return control to the correct app-owned context.
 
 ### 8.6 Routing Boundaries
 
 - Tutorial hub, completion surface, leave confirmation, and guidance helpers are tutorial-owned host surfaces.
-- Guided task states should prefer real production pages, shown through tutorial filtering and configuration.
-- If a production page cannot safely satisfy the tutorial contract, the tutorial may introduce a narrowly scoped auxiliary surface for that gap rather than replacing the entire flow.
+- Guided task states should use real production pages shown through host control and generic configuration.
+- The task surface must not be replaced by a tutorial-exclusive page unless the real page cannot safely or clearly carry the task after unsafe-route blocking and side-effect interception.
 
 ### 8.7 Side-Effect Interception Boundaries
 
@@ -563,7 +595,7 @@ The tutorial state model must include, at minimum:
 
 - Tutorial-owned helper modals belong to the tutorial host, not whichever production page requested them.
 - System biometric prompts remain system-owned, but the tutorial host must frame them with guidance before and after as needed.
-- Tutorial modals and guidance around system prompts must still satisfy the automation and continuity contract.
+- Tutorial helper modals and guidance around system prompts must still satisfy the automation and continuity contract.
 
 ## 9. Testability And Automation Contract
 
@@ -607,9 +639,13 @@ Tutorial anchors are required for:
 - first-run skip path into the real app
 - onboarding CTA one-way handoff: onboarding closes, tutorial appears, onboarding is not restored
 - sandbox acknowledgement to first guided task
-- full tutorial completion to real app entry
+- full seven-module tutorial completion to real app entry
 - in-progress leave confirmation and exit behavior
+- same-app-run tutorial close and resume behavior
+- app relaunch after unfinished tutorial causes tutorial to restart from the beginning
+- completed replay from Settings can enter any module directly
 - authentication-sensitive guided flow with real LocalAuthentication prompt where supported
+- backup and High Security covered as part of the same tutorial run
 - regular-width guidance rail behavior on iPad
 
 #### macOS
@@ -617,9 +653,13 @@ Tutorial anchors are required for:
 - launch tutorial into the dedicated tutorial workspace
 - close tutorial and return to the correct app-owned context
 - completion and finish behavior
+- same-app-run tutorial close and resume behavior
+- app relaunch after unfinished tutorial causes tutorial to restart from the beginning
+- completed replay from Settings can enter any module directly
 - guidance rail collapse and explicit restore behavior
 - tutorial-owned helper modal continuity
 - authentication-sensitive guided flow with the tutorial security simulation stack
+- backup and High Security covered as part of the same tutorial run
 
 ### 9.5 Smoke Vs Deeper UI Suites
 
@@ -631,16 +671,19 @@ Tutorial anchors are required for:
 
 1. A first-run iPhone user reaches onboarding page 3, sees a tutorial decision page, chooses the tutorial, and experiences a one-way handoff where onboarding closes and the tutorial host appears.
 2. A first-run user chooses skip and enters the real app without tutorial completion being recorded.
-3. A first-run user leaves the tutorial after the one-way handoff and is not sent back to onboarding.
+3. A first-run user leaves the tutorial after the one-way handoff and is sent directly into the main app context, not back to onboarding.
 4. A user generates a sandbox key through the real key-generation flow without touching any real user key data.
 5. A user imports a sandbox contact through the real contact flow without touching real contact storage.
 6. A user encrypts and decrypts a sandbox message through the real service path without touching real workspace data.
 7. A user completes backup through the real backup flow without a real file exporter writing outside the sandbox.
 8. A user reaches High Security in the tutorial through the real settings flow while the private-key security path remains isolated from real user assets.
 9. A user sees real system biometric interaction where supported, while the tutorial still protects real Keychain and Secure Enclave assets by routing the secured path through isolated tutorial security plumbing.
-10. An iPad regular-width user sees guidance adjacent to the real guided task surface.
-11. A macOS user experiences the tutorial as a single dedicated workspace in the main window and can restore guidance after collapsing it.
-12. No tutorial flow performs a real file import, real file export, share sheet export, clipboard write, photo picker import, URL handoff, or real workspace mutation.
+10. A user who leaves the tutorial during the current app run can return and continue that in-memory progress.
+11. A user who kills the app and later reopens the tutorial starts again from the beginning unless the tutorial had already been finished.
+12. A user who already finished the tutorial can reopen it from Settings and directly enter any module for review.
+13. An iPad regular-width user sees guidance adjacent to the real guided task surface.
+14. A macOS user experiences the tutorial as a single dedicated workspace in the main window and can restore guidance after collapsing it.
+15. No tutorial flow performs a real file import, real file export, share sheet export, clipboard write, photo picker import, URL handoff, or real workspace mutation.
 
 ## 11. Deferred / Explicitly Out Of Scope
 

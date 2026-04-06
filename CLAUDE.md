@@ -140,7 +140,9 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 - Do not add error handling for impossible scenarios.
 - Run `cargo test` and `xcodebuild test` before considering a task complete.
 - Commit messages: conventional format — `feat:`, `fix:`, `refactor:`, `test:`, `docs:`.
-- **Never modify code without explicit user approval.** When asked to investigate, diagnose, or review an issue, only analyze and report findings. Do not edit any files until the user explicitly approves a specific modification plan.
+- Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.
+- Treat `CypherAir.xcodeproj/project.pbxproj` and other Xcode project file changes as explicit-scope changes that require user confirmation. Do not revert, rewrite, or "clean up" existing project file edits you did not make. If the correct implementation requires adding new files and updating the project file, call that out explicitly, confirm that scope with the user, and obtain approval before proceeding.
+- Do not work around this by forcing new code into existing large files or unrelated files just to avoid editing `project.pbxproj`. Prefer a clean repository structure over artificially avoiding project file changes.
 - **Before text replacement, verify match count.** Before executing any string replacement, check how many matches exist in the file. If multiple matches exist, handle each one individually to avoid unintended changes to other locations.
 - **After reverting changes, verify with `git diff`.** Never rely on memory to confirm a revert is complete. Always run `git diff` (or `git diff origin/main`) to confirm the file matches the expected state.
 - **After code changes, run tests — not just build.** A successful build does not guarantee correctness. Always run the relevant test suite to verify no regressions were introduced.
