@@ -24,6 +24,9 @@ final class KeyManagementServiceTests: XCTestCase {
         // Clean up crash recovery flags that tests may have set
         UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryInProgressKey)
         UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        UserDefaults.standard.removeObject(forKey: AuthPreferences.rewrapInProgressKey)
+        UserDefaults.standard.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
+        UserDefaults.standard.removeObject(forKey: AuthPreferences.authModeKey)
 
         service = nil
         mockSE = nil
@@ -31,6 +34,41 @@ final class KeyManagementServiceTests: XCTestCase {
         mockAuth = nil
         engine = nil
         super.tearDown()
+    }
+
+    private func copyPermanentBundleToPending(fingerprint: String) throws {
+        let account = KeychainConstants.defaultAccount
+        let seKeyData = try mockKC.load(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account
+        )
+        let saltData = try mockKC.load(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account
+        )
+        let sealedData = try mockKC.load(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account
+        )
+
+        try mockKC.save(
+            seKeyData,
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try mockKC.save(
+            saltData,
+            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try mockKC.save(
+            sealedData,
+            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
     }
 
     // MARK: - Key Generation: Profile A
@@ -233,6 +271,25 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(service.keys.count, 0)
     }
 
+    func test_deleteKey_removesPendingKeychainItems() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let fp = identity.fingerprint
+
+        try copyPermanentBundleToPending(fingerprint: fp)
+
+        try service.deleteKey(fingerprint: fp)
+
+        XCTAssertFalse(mockKC.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+            account: KeychainConstants.defaultAccount))
+        XCTAssertFalse(mockKC.exists(
+            service: KeychainConstants.pendingSaltService(fingerprint: fp),
+            account: KeychainConstants.defaultAccount))
+        XCTAssertFalse(mockKC.exists(
+            service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
+            account: KeychainConstants.defaultAccount))
+    }
+
     func test_deleteKey_reassignsDefaultIfNeeded() async throws {
         let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
         let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
@@ -246,6 +303,61 @@ final class KeyManagementServiceTests: XCTestCase {
         // The remaining key should become default
         XCTAssertTrue(service.keys.first?.isDefault == true,
                       "Remaining key should become default after default deleted")
+    }
+
+    func test_deleteKey_interruptedModifyExpiry_clearsRecoveryStateAndBlocksRestore() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let fp = identity.fingerprint
+
+        try copyPermanentBundleToPending(fingerprint: fp)
+        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
+        try service.deleteKey(fingerprint: fp)
+
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+        XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey))
+        XCTAssertNil(service.checkAndRecoverFromInterruptedModifyExpiry())
+        XCTAssertFalse(mockKC.exists(
+            service: KeychainConstants.seKeyService(fingerprint: fp),
+            account: KeychainConstants.defaultAccount))
+        XCTAssertFalse(mockKC.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+            account: KeychainConstants.defaultAccount))
+    }
+
+    func test_deleteKey_interruptedRewrap_lastKeyClearsGlobalRecoveryState() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+
+        try copyPermanentBundleToPending(fingerprint: identity.fingerprint)
+        UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
+        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+
+        try service.deleteKey(fingerprint: identity.fingerprint)
+
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.rewrapTargetModeKey))
+    }
+
+    func test_deleteKey_interruptedRewrap_withOtherKeysPreservesGlobalRecoveryState() async throws {
+        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
+        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
+
+        try copyPermanentBundleToPending(fingerprint: first.fingerprint)
+        UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
+        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+
+        try service.deleteKey(fingerprint: first.fingerprint)
+
+        XCTAssertTrue(UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: AuthPreferences.rewrapTargetModeKey),
+            AuthenticationMode.highSecurity.rawValue
+        )
+        XCTAssertEqual(service.keys.map(\.fingerprint), [second.fingerprint])
+        XCTAssertFalse(mockKC.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: first.fingerprint),
+            account: KeychainConstants.defaultAccount))
     }
 
     // MARK: - Unwrap Private Key

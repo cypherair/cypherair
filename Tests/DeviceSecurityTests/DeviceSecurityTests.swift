@@ -7,12 +7,11 @@ import LocalAuthentication
 /// C6/C7/C8: Device-only Security Layer Tests
 ///
 /// These tests exercise real Secure Enclave hardware, real Keychain,
-/// and real biometric authentication. They MUST run on a physical device
-/// (iPhone 17 Pro Max or any device with Secure Enclave).
+/// and real biometric authentication. They MUST run on a
+/// physical device (iPhone 17 Pro Max or any device with Secure Enclave).
 ///
 /// Run with: CypherAir-DeviceTests test plan on a connected device.
 final class DeviceSecurityTests: XCTestCase {
-
     // MARK: - Properties
 
     private var keychain: SystemKeychain!
@@ -49,6 +48,9 @@ final class DeviceSecurityTests: XCTestCase {
         // Clean up UserDefaults flags
         UserDefaults.standard.removeObject(forKey: AuthPreferences.rewrapInProgressKey)
         UserDefaults.standard.removeObject(forKey: AuthPreferences.authModeKey)
+        UserDefaults.standard.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
+        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryInProgressKey)
+        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
 
         createdFingerprints = []
         createdKeychainServices = []
@@ -67,6 +69,101 @@ final class DeviceSecurityTests: XCTestCase {
     /// Track a Keychain service for cleanup.
     private func trackKeychain(service: String, account: String = KeychainConstants.defaultAccount) {
         createdKeychainServices.append((service: service, account: account))
+    }
+
+    private func waitForAuthenticationSessionToSettle() async throws {
+        // Sequential device tests can leave LAContext activity in flight for a moment.
+        // Give the system prompt time to fully dismiss before starting the next auth-bound step.
+        try await Task.sleep(for: .seconds(2))
+    }
+
+    private func storePermanentBundle(_ bundle: WrappedKeyBundle, fingerprint: String) throws {
+        let account = KeychainConstants.defaultAccount
+        try keychain.save(
+            bundle.seKeyData,
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try keychain.save(
+            bundle.salt,
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try keychain.save(
+            bundle.sealedBox,
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+    }
+
+    private func createWrappedBundle(
+        privateKey: Data,
+        fingerprint: String,
+        mode: AuthenticationMode
+    ) throws -> WrappedKeyBundle {
+        let accessControl = try mode.createAccessControl()
+        let handle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
+        return try secureEnclave.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+    }
+
+    private func authenticateAndUnwrapStoredBundle(
+        mode: AuthenticationMode,
+        fingerprint: String,
+        privateKey: Data,
+        defaults: UserDefaults,
+        reason: String
+    ) async throws {
+        try await waitForAuthenticationSessionToSettle()
+
+        let bundle = try createWrappedBundle(
+            privateKey: privateKey,
+            fingerprint: fingerprint,
+            mode: mode
+        )
+        try storePermanentBundle(bundle, fingerprint: fingerprint)
+
+        let authManager = AuthenticationManager(
+            secureEnclave: secureEnclave,
+            keychain: keychain,
+            defaults: defaults
+        )
+
+        try await waitForAuthenticationSessionToSettle()
+
+        let authenticated = try await authManager.evaluate(mode: mode, reason: reason)
+        XCTAssertTrue(authenticated, "Authentication must succeed before SE reconstruction")
+
+        let loadedSEKey = try keychain.load(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount
+        )
+        let loadedSalt = try keychain.load(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount
+        )
+        let loadedSealed = try keychain.load(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount
+        )
+        let handle = try secureEnclave.reconstructKey(
+            from: loadedSEKey,
+            authenticationContext: authManager.lastEvaluatedContext
+        )
+        let storedBundle = WrappedKeyBundle(
+            seKeyData: loadedSEKey,
+            salt: loadedSalt,
+            sealedBox: loadedSealed
+        )
+        let unwrapped = try secureEnclave.unwrap(
+            bundle: storedBundle,
+            using: handle,
+            fingerprint: fingerprint
+        )
+
+        XCTAssertEqual(unwrapped, privateKey, "Stored key must unwrap after production authentication")
     }
 
     // MARK: - C6.1: SE Key Generation
@@ -624,6 +721,19 @@ final class DeviceSecurityTests: XCTestCase {
         XCTAssertTrue(authManager.canEvaluate(mode: .standard), "Standard mode must be evaluable on device")
     }
 
+    func test_canEvaluate_highSecurity_matchesBiometricsAvailability() {
+        let authManager = AuthenticationManager(
+            secureEnclave: secureEnclave,
+            keychain: keychain
+        )
+
+        XCTAssertEqual(
+            authManager.canEvaluate(mode: .highSecurity),
+            authManager.isBiometricsAvailable,
+            "High Security evaluability should match biometric availability"
+        )
+    }
+
     func test_isBiometricsAvailable_onFaceIDDevice_returnsTrue() {
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
@@ -631,6 +741,40 @@ final class DeviceSecurityTests: XCTestCase {
         )
         // iPhone 17 Pro Max has Face ID — this should return true.
         XCTAssertTrue(authManager.isBiometricsAvailable, "Biometrics must be available on iPhone 17 Pro Max")
+    }
+
+    // MARK: - C7.1A: Production Authentication Path (Manual Device)
+
+    func test_authenticateAndUnwrap_standard_productionPath_manual() async throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let fingerprint = uniqueFingerprint()
+        let testDefaults = UserDefaults(suiteName: "com.cypherair.device.manual.standard")!
+        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.device.manual.standard") }
+
+        try await authenticateAndUnwrapStoredBundle(
+            mode: .standard,
+            fingerprint: fingerprint,
+            privateKey: Data(repeating: 0x91, count: 32),
+            defaults: testDefaults,
+            reason: "Authenticate to validate Standard mode Secure Enclave access."
+        )
+    }
+
+    func test_authenticateAndUnwrap_highSecurity_productionPath_manual() async throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let fingerprint = uniqueFingerprint()
+        let testDefaults = UserDefaults(suiteName: "com.cypherair.device.manual.highsecurity")!
+        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.device.manual.highsecurity") }
+
+        try await authenticateAndUnwrapStoredBundle(
+            mode: .highSecurity,
+            fingerprint: fingerprint,
+            privateKey: Data(repeating: 0xA7, count: 57),
+            defaults: testDefaults,
+            reason: "Authenticate to validate High Security Secure Enclave access."
+        )
     }
 
     // MARK: - C7.2: Authentication Manager — Mode Preference Persistence
@@ -911,9 +1055,12 @@ final class DeviceSecurityTests: XCTestCase {
         try await authManager.switchMode(to: .standard, fingerprints: ["abc123"], hasBackup: true, authenticator: mockAuth)
     }
 
-    // MARK: - C7.5: Full Mode Switch on Device (SE + Keychain)
+    // MARK: - C7.5: Mode Switch Migration Flow on Device (SE + Keychain)
 
-    func test_switchMode_standardToHighSecurity_fullStack() async throws {
+    /// Verifies the migration flow completes on real device infrastructure.
+    /// This test intentionally uses a mock authenticator and a non-ACL initial key so it
+    /// remains non-interactive; it does NOT prove the final High Security boundary.
+    func test_switchMode_standardToHighSecurity_migrationFlowCompletesWithMockAuthenticator() async throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let fingerprint = uniqueFingerprint()
@@ -925,6 +1072,7 @@ final class DeviceSecurityTests: XCTestCase {
         testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
 
         // 1. Initial wrap under Standard mode (no access control for test simplicity).
+        // This keeps the test non-interactive and focused on migration mechanics only.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
@@ -967,6 +1115,88 @@ final class DeviceSecurityTests: XCTestCase {
         XCTAssertEqual(unwrapped, fakePrivateKey, "Key must be accessible after mode switch")
 
         // 6. Verify: no pending items left.
+        XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
+    }
+
+    // MARK: - C7.5A: Mode Switch Access Control Validation (Manual Device)
+
+    func test_switchMode_standardToHighSecurity_reappliesRealAccessControl_manual() async throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let fingerprint = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+        let fakePrivateKey = Data(repeating: 0x77, count: 32)
+
+        let testDefaults = UserDefaults(suiteName: "com.cypherair.device.manual.stdtohs")!
+        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.device.manual.stdtohs") }
+        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
+
+        let initialBundle = try createWrappedBundle(
+            privateKey: fakePrivateKey,
+            fingerprint: fingerprint,
+            mode: .standard
+        )
+        try storePermanentBundle(initialBundle, fingerprint: fingerprint)
+
+        let authManager = AuthenticationManager(
+            secureEnclave: secureEnclave,
+            keychain: keychain,
+            defaults: testDefaults
+        )
+
+        // Brief pause to let any prior SE authentication session settle,
+        // preventing "Canceled by another authentication" from overlapping requests.
+        try await waitForAuthenticationSessionToSettle()
+
+        try await authManager.switchMode(
+            to: .highSecurity,
+            fingerprints: [fingerprint],
+            hasBackup: true,
+            authenticator: authManager
+        )
+
+        XCTAssertEqual(
+            testDefaults.string(forKey: AuthPreferences.authModeKey),
+            AuthenticationMode.highSecurity.rawValue
+        )
+        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+
+        try await waitForAuthenticationSessionToSettle()
+
+        let authenticated = try await authManager.evaluate(
+            mode: .highSecurity,
+            reason: "Authenticate to validate High Security access after mode switch."
+        )
+        XCTAssertTrue(authenticated)
+
+        let newSEKeyData = try keychain.load(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account
+        )
+        let newSalt = try keychain.load(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account
+        )
+        let newSealed = try keychain.load(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account
+        )
+        let newHandle = try secureEnclave.reconstructKey(
+            from: newSEKeyData,
+            authenticationContext: authManager.lastEvaluatedContext
+        )
+        let newBundle = WrappedKeyBundle(
+            seKeyData: newSEKeyData,
+            salt: newSalt,
+            sealedBox: newSealed
+        )
+        let unwrapped = try secureEnclave.unwrap(
+            bundle: newBundle,
+            using: newHandle,
+            fingerprint: fingerprint
+        )
+
+        XCTAssertEqual(unwrapped, fakePrivateKey, "Key must be accessible after manual Standard→High Security switch")
         XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
     }
 
@@ -1895,10 +2125,10 @@ final class DeviceSecurityTests: XCTestCase {
 
     // MARK: - High Security → Standard Reverse Mode Switch (Device)
 
-    /// Verify full-stack mode switch from High Security back to Standard.
-    /// This is the reverse direction of test_switchMode_standardToHighSecurity_fullStack.
-    /// Uses real SE + real Keychain on device.
-    func test_switchMode_highSecurityToStandard_fullStack() async throws {
+    /// Verifies the reverse migration flow completes on real device infrastructure.
+    /// Like the forward migration test, this remains non-interactive and does not
+    /// prove the final Standard-mode passcode fallback boundary.
+    func test_switchMode_highSecurityToStandard_migrationFlowCompletesWithMockAuthenticator() async throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let fingerprint = uniqueFingerprint()
@@ -1910,6 +2140,7 @@ final class DeviceSecurityTests: XCTestCase {
         testDefaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.authModeKey)
 
         // 1. Initial wrap under High Security mode.
+        // No initial ACL so this test stays focused on migration mechanics.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
@@ -1951,6 +2182,86 @@ final class DeviceSecurityTests: XCTestCase {
         XCTAssertEqual(unwrapped, fakePrivateKey, "Key must be accessible after HS→Standard switch")
 
         // 6. Verify: no pending items left.
+        XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
+    }
+
+    func test_switchMode_highSecurityToStandard_reappliesRealAccessControl_manual() async throws {
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+
+        let fingerprint = uniqueFingerprint()
+        let account = KeychainConstants.defaultAccount
+        let fakePrivateKey = Data(repeating: 0x88, count: 57)
+
+        let testDefaults = UserDefaults(suiteName: "com.cypherair.device.manual.hs2std")!
+        defer { testDefaults.removePersistentDomain(forName: "com.cypherair.device.manual.hs2std") }
+        testDefaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.authModeKey)
+
+        let initialBundle = try createWrappedBundle(
+            privateKey: fakePrivateKey,
+            fingerprint: fingerprint,
+            mode: .highSecurity
+        )
+        try storePermanentBundle(initialBundle, fingerprint: fingerprint)
+
+        let authManager = AuthenticationManager(
+            secureEnclave: secureEnclave,
+            keychain: keychain,
+            defaults: testDefaults
+        )
+
+        // Brief pause to let any prior SE authentication session settle,
+        // preventing "Canceled by another authentication" from overlapping requests.
+        try await waitForAuthenticationSessionToSettle()
+
+        try await authManager.switchMode(
+            to: .standard,
+            fingerprints: [fingerprint],
+            hasBackup: true,
+            authenticator: authManager
+        )
+
+        XCTAssertEqual(
+            testDefaults.string(forKey: AuthPreferences.authModeKey),
+            AuthenticationMode.standard.rawValue
+        )
+        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+
+        try await waitForAuthenticationSessionToSettle()
+
+        let authenticated = try await authManager.evaluate(
+            mode: .standard,
+            reason: "Authenticate to validate Standard access after mode switch."
+        )
+        XCTAssertTrue(authenticated)
+
+        let newSEKeyData = try keychain.load(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account
+        )
+        let newSalt = try keychain.load(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account
+        )
+        let newSealed = try keychain.load(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account
+        )
+        let newHandle = try secureEnclave.reconstructKey(
+            from: newSEKeyData,
+            authenticationContext: authManager.lastEvaluatedContext
+        )
+        let newBundle = WrappedKeyBundle(
+            seKeyData: newSEKeyData,
+            salt: newSalt,
+            sealedBox: newSealed
+        )
+        let unwrapped = try secureEnclave.unwrap(
+            bundle: newBundle,
+            using: newHandle,
+            fingerprint: fingerprint
+        )
+
+        XCTAssertEqual(unwrapped, fakePrivateKey, "Key must be accessible after manual High Security→Standard switch")
         XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
     }
 
