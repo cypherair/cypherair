@@ -16,6 +16,7 @@ struct ContentView: View {
 #if os(macOS)
 struct MacAppShellView: View {
     @Environment(AppConfiguration.self) private var config
+    @Environment(TutorialPresentationCoordinator.self) private var tutorialPresentationCoordinator
 
     @State private var navigationState = MacShellNavigationState()
 
@@ -58,6 +59,11 @@ struct MacAppShellView: View {
             if !config.hasCompletedOnboarding,
                navigationState.activePresentation == nil {
                 navigationState.activePresentation = .onboarding(initialPage: 0)
+            }
+        }
+        .task(id: tutorialPresentationCoordinator.pendingMacPresentation?.id) {
+            if let pendingPresentation = tutorialPresentationCoordinator.drainPendingMacPresentation() {
+                navigationState.activePresentation = pendingPresentation
             }
         }
     }
