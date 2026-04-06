@@ -94,6 +94,7 @@ private struct MacPresentationHostModifier: ViewModifier {
             OnboardingView(initialPage: initialPage)
                 .environment(config)
                 .environment(tutorialStore)
+                .environment(\.macPresentationController, macPresentationControllerValue)
         case .tutorial(let presentationContext):
             TutorialView(
                 presentationContext: presentationContext,
@@ -103,9 +104,21 @@ private struct MacPresentationHostModifier: ViewModifier {
             )
             .environment(config)
             .environment(tutorialStore)
+            .environment(\.macPresentationController, macPresentationControllerValue)
         case .importConfirmation, .authModeConfirmation, .modifyExpiry:
             EmptyView()
         }
+    }
+
+    private var macPresentationControllerValue: MacPresentationController {
+        MacPresentationController(
+            present: { presentation in
+                activePresentation = presentation
+            },
+            dismiss: {
+                activePresentation = nil
+            }
+        )
     }
 }
 

@@ -69,20 +69,7 @@ struct CypherAirApp: App {
                     .environment(container.authManager)
                     .environment(tutorialStore)
                     #if os(iOS)
-                    .environment(
-                        \.iosPresentationController,
-                        IOSPresentationController(
-                            present: { presentation in
-                                iosPresentationState.activePresentation = presentation
-                            },
-                            dismiss: {
-                                iosPresentationState.activePresentation = nil
-                            },
-                            handoffToTutorialAfterOnboardingDismiss: { presentationContext in
-                                iosPresentationState.requestTutorialLaunchFromOnboarding(presentationContext)
-                            }
-                        )
-                    )
+                    .environment(\.iosPresentationController, iosPresentationControllerValue)
                     #endif
             }
                 #if os(iOS)
@@ -249,6 +236,7 @@ struct CypherAirApp: App {
             )
             .environment(container.config)
             .environment(tutorialStore)
+            .environment(\.iosPresentationController, iosPresentationControllerValue)
             .interactiveDismissDisabled(context == .firstRun && !container.config.hasCompletedOnboarding)
         }
     }
@@ -262,7 +250,22 @@ struct CypherAirApp: App {
             )
                 .environment(container.config)
                 .environment(tutorialStore)
+                .environment(\.iosPresentationController, iosPresentationControllerValue)
         }
+    }
+
+    private var iosPresentationControllerValue: IOSPresentationController {
+        IOSPresentationController(
+            present: { presentation in
+                iosPresentationState.activePresentation = presentation
+            },
+            dismiss: {
+                iosPresentationState.activePresentation = nil
+            },
+            handoffToTutorialAfterOnboardingDismiss: { presentationContext in
+                iosPresentationState.requestTutorialLaunchFromOnboarding(presentationContext)
+            }
+        )
     }
 
     private func presentInitialIOSFlowIfNeeded() {
