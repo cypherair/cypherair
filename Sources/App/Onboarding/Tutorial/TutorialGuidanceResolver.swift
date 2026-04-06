@@ -113,7 +113,7 @@ struct TutorialGuidanceResolver {
             if session.artifacts.parseResult == nil {
                 return payload(
                     module,
-                    body: String(localized: "guidedTutorial.decrypt.parse", defaultValue: "Check the recipients first. The lesson continues after the sandbox key matches."),
+                    body: String(localized: "guidedTutorial.decrypt.parse", defaultValue: "Check the recipients first and make sure the message matches your sandbox key."),
                     target: nil
                 )
             }
