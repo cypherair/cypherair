@@ -16,6 +16,7 @@ struct SignView: View {
         var allowsFileResultExport = true
         var fileRestrictionMessage: String?
         var resultRestrictionMessage: String?
+        var outputInterceptionPolicy: OutputInterceptionPolicy = .passthrough
 
         static let `default` = Configuration()
     }
@@ -23,7 +24,6 @@ struct SignView: View {
     @Environment(SigningService.self) private var signingService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
-    @Environment(\.tutorialSideEffectInterceptor) private var tutorialSideEffectInterceptor
 
     enum SignMode: String, CaseIterable {
         case text, file
@@ -148,7 +148,11 @@ struct SignView: View {
 
                     Button {
                         if configuration.allowsClipboardWrite,
-                           tutorialSideEffectInterceptor?.interceptClipboardWrite?(signedMessage, config) != true {
+                           configuration.outputInterceptionPolicy.interceptClipboardCopy?(
+                               signedMessage,
+                               config,
+                               .generic
+                           ) != true {
                             operation.copyToClipboard(signedMessage, config: config)
                         }
                     } label: {
@@ -163,7 +167,7 @@ struct SignView: View {
                         guard configuration.allowsTextResultExport else { return }
                         do {
                             let exportData = Data(signedMessage.utf8)
-                            if try tutorialSideEffectInterceptor?.interceptDataExport?(
+                            if try configuration.outputInterceptionPolicy.interceptDataExport?(
                                 exportData,
                                 "signed.asc",
                                 .generic
@@ -199,7 +203,7 @@ struct SignView: View {
                         guard configuration.allowsFileResultExport else { return }
                         do {
                             let suggestedFilename = (selectedFileName ?? "file") + ".sig"
-                            if try tutorialSideEffectInterceptor?.interceptDataExport?(
+                            if try configuration.outputInterceptionPolicy.interceptDataExport?(
                                 detachedSignature,
                                 suggestedFilename,
                                 .generic

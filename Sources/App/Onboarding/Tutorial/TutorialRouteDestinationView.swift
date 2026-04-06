@@ -82,7 +82,14 @@ struct TutorialRouteDestinationView: View {
                 }
             )
         case .keyDetail(let fingerprint):
-            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { KeyDetailView(fingerprint: fingerprint) })
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    KeyDetailView(
+                        fingerprint: fingerprint,
+                        configuration: factory.keyDetailConfiguration()
+                    )
+                }
+            )
         case .contactDetail(let fingerprint):
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ContactDetailView(fingerprint: fingerprint) })
         case .qrDisplay(let publicKeyData, let displayName):

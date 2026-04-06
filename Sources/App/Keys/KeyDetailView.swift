@@ -9,13 +9,22 @@ import AppKit
 
 /// Detailed view of a single key identity.
 struct KeyDetailView: View {
+    struct Configuration {
+        var allowsPublicKeySave = true
+        var allowsPublicKeyCopy = true
+        var allowsRevocationExport = true
+        var outputInterceptionPolicy: OutputInterceptionPolicy = .passthrough
+
+        static let `default` = Configuration()
+    }
+
     let fingerprint: String
+    let configuration: Configuration
 
     @Environment(AppConfiguration.self) private var config
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.dismiss) private var dismiss
     @Environment(\.macPresentationController) private var macPresentationController
-    @Environment(\.tutorialSideEffectInterceptor) private var tutorialSideEffectInterceptor
 
     @State private var showDeleteConfirmation = false
     @State private var error: CypherAirError?
@@ -33,6 +42,14 @@ struct KeyDetailView: View {
 
     private var key: PGPKeyIdentity? {
         keyManagement.keys.first { $0.fingerprint == fingerprint }
+    }
+
+    init(
+        fingerprint: String,
+        configuration: Configuration = .default
+    ) {
+        self.fingerprint = fingerprint
+        self.configuration = configuration
     }
 
     var body: some View {
@@ -112,15 +129,27 @@ struct KeyDetailView: View {
                     Section {
                         if armoredPublicKey != nil {
                             Button {
-                                guard tutorialSideEffectInterceptor == nil else { return }
-                                activeExport = .publicKey
+                                guard configuration.allowsPublicKeySave,
+                                      let armoredPublicKey else { return }
+                                do {
+                                    if try configuration.outputInterceptionPolicy.interceptDataExport?(
+                                        armoredPublicKey,
+                                        exportFilename(for: .publicKey),
+                                        .publicKey
+                                    ) != true {
+                                        activeExport = .publicKey
+                                    }
+                                } catch {
+                                    self.error = CypherAirError.from(error) { .keychainError($0) }
+                                    showError = true
+                                }
                             } label: {
                                 Label(
                                     String(localized: "keydetail.sharePublicKey", defaultValue: "Save Public Key"),
                                     systemImage: "square.and.arrow.down"
                                 )
                             }
-                            .disabled(tutorialSideEffectInterceptor != nil)
+                            .disabled(armoredPublicKey == nil || !configuration.allowsPublicKeySave)
                         }
 
                         NavigationLink(value: AppRoute.qrDisplay(publicKeyData: key.publicKeyData, displayName: key.userId ?? key.shortKeyId)) {
@@ -132,9 +161,14 @@ struct KeyDetailView: View {
                         .accessibilityIdentifier("keydetail.qr")
 
                         Button {
+                            guard configuration.allowsPublicKeyCopy else { return }
                             if let armoredPublicKey,
                                let armoredString = String(data: armoredPublicKey, encoding: .utf8) {
-                                if tutorialSideEffectInterceptor?.interceptClipboardWrite?(armoredString, config) != true {
+                                if configuration.outputInterceptionPolicy.interceptClipboardCopy?(
+                                    armoredString,
+                                    config,
+                                    .publicKey
+                                ) != true {
                                     #if canImport(UIKit)
                                     UIPasteboard.general.string = armoredString
                                     #elseif canImport(AppKit)
@@ -150,7 +184,7 @@ struct KeyDetailView: View {
                                 systemImage: "doc.on.doc"
                             )
                         }
-                        .disabled(armoredPublicKey == nil || tutorialSideEffectInterceptor != nil)
+                        .disabled(armoredPublicKey == nil || !configuration.allowsPublicKeyCopy)
                     } header: {
                         Text(String(localized: "keydetail.publicKey", defaultValue: "Public Key"))
                     }
@@ -185,15 +219,27 @@ struct KeyDetailView: View {
 
                         if !key.revocationCert.isEmpty {
                             Button {
-                                guard tutorialSideEffectInterceptor == nil else { return }
-                                activeExport = .revocation
+                                guard configuration.allowsRevocationExport,
+                                      !key.revocationCert.isEmpty else { return }
+                                do {
+                                    if try configuration.outputInterceptionPolicy.interceptDataExport?(
+                                        key.revocationCert,
+                                        exportFilename(for: .revocation),
+                                        .revocation
+                                    ) != true {
+                                        activeExport = .revocation
+                                    }
+                                } catch {
+                                    self.error = CypherAirError.from(error) { .keychainError($0) }
+                                    showError = true
+                                }
                             } label: {
                                 Label(
                                     String(localized: "keydetail.exportRevocation", defaultValue: "Export Revocation Certificate"),
                                     systemImage: "xmark.seal"
                                 )
                             }
-                            .disabled(tutorialSideEffectInterceptor != nil)
+                            .disabled(!key.revocationCert.isEmpty && !configuration.allowsRevocationExport)
                         }
                     } header: {
                         Text(String(localized: "keydetail.actions", defaultValue: "Actions"))
@@ -322,7 +368,11 @@ struct KeyDetailView: View {
     }
 
     private var exportFilename: String {
-        switch activeExport {
+        exportFilename(for: activeExport)
+    }
+
+    private func exportFilename(for exportType: ExportType?) -> String {
+        switch exportType {
         case .publicKey:
             "\(key?.shortKeyId ?? "key").asc"
         case .revocation:

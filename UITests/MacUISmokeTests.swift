@@ -165,9 +165,16 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     private func generateTutorialKey() {
-        if element("tutorial.sidebar.keys").waitForExistence(timeout: 5) {
-            element("tutorial.sidebar.keys").tap()
+        if element("tutorial.hub.ready").waitForExistence(timeout: 2) {
+            XCTAssertTrue(element("tutorial.primaryAction").waitForExistence(timeout: 5))
+            element("tutorial.primaryAction").tap()
         }
+
+        if element("tutorial.sandbox.ready").waitForExistence(timeout: 2) {
+            XCTAssertTrue(element("tutorial.module.0.open").waitForExistence(timeout: 5))
+            element("tutorial.module.0.open").tap()
+        }
+
         XCTAssertTrue(element("keys.generate").waitForExistence(timeout: 10))
         element("keys.generate").tap()
 
@@ -188,9 +195,15 @@ final class MacUISmokeTests: XCTestCase {
     private func waitForLaunchReadiness(rootReadyID: String) {
         let timeout = requiresManualAuthentication ? manualAuthenticationTimeout : 10
         let unlocked = element(rootReadyID).waitForExistence(timeout: timeout)
+        let failureMessage: String
+        if requiresManualAuthentication {
+            failureMessage = "Timed out waiting for launch ready marker \(rootReadyID) to appear, or for manual Touch ID / Face ID authentication to complete."
+        } else {
+            failureMessage = "Expected launch ready marker \(rootReadyID) to appear."
+        }
         XCTAssertTrue(
             unlocked,
-            "Timed out waiting for manual Touch ID / Face ID authentication to complete before interacting with the UI."
+            failureMessage
         )
     }
 

@@ -240,7 +240,7 @@ The implementation must define two separate host-level mechanisms:
 | Interface | Responsibility |
 |-----------|----------------|
 | `TutorialUnsafeRouteBlocklist` | Blocks only routes that break sandbox isolation, launch forbidden real-world workflows, or create a false tutorial learning path |
-| `TutorialSideEffectInterceptor` | Intercepts only dangerous side effects such as real file import/export, share, clipboard, URL handoff, or real workspace writes |
+| `OutputInterceptionPolicy` | Intercepts only dangerous side effects such as real file import/export, share, clipboard, URL handoff, or real workspace writes |
 
 ### 4.4 Disallowed Real-World Side Effects
 
@@ -543,8 +543,8 @@ The implementation must introduce clear contract-level boundaries equivalent to 
 | `TutorialSandboxHost` | Owns onboarding handoff, replay launch, host lifecycle, exit semantics, and tutorial-level UI surfaces |
 | `TutorialSandboxContainer` | Provides isolated tutorial storage, isolated tutorial services, and tutorial-scoped runtime artifacts |
 | `TutorialUnsafeRouteBlocklist` | Blocks only routes that break sandbox isolation, launch forbidden side effects, or distort the intended learning path |
-| `TutorialSideEffectInterceptor` | Intercepts dangerous side effects such as real import/export, share, clipboard, URL handoff, or real workspace writes |
-| `TutorialSurfaceConfiguration` | Passes generic page-level constraints or defaults into real production pages without making them tutorial-aware |
+| `OutputInterceptionPolicy` | Intercepts dangerous side effects such as real import/export, share, clipboard, URL handoff, or real workspace writes |
+| `PageBehaviorConfiguration` | Passes generic page-level constraints or defaults into real production pages without making them tutorial-aware |
 | `TutorialGuidanceOverlayModel` | Provides guidance rails, overlays, anchors, target context, and modal continuity |
 | `TutorialSecuritySimulationStack` | Combines real LocalAuthentication interaction with isolated mock secure enclave, mock keychain, and tutorial-only private-key security flow |
 | `TutorialAutomationContract` | Defines required ready markers, accessibility identifiers, and anchor points |

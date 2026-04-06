@@ -69,11 +69,11 @@ final class TutorialSessionStore {
         return appConfiguration.guidedTutorialCompletionState != .neverCompleted
     }
 
-    var sideEffectInterceptor: TutorialSideEffectInterceptor? {
+    var outputInterceptionPolicy: OutputInterceptionPolicy? {
         guard session.hasStartedSession else { return nil }
 
-        return TutorialSideEffectInterceptor(
-            interceptClipboardWrite: { _, _ in
+        return OutputInterceptionPolicy(
+            interceptClipboardCopy: { _, _, _ in
                 true
             },
             interceptDataExport: { _, _, _ in
@@ -82,14 +82,6 @@ final class TutorialSessionStore {
             interceptFileExport: { _, _, _ in
                 true
             }
-        )
-    }
-
-    var surfaceConfiguration: TutorialSurfaceConfiguration {
-        TutorialSurfaceConfiguration(
-            activeModule: session.activeModule,
-            blocklist: blocklist,
-            sideEffectInterceptor: sideEffectInterceptor ?? .passthrough
         )
     }
 

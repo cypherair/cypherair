@@ -292,16 +292,17 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertEqual(store.lifecycleState, .stepsCompleted)
     }
 
-    func test_sideEffectInterceptor_isAvailableOnlyForLiveSessionAndBlocksDangerousEffects() async throws {
+    func test_outputInterceptionPolicy_isAvailableOnlyForLiveSessionAndBlocksDangerousEffects() async throws {
         let store = TutorialSessionStore()
-        XCTAssertNil(store.sideEffectInterceptor)
+        XCTAssertNil(store.outputInterceptionPolicy)
 
         await startTutorialSession(store)
-        let interceptor = try XCTUnwrap(store.sideEffectInterceptor)
+        let interceptor = try XCTUnwrap(store.outputInterceptionPolicy)
         let config = AppConfiguration(defaults: UserDefaults(suiteName: UUID().uuidString)!)
 
-        XCTAssertTrue(interceptor.interceptClipboardWrite?("ciphertext", config) == true)
+        XCTAssertTrue(interceptor.interceptClipboardCopy?("ciphertext", config, .ciphertext) == true)
         XCTAssertTrue(try interceptor.interceptDataExport?(Data("demo".utf8), "demo.asc", .ciphertext) == true)
+        XCTAssertTrue(interceptor.interceptFileExport?(URL(fileURLWithPath: "/tmp/demo.asc"), "demo.asc", .ciphertext) == true)
     }
 
     func test_blocklist_blocksUnsafeRoutes_withoutBlockingSignAndVerifyRoots() {
@@ -348,6 +349,30 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertFalse(verifyConfiguration.allowsDetachedSignatureImport)
         XCTAssertNotNil(verifyConfiguration.cleartextFileRestrictionMessage)
         XCTAssertNotNil(verifyConfiguration.detachedFileRestrictionMessage)
+    }
+
+    func test_tutorialConfigurationFactory_keyDetailConfiguration_disablesNonTutorialOutputs() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+
+        let configuration = store.configurationFactory.keyDetailConfiguration()
+        let config = AppConfiguration(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+
+        XCTAssertFalse(configuration.allowsPublicKeySave)
+        XCTAssertFalse(configuration.allowsPublicKeyCopy)
+        XCTAssertFalse(configuration.allowsRevocationExport)
+        XCTAssertTrue(configuration.outputInterceptionPolicy.interceptClipboardCopy?("public-key", config, .publicKey) == true)
+    }
+
+    func test_tutorialConfigurationFactory_backupConfiguration_usesInlinePreviewAndActiveExportCallback() {
+        let store = TutorialSessionStore()
+        let inactiveConfiguration = store.configurationFactory.backupConfiguration(isActiveModule: false)
+        let activeConfiguration = store.configurationFactory.backupConfiguration(isActiveModule: true)
+
+        XCTAssertEqual(inactiveConfiguration.resultPresentation, .inlinePreview)
+        XCTAssertNil(inactiveConfiguration.onExported)
+        XCTAssertEqual(activeConfiguration.resultPresentation, .inlinePreview)
+        XCTAssertNotNil(activeConfiguration.onExported)
     }
 
     func test_tutorialGuidanceResolver_completedModule_returnsCompletionStatePayload() async throws {
@@ -435,6 +460,28 @@ final class TutorialSessionStoreTests: XCTestCase {
             XCTAssertFalse(contents.contains("allowedModes"), "\(path) should not use mode allowlists")
             XCTAssertFalse(contents.contains("= configuration.allowedModes.first"), "\(path) should not reset mode on appear")
         }
+    }
+
+    func test_outputPages_removeTutorialOutputCouplingFromPageImplementations() throws {
+        let rootURL = repositoryRootURL()
+        let files = [
+            "Sources/App/Encrypt/EncryptView.swift",
+            "Sources/App/Sign/SignView.swift",
+            "Sources/App/Decrypt/DecryptView.swift",
+            "Sources/App/Keys/KeyDetailView.swift",
+            "Sources/App/Keys/BackupKeyView.swift",
+        ]
+
+        for path in files {
+            let contents = try String(contentsOf: rootURL.appending(path: path), encoding: .utf8)
+            XCTAssertFalse(contents.contains("tutorialSideEffectInterceptor"), "\(path) should not reference tutorial-specific output interception")
+        }
+
+        let backupContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Keys/BackupKeyView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertFalse(backupContents.contains("tutorialArtifact"), "BackupKeyView should not expose tutorial-specific result presentation")
     }
 
     func test_tutorialConfigurationFactory_settingsConfiguration_disablesRestrictedEntries() {
