@@ -39,8 +39,7 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
     private var currentGuidance: TutorialGuidancePayload? {
         guard isActiveSandboxTab else { return nil }
         guard tutorialStore.activeModal == nil else { return nil }
-        guard let activeModule = tutorialStore.currentModule else { return nil }
-        guard !tutorialStore.isCompleted(activeModule) else { return nil }
+        guard tutorialStore.currentModule != nil else { return nil }
 
         return TutorialGuidanceResolver().guidance(
             session: tutorialStore.session,
@@ -151,9 +150,9 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
 
     private func completionMessage(for module: TutorialModuleID) -> String {
         if module == .enableHighSecurity {
-            return String(localized: "guidedTutorial.task.complete.final", defaultValue: "All modules are complete. Review the completion summary before you finish the tutorial.")
+            return String(localized: "guidedTutorial.task.complete.final", defaultValue: "This task is complete. Return to the tutorial overview to review completion and finish the tutorial.")
         }
-        return String(localized: "guidedTutorial.task.complete", defaultValue: "Task complete. Return to the tutorial overview to continue.")
+        return String(localized: "guidedTutorial.task.complete", defaultValue: "This task is complete. Return to the tutorial overview to continue.")
     }
 }
 

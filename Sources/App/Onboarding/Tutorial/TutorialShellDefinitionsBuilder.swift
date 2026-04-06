@@ -63,16 +63,16 @@ struct TutorialShellDefinitionsBuilder {
                     DecryptView(configuration: store.configurationFactory.decryptConfiguration(isActiveModule: store.currentModule == .decryptAndVerify))
                 }
             }
-        case .sign, .verify:
+        case .sign:
             return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    TutorialBlockedRouteView(
-                        surface: store.blocklist.blockedRoot(for: tab) ?? TutorialBlockedSurface(
-                            title: String(localized: "guidedTutorial.blocked.title", defaultValue: "Unavailable in Tutorial"),
-                            message: String(localized: "guidedTutorial.blocked.body", defaultValue: "This action is unavailable inside the guided tutorial sandbox."),
-                            systemImage: "hand.raised"
-                        )
-                    )
+                    SignView(configuration: store.configurationFactory.signConfiguration())
+                }
+            }
+        case .verify:
+            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
+                TutorialSurfaceView(tab: tab, route: nil) {
+                    VerifyView(configuration: store.configurationFactory.verifyConfiguration())
                 }
             }
         }

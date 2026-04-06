@@ -32,7 +32,6 @@ struct EncryptView: View {
             }
         }
 
-        var allowedModes: [EncryptMode] = EncryptMode.allCases
         var prefilledPlaintext: String?
         var initialRecipientFingerprints: [String] = []
         var initialSignerFingerprint: String?
@@ -40,6 +39,9 @@ struct EncryptView: View {
         var encryptToSelfPolicy: TogglePolicy = .appDefault
         var allowsClipboardWrite = true
         var allowsResultExport = true
+        var allowsFileInput = true
+        var allowsFileResultExport = true
+        var fileRestrictionMessage: String?
         var onEncrypted: (@MainActor (Data) -> Void)?
 
         static let `default` = Configuration()
@@ -92,12 +94,12 @@ struct EncryptView: View {
         Form {
             Section {
                 Picker(String(localized: "encrypt.mode", defaultValue: "Mode"), selection: $encryptMode) {
-                    ForEach(configuration.allowedModes, id: \.self) { mode in
+                    ForEach(EncryptMode.allCases, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(configuration.allowedModes.count == 1 || operation.isRunning)
+                .disabled(operation.isRunning)
             }
 
             if encryptMode == .text {
@@ -305,7 +307,7 @@ struct EncryptView: View {
             if encryptMode == .file, encryptedFileURL != nil {
                 Section {
                     Button {
-                        guard configuration.allowsResultExport else { return }
+                        guard configuration.allowsFileResultExport else { return }
                         if let url = encryptedFileURL {
                             guard FileManager.default.fileExists(atPath: url.path) else {
                                 operation.present(
@@ -335,7 +337,7 @@ struct EncryptView: View {
                             systemImage: "square.and.arrow.down"
                         )
                     }
-                    .disabled(!configuration.allowsResultExport)
+                    .disabled(!configuration.allowsFileResultExport)
                 }
             }
         }
@@ -419,8 +421,6 @@ struct EncryptView: View {
             )
         }
         .onAppear {
-            encryptMode = configuration.allowedModes.first ?? .text
-
             if plaintext.isEmpty, let prefilledPlaintext = configuration.prefilledPlaintext {
                 plaintext = prefilledPlaintext
             }
@@ -458,6 +458,7 @@ struct EncryptView: View {
     private var fileInputContent: some View {
         Section {
             Button {
+                guard configuration.allowsFileInput else { return }
                 showFileImporter = true
             } label: {
                 Label(
@@ -465,6 +466,7 @@ struct EncryptView: View {
                     systemImage: "doc.badge.plus"
                 )
             }
+            .disabled(!configuration.allowsFileInput)
 
             if let selectedFileName {
                 LabeledContent(
@@ -474,6 +476,10 @@ struct EncryptView: View {
             }
         } header: {
             Text(String(localized: "fileEncrypt.file", defaultValue: "File"))
+        } footer: {
+            if let fileRestrictionMessage = configuration.fileRestrictionMessage {
+                Text(fileRestrictionMessage)
+            }
         }
     }
 

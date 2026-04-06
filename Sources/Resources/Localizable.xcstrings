@@ -3958,8 +3958,237 @@
         }
       }
     },
-    "guidedTutorial.complete.enterApp" : {
+    "guidedTutorial.blocked.appIcon.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App icon changes affect the real app and are unavailable inside the tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 图标修改会影响真实应用，因此在教程沙箱中不可用。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.appIcon.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Icon Unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法更改 App 图标"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.body" : {
       "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This action is unavailable inside the guided tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此操作在引导教程沙箱中不可用。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.importKey.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importing a real private key is disabled in the tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在教程沙箱中无法导入真实私钥。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.importKey.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Key Import Unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法导入私钥"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.photo.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tutorial does not use the photo picker. Use the sandbox sample flow instead."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "教程不会使用照片选择器。请改用沙箱示例流程。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.photo.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo Import Unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法导入照片"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.selfTest.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Self-Test is outside the guided tutorial path and is not available in the sandbox workspace."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自检不属于引导教程路径，因此在沙箱工作区中不可用。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.selfTest.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Self-Test Unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法使用自检"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.sign.body" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signing is outside the guided tutorial path and is hidden to keep the sandbox focused."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名不属于引导教程路径，因此已隐藏以保持沙箱聚焦。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.sign.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign Unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法使用签名"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable in Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "教程中不可用"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.verify.body" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verification outside the decrypt lesson is hidden to keep the tutorial focused."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解密课程之外的验证功能已被隐藏，以保持教程聚焦。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.verify.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verify Unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法使用验证"
+          }
+        }
+      }
+    },
+    "guidedTutorial.complete.enterApp" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3976,7 +4205,6 @@
       }
     },
     "guidedTutorial.completion.badge" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3993,7 +4221,6 @@
       }
     },
     "guidedTutorial.completion.body" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4004,18 +4231,17 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你已经在安全的沙箱环境中完成了引导教程。现在可以开始使用真实应用创建自己的密钥和消息，而且教程数据没有保存到你的真实空间中。"
+            "value" : "你已经在安全的沙箱环境中完成了引导教程。现在可以开始在真实应用中创建自己的密钥和消息，而且教程数据没有保存到你的真实工作区中。"
           }
         }
       }
     },
     "guidedTutorial.completion.next.header" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Next Steps"
+            "value" : "Next Step"
           }
         },
         "zh-Hans" : {
@@ -4027,7 +4253,6 @@
       }
     },
     "guidedTutorial.completion.next.realKey" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4044,7 +4269,6 @@
       }
     },
     "guidedTutorial.completion.next.replay" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4061,7 +4285,6 @@
       }
     },
     "guidedTutorial.completion.title" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4157,6 +4380,38 @@
         }
       }
     },
+    "guidedTutorial.demoName.alice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alice Demo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alice 示例"
+          }
+        }
+      }
+    },
+    "guidedTutorial.demoName.bob" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bob Demo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bob 示例"
+          }
+        }
+      }
+    },
     "guidedTutorial.encrypt.form" : {
       "localizations" : {
         "en" : {
@@ -4217,40 +4472,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法准备沙箱教程环境。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.finish" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finish Tutorial"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完成教程"
-          }
-        }
-      }
-    },
-    "guidedTutorial.hero.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This guided tutorial uses the real app UI with isolated sandbox data. Your real keys, contacts, settings, exports, and files are never touched."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此引导教程使用真实的应用界面，但数据完全隔离在沙箱中。你的真实密钥、联系人、设置、导出内容和文件都不会受到影响。"
           }
         }
       }
@@ -4447,6 +4668,342 @@
         }
       }
     },
+    "guidedTutorial.location.contacts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacts"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人"
+          }
+        }
+      }
+    },
+    "guidedTutorial.location.decrypt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decrypt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解密"
+          }
+        }
+      }
+    },
+    "guidedTutorial.location.encrypt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加密"
+          }
+        }
+      }
+    },
+    "guidedTutorial.location.keys" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥"
+          }
+        }
+      }
+    },
+    "guidedTutorial.location.settings" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.backup" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back Up a Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份密钥"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.backup.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create a passphrase-protected backup artifact inside the sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在沙箱中创建一个受密码短语保护的备份。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.contact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a Demo Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加示例联系人"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.contact.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Bob's demo public key into sandbox contacts."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 Bob 的示例公钥导入沙箱联系人。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.decrypt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decrypt and Verify"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解密并验证"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.decrypt.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check recipients, authenticate, and verify the signed message."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查收件人、完成认证并验证签名消息。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.encrypt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypt a Demo Message"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加密示例消息"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.encrypt.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use the real encrypt page to protect a demo message."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用真实的加密页面保护一条示例消息。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.highSecurity" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable High Security"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用高安全模式"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.highSecurity.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Practice switching auth mode after backing up the sandbox key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在备份沙箱密钥后，练习切换到高安全模式。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.identity" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create a Demo Identity"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建示例身份"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.identity.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate a sandbox key through the real key-generation flow."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通过真实的密钥生成流程创建一个沙箱密钥。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.sandbox" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Understand the Sandbox"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "了解沙箱"
+          }
+        }
+      }
+    },
+    "guidedTutorial.module.sandbox.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm that tutorial data is isolated from your real workspace."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认教程数据与你的真实工作区完全隔离。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.modules" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutorial Modules"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "教程模块"
+          }
+        }
+      }
+    },
+    "guidedTutorial.modulesCount" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 modules"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 个模块"
+          }
+        }
+      }
+    },
     "guidedTutorial.nav.contacts" : {
       "localizations" : {
         "en" : {
@@ -4575,23 +5132,6 @@
         }
       }
     },
-    "guidedTutorial.onboarding.entry" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View Guided Tutorial"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查看引导教程"
-          }
-        }
-      }
-    },
     "guidedTutorial.openTask" : {
       "localizations" : {
         "en" : {
@@ -4608,110 +5148,23 @@
         }
       }
     },
-    "guidedTutorial.phase.contact" : {
-      "extractionState" : "stale",
+    "guidedTutorial.promise" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add Demo Contact"
+            "value" : "This tutorial uses isolated tutorial data in a tutorial workspace. It does not read or write your real keys, contacts, settings, files, exports, or other real workspace content."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "添加演示联系人"
-          }
-        }
-      }
-    },
-    "guidedTutorial.phase.decrypt" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Decrypt & Verify"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "解密与验证"
-          }
-        }
-      }
-    },
-    "guidedTutorial.phase.encrypt" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encrypt Message"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "加密消息"
-          }
-        }
-      }
-    },
-    "guidedTutorial.phase.intro" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sandbox Intro"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "沙箱介绍"
-          }
-        }
-      }
-    },
-    "guidedTutorial.phase.key" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create Demo Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "创建演示密钥"
-          }
-        }
-      }
-    },
-    "guidedTutorial.phase.protect" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protect Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保护密钥"
+            "value" : "本教程会在教程工作区中使用隔离的教程数据。它不会读取或写入你的真实密钥、联系人、设置、文件、导出内容或其他真实工作区内容。"
           }
         }
       }
     },
     "guidedTutorial.replay" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4743,6 +5196,70 @@
         }
       }
     },
+    "guidedTutorial.restricted.detachedVerify" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detached file verification is unavailable in the tutorial sandbox. Use Cleartext mode to keep exploring this page safely."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在教程沙箱中无法进行分离式文件验证。请改用明文模式继续安全探索这个页面。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.restricted.fileMode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Real file import and export are unavailable in the tutorial sandbox. Use Text mode to keep exploring this page safely."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在教程沙箱中无法使用真实文件导入和导出。请改用文本模式继续安全探索这个页面。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.restricted.signResult" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutorial sandbox output cannot be copied to the clipboard or saved to a real destination."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "教程沙箱中的输出不能复制到剪贴板，也不能保存到真实目的地。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.restricted.textImport" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Real file import is unavailable in the tutorial sandbox. Paste text directly to keep exploring this page safely."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在教程沙箱中无法导入真实文件。请直接粘贴文本以继续安全探索这个页面。"
+          }
+        }
+      }
+    },
     "guidedTutorial.return" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4756,23 +5273,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "返回教程"
-          }
-        }
-      }
-    },
-    "guidedTutorial.return.hint" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Return to the guided tutorial overview."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "返回引导教程总览。"
           }
         }
       }
@@ -4805,6 +5305,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "返回教程概览页面。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.review" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看"
+          }
+        }
+      }
+    },
+    "guidedTutorial.reviewCompletion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review Completion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看完成页"
           }
         }
       }
@@ -5033,86 +5565,18 @@
         }
       }
     },
-    "guidedTutorial.status.complete" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Completed in this sandbox session"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已在本次沙箱会话中完成"
-          }
-        }
-      }
-    },
-    "guidedTutorial.status.locked" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Complete earlier steps first"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请先完成前面的步骤"
-          }
-        }
-      }
-    },
-    "guidedTutorial.status.ready" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ready to start"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可以开始"
-          }
-        }
-      }
-    },
-    "guidedTutorial.task.backup" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Export a backup"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导出备份"
-          }
-        }
-      }
-    },
     "guidedTutorial.task.complete" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Task complete. Return to the tutorial overview to continue."
+            "value" : "This task is complete. Return to the tutorial overview to continue."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "任务已完成。返回教程概览以继续下一步。"
+            "value" : "当前任务已完成。返回教程概览以继续。"
           }
         }
       }
@@ -5122,132 +5586,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "All modules are complete. Review the completion summary before you finish the tutorial."
+            "value" : "This task is complete. Return to the tutorial overview to review completion and finish the tutorial."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "所有模块已完成。请先查看完成总结，再结束教程。"
+            "value" : "当前任务已完成。返回教程概览以查看完成页并结束教程。"
           }
         }
       }
     },
-    "guidedTutorial.task.decrypt" : {
-      "extractionState" : "stale",
+    "guidedTutorial.time" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Decrypt and verify"
+            "value" : "4–7 min"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解密并验证"
-          }
-        }
-      }
-    },
-    "guidedTutorial.task.encrypt" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compose and encrypt a message"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "撰写并加密消息"
-          }
-        }
-      }
-    },
-    "guidedTutorial.task.generate" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate Alice's key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成 Alice 的密钥"
-          }
-        }
-      }
-    },
-    "guidedTutorial.task.highSecurity" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enable High Security"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "启用高安全模式"
-          }
-        }
-      }
-    },
-    "guidedTutorial.task.import" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import Bob's contact"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导入 Bob 的联系人"
-          }
-        }
-      }
-    },
-    "guidedTutorial.task.intro" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Understand the sandbox"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "了解沙箱环境"
-          }
-        }
-      }
-    },
-    "guidedTutorial.task.parse" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Check recipients"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检查收件人"
+            "value" : "4–7 分钟"
           }
         }
       }
@@ -5269,7 +5630,6 @@
       }
     },
     "guidedTutorial.updated.entry" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5286,7 +5646,6 @@
       }
     },
     "guidedTutorial.updated.start" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7321,6 +7680,22 @@
         }
       }
     },
+    "onboarding.skip.enterApp" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip Tutorial and Enter App"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过教程并进入应用"
+          }
+        }
+      }
+    },
     "onboarding.viewTutorial" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -9323,278 +9698,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "天空"
-          }
-        }
-      }
-    },
-    "tutorial.back" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上一步"
-          }
-        }
-      }
-    },
-    "tutorial.next" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Next"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下一步"
-          }
-        }
-      }
-    },
-    "tutorial.p1.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encryption uses a pair of keys. Your public key is shared with friends so they can send you encrypted messages. Your private key stays on your device and is used to decrypt those messages. Never share your private key."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "加密使用一对密钥。公钥分享给朋友，他们用它给你发送加密消息。私钥保留在你的设备上，用于解密收到的消息。切勿分享你的私钥。"
-          }
-        }
-      }
-    },
-    "tutorial.p1.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Public & Private Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "公钥与私钥"
-          }
-        }
-      }
-    },
-    "tutorial.p2.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Go to the Keys tab and tap \"Generate My Key.\" Enter your name and optionally your email. Choose Universal (compatible with GnuPG) or Advanced (stronger security). Your key will be created and protected by Face ID or Touch ID."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "前往「密钥」标签页，点击「生成我的密钥」。输入你的姓名，可选填邮箱。选择通用（兼容 GnuPG）或高级（更强安全性）。你的密钥将被创建，并由面容 ID 或触控 ID 保护。"
-          }
-        }
-      }
-    },
-    "tutorial.p2.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Step 1: Generate Your Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 1 步：生成你的密钥"
-          }
-        }
-      }
-    },
-    "tutorial.p3.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share your public key with friends via QR code, file, or copy-paste. Add their public keys the same way in the Contacts tab. Meet in person for the most secure exchange — scan each other's QR codes with the system camera."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通过二维码、文件或复制粘贴的方式与朋友分享你的公钥。在「联系人」标签页中以相同方式添加他们的公钥。面对面交换最为安全——用系统相机互扫二维码。"
-          }
-        }
-      }
-    },
-    "tutorial.p3.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Step 2: Exchange Public Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 2 步：交换公钥"
-          }
-        }
-      }
-    },
-    "tutorial.p4.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Type or paste your message, select recipients from your contacts, and tap Encrypt. The encrypted message can be copied or shared through any messaging app. Only the selected recipients can decrypt it."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入或粘贴你的消息，从联系人中选择收件人，然后点击加密。加密后的消息可以复制或通过任何聊天工具分享。只有选定的收件人才能解密。"
-          }
-        }
-      }
-    },
-    "tutorial.p4.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Step 3: Encrypt"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 3 步：加密"
-          }
-        }
-      }
-    },
-    "tutorial.p5.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paste the encrypted message you received and tap Decrypt. CypherAir will verify it is addressed to you, then ask for Face ID or Touch ID. The decrypted message is shown in memory only and cleared when you leave."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "粘贴收到的加密消息并点击解密。CypherAir 会确认消息是否发给你，然后请求面容 ID 或触控 ID 认证。解密后的消息仅保留在内存中，离开时自动清除。"
-          }
-        }
-      }
-    },
-    "tutorial.p5.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Step 4: Decrypt"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 4 步：解密"
-          }
-        }
-      }
-    },
-    "tutorial.p6.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back up your private key from the key detail page — if you lose your device without a backup, your key is gone forever. Enable High Security mode in Settings for biometric-only protection. Keep your backup passphrase in a safe place."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从密钥详情页备份你的私钥——如果没有备份就丢失设备，密钥将永远消失。在设置中启用高安全模式以获得纯生物识别保护。将备份密码保存在安全的地方。"
-          }
-        }
-      }
-    },
-    "tutorial.p6.demo" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View Interactive Demo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查看交互式演示"
-          }
-        }
-      }
-    },
-    "tutorial.p6.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protect Your Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保护你的密钥"
-          }
-        }
-      }
-    },
-    "tutorial.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usage Tutorial"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用教程"
           }
         }
       }

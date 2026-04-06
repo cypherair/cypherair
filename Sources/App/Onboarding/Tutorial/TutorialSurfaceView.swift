@@ -187,8 +187,6 @@ struct TutorialSurfaceView<Content: View>: View {
     private var inlineHeaderContext: TutorialInlineHeaderContext? {
         guard tutorialStore.selectedTab == tab else { return nil }
         guard tutorialStore.activeModal == nil else { return nil }
-        guard let activeModule = tutorialStore.currentModule else { return nil }
-        guard !tutorialStore.isCompleted(activeModule) else { return nil }
         guard let guidance = TutorialGuidanceResolver().guidance(
             session: tutorialStore.session,
             navigation: tutorialStore.navigation,

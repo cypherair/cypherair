@@ -7,11 +7,13 @@ import UniformTypeIdentifiers
 /// Unified two-phase decryption view for text and files.
 struct DecryptView: View {
     struct Configuration {
-        var allowedModes: [DecryptMode] = DecryptMode.allCases
         var prefilledCiphertext: String?
         var initialPhase1Result: DecryptionService.Phase1Result?
         var allowsTextFileImport = true
+        var allowsFileInput = true
         var allowsFileResultExport = true
+        var textFileRestrictionMessage: String?
+        var fileRestrictionMessage: String?
         var onParsed: (@MainActor (DecryptionService.Phase1Result) -> Void)?
         var onDecrypted: (@MainActor (Data, SignatureVerification) -> Void)?
 
@@ -76,12 +78,12 @@ struct DecryptView: View {
         Form {
             Section {
                 Picker(String(localized: "decrypt.mode", defaultValue: "Mode"), selection: $decryptMode) {
-                    ForEach(configuration.allowedModes, id: \.self) { mode in
+                    ForEach(DecryptMode.allCases, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(configuration.allowedModes.count == 1 || operation.isRunning)
+                .disabled(operation.isRunning)
             }
 
             if decryptMode == .text {
@@ -351,7 +353,6 @@ struct DecryptView: View {
             filePhase1Result = nil
         }
         .onAppear {
-            decryptMode = configuration.allowedModes.first ?? .text
             if ciphertextInput.isEmpty, let prefilledCiphertext = configuration.prefilledCiphertext {
                 ciphertextInput = prefilledCiphertext
             }
@@ -406,6 +407,11 @@ struct DecryptView: View {
             }
         } header: {
             Text(String(localized: "decrypt.input", defaultValue: "Encrypted Message"))
+        } footer: {
+            if !configuration.allowsTextFileImport,
+               let textFileRestrictionMessage = configuration.textFileRestrictionMessage {
+                Text(textFileRestrictionMessage)
+            }
         }
         .id(textInputSectionEpoch)
     }
@@ -414,6 +420,7 @@ struct DecryptView: View {
     private var fileInputContent: some View {
         Section {
             Button {
+                guard configuration.allowsFileInput else { return }
                 fileImportTarget = .fileCiphertextImport
                 showFileImporter = true
             } label: {
@@ -422,6 +429,7 @@ struct DecryptView: View {
                     systemImage: "doc.badge.arrow.up"
                 )
             }
+            .disabled(!configuration.allowsFileInput)
 
             if let selectedFileName {
                 LabeledContent(
@@ -432,7 +440,11 @@ struct DecryptView: View {
         } header: {
             Text(String(localized: "fileDecrypt.file", defaultValue: "Encrypted File"))
         } footer: {
-            Text(String(localized: "fileDecrypt.types", defaultValue: "Supports .gpg, .pgp, and .asc files"))
+            if let fileRestrictionMessage = configuration.fileRestrictionMessage {
+                Text(fileRestrictionMessage)
+            } else {
+                Text(String(localized: "fileDecrypt.types", defaultValue: "Supports .gpg, .pgp, and .asc files"))
+            }
         }
     }
 

@@ -9,9 +9,21 @@ import UniformTypeIdentifiers
 
 /// Cleartext and detached signing view.
 struct SignView: View {
+    struct Configuration {
+        var allowsClipboardWrite = true
+        var allowsTextResultExport = true
+        var allowsFileInput = true
+        var allowsFileResultExport = true
+        var fileRestrictionMessage: String?
+        var resultRestrictionMessage: String?
+
+        static let `default` = Configuration()
+    }
+
     @Environment(SigningService.self) private var signingService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
+    @Environment(\.tutorialSideEffectInterceptor) private var tutorialSideEffectInterceptor
 
     enum SignMode: String, CaseIterable {
         case text, file
@@ -34,6 +46,12 @@ struct SignView: View {
     @State private var operation = OperationController()
     @State private var exportController = FileExportController()
     @State private var textInputSectionEpoch = 0
+    
+    let configuration: Configuration
+
+    init(configuration: Configuration = .default) {
+        self.configuration = configuration
+    }
 
     var body: some View {
         Form {
@@ -129,20 +147,32 @@ struct SignView: View {
                         .textSelection(.enabled)
 
                     Button {
-                        operation.copyToClipboard(signedMessage, config: config)
+                        if configuration.allowsClipboardWrite,
+                           tutorialSideEffectInterceptor?.interceptClipboardWrite?(signedMessage, config) != true {
+                            operation.copyToClipboard(signedMessage, config: config)
+                        }
                     } label: {
                         Label(
                             String(localized: "common.copy", defaultValue: "Copy"),
                             systemImage: "doc.on.doc"
                         )
                     }
+                    .disabled(!configuration.allowsClipboardWrite)
 
                     Button {
+                        guard configuration.allowsTextResultExport else { return }
                         do {
-                            try exportController.prepareDataExport(
-                                Data(signedMessage.utf8),
-                                suggestedFilename: "signed.asc"
-                            )
+                            let exportData = Data(signedMessage.utf8)
+                            if try tutorialSideEffectInterceptor?.interceptDataExport?(
+                                exportData,
+                                "signed.asc",
+                                .generic
+                            ) != true {
+                                try exportController.prepareDataExport(
+                                    exportData,
+                                    suggestedFilename: "signed.asc"
+                                )
+                            }
                         } catch {
                             operation.present(error: mapSigningError(error))
                         }
@@ -152,8 +182,13 @@ struct SignView: View {
                             systemImage: "square.and.arrow.down"
                         )
                     }
+                    .disabled(!configuration.allowsTextResultExport)
                 } header: {
                     Text(String(localized: "sign.result", defaultValue: "Signed Message"))
+                } footer: {
+                    if let resultRestrictionMessage = configuration.resultRestrictionMessage {
+                        Text(resultRestrictionMessage)
+                    }
                 }
             }
 
@@ -161,11 +196,19 @@ struct SignView: View {
                 Section {
                     Button {
                         guard let detachedSignature else { return }
+                        guard configuration.allowsFileResultExport else { return }
                         do {
-                            try exportController.prepareDataExport(
+                            let suggestedFilename = (selectedFileName ?? "file") + ".sig"
+                            if try tutorialSideEffectInterceptor?.interceptDataExport?(
                                 detachedSignature,
-                                suggestedFilename: (selectedFileName ?? "file") + ".sig"
-                            )
+                                suggestedFilename,
+                                .generic
+                            ) != true {
+                                try exportController.prepareDataExport(
+                                    detachedSignature,
+                                    suggestedFilename: suggestedFilename
+                                )
+                            }
                         } catch {
                             operation.present(error: mapSigningError(error))
                         }
@@ -175,6 +218,7 @@ struct SignView: View {
                             systemImage: "square.and.arrow.down"
                         )
                     }
+                    .disabled(!configuration.allowsFileResultExport)
                 } header: {
                     Text(String(localized: "sign.detached.result", defaultValue: "Detached Signature"))
                 }
@@ -268,6 +312,7 @@ struct SignView: View {
     private var fileSigningContent: some View {
         Section {
             Button {
+                guard configuration.allowsFileInput else { return }
                 showFileImporter = true
             } label: {
                 Label(
@@ -275,6 +320,7 @@ struct SignView: View {
                     systemImage: "doc"
                 )
             }
+            .disabled(!configuration.allowsFileInput)
 
             if let selectedFileName {
                 LabeledContent(
@@ -284,6 +330,10 @@ struct SignView: View {
             }
         } header: {
             Text(String(localized: "sign.file.header", defaultValue: "File to Sign"))
+        } footer: {
+            if let fileRestrictionMessage = configuration.fileRestrictionMessage {
+                Text(fileRestrictionMessage)
+            }
         }
     }
 
@@ -294,7 +344,7 @@ struct SignView: View {
         if keyManagement.defaultKey == nil && signerFingerprint == nil { return true }
         switch signMode {
         case .text: return text.isEmpty
-        case .file: return selectedFileURL == nil
+        case .file: return !configuration.allowsFileInput || selectedFileURL == nil
         }
     }
 
