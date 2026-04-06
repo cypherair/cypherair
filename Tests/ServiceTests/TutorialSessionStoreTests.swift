@@ -14,14 +14,48 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertEqual(container.contactService.contacts.count, 0)
         XCTAssertEqual(container.keyManagement.keys.count, 0)
         XCTAssertFalse(container.contactsDirectory.path.contains("/Documents/contacts"))
+        XCTAssertNotNil(container.securitySimulationStack.authManager)
     }
 
-    func test_tutorialSessionStore_returnToOverview_keepsLiveSandboxSideEffects() async throws {
+    func test_prepareForPresentation_doesNotStartSandboxUntilModuleOpens() {
         let store = TutorialSessionStore()
-        store.ensureSession()
-        let firstContainer = try XCTUnwrap(store.container)
 
-        let alice = try await firstContainer.keyManagement.generateKey(
+        store.prepareForPresentation(launchOrigin: .inApp)
+
+        XCTAssertNil(store.container)
+        XCTAssertEqual(store.lifecycleState, .notStarted)
+        XCTAssertEqual(store.hostSurface, .hub)
+    }
+
+    func test_openModule_sandbox_startsSessionAndShowsAcknowledgement() async {
+        let store = TutorialSessionStore()
+
+        await store.openModule(.sandbox)
+
+        XCTAssertNotNil(store.container)
+        XCTAssertEqual(store.lifecycleState, .inProgress)
+        XCTAssertEqual(store.hostSurface, .sandboxAcknowledgement)
+        XCTAssertFalse(store.isCompleted(.sandbox))
+    }
+
+    func test_confirmSandboxAcknowledgement_completesSandboxAndAdvancesToIdentityModule() async {
+        let store = TutorialSessionStore()
+        await store.openModule(.sandbox)
+
+        store.confirmSandboxAcknowledgement()
+        await Task.yield()
+
+        XCTAssertTrue(store.isCompleted(.sandbox))
+        XCTAssertEqual(store.currentModule, .createDemoIdentity)
+        XCTAssertEqual(store.hostSurface, .workspace(module: .createDemoIdentity))
+    }
+
+    func test_returnToOverview_keepsSandboxArtifactsAndProgressForSameAppRun() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        let container = try XCTUnwrap(store.container)
+
+        let alice = try await container.keyManagement.generateKey(
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
@@ -30,25 +64,18 @@ final class TutorialSessionStoreTests: XCTestCase {
         )
         await store.noteAliceGenerated(alice)
 
-        await store.openTask(.importBobKey)
-        let resumedContainer = try XCTUnwrap(store.container)
-
-        XCTAssertTrue(store.session.isShellPresented)
-        XCTAssertEqual(firstContainer.defaultsSuiteName, resumedContainer.defaultsSuiteName)
-        XCTAssertEqual(store.session.artifacts.aliceIdentity?.fingerprint, alice.fingerprint)
-        XCTAssertNotNil(store.session.artifacts.bobArmoredPublicKey)
-
         store.returnToOverview()
 
-        XCTAssertFalse(store.session.isShellPresented)
+        XCTAssertEqual(store.hostSurface, .hub)
+        XCTAssertEqual(store.lifecycleState, .inProgress)
         XCTAssertNotNil(store.container)
-        XCTAssertEqual(store.container?.defaultsSuiteName, firstContainer.defaultsSuiteName)
         XCTAssertEqual(store.session.artifacts.aliceIdentity?.fingerprint, alice.fingerprint)
+        XCTAssertTrue(store.isCompleted(.createDemoIdentity))
     }
 
-    func test_tutorialSessionStore_reset_recreatesSandboxAndClearsProgress() async throws {
+    func test_resetTutorial_recreatesSandboxAndClearsProgress() async throws {
         let store = TutorialSessionStore()
-        store.ensureSession()
+        await startTutorialSession(store)
         let oldContainer = try XCTUnwrap(store.container)
         let oldDirectory = oldContainer.contactsDirectory
 
@@ -64,18 +91,15 @@ final class TutorialSessionStoreTests: XCTestCase {
         store.resetTutorial()
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: oldDirectory.path))
-        XCTAssertFalse(store.isCompleted(.generateAliceKey))
+        XCTAssertFalse(store.isCompleted(.createDemoIdentity))
         XCTAssertNil(store.session.artifacts.aliceIdentity)
-        XCTAssertNil(store.session.artifacts.bobArmoredPublicKey)
-
-        let newContainer = try XCTUnwrap(store.container)
-        XCTAssertNotEqual(newContainer.defaultsSuiteName, oldContainer.defaultsSuiteName)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: newContainer.contactsDirectory.path))
+        XCTAssertNil(store.container)
+        XCTAssertEqual(store.lifecycleState, .notStarted)
     }
 
-    func test_tutorialSessionStore_recordsTaskArtifactsAcrossFlow() async throws {
+    func test_tutorialSessionStore_recordsArtifactsAcrossFullModuleFlow() async throws {
         let store = TutorialSessionStore()
-        store.ensureSession()
+        await startTutorialSession(store)
         let container = try XCTUnwrap(store.container)
 
         let alice = try await container.keyManagement.generateKey(
@@ -86,15 +110,16 @@ final class TutorialSessionStoreTests: XCTestCase {
             authMode: .standard
         )
         await store.noteAliceGenerated(alice)
-        XCTAssertTrue(store.isCompleted(.generateAliceKey))
+        XCTAssertTrue(store.isCompleted(.createDemoIdentity))
 
+        await store.openModule(.addDemoContact)
         let bobArmored = try XCTUnwrap(store.session.artifacts.bobArmoredPublicKey)
         let addResult = try container.contactService.addContact(publicKeyData: Data(bobArmored.utf8))
         guard case .added(let contact) = addResult else {
             return XCTFail("Expected Bob contact to be added")
         }
         store.noteBobImported(contact)
-        XCTAssertTrue(store.isCompleted(.importBobKey))
+        XCTAssertTrue(store.isCompleted(.addDemoContact))
 
         let ciphertext = try await container.encryptionService.encryptText(
             "Hello Bob from the guided tutorial",
@@ -103,16 +128,16 @@ final class TutorialSessionStoreTests: XCTestCase {
             encryptToSelf: false
         )
         store.noteEncrypted(ciphertext)
-        XCTAssertTrue(store.isCompleted(.composeAndEncryptMessage))
+        XCTAssertTrue(store.isCompleted(.encryptDemoMessage))
 
         let phase1 = try await container.decryptionService.parseRecipients(ciphertext: ciphertext)
         store.noteParsed(phase1)
-        XCTAssertTrue(store.isCompleted(.parseRecipients))
+        XCTAssertFalse(store.isCompleted(.decryptAndVerify))
         XCTAssertEqual(store.session.artifacts.parseResult?.matchedKey?.fingerprint, store.session.artifacts.bobIdentity?.fingerprint)
 
         let decryptResult = try await container.decryptionService.decrypt(phase1: phase1)
         store.noteDecrypted(plaintext: decryptResult.plaintext, verification: decryptResult.signature)
-        XCTAssertTrue(store.isCompleted(.decryptMessage))
+        XCTAssertTrue(store.isCompleted(.decryptAndVerify))
         XCTAssertEqual(store.session.artifacts.decryptedVerification?.status, .valid)
 
         let backup = try await container.keyManagement.exportKey(
@@ -120,7 +145,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             passphrase: "demo-backup-passphrase"
         )
         store.noteBackupExported(backup)
-        XCTAssertTrue(store.isCompleted(.exportBackup))
+        XCTAssertTrue(store.isCompleted(.backupKey))
         XCTAssertTrue(store.session.artifacts.backupArmoredKey?.contains("BEGIN PGP PRIVATE KEY BLOCK") == true)
 
         try await container.authManager.switchMode(
@@ -133,312 +158,162 @@ final class TutorialSessionStoreTests: XCTestCase {
         store.noteHighSecurityEnabled(.highSecurity)
         XCTAssertTrue(store.isCompleted(.enableHighSecurity))
         XCTAssertEqual(store.session.artifacts.authMode, .highSecurity)
+        XCTAssertEqual(store.lifecycleState, .stepsCompleted)
     }
 
-    func test_tutorialSessionStore_finalCompletion_marksCurrentTutorialVersion() {
+    func test_markFinishedTutorial_isTheOnlyPointThatPersistsCompletion() {
         let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
         let config = AppConfiguration(defaults: defaults)
         let store = TutorialSessionStore()
         store.configurePersistence(appConfiguration: config)
 
-        completeTutorialFlow(store: store)
+        for module in TutorialModuleID.allCases {
+            store.markCompletedForTesting(module)
+        }
+
+        XCTAssertEqual(store.lifecycleState, .stepsCompleted)
+        XCTAssertEqual(config.guidedTutorialCompletedVersion, 0)
+
+        store.markFinishedTutorial()
 
         XCTAssertEqual(config.guidedTutorialCompletedVersion, GuidedTutorialVersion.current)
-        XCTAssertTrue(config.hasCompletedCurrentGuidedTutorialVersion)
+        XCTAssertEqual(store.lifecycleState, .finished)
     }
 
-    func test_tutorialSessionStore_incompleteFlowDoesNotMarkTutorialCompleted() async throws {
+    func test_prepareForPresentation_afterReopen_returnsHubAndPreservesProgress() async {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.markCompletedForTesting(.createDemoIdentity)
+
+        store.prepareForPresentation(launchOrigin: .inApp)
+
+        XCTAssertEqual(store.hostSurface, .hub)
+        XCTAssertEqual(store.lifecycleState, .inProgress)
+        XCTAssertTrue(store.isCompleted(.createDemoIdentity))
+        XCTAssertNil(store.pendingCompletionPromptModule)
+    }
+
+    func test_prepareForPresentation_afterFinishedReplay_resetsSession() {
+        let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
+        let config = AppConfiguration(defaults: defaults)
+        let store = TutorialSessionStore()
+        store.configurePersistence(appConfiguration: config)
+        for module in TutorialModuleID.allCases {
+            store.markCompletedForTesting(module)
+        }
+        store.markFinishedTutorial()
+
+        store.prepareForPresentation(launchOrigin: .inApp)
+
+        XCTAssertEqual(store.lifecycleState, .notStarted)
+        XCTAssertNil(store.container)
+        XCTAssertEqual(store.hostSurface, .hub)
+    }
+
+    func test_canOpen_unlocksSequentiallyBeforeReplayAndEverythingAfterReplay() {
         let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
         let config = AppConfiguration(defaults: defaults)
         let store = TutorialSessionStore()
         store.configurePersistence(appConfiguration: config)
 
-        store.ensureSession()
-        let container = try XCTUnwrap(store.container)
-        let alice = try await container.keyManagement.generateKey(
-            name: "Alice Demo",
-            email: "alice@demo.invalid",
-            expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
-        )
-        await store.noteAliceGenerated(alice)
-        store.returnToOverview()
+        XCTAssertTrue(store.canOpen(.sandbox))
+        XCTAssertFalse(store.canOpen(.addDemoContact))
 
-        XCTAssertEqual(config.guidedTutorialCompletedVersion, 0)
-        XCTAssertEqual(config.guidedTutorialCompletionState, .neverCompleted)
+        store.markCompletedForTesting(.sandbox)
+        store.markCompletedForTesting(.createDemoIdentity)
+
+        XCTAssertTrue(store.canOpen(.addDemoContact))
+        XCTAssertFalse(store.canOpen(.backupKey))
+
+        config.markGuidedTutorialCompletedCurrentVersion()
+
+        XCTAssertTrue(store.canOpen(.backupKey))
+        XCTAssertTrue(store.canOpen(.enableHighSecurity))
     }
 
-    func test_tutorialSessionStore_showCompletionViewAfterFinalTaskShowsCompletionPhase() async {
+    func test_presentLeaveConfirmation_installsTutorialOwnedModal() {
         let store = TutorialSessionStore()
-        store.ensureSession()
-        completeTutorialFlow(store: store)
-        await store.openTask(.enableHighSecurity)
+        store.presentLeaveConfirmation(onLeave: { })
 
-        store.showCompletionView()
-
-        XCTAssertFalse(store.session.isShellPresented)
-        XCTAssertTrue(store.isShowingCompletionView)
-        XCTAssertEqual(store.flowPhase, .completion)
+        guard case .leaveConfirmation? = store.activeModal else {
+            return XCTFail("Expected leave confirmation modal")
+        }
     }
 
-    func test_tutorialSessionStore_nonFinalTaskCompletion_setsPendingCompletionPrompt() async {
-        let store = TutorialSessionStore()
-        await store.openTask(.generateAliceKey)
-
-        store.markCompletedForTesting(.generateAliceKey)
-
-        XCTAssertEqual(store.pendingCompletionPromptTask, .generateAliceKey)
-        XCTAssertEqual(store.session.activeTask, .generateAliceKey)
-    }
-
-    func test_tutorialSessionStore_pendingCompletionPrompt_survivesRoutePush() async {
-        let store = TutorialSessionStore()
-        await store.openTask(.generateAliceKey)
-        let identity = makeIdentity(
-            fingerprint: "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678",
-            userId: "Alice Demo <alice@demo.invalid>"
+    func test_tutorialOnboardingHandoff_requestFromOnboarding_clearsSheetAndQueuesTutorial() {
+        var state = TutorialOnboardingHandoffState(
+            activePresentation: .onboarding(initialPage: 2, context: .firstRun)
         )
 
-        store.markCompletedForTesting(.generateAliceKey)
-        store.navigateToPostGenerationPrompt(identity)
+        state.requestTutorialLaunchFromOnboarding(.onboardingFirstRun)
 
-        XCTAssertEqual(store.pendingCompletionPromptTask, .generateAliceKey)
-        XCTAssertEqual(store.routePath, [.postGenerationPrompt(identity: identity)])
-        XCTAssertEqual(store.session.activeTask, .generateAliceKey)
+        XCTAssertNil(state.activePresentation)
+        XCTAssertEqual(state.pendingTutorialLaunchAfterOnboardingDismissal, .onboardingFirstRun)
     }
 
-    func test_tutorialSessionStore_dismissCompletionPrompt_keepsCompletedTaskFact() async {
-        let store = TutorialSessionStore()
-        await store.openTask(.generateAliceKey)
+    func test_tutorialOnboardingHandoff_completeAfterDismissal_launchesTutorial() {
+        var state = TutorialOnboardingHandoffState(
+            activePresentation: nil,
+            pendingTutorialLaunchAfterOnboardingDismissal: .onboardingFirstRun
+        )
 
-        store.markCompletedForTesting(.generateAliceKey)
-        store.dismissCompletionPrompt()
+        state.completePendingTutorialLaunchIfNeeded()
 
-        XCTAssertTrue(store.isCompleted(.generateAliceKey))
-        XCTAssertNil(store.pendingCompletionPromptTask)
-        XCTAssertEqual(store.session.activeTask, .generateAliceKey)
+        guard case .tutorial(let presentationContext)? = state.activePresentation else {
+            return XCTFail("Expected tutorial presentation after onboarding dismissal")
+        }
+        XCTAssertEqual(presentationContext, .onboardingFirstRun)
+        XCTAssertNil(state.pendingTutorialLaunchAfterOnboardingDismissal)
     }
 
-    func test_tutorialSessionStore_handlePrimaryCompletionPromptAction_nonFinal_returnsOverview() async {
-        let store = TutorialSessionStore()
-        await store.openTask(.generateAliceKey)
+    func test_tutorialOnboardingHandoff_requestWithoutOnboarding_launchesImmediately() {
+        var state = TutorialOnboardingHandoffState(activePresentation: nil)
 
-        store.markCompletedForTesting(.generateAliceKey)
-        store.handlePrimaryCompletionPromptAction()
+        state.requestTutorialLaunchFromOnboarding(.onboardingFirstRun)
 
-        XCTAssertNil(store.pendingCompletionPromptTask)
-        XCTAssertEqual(store.flowPhase, .overview)
-        XCTAssertNil(store.session.activeTask)
+        guard case .tutorial(let presentationContext)? = state.activePresentation else {
+            return XCTFail("Expected tutorial presentation to launch immediately")
+        }
+        XCTAssertEqual(presentationContext, .onboardingFirstRun)
+        XCTAssertNil(state.pendingTutorialLaunchAfterOnboardingDismissal)
     }
 
-    func test_tutorialSessionStore_handlePrimaryCompletionPromptAction_final_showsCompletion() async {
+    func test_handlePrimaryCompletionPromptAction_finalModuleShowsCompletionSurface() async {
         let store = TutorialSessionStore()
-        store.ensureSession()
-        completeTutorialFlow(store: store)
-        await store.openTask(.enableHighSecurity)
-
+        for module in TutorialModuleID.allCases {
+            store.markCompletedForTesting(module)
+        }
+        await store.openModule(.enableHighSecurity)
         store.markCompletedForTesting(.enableHighSecurity)
+
         store.handlePrimaryCompletionPromptAction()
 
-        XCTAssertNil(store.pendingCompletionPromptTask)
-        XCTAssertEqual(store.flowPhase, .completion)
-        XCTAssertTrue(store.isShowingCompletionView)
+        XCTAssertEqual(store.hostSurface, .completion)
+        XCTAssertEqual(store.lifecycleState, .stepsCompleted)
     }
 
-    func test_tutorialSessionStore_finishAndCleanupTutorial_clearsSandboxArtifacts() async throws {
+    func test_sideEffectInterceptor_isAvailableOnlyForLiveSessionAndBlocksDangerousEffects() async throws {
         let store = TutorialSessionStore()
-        store.ensureSession()
-        let container = try XCTUnwrap(store.container)
-        let oldSuite = container.defaultsSuiteName
+        XCTAssertNil(store.sideEffectInterceptor)
 
-        let alice = try await container.keyManagement.generateKey(
-            name: "Alice Demo",
-            email: "alice@demo.invalid",
-            expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
-        )
-        await store.noteAliceGenerated(alice)
-        store.showCompletionView()
+        await startTutorialSession(store)
+        let interceptor = try XCTUnwrap(store.sideEffectInterceptor)
+        let config = AppConfiguration(defaults: UserDefaults(suiteName: UUID().uuidString)!)
 
-        store.finishAndCleanupTutorial()
-
-        XCTAssertNil(store.container)
-        XCTAssertNil(store.session.artifacts.aliceIdentity)
-        XCTAssertEqual(store.flowPhase, .overview)
-
-        store.ensureSession()
-        XCTAssertNotEqual(store.container?.defaultsSuiteName, oldSuite)
+        XCTAssertTrue(interceptor.interceptClipboardWrite?("ciphertext", config) == true)
+        XCTAssertTrue(try interceptor.interceptDataExport?(Data("demo".utf8), "demo.asc", .ciphertext) == true)
     }
 
-    func test_tutorialSessionStore_prepareForPresentation_afterReopen_returnsCleanOverview() async {
-        let store = TutorialSessionStore()
-        await store.openTask(.generateAliceKey)
-        store.markCompletedForTesting(.generateAliceKey)
+    func test_blocklist_blocksUnsafeRoutesAndRoots() {
+        let blocklist = TutorialUnsafeRouteBlocklist()
 
-        store.prepareForPresentation()
-
-        XCTAssertEqual(store.flowPhase, .overview)
-        XCTAssertNil(store.pendingCompletionPromptTask)
-        XCTAssertEqual(store.selectedTab, .home)
-    }
-
-    func test_tutorialSessionStore_pendingCompletionPrompt_survivesTabSwitch() async {
-        let store = TutorialSessionStore()
-        await store.openTask(.generateAliceKey)
-
-        store.markCompletedForTesting(.generateAliceKey)
-        store.selectTab(.home)
-        store.selectTab(.keys)
-
-        XCTAssertEqual(store.pendingCompletionPromptTask, .generateAliceKey)
-        XCTAssertEqual(store.session.activeTask, .generateAliceKey)
-    }
-
-    func test_tutorialSessionStore_pendingCompletionPrompt_survivesModalRoundTrip() async {
-        let store = TutorialSessionStore()
-        await store.openTask(.generateAliceKey)
-
-        store.markCompletedForTesting(.generateAliceKey)
-        store.presentAuthModeConfirmation(
-            AuthModeChangeConfirmationRequest(
-                pendingMode: .highSecurity,
-                title: "Demo",
-                message: "Demo",
-                requiresRiskAcknowledgement: false,
-                onConfirm: { },
-                onCancel: { }
-            )
-        )
-        store.dismissModal()
-
-        XCTAssertEqual(store.pendingCompletionPromptTask, .generateAliceKey)
-        XCTAssertEqual(store.session.activeTask, .generateAliceKey)
-    }
-
-    func test_tutorialSessionStore_openTask_understandSandbox_showsAcknowledgementPhase() async {
-        let store = TutorialSessionStore()
-
-        await store.openTask(.understandSandbox)
-
-        XCTAssertEqual(store.flowPhase, .sandboxAcknowledgement)
-        XCTAssertFalse(store.isCompleted(.understandSandbox))
-        XCTAssertNil(store.session.activeTask)
-    }
-
-    func test_tutorialSessionStore_confirmSandboxAcknowledgement_completesIntroAndReturnsOverview() {
-        let store = TutorialSessionStore()
-        store.openSandboxAcknowledgement()
-
-        store.confirmSandboxAcknowledgement()
-
-        XCTAssertTrue(store.isCompleted(.understandSandbox))
-        XCTAssertEqual(store.flowPhase, .overview)
-        XCTAssertEqual(store.selectedTab, .home)
-    }
-
-    func test_tutorialSessionStore_resetTutorial_requiresSandboxAcknowledgementAgain() {
-        let store = TutorialSessionStore()
-        store.openSandboxAcknowledgement()
-        store.confirmSandboxAcknowledgement()
-
-        XCTAssertTrue(store.isCompleted(.understandSandbox))
-
-        store.resetTutorial()
-
-        XCTAssertFalse(store.isCompleted(.understandSandbox))
-        XCTAssertEqual(store.flowPhase, .overview)
-    }
-
-    func test_tutorialSessionStore_prepareForPresentation_returnsToOverview() async {
-        let store = TutorialSessionStore()
-        await store.openTask(.generateAliceKey)
-
-        store.prepareForPresentation()
-
-        XCTAssertEqual(store.flowPhase, .overview)
-        XCTAssertFalse(store.session.isShellPresented)
-        XCTAssertTrue(store.routePath.isEmpty)
-    }
-
-    func test_tutorialSessionStore_selectTabPreservesPerTabRouteAndClearsModalState() {
-        let store = TutorialSessionStore()
-        store.ensureSession()
-
-        store.setRoutePath([.addContact])
-        store.presentImportConfirmation(makeImportConfirmationRequest())
-
-        XCTAssertEqual(store.routePath, [.addContact])
-        XCTAssertNotNil(store.activeModal)
-
-        store.selectTab(.contacts)
-
-        XCTAssertEqual(store.selectedTab, .contacts)
-        XCTAssertTrue(store.routePath.isEmpty)
-        XCTAssertNil(store.activeModal)
-
-        store.selectTab(.home)
-
-        XCTAssertEqual(store.routePath, [.addContact])
-    }
-
-    func test_tutorialSessionStore_postGenerationPrompt_appendsRouteOnSelectedTab() {
-        let store = TutorialSessionStore()
-        store.ensureSession()
-        store.selectTab(.keys)
-
-        let identity = makeIdentity(
-            fingerprint: "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678",
-            userId: "Alice Demo <alice@demo.invalid>"
-        )
-
-        store.navigateToPostGenerationPrompt(identity)
-
-        XCTAssertEqual(store.routePath, [.postGenerationPrompt(identity: identity)])
-        XCTAssertEqual(store.visibleRoute, .postGenerationPrompt(identity: identity))
-    }
-
-    func test_tutorialSessionStore_postGenerationPrompt_routePreservesCompletedKeyTaskAndArtifacts() async throws {
-        let store = TutorialSessionStore()
-        store.ensureSession()
-        let container = try XCTUnwrap(store.container)
-
-        let alice = try await container.keyManagement.generateKey(
-            name: "Alice Demo",
-            email: "alice@demo.invalid",
-            expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
-        )
-        await store.noteAliceGenerated(alice)
-        await store.openTask(.generateAliceKey)
-        store.navigateToPostGenerationPrompt(alice)
-
-        XCTAssertTrue(store.isCompleted(.generateAliceKey))
-        XCTAssertEqual(store.session.artifacts.aliceIdentity?.fingerprint, alice.fingerprint)
-        XCTAssertNotNil(store.session.artifacts.bobArmoredPublicKey)
-        XCTAssertTrue(store.session.isShellPresented)
-        XCTAssertEqual(store.session.activeTask, .generateAliceKey)
-        XCTAssertEqual(store.routePath, [.postGenerationPrompt(identity: alice)])
-    }
-
-    func test_tutorialSessionStore_setRoutePath_forTab_preservesIndependentTabStacks() {
-        let store = TutorialSessionStore()
-        store.ensureSession()
-
-        store.setRoutePath([.addContact], for: .contacts)
-        store.setRoutePath([.themePicker], for: .settings)
-
-        XCTAssertEqual(store.routePath(for: .contacts), [.addContact])
-        XCTAssertEqual(store.routePath(for: .settings), [.themePicker])
-        XCTAssertTrue(store.routePath.isEmpty)
-
-        store.selectTab(.contacts)
-        XCTAssertEqual(store.routePath, [.addContact])
-
-        store.selectTab(.settings)
-        XCTAssertEqual(store.routePath, [.themePicker])
+        XCTAssertNotNil(blocklist.blockedRoute(for: .importKey))
+        XCTAssertNotNil(blocklist.blockedRoute(for: .qrPhotoImport))
+        XCTAssertNotNil(blocklist.blockedRoute(for: .selfTest))
+        XCTAssertNotNil(blocklist.blockedRoute(for: .appIcon))
+        XCTAssertNotNil(blocklist.blockedRoot(for: .sign))
+        XCTAssertNotNil(blocklist.blockedRoot(for: .verify))
+        XCTAssertNil(blocklist.blockedRoute(for: .encrypt))
     }
 
     func test_tutorialConfigurationFactory_settingsConfiguration_disablesRestrictedEntries() {
@@ -463,68 +338,24 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertEqual(definitions.map(\.tab), AppShellTab.allCases)
     }
 
-    func test_tutorialSessionStore_returnToOverview_clearsTutorialNavigationState() async {
+    func test_finishAndCleanupTutorial_clearsSandboxArtifacts() async throws {
         let store = TutorialSessionStore()
-        await store.openTask(.importBobKey)
-        store.setRoutePath([.addContact])
-        store.presentImportConfirmation(makeImportConfirmationRequest())
+        await startTutorialSession(store)
+        let container = try XCTUnwrap(store.container)
+        let oldSuite = container.defaultsSuiteName
 
-        store.returnToOverview()
+        store.finishAndCleanupTutorial()
 
-        XCTAssertFalse(store.session.isShellPresented)
-        XCTAssertEqual(store.selectedTab, .home)
-        XCTAssertTrue(store.routePath.isEmpty)
-        XCTAssertNil(store.activeModal)
+        XCTAssertNil(store.container)
+        XCTAssertEqual(store.lifecycleState, .notStarted)
+
+        await startTutorialSession(store)
+        XCTAssertNotEqual(store.container?.defaultsSuiteName, oldSuite)
     }
 
-    private func completeTutorialFlow(store: TutorialSessionStore) {
-        for task in TutorialTaskID.allCases {
-            store.markCompletedForTesting(task)
-        }
-    }
-
-    private func makeImportConfirmationRequest() -> ImportConfirmationRequest {
-        ImportConfirmationRequest(
-            keyData: Data("demo".utf8),
-            keyInfo: KeyInfo(
-                fingerprint: "abcdef1234567890",
-                keyVersion: 6,
-                userId: "Bob Demo <bob@demo.invalid>",
-                hasEncryptionSubkey: true,
-                isRevoked: false,
-                isExpired: false,
-                profile: .advanced,
-                primaryAlgo: "Ed448",
-                subkeyAlgo: "X448",
-                expiryTimestamp: nil
-            ),
-            profile: .advanced,
-            allowsUnverifiedImport: false,
-            onImportVerified: { },
-            onImportUnverified: { },
-            onCancel: { }
-        )
-    }
-
-    private func makeIdentity(
-        fingerprint: String,
-        userId: String
-    ) -> PGPKeyIdentity {
-        PGPKeyIdentity(
-            fingerprint: fingerprint,
-            keyVersion: 6,
-            profile: .advanced,
-            userId: userId,
-            hasEncryptionSubkey: true,
-            isRevoked: false,
-            isExpired: false,
-            isDefault: false,
-            isBackedUp: false,
-            publicKeyData: Data("demo-public-key".utf8),
-            revocationCert: Data(),
-            primaryAlgo: "Ed448",
-            subkeyAlgo: "X448",
-            expiryDate: nil
-        )
+    private func startTutorialSession(_ store: TutorialSessionStore) async {
+        await store.openModule(.sandbox)
+        store.confirmSandboxAcknowledgement()
+        await Task.yield()
     }
 }

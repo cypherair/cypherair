@@ -29,8 +29,9 @@ struct TutorialInlineHeaderView: View {
         .background(headerBackgroundColor, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.quaternary, lineWidth: 1)
+                .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1.5)
         }
+        .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("tutorial.inlineHeader")
     }
@@ -56,38 +57,38 @@ struct TutorialInlineHeaderView: View {
             context.onReturn()
         } label: {
             Label(
-                String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial"),
-                systemImage: "chevron.left"
+                String(localized: "guidedTutorial.returnToOverview", defaultValue: "Return to Tutorial Overview"),
+                systemImage: "chevron.left.circle.fill"
             )
             .font(.subheadline.weight(.semibold))
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
             .padding(.horizontal, 12)
             .frame(minHeight: 44)
         }
-        .buttonStyle(.plain)
-        .background(.clear, in: Capsule())
-        .contentShape(Capsule())
+        .buttonStyle(.bordered)
+        .tint(.orange)
         .accessibilityHint(
-            String(localized: "guidedTutorial.return.hint", defaultValue: "Return to the guided tutorial overview.")
+            String(localized: "guidedTutorial.returnToOverview.hint", defaultValue: "Return to the guided tutorial overview.")
         )
     }
 
     private var sandboxBadge: some View {
-        Text(context.sandboxLabel)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
+        Label(context.sandboxLabel, systemImage: "testtube.2")
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.orange)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(.fill.quaternary, in: Capsule())
+            .background(Color.orange.opacity(0.14), in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1)
+            }
     }
 
     private var headerBackgroundColor: Color {
         #if canImport(UIKit)
-        Color(uiColor: .secondarySystemGroupedBackground)
+        Color(uiColor: .systemBackground)
         #elseif canImport(AppKit)
-        Color(nsColor: .controlBackgroundColor)
+        Color(nsColor: .windowBackgroundColor)
         #else
         .clear
         #endif
@@ -166,6 +167,7 @@ struct TutorialSurfaceView<Content: View>: View {
 
     var body: some View {
         content()
+            .environment(\.tutorialSideEffectInterceptor, tutorialStore.sideEffectInterceptor)
             #if canImport(UIKit)
             .tutorialInlineHeaderHost(context: inlineHeaderContext)
             #endif
@@ -185,8 +187,8 @@ struct TutorialSurfaceView<Content: View>: View {
     private var inlineHeaderContext: TutorialInlineHeaderContext? {
         guard tutorialStore.selectedTab == tab else { return nil }
         guard tutorialStore.activeModal == nil else { return nil }
-        guard let activeTask = tutorialStore.session.activeTask else { return nil }
-        guard !tutorialStore.isCompleted(activeTask) else { return nil }
+        guard let activeModule = tutorialStore.currentModule else { return nil }
+        guard !tutorialStore.isCompleted(activeModule) else { return nil }
         guard let guidance = TutorialGuidanceResolver().guidance(
             session: tutorialStore.session,
             navigation: tutorialStore.navigation,
@@ -198,7 +200,7 @@ struct TutorialSurfaceView<Content: View>: View {
 
         return TutorialInlineHeaderContext(
             onReturn: { tutorialStore.returnToOverview() },
-            sandboxLabel: String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Sandbox"),
+            sandboxLabel: String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Tutorial Sandbox"),
             taskTitle: guidance.title,
             guidanceBody: guidance.body
         )
@@ -211,7 +213,7 @@ struct TutorialSettingsTaskView: View {
     @Environment(AppConfiguration.self) private var config
 
     var body: some View {
-        TutorialTaskHostView(task: .enableHighSecurity) {
+        TutorialTaskHostView(module: .enableHighSecurity) {
             SettingsView(configuration: tutorialStore.configurationFactory.settingsConfiguration())
                 .onChange(of: config.authMode) { _, newMode in
                     if newMode == .highSecurity {
@@ -228,15 +230,11 @@ struct TutorialDisabledSettingView: View {
     let systemImage: String
 
     var body: some View {
-        unavailableContent
-        .navigationTitle(title)
-    }
-
-    private var unavailableContent: some View {
         ContentUnavailableView {
             Label(title, systemImage: systemImage)
         } description: {
             Text(message)
         }
+        .navigationTitle(title)
     }
 }

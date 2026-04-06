@@ -31,6 +31,7 @@ enum MacPresentation: Identifiable {
 
 struct MacPresentationController {
     let present: @MainActor (MacPresentation) -> Void
+    let dismiss: @MainActor () -> Void
 }
 
 private struct MacPresentationControllerKey: EnvironmentKey {

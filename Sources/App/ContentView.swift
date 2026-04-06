@@ -48,9 +48,14 @@ struct MacAppShellView: View {
         }
         .environment(
             \.macPresentationController,
-            MacPresentationController { presentation in
-                navigationState.activePresentation = presentation
-            }
+            MacPresentationController(
+                present: { presentation in
+                    navigationState.activePresentation = presentation
+                },
+                dismiss: {
+                    navigationState.activePresentation = nil
+                }
+            )
         )
         .screenReady("main.ready")
         .macPresentationHost($navigationState.activePresentation)

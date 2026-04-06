@@ -10,6 +10,8 @@ struct DecryptView: View {
         var allowedModes: [DecryptMode] = DecryptMode.allCases
         var prefilledCiphertext: String?
         var initialPhase1Result: DecryptionService.Phase1Result?
+        var allowsTextFileImport = true
+        var allowsFileResultExport = true
         var onParsed: (@MainActor (DecryptionService.Phase1Result) -> Void)?
         var onDecrypted: (@MainActor (Data, SignatureVerification) -> Void)?
 
@@ -44,6 +46,7 @@ struct DecryptView: View {
 
     @Environment(DecryptionService.self) private var decryptionService
     @Environment(AppConfiguration.self) private var config
+    @Environment(\.tutorialSideEffectInterceptor) private var tutorialSideEffectInterceptor
 
     let configuration: Configuration
 
@@ -196,6 +199,7 @@ struct DecryptView: View {
             if decryptMode == .file, decryptedFileURL != nil {
                 Section {
                     Button {
+                        guard configuration.allowsFileResultExport else { return }
                         if let url = decryptedFileURL {
                             guard FileManager.default.fileExists(atPath: url.path) else {
                                 operation.present(
@@ -208,10 +212,16 @@ struct DecryptView: View {
                                 )
                                 return
                             }
-                            exportController.prepareFileExport(
-                                fileURL: url,
-                                suggestedFilename: decryptedFilename()
-                            )
+                            if tutorialSideEffectInterceptor?.interceptFileExport?(
+                                url,
+                                decryptedFilename(),
+                                .generic
+                            ) != true {
+                                exportController.prepareFileExport(
+                                    fileURL: url,
+                                    suggestedFilename: decryptedFilename()
+                                )
+                            }
                         }
                     } label: {
                         Label(
@@ -219,6 +229,7 @@ struct DecryptView: View {
                             systemImage: "square.and.arrow.down"
                         )
                     }
+                    .disabled(!configuration.allowsFileResultExport)
                 }
             }
 
@@ -364,6 +375,7 @@ struct DecryptView: View {
                 )
 
             Button {
+                guard configuration.allowsTextFileImport else { return }
                 fileImportTarget = .textCiphertextImport
                 showFileImporter = true
             } label: {
@@ -372,6 +384,7 @@ struct DecryptView: View {
                     systemImage: "doc.badge.plus"
                 )
             }
+            .disabled(!configuration.allowsTextFileImport)
 
             if let importedFileName = importedCiphertext.fileName, importedCiphertext.hasImportedFile {
                 HStack {

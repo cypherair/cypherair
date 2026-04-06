@@ -8,7 +8,7 @@ struct TutorialSandboxAcknowledgementView: View {
             Form {
                 Section {
                     Label(
-                        String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Sandbox"),
+                        String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Tutorial Sandbox"),
                         systemImage: "testtube.2"
                     )
                     .font(.headline)
@@ -59,6 +59,7 @@ struct TutorialSandboxAcknowledgementView: View {
                         tutorialStore.confirmSandboxAcknowledgement()
                     }
                     .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier(TutorialModuleID.sandbox.launchControlIdentifier)
                 }
             }
             .navigationTitle(
@@ -72,11 +73,12 @@ struct TutorialSandboxAcknowledgementView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial")) {
+                    Button(String(localized: "guidedTutorial.returnToOverview", defaultValue: "Return to Tutorial Overview")) {
                         tutorialStore.returnToOverview()
                     }
                 }
             }
+            .screenReady(TutorialAutomationContract.sandboxAcknowledgementReadyMarker)
         }
     }
 }

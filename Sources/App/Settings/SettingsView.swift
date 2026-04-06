@@ -403,9 +403,14 @@ struct MacSettingsRootView: View {
         }
         .environment(
             \.macPresentationController,
-            MacPresentationController { presentation in
-                activePresentation = presentation
-            }
+            MacPresentationController(
+                present: { presentation in
+                    activePresentation = presentation
+                },
+                dismiss: {
+                    activePresentation = nil
+                }
+            )
         )
         .task {
             if launchConfiguration?.opensAuthModeConfirmation == true,

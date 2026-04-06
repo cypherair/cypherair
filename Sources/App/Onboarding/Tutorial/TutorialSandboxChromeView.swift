@@ -18,9 +18,9 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
                 #endif
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if let promptTask = visibleCompletionPromptTask,
+                if let promptModule = visibleCompletionPromptModule,
                    tutorialStore.activeModal == nil {
-                    completionPrompt(for: promptTask)
+                    completionPrompt(for: promptModule)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
                 }
@@ -33,14 +33,14 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
     }
 
     private var isActiveSandboxTab: Bool {
-        tutorialStore.session.activeTask != nil && tab == tutorialStore.selectedTab
+        tutorialStore.currentModule != nil && tab == tutorialStore.selectedTab
     }
 
-    private var currentGuidance: TutorialGuidance? {
+    private var currentGuidance: TutorialGuidancePayload? {
         guard isActiveSandboxTab else { return nil }
         guard tutorialStore.activeModal == nil else { return nil }
-        guard let activeTask = tutorialStore.session.activeTask else { return nil }
-        guard !tutorialStore.isCompleted(activeTask) else { return nil }
+        guard let activeModule = tutorialStore.currentModule else { return nil }
+        guard !tutorialStore.isCompleted(activeModule) else { return nil }
 
         return TutorialGuidanceResolver().guidance(
             session: tutorialStore.session,
@@ -50,11 +50,11 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
         )
     }
 
-    private var visibleCompletionPromptTask: TutorialTaskID? {
+    private var visibleCompletionPromptModule: TutorialModuleID? {
         guard isActiveSandboxTab else { return nil }
-        guard let promptTask = tutorialStore.pendingCompletionPromptTask else { return nil }
-        guard tutorialStore.session.activeTask == promptTask else { return nil }
-        return promptTask
+        guard let promptModule = tutorialStore.pendingCompletionPromptModule else { return nil }
+        guard tutorialStore.currentModule == promptModule else { return nil }
+        return promptModule
     }
 
     #if os(macOS)
@@ -64,14 +64,13 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
                 tutorialStore.returnToOverview()
             } label: {
                 Label(
-                    String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial"),
-                    systemImage: "chevron.left"
+                    String(localized: "guidedTutorial.returnToOverview", defaultValue: "Return to Tutorial Overview"),
+                    systemImage: "chevron.left.circle.fill"
                 )
                 .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
+            .tint(.orange)
 
             Spacer()
         }
@@ -82,25 +81,25 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
     #endif
 
     @ViewBuilder
-    private func completionPrompt(for task: TutorialTaskID) -> some View {
+    private func completionPrompt(for module: TutorialModuleID) -> some View {
         if horizontalSizeClass == .compact {
-            compactCompletionPrompt(for: task)
+            compactCompletionPrompt(for: module)
         } else {
-            regularCompletionPrompt(for: task)
+            regularCompletionPrompt(for: module)
         }
     }
 
-    private func compactCompletionPrompt(for task: TutorialTaskID) -> some View {
+    private func compactCompletionPrompt(for module: TutorialModuleID) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(task.title)
+            Text(module.title)
                 .font(.headline)
 
-            Text(completionMessage(for: task))
+            Text(completionMessage(for: module))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
-                Button(primaryPromptButtonTitle(for: task)) {
+                Button(primaryPromptButtonTitle(for: module)) {
                     tutorialStore.handlePrimaryCompletionPromptAction()
                 }
                 .buttonStyle(.borderedProminent)
@@ -117,17 +116,17 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
         .tutorialBannerChrome()
     }
 
-    private func regularCompletionPrompt(for task: TutorialTaskID) -> some View {
+    private func regularCompletionPrompt(for module: TutorialModuleID) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(task.title)
+            Text(module.title)
                 .font(.headline)
 
-            Text(completionMessage(for: task))
+            Text(completionMessage(for: module))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
-                Button(primaryPromptButtonTitle(for: task)) {
+                Button(primaryPromptButtonTitle(for: module)) {
                     tutorialStore.handlePrimaryCompletionPromptAction()
                 }
                 .buttonStyle(.borderedProminent)
@@ -143,18 +142,18 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
         .tutorialCardChrome(.overlay)
     }
 
-    private func primaryPromptButtonTitle(for task: TutorialTaskID) -> String {
-        if task == TutorialTaskID.allCases.last {
-            return String(localized: "guidedTutorial.finish", defaultValue: "Finish Tutorial")
+    private func primaryPromptButtonTitle(for module: TutorialModuleID) -> String {
+        if module == .enableHighSecurity {
+            return String(localized: "guidedTutorial.reviewCompletion", defaultValue: "Review Completion")
         }
-        return String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial")
+        return String(localized: "guidedTutorial.returnToOverview", defaultValue: "Return to Tutorial Overview")
     }
 
-    private func completionMessage(for task: TutorialTaskID) -> String {
-        if task == TutorialTaskID.allCases.last {
-            return String(localized: "guidedTutorial.task.complete.final", defaultValue: "Tutorial complete. Finish to see your next steps.")
+    private func completionMessage(for module: TutorialModuleID) -> String {
+        if module == .enableHighSecurity {
+            return String(localized: "guidedTutorial.task.complete.final", defaultValue: "All modules are complete. Review the completion summary before you finish the tutorial.")
         }
-        return String(localized: "guidedTutorial.task.complete", defaultValue: "Task complete. Return to the tutorial to continue.")
+        return String(localized: "guidedTutorial.task.complete", defaultValue: "Task complete. Return to the tutorial overview to continue.")
     }
 }
 

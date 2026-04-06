@@ -39,6 +39,7 @@ struct SettingsAuthModeConfirmationSheetView: View {
                     request.onConfirm()
                 }
                 .accessibilityIdentifier("settings.mode.confirm")
+                .tutorialAnchor(.settingsModeConfirmButton)
                 .disabled(request.requiresRiskAcknowledgement && !riskAcknowledged)
                 .frame(maxWidth: .infinity)
             }

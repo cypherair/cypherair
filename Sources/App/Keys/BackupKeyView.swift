@@ -4,12 +4,13 @@ import UniformTypeIdentifiers
 /// Passphrase-protected key export for backup.
 struct BackupKeyView: View {
     struct Configuration {
-        enum ResultPresentation {
+        enum ResultSink {
             case fileExporter
             case inline
+            case tutorialArtifact
         }
 
-        var resultPresentation: ResultPresentation = .fileExporter
+        var resultSink: ResultSink = .fileExporter
         var onExported: (@MainActor (Data) -> Void)?
 
         static let `default` = Configuration()
@@ -19,6 +20,7 @@ struct BackupKeyView: View {
     let configuration: Configuration
 
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(\.tutorialSideEffectInterceptor) private var tutorialSideEffectInterceptor
 
     enum Field {
         case passphrase
@@ -95,7 +97,7 @@ struct BackupKeyView: View {
                 .disabled(passphrase.isEmpty || passphrase != passphraseConfirm || isExporting)
             }
 
-            if configuration.resultPresentation == .inline,
+            if configuration.resultSink == .inline || configuration.resultSink == .tutorialArtifact,
                let exportedData,
                let exportedString = String(data: exportedData, encoding: .utf8) {
                 Section {
@@ -165,6 +167,9 @@ struct BackupKeyView: View {
                     passphrase: pass
                 )
                 exportedData = data
+                if configuration.resultSink == .tutorialArtifact {
+                    _ = try? tutorialSideEffectInterceptor?.interceptDataExport?(data, "\(fingerprint.prefix(16)).asc", .backup)
+                }
                 configuration.onExported?(data)
                 passphrase = ""
                 passphraseConfirm = ""

@@ -21,45 +21,13 @@ struct TutorialMirrorShellView: View {
             .environment(container.qrService)
             .environment(container.selfTestService)
             .environment(container.authManager)
+            .environment(\.tutorialSideEffectInterceptor, tutorialStore.sideEffectInterceptor)
+            .screenReady(tutorialStore.currentModule?.readyMarker ?? "tutorial.workspace.ready")
             .onAppear {
                 tutorialStore.noteVisibleSurface(
                     tab: tutorialStore.selectedTab,
                     route: tutorialStore.routePath.last
                 )
-            }
-            .sheet(item: activeModalBinding) { modal in
-                switch modal {
-                case .importConfirmation(let request):
-                    ImportConfirmView(
-                        keyInfo: request.keyInfo,
-                        detectedProfile: request.profile,
-                        onImportVerified: {
-                            let action = request.onImportVerified
-                            tutorialStore.dismissModal()
-                            action()
-                        },
-                        onImportUnverified: request.allowsUnverifiedImport ? {
-                            let action = request.onImportUnverified
-                            tutorialStore.dismissModal()
-                            action()
-                        } : nil,
-                        onCancel: {
-                            let action = request.onCancel
-                            tutorialStore.dismissModal()
-                            action()
-                        }
-                    )
-                case .authModeConfirmation(let request):
-                    NavigationStack {
-                        TutorialAuthModeConfirmationView(request: request)
-                    }
-                    #if os(macOS)
-                    .frame(minWidth: 500, idealWidth: 540, minHeight: 360, idealHeight: 420)
-                    #endif
-                    #if canImport(UIKit)
-                    .presentationDetents([.medium, .large])
-                    #endif
-                }
             }
         } else {
             ContentUnavailableView {
@@ -81,12 +49,6 @@ struct TutorialMirrorShellView: View {
         Binding(
             get: { tutorialStore.selectedTab },
             set: { tutorialStore.selectTab($0) }
-        )
-    }
-    private var activeModalBinding: Binding<TutorialModal?> {
-        Binding(
-            get: { tutorialStore.activeModal },
-            set: { if $0 == nil { tutorialStore.dismissModal() } }
         )
     }
 }

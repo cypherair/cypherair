@@ -38,6 +38,8 @@ struct EncryptView: View {
         var initialSignerFingerprint: String?
         var signingPolicy: TogglePolicy = .initial(true)
         var encryptToSelfPolicy: TogglePolicy = .appDefault
+        var allowsClipboardWrite = true
+        var allowsResultExport = true
         var onEncrypted: (@MainActor (Data) -> Void)?
 
         static let `default` = Configuration()
@@ -61,6 +63,7 @@ struct EncryptView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(ContactService.self) private var contactService
     @Environment(AppConfiguration.self) private var config
+    @Environment(\.tutorialSideEffectInterceptor) private var tutorialSideEffectInterceptor
 
     let configuration: Configuration
 
@@ -252,20 +255,31 @@ struct EncryptView: View {
                         .textSelection(.enabled)
 
                     Button {
-                        operation.copyToClipboard(ciphertextString, config: config)
+                        if configuration.allowsClipboardWrite,
+                           tutorialSideEffectInterceptor?.interceptClipboardWrite?(ciphertextString, config) != true {
+                            operation.copyToClipboard(ciphertextString, config: config)
+                        }
                     } label: {
                         Label(
                             String(localized: "common.copy", defaultValue: "Copy"),
                             systemImage: "doc.on.doc"
                         )
                     }
+                    .disabled(!configuration.allowsClipboardWrite)
 
                     Button {
+                        guard configuration.allowsResultExport else { return }
                         do {
-                            try exportController.prepareDataExport(
+                            if try tutorialSideEffectInterceptor?.interceptDataExport?(
                                 ciphertext,
-                                suggestedFilename: "encrypted.asc"
-                            )
+                                "encrypted.asc",
+                                .ciphertext
+                            ) != true {
+                                try exportController.prepareDataExport(
+                                    ciphertext,
+                                    suggestedFilename: "encrypted.asc"
+                                )
+                            }
                         } catch {
                             operation.present(
                                 error: .encryptionFailed(
@@ -282,6 +296,7 @@ struct EncryptView: View {
                             systemImage: "square.and.arrow.down"
                         )
                     }
+                    .disabled(!configuration.allowsResultExport)
                 } header: {
                     Text(String(localized: "encrypt.result", defaultValue: "Encrypted Message"))
                 }
@@ -290,6 +305,7 @@ struct EncryptView: View {
             if encryptMode == .file, encryptedFileURL != nil {
                 Section {
                     Button {
+                        guard configuration.allowsResultExport else { return }
                         if let url = encryptedFileURL {
                             guard FileManager.default.fileExists(atPath: url.path) else {
                                 operation.present(
@@ -302,10 +318,16 @@ struct EncryptView: View {
                                 )
                                 return
                             }
-                            exportController.prepareFileExport(
-                                fileURL: url,
-                                suggestedFilename: (selectedFileName ?? "file") + ".gpg"
-                            )
+                            if tutorialSideEffectInterceptor?.interceptFileExport?(
+                                url,
+                                (selectedFileName ?? "file") + ".gpg",
+                                .ciphertext
+                            ) != true {
+                                exportController.prepareFileExport(
+                                    fileURL: url,
+                                    suggestedFilename: (selectedFileName ?? "file") + ".gpg"
+                                )
+                            }
                         }
                     } label: {
                         Label(
@@ -313,6 +335,7 @@ struct EncryptView: View {
                             systemImage: "square.and.arrow.down"
                         )
                     }
+                    .disabled(!configuration.allowsResultExport)
                 }
             }
         }

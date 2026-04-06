@@ -33,6 +33,33 @@ enum IOSPresentation: Identifiable {
 struct IOSPresentationController {
     let present: @MainActor (IOSPresentation) -> Void
     let dismiss: @MainActor () -> Void
+    let handoffToTutorialAfterOnboardingDismiss: @MainActor (TutorialPresentationContext) -> Void
+}
+
+struct TutorialOnboardingHandoffState {
+    var activePresentation: IOSPresentation?
+    var pendingTutorialLaunchAfterOnboardingDismissal: TutorialPresentationContext?
+
+    mutating func requestTutorialLaunchFromOnboarding(_ presentationContext: TutorialPresentationContext) {
+        pendingTutorialLaunchAfterOnboardingDismissal = presentationContext
+
+        if case .onboarding? = activePresentation {
+            activePresentation = nil
+        } else {
+            activePresentation = .tutorial(presentationContext: presentationContext)
+            pendingTutorialLaunchAfterOnboardingDismissal = nil
+        }
+    }
+
+    mutating func completePendingTutorialLaunchIfNeeded() {
+        guard activePresentation == nil,
+              let pendingTutorialLaunchAfterOnboardingDismissal else {
+            return
+        }
+
+        activePresentation = .tutorial(presentationContext: pendingTutorialLaunchAfterOnboardingDismissal)
+        self.pendingTutorialLaunchAfterOnboardingDismissal = nil
+    }
 }
 
 private struct IOSPresentationControllerKey: EnvironmentKey {
