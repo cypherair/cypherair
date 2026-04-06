@@ -178,23 +178,8 @@ struct TutorialUnsafeRouteBlocklist {
         }
     }
 
-    func blockedRoot(for tab: AppShellTab) -> TutorialBlockedSurface? {
-        switch tab {
-        case .sign:
-            TutorialBlockedSurface(
-                title: String(localized: "guidedTutorial.blocked.sign.title", defaultValue: "Sign Unavailable"),
-                message: String(localized: "guidedTutorial.blocked.sign.body", defaultValue: "Signing is outside the guided tutorial path and is hidden to keep the sandbox focused."),
-                systemImage: "signature"
-            )
-        case .verify:
-            TutorialBlockedSurface(
-                title: String(localized: "guidedTutorial.blocked.verify.title", defaultValue: "Verify Unavailable"),
-                message: String(localized: "guidedTutorial.blocked.verify.body", defaultValue: "Verification outside the decrypt lesson is hidden to keep the tutorial focused."),
-                systemImage: "checkmark.seal"
-            )
-        default:
-            nil
-        }
+    func blockedRoot(for _: AppShellTab) -> TutorialBlockedSurface? {
+        nil
     }
 }
 
@@ -305,7 +290,13 @@ struct TutorialSessionState {
 }
 
 struct TutorialGuidancePayload {
+    enum State: Equatable {
+        case inProgress
+        case completed
+    }
+
     let module: TutorialModuleID
+    let state: State
     let title: String
     let body: String
     let realAppLocation: String?

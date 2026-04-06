@@ -19,12 +19,7 @@ struct TutorialShellTabsView: View {
         if tutorialStore.activeModal != nil {
             return nil
         }
-        guard let activeModule = tutorialStore.currentModule else {
-            return nil
-        }
-        if tutorialStore.isCompleted(activeModule) {
-            return nil
-        }
+        guard tutorialStore.currentModule != nil else { return nil }
 
         let guidance = TutorialGuidanceResolver().guidance(
             session: tutorialStore.session,

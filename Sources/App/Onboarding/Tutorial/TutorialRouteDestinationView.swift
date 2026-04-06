@@ -92,9 +92,17 @@ struct TutorialRouteDestinationView: View {
         case .importKey:
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ImportKeyView() })
         case .sign:
-            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { TutorialBlockedRouteView(surface: tutorialStore.blocklist.blockedRoot(for: .sign) ?? genericBlockedSurface) })
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    SignView(configuration: factory.signConfiguration())
+                }
+            )
         case .verify:
-            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { TutorialBlockedRouteView(surface: tutorialStore.blocklist.blockedRoot(for: .verify) ?? genericBlockedSurface) })
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    VerifyView(configuration: factory.verifyConfiguration())
+                }
+            )
         case .selfTest:
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { SelfTestView() })
         case .about:
@@ -119,13 +127,6 @@ struct TutorialRouteDestinationView: View {
         }
     }
 
-    private var genericBlockedSurface: TutorialBlockedSurface {
-        TutorialBlockedSurface(
-            title: String(localized: "guidedTutorial.blocked.title", defaultValue: "Unavailable in Tutorial"),
-            message: String(localized: "guidedTutorial.blocked.body", defaultValue: "This action is unavailable inside the guided tutorial sandbox."),
-            systemImage: "hand.raised"
-        )
-    }
 }
 
 struct TutorialBlockedRouteView: View {

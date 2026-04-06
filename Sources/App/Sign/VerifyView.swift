@@ -3,6 +3,16 @@ import UniformTypeIdentifiers
 
 /// Signature verification view — supports cleartext and detached signatures.
 struct VerifyView: View {
+    struct Configuration {
+        var allowsCleartextFileImport = true
+        var allowsDetachedOriginalImport = true
+        var allowsDetachedSignatureImport = true
+        var cleartextFileRestrictionMessage: String?
+        var detachedFileRestrictionMessage: String?
+
+        static let `default` = Configuration()
+    }
+
     @Environment(SigningService.self) private var signingService
 
     enum VerifyMode: String, CaseIterable {
@@ -33,6 +43,12 @@ struct VerifyView: View {
     @State private var signatureFileURL: URL?
     @State private var signatureFileName: String?
     @State private var textInputSectionEpoch = 0
+    
+    let configuration: Configuration
+
+    init(configuration: Configuration = .default) {
+        self.configuration = configuration
+    }
 
     var body: some View {
         Form {
@@ -196,9 +212,10 @@ struct VerifyView: View {
                     minHeight: editorHeightRange.min,
                     idealHeight: editorHeightRange.ideal,
                     maxHeight: editorHeightRange.max
-                )
+            )
 
             Button {
+                guard configuration.allowsCleartextFileImport else { return }
                 filePickerTarget = .cleartextSignedImport
                 showFileImporter = true
             } label: {
@@ -207,6 +224,7 @@ struct VerifyView: View {
                     systemImage: "doc.badge.plus"
                 )
             }
+            .disabled(!configuration.allowsCleartextFileImport)
 
             if let importedFileName = importedCleartext.fileName, importedCleartext.hasImportedFile {
                 HStack {
@@ -228,6 +246,11 @@ struct VerifyView: View {
             }
         } header: {
             Text(String(localized: "verify.input", defaultValue: "Signed Message"))
+        } footer: {
+            if !configuration.allowsCleartextFileImport,
+               let cleartextFileRestrictionMessage = configuration.cleartextFileRestrictionMessage {
+                Text(cleartextFileRestrictionMessage)
+            }
         }
         .id(textInputSectionEpoch)
     }
@@ -236,6 +259,7 @@ struct VerifyView: View {
     private var detachedContent: some View {
         Section {
             Button {
+                guard configuration.allowsDetachedOriginalImport else { return }
                 filePickerTarget = .original
                 showFileImporter = true
             } label: {
@@ -244,6 +268,7 @@ struct VerifyView: View {
                     systemImage: "doc"
                 )
             }
+            .disabled(!configuration.allowsDetachedOriginalImport)
             if let originalFileName {
                 LabeledContent(
                     String(localized: "verify.originalFile", defaultValue: "Original"),
@@ -252,10 +277,15 @@ struct VerifyView: View {
             }
         } header: {
             Text(String(localized: "verify.detached.original", defaultValue: "Original File"))
+        } footer: {
+            if let detachedFileRestrictionMessage = configuration.detachedFileRestrictionMessage {
+                Text(detachedFileRestrictionMessage)
+            }
         }
 
         Section {
             Button {
+                guard configuration.allowsDetachedSignatureImport else { return }
                 filePickerTarget = .signature
                 showFileImporter = true
             } label: {
@@ -264,6 +294,7 @@ struct VerifyView: View {
                     systemImage: "signature"
                 )
             }
+            .disabled(!configuration.allowsDetachedSignatureImport)
             if let signatureFileName {
                 LabeledContent(
                     String(localized: "verify.signatureFile", defaultValue: "Signature"),
@@ -272,6 +303,10 @@ struct VerifyView: View {
             }
         } header: {
             Text(String(localized: "verify.detached.signature", defaultValue: "Signature File"))
+        } footer: {
+            if let detachedFileRestrictionMessage = configuration.detachedFileRestrictionMessage {
+                Text(detachedFileRestrictionMessage)
+            }
         }
     }
 

@@ -9,6 +9,9 @@ struct TutorialGuidanceResolver {
     ) -> TutorialGuidancePayload? {
         guard navigation.activeModal == nil else { return nil }
         guard let module = session.activeModule else { return nil }
+        if session.moduleStates[module]?.isCompleted == true {
+            return completionPayload(module)
+        }
 
         let visibleRoute = navigation.visibleSurface.route
 
@@ -179,10 +182,36 @@ struct TutorialGuidanceResolver {
     ) -> TutorialGuidancePayload {
         TutorialGuidancePayload(
             module: module,
+            state: .inProgress,
             title: module.title,
             body: body,
             realAppLocation: module.realAppLocation,
             target: target
+        )
+    }
+
+    private func completionPayload(_ module: TutorialModuleID) -> TutorialGuidancePayload {
+        TutorialGuidancePayload(
+            module: module,
+            state: .completed,
+            title: module.title,
+            body: completionMessage(for: module),
+            realAppLocation: module.realAppLocation,
+            target: nil
+        )
+    }
+
+    private func completionMessage(for module: TutorialModuleID) -> String {
+        if module == .enableHighSecurity {
+            return String(
+                localized: "guidedTutorial.task.complete.final",
+                defaultValue: "This task is complete. Return to the tutorial overview to review completion and finish the tutorial."
+            )
+        }
+
+        return String(
+            localized: "guidedTutorial.task.complete",
+            defaultValue: "This task is complete. Return to the tutorial overview to continue."
         )
     }
 }

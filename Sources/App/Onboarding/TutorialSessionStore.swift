@@ -419,7 +419,10 @@ final class TutorialSessionStore {
 
         do {
             let bob = try await container.keyManagement.generateKey(
-                name: "Bob Demo",
+                name: String(
+                    localized: "guidedTutorial.demoName.bob",
+                    defaultValue: "Bob Demo"
+                ),
                 email: "bob@demo.invalid",
                 expirySeconds: nil,
                 profile: .advanced,

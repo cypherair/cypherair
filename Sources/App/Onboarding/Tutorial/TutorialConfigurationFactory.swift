@@ -6,7 +6,10 @@ struct TutorialConfigurationFactory {
 
     func keyGenerationConfiguration(isActiveModule: Bool) -> KeyGenerationView.Configuration {
         var configuration = KeyGenerationView.Configuration(
-            prefilledName: "Alice Demo",
+            prefilledName: String(
+                localized: "guidedTutorial.demoName.alice",
+                defaultValue: "Alice Demo"
+            ),
             prefilledEmail: "alice@demo.invalid",
             lockedProfile: .advanced,
             lockedExpiryMonths: 24,
@@ -46,11 +49,13 @@ struct TutorialConfigurationFactory {
 
     func encryptConfiguration(isActiveModule: Bool) -> EncryptView.Configuration {
         var configuration = EncryptView.Configuration(
-            allowedModes: [.text],
             signingPolicy: .fixed(true),
             encryptToSelfPolicy: .fixed(false),
             allowsClipboardWrite: false,
-            allowsResultExport: false
+            allowsResultExport: false,
+            allowsFileInput: false,
+            allowsFileResultExport: false,
+            fileRestrictionMessage: fileModeRestrictionMessage
         )
 
         if isActiveModule {
@@ -70,9 +75,11 @@ struct TutorialConfigurationFactory {
 
     func decryptConfiguration(isActiveModule: Bool) -> DecryptView.Configuration {
         var configuration = DecryptView.Configuration(
-            allowedModes: [.text],
             allowsTextFileImport: false,
-            allowsFileResultExport: false
+            allowsFileInput: false,
+            allowsFileResultExport: false,
+            textFileRestrictionMessage: textImportRestrictionMessage,
+            fileRestrictionMessage: fileModeRestrictionMessage
         )
 
         if isActiveModule {
@@ -87,6 +94,27 @@ struct TutorialConfigurationFactory {
         }
 
         return configuration
+    }
+
+    func signConfiguration() -> SignView.Configuration {
+        SignView.Configuration(
+            allowsClipboardWrite: false,
+            allowsTextResultExport: false,
+            allowsFileInput: false,
+            allowsFileResultExport: false,
+            fileRestrictionMessage: fileModeRestrictionMessage,
+            resultRestrictionMessage: signResultRestrictionMessage
+        )
+    }
+
+    func verifyConfiguration() -> VerifyView.Configuration {
+        VerifyView.Configuration(
+            allowsCleartextFileImport: false,
+            allowsDetachedOriginalImport: false,
+            allowsDetachedSignatureImport: false,
+            cleartextFileRestrictionMessage: textImportRestrictionMessage,
+            detachedFileRestrictionMessage: detachedVerifyRestrictionMessage
+        )
     }
 
     func backupConfiguration(isActiveModule: Bool) -> BackupKeyView.Configuration {
@@ -118,6 +146,34 @@ struct TutorialConfigurationFactory {
                 localized: "guidedTutorial.settings.restricted.appIcon",
                 defaultValue: "App Icon changes affect the real app and are unavailable inside the tutorial sandbox."
             )
+        )
+    }
+
+    private var fileModeRestrictionMessage: String {
+        String(
+            localized: "guidedTutorial.restricted.fileMode",
+            defaultValue: "Real file import and export are unavailable in the tutorial sandbox. Use Text mode to keep exploring this page safely."
+        )
+    }
+
+    private var textImportRestrictionMessage: String {
+        String(
+            localized: "guidedTutorial.restricted.textImport",
+            defaultValue: "Real file import is unavailable in the tutorial sandbox. Paste text directly to keep exploring this page safely."
+        )
+    }
+
+    private var signResultRestrictionMessage: String {
+        String(
+            localized: "guidedTutorial.restricted.signResult",
+            defaultValue: "Tutorial sandbox output cannot be copied to the clipboard or saved to a real destination."
+        )
+    }
+
+    private var detachedVerifyRestrictionMessage: String {
+        String(
+            localized: "guidedTutorial.restricted.detachedVerify",
+            defaultValue: "Detached file verification is unavailable in the tutorial sandbox. Use Cleartext mode to keep exploring this page safely."
         )
     }
 }

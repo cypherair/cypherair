@@ -304,16 +304,137 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertTrue(try interceptor.interceptDataExport?(Data("demo".utf8), "demo.asc", .ciphertext) == true)
     }
 
-    func test_blocklist_blocksUnsafeRoutesAndRoots() {
+    func test_blocklist_blocksUnsafeRoutes_withoutBlockingSignAndVerifyRoots() {
         let blocklist = TutorialUnsafeRouteBlocklist()
 
         XCTAssertNotNil(blocklist.blockedRoute(for: .importKey))
         XCTAssertNotNil(blocklist.blockedRoute(for: .qrPhotoImport))
         XCTAssertNotNil(blocklist.blockedRoute(for: .selfTest))
         XCTAssertNotNil(blocklist.blockedRoute(for: .appIcon))
-        XCTAssertNotNil(blocklist.blockedRoot(for: .sign))
-        XCTAssertNotNil(blocklist.blockedRoot(for: .verify))
+        XCTAssertNil(blocklist.blockedRoot(for: .sign))
+        XCTAssertNil(blocklist.blockedRoot(for: .verify))
         XCTAssertNil(blocklist.blockedRoute(for: .encrypt))
+    }
+
+    func test_tutorialConfigurationFactory_unifiesToolPages_withRealModesAndRestrictedFileCapabilities() {
+        let store = TutorialSessionStore()
+        let factory = store.configurationFactory
+
+        let encryptConfiguration = factory.encryptConfiguration(isActiveModule: false)
+        XCTAssertFalse(encryptConfiguration.allowsClipboardWrite)
+        XCTAssertFalse(encryptConfiguration.allowsResultExport)
+        XCTAssertFalse(encryptConfiguration.allowsFileInput)
+        XCTAssertFalse(encryptConfiguration.allowsFileResultExport)
+        XCTAssertNotNil(encryptConfiguration.fileRestrictionMessage)
+
+        let decryptConfiguration = factory.decryptConfiguration(isActiveModule: false)
+        XCTAssertFalse(decryptConfiguration.allowsTextFileImport)
+        XCTAssertFalse(decryptConfiguration.allowsFileInput)
+        XCTAssertFalse(decryptConfiguration.allowsFileResultExport)
+        XCTAssertNotNil(decryptConfiguration.textFileRestrictionMessage)
+        XCTAssertNotNil(decryptConfiguration.fileRestrictionMessage)
+
+        let signConfiguration = factory.signConfiguration()
+        XCTAssertFalse(signConfiguration.allowsClipboardWrite)
+        XCTAssertFalse(signConfiguration.allowsTextResultExport)
+        XCTAssertFalse(signConfiguration.allowsFileInput)
+        XCTAssertFalse(signConfiguration.allowsFileResultExport)
+        XCTAssertNotNil(signConfiguration.fileRestrictionMessage)
+        XCTAssertNotNil(signConfiguration.resultRestrictionMessage)
+
+        let verifyConfiguration = factory.verifyConfiguration()
+        XCTAssertFalse(verifyConfiguration.allowsCleartextFileImport)
+        XCTAssertFalse(verifyConfiguration.allowsDetachedOriginalImport)
+        XCTAssertFalse(verifyConfiguration.allowsDetachedSignatureImport)
+        XCTAssertNotNil(verifyConfiguration.cleartextFileRestrictionMessage)
+        XCTAssertNotNil(verifyConfiguration.detachedFileRestrictionMessage)
+    }
+
+    func test_tutorialGuidanceResolver_completedModule_returnsCompletionStatePayload() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.markCompletedForTesting(.createDemoIdentity)
+
+        let payload = try XCTUnwrap(
+            TutorialGuidanceResolver().guidance(
+                session: store.session,
+                navigation: store.navigation,
+                sizeClass: .compact,
+                selectedTab: store.selectedTab
+            )
+        )
+
+        XCTAssertEqual(payload.module, .createDemoIdentity)
+        XCTAssertEqual(payload.state, .completed)
+        XCTAssertNil(payload.target)
+        XCTAssertEqual(
+            payload.body,
+            String(
+                localized: "guidedTutorial.task.complete",
+                defaultValue: "This task is complete. Return to the tutorial overview to continue."
+            )
+        )
+    }
+
+    func test_tutorialGuidanceResolver_completedFinalModule_returnsFinalCompletionPayload() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        for module in TutorialModuleID.allCases where module != .enableHighSecurity {
+            store.markCompletedForTesting(module)
+        }
+        await store.openModule(.enableHighSecurity)
+        store.markCompletedForTesting(.enableHighSecurity)
+
+        let payload = try XCTUnwrap(
+            TutorialGuidanceResolver().guidance(
+                session: store.session,
+                navigation: store.navigation,
+                sizeClass: .compact,
+                selectedTab: store.selectedTab
+            )
+        )
+
+        XCTAssertEqual(payload.module, .enableHighSecurity)
+        XCTAssertEqual(payload.state, .completed)
+        XCTAssertNil(payload.target)
+        XCTAssertEqual(
+            payload.body,
+            String(
+                localized: "guidedTutorial.task.complete.final",
+                defaultValue: "This task is complete. Return to the tutorial overview to review completion and finish the tutorial."
+            )
+        )
+    }
+
+    func test_tutorialGuidanceResolver_activeModal_returnsNil() async {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.presentLeaveConfirmation(onLeave: { })
+
+        let payload = TutorialGuidanceResolver().guidance(
+            session: store.session,
+            navigation: store.navigation,
+            sizeClass: .compact,
+            selectedTab: store.selectedTab
+        )
+
+        XCTAssertNil(payload)
+    }
+
+    func test_toolViews_removeModeAllowlistAndAppearResetPatterns() throws {
+        let rootURL = repositoryRootURL()
+        let files = [
+            "Sources/App/Encrypt/EncryptView.swift",
+            "Sources/App/Decrypt/DecryptView.swift",
+            "Sources/App/Sign/SignView.swift",
+            "Sources/App/Sign/VerifyView.swift",
+        ]
+
+        for path in files {
+            let contents = try String(contentsOf: rootURL.appending(path: path), encoding: .utf8)
+            XCTAssertFalse(contents.contains("allowedModes"), "\(path) should not use mode allowlists")
+            XCTAssertFalse(contents.contains("= configuration.allowedModes.first"), "\(path) should not reset mode on appear")
+        }
     }
 
     func test_tutorialConfigurationFactory_settingsConfiguration_disablesRestrictedEntries() {
@@ -353,9 +474,91 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNotEqual(store.container?.defaultsSuiteName, oldSuite)
     }
 
+    func test_onboardingLocalizedKeys_existInCatalogAndAreFullyTranslated() throws {
+        let rootURL = repositoryRootURL()
+        let catalogURL = rootURL.appending(path: "Sources/Resources/Localizable.xcstrings")
+        let sourceURL = rootURL.appending(path: "Sources/App/Onboarding", directoryHint: .isDirectory)
+
+        let catalogData = try Data(contentsOf: catalogURL)
+        let catalog = try JSONDecoder().decode(StringCatalog.self, from: catalogData)
+        let keys = try localizedKeys(in: sourceURL)
+
+        XCTAssertFalse(keys.isEmpty)
+
+        for key in keys.sorted() {
+            let entry = try XCTUnwrap(catalog.strings[key], "Missing catalog entry for \(key)")
+
+            guard key.hasPrefix("guidedTutorial.") || key.hasPrefix("onboarding.") || key.hasPrefix("tutorial.") else {
+                continue
+            }
+
+            let locales = Set(entry.localizations.keys)
+            XCTAssertTrue(
+                locales.isSuperset(of: ["en", "zh-Hans"]),
+                "\(key) is missing required tutorial locales"
+            )
+            XCTAssertNotEqual(entry.extractionState, "stale", "\(key) should not be stale")
+        }
+    }
+
     private func startTutorialSession(_ store: TutorialSessionStore) async {
         await store.openModule(.sandbox)
         store.confirmSandboxAcknowledgement()
         await Task.yield()
     }
+
+    private func repositoryRootURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    private func localizedKeys(in directoryURL: URL) throws -> Set<String> {
+        let expression = try NSRegularExpression(pattern: #"localized:\s*"([^"]+)""#)
+        var keys = Set<String>()
+
+        let enumerator = FileManager.default.enumerator(
+            at: directoryURL,
+            includingPropertiesForKeys: nil
+        )
+
+        while let fileURL = enumerator?.nextObject() as? URL {
+            guard fileURL.pathExtension == "swift" else { continue }
+
+            let contents = try String(contentsOf: fileURL, encoding: .utf8)
+            let range = NSRange(contents.startIndex..<contents.endIndex, in: contents)
+            let matches = expression.matches(in: contents, range: range)
+
+            for match in matches {
+                guard
+                    let keyRange = Range(match.range(at: 1), in: contents)
+                else {
+                    continue
+                }
+
+                keys.insert(String(contents[keyRange]))
+            }
+        }
+
+        return keys
+    }
+}
+
+private struct StringCatalog: Decodable {
+    let strings: [String: StringCatalogEntry]
+}
+
+private struct StringCatalogEntry: Decodable {
+    let extractionState: String?
+    let localizations: [String: StringCatalogLocalization]
+}
+
+private struct StringCatalogLocalization: Decodable {
+    let stringUnit: StringCatalogStringUnit?
+}
+
+private struct StringCatalogStringUnit: Decodable {
+    let state: String
+    let value: String
 }
