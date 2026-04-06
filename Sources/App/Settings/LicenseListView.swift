@@ -47,6 +47,10 @@ struct LicenseListView: View {
                 #endif
             }
         }
+        .searchable(
+            text: $searchText,
+            prompt: Text(String(localized: "license.search", defaultValue: "Search components"))
+        )
         .accessibilityIdentifier("license.root")
         .screenReady("license.ready")
         .navigationTitle(String(localized: "license.title", defaultValue: "Licenses"))
