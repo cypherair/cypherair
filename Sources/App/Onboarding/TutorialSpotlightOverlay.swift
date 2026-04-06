@@ -9,12 +9,6 @@ enum TutorialAnchorID: Hashable {
     case keyDetailBackupButton
     case settingsAuthModePicker
     case settingsModeConfirmButton
-    case tutorialPrimaryAction
-    case tutorialReturnButton
-    case tutorialCloseButton
-    case tutorialFinishButton
-    case tutorialModalConfirmButton
-    case tutorialGuidanceRestoreButton
 }
 
 private struct TutorialAnchorPreferenceKey: PreferenceKey {

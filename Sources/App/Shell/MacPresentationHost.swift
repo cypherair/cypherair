@@ -5,7 +5,6 @@ private struct MacPresentationHostModifier: ViewModifier {
 
     @Environment(AppConfiguration.self) private var config
     @Environment(TutorialSessionStore.self) private var tutorialStore
-    @Environment(TutorialPresentationCoordinator.self) private var tutorialPresentationCoordinator
 
     func body(content: Content) -> some View {
         content
@@ -46,13 +45,10 @@ private struct MacPresentationHostModifier: ViewModifier {
                         .interactiveDismissDisabled(!config.hasCompletedOnboarding)
                         .presentationSizing(.page)
                 case .tutorial(let presentationContext):
-                    Color.clear
-                        .task {
-                            tutorialPresentationCoordinator.presentMacTutorial(
-                                origin: presentationContext == .onboardingFirstRun ? .onboardingFirstRun : .inApp
-                            )
-                            activePresentation = nil
-                        }
+                    TutorialView(presentationContext: presentationContext)
+                        .environment(config)
+                        .environment(tutorialStore)
+                        .presentationSizing(.page)
                 }
             }
     }

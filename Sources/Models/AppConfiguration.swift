@@ -1,7 +1,7 @@
 import Foundation
 
 enum GuidedTutorialVersion {
-    static let current = 3
+    static let current = 2
 }
 
 enum GuidedTutorialCompletionState: Equatable {
@@ -69,20 +69,6 @@ final class AppConfiguration {
         }
     }
 
-    /// The tutorial spec version associated with `guidedTutorialCompletedModules`.
-    var guidedTutorialCompletedModulesVersion: Int {
-        didSet {
-            defaults.set(guidedTutorialCompletedModulesVersion, forKey: Self.guidedTutorialCompletedModulesVersionKey)
-        }
-    }
-
-    /// Completed advanced tutorial modules for the current tutorial spec version.
-    var guidedTutorialCompletedModules: [String] {
-        didSet {
-            defaults.set(guidedTutorialCompletedModules, forKey: Self.guidedTutorialCompletedModulesKey)
-        }
-    }
-
     /// The selected color theme preset.
     var colorTheme: ColorTheme {
         didSet {
@@ -108,8 +94,6 @@ final class AppConfiguration {
     private static let requireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
     private static let onboardingCompleteKey = "com.cypherair.preference.onboardingComplete"
     private static let guidedTutorialCompletedVersionKey = "com.cypherair.preference.guidedTutorialCompletedVersion"
-    private static let guidedTutorialCompletedModulesVersionKey = "com.cypherair.preference.guidedTutorialCompletedModulesVersion"
-    private static let guidedTutorialCompletedModulesKey = "com.cypherair.preference.guidedTutorialCompletedModules"
     private static let colorThemeKey = "com.cypherair.preference.colorTheme"
 
     // MARK: - Initialization
@@ -151,8 +135,6 @@ final class AppConfiguration {
 
         // Guided Tutorial completion
         self.guidedTutorialCompletedVersion = defaults.integer(forKey: Self.guidedTutorialCompletedVersionKey)
-        self.guidedTutorialCompletedModulesVersion = defaults.integer(forKey: Self.guidedTutorialCompletedModulesVersionKey)
-        self.guidedTutorialCompletedModules = defaults.stringArray(forKey: Self.guidedTutorialCompletedModulesKey) ?? []
 
         // Color theme (default: system accent — no tint override)
         if let themeRaw = defaults.string(forKey: Self.colorThemeKey),
@@ -198,19 +180,6 @@ final class AppConfiguration {
 
     func markGuidedTutorialCompletedCurrentVersion() {
         guidedTutorialCompletedVersion = GuidedTutorialVersion.current
-    }
-
-    func normalizeGuidedTutorialModulePersistence() {
-        guard guidedTutorialCompletedModulesVersion != GuidedTutorialVersion.current else { return }
-        guidedTutorialCompletedModulesVersion = GuidedTutorialVersion.current
-        guidedTutorialCompletedModules = []
-    }
-
-    func markGuidedTutorialModuleCompleted(_ identifier: String) {
-        normalizeGuidedTutorialModulePersistence()
-        if !guidedTutorialCompletedModules.contains(identifier) {
-            guidedTutorialCompletedModules.append(identifier)
-        }
     }
 
     /// Available grace period options (in seconds).
