@@ -19,6 +19,9 @@ struct SettingsView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
+    #if os(macOS)
+    @Environment(TutorialPresentationCoordinator.self) private var tutorialPresentationCoordinator
+    #endif
 
     @State private var pendingMode: AuthenticationMode?
     @State private var showModeWarning = false
@@ -26,7 +29,6 @@ struct SettingsView: View {
     @State private var switchError: String?
     @State private var showSwitchError = false
     @State private var showOnboarding = false
-    @State private var showTutorialOnboarding = false
 
     let configuration: Configuration
 
@@ -210,9 +212,6 @@ struct SettingsView: View {
         .sheet(isPresented: $showOnboarding) {
             OnboardingView(presentationContext: .inApp)
         }
-        .sheet(isPresented: $showTutorialOnboarding) {
-            TutorialView(presentationContext: .inApp)
-        }
         #endif
     }
 
@@ -311,12 +310,10 @@ struct SettingsView: View {
     private func presentTutorial() {
         guard configuration.isGuidedTutorialEntryEnabled else { return }
         #if !os(iOS)
-        if let macPresentationController {
-            macPresentationController.present(.tutorial(presentationContext: .inApp))
-        } else if let iosPresentationController {
+        if let iosPresentationController {
             iosPresentationController.present(.tutorial(presentationContext: .inApp))
         } else {
-            showTutorialOnboarding = true
+            tutorialPresentationCoordinator.presentMacTutorial(origin: .inApp)
         }
         #else
         if let macPresentationController {

@@ -11,6 +11,16 @@
         }
       }
     },
+    "%@/%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@/%2$@"
+          }
+        }
+      }
+    },
     "about.app" : {
       "localizations" : {
         "en" : {
@@ -4223,6 +4233,7 @@
       }
     },
     "guidedTutorial.hero.body" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4239,6 +4250,7 @@
       }
     },
     "guidedTutorial.hero.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4479,6 +4491,7 @@
       }
     },
     "guidedTutorial.onboarding.entry" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4624,6 +4637,7 @@
       }
     },
     "guidedTutorial.reset" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4864,6 +4878,7 @@
       }
     },
     "guidedTutorial.start" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4880,6 +4895,7 @@
       }
     },
     "guidedTutorial.status.complete" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4896,6 +4912,7 @@
       }
     },
     "guidedTutorial.status.locked" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4912,6 +4929,7 @@
       }
     },
     "guidedTutorial.status.ready" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7029,6 +7047,7 @@
       }
     },
     "onboarding.getStarted" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
