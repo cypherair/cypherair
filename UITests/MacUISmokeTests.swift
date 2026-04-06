@@ -2,34 +2,6 @@ import XCTest
 
 @MainActor
 final class MacUISmokeTests: XCTestCase {
-    private enum TutorialIDs {
-        static let hubReady = "tutorial.hub.ready"
-        static let sandboxReady = "tutorial.module.sandbox.ready"
-        static let demoIdentityReady = "tutorial.module.identity.ready"
-        static let demoContactReady = "tutorial.module.contact.ready"
-        static let encryptReady = "tutorial.module.encrypt.ready"
-        static let decryptReady = "tutorial.module.decrypt.ready"
-        static let backupReady = "tutorial.module.backup.ready"
-        static let coreCompletionReady = "tutorial.completion.core.ready"
-        static let moduleCompletionReady = "tutorial.completion.module.ready"
-        static let leaveConfirmationReady = "tutorial.leave.ready"
-        static let authModalReady = "tutorial.modal.auth.ready"
-
-        static let hubPrimaryAction = "tutorial.hub.primary"
-        static let hubBackupModule = "tutorial.hub.module.backupKey"
-        static let hubDemoIdentityModule = "tutorial.hub.module.demoIdentity"
-        static let hubDemoContactModule = "tutorial.hub.module.demoContact"
-        static let hubEncryptModule = "tutorial.hub.module.encryptMessage"
-        static let hubDecryptModule = "tutorial.hub.module.decryptAndVerify"
-        static let closeButton = "tutorial.close"
-        static let primaryAction = "tutorial.primaryAction"
-        static let returnButton = "tutorial.return"
-        static let exploreAdvanced = "tutorial.exploreAdvanced"
-        static let leaveContinue = "tutorial.leave.continue"
-        static let leaveConfirm = "tutorial.leave.confirm"
-        static let modalConfirm = "tutorial.modal.confirm"
-    }
-
     private var app: XCUIApplication!
     private let manualAuthenticationTimeout: TimeInterval = 45
     private let requiresManualAuthentication =
@@ -118,40 +90,31 @@ final class MacUISmokeTests: XCTestCase {
         XCTAssertTrue(element("settings.mode.confirm").exists)
     }
 
-    func test_tutorialRoot_startsCoreTutorialFromHub() throws {
-        launchTutorial()
+    func test_tutorial_generateAlice_opensKeyDetailFromKeyReady() throws {
+        launchTutorial(task: "generateAliceKey")
+        generateTutorialKey()
 
-        element(TutorialIDs.hubPrimaryAction).tap()
+        element("postgen.keyDetail").tap()
 
-        waitForScreenReady(TutorialIDs.sandboxReady)
+        waitForScreenReady("keydetail.ready")
     }
 
-    func test_tutorialCore_inProgressCloseShowsLeaveConfirmation() throws {
-        launchTutorial()
-        element(TutorialIDs.hubPrimaryAction).tap()
-        waitForScreenReady(TutorialIDs.sandboxReady)
+    func test_tutorial_generateAlice_opensQRCodeFromKeyReady() throws {
+        launchTutorial(task: "generateAliceKey")
+        generateTutorialKey()
 
-        element(TutorialIDs.closeButton).tap()
+        element("postgen.qr").tap()
 
-        waitForScreenReady(TutorialIDs.leaveConfirmationReady)
-        XCTAssertTrue(element(TutorialIDs.leaveContinue).exists)
-        XCTAssertTrue(element(TutorialIDs.leaveConfirm).exists)
+        waitForScreenReady("qr.ready")
     }
 
-    func test_tutorialCore_completionUnlocksAdvancedModules() throws {
-        launchTutorial(completedCore: true)
+    func test_tutorial_generateAlice_opensBackupFromKeyReady() throws {
+        launchTutorial(task: "generateAliceKey")
+        generateTutorialKey()
 
-        XCTAssertTrue(element(TutorialIDs.hubBackupModule).exists)
-    }
+        element("postgen.backup").tap()
 
-    func test_tutorialAdvancedBackup_canCompleteFromHub() throws {
-        launchTutorial(completedCore: true)
-
-        element(TutorialIDs.hubBackupModule).tap()
-        waitForScreenReady(TutorialIDs.backupReady)
-
-        element(TutorialIDs.primaryAction).tap()
-        waitForScreenReady(TutorialIDs.moduleCompletionReady)
+        waitForScreenReady("backup.ready")
     }
 
     // MARK: - Launch Helpers
@@ -177,19 +140,13 @@ final class MacUISmokeTests: XCTestCase {
         waitForLaunchReadiness(rootReadyID: "settings.ready")
     }
 
-    private func launchTutorial(
-        completedCore: Bool = false,
-        completedModules: [String] = []
-    ) {
+    private func launchTutorial(task: String) {
         app.launchEnvironment["UITEST_ROOT"] = "tutorial"
         app.launchEnvironment["UITEST_SKIP_ONBOARDING"] = "1"
+        app.launchEnvironment["UITEST_TUTORIAL_TASK"] = task
         app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
-        app.launchEnvironment["UITEST_COMPLETE_GUIDED_TUTORIAL"] = completedCore ? "1" : "0"
-        if !completedModules.isEmpty {
-            app.launchEnvironment["UITEST_COMPLETED_TUTORIAL_MODULES"] = completedModules.joined(separator: ",")
-        }
         app.launch()
-        waitForLaunchReadiness(rootReadyID: TutorialIDs.hubReady)
+        waitForLaunchReadiness(rootReadyID: "tutorial.ready")
     }
 
     // MARK: - Flow Helpers
@@ -207,40 +164,17 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("postgen.ready", timeout: 15)
     }
 
-    private func completeCoreTutorial() {
-        element(TutorialIDs.hubPrimaryAction).tap()
-        waitForScreenReady(TutorialIDs.sandboxReady)
-        element(TutorialIDs.primaryAction).tap()
-        waitForScreenReady(TutorialIDs.hubReady)
+    private func generateTutorialKey() {
+        if element("tutorial.sidebar.keys").waitForExistence(timeout: 5) {
+            element("tutorial.sidebar.keys").tap()
+        }
+        XCTAssertTrue(element("keys.generate").waitForExistence(timeout: 10))
+        element("keys.generate").tap()
 
-        element(TutorialIDs.hubDemoIdentityModule).tap()
-        waitForScreenReady(TutorialIDs.demoIdentityReady)
-        element(TutorialIDs.primaryAction).tap()
-        waitForScreenReady(TutorialIDs.demoIdentityReady)
-        element(TutorialIDs.returnButton).tap()
-        waitForScreenReady(TutorialIDs.hubReady)
+        waitForScreenReady("keygen.ready")
+        app.buttons["Generate Key"].tap()
 
-        element(TutorialIDs.hubDemoContactModule).tap()
-        waitForScreenReady(TutorialIDs.demoContactReady)
-        element(TutorialIDs.primaryAction).tap()
-        waitForScreenReady(TutorialIDs.demoContactReady)
-        element(TutorialIDs.returnButton).tap()
-        waitForScreenReady(TutorialIDs.hubReady)
-
-        element(TutorialIDs.hubEncryptModule).tap()
-        waitForScreenReady(TutorialIDs.encryptReady)
-        element(TutorialIDs.primaryAction).tap()
-        waitForScreenReady(TutorialIDs.encryptReady)
-        element(TutorialIDs.returnButton).tap()
-        waitForScreenReady(TutorialIDs.hubReady)
-
-        element(TutorialIDs.hubDecryptModule).tap()
-        waitForScreenReady(TutorialIDs.decryptReady)
-        element(TutorialIDs.primaryAction).tap()
-        waitForScreenReady(TutorialIDs.decryptReady)
-        element(TutorialIDs.primaryAction).tap()
-        waitForScreenReady(TutorialIDs.authModalReady)
-        element(TutorialIDs.modalConfirm).tap()
+        waitForScreenReady("postgen.ready", timeout: 15)
     }
 
     // MARK: - Element Helpers
@@ -252,7 +186,7 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     private func waitForLaunchReadiness(rootReadyID: String) {
-        let timeout = requiresManualAuthentication ? manualAuthenticationTimeout : 20
+        let timeout = requiresManualAuthentication ? manualAuthenticationTimeout : 10
         let unlocked = element(rootReadyID).waitForExistence(timeout: timeout)
         XCTAssertTrue(
             unlocked,

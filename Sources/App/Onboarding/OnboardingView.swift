@@ -94,8 +94,6 @@ struct OnboardingPageOne: View {
             Spacer()
             Spacer()
         }
-        .accessibilityIdentifier("onboarding.page1")
-        .screenReady(TutorialAutomationContract.Ready.onboardingPageOne)
     }
 }
 
@@ -122,8 +120,6 @@ struct OnboardingPageTwo: View {
             Spacer()
             Spacer()
         }
-        .accessibilityIdentifier("onboarding.page2")
-        .screenReady(TutorialAutomationContract.Ready.onboardingPageTwo)
     }
 }
 
@@ -132,25 +128,25 @@ struct OnboardingPageThree: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
     @Environment(\.iosPresentationController) private var iosPresentationController
-    #if os(macOS)
-    @Environment(TutorialPresentationCoordinator.self) private var tutorialPresentationCoordinator
-    #endif
 
     let presentationContext: OnboardingPresentationContext
+    #if !os(iOS)
+    @State private var showTutorial = false
+    #endif
 
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
 
-            Image(systemName: "testtube.2")
+            Image(systemName: "key.fill")
                 .font(.system(size: 72, weight: .light))
                 .foregroundStyle(.orange)
                 .accessibilityHidden(true)
 
-            Text(String(localized: "onboarding.p3.title", defaultValue: "Choose How You Want to Start"))
+            Text(String(localized: "onboarding.p3.title", defaultValue: "Generate Your Key"))
                 .font(.title.bold())
 
-            Text(String(localized: "onboarding.p3.body", defaultValue: "Take the guided tutorial to learn CypherAir in a safe demo workspace first, or skip it and go straight into the real app."))
+            Text(String(localized: "onboarding.p3.body", defaultValue: "Create your encryption key to start securing your messages. You can choose between Universal (GnuPG compatible) and Advanced (stronger security) profiles."))
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -159,42 +155,58 @@ struct OnboardingPageThree: View {
             Button {
                 presentTutorial()
             } label: {
-                Text(String(localized: "tutorial.onboarding.start", defaultValue: "Start Guided Tutorial"))
+                Text(guidedTutorialEntryTitle)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .padding(.horizontal, 40)
-            .accessibilityIdentifier(TutorialAutomationContract.Identifier.onboardingStartTutorial)
 
             Button {
                 config.hasCompletedOnboarding = true
                 dismiss()
             } label: {
-                Text(String(localized: "tutorial.onboarding.skip", defaultValue: "Skip Tutorial and Enter App"))
+                Text(String(localized: "onboarding.getStarted", defaultValue: "Get Started"))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
             .padding(.horizontal, 40)
-            .accessibilityIdentifier(TutorialAutomationContract.Identifier.onboardingSkipTutorial)
 
             Spacer()
         }
-        .accessibilityIdentifier("onboarding.page3")
-        .screenReady(TutorialAutomationContract.Ready.onboardingPageThree)
+        #if !os(iOS)
+        .sheet(isPresented: $showTutorial) {
+            TutorialView(presentationContext: .onboardingFirstRun) {
+                showTutorial = false
+                dismiss()
+            }
+        }
+        #endif
+    }
+
+    private var guidedTutorialEntryTitle: String {
+        switch config.guidedTutorialCompletionState {
+        case .neverCompleted:
+            String(localized: "guidedTutorial.onboarding.entry", defaultValue: "Open Guided Tutorial")
+        case .completedCurrentVersion:
+            String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
+        case .completedPreviousVersion:
+            String(localized: "guidedTutorial.updated.entry", defaultValue: "Updated Guided Tutorial Available")
+        }
     }
 
     private func presentTutorial() {
         #if os(iOS)
-        iosPresentationController?.dismiss()
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(150))
-            iosPresentationController?.present(.tutorial(presentationContext: .onboardingFirstRun))
+        if let iosPresentationController {
+            iosPresentationController.present(.tutorial(presentationContext: .onboardingFirstRun))
         }
         #else
-        dismiss()
-        tutorialPresentationCoordinator.presentMacTutorial(origin: .onboardingFirstRun)
+        if let iosPresentationController {
+            iosPresentationController.present(.tutorial(presentationContext: .onboardingFirstRun))
+        } else {
+            showTutorial = true
+        }
         #endif
     }
 }

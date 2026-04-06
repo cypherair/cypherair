@@ -18,7 +18,6 @@ struct CypherAirApp: App {
     @State private var pendingKeyUpdateRequest: ContactKeyUpdateConfirmationRequest?
     @State private var loadError: String?
     @State private var tutorialStore = TutorialSessionStore()
-    @State private var tutorialPresentationCoordinator = TutorialPresentationCoordinator()
     @State private var importConfirmationCoordinator = ImportConfirmationCoordinator()
     @State private var launchConfiguration: AppLaunchConfiguration
     #if os(iOS)
@@ -43,12 +42,6 @@ struct CypherAirApp: App {
         }
         if launchConfiguration.shouldSkipOnboarding {
             container.config.hasCompletedOnboarding = true
-        }
-        if launchConfiguration.completeGuidedTutorial {
-            container.config.markGuidedTutorialCompletedCurrentVersion()
-        }
-        for completedModule in launchConfiguration.completedGuidedTutorialModules {
-            container.config.markGuidedTutorialModuleCompleted(completedModule)
         }
         let startupResult = AppStartupCoordinator().performStartup(using: container)
 
@@ -75,7 +68,6 @@ struct CypherAirApp: App {
                     .environment(container.selfTestService)
                     .environment(container.authManager)
                     .environment(tutorialStore)
-                    .environment(tutorialPresentationCoordinator)
                     #if os(iOS)
                     .environment(
                         \.iosPresentationController,
@@ -181,7 +173,6 @@ struct CypherAirApp: App {
             .environment(container.keyManagement)
             .environment(container.selfTestService)
             .environment(tutorialStore)
-            .environment(tutorialPresentationCoordinator)
         }
         #endif
     }
@@ -189,24 +180,18 @@ struct CypherAirApp: App {
     @ViewBuilder
     private var mainWindowContent: some View {
         #if os(macOS)
-        if let request = tutorialPresentationCoordinator.activeMacTutorialRequest {
-            TutorialView(
-                presentationContext: request.origin == .onboardingFirstRun ? .onboardingFirstRun : .inApp
+        switch launchConfiguration.root {
+        case .main:
+            MacAppShellView()
+        case .settings:
+            MacSettingsRootView(
+                launchConfiguration: launchConfiguration
             )
-        } else {
-            switch launchConfiguration.root {
-            case .main:
-                MacAppShellView()
-            case .settings:
-                MacSettingsRootView(
-                    launchConfiguration: launchConfiguration
-                )
-            case .tutorial:
-                TutorialView(
-                    presentationContext: .inApp,
-                    initialTask: launchConfiguration.tutorialTask
-                )
-            }
+        case .tutorial:
+            TutorialView(
+                presentationContext: .inApp,
+                initialTask: launchConfiguration.tutorialTask
+            )
         }
         #else
         ContentView()
@@ -336,8 +321,6 @@ struct AppLaunchConfiguration {
     let isUITestMode: Bool
     let requiresManualAuthentication: Bool
     let opensAuthModeConfirmation: Bool
-    let completeGuidedTutorial: Bool
-    let completedGuidedTutorialModules: [String]
 
     init(processInfo: ProcessInfo = .processInfo) {
         let environment = processInfo.environment
@@ -346,10 +329,6 @@ struct AppLaunchConfiguration {
         self.requiresManualAuthentication = environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
         self.opensAuthModeConfirmation = environment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] == "1"
         self.shouldSkipOnboarding = environment["UITEST_SKIP_ONBOARDING"] == "1" || root != .main
-        self.completeGuidedTutorial = environment["UITEST_COMPLETE_GUIDED_TUTORIAL"] == "1"
-        self.completedGuidedTutorialModules = environment["UITEST_COMPLETED_TUTORIAL_MODULES"]?
-            .split(separator: ",")
-            .map { String($0) } ?? []
         self.tutorialTask = environment["UITEST_TUTORIAL_TASK"].flatMap { value in
             switch value {
             case "understandSandbox": .understandSandbox
