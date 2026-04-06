@@ -14,6 +14,7 @@ struct DecryptView: View {
         var allowsFileResultExport = true
         var textFileRestrictionMessage: String?
         var fileRestrictionMessage: String?
+        var outputInterceptionPolicy: OutputInterceptionPolicy = .passthrough
         var onParsed: (@MainActor (DecryptionService.Phase1Result) -> Void)?
         var onDecrypted: (@MainActor (Data, SignatureVerification) -> Void)?
 
@@ -48,7 +49,6 @@ struct DecryptView: View {
 
     @Environment(DecryptionService.self) private var decryptionService
     @Environment(AppConfiguration.self) private var config
-    @Environment(\.tutorialSideEffectInterceptor) private var tutorialSideEffectInterceptor
 
     let configuration: Configuration
 
@@ -214,7 +214,7 @@ struct DecryptView: View {
                                 )
                                 return
                             }
-                            if tutorialSideEffectInterceptor?.interceptFileExport?(
+                            if configuration.outputInterceptionPolicy.interceptFileExport?(
                                 url,
                                 decryptedFilename(),
                                 .generic

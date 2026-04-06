@@ -183,28 +183,6 @@ struct TutorialUnsafeRouteBlocklist {
     }
 }
 
-enum TutorialExportKind {
-    case ciphertext
-    case publicKey
-    case revocation
-    case backup
-    case generic
-}
-
-struct TutorialSideEffectInterceptor {
-    var interceptClipboardWrite: (@MainActor (String, AppConfiguration) -> Bool)?
-    var interceptDataExport: (@MainActor (Data, String, TutorialExportKind) throws -> Bool)?
-    var interceptFileExport: (@MainActor (URL, String, TutorialExportKind) -> Bool)?
-
-    static let passthrough = TutorialSideEffectInterceptor()
-}
-
-struct TutorialSurfaceConfiguration {
-    let activeModule: TutorialModuleID?
-    let blocklist: TutorialUnsafeRouteBlocklist
-    let sideEffectInterceptor: TutorialSideEffectInterceptor
-}
-
 struct TutorialSecuritySimulationStack {
     let authManager: AuthenticationManager
     let mockSecureEnclave: MockSecureEnclave
@@ -213,6 +191,7 @@ struct TutorialSecuritySimulationStack {
 }
 
 enum TutorialAutomationContract {
+    static let rootReadyMarker = "tutorial.ready"
     static let hubReadyMarker = "tutorial.hub.ready"
     static let sandboxAcknowledgementReadyMarker = "tutorial.sandbox.ready"
     static let completionReadyMarker = "tutorial.completion.ready"
@@ -323,16 +302,5 @@ enum TutorialModal: Identifiable {
         case .leaveConfirmation(let request):
             "leave-\(request.id.uuidString)"
         }
-    }
-}
-
-private struct TutorialSideEffectInterceptorKey: EnvironmentKey {
-    static let defaultValue: TutorialSideEffectInterceptor? = nil
-}
-
-extension EnvironmentValues {
-    var tutorialSideEffectInterceptor: TutorialSideEffectInterceptor? {
-        get { self[TutorialSideEffectInterceptorKey.self] }
-        set { self[TutorialSideEffectInterceptorKey.self] = newValue }
     }
 }

@@ -21,7 +21,6 @@ struct TutorialMirrorShellView: View {
             .environment(container.qrService)
             .environment(container.selfTestService)
             .environment(container.authManager)
-            .environment(\.tutorialSideEffectInterceptor, tutorialStore.sideEffectInterceptor)
             .screenReady(tutorialStore.currentModule?.readyMarker ?? "tutorial.workspace.ready")
             .onAppear {
                 tutorialStore.noteVisibleSurface(

@@ -55,7 +55,8 @@ struct TutorialConfigurationFactory {
             allowsResultExport: false,
             allowsFileInput: false,
             allowsFileResultExport: false,
-            fileRestrictionMessage: fileModeRestrictionMessage
+            fileRestrictionMessage: fileModeRestrictionMessage,
+            outputInterceptionPolicy: outputInterceptionPolicy
         )
 
         if isActiveModule {
@@ -79,7 +80,8 @@ struct TutorialConfigurationFactory {
             allowsFileInput: false,
             allowsFileResultExport: false,
             textFileRestrictionMessage: textImportRestrictionMessage,
-            fileRestrictionMessage: fileModeRestrictionMessage
+            fileRestrictionMessage: fileModeRestrictionMessage,
+            outputInterceptionPolicy: outputInterceptionPolicy
         )
 
         if isActiveModule {
@@ -103,7 +105,8 @@ struct TutorialConfigurationFactory {
             allowsFileInput: false,
             allowsFileResultExport: false,
             fileRestrictionMessage: fileModeRestrictionMessage,
-            resultRestrictionMessage: signResultRestrictionMessage
+            resultRestrictionMessage: signResultRestrictionMessage,
+            outputInterceptionPolicy: outputInterceptionPolicy
         )
     }
 
@@ -118,7 +121,7 @@ struct TutorialConfigurationFactory {
     }
 
     func backupConfiguration(isActiveModule: Bool) -> BackupKeyView.Configuration {
-        var configuration = BackupKeyView.Configuration(resultSink: .tutorialArtifact)
+        var configuration = BackupKeyView.Configuration(resultPresentation: .inlinePreview)
 
         if isActiveModule {
             configuration.onExported = { [weak store] data in
@@ -127,6 +130,15 @@ struct TutorialConfigurationFactory {
         }
 
         return configuration
+    }
+
+    func keyDetailConfiguration() -> KeyDetailView.Configuration {
+        KeyDetailView.Configuration(
+            allowsPublicKeySave: false,
+            allowsPublicKeyCopy: false,
+            allowsRevocationExport: false,
+            outputInterceptionPolicy: outputInterceptionPolicy
+        )
     }
 
     func settingsConfiguration() -> SettingsView.Configuration {
@@ -175,5 +187,9 @@ struct TutorialConfigurationFactory {
             localized: "guidedTutorial.restricted.detachedVerify",
             defaultValue: "Detached file verification is unavailable in the tutorial sandbox. Use Cleartext mode to keep exploring this page safely."
         )
+    }
+
+    private var outputInterceptionPolicy: OutputInterceptionPolicy {
+        store.outputInterceptionPolicy ?? .passthrough
     }
 }

@@ -167,7 +167,6 @@ struct TutorialSurfaceView<Content: View>: View {
 
     var body: some View {
         content()
-            .environment(\.tutorialSideEffectInterceptor, tutorialStore.sideEffectInterceptor)
             #if canImport(UIKit)
             .tutorialInlineHeaderHost(context: inlineHeaderContext)
             #endif

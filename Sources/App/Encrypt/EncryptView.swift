@@ -42,6 +42,7 @@ struct EncryptView: View {
         var allowsFileInput = true
         var allowsFileResultExport = true
         var fileRestrictionMessage: String?
+        var outputInterceptionPolicy: OutputInterceptionPolicy = .passthrough
         var onEncrypted: (@MainActor (Data) -> Void)?
 
         static let `default` = Configuration()
@@ -65,7 +66,6 @@ struct EncryptView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(ContactService.self) private var contactService
     @Environment(AppConfiguration.self) private var config
-    @Environment(\.tutorialSideEffectInterceptor) private var tutorialSideEffectInterceptor
 
     let configuration: Configuration
 
@@ -258,7 +258,11 @@ struct EncryptView: View {
 
                     Button {
                         if configuration.allowsClipboardWrite,
-                           tutorialSideEffectInterceptor?.interceptClipboardWrite?(ciphertextString, config) != true {
+                           configuration.outputInterceptionPolicy.interceptClipboardCopy?(
+                               ciphertextString,
+                               config,
+                               .ciphertext
+                           ) != true {
                             operation.copyToClipboard(ciphertextString, config: config)
                         }
                     } label: {
@@ -272,7 +276,7 @@ struct EncryptView: View {
                     Button {
                         guard configuration.allowsResultExport else { return }
                         do {
-                            if try tutorialSideEffectInterceptor?.interceptDataExport?(
+                            if try configuration.outputInterceptionPolicy.interceptDataExport?(
                                 ciphertext,
                                 "encrypted.asc",
                                 .ciphertext
@@ -320,7 +324,7 @@ struct EncryptView: View {
                                 )
                                 return
                             }
-                            if tutorialSideEffectInterceptor?.interceptFileExport?(
+                            if configuration.outputInterceptionPolicy.interceptFileExport?(
                                 url,
                                 (selectedFileName ?? "file") + ".gpg",
                                 .ciphertext

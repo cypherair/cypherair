@@ -94,7 +94,7 @@ Highest-signal findings:
 | 6.4 | Demo contact module must use real contact-import flow with dangerous import surfaces disabled/intercepted | `AddContactView` reused with `.paste` only and verified import confirmation flow | 符合 | None | None |
 | 6.5 | Encrypt module must use real encrypt page and intercept dangerous clipboard/export effects | `EncryptView` reused with tutorial config and side-effect interceptor | 符合 | None | None |
 | 6.6 | Decrypt module must use real decrypt page and preserve auth-sensitive flow semantics | `DecryptView` reused with tutorial config and sandbox dependencies; real biometric runtime behavior not exercised here | 部分符合 | P1 | Add auth-sensitive runtime/UI coverage for tutorial decrypt path |
-| 6.7 | Backup module must use real backup page and replace export sink with tutorial-local artifact | `BackupKeyView` reused with `resultSink: .tutorialArtifact` and tutorial export callback | 符合 | None | None |
+| 6.7 | Backup module must use real backup page and replace export sink with tutorial-local artifact | `BackupKeyView` reused with inline preview result presentation and tutorial export callback | 符合 | None | None |
 | 6.8 | High Security module must use real settings/auth flow with isolated security plumbing and auth-sensitive continuity | `SettingsView` reused inside tutorial with tutorial config and isolated `AuthenticationManager`; continuity and runtime auth proof remain incomplete | 部分符合 | P1 | Add explicit tutorial auth-flow validation and modal continuity improvements |
 | 6.9 | Completion surface must confirm completion, untouched real workspace, and next real step | `TutorialView.completionView` | 符合 | None | None |
 

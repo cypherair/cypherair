@@ -25,6 +25,7 @@ struct TutorialView: View {
     @ViewBuilder
     var body: some View {
         rootContent
+            .screenReady(TutorialAutomationContract.rootReadyMarker)
             .sheet(item: activeModalBinding) { modal in
                 modalView(for: modal)
             }
