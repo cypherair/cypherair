@@ -236,6 +236,8 @@ This model intentionally balances privacy and usability:
 - better usability than prompting for biometrics every time the user opens Contacts or Encrypt
 - better fit for social-graph-sensitive data than partial protection of only labels or metadata
 
+This model is explicitly tied to the app's authenticated session rather than to per-view or per-operation access. The vault is not assumed to be synchronously available as plaintext at cold launch before authentication has succeeded. Instead, vault availability follows the app's launch and resume authentication lifecycle.
+
 ### 5.4 Explicitly Rejected Alternatives
 
 The following approaches are intentionally not the target architecture:
@@ -252,12 +254,39 @@ Private-key operations justify per-operation gating because they protect secret 
 
 The vault's master key is expected to be protected by Keychain. The session-unlocked model allows the app to reuse existing app authentication rather than introducing a second persistent prompts layer for normal Contacts use.
 
+At the planning level, the required semantics are:
+
+- the vault master key is Keychain-protected
+- the vault follows session-auth-gated behavior tied to app launch and resume authentication
+- the vault does not adopt the private-key model of per-operation gating
+- the vault is not intended to inherit private-key loss semantics after biometric enrollment changes
+
+This means the contacts vault should be treated as part of the app's authenticated working session, not as a second copy of the private-key protection model.
+
 This document does not define the final cryptographic container format in implementation detail. That is a future TDD concern. It does define the required security posture:
 
 - encrypted at rest
 - session-scoped unlock
 - no plaintext contacts source of truth on disk
 - no reopening of the storage direction in future documents unless explicitly re-approved
+
+Future TDD work must still define the concrete Keychain policy details, including accessibility class, `ThisDeviceOnly` behavior, and the exact relationship between vault-key accessibility, `requireAuthOnLaunch`, and grace-period relocking. However, those later details must remain inside the direction established here: the contacts vault is session-auth-gated and does not follow the private-key survivability semantics of authentication modes.
+
+### 5.6 Relationship To Authentication Modes
+
+The contacts vault design must remain compatible with a future world in which the app exposes three authentication modes:
+
+- `Standard`
+- `High Security`
+- `Special Security Mode`
+
+The contacts vault does not redefine those modes and does not change their private-key behavior. Instead, the planning assumption is:
+
+- authentication modes continue to govern private-key access semantics
+- the contacts vault continues to follow app session authentication semantics
+- `Special Security Mode` may strengthen private-key access guarantees, but it does not change the contacts vault into a biometric-enrollment-bound asset that becomes unrecoverable after enrollment reset
+
+This boundary is important. The contacts vault protects social-graph-sensitive relationship data, but it is still intended to unlock and relock with the app's authenticated session rather than mirror the recoverability profile of private keys.
 
 ## 6. Storage And Data Model Direction
 
@@ -328,6 +357,23 @@ The vault must be versioned from the start. This document does not prescribe a f
 
 Later technical design work must treat versioning as a first-class requirement, not as an afterthought.
 
+### 6.6 Legacy Storage Retirement
+
+The encrypted vault becomes the sole source of truth only after migration has fully succeeded. Until then, the legacy plaintext storage remains authoritative.
+
+After a successful migration and validated cutover:
+
+- the legacy `.gpg` files must be retired
+- the legacy `contact-metadata.json` file must be retired
+- legacy plaintext storage must be deleted in the same migration completion path that commits the new vault as authoritative
+
+This creates two simultaneous rules:
+
+- before success: legacy data must not be deleted
+- after success: legacy plaintext data must not remain on disk as a long-term fallback source
+
+The purpose of this rule is to align migration behavior with the stated privacy goal that no plaintext contacts source of truth remains on disk after the vault architecture is in effect.
+
 ## 7. Service And Runtime Architecture
 
 ### 7.1 UI-Facing Boundary
@@ -367,7 +413,55 @@ The internal Contacts runtime is divided into four planned components.
 | `ContactsMigrationCoordinator` | Import from legacy `.gpg + JSON` storage, conservative cutover, and migration fallback behavior |
 | `ContactsSearchIndex` | In-memory search, filtering, and stable ordering over the unlocked contacts runtime state |
 
-### 7.4 Deliberately Deferred Service Splits
+### 7.4 Locked-State Runtime Behavior
+
+The contacts vault must have an explicit locked runtime state. When the vault is locked, the app must not pretend that the user simply has zero contacts.
+
+Required planning-level behavior:
+
+- `Contacts` shows an explicit locked state rather than an empty contacts list
+- `Encrypt` shows an explicit locked recipient state rather than an empty recipient list
+- the user is given an unlock or retry path
+- selection and management actions that depend on unlocked contacts data remain unavailable until unlock succeeds
+
+This avoids two implementation failures:
+
+1. treating a security lock as if it were an empty dataset
+2. forcing future implementation to choose between silent failure and accidental plaintext preload
+
+### 7.5 Authentication Timing And Vault Availability
+
+Current app behavior performs contact loading during startup and performs re-authentication later through the privacy-screen resume flow. The future contacts vault design must bridge those two timing models explicitly.
+
+The planning requirement is:
+
+- the contacts vault is not assumed to preload into an unlocked plaintext runtime state during cold startup
+- successful launch authentication or resume authentication enables vault unlock
+- grace-period expiry, app lock, or session loss must relock the vault and invalidate any unlocked search/index state
+
+Later technical design work must decide the exact mechanics, but it must preserve the product semantics above and the explicit locked-state behavior described here.
+
+### 7.6 Contacts-Dependent Decrypt And Verify Behavior
+
+Some decrypt and verify flows do not merely display contacts data. They actively depend on contacts data for:
+
+- verification key collection
+- signer-contact lookup
+- signer identity resolution
+
+For those flows, a locked contacts vault is a blocking condition rather than a soft degradation state.
+
+Required planning-level behavior:
+
+- contacts-aware `Decrypt` requires the contacts vault to be unlocked before the operation proceeds
+- contacts-aware `Verify` paths follow the same rule for consistency
+- if unlock is required and the user cancels or authentication fails, the operation does not continue
+- the app must not silently continue and downgrade signer recognition to `unknown signer`
+- the app must not treat a locked contacts vault as if contacts verification inputs were simply absent
+
+This preserves the meaning of signer identity recognition as a supported feature rather than turning it into an opportunistic best-effort behavior under lock conditions.
+
+### 7.7 Deliberately Deferred Service Splits
 
 Tags and recipient lists are intentionally not promoted to their own top-level services at this stage. The planning assumption is that they remain coordinated inside the Contacts subsystem through `ContactService` and the runtime vault model.
 
@@ -402,6 +496,7 @@ Three planning-level outcomes are expected:
 - legacy metadata is interpreted
 - a valid encrypted vault is built
 - the app switches to the new vault as source of truth
+- the legacy plaintext `.gpg + JSON` storage is deleted immediately after validated cutover succeeds
 
 #### Migration Failure With Fallback
 
@@ -420,12 +515,16 @@ Three planning-level outcomes are expected:
 
 Key replacement is already a meaningful contact lifecycle event and remains so in the new model.
 
-When the user confirms replacement of an existing contact key with a new fingerprint for the same person:
+The current system detects a likely key-update situation when the same `userId` appears with a different fingerprint. In the future model, that heuristic remains only a **candidate detection signal**. It is not, by itself, the authoritative proof that two keys belong to the same person.
+
+The authoritative condition for migrating local organization data is explicit user confirmation that the newly detected key should replace the existing contact.
+
+When the user confirms replacement of an existing contact key with a new fingerprint:
 
 - tag relationships migrate automatically to the replacement fingerprint
 - recipient list membership migrates automatically to the replacement fingerprint
 
-This preserves the user's organization model and avoids turning routine key replacement into a loss of contact structure.
+This preserves the user's organization model and avoids turning routine key replacement into a loss of contact structure, while reducing the risk that automatic metadata migration is triggered by a heuristic match alone.
 
 ## 9. Testing And Validation Scope
 
@@ -476,10 +575,17 @@ Vault validation must cover:
 - successful session unlock
 - relock on app lock or app exit
 - relock after grace period expiration
+- explicit locked-state behavior in `Contacts`
+- explicit locked-state behavior in `Encrypt`
+- no empty-list masquerade when the vault is locked
+- locked-vault `Decrypt` behavior when contacts-aware verification requires unlock
+- locked-vault `Verify` behavior when contacts-aware identity resolution requires unlock
+- cancellation or failed unlock resulting in a hard stop rather than degraded signer recognition
 - clearing in-memory unlock state when access should no longer be allowed
 - failure behavior for invalid vault material
 - failure behavior for wrong key usage
 - failure behavior for corrupted encrypted payloads
+- compatibility with future authentication-mode expansion, including the requirement that `Special Security Mode` does not change the vault into a private-key-style loss-on-biometric-reset asset
 
 ### 9.5 Migration Validation
 
@@ -488,9 +594,12 @@ Migration validation must cover:
 - import from legacy contact files
 - import from legacy JSON metadata
 - successful creation of a new vault from legacy data
+- immediate legacy plaintext deletion after successful validated cutover
 - interrupted migration behavior
 - fallback behavior when migration does not fully succeed
 - cutover behavior only after successful validation
+- candidate detection for key replacement without immediate metadata migration
+- metadata migration only after explicit replacement confirmation
 
 ### 9.6 Regression Validation
 
@@ -502,6 +611,7 @@ The new Contacts model must not regress the existing baseline behavior around:
 - contact deletion
 - encryption recipient selection
 - signer identity recognition during verification
+- decrypt and verify flows requiring contacts unlock rather than silently degrading under locked-vault conditions
 
 Later TDD work must turn this section into a concrete test matrix, but future documentation must preserve this validation scope as the baseline requirement.
 
@@ -544,6 +654,7 @@ Future documents should refine and operationalize this plan. They should not reo
 - session-unlocked encrypted contacts vault as the target protection model
 - single encrypted vault file as the target storage form
 - Keychain-protected vault key
+- session-auth-only vault semantics even in a future world with `Special Security Mode`
 - `ContactService` as a facade over internal runtime components
 - first-launch automatic migration with conservative fallback
 
@@ -568,8 +679,9 @@ For future document authors, the durable planning decisions established here are
 - The target architecture is a session-unlocked encrypted contacts vault
 - The vault is a single encrypted, versioned file under `Application Support`
 - The vault key is Keychain-protected
+- The vault follows app session authentication semantics and explicit locked-state UX
 - `ContactService` remains the UI-facing facade
 - Internal Contacts runtime responsibilities are split across vault storage, vault key management, migration, and search indexing
-- Migration from legacy storage is automatic on first launch and uses conservative fallback
+- Migration from legacy storage is automatic on first launch, uses conservative fallback before success, and deletes legacy plaintext storage immediately after successful cutover
 
 This document is the master planning artifact for future Contacts documentation. It should be read as the baseline from which later Contacts PRD and TDD work will be expanded.

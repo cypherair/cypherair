@@ -298,6 +298,142 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertFalse(merged?.contains("89abcdef") == true)
     }
 
+    func test_appStartupCoordinator_deletedKeyDoesNotRestoreInterruptedModifyExpiryBundle() async throws {
+        let engine = PgpEngine()
+        let mockSE = MockSecureEnclave()
+        let mockKC = MockKeychain()
+        let suiteName = "com.cypherair.startup.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let setupAuthManager = AuthenticationManager(
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            defaults: defaults
+        )
+        let setupKeyManagement = KeyManagementService(
+            engine: engine,
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            authenticator: setupAuthManager,
+            defaults: defaults
+        )
+
+        let identity = try await setupKeyManagement.generateKey(
+            name: "Startup Test",
+            email: "startup@example.com",
+            expirySeconds: nil,
+            profile: .universal,
+            authMode: .standard
+        )
+        let fingerprint = identity.fingerprint
+        let account = KeychainConstants.defaultAccount
+
+        let seKeyData = try mockKC.load(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account
+        )
+        let saltData = try mockKC.load(
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account
+        )
+        let sealedData = try mockKC.load(
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account
+        )
+
+        try mockKC.save(
+            seKeyData,
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try mockKC.save(
+            saltData,
+            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try mockKC.save(
+            sealedData,
+            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+
+        defaults.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        defaults.set(fingerprint, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+
+        try setupKeyManagement.deleteKey(fingerprint: fingerprint)
+
+        let authManager = AuthenticationManager(
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            defaults: defaults
+        )
+        let keyManagement = KeyManagementService(
+            engine: engine,
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            authenticator: authManager,
+            defaults: defaults
+        )
+        let config = AppConfiguration(defaults: defaults)
+        let contactDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirStartupTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: contactDirectory) }
+        let contactService = ContactService(engine: engine, contactsDirectory: contactDirectory)
+        let encryptionService = EncryptionService(
+            engine: engine,
+            keyManagement: keyManagement,
+            contactService: contactService
+        )
+        let decryptionService = DecryptionService(
+            engine: engine,
+            keyManagement: keyManagement,
+            contactService: contactService
+        )
+        let signingService = SigningService(
+            engine: engine,
+            keyManagement: keyManagement,
+            contactService: contactService
+        )
+        let qrService = QRService(engine: engine)
+        let selfTestService = SelfTestService(engine: engine)
+        let container = AppContainer(
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            authManager: authManager,
+            config: config,
+            engine: engine,
+            keyManagement: keyManagement,
+            contactService: contactService,
+            encryptionService: encryptionService,
+            decryptionService: decryptionService,
+            signingService: signingService,
+            qrService: qrService,
+            selfTestService: selfTestService,
+            contactsDirectory: contactDirectory,
+            defaultsSuiteName: suiteName
+        )
+
+        let result = AppStartupCoordinator().performStartup(using: container)
+
+        XCTAssertNil(result.loadError)
+        XCTAssertTrue(keyManagement.keys.isEmpty)
+        XCTAssertFalse(defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+        XCTAssertNil(defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey))
+        XCTAssertFalse(mockKC.exists(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account
+        ))
+        XCTAssertFalse(mockKC.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: account
+        ))
+    }
+
     func test_importedTextInputState_preservesRawData_untilVisibleTextChanges() {
         var state = ImportedTextInputState()
         let text = "-----BEGIN PGP MESSAGE-----\nVersion: Test\n\nabc\n-----END PGP MESSAGE-----"

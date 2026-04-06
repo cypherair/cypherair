@@ -364,30 +364,16 @@ final class KeyManagementService {
 
     // MARK: - Key Deletion
 
-    /// Permanently delete a key and all its Keychain items.
+    /// Permanently delete a key and all of its Keychain items, including
+    /// any pending migration bundles and related crash-recovery state.
     /// Keychain deletions are best-effort: `itemNotFound` is benign (idempotent delete),
     /// but other errors are collected and reported after all items are attempted.
     func deleteKey(fingerprint: String) throws {
-        let services = [
-            KeychainConstants.seKeyService(fingerprint: fingerprint),
-            KeychainConstants.saltService(fingerprint: fingerprint),
-            KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-            KeychainConstants.metadataService(fingerprint: fingerprint)
-        ]
-
-        var deletionErrors: [Error] = []
-        for service in services {
-            do {
-                try keychain.delete(service: service, account: KeychainConstants.defaultAccount)
-            } catch KeychainError.itemNotFound {
-                // Benign: item already absent. Continue.
-            } catch {
-                deletionErrors.append(error)
-            }
-        }
+        let deletionErrors = deleteAllKeychainMaterial(for: fingerprint)
 
         // Always update in-memory state (the key is logically deleted).
         keys.removeAll { $0.fingerprint == fingerprint }
+        clearRecoveryStateIfNeeded(afterDeleting: fingerprint)
 
         // If the deleted key was default, assign a new default
         if !keys.isEmpty && !keys.contains(where: { $0.isDefault }) {
@@ -403,6 +389,49 @@ final class KeyManagementService {
             throw CypherAirError.keychainError(
                 "Partial key deletion: \(deletionErrors.count) item(s) could not be removed — \(firstError.localizedDescription)"
             )
+        }
+    }
+
+    private func deleteAllKeychainMaterial(for fingerprint: String) -> [Error] {
+        var deletionErrors: [Error] = []
+
+        for service in allKeychainServices(for: fingerprint) {
+            do {
+                try keychain.delete(service: service, account: KeychainConstants.defaultAccount)
+            } catch {
+                guard !Self.isItemNotFound(error) else {
+                    continue
+                }
+                deletionErrors.append(error)
+            }
+        }
+
+        return deletionErrors
+    }
+
+    private func allKeychainServices(for fingerprint: String) -> [String] {
+        [
+            KeychainConstants.seKeyService(fingerprint: fingerprint),
+            KeychainConstants.saltService(fingerprint: fingerprint),
+            KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+            KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+            KeychainConstants.metadataService(fingerprint: fingerprint)
+        ]
+    }
+
+    private func clearRecoveryStateIfNeeded(afterDeleting fingerprint: String) {
+        if defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey),
+           defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey) == fingerprint {
+            defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
+            defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        }
+
+        if defaults.bool(forKey: AuthPreferences.rewrapInProgressKey),
+           keys.isEmpty {
+            defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
+            defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
         }
     }
 
@@ -564,5 +593,17 @@ final class KeyManagementService {
         let bundle = try bundleStore.loadBundle(fingerprint: fp)
         let handle = try secureEnclave.reconstructKey(from: bundle.seKeyData)
         return try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fp)
+    }
+
+    private static func isItemNotFound(_ error: Error) -> Bool {
+        if let keychainError = error as? KeychainError,
+           case .itemNotFound = keychainError {
+            return true
+        }
+        if let mockError = error as? MockKeychainError,
+           case .itemNotFound = mockError {
+            return true
+        }
+        return false
     }
 }
