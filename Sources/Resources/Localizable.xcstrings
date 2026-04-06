@@ -4369,13 +4369,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Check the recipients first. The task completes once the sandbox key matches."
+            "value" : "Check the recipients first and make sure the message matches your sandbox key."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先检查收件人。匹配到沙箱密钥后，此任务即完成。"
+            "value" : "先检查收件人，并确认这条消息匹配到你的沙箱密钥。"
           }
         }
       }
