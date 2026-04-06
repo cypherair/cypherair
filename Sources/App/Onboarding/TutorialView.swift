@@ -1,85 +1,52 @@
 import SwiftUI
 
-enum TutorialPresentationContext {
-    case onboardingFirstRun
-    case inApp
-}
-
 struct TutorialView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.iosPresentationController) private var iosPresentationController
+    @Environment(\.macPresentationController) private var macPresentationController
     @Environment(AppConfiguration.self) private var config
     @Environment(TutorialSessionStore.self) private var tutorialStore
 
     let presentationContext: TutorialPresentationContext
-    let initialTask: TutorialTaskID?
+    let initialModule: TutorialModuleID?
     let onTutorialFinished: (@MainActor () -> Void)?
     @State private var hasPreparedPresentation = false
 
     init(
         presentationContext: TutorialPresentationContext = .inApp,
-        initialTask: TutorialTaskID? = nil,
+        initialModule: TutorialModuleID? = nil,
         onTutorialFinished: (@MainActor () -> Void)? = nil
     ) {
         self.presentationContext = presentationContext
-        self.initialTask = initialTask
+        self.initialModule = initialModule
         self.onTutorialFinished = onTutorialFinished
     }
 
     @ViewBuilder
     var body: some View {
-        Group {
-            #if canImport(UIKit)
-            rootContent
-            #else
-            macOSRootContent
-            #endif
-        }
+        rootContent
+            .sheet(item: activeModalBinding) { modal in
+                modalView(for: modal)
+            }
             .task {
                 guard !hasPreparedPresentation else { return }
                 hasPreparedPresentation = true
-                tutorialStore.ensureSession()
                 tutorialStore.configurePersistence(appConfiguration: config)
-                tutorialStore.prepareForPresentation()
-                if let initialTask {
-                    await tutorialStore.openTask(initialTask)
+                tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
+                if let initialModule {
+                    await tutorialStore.openModule(initialModule)
                 }
             }
     }
 
-    #if !canImport(UIKit)
-    private var macOSRootContent: some View {
-        Group {
-            switch tutorialStore.flowPhase {
-            case .sandboxAcknowledgement:
-                TutorialSandboxAcknowledgementView()
-            case .completion:
-                completionView
-            case .overview, .sandbox:
-                tutorialHome
-            }
-        }
-        .sheet(
-            isPresented: Binding(
-                get: { tutorialStore.session.isShellPresented },
-                set: { if !$0 { tutorialStore.returnToOverview() } }
-            )
-        ) {
-            TutorialMirrorShellView()
-                .environment(tutorialStore)
-                .frame(minWidth: 880, minHeight: 640)
-        }
-    }
-    #endif
-
     @ViewBuilder
     private var rootContent: some View {
-        switch tutorialStore.flowPhase {
-        case .overview:
-            tutorialHome
+        switch tutorialStore.hostSurface {
+        case .hub:
+            tutorialHub
         case .sandboxAcknowledgement:
             TutorialSandboxAcknowledgementView()
-        case .sandbox:
+        case .workspace:
             TutorialMirrorShellView()
                 .environment(tutorialStore)
         case .completion:
@@ -87,34 +54,31 @@ struct TutorialView: View {
         }
     }
 
-    private var tutorialHome: some View {
+    private var tutorialHub: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    heroCard
-
-                    ForEach(TutorialPhaseID.allCases) { phase in
-                        phaseCard(phase)
-                    }
+                    promiseCard
+                    moduleMapCard
                 }
                 .padding()
             }
             .navigationTitle(String(localized: "guidedTutorial.title", defaultValue: "Guided Tutorial"))
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "common.done", defaultValue: "Done")) {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "common.close", defaultValue: "Close")) {
                         closeTutorial()
                     }
                 }
             }
-            .screenReady("tutorial.ready")
+            .screenReady(TutorialAutomationContract.hubReadyMarker)
         }
     }
 
-    private var heroCard: some View {
+    private var promiseCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label(
-                String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Sandbox"),
+                String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Tutorial Sandbox"),
                 systemImage: "testtube.2"
             )
             .font(.headline)
@@ -123,8 +87,18 @@ struct TutorialView: View {
             Text(String(localized: "guidedTutorial.hero.title", defaultValue: "Learn CypherAir in a real sandbox"))
                 .font(.title2.weight(.semibold))
 
-            Text(String(localized: "guidedTutorial.hero.body", defaultValue: "This guided tutorial uses the real app UI with isolated sandbox data. Your real keys, contacts, settings, exports, and files are never touched."))
+            Text(String(localized: "guidedTutorial.promise", defaultValue: "This tutorial uses isolated tutorial data in a tutorial workspace. It does not read or write your real keys, contacts, settings, files, exports, or other real workspace content."))
                 .foregroundStyle(.secondary)
+
+            HStack(spacing: 16) {
+                Label(String(localized: "guidedTutorial.time", defaultValue: "4–7 min"), systemImage: "clock")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Label(String(localized: "guidedTutorial.modulesCount", defaultValue: "7 modules"), systemImage: "list.number")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
 
             ProgressView(value: tutorialStore.session.progressValue)
 
@@ -139,14 +113,80 @@ struct TutorialView: View {
                     .accessibilityIdentifier("tutorial.primaryAction")
                 }
 
-                Button(String(localized: "guidedTutorial.reset", defaultValue: "Reset Tutorial")) {
-                    tutorialStore.resetTutorial()
+                if tutorialStore.session.hasStartedSession {
+                    Button(String(localized: "guidedTutorial.reset", defaultValue: "Reset Tutorial")) {
+                        tutorialStore.resetTutorial()
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
             }
         }
         .padding(20)
         .tutorialCardChrome(.hero)
+    }
+
+    private var moduleMapCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(String(localized: "guidedTutorial.modules", defaultValue: "Tutorial Modules"))
+                .font(.headline)
+
+            ForEach(TutorialModuleID.allCases) { module in
+                moduleRow(module)
+            }
+        }
+        .padding(20)
+        .tutorialCardChrome(.standard)
+    }
+
+    private func moduleRow(_ module: TutorialModuleID) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            statusIcon(for: module)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(module.title)
+                    .font(.subheadline.weight(.semibold))
+
+                Text(module.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let location = module.realAppLocation {
+                    Text(location)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            if tutorialStore.canOpen(module) {
+                Button(tutorialStore.isCompleted(module) ? String(localized: "guidedTutorial.review", defaultValue: "Review") : String(localized: "guidedTutorial.openTask", defaultValue: "Open")) {
+                    Task {
+                        await tutorialStore.openModule(module)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier(module.launchControlIdentifier)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func statusIcon(for module: TutorialModuleID) -> some View {
+        Group {
+            if tutorialStore.isCompleted(module) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            } else if tutorialStore.canOpen(module) {
+                Image(systemName: "circle")
+                    .foregroundStyle(.secondary)
+            } else {
+                Image(systemName: "lock.fill")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 20)
     }
 
     private var completionView: some View {
@@ -176,7 +216,7 @@ struct TutorialView: View {
                     .tutorialCardChrome(.hero)
 
                     VStack(alignment: .leading, spacing: 14) {
-                        Text(String(localized: "guidedTutorial.completion.next.header", defaultValue: "Next Steps"))
+                        Text(String(localized: "guidedTutorial.completion.next.header", defaultValue: "Next Step"))
                             .font(.headline)
 
                         Label(
@@ -198,90 +238,33 @@ struct TutorialView: View {
             }
             .navigationTitle(String(localized: "guidedTutorial.title", defaultValue: "Guided Tutorial"))
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "common.done", defaultValue: "Done")) {
-                        finishTutorial()
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "common.close", defaultValue: "Close")) {
+                        closeTutorial()
                     }
                 }
             }
+            .screenReady(TutorialAutomationContract.completionReadyMarker)
         }
-    }
-
-    private func phaseCard(_ phase: TutorialPhaseID) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(phase.title)
-                .font(.headline)
-
-            ForEach(phase.tasks) { task in
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(task.title)
-                            .font(.subheadline.weight(.medium))
-                        Text(taskStatusDescription(task))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    if tutorialStore.isCompleted(task) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                    } else if canOpen(task) {
-                        Button(String(localized: "guidedTutorial.openTask", defaultValue: "Open")) {
-                            Task {
-                                await tutorialStore.openTask(task)
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                    } else {
-                        Image(systemName: "lock.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-        }
-        .padding(20)
-        .tutorialCardChrome(.standard)
-    }
-
-    private func canOpen(_ task: TutorialTaskID) -> Bool {
-        if tutorialStore.isCompleted(task) {
-            return true
-        }
-
-        guard let index = TutorialTaskID.allCases.firstIndex(of: task) else { return false }
-        if index == 0 {
-            return true
-        }
-        let previousTasks = TutorialTaskID.allCases.prefix(index)
-        return previousTasks.allSatisfy { tutorialStore.isCompleted($0) }
-    }
-
-    private func taskStatusDescription(_ task: TutorialTaskID) -> String {
-        if tutorialStore.isCompleted(task) {
-            return String(localized: "guidedTutorial.status.complete", defaultValue: "Completed in this sandbox session")
-        }
-        if canOpen(task) {
-            return String(localized: "guidedTutorial.status.ready", defaultValue: "Ready to start")
-        }
-        return String(localized: "guidedTutorial.status.locked", defaultValue: "Complete earlier steps first")
     }
 
     private var primaryActionTitle: String? {
-        if tutorialStore.session.completedCount > 0,
-           tutorialStore.nextTask != nil {
-            return String(localized: "guidedTutorial.continue", defaultValue: "Continue")
-        }
-
-        switch config.guidedTutorialCompletionState {
-        case .neverCompleted:
-            return tutorialStore.nextTask == nil ? nil : String(localized: "guidedTutorial.start", defaultValue: "Start Guided Tutorial")
-        case .completedCurrentVersion:
-            return String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
-        case .completedPreviousVersion:
-            return String(localized: "guidedTutorial.updated.start", defaultValue: "Start Updated Guided Tutorial")
+        switch tutorialStore.lifecycleState {
+        case .stepsCompleted:
+            return String(localized: "guidedTutorial.reviewCompletion", defaultValue: "Review Completion")
+        case .inProgress:
+            return tutorialStore.nextModule == nil
+                ? String(localized: "guidedTutorial.reviewCompletion", defaultValue: "Review Completion")
+                : String(localized: "guidedTutorial.continue", defaultValue: "Continue Tutorial")
+        case .notStarted, .finished:
+            switch config.guidedTutorialCompletionState {
+            case .neverCompleted:
+                return String(localized: "guidedTutorial.start", defaultValue: "Start Guided Tutorial")
+            case .completedCurrentVersion:
+                return String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
+            case .completedPreviousVersion:
+                return String(localized: "guidedTutorial.updated.start", defaultValue: "Start Updated Guided Tutorial")
+            }
         }
     }
 
@@ -295,31 +278,47 @@ struct TutorialView: View {
     }
 
     private func handlePrimaryHeroAction() async {
-        if tutorialStore.session.completedCount > 0,
-           let nextTask = tutorialStore.nextTask {
-            await tutorialStore.openTask(nextTask)
-            return
-        }
-
-        switch config.guidedTutorialCompletionState {
-        case .neverCompleted:
-            await tutorialStore.openTask(.understandSandbox)
-        case .completedCurrentVersion, .completedPreviousVersion:
-            tutorialStore.resetTutorial()
-            await tutorialStore.openTask(.understandSandbox)
+        switch tutorialStore.lifecycleState {
+        case .stepsCompleted:
+            tutorialStore.showCompletionView()
+        case .inProgress:
+            if let nextModule = tutorialStore.nextModule {
+                await tutorialStore.openModule(nextModule)
+            } else {
+                tutorialStore.showCompletionView()
+            }
+        case .notStarted, .finished:
+            if config.guidedTutorialCompletionState != .neverCompleted {
+                tutorialStore.resetTutorial()
+                tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
+            }
+            await tutorialStore.openModule(.sandbox)
         }
     }
 
     private func finishTutorial() {
-        tutorialStore.dismissCompletionView()
+        tutorialStore.markFinishedTutorial()
         tutorialStore.finishAndCleanupTutorial()
+        dismissTutorial()
+    }
 
-        if presentationContext == .onboardingFirstRun {
-            config.hasCompletedOnboarding = true
+    private func closeTutorial() {
+        if tutorialStore.requiresLeaveConfirmation {
+            tutorialStore.presentLeaveConfirmation {
+                dismissTutorial()
+            }
+            return
         }
 
+        tutorialStore.returnToOverview()
+        dismissTutorial()
+    }
+
+    private func dismissTutorial() {
         if let iosPresentationController {
             iosPresentationController.dismiss()
+        } else if let macPresentationController {
+            macPresentationController.dismiss()
         } else if let onTutorialFinished {
             onTutorialFinished()
         } else {
@@ -327,22 +326,56 @@ struct TutorialView: View {
         }
     }
 
-    private func closeTutorial() {
-        tutorialStore.returnToOverview()
+    private var activeModalBinding: Binding<TutorialModal?> {
+        Binding(
+            get: { tutorialStore.activeModal },
+            set: { if $0 == nil { tutorialStore.dismissModal() } }
+        )
+    }
 
-        switch presentationContext {
-        case .onboardingFirstRun:
-            if let iosPresentationController {
-                iosPresentationController.present(.onboarding(initialPage: 2, context: .firstRun))
-            } else {
-                dismiss()
+    @ViewBuilder
+    private func modalView(for modal: TutorialModal) -> some View {
+        switch modal {
+        case .importConfirmation(let request):
+            ImportConfirmView(
+                keyInfo: request.keyInfo,
+                detectedProfile: request.profile,
+                onImportVerified: {
+                    let action = request.onImportVerified
+                    tutorialStore.dismissModal()
+                    action()
+                },
+                onImportUnverified: request.allowsUnverifiedImport ? {
+                    let action = request.onImportUnverified
+                    tutorialStore.dismissModal()
+                    action()
+                } : nil,
+                onCancel: {
+                    let action = request.onCancel
+                    tutorialStore.dismissModal()
+                    action()
+                }
+            )
+        case .authModeConfirmation(let request):
+            NavigationStack {
+                TutorialAuthModeConfirmationView(request: request)
             }
-        case .inApp:
-            if let iosPresentationController {
-                iosPresentationController.dismiss()
-            } else {
-                dismiss()
+            #if os(macOS)
+            .frame(minWidth: 500, idealWidth: 540, minHeight: 360, idealHeight: 420)
+            #endif
+            #if canImport(UIKit)
+            .presentationDetents([.medium, .large])
+            #endif
+        case .leaveConfirmation(let request):
+            NavigationStack {
+                TutorialLeaveConfirmationView(request: request)
             }
+            #if os(macOS)
+            .frame(minWidth: 480, idealWidth: 520, minHeight: 260, idealHeight: 320)
+            #endif
+            #if canImport(UIKit)
+            .presentationDetents([.medium])
+            #endif
         }
     }
 }

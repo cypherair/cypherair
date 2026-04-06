@@ -11,9 +11,11 @@ import AppKit
 struct KeyDetailView: View {
     let fingerprint: String
 
+    @Environment(AppConfiguration.self) private var config
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.dismiss) private var dismiss
     @Environment(\.macPresentationController) private var macPresentationController
+    @Environment(\.tutorialSideEffectInterceptor) private var tutorialSideEffectInterceptor
 
     @State private var showDeleteConfirmation = false
     @State private var error: CypherAirError?
@@ -110,6 +112,7 @@ struct KeyDetailView: View {
                     Section {
                         if armoredPublicKey != nil {
                             Button {
+                                guard tutorialSideEffectInterceptor == nil else { return }
                                 activeExport = .publicKey
                             } label: {
                                 Label(
@@ -117,6 +120,7 @@ struct KeyDetailView: View {
                                     systemImage: "square.and.arrow.down"
                                 )
                             }
+                            .disabled(tutorialSideEffectInterceptor != nil)
                         }
 
                         NavigationLink(value: AppRoute.qrDisplay(publicKeyData: key.publicKeyData, displayName: key.userId ?? key.shortKeyId)) {
@@ -130,13 +134,15 @@ struct KeyDetailView: View {
                         Button {
                             if let armoredPublicKey,
                                let armoredString = String(data: armoredPublicKey, encoding: .utf8) {
-                                #if canImport(UIKit)
-                                UIPasteboard.general.string = armoredString
-                                #elseif canImport(AppKit)
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(armoredString, forType: .string)
-                                #endif
-                                showCopiedNotice = true
+                                if tutorialSideEffectInterceptor?.interceptClipboardWrite?(armoredString, config) != true {
+                                    #if canImport(UIKit)
+                                    UIPasteboard.general.string = armoredString
+                                    #elseif canImport(AppKit)
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(armoredString, forType: .string)
+                                    #endif
+                                    showCopiedNotice = true
+                                }
                             }
                         } label: {
                             Label(
@@ -144,7 +150,7 @@ struct KeyDetailView: View {
                                 systemImage: "doc.on.doc"
                             )
                         }
-                        .disabled(armoredPublicKey == nil)
+                        .disabled(armoredPublicKey == nil || tutorialSideEffectInterceptor != nil)
                     } header: {
                         Text(String(localized: "keydetail.publicKey", defaultValue: "Public Key"))
                     }
@@ -179,6 +185,7 @@ struct KeyDetailView: View {
 
                         if !key.revocationCert.isEmpty {
                             Button {
+                                guard tutorialSideEffectInterceptor == nil else { return }
                                 activeExport = .revocation
                             } label: {
                                 Label(
@@ -186,6 +193,7 @@ struct KeyDetailView: View {
                                     systemImage: "xmark.seal"
                                 )
                             }
+                            .disabled(tutorialSideEffectInterceptor != nil)
                         }
                     } header: {
                         Text(String(localized: "keydetail.actions", defaultValue: "Actions"))

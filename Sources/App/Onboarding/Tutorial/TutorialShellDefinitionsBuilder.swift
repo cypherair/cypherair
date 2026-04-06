@@ -15,97 +15,64 @@ struct TutorialShellDefinitionsBuilder {
     }
 
     private func root(for tab: AppShellTab) -> AnyView {
-        let factory = store.configurationFactory
+        if let blockedSurface = store.blocklist.blockedRoot(for: tab) {
+            return tutorialHostedRoot(resolver: routeResolver(for: tab), path: store.routePathBinding(for: tab), tab: tab) {
+                TutorialSurfaceView(tab: tab, route: nil) {
+                    TutorialBlockedRouteView(surface: blockedSurface)
+                }
+            }
+        }
+
         let routeResolver = routeResolver(for: tab)
         let pathBinding = store.routePathBinding(for: tab)
-        switch (store.session.activeTask, tab) {
-        case (.composeAndEncryptMessage?, .encrypt) where sizeClass != .compact:
-            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    TutorialTaskHostView(task: .composeAndEncryptMessage) {
-                        EncryptView(configuration: factory.encryptConfiguration())
-                    }
-                }
-            }
-        case (.parseRecipients?, .decrypt) where sizeClass != .compact:
-            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    TutorialTaskHostView(task: .parseRecipients) {
-                        DecryptView(configuration: factory.decryptConfiguration(for: .parseRecipients))
-                    }
-                }
-            }
-        case (.decryptMessage?, .decrypt) where sizeClass != .compact:
-            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    TutorialTaskHostView(task: .decryptMessage) {
-                        DecryptView(configuration: factory.decryptConfiguration(for: .decryptMessage))
-                    }
-                }
-            }
-        case (.enableHighSecurity?, .settings):
-            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    TutorialSettingsTaskView()
-                }
-            }
-        default:
-            return defaultRoot(for: tab, resolver: routeResolver, path: pathBinding)
-        }
-    }
 
-    private func defaultRoot(
-        for tab: AppShellTab,
-        resolver: AppRouteDestinationResolver,
-        path: Binding<[AppRoute]>
-    ) -> AnyView {
         switch tab {
         case .home:
-            return tutorialHostedRoot(resolver: resolver, path: path, tab: tab) {
+            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
                 TutorialSurfaceView(tab: tab, route: nil) {
                     HomeView()
                 }
             }
         case .keys:
-            return tutorialHostedRoot(resolver: resolver, path: path, tab: tab) {
+            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
                 TutorialSurfaceView(tab: tab, route: nil) {
                     MyKeysView()
                 }
             }
         case .contacts:
-            return tutorialHostedRoot(resolver: resolver, path: path, tab: tab) {
+            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
                 TutorialSurfaceView(tab: tab, route: nil) {
                     ContactsView()
                 }
             }
         case .settings:
-            return tutorialHostedRoot(resolver: resolver, path: path, tab: tab) {
+            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    SettingsView(configuration: store.configurationFactory.settingsConfiguration())
+                    TutorialSettingsTaskView()
                 }
             }
         case .encrypt:
-            return tutorialHostedRoot(resolver: resolver, path: path, tab: tab) {
+            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    EncryptView()
+                    EncryptView(configuration: store.configurationFactory.encryptConfiguration(isActiveModule: store.currentModule == .encryptDemoMessage))
                 }
             }
         case .decrypt:
-            return tutorialHostedRoot(resolver: resolver, path: path, tab: tab) {
+            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    DecryptView()
+                    DecryptView(configuration: store.configurationFactory.decryptConfiguration(isActiveModule: store.currentModule == .decryptAndVerify))
                 }
             }
-        case .sign:
-            return tutorialHostedRoot(resolver: resolver, path: path, tab: tab) {
+        case .sign, .verify:
+            return tutorialHostedRoot(resolver: routeResolver, path: pathBinding, tab: tab) {
                 TutorialSurfaceView(tab: tab, route: nil) {
-                    SignView()
-                }
-            }
-        case .verify:
-            return tutorialHostedRoot(resolver: resolver, path: path, tab: tab) {
-                TutorialSurfaceView(tab: tab, route: nil) {
-                    VerifyView()
+                    TutorialBlockedRouteView(
+                        surface: store.blocklist.blockedRoot(for: tab) ?? TutorialBlockedSurface(
+                            title: String(localized: "guidedTutorial.blocked.title", defaultValue: "Unavailable in Tutorial"),
+                            message: String(localized: "guidedTutorial.blocked.body", defaultValue: "This action is unavailable inside the guided tutorial sandbox."),
+                            systemImage: "hand.raised"
+                        )
+                    )
                 }
             }
         }

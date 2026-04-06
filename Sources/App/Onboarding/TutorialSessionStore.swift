@@ -19,70 +19,138 @@ final class TutorialSessionStore {
     var visibleRoute: AppRoute? { navigation.visibleSurface.route }
     var isInspectorPresented: Bool { navigation.isInspectorPresented }
     var configurationFactory: TutorialConfigurationFactory { TutorialConfigurationFactory(store: self) }
+    var blocklist = TutorialUnsafeRouteBlocklist()
 
-    var nextTask: TutorialTaskID? {
-        session.nextIncompleteTask
+    var nextModule: TutorialModuleID? {
+        session.nextIncompleteModule
     }
 
-    var hasCompletedAllTasks: Bool {
-        session.hasCompletedAllTasks
+    var hasCompletedAllModules: Bool {
+        session.hasCompletedAllModules
     }
 
-    var flowPhase: TutorialFlowPhase {
-        session.flowPhase
+    var lifecycleState: TutorialLifecycleState {
+        session.lifecycleState
+    }
+
+    var hostSurface: TutorialHostSurface {
+        session.surface
+    }
+
+    var currentModule: TutorialModuleID? {
+        session.activeModule
     }
 
     var isShowingCompletionView: Bool {
-        session.isShowingCompletionView
+        session.surface == .completion
     }
 
     var isShowingSandboxAcknowledgement: Bool {
-        session.flowPhase == .sandboxAcknowledgement
+        session.surface == .sandboxAcknowledgement
     }
 
-    var pendingCompletionPromptTask: TutorialTaskID? {
-        session.pendingCompletionPromptTask
+    var pendingCompletionPromptModule: TutorialModuleID? {
+        session.pendingCompletionPromptModule
     }
 
-    func isCompleted(_ task: TutorialTaskID) -> Bool {
-        session.taskStates[task]?.isCompleted == true
+    var canFinishFromCompletionSurface: Bool {
+        session.lifecycleState == .stepsCompleted
+    }
+
+    var requiresLeaveConfirmation: Bool {
+        session.lifecycleState == .inProgress || session.lifecycleState == .stepsCompleted
+    }
+
+    var isReplayUnlocked: Bool {
+        if session.lifecycleState == .finished {
+            return true
+        }
+        guard let appConfiguration else { return false }
+        return appConfiguration.guidedTutorialCompletionState != .neverCompleted
+    }
+
+    var sideEffectInterceptor: TutorialSideEffectInterceptor? {
+        guard session.hasStartedSession else { return nil }
+
+        return TutorialSideEffectInterceptor(
+            interceptClipboardWrite: { _, _ in
+                true
+            },
+            interceptDataExport: { _, _, _ in
+                true
+            },
+            interceptFileExport: { _, _, _ in
+                true
+            }
+        )
+    }
+
+    var surfaceConfiguration: TutorialSurfaceConfiguration {
+        TutorialSurfaceConfiguration(
+            activeModule: session.activeModule,
+            blocklist: blocklist,
+            sideEffectInterceptor: sideEffectInterceptor ?? .passthrough
+        )
+    }
+
+    func isCompleted(_ module: TutorialModuleID) -> Bool {
+        session.moduleStates[module]?.isCompleted == true
+    }
+
+    func canOpen(_ module: TutorialModuleID) -> Bool {
+        if isCompleted(module) || isReplayUnlocked {
+            return true
+        }
+
+        guard let index = TutorialModuleID.allCases.firstIndex(of: module) else { return false }
+        if index == 0 {
+            return true
+        }
+
+        let previousModules = TutorialModuleID.allCases.prefix(index)
+        return previousModules.allSatisfy { isCompleted($0) }
     }
 
     func configurePersistence(appConfiguration: AppConfiguration) {
         self.appConfiguration = appConfiguration
     }
 
-    func ensureSession() {
-        if container == nil {
+    func prepareForPresentation(launchOrigin: TutorialLaunchOrigin) {
+        session.launchOrigin = launchOrigin
+        navigation.activeModal = nil
+        errorMessage = nil
+        session.pendingCompletionPromptModule = nil
+        clearNavigationState()
+
+        if session.lifecycleState == .finished {
+            resetTutorial()
+            session.launchOrigin = launchOrigin
+        } else if session.hasStartedSession && container == nil {
             recreateContainer()
+            session.surface = .hub
+        } else {
+            session.surface = .hub
         }
     }
 
-    func prepareForPresentation() {
-        ensureSession()
-        navigation.activeModal = nil
-        errorMessage = nil
-        session.pendingCompletionPromptTask = nil
-        session.flowPhase = .overview
-        clearNavigationState()
-    }
+    func openModule(_ requestedModule: TutorialModuleID) async {
+        guard canOpen(requestedModule) else { return }
 
-    func openTask(_ requestedTask: TutorialTaskID) async {
         ensureSession()
 
-        if requestedTask == .understandSandbox {
+        if requestedModule == .sandbox {
             openSandboxAcknowledgement()
             return
         }
 
-        let task = requestedTask
-        if task == .importBobKey {
+        if requestedModule == .addDemoContact {
             await ensureBobPrepared()
         }
 
-        resetNavigationState(for: task)
-        session.pendingCompletionPromptTask = nil
-        session.flowPhase = .sandbox(task: task)
+        resetNavigationState(for: requestedModule)
+        session.pendingCompletionPromptModule = nil
+        session.surface = .workspace(module: requestedModule)
+        refreshLifecycleState()
         errorMessage = nil
     }
 
@@ -90,51 +158,58 @@ final class TutorialSessionStore {
         ensureSession()
         navigation.activeModal = nil
         errorMessage = nil
-        session.pendingCompletionPromptTask = nil
+        session.pendingCompletionPromptModule = nil
         clearNavigationState()
-        session.flowPhase = .sandboxAcknowledgement
+        session.surface = .sandboxAcknowledgement
+        refreshLifecycleState()
     }
 
     func confirmSandboxAcknowledgement() {
-        complete(.understandSandbox)
-        returnToOverview()
+        complete(.sandbox)
+        if let nextModule = session.nextIncompleteModule {
+            Task { @MainActor in
+                await openModule(nextModule)
+            }
+        } else {
+            showCompletionView()
+        }
     }
 
     func returnToOverview() {
         navigation.activeModal = nil
         errorMessage = nil
-        session.pendingCompletionPromptTask = nil
+        session.pendingCompletionPromptModule = nil
         clearNavigationState()
-        session.flowPhase = .overview
+        session.surface = .hub
     }
 
     func showCompletionView() {
-        guard session.hasCompletedAllTasks else {
+        guard session.hasCompletedAllModules else {
             returnToOverview()
             return
         }
 
         navigation.activeModal = nil
         errorMessage = nil
-        session.pendingCompletionPromptTask = nil
+        session.pendingCompletionPromptModule = nil
         clearNavigationState()
-        session.flowPhase = .completion
+        session.surface = .completion
+        refreshLifecycleState()
     }
 
     func dismissCompletionView() {
-        session.pendingCompletionPromptTask = nil
-        session.flowPhase = .overview
+        session.surface = .hub
     }
 
     func dismissCompletionPrompt() {
-        session.pendingCompletionPromptTask = nil
+        session.pendingCompletionPromptModule = nil
     }
 
     func handlePrimaryCompletionPromptAction() {
-        guard let promptTask = session.pendingCompletionPromptTask else { return }
-        session.pendingCompletionPromptTask = nil
+        guard let promptModule = session.pendingCompletionPromptModule else { return }
+        session.pendingCompletionPromptModule = nil
 
-        if promptTask == TutorialTaskID.allCases.last {
+        if promptModule == .enableHighSecurity {
             showCompletionView()
         } else {
             returnToOverview()
@@ -143,7 +218,15 @@ final class TutorialSessionStore {
 
     func resetTutorial() {
         container?.cleanup()
-        recreateContainer()
+        container = nil
+        session = TutorialSessionState()
+        navigation = TutorialNavigationState()
+        errorMessage = nil
+    }
+
+    func markFinishedTutorial() {
+        appConfiguration?.markGuidedTutorialCompletedCurrentVersion()
+        session.lifecycleState = .finished
     }
 
     func finishAndCleanupTutorial() {
@@ -193,6 +276,21 @@ final class TutorialSessionStore {
         navigation.activeModal = .authModeConfirmation(request)
     }
 
+    func presentLeaveConfirmation(onLeave: @escaping @MainActor () -> Void) {
+        navigation.activeModal = .leaveConfirmation(
+            TutorialLeaveConfirmationRequest(
+                onContinue: { [weak self] in
+                    self?.dismissModal()
+                },
+                onLeave: { [weak self] in
+                    self?.dismissModal()
+                    self?.returnToOverview()
+                    onLeave()
+                }
+            )
+        )
+    }
+
     func dismissModal() {
         navigation.activeModal = nil
     }
@@ -201,29 +299,32 @@ final class TutorialSessionStore {
         navigation.visibleSurface = TutorialVisibleSurface(tab: tab, route: route)
     }
 
+    func noteGuidance(_ guidance: TutorialGuidancePayload?) {
+        session.currentGuidance = guidance
+    }
+
     func setInspectorPresented(_ isPresented: Bool) {
         navigation.isInspectorPresented = isPresented
     }
 
     func noteAliceGenerated(_ identity: PGPKeyIdentity) async {
         session.artifacts.aliceIdentity = identity
-        complete(.generateAliceKey)
+        complete(.createDemoIdentity)
         await ensureBobPrepared()
     }
 
     func noteBobImported(_ contact: Contact) {
         session.artifacts.bobContact = contact
-        complete(.importBobKey)
+        complete(.addDemoContact)
     }
 
     func noteEncrypted(_ ciphertext: Data) {
         session.artifacts.encryptedMessage = String(data: ciphertext, encoding: .utf8)
-        complete(.composeAndEncryptMessage)
+        complete(.encryptDemoMessage)
     }
 
     func noteParsed(_ result: DecryptionService.Phase1Result) {
         session.artifacts.parseResult = result
-        complete(.parseRecipients)
     }
 
     func noteDecrypted(
@@ -232,12 +333,12 @@ final class TutorialSessionStore {
     ) {
         session.artifacts.decryptedMessage = String(data: plaintext, encoding: .utf8)
         session.artifacts.decryptedVerification = verification
-        complete(.decryptMessage)
+        complete(.decryptAndVerify)
     }
 
     func noteBackupExported(_ backupData: Data) {
         session.artifacts.backupArmoredKey = String(data: backupData, encoding: .utf8)
-        complete(.exportBackup)
+        complete(.backupKey)
     }
 
     func noteHighSecurityEnabled(_ mode: AuthenticationMode) {
@@ -246,56 +347,68 @@ final class TutorialSessionStore {
     }
 
     #if DEBUG
-    func markCompletedForTesting(_ task: TutorialTaskID) {
-        complete(task)
+    func markCompletedForTesting(_ module: TutorialModuleID) {
+        complete(module)
     }
     #endif
 
-    private func complete(_ task: TutorialTaskID) {
-        session.taskStates[task]?.isCompleted = true
-        if task != .understandSandbox {
-            session.pendingCompletionPromptTask = task
+    func navigateToPostGenerationPrompt(_ identity: PGPKeyIdentity) {
+        var path = routePath(for: navigation.selectedTab)
+        path.append(.postGenerationPrompt(identity: identity))
+        setRoutePath(path, for: navigation.selectedTab)
+    }
+
+    private func complete(_ module: TutorialModuleID) {
+        session.moduleStates[module]?.isCompleted = true
+        if module != .sandbox {
+            session.pendingCompletionPromptModule = module
         }
-        if session.hasCompletedAllTasks {
-            appConfiguration?.markGuidedTutorialCompletedCurrentVersion()
+        refreshLifecycleState()
+    }
+
+    private func ensureSession() {
+        if container == nil {
+            recreateContainer()
+        }
+
+        if session.sessionID == nil {
+            session.sessionID = TutorialSessionID()
+            session.lifecycleState = .inProgress
         }
     }
 
     private func recreateContainer() {
         do {
             container = try TutorialSandboxContainer()
-            session = TutorialSessionState()
-            navigation = TutorialNavigationState()
             errorMessage = nil
         } catch {
             container = nil
-            session = TutorialSessionState()
-            navigation = TutorialNavigationState()
             errorMessage = error.localizedDescription
         }
     }
 
-    private func resetNavigationState(for task: TutorialTaskID) {
+    private func refreshLifecycleState() {
+        if session.lifecycleState == .finished {
+            return
+        }
+
+        if session.hasCompletedAllModules {
+            session.lifecycleState = .stepsCompleted
+        } else if session.hasStartedSession {
+            session.lifecycleState = .inProgress
+        } else {
+            session.lifecycleState = .notStarted
+        }
+    }
+
+    private func resetNavigationState(for module: TutorialModuleID) {
         navigation = TutorialNavigationState()
-        navigation.selectedTab = initialSelection(for: task)
+        navigation.selectedTab = module.tab
         navigation.visibleSurface.tab = navigation.selectedTab
     }
 
     private func clearNavigationState() {
         navigation = TutorialNavigationState()
-    }
-
-    private func initialSelection(for task: TutorialTaskID) -> AppShellTab {
-        switch task {
-        case .generateAliceKey, .exportBackup:
-            .keys
-        case .importBobKey:
-            .contacts
-        case .composeAndEncryptMessage, .parseRecipients, .decryptMessage, .understandSandbox:
-            .home
-        case .enableHighSecurity:
-            .settings
-        }
     }
 
     private func ensureBobPrepared() async {
@@ -320,11 +433,5 @@ final class TutorialSessionStore {
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-
-    func navigateToPostGenerationPrompt(_ identity: PGPKeyIdentity) {
-        var path = routePath(for: navigation.selectedTab)
-        path.append(.postGenerationPrompt(identity: identity))
-        setRoutePath(path, for: navigation.selectedTab)
     }
 }

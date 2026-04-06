@@ -802,6 +802,22 @@
         }
       }
     },
+    "common.close" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        }
+      }
+    },
     "common.comingSoon" : {
       "localizations" : {
         "en" : {
@@ -4223,6 +4239,7 @@
       }
     },
     "guidedTutorial.hero.body" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4366,6 +4383,70 @@
         }
       }
     },
+    "guidedTutorial.leave.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave the guided tutorial now? Your progress will stay available until this app run ends, but the tutorial will close."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在离开引导教程吗？在本次 App 运行期间，你的进度仍会保留，但教程会先关闭。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.leave.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离开教程"
+          }
+        }
+      }
+    },
+    "guidedTutorial.leave.continue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续教程"
+          }
+        }
+      }
+    },
+    "guidedTutorial.leave.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离开教程"
+          }
+        }
+      }
+    },
     "guidedTutorial.nav.contacts" : {
       "localizations" : {
         "en" : {
@@ -4478,7 +4559,24 @@
         }
       }
     },
+    "guidedTutorial.onboarding.enterTutorial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close Onboarding and Enter Tutorial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭引导并进入教程"
+          }
+        }
+      }
+    },
     "guidedTutorial.onboarding.entry" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4511,6 +4609,7 @@
       }
     },
     "guidedTutorial.phase.contact" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4527,6 +4626,7 @@
       }
     },
     "guidedTutorial.phase.decrypt" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4543,6 +4643,7 @@
       }
     },
     "guidedTutorial.phase.encrypt" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4559,6 +4660,7 @@
       }
     },
     "guidedTutorial.phase.intro" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4575,6 +4677,7 @@
       }
     },
     "guidedTutorial.phase.key" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4591,6 +4694,7 @@
       }
     },
     "guidedTutorial.phase.protect" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4640,6 +4744,7 @@
       }
     },
     "guidedTutorial.return" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4656,6 +4761,7 @@
       }
     },
     "guidedTutorial.return.hint" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4671,18 +4777,50 @@
         }
       }
     },
-    "guidedTutorial.sandbox.badge" : {
+    "guidedTutorial.returnToOverview" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sandbox"
+            "value" : "Return to Tutorial Overview"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "沙箱"
+            "value" : "返回教程概览"
+          }
+        }
+      }
+    },
+    "guidedTutorial.returnToOverview.hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Return to the guided tutorial overview."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回教程概览页面。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.sandbox.badge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutorial Sandbox"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "教程沙箱"
           }
         }
       }
@@ -4863,6 +5001,22 @@
         }
       }
     },
+    "guidedTutorial.showGuidance" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Guidance"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示引导"
+          }
+        }
+      }
+    },
     "guidedTutorial.start" : {
       "localizations" : {
         "en" : {
@@ -4880,6 +5034,7 @@
       }
     },
     "guidedTutorial.status.complete" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4896,6 +5051,7 @@
       }
     },
     "guidedTutorial.status.locked" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4912,6 +5068,7 @@
       }
     },
     "guidedTutorial.status.ready" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4928,6 +5085,7 @@
       }
     },
     "guidedTutorial.task.backup" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4948,35 +5106,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Task complete. Return to the tutorial to continue."
+            "value" : "Task complete. Return to the tutorial overview to continue."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "任务已完成。返回教程以继续下一步。"
+            "value" : "任务已完成。返回教程概览以继续下一步。"
           }
         }
       }
     },
     "guidedTutorial.task.complete.final" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Final step complete. Finish the guided tutorial when you're ready."
+            "value" : "All modules are complete. Review the completion summary before you finish the tutorial."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最后一步已完成。准备好后即可结束引导教程。"
+            "value" : "所有模块已完成。请先查看完成总结，再结束教程。"
           }
         }
       }
     },
     "guidedTutorial.task.decrypt" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4993,6 +5151,7 @@
       }
     },
     "guidedTutorial.task.encrypt" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5009,6 +5168,7 @@
       }
     },
     "guidedTutorial.task.generate" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5025,6 +5185,7 @@
       }
     },
     "guidedTutorial.task.highSecurity" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5041,6 +5202,7 @@
       }
     },
     "guidedTutorial.task.import" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5057,6 +5219,7 @@
       }
     },
     "guidedTutorial.task.intro" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5073,6 +5236,7 @@
       }
     },
     "guidedTutorial.task.parse" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7029,6 +7193,7 @@
       }
     },
     "onboarding.getStarted" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7129,13 +7294,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create your encryption key to start securing your messages. You can choose between Universal (GnuPG compatible) and Advanced (stronger security) profiles."
+            "value" : "Learn CypherAir in an isolated sandbox first, or skip the tutorial and enter the real app right away. Tutorial actions never touch your real keys, contacts, settings, files, exports, or private-key security assets."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "创建你的加密密钥以开始保护你的消息。你可以选择通用（兼容 GnuPG）或高级（更强安全性）配置。"
+            "value" : "你可以先在隔离的教程沙箱中了解 CypherAir，或直接跳过教程进入真实应用。教程中的操作不会触碰你的真实密钥、联系人、设置、文件、导出内容或私钥安全资产。"
           }
         }
       }
@@ -7145,13 +7310,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Generate Your Key"
+            "value" : "Start with a Guided Tutorial"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生成你的密钥"
+            "value" : "先通过引导教程快速上手"
           }
         }
       }

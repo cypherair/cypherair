@@ -9,87 +9,134 @@ struct TutorialShellTabsView: View {
 
     var body: some View {
         #if os(macOS)
-        AnyView(macOSLayout)
+        macOSLayout
         #else
-        AnyView(iOSLayout)
+        iOSLayout
         #endif
     }
 
-    private var currentGuidance: TutorialGuidance? {
+    private var currentGuidance: TutorialGuidancePayload? {
         if tutorialStore.activeModal != nil {
             return nil
         }
-        if let activeTask = tutorialStore.session.activeTask,
-           tutorialStore.isCompleted(activeTask) {
+        guard let activeModule = tutorialStore.currentModule else {
+            return nil
+        }
+        if tutorialStore.isCompleted(activeModule) {
             return nil
         }
 
-        return TutorialGuidanceResolver().guidance(
+        let guidance = TutorialGuidanceResolver().guidance(
             session: tutorialStore.session,
             navigation: tutorialStore.navigation,
             sizeClass: sizeClass,
             selectedTab: selectedTab
         )
+        return guidance
     }
 
     private var iOSLayout: some View {
-        SharedIOSTabShellView(
-            selectedTab: $selectedTab,
-            definitions: TutorialShellDefinitionsBuilder(
-                store: tutorialStore,
-                sizeClass: sizeClass
-            ).definitions()
-        )
+        Group {
+            if sizeClass == .regular {
+                HStack(spacing: 0) {
+                    SharedIOSTabShellView(
+                        selectedTab: $selectedTab,
+                        definitions: TutorialShellDefinitionsBuilder(
+                            store: tutorialStore,
+                            sizeClass: sizeClass
+                        ).definitions()
+                    )
+
+                    if let currentGuidance {
+                        guidanceRail(currentGuidance)
+                            .frame(width: 300)
+                            .background(.background)
+                    }
+                }
+            } else {
+                SharedIOSTabShellView(
+                    selectedTab: $selectedTab,
+                    definitions: TutorialShellDefinitionsBuilder(
+                        store: tutorialStore,
+                        sizeClass: sizeClass
+                    ).definitions()
+                )
+            }
+        }
     }
 
     #if os(macOS)
     private var macOSLayout: some View {
-        NavigationSplitView {
-            sidebar
-        } detail: {
-            tabRoot(for: selectedTab)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .inspector(isPresented: inspectorBinding) {
-            if let currentGuidance {
-                guidanceInspector(currentGuidance)
-                    .inspectorColumnWidth(min: 260, ideal: 300, max: 360)
+        HStack(spacing: 0) {
+            moduleNavigator
+                .frame(minWidth: 240, idealWidth: 260, maxWidth: 280)
+
+            Divider()
+
+            ZStack(alignment: .topTrailing) {
+                tabRoot(for: selectedTab)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if !tutorialStore.isInspectorPresented,
+                   currentGuidance != nil {
+                    Button(String(localized: "guidedTutorial.showGuidance", defaultValue: "Show Guidance")) {
+                        tutorialStore.setInspectorPresented(true)
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(16)
+                }
+            }
+
+            if tutorialStore.isInspectorPresented,
+               let currentGuidance {
+                Divider()
+                guidanceRail(currentGuidance)
+                    .frame(minWidth: 280, idealWidth: 300, maxWidth: 340)
+                    .background(.background)
             }
         }
     }
     #endif
 
     #if os(macOS)
-    private var sidebar: some View {
-        List(selection: $selectedTab) {
+    private var moduleNavigator: some View {
+        List {
             Section {
-                sidebarSelectionRow(.home)
-                sidebarSelectionRow(.keys)
-                sidebarSelectionRow(.contacts)
-                sidebarSelectionRow(.settings)
-            }
+                ForEach(TutorialModuleID.allCases) { module in
+                    Button {
+                        Task {
+                            await tutorialStore.openModule(module)
+                        }
+                    } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            completionIndicator(for: module)
 
-            Section(String(localized: "tab.section.tools", defaultValue: "Tools")) {
-                sidebarSelectionRow(.encrypt)
-                sidebarSelectionRow(.decrypt)
-                sidebarSelectionRow(.sign)
-                sidebarSelectionRow(.verify)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(module.title)
+                                    .font(.headline)
+                                if let location = module.realAppLocation {
+                                    Text(location)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!tutorialStore.canOpen(module))
+                    .accessibilityIdentifier(module.launchControlIdentifier)
+                }
+            } header: {
+                Text(String(localized: "guidedTutorial.modules", defaultValue: "Tutorial Modules"))
             }
         }
-        .frame(minWidth: 220, idealWidth: 240, maxWidth: 260)
+        .listStyle(.sidebar)
     }
     #endif
 
     #if os(macOS)
-    private func sidebarSelectionRow(_ tab: AppShellTab) -> some View {
-        Label(
-            AppShellComposition.title(for: tab),
-            systemImage: AppShellComposition.systemImage(for: tab)
-        )
-        .tag(tab)
-        .accessibilityIdentifier("tutorial.sidebar.\(tab.rawValue)")
-    }
-
     private func tabRoot(for tab: AppShellTab) -> AnyView {
         TutorialShellDefinitionsBuilder(
             store: tutorialStore,
@@ -97,109 +144,59 @@ struct TutorialShellTabsView: View {
         ).definitions().first(where: { $0.tab == tab })?.content ?? AnyView(EmptyView())
     }
     #endif
-    private func guidanceCard(_ guidance: TutorialGuidance) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label(
-                    String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Sandbox"),
-                    systemImage: "testtube.2"
-                )
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.orange)
 
-                Spacer()
-
-                Button(String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial")) {
-                    tutorialStore.returnToOverview()
-                }
-                .buttonStyle(.bordered)
+    private func guidanceRail(_ guidance: TutorialGuidancePayload) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label(
+                String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Tutorial Sandbox"),
+                systemImage: "testtube.2"
+            )
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.orange.opacity(0.14), in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1)
             }
 
             Text(guidance.title)
                 .font(.headline)
-            Text(guidance.body)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: sizeClass == .compact ? .infinity : 280, alignment: .leading)
-        .padding(16)
-        .tutorialCardChrome(.overlay)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
 
-    #if os(macOS)
-    private var inspectorBinding: Binding<Bool> {
-        Binding(
-            get: { tutorialStore.isInspectorPresented && currentGuidance != nil },
-            set: { tutorialStore.setInspectorPresented($0) }
-        )
-    }
-
-    private func guidanceInspector(_ guidance: TutorialGuidance) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(
-                String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Sandbox"),
-                systemImage: "testtube.2"
-            )
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.orange)
-
-            Text(guidance.title)
-                .font(.headline)
+            if let location = guidance.realAppLocation {
+                Text(location)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
 
             Text(guidance.body)
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
+            Button(String(localized: "guidedTutorial.returnToOverview", defaultValue: "Return to Tutorial Overview")) {
+                tutorialStore.returnToOverview()
+            }
+            .buttonStyle(.bordered)
+            .tint(.orange)
+
             Spacer(minLength: 0)
         }
         .padding(20)
     }
-    #endif
 
-    private func compactGuidanceBanner(_ guidance: TutorialGuidance) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(
-                String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Sandbox"),
-                systemImage: "testtube.2"
-            )
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.orange)
-
-            Text(guidance.title)
-                .font(.subheadline.weight(.semibold))
-
-            Text(guidance.body)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .tutorialBannerChrome()
-    }
-
-    private var compactReturnBar: some View {
-        HStack {
-            Button {
-                tutorialStore.returnToOverview()
-            } label: {
-                Label(
-                    String(localized: "guidedTutorial.return", defaultValue: "Return to Tutorial"),
-                    systemImage: "chevron.left"
-                )
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+    private func completionIndicator(for module: TutorialModuleID) -> some View {
+        Group {
+            if tutorialStore.isCompleted(module) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            } else if tutorialStore.canOpen(module) {
+                Image(systemName: "circle")
+                    .foregroundStyle(.secondary)
+            } else {
+                Image(systemName: "lock.fill")
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-
-            Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.bar)
     }
 }

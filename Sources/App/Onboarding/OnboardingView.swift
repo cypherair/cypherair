@@ -128,25 +128,23 @@ struct OnboardingPageThree: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
     @Environment(\.iosPresentationController) private var iosPresentationController
+    @Environment(\.macPresentationController) private var macPresentationController
 
     let presentationContext: OnboardingPresentationContext
-    #if !os(iOS)
-    @State private var showTutorial = false
-    #endif
 
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
 
-            Image(systemName: "key.fill")
+            Image(systemName: "testtube.2")
                 .font(.system(size: 72, weight: .light))
                 .foregroundStyle(.orange)
                 .accessibilityHidden(true)
 
-            Text(String(localized: "onboarding.p3.title", defaultValue: "Generate Your Key"))
+            Text(String(localized: "onboarding.p3.title", defaultValue: "Start with a Guided Tutorial"))
                 .font(.title.bold())
 
-            Text(String(localized: "onboarding.p3.body", defaultValue: "Create your encryption key to start securing your messages. You can choose between Universal (GnuPG compatible) and Advanced (stronger security) profiles."))
+            Text(String(localized: "onboarding.p3.body", defaultValue: "Learn CypherAir in an isolated sandbox first, or skip the tutorial and enter the real app right away. Tutorial actions never touch your real keys, contacts, settings, files, exports, or private-key security assets."))
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -155,7 +153,7 @@ struct OnboardingPageThree: View {
             Button {
                 presentTutorial()
             } label: {
-                Text(guidedTutorialEntryTitle)
+                Text(String(localized: "guidedTutorial.onboarding.enterTutorial", defaultValue: "Close Onboarding and Enter Tutorial"))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -163,10 +161,9 @@ struct OnboardingPageThree: View {
             .padding(.horizontal, 40)
 
             Button {
-                config.hasCompletedOnboarding = true
-                dismiss()
+                skipTutorial()
             } label: {
-                Text(String(localized: "onboarding.getStarted", defaultValue: "Get Started"))
+                Text(String(localized: "onboarding.skip.enterApp", defaultValue: "Skip Tutorial and Enter App"))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
@@ -175,39 +172,34 @@ struct OnboardingPageThree: View {
 
             Spacer()
         }
-        #if !os(iOS)
-        .sheet(isPresented: $showTutorial) {
-            TutorialView(presentationContext: .onboardingFirstRun) {
-                showTutorial = false
-                dismiss()
-            }
-        }
-        #endif
-    }
-
-    private var guidedTutorialEntryTitle: String {
-        switch config.guidedTutorialCompletionState {
-        case .neverCompleted:
-            String(localized: "guidedTutorial.onboarding.entry", defaultValue: "Open Guided Tutorial")
-        case .completedCurrentVersion:
-            String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
-        case .completedPreviousVersion:
-            String(localized: "guidedTutorial.updated.entry", defaultValue: "Updated Guided Tutorial Available")
-        }
     }
 
     private func presentTutorial() {
+        config.hasCompletedOnboarding = true
         #if os(iOS)
         if let iosPresentationController {
-            iosPresentationController.present(.tutorial(presentationContext: .onboardingFirstRun))
+            iosPresentationController.handoffToTutorialAfterOnboardingDismiss(.onboardingFirstRun)
         }
         #else
-        if let iosPresentationController {
-            iosPresentationController.present(.tutorial(presentationContext: .onboardingFirstRun))
+        if let macPresentationController {
+            macPresentationController.present(.tutorial(presentationContext: .onboardingFirstRun))
+        } else if let iosPresentationController {
+            iosPresentationController.handoffToTutorialAfterOnboardingDismiss(.onboardingFirstRun)
         } else {
-            showTutorial = true
+            dismiss()
         }
         #endif
+    }
+
+    private func skipTutorial() {
+        config.hasCompletedOnboarding = true
+        if let macPresentationController {
+            macPresentationController.dismiss()
+        } else if let iosPresentationController {
+            iosPresentationController.dismiss()
+        } else {
+            dismiss()
+        }
     }
 }
 

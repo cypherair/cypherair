@@ -13,19 +13,25 @@ struct TutorialRouteDestinationView: View {
     }
 
     private var destination: AnyView {
+        if let blockedSurface = tutorialStore.blocklist.blockedRoute(for: route) {
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    TutorialBlockedRouteView(surface: blockedSurface)
+                }
+            )
+        }
+
         let factory = tutorialStore.configurationFactory
 
         switch route {
         case .keyGeneration:
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {
-                    if tutorialStore.session.activeTask == .generateAliceKey {
-                        TutorialTaskHostView(task: .generateAliceKey) {
-                            KeyGenerationView(configuration: factory.keyGenerationConfiguration())
-                        }
-                    } else {
-                        KeyGenerationView()
-                    }
+                    KeyGenerationView(
+                        configuration: factory.keyGenerationConfiguration(
+                            isActiveModule: tutorialStore.currentModule == .createDemoIdentity
+                        )
+                    )
                 }
             )
         case .postGenerationPrompt(let identity):
@@ -37,56 +43,42 @@ struct TutorialRouteDestinationView: View {
         case .addContact:
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {
-                    if tutorialStore.session.activeTask == .importBobKey {
-                        TutorialTaskHostView(task: .importBobKey) {
-                            AddContactView(configuration: factory.addContactConfiguration())
-                        }
-                    } else {
-                        AddContactView()
-                    }
+                    AddContactView(
+                        configuration: factory.addContactConfiguration(
+                            isActiveModule: tutorialStore.currentModule == .addDemoContact
+                        )
+                    )
                 }
             )
         case .encrypt:
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {
-                    if tutorialStore.session.activeTask == .composeAndEncryptMessage {
-                        TutorialTaskHostView(task: .composeAndEncryptMessage) {
-                            EncryptView(configuration: factory.encryptConfiguration())
-                        }
-                    } else {
-                        EncryptView()
-                    }
+                    EncryptView(
+                        configuration: factory.encryptConfiguration(
+                            isActiveModule: tutorialStore.currentModule == .encryptDemoMessage
+                        )
+                    )
                 }
             )
         case .decrypt:
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {
-                    if tutorialStore.session.activeTask == .parseRecipients {
-                        TutorialTaskHostView(task: .parseRecipients) {
-                            DecryptView(configuration: factory.decryptConfiguration(for: .parseRecipients))
-                        }
-                    } else if tutorialStore.session.activeTask == .decryptMessage {
-                        TutorialTaskHostView(task: .decryptMessage) {
-                            DecryptView(configuration: factory.decryptConfiguration(for: .decryptMessage))
-                        }
-                    } else {
-                        DecryptView()
-                    }
+                    DecryptView(
+                        configuration: factory.decryptConfiguration(
+                            isActiveModule: tutorialStore.currentModule == .decryptAndVerify
+                        )
+                    )
                 }
             )
         case .backupKey(let fingerprint):
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {
-                    if tutorialStore.session.activeTask == .exportBackup {
-                        TutorialTaskHostView(task: .exportBackup) {
-                            BackupKeyView(
-                                fingerprint: fingerprint,
-                                configuration: factory.backupConfiguration()
-                            )
-                        }
-                    } else {
-                        BackupKeyView(fingerprint: fingerprint)
-                    }
+                    BackupKeyView(
+                        fingerprint: fingerprint,
+                        configuration: factory.backupConfiguration(
+                            isActiveModule: tutorialStore.currentModule == .backupKey
+                        )
+                    )
                 }
             )
         case .keyDetail(let fingerprint):
@@ -100,9 +92,9 @@ struct TutorialRouteDestinationView: View {
         case .importKey:
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ImportKeyView() })
         case .sign:
-            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { SignView() })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { TutorialBlockedRouteView(surface: tutorialStore.blocklist.blockedRoot(for: .sign) ?? genericBlockedSurface) })
         case .verify:
-            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { VerifyView() })
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { TutorialBlockedRouteView(surface: tutorialStore.blocklist.blockedRoot(for: .verify) ?? genericBlockedSurface) })
         case .selfTest:
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { SelfTestView() })
         case .about:
@@ -125,5 +117,26 @@ struct TutorialRouteDestinationView: View {
         case .themePicker:
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ThemePickerView() })
         }
+    }
+
+    private var genericBlockedSurface: TutorialBlockedSurface {
+        TutorialBlockedSurface(
+            title: String(localized: "guidedTutorial.blocked.title", defaultValue: "Unavailable in Tutorial"),
+            message: String(localized: "guidedTutorial.blocked.body", defaultValue: "This action is unavailable inside the guided tutorial sandbox."),
+            systemImage: "hand.raised"
+        )
+    }
+}
+
+struct TutorialBlockedRouteView: View {
+    let surface: TutorialBlockedSurface
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(surface.title, systemImage: surface.systemImage)
+        } description: {
+            Text(surface.message)
+        }
+        .navigationTitle(surface.title)
     }
 }

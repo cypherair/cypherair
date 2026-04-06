@@ -22,6 +22,7 @@ final class TutorialSandboxContainer {
     let mockKeychain: MockKeychain
     let mockAuthenticator: MockAuthenticator
     let authManager: AuthenticationManager
+    let securitySimulationStack: TutorialSecuritySimulationStack
     let config: AppConfiguration
     let keyManagement: KeyManagementService
     let contactService: ContactService
@@ -63,6 +64,12 @@ final class TutorialSandboxContainer {
             secureEnclave: mockSecureEnclave,
             keychain: mockKeychain,
             defaults: defaults
+        )
+        self.securitySimulationStack = TutorialSecuritySimulationStack(
+            authManager: authManager,
+            mockSecureEnclave: mockSecureEnclave,
+            mockKeychain: mockKeychain,
+            mockAuthenticator: mockAuthenticator
         )
         self.config = AppConfiguration(defaults: defaults)
         self.keyManagement = KeyManagementService(

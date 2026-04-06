@@ -1,16 +1,16 @@
 import SwiftUI
 
 struct TutorialTaskHostView<Content: View>: View {
-    let task: TutorialTaskID
+    let module: TutorialModuleID
     let showsCompletionFeedback: Bool
     @ViewBuilder let content: () -> Content
 
     init(
-        task: TutorialTaskID,
+        module: TutorialModuleID,
         showsCompletionFeedback: Bool = true,
         @ViewBuilder content: @escaping () -> Content
     ) {
-        self.task = task
+        self.module = module
         self.showsCompletionFeedback = showsCompletionFeedback
         self.content = content
     }

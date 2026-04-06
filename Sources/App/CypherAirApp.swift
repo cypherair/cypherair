@@ -21,7 +21,7 @@ struct CypherAirApp: App {
     @State private var importConfirmationCoordinator = ImportConfirmationCoordinator()
     @State private var launchConfiguration: AppLaunchConfiguration
     #if os(iOS)
-    @State private var activeIOSPresentation: IOSPresentation?
+    @State private var iosPresentationState = TutorialOnboardingHandoffState()
     #endif
 
     // MARK: - Init
@@ -73,17 +73,22 @@ struct CypherAirApp: App {
                         \.iosPresentationController,
                         IOSPresentationController(
                             present: { presentation in
-                                activeIOSPresentation = presentation
+                                iosPresentationState.activePresentation = presentation
                             },
                             dismiss: {
-                                activeIOSPresentation = nil
+                                iosPresentationState.activePresentation = nil
+                            },
+                            handoffToTutorialAfterOnboardingDismiss: { presentationContext in
+                                iosPresentationState.requestTutorialLaunchFromOnboarding(presentationContext)
                             }
                         )
                     )
                     #endif
             }
                 #if os(iOS)
-                .sheet(item: onboardingPresentationBinding) { presentation in
+                .sheet(item: onboardingPresentationBinding, onDismiss: {
+                    iosPresentationState.completePendingTutorialLaunchIfNeeded()
+                }) { presentation in
                     onboardingPresentationView(for: presentation)
                 }
                 .fullScreenCover(item: tutorialPresentationBinding) { presentation in
@@ -94,8 +99,8 @@ struct CypherAirApp: App {
                 }
                 .onChange(of: container.config.hasCompletedOnboarding) { _, hasCompletedOnboarding in
                     if !hasCompletedOnboarding,
-                       activeIOSPresentation == nil {
-                        activeIOSPresentation = .onboarding(initialPage: 0, context: .firstRun)
+                       iosPresentationState.activePresentation == nil {
+                        iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
                     }
                 }
                 #endif
@@ -190,7 +195,7 @@ struct CypherAirApp: App {
         case .tutorial:
             TutorialView(
                 presentationContext: .inApp,
-                initialTask: launchConfiguration.tutorialTask
+                initialModule: launchConfiguration.tutorialModule
             )
         }
         #else
@@ -202,16 +207,16 @@ struct CypherAirApp: App {
     private var onboardingPresentationBinding: Binding<IOSPresentation?> {
         Binding(
             get: {
-                guard case .onboarding? = activeIOSPresentation else {
+                guard case .onboarding? = iosPresentationState.activePresentation else {
                     return nil
                 }
-                return activeIOSPresentation
+                return iosPresentationState.activePresentation
             },
             set: { newValue in
                 if let newValue {
-                    activeIOSPresentation = newValue
-                } else if case .onboarding? = activeIOSPresentation {
-                    activeIOSPresentation = nil
+                    iosPresentationState.activePresentation = newValue
+                } else if case .onboarding? = iosPresentationState.activePresentation {
+                    iosPresentationState.activePresentation = nil
                 }
             }
         )
@@ -220,16 +225,16 @@ struct CypherAirApp: App {
     private var tutorialPresentationBinding: Binding<IOSPresentation?> {
         Binding(
             get: {
-                guard case .tutorial? = activeIOSPresentation else {
+                guard case .tutorial? = iosPresentationState.activePresentation else {
                     return nil
                 }
-                return activeIOSPresentation
+                return iosPresentationState.activePresentation
             },
             set: { newValue in
                 if let newValue {
-                    activeIOSPresentation = newValue
-                } else if case .tutorial? = activeIOSPresentation {
-                    activeIOSPresentation = nil
+                    iosPresentationState.activePresentation = newValue
+                } else if case .tutorial? = iosPresentationState.activePresentation {
+                    iosPresentationState.activePresentation = nil
                 }
             }
         )
@@ -253,7 +258,7 @@ struct CypherAirApp: App {
         if case .tutorial(let presentationContext) = presentation {
             TutorialView(
                 presentationContext: presentationContext,
-                initialTask: launchConfiguration.root == .tutorial ? launchConfiguration.tutorialTask : nil
+                initialModule: launchConfiguration.root == .tutorial ? launchConfiguration.tutorialModule : nil
             )
                 .environment(container.config)
                 .environment(tutorialStore)
@@ -261,14 +266,14 @@ struct CypherAirApp: App {
     }
 
     private func presentInitialIOSFlowIfNeeded() {
-        guard activeIOSPresentation == nil else { return }
+        guard iosPresentationState.activePresentation == nil else { return }
 
         switch launchConfiguration.root {
         case .tutorial:
-            activeIOSPresentation = .tutorial(presentationContext: .inApp)
+            iosPresentationState.activePresentation = .tutorial(presentationContext: .inApp)
         case .main, .settings:
             if !container.config.hasCompletedOnboarding {
-                activeIOSPresentation = .onboarding(initialPage: 0, context: .firstRun)
+                iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
             }
         }
     }
@@ -281,6 +286,7 @@ struct CypherAirApp: App {
     /// The user must confirm before the key is added as a contact.
     private func handleIncomingURL(_ url: URL) {
         guard url.scheme == "cypherair" else { return }
+        guard !tutorialStore.session.hasStartedSession else { return }
 
         do {
             let inspection = try PublicKeyImportLoader(qrService: container.qrService).loadFromURL(url)
@@ -317,7 +323,7 @@ struct AppLaunchConfiguration {
 
     let root: Root
     let shouldSkipOnboarding: Bool
-    let tutorialTask: TutorialTaskID?
+    let tutorialModule: TutorialModuleID?
     let isUITestMode: Bool
     let requiresManualAuthentication: Bool
     let opensAuthModeConfirmation: Bool
@@ -329,15 +335,14 @@ struct AppLaunchConfiguration {
         self.requiresManualAuthentication = environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
         self.opensAuthModeConfirmation = environment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] == "1"
         self.shouldSkipOnboarding = environment["UITEST_SKIP_ONBOARDING"] == "1" || root != .main
-        self.tutorialTask = environment["UITEST_TUTORIAL_TASK"].flatMap { value in
+        self.tutorialModule = environment["UITEST_TUTORIAL_TASK"].flatMap { value in
             switch value {
-            case "understandSandbox": .understandSandbox
-            case "generateAliceKey": .generateAliceKey
-            case "importBobKey": .importBobKey
-            case "composeAndEncryptMessage": .composeAndEncryptMessage
-            case "parseRecipients": .parseRecipients
-            case "decryptMessage": .decryptMessage
-            case "exportBackup": .exportBackup
+            case "understandSandbox", "sandbox": .sandbox
+            case "generateAliceKey", "createDemoIdentity": .createDemoIdentity
+            case "importBobKey", "addDemoContact": .addDemoContact
+            case "composeAndEncryptMessage", "encryptDemoMessage": .encryptDemoMessage
+            case "parseRecipients", "decryptMessage", "decryptAndVerify": .decryptAndVerify
+            case "exportBackup", "backupKey": .backupKey
             case "enableHighSecurity": .enableHighSecurity
             default: nil
             }
