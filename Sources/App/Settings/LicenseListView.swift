@@ -38,10 +38,6 @@ struct LicenseListView: View {
                 List {
                     noticeListSections
                 }
-                .searchable(
-                    text: $searchText,
-                    prompt: Text(String(localized: "license.search", defaultValue: "Search components"))
-                )
                 #if os(macOS)
                 .listStyle(.inset)
                 #endif
