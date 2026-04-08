@@ -126,8 +126,8 @@ Mode switching requires re-wrapping all Secure Enclave protected keys.
 - Keep changes scoped to the user request.
   This means only make changes that are directly required to complete the requested task; it is not permission to normalize, revert, or clean up unrelated local changes that are already in the worktree.
 - Treat `CypherAir.xcodeproj/project.pbxproj` and other Xcode project file changes as explicit-scope changes that require user confirmation, not as changes to avoid by default.
-  Do not revert, rewrite, or “clean up” existing project file edits you did not make. If the correct implementation requires adding new files and updating the project file, call that out explicitly, confirm that scope with the user, and obtain approval before proceeding.
-  Do not work around this requirement by forcing new code into existing large files or unrelated files just to avoid editing the project file. Prefer a clean repository structure over artificially avoiding `project.pbxproj` changes.
+  Do not revert, rewrite, or “clean up” existing project file edits you did not make. If the correct implementation requires modifying Xcode project files, call that out proactively to the user, explain why the change is needed, and obtain approval before making those edits.
+  Do not compromise the intended implementation or force code into unrelated files merely to avoid touching project files.
 - Do not add “nice to have” refactors unless they directly support the requested work.
 - Prefer small, reviewable diffs.
 - Maintain existing user-visible behavior unless the task explicitly changes it.
