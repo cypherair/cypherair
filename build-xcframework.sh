@@ -92,31 +92,9 @@ ls -lh "$MACOS_LIB"
 # ── Step 5: Build host dylib for UniFFI bindgen ──────────────────
 echo ""
 echo "[5/9] Building host dylib for UniFFI bindgen..."
-# Temporarily add cdylib to crate-type so cargo produces a .dylib for bindgen.
-# The dylib is only needed on the macOS host for uniffi-bindgen — it is never
-# shipped to iOS.  We restore the original Cargo.toml afterwards.
-CARGO_TOML="$SCRIPT_DIR/pgp-mobile/Cargo.toml"
-
-# Trap handler: restore Cargo.toml if the script is interrupted or fails
-# while the backup exists (between cp and mv).
-cleanup_cargo_toml() {
-    if [ -f "$CARGO_TOML.bak" ]; then
-        echo "  ⚠️  Restoring Cargo.toml from backup..."
-        mv "$CARGO_TOML.bak" "$CARGO_TOML" 2>/dev/null || true
-    fi
-}
-trap 'cleanup_cargo_toml' EXIT INT TERM
-
-cp "$CARGO_TOML" "$CARGO_TOML.bak"
-sed -i '' 's/crate-type = \["lib", "staticlib"\]/crate-type = ["lib", "staticlib", "cdylib"]/' "$CARGO_TOML"
-
-cargo build $CARGO_FLAGS --manifest-path "$MANIFEST"
-
-# Restore original Cargo.toml
-mv "$CARGO_TOML.bak" "$CARGO_TOML"
-
-# Clear the trap now that Cargo.toml is safely restored
-trap - EXIT INT TERM
+# The dylib is only needed on the macOS host for uniffi-bindgen. Build it
+# explicitly so Apple target builds stay static-only.
+cargo rustc $CARGO_FLAGS --manifest-path "$MANIFEST" --lib -- --crate-type cdylib
 
 HOST_DYLIB="$SCRIPT_DIR/pgp-mobile/target/$BUILD_DIR/libpgp_mobile.dylib"
 if [ ! -f "$HOST_DYLIB" ]; then

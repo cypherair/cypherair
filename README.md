@@ -115,19 +115,21 @@ cargo build --release --target aarch64-apple-ios-sim \
 cargo build --release --target aarch64-apple-darwin \
     --manifest-path pgp-mobile/Cargo.toml
 
-# Build host dylib for UniFFI bindgen
-cargo build --release --manifest-path pgp-mobile/Cargo.toml
+# Build the host-only dylib used by UniFFI bindgen
+cargo rustc --release --manifest-path pgp-mobile/Cargo.toml \
+    --lib -- --crate-type cdylib
 
 # Generate Swift bindings
-cargo run --bin uniffi-bindgen generate \
-    --library target/release/libpgp_mobile.dylib \
+cargo run --release --manifest-path pgp-mobile/Cargo.toml \
+    --bin uniffi-bindgen generate \
+    --library pgp-mobile/target/release/libpgp_mobile.dylib \
     --language swift --out-dir bindings/
 
 # Create XCFramework (all three platform slices)
 xcodebuild -create-xcframework \
-    -library target/aarch64-apple-ios/release/libpgp_mobile.a -headers bindings/ \
-    -library target/aarch64-apple-ios-sim/release/libpgp_mobile.a -headers bindings/ \
-    -library target/aarch64-apple-darwin/release/libpgp_mobile.a -headers bindings/ \
+    -library pgp-mobile/target/aarch64-apple-ios/release/libpgp_mobile.a -headers bindings/ \
+    -library pgp-mobile/target/aarch64-apple-ios-sim/release/libpgp_mobile.a -headers bindings/ \
+    -library pgp-mobile/target/aarch64-apple-darwin/release/libpgp_mobile.a -headers bindings/ \
     -output PgpMobile.xcframework
 
 # Run Rust tests
