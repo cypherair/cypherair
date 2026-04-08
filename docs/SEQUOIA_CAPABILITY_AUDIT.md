@@ -1,6 +1,6 @@
 # Sequoia Capability Audit
 
-> Purpose: Systematically audit which Sequoia 2.2 capabilities CypherAir currently wraps, exports, consumes, or omits.
+> Purpose: Provide the canonical inventory of which Sequoia 2.2 capabilities CypherAir's current build wraps, exports, consumes, disconnects, omits, or intentionally leaves out.
 > Audience: Human developers, reviewers, and AI coding tools.
 
 ## 1. Scope And Baselines
@@ -22,6 +22,20 @@ Layers audited:
 - Swift consumption layer: `Sources/Services/`
 - Test coverage: `pgp-mobile/tests`, `Tests/FFIIntegrationTests`, `Tests/ServiceTests`
 
+## 2. How To Read This Audit
+
+This document is the **canonical inventory** for the current build. It is intentionally broader than the companion roadmap document:
+
+- [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) is the **active Rust roadmap**
+- [`SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md) records **out-of-boundary surface**
+
+The companion documents use the following terms consistently:
+
+- `current-build omission`: a Sequoia capability that is available in the current repository build, but is still missing or disconnected at one or more CypherAir layers
+- `active Rust roadmap`: the subset of current-build omissions that CypherAir is actively tracking as wrapper/FFI work for `pgp-mobile`
+- `service adoption deferred`: Rust and FFI work may be completed before production Swift services adopt the capability
+- `out-of-boundary surface`: Sequoia surface that is either not compiled into the current repository build or intentionally outside CypherAir's current product/security boundary
+
 ### Status Legend
 
 Conclusions use the following fixed labels:
@@ -38,12 +52,13 @@ Conclusions use the following fixed labels:
 - `Services` means the capability is consumed by the production Swift services layer, not just by tests.
 - `Tests` means there is direct evidence in Rust, FFI, or Swift tests that the capability works or that its absence is intentional.
 - App-specific helpers such as QR URL encoding/decoding are tracked as extensions, but they are not counted as Sequoia capability gaps.
+- Conclusion labels describe **coverage status**, not roadmap priority.
 
-## 2. Current-Build Capability Matrix
+## 3. Current-Build Capability Matrix
 
-All current `PgpEngine` exports are covered by Sections 2.1 through 2.5.
+All current `PgpEngine` exports and the major current-build omission families are covered by Sections 3.1 through 3.5.
 
-### 2.1 Certificate And Key Lifecycle
+### 3.1 Certificate And Key Lifecycle
 
 | Capability | Domain | Sequoia | Build | Rust | FFI | Services | Tests | Conclusion | Notes |
 |---|---|---:|---:|---:|---:|---:|---:|---|---|
@@ -56,10 +71,10 @@ All current `PgpEngine` exports are covered by Sections 2.1 through 2.5.
 | Parse S2K parameters before import | Cert lifecycle | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Used by `Argon2idMemoryGuard` before import. |
 | Modify certificate expiry by re-signing bindings | Cert lifecycle | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Backed by `Cert::set_expiration_time`; consumed by `KeyManagementService.modifyExpiry`. |
 | Validate a standalone key revocation signature against a target certificate | Cert lifecycle | Yes | Yes | Yes | Yes | No | Yes | Exported but unused | `parse_revocation_cert` is exported and tested, but production services do not consume it. |
-| Merge same-fingerprint public certificate updates into an existing local certificate | Cert lifecycle | Yes | Yes | No | No | No | No | Missing wrapper | Sequoia has `merge_public` and `insert_packets`; current contact handling treats same-fingerprint imports as duplicates instead of updates. |
-| Regenerate a new key revocation signature from an existing private key | Cert lifecycle | Yes | Yes | No | No | No | No | Missing wrapper | Sequoia exposes `Cert::revoke`, but CypherAir only stores the revocation cert emitted at generation time. Imported keys lose this path. |
+| Merge same-fingerprint public certificate updates into an existing local certificate | Cert lifecycle | Yes | Yes | No | No | No | No | Missing wrapper | Sequoia has `merge_public` and packet insertion paths, but `ContactService.addContact` treats same-fingerprint imports as duplicates and never merges updates. |
+| Regenerate a new key revocation signature from an existing private key | Cert lifecycle | Yes | Yes | No | No | No | No | Missing wrapper | Sequoia exposes `Cert::revoke`, but CypherAir only stores the revocation cert emitted at generation time. Imported keys lose revocation-export parity after import. |
 
-### 2.2 Message Encryption And Decryption
+### 3.2 Message Encryption And Decryption
 
 | Capability | Domain | Sequoia | Build | Rust | FFI | Services | Tests | Conclusion | Notes |
 |---|---|---:|---:|---:|---:|---:|---:|---|---|
@@ -73,7 +88,7 @@ All current `PgpEngine` exports are covered by Sections 2.1 through 2.5.
 | Password/SKESK message encryption | Encrypt/decrypt | Yes | Yes | No | No | No | No | Missing wrapper | Sequoia supports `Encryptor::with_passwords` and `add_passwords`; CypherAir exposes only recipient-based encryption. |
 | Password/SKESK message decryption | Encrypt/decrypt | Yes | Yes | No | No | No | No | Missing wrapper | Current `DecryptHelper` ignores `SKESK` packets and only tries recipient key decryption. |
 
-### 2.3 Signing, Verification, And Parsing Helpers
+### 3.3 Signing, Verification, And Parsing Helpers
 
 | Capability | Domain | Sequoia | Build | Rust | FFI | Services | Tests | Conclusion | Notes |
 |---|---|---:|---:|---:|---:|---:|---:|---|---|
@@ -88,7 +103,7 @@ All current `PgpEngine` exports are covered by Sections 2.1 through 2.5.
 | Public-key armor convenience | Parsing/tools | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Used by public-key export and import normalization flows. |
 | Generic packet/metadata introspection beyond recipient header parsing | Parsing/tools | Yes | Yes | No | No | No | No | Missing wrapper | Current packet parsing is intentionally narrow and limited to PKESK header inspection. |
 
-### 2.4 Certificate Structure Updates And Policy Control
+### 3.4 Certificate Structure Updates And Policy Control
 
 | Capability | Domain | Sequoia | Build | Rust | FFI | Services | Tests | Conclusion | Notes |
 |---|---|---:|---:|---:|---:|---:|---:|---|---|
@@ -99,7 +114,7 @@ All current `PgpEngine` exports are covered by Sections 2.1 through 2.5.
 | Runtime policy customization beyond `StandardPolicy` | Policy | Yes | Yes | No | No | No | No | Intentionally excluded by product/security policy | Current wrapper hardcodes `StandardPolicy` and product-default algorithm decisions. |
 | Algorithm/backend selection knobs exposed to callers | Policy | Yes | Yes | No | No | No | No | Intentionally excluded by product/security policy | Product fixes OpenSSL backend, outgoing compression policy, and format-selection behavior. |
 
-### 2.5 App-Specific Exported Extensions
+### 3.5 App-Specific Exported Extensions
 
 These methods are part of the `PgpEngine` export surface, but they are CypherAir-specific extensions built on top of Sequoia parsing rather than missing Sequoia wrappers.
 
@@ -108,7 +123,7 @@ These methods are part of the `PgpEngine` export surface, but they are CypherAir
 | QR URL encode for public keys (`cypherair://import/v1/...`) | App extension | No | n/a | Yes | Yes | Yes | Yes | Implemented end-to-end | Uses Sequoia for certificate validation and secret-key rejection before encoding. |
 | QR URL decode and validate public-key payloads | App extension | No | n/a | Yes | Yes | Yes | Yes | Implemented end-to-end | Uses Sequoia to parse decoded payloads and reject secret-key material. |
 
-## 3. Rust-Only Internal Inventory
+## 4. Rust-Only Internal Inventory
 
 The following unexported Rust functions exist today but are implementation helpers, not missing public capabilities:
 
@@ -130,58 +145,57 @@ One internal item looks like a wrapper surface, but is not currently needed by t
 |---|---|---|---|
 | `keys::extract_secret_key_bytes` | Serialize a TSK back to raw secret-key bytes | Wrapped in Rust only | Redundant in current design because generation/import already return full secret cert bytes for SE wrapping. |
 
-## 4. Gap List
+## 5. Current-Build Omission Families
 
-### P0
+This section summarizes the current-build omissions recorded above. It intentionally separates the **active Rust roadmap** from broader omissions that remain tracked here in the audit.
 
-1. **Same-fingerprint certificate update absorption is missing**
-   - Evidence: Sequoia provides `merge_public` and packet insertion paths, but `ContactService.addContact` treats same-fingerprint imports as duplicates and never merges updates.
-   - Impact: revoked contact certs, refreshed expiry, and accumulated third-party signatures cannot be absorbed once the fingerprint is already present.
-   - Classification: `Missing wrapper`
+### 5.1 Families On The Active Rust Roadmap
 
-2. **Imported private keys cannot regenerate/export a revocation certificate**
-   - Evidence: imported identities store `revocationCert = Data()` in `KeyManagementService.importKey`, while the UI only offers revocation export when that field is populated.
-   - Impact: keys created elsewhere lose revocation-export parity after import.
-   - Classification: `Missing wrapper`
+The following omission families are part of the companion active Rust roadmap in [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md):
 
-### P1
+1. **Certificate merge/update family**
+   - Includes same-fingerprint public certificate update absorption and the broader certificate-structure update wrappers for new User IDs, new subkeys, and updated binding packets.
+   - Default stance: `service adoption deferred`
+   - Current production-flow exception: same-fingerprint contact update absorption
 
-1. **Password/SKESK message support is absent**
-   - Sequoia support exists in the current build.
-   - Rust wrapper does not expose encrypt/decrypt entry points.
-   - Decryption helper explicitly ignores `SKESK`.
+2. **Revocation construction family**
+   - Includes generating a key revocation certificate from an existing secret cert, plus selective subkey and User ID revocation builders.
+   - Default stance: `service adoption deferred`
+   - Current production-flow exception: imported-key revocation parity
 
-2. **Third-party certification and binding verification are absent**
-   - No Rust wrapper for direct-key, User ID binding, or related certification verification methods.
+3. **Password/SKESK symmetric-message family**
+   - Includes password-based encryption/decryption wrappers and the error-mapping work needed to distinguish wrong-password, integrity/authentication, and malformed-message outcomes.
+   - Default stance: `service adoption deferred`
 
-3. **Certificate-structure update wrappers are absent**
-   - No wrapper for adding or merging updated User IDs, subkeys, or binding packets.
+4. **Certification and binding verification family**
+   - Includes direct-key verification, User ID binding verification, related certification checks, and the broader certification surface required for typed certificate-signature semantics.
+   - Default stance: `service adoption deferred`
 
-4. **Subkey and User ID revocation builders are absent**
-   - No path for selective revocation flows if the product later needs them.
+5. **Richer signature result family**
+   - Includes multi-signature-aware verification/decryption result models that preserve Sequoia semantics instead of collapsing them into one status.
+   - Default stance: `service adoption deferred`
 
-5. **Detailed multi-signature results are absent**
-   - Current verify/decrypt models collapse multiple signatures into one result.
+### 5.2 Current-Build Omissions Tracked Here, But Not On The Active Rust Roadmap
 
-### P2
+1. **Generic packet/metadata introspection beyond recipient header parsing**
+   - This remains a `current-build omission`, but it is not on the current active Rust roadmap.
+   - Reason: no bounded consumer-facing schema has been selected, and the project does not currently want to grow a general packet-inspection API as incidental backlog.
 
-1. **Standalone revocation-signature validation is exported but unused by production services**
-   - Only tests consume `parse_revocation_cert`.
+### 5.3 Disconnected But Not Omitted
 
-2. **Generic armor encode is exported but unused by production services**
-   - Production code uses `dearmor` and `armorPublicKey`, not generic `armor`.
+These are not `current-build omissions`, but they remain worth keeping visible because they illustrate capabilities that already crossed the Rust/FFI boundary while production services still defer adoption:
 
-### P3
+1. **Standalone revocation-signature validation**
+   - Exported through `parse_revocation_cert`
+   - Production service adoption is still deferred
 
-1. **Runtime policy customization is intentionally not surfaced**
-   - CypherAir fixes `StandardPolicy`, recipient-driven format selection, and profile-driven export rules.
+2. **Generic armor encode**
+   - Exported through `engine.armor`
+   - Production service adoption is still deferred
 
-2. **Algorithm/backend knobs are intentionally fixed**
-   - The app standardizes on `crypto-openssl` and disallows product-level backend switching.
+## 6. Design Exclusions And Non-Gaps
 
-## 5. Design Exclusions And Non-Gaps
-
-The following items should not be treated as defects in the primary report:
+The following items should not be treated as defects in the primary audit:
 
 - **QR URL encode/decode helpers**
   - These are app-specific wrappers built on top of Sequoia key parsing, not missing Sequoia integrations.
@@ -190,35 +204,7 @@ The following items should not be treated as defects in the primary report:
 - **Generic helper functions in `pgp-mobile/src`**
   - Error classifiers, recipient builders, and zeroizing stream utilities are not public capability gaps.
 - **Alternative Sequoia feature-gated surfaces**
-  - These are tracked in the appendix and are outside the primary current-build gap count.
-
-## 6. Minimal Remediation Paths
-
-1. **Certificate update absorption**
-   - Add a Rust wrapper around Sequoia public cert merge/update flows.
-   - Add an FFI entry point that accepts an existing cert plus an incoming update cert or update packet.
-   - Teach `ContactService` to distinguish:
-     - exact duplicate
-     - same fingerprint with newer public material
-     - same user ID with different fingerprint
-   - Add tests for revocation update, expiry refresh, and extra-signature merge.
-
-2. **Revocation regeneration for imported private keys**
-   - Add a Rust wrapper around Sequoia key revocation generation from an existing secret cert.
-   - Export it through `PgpEngine`.
-   - Use it in `KeyManagementService.importKey` or on-demand export flows so imported identities regain revocation-export parity.
-   - Add tests for both profiles.
-
-3. **Password/SKESK support**
-   - If product scope wants symmetric-message compatibility, add Rust wrappers for password-based encrypt/decrypt and explicit error mapping.
-   - Extend Swift services only if a product flow is approved; otherwise document the omission as intentional.
-
-4. **Certification and advanced signature semantics**
-   - Add dedicated wrappers only when a certification feature is planned.
-   - Prefer a richer result model before wiring multi-signature or certification verification into Swift.
-
-5. **Documentation cleanup**
-   - Clarify in product/security docs that current support is centered on recipient-key workflows, not password messages or certificate-merge/update intake.
+  - These are recorded as `out-of-boundary surface` in the appendix, not as current-build omissions.
 
 ## 7. Evidence Sources
 

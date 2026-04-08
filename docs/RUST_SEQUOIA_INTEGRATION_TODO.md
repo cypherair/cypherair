@@ -1,423 +1,278 @@
-# Rust Sequoia 集成待办事项
+# Rust Sequoia Integration Roadmap
 
-> 目的：将 Sequoia 审计结果转化为面向 `pgp-mobile` 的、以 Rust 为优先的执行待办清单。
-> 受众：人工开发者、审阅者以及 AI 编码工具。
+> Purpose: Translate the Sequoia audit into the active Rust roadmap for `pgp-mobile`.
+> Audience: Human developers, reviewers, and AI coding tools.
 
-本文档基于以下文件整理而来：
+Primary objective:
+
+> Improve `pgp-mobile` as a more complete Sequoia wrapper surface, even when immediate CypherAir service adoption is deferred.
+
+This roadmap is derived from:
 
 - [`SEQUOIA_CAPABILITY_AUDIT.md`](SEQUOIA_CAPABILITY_AUDIT.md)
 - [`SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md)
 
-它被有意设计为**以 Rust 为优先**：
+This document is intentionally narrower than the main audit:
 
-- 主待办清单聚焦于 Rust 包装层以及 Rust + FFI 工作
-- 除非某个 Rust 项天然需要导出的接口，否则 Swift 侧消费工作暂时后置
-- 已在 Rust 侧完成、但仍需要产品层接入的能力，会单独作为交接项跟踪
+- the audit is the **canonical inventory**
+- this file is the **active Rust roadmap**
+- the appendix records **out-of-boundary surface**
 
-## 1. 主要 Rust TODO 待办清单
+## 1. Roadmap Framing
 
-### P0 — 吸收同一指纹证书的更新
+The workstreams below are listed in recommended execution order. They are grouped by capability family rather than by current product exposure.
 
-**问题**
+Default rules:
 
-当传入的新公钥证书与本地已存证书拥有相同的主指纹时，CypherAir 目前无法吸收这类新的公钥证书更新。
+- Rust wrapper coverage is the primary objective.
+- FFI export is part of the roadmap whenever a wrapper family needs a stable boundary for later consumers.
+- `service adoption deferred` is the default stance unless explicitly stated otherwise.
+- If a workstream changes exported record shapes or public method shapes, the implementation must include:
+  - UniFFI regeneration
+  - FFI integration tests
+  - a separate Swift migration/adaptation plan
 
-**为什么重要**
+## 2. Active Rust Roadmap
 
-这会阻塞若干关键的公钥证书演进路径，包括：
+### 2.1 Certificate Merge/Update Family
 
-- 吊销更新
-- 过期时间刷新材料
-- 累积的第三方认证或其他数据包更新
+**Purpose**
 
-如果缺少这项能力，同指纹导入会被当作重复项，而不是更新项。
+Close the current-build omission around same-fingerprint public-certificate updates, while establishing a bounded certificate-update family instead of a one-off merge hook.
 
-**所需的 Rust 工作**
+**Rust scope**
 
-- 基于 Sequoia 的证书合并与数据包插入 API，为公钥证书更新/合并流程添加 Rust 包装层。
-- 支持 CypherAir 所需的最小更新路径：
-  - 现有公钥证书 + 新传入的公钥证书更新
-  - 同一指纹的合并/更新结果
-- 以适合后续通过 FFI 导出的二进制形式返回合并后的公钥证书。
+- Wrap Sequoia public-certificate merge/update flows around `merge_public` and packet-insertion paths.
+- Support an initial bounded scope:
+  - existing public certificate + incoming public-certificate update
+  - same-fingerprint merge/update result
+  - absorption of new User IDs
+  - absorption of new subkeys
+  - absorption of updated binding packets
+- Return merged public-certificate bytes as the primary output.
+- Do not design a generic packet-diff or policy engine in this workstream.
 
-**受影响的 Rust 接口面**
+**FFI scope**
 
-- Rust 包装层：**必需**
-- `PgpEngine` 导出：**必需**
-- 结果/类型变更：**是**，因为合并操作需要明确的输入/输出接口
+- Export a dedicated `PgpEngine` entry point for certificate merge/update.
+- Keep the first FFI shape narrow:
+  - input: existing certificate bytes
+  - input: incoming certificate/update bytes
+  - output: merged certificate bytes, plus any minimal metadata needed to distinguish success vs rejection
+- Keep the first export independent from Swift-specific contact replacement policy.
 
-**Rust、FFI 与 Swift 的边界**
+**Service stance**
 
-- Rust：实现合并/更新包装层
-- FFI：导出合并/更新入口点
-- Swift：本文档暂不处理，但预计后续会在联系人更新流程中消费该导出能力
+- Default: `service adoption deferred`
+- Current production-flow exception: same-fingerprint contact update absorption is already a product gap and should be the first downstream consumer when service work is scheduled
 
-**本文档不涵盖**
+**Minimum testing**
 
-- Swift 的联系人存储策略
-- UI 如何显示“重复项”与“已更新”
-- 针对不同指纹的联系人替换流程
+- Rust tests:
+  - revocation update merge
+  - expiry refresh merge
+  - absorb new User ID
+  - absorb new subkey
+  - exact-duplicate no-op merge
+  - reject unrelated fingerprints
+- FFI tests:
+  - merge round-trip across the boundary
+  - merged certificate still parses into expected metadata
 
-**最低测试覆盖**
+**Interface compatibility notes**
 
-- Rust 测试：
-  - 吊销更新合并
-  - 过期时间刷新合并
-  - 对完全相同证书的 no-op 合并
-  - 拒绝不匹配的指纹
-- FFI 测试：
-  - 跨边界的合并往返
-  - 合并后的证书保留更新后的状态元数据
+- Prefer additive methods and result records over overloading current import helpers.
+- The first export should be small, but extensible enough that future update categories do not require breaking the initial FFI method shape.
 
-### P0 — 为导入私钥补齐吊销重新生成/导出能力
+### 2.2 Revocation Construction Family
 
-**问题**
+**Purpose**
 
-导入的私钥目前无法恢复与导出相关的吊销能力一致性，因为 CypherAir 现在会为导入身份存储一个空的 `revocationCert`。
+Restore revocation-construction coverage for imported secret certificates and provide a coherent family for finer-grained revocation material.
 
-**为什么重要**
+**Rust scope**
 
-在应用外生成的密钥导入后，会失去一项有意义的恢复/安全能力。这使本地生成的密钥与导入密钥之间出现能力缺口。
+- Add a wrapper that generates a key revocation certificate from an existing secret certificate.
+- Add selective revocation builders for:
+  - subkey-specific revocation material
+  - User ID-specific revocation material
+- Return raw revocation bytes suitable for storage, export, validation, or later application.
+- Do not couple this workstream to Swift persistence or UI/export policy.
 
-**所需的 Rust 工作**
+**FFI scope**
 
-- 添加 Rust 包装层，能够基于现有的秘密证书生成密钥吊销签名。
-- 让该包装层同时适配两个受支持的配置档。
-- 以可供上层后续存储或导出的形式返回吊销证书字节。
+- Export key-level revocation generation as a first-class `PgpEngine` method.
+- Export subkey and User ID revocation builders as separate methods rather than mode flags on one overloaded API.
+- Keep the output shape byte-oriented in the first iteration.
 
-**受影响的 Rust 接口面**
+**Service stance**
 
-- Rust 包装层：**必需**
-- `PgpEngine` 导出：**必需**
-- 结果/类型变更：**可能需要**，取决于该能力是作为独立函数暴露，还是挂接到现有导出流程中
+- Default: `service adoption deferred`
+- Current production-flow exception: imported-key revocation parity is already a product gap and should be the first downstream consumer when service work is scheduled
 
-**Rust、FFI 与 Swift 的边界**
+**Minimum testing**
 
-- Rust：实现基于现有秘密证书的吊销生成
-- FFI：导出该能力
-- Swift：本文档暂不处理，但预计后续会在导入流程或按需导出流程中使用该导出能力
+- Rust tests:
+  - Profile A key revocation generation
+  - Profile B key revocation generation
+  - generated revocation validates against the source certificate
+  - mismatched-certificate validation fails
+  - valid subkey revocation generation
+  - valid User ID revocation generation
+- FFI tests:
+  - generated revocation bytes cross the boundary cleanly
+  - exported bytes validate through the existing revocation-validation path
 
-**本文档不涵盖**
+**Interface compatibility notes**
 
-- Swift 对导入吊销证书的存储策略
-- UI/导出行为
-- 已导入身份在持久化存储中的迁移
+- Keep the first exported outputs as raw revocation bytes instead of freezing a richer revocation record too early.
+- Prefer separate methods for key, subkey, and User ID revocation so later semantic expansion does not overload one API surface.
 
-**最低测试覆盖**
+### 2.3 Password/SKESK Symmetric-Message Family
 
-- Rust 测试：
-  - Profile A 吊销生成
-  - Profile B 吊销生成
-  - 生成的吊销证书可针对源证书完成验证
-  - 不匹配证书的校验失败
-- FFI 测试：
-  - 生成的吊销证书可跨边界传递
-  - 导出的字节可通过现有吊销验证路径完成校验
+**Purpose**
 
-### P1 — 密码 / SKESK 加解密支持
+Add the current-build symmetric-message surface to `pgp-mobile` even if CypherAir does not currently expose it as a product workflow.
 
-**问题**
+**Rust scope**
 
-CypherAir 目前只封装了基于收件人密钥的消息加密与解密。虽然当前构建中的 Sequoia 已支持密码/SKESK 消息，但这部分能力尚未接入。
+- Add password-based encryption wrappers.
+- Add password/SKESK decryption wrappers.
+- Extend error mapping so wrong password, authentication/integrity failure, and malformed/corrupt message remain distinguishable.
+- Handle `SKESK` packets explicitly instead of ignoring them.
+- Keep this family separate from recipient-key workflows.
 
-**为什么重要**
+**FFI scope**
 
-这在 OpenPGP 对称消息工作流中留下了真实的互操作性缺口。
+- Export separate `PgpEngine` methods for password encrypt/decrypt.
+- Do not overload existing recipient-key methods with optional password arguments.
+- Reuse existing decrypt result models only if the semantics remain identical; otherwise add dedicated records.
 
-**所需的 Rust 工作**
+**Service stance**
 
-- 添加基于密码加密的 Rust 包装层。
-- 添加密码/SKESK 解密的 Rust 包装层。
-- 扩展错误映射，使错误密码、认证失败和消息格式错误等行为保持明确可区分。
-- 保持这项能力与基于收件人密钥的 API 接口面分离，以免模糊当前消息流程。
+- Default: `service adoption deferred`
+- No current CypherAir product commitment is implied by adding these Rust/FFI capabilities
 
-**受影响的 Rust 接口面**
+**Minimum testing**
 
-- Rust 包装层：**必需**
-- `PgpEngine` 导出：**必需**
-- 结果/类型变更：**很可能需要**，因为基于密码的解密输入不同于当前基于收件人密钥的解密输入
+- Rust tests:
+  - password encrypt/decrypt round-trip
+  - wrong password
+  - tampered symmetric ciphertext
+  - compatibility coverage across Profile A / Profile B message handling where applicable
+- FFI tests:
+  - password encrypt/decrypt round-trip
+  - wrong-password error mapping
+  - integrity/authentication failure mapping
 
-**Rust、FFI 与 Swift 的边界**
+**Interface compatibility notes**
 
-- Rust：实现密码/SKESK 入口点
-- FFI：导出它们
-- Swift：本文档暂不处理；产品层可稍后再接入
+- This workstream should be additive only.
+- Do not blur symmetric-message APIs into the existing recipient-key APIs.
 
-**本文档不涵盖**
+### 2.4 Certification And Binding Verification Family
 
-- Swift/UI 中基于密码的消息工作流入口
-- 产品层关于是否正式暴露对称消息支持的表述
+**Purpose**
 
-**最低测试覆盖**
+Expose typed certificate-signature semantics needed for future certification features, trust-related tooling, and richer certificate validation.
 
-- Rust 测试：
-  - 密码加密/解密往返
-  - 错误密码
-  - 被篡改的对称密文
-  - 在与消息格式处理相关时，覆盖 Profile A / Profile B 的兼容性
-- FFI 测试：
-  - 密码加密/解密往返
-  - 错误密码的错误映射
+**Rust scope**
 
-### P1 — 第三方认证与绑定验证
+- Wrap:
+  - direct-key verification
+  - User ID binding verification
+  - related third-party certification checks
+- Include the broader certification surface needed to create third-party certification material built on current-build Sequoia flows such as `UserID::certify`.
+- Define compact certificate-signature result models distinct from message verification results.
 
-**问题**
+**FFI scope**
 
-CypherAir 目前尚未封装 Sequoia 的证书签名验证接口，因此无法处理 direct-key、User ID 绑定以及相关第三方认证检查。
+- Export dedicated verification and certification methods on `PgpEngine`.
+- Export dedicated certificate-signature result records separate from message `VerifyResult` and `DecryptResult`.
+- Keep certificate-signature APIs isolated from current message-verification entry points.
 
-**为什么重要**
+**Service stance**
 
-这是一切未来认证或信任相关功能的基础。如果 Rust 层没有支持，后续更高层的工作就没有安全、类型明确的接口可以构建。
+- Default: `service adoption deferred`
+- Rust completeness remains the objective even without current CypherAir exposure
 
-**所需的 Rust 工作**
+**Minimum testing**
 
-- 为与以下场景相关的证书签名验证接口添加 Rust 包装层：
-  - direct-key 验证
-  - User ID 绑定验证
-  - 相关第三方认证检查
-- 定义适合 Rust/FFI 使用的紧凑结果模型。
+- Rust tests:
+  - valid direct-key verification
+  - valid User ID binding verification
+  - invalid signature
+  - mismatched certificate/signature inputs
+  - third-party certification generation followed by successful verification
+- FFI tests:
+  - result mapping across the boundary
+  - invalid-input behavior across the boundary
 
-**受影响的 Rust 接口面**
+**Interface compatibility notes**
 
-- Rust 包装层：**必需**
-- `PgpEngine` 导出：**必需**
-- 结果/类型变更：**是**，因为当前导出的验证结果面向消息，而不是面向证书签名
+- Do not extend current message-verification enums to carry certificate-signature semantics.
+- Use new records and new methods for this family from the first export.
 
-**Rust、FFI 与 Swift 的边界**
+### 2.5 Richer Signature Result Family
 
-- Rust：实现证书签名验证能力
-- FFI：导出类型化的验证结果
-- Swift：本文档暂不处理
+**Purpose**
 
-**本文档不涵盖**
+Preserve Sequoia's multi-signature semantics instead of collapsing verification and decryption results to one status and one optional signer fingerprint.
 
-- 认证相关 UX
-- 信任模型或信任图
-- 任何 Swift 侧的联系人认证工作流
+**Rust scope**
 
-**最低测试覆盖**
+- Define a multi-entry signature result model for:
+  - cleartext verification
+  - detached verification
+  - decryption-side signature reporting
+- Preserve per-signature status and signer identity where available.
+- Remove last-result-wins semantics from the detailed path.
 
-- Rust 测试：
-  - 有效的 direct-key / 绑定验证
-  - 无效签名
-  - 证书/签名输入不匹配
-- FFI 测试：
-  - 跨边界的结果映射
-  - 无效场景下的错误/结果行为
+**FFI scope**
 
-### P1 — 证书结构更新包装层
+- Export parallel detailed methods and detailed result records rather than silently changing current result shapes in place.
+- Keep the existing single-status methods available during the first rollout.
 
-**问题**
+**Service stance**
 
-CypherAir 目前尚未封装更广义的证书结构更新操作，例如合并新的证书材料、新的 User ID、新的子密钥以及更新后的绑定。
+- Default: `service adoption deferred`
+- Rust completeness remains the objective even without current CypherAir exposure
 
-**为什么重要**
+**Minimum testing**
 
-吸收同指纹更新是当前最紧迫的缺口，但其背后的能力族更大。如果只做一个狭窄的一次性修复，而很快又需要更广泛的更新处理，就可能形成死胡同式 API。
+- Rust tests:
+  - multi-signature all-valid case
+  - mixed valid/invalid signatures
+  - known signer + unknown signer combinations
+  - cleartext and detached variants
+  - decryption-side signed message coverage
+- FFI tests:
+  - multi-entry result mapping across the boundary
+  - compatibility of legacy and detailed methods during the transition
 
-**所需的 Rust 工作**
+**Interface compatibility notes**
 
-- 引入一个证书更新包装层家族，以支持：
-  - 同一指纹的公钥证书材料合并/更新
-  - 新的 User ID
-  - 新的子密钥
-  - 更新后的绑定数据包
-- 保持初始导出接口尽量精简，但在设计时要确保未来新增更新类别时无需破坏 FFI 形态。
+- The first rollout must be additive.
+- Do not break existing verify/decrypt record shapes in place; introduce parallel detailed entry points first.
 
-**受影响的 Rust 接口面**
+## 3. Tracked In Audit, Not On The Active Rust Roadmap
 
-- Rust 包装层：**必需**
-- `PgpEngine` 导出：**必需**
-- 结果/类型变更：**是**
+The following `current-build omission` remains recorded in the audit, but is intentionally outside the current active roadmap:
 
-**Rust、FFI 与 Swift 的边界**
+1. **Generic packet/metadata introspection beyond recipient header parsing**
+   - Keep it visible in the audit.
+   - Do not expand it into a general packet-inspection API without a concrete consumer and a bounded schema.
 
-- Rust：定义更新/合并能力家族
-- FFI：导出初始接口面
-- Swift：暂缓处理，仅在未来联系人更新流程需要时接入
+## 4. Already Implemented In Rust, Still Waiting On Service Adoption
 
-**本文档不涵盖**
+These are visible for handoff tracking, but they are **not** active roadmap items because no new wrapper work is required:
 
-- 完整的 Swift 侧更新策略
-- 已存联系人文件的迁移
-- 针对不同更新类别的 UI 提示
+1. **Standalone revocation-signature validation**
+   - Rust wrapper: complete
+   - `PgpEngine` export: complete
+   - current status: `service adoption deferred`
 
-**最低测试覆盖**
-
-- Rust 测试：
-  - 同指纹合并成功
-  - 吸收新 UID
-  - 吸收新子密钥
-  - 拒绝无关证书
-- FFI 测试：
-  - 更新输出的往返
-  - 合并后的元数据仍然可解析
-
-### P1 — 子密钥 / 用户 ID 吊销构建器
-
-**问题**
-
-CypherAir 目前没有封装 Sequoia 面向子密钥和单个 User ID 的选择性吊销构建器。
-
-**为什么重要**
-
-这属于更广泛的吊销能力家族的一部分。如果 CypherAir 未来需要更细粒度的吊销流程，Rust 层目前没有现成起点。
-
-**所需的 Rust 工作**
-
-- 为以下能力添加 Rust 包装层：
-  - 面向特定子密钥的吊销生成
-  - 面向特定 User ID 的吊销生成
-- 保持输出与证书更新/合并路径兼容，以便后续能够干净地应用或传输生成的吊销材料。
-
-**受影响的 Rust 接口面**
-
-- Rust 包装层：**必需**
-- `PgpEngine` 导出：**必需**
-- 结果/类型变更：**可能需要**，取决于输出是原始吊销签名，还是更丰富的类型化结果
-
-**Rust、FFI 与 Swift 的边界**
-
-- Rust：实现选择性吊销生成
-- FFI：导出它
-- Swift：本文档暂不处理
-
-**本文档不涵盖**
-
-- 用于选择要吊销的子密钥或 User ID 的 UI
-- 关于何时暴露细粒度吊销能力的产品策略
-
-**最低测试覆盖**
-
-- Rust 测试：
-  - 有效的子密钥吊销生成
-  - 有效的 User ID 吊销生成
-  - 吊销验证/应用路径
-- FFI 测试：
-  - 生成的吊销字节可跨边界传递
-
-### P1 — 更丰富的多签名结果模型
-
-**问题**
-
-当前的验证与解密结果接口，会把可能存在的多个签名压缩成单一 `status` 和一个可选的单个签名者指纹。
-
-**为什么重要**
-
-这会丢失 Sequoia 更丰富的签名组语义，并限制未来消息验证的保真度。
-
-**所需的 Rust 工作**
-
-- 设计一个更丰富的 Rust 侧验证结果模型，以表示多个签名。
-- 更新消息验证包装层，使其输出能够感知多签名的结果。
-- 明确标出向后兼容风险，因为导出的结果记录可能需要变化。
-
-**受影响的 Rust 接口面**
-
-- Rust 包装层：**必需**
-- `PgpEngine` 导出：**必需**
-- 结果/类型变更：**明确需要**
-
-**Rust、FFI 与 Swift 的边界**
-
-- Rust：定义更丰富的结果形态
-- FFI：导出新类型
-- Swift：本文档暂不处理，但任何消费者后续都需要适配
-
-**本文档不涵盖**
-
-- Swift UI 中对多个签名的展示
-- Swift 调用点的向后兼容迁移策略
-
-**最低测试覆盖**
-
-- Rust 测试：
-  - 多签名下有效/无效组合
-  - 已知签名者 + 未知签名者组合
-  - 适用时覆盖分离签名与明文签名变体
-- FFI 测试：
-  - 跨边界的多条目结果映射
-
-## 2. Rust 已完成，等待 Swift 交接
-
-这些项目应继续保持可见，但它们**不是当前活跃的 Rust TODO 项**。
-
-### 独立吊销验证
-
-**当前状态**
-
-Rust 已经封装并导出了独立吊销验证。
-
-**为什么列在这里**
-
-尚未解决的工作主要在于 Swift/产品层消费，而不是 Rust 能力创建。
-
-**Rust 状态**
-
-- Rust 包装层：已完成
-- `PgpEngine` 导出：已完成
-
-**延后的 Swift 工作**
-
-- 决定生产服务是否应消费现有导出
-- 后续在任何吊销导入或验证流程中接入它
-
-### 通用 Armor 编码
-
-**当前状态**
-
-Rust 已经封装并导出了通用 armor 编码。
-
-**为什么列在这里**
-
-生产 Swift 代码目前使用的是 `dearmor` 和 `armorPublicKey`，因此剩余问题在于产品层消费，而不是 Rust 实现。
-
-**Rust 状态**
-
-- Rust 包装层：已完成
-- `PgpEngine` 导出：已完成
-
-**延后的 Swift 工作**
-
-- 仅当未来某个产品流程需要按种类进行通用 armor 编码时才需要
-
-## 3. 实验性 / 可选的后续工作
-
-这些项目被有意**排除在主 Rust 待办清单之外**。
-
-### 运行时策略自定义
-
-**当前状态**
-
-CypherAir 当前围绕 `StandardPolicy` 以及产品默认验证行为固定使用 Sequoia。
-
-**为什么它属于实验性**
-
-暴露运行时策略控制会扩大底层 API 接口面，并把产品/安全决策上移。
-
-**当前决定**
-
-将其作为可选的未来能力跟踪，而不是已承诺的 Rust TODO。
-
-### 算法 / 后端选择开关
-
-**当前状态**
-
-CypherAir 围绕当前的产品/安全模型，固定了后端与算法策略选择。
-
-**为什么它属于实验性**
-
-暴露这些开关会扩大可配置性，而这与当前产品模型并不一致。
-
-**当前决定**
-
-将其作为可选的未来能力跟踪，而不是已承诺的 Rust TODO。
-
-## 4. 后续执行说明
-
-- 本文档被有意设计为**以 Rust 为优先**。Swift 工作应在 Rust 层稳定后单独规划。
-- 如果某个 Rust 项会改变导出的记录或方法形态，则后续工作必须包含：
-  - UniFFI 重新生成
-  - FFI 集成测试
-  - 独立的 Swift 适配计划
-- 能力映射和设计理由仍以审计文档为准。本文档是从那些文档中派生出的执行待办清单。
+2. **Generic armor encode**
+   - Rust wrapper: complete
+   - `PgpEngine` export: complete
+   - current status: `service adoption deferred`

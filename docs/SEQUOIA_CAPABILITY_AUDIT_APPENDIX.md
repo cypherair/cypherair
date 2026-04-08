@@ -1,14 +1,25 @@
 # Sequoia Capability Audit Appendix
 
-> Purpose: Record the broader Sequoia 2.2 capability surface that sits outside CypherAir's current build baseline or product boundary.
+> Purpose: Record the Sequoia 2.2 surface that is outside CypherAir's current build baseline or current product/security boundary.
 > Audience: Human developers, reviewers, and AI coding tools.
 
-This appendix is not a defect list by itself. Its role is to separate:
+This appendix is intentionally **not** a defect list or backlog by itself. Its job is to capture `out-of-boundary surface` and keep it separate from the current-build inventory in [`SEQUOIA_CAPABILITY_AUDIT.md`](SEQUOIA_CAPABILITY_AUDIT.md).
 
-- features that Sequoia supports but CypherAir does not currently compile
-- capability families that Sequoia documents but CypherAir intentionally does not surface
+## 1. Classification Rule
 
-## 1. Feature-Gated Sequoia Surface Not Compiled In This Repository
+A Sequoia capability belongs in this appendix only if at least one of the following is true:
+
+- it is **not compiled into the current repository build**
+- it is **intentionally outside CypherAir's current product/security boundary**
+
+The converse also matters:
+
+- if a capability is available in the current repository build and is still missing or disconnected, it belongs in the main audit as a `current-build omission`
+- if the project decides to actively pursue wrapper work for a current-build omission, it moves into the companion `active Rust roadmap` in [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md)
+
+This appendix should therefore stay narrower than both the main audit and the active Rust roadmap.
+
+## 2. Feature-Gated Sequoia Surface Not Compiled In This Repository
 
 CypherAir builds `sequoia-openpgp` with:
 
@@ -18,7 +29,7 @@ CypherAir builds `sequoia-openpgp` with:
 
 The following Sequoia 2.2 surfaces exist upstream but are not available in the current repository build:
 
-| Sequoia surface | Upstream evidence | Current repo status | Why it is not scored as a primary gap |
+| Sequoia surface | Upstream evidence | Current repo status | Why it is kept in the appendix |
 |---|---|---|---|
 | `compression-bzip2` | Sequoia feature list | Unavailable in current build | Feature not enabled; CypherAir docs already exclude bzip2 for dependency reasons. |
 | `compression` default bundle (`deflate + bzip2`) | Sequoia feature list | Unavailable in current build | Repository explicitly opts out of default features. |
@@ -29,26 +40,28 @@ The following Sequoia 2.2 surfaces exist upstream but are not available in the c
 | `allow-experimental-crypto` | Sequoia feature list | Unavailable in current build | Security model does not opt into experimental crypto. |
 | `allow-variable-time-crypto` | Sequoia feature list | Unavailable in current build | Security model does not opt into variable-time crypto. |
 
-## 2. Broader Official Sequoia Surface Outside CypherAir's Current Product Boundary
+## 3. Official Sequoia Surface Outside CypherAir's Current Product Or Security Boundary
 
 The Sequoia source and examples expose capability families that CypherAir does not currently surface as product features:
 
-| Sequoia surface | Upstream evidence | Current repo status | Audit interpretation |
+| Sequoia surface | Upstream evidence | Current repo status | Why it is kept in the appendix |
 |---|---|---|---|
-| Web-of-trust example flows | Sequoia examples (`web-of-trust`) | Not wrapped | Outside current CypherAir product model. |
+| Web-of-trust example flows | Sequoia examples (`web-of-trust`) | Not wrapped | Outside CypherAir's current product model. |
 | Statistics / supported-algorithms examples | Sequoia examples (`statistics`, `supported-algorithms`) | Not wrapped | Diagnostic tooling, not a current product gap. |
 | Notarization example flow | Sequoia examples (`notarize`) | Not wrapped | Outside current CypherAir scope. |
 | Padding / wrap-literal helper examples | Sequoia examples (`pad`, `wrap-literal`) | Not wrapped | Not part of CypherAir's current message UX. |
 | Group-key example flows | Sequoia examples (`generate-group-key`) | Not wrapped | Outside the current key-management model. |
 
-## 3. Relationship To The Main Audit
+## 4. Relationship To The Main Audit And Roadmap
 
-The main report should be read as:
+Read the companion documents as follows:
 
-- **Primary gap list**: items that are compiled today and are missing or disconnected in CypherAir
-- **Appendix**: items that exist upstream, but are not actionable gaps unless the build policy or product boundary changes
+- [`SEQUOIA_CAPABILITY_AUDIT.md`](SEQUOIA_CAPABILITY_AUDIT.md): canonical inventory of the current build, including every relevant `current-build omission`
+- [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md): the subset of current-build omissions on the `active Rust roadmap`
+- this appendix: `out-of-boundary surface` only
 
 In practice:
 
-- `password/SKESK`, `merge_public`, `revoke`, `certify`, and binding verification remain **actionable omissions** because they are available in the current build.
-- alternative compression and crypto backends remain **non-actionable for now** because the repository does not compile them in.
+- `password/SKESK`, `merge_public`, `revoke`, `certify`, binding verification, and richer signature-result work remain in the main audit because they are available in the current build
+- alternative compression and crypto backends remain in this appendix because the repository does not compile them in
+- example-driven families such as web-of-trust, notarization, and group-key flows remain in this appendix until CypherAir explicitly expands its product/security boundary
