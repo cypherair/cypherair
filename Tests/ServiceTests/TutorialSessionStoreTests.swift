@@ -73,6 +73,55 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertTrue(store.isCompleted(.createDemoIdentity))
     }
 
+    func test_returnToOverview_preservesNavigationStateUntilNextModuleLaunch() async {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.markCompletedForTesting(.createDemoIdentity)
+        store.markCompletedForTesting(.addDemoContact)
+        await store.openModule(.encryptDemoMessage)
+        store.setRoutePath([.encrypt], for: .home)
+
+        store.returnToOverview()
+
+        XCTAssertEqual(store.hostSurface, .hub)
+        XCTAssertEqual(store.routePath(for: .home), [.encrypt])
+        XCTAssertEqual(store.visibleRoute, .encrypt)
+        XCTAssertEqual(store.selectedTab, .home)
+    }
+
+    func test_openSandboxAcknowledgement_preservesNavigationStateUntilHostSwitches() async {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.markCompletedForTesting(.createDemoIdentity)
+        store.markCompletedForTesting(.addDemoContact)
+        await store.openModule(.encryptDemoMessage)
+        store.setRoutePath([.encrypt], for: .home)
+
+        store.openSandboxAcknowledgement()
+
+        XCTAssertEqual(store.hostSurface, .sandboxAcknowledgement)
+        XCTAssertEqual(store.routePath(for: .home), [.encrypt])
+        XCTAssertEqual(store.visibleRoute, .encrypt)
+        XCTAssertEqual(store.selectedTab, .home)
+    }
+
+    func test_showCompletionView_preservesNavigationStateUntilHostSwitches() async {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        for module in TutorialModuleID.allCases {
+            store.markCompletedForTesting(module)
+        }
+        await store.openModule(.encryptDemoMessage)
+        store.setRoutePath([.encrypt], for: .home)
+
+        store.showCompletionView()
+
+        XCTAssertEqual(store.hostSurface, .completion)
+        XCTAssertEqual(store.routePath(for: .home), [.encrypt])
+        XCTAssertEqual(store.visibleRoute, .encrypt)
+        XCTAssertEqual(store.selectedTab, .home)
+    }
+
     func test_resetTutorial_recreatesSandboxAndClearsProgress() async throws {
         let store = TutorialSessionStore()
         await startTutorialSession(store)

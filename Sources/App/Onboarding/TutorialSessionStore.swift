@@ -151,7 +151,6 @@ final class TutorialSessionStore {
         navigation.activeModal = nil
         errorMessage = nil
         session.pendingCompletionPromptModule = nil
-        clearNavigationState()
         session.surface = .sandboxAcknowledgement
         refreshLifecycleState()
     }
@@ -171,7 +170,9 @@ final class TutorialSessionStore {
         navigation.activeModal = nil
         errorMessage = nil
         session.pendingCompletionPromptModule = nil
-        clearNavigationState()
+        // Preserve the live navigation tree until the workspace is no longer rendered.
+        // On macOS, tearing down routed tutorial content before switching surfaces can
+        // trip SwiftUI/AttributeGraph into a tagged-memory fault during teardown.
         session.surface = .hub
     }
 
@@ -184,7 +185,6 @@ final class TutorialSessionStore {
         navigation.activeModal = nil
         errorMessage = nil
         session.pendingCompletionPromptModule = nil
-        clearNavigationState()
         session.surface = .completion
         refreshLifecycleState()
     }
