@@ -1,5 +1,7 @@
 # Contacts Enhancement Plan
 
+> Archived historical planning document. Superseded by [`CONTACTS_PRD.md`](../CONTACTS_PRD.md) and [`CONTACTS_TDD.md`](../CONTACTS_TDD.md).
+
 > Purpose: Master planning document for the next-generation Contacts capability in CypherAir.
 > Audience: Product authors, technical design authors, human developers, and AI coding tools.
 > Status: Planning baseline only. This document does not indicate that any described functionality has been implemented.

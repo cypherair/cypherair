@@ -4,7 +4,7 @@
 > **Purpose:** Technical design for implementing the Contacts enhancement initiative.  
 > **Audience:** Engineering, QA, and AI coding tools.  
 > **Companion document:** [CONTACTS_PRD](CONTACTS_PRD.md)  
-> **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific technical direction.  
+> **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific technical direction.  
 > **Related document:** [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Technical Scope

@@ -3,7 +3,7 @@
 > **Version:** Draft v1.0  
 > **Purpose:** Product requirements for the Contacts enhancement initiative.  
 > **Audience:** Product, design, engineering, QA, and AI coding tools.  
-> **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific product direction.  
+> **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific product direction.  
 > **Companion document:** [CONTACTS_TDD](CONTACTS_TDD.md)  
 > **Related document:** [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
