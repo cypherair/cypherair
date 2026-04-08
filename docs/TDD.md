@@ -181,10 +181,9 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 ### 2.5 Build Pipeline
 
 1. `cargo build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim` / `aarch64-apple-darwin`
-2. `cargo rustc --release --lib -- --crate-type cdylib` to produce the host-only `libpgp_mobile.dylib` used by UniFFI bindgen
-3. `uniffi-bindgen generate` → `.swift` + `.h` + `.modulemap`
-4. `lipo` (fat sim binary) → `xcodebuild -create-xcframework`
-5. Import XCFramework into Xcode + copy generated `.swift`
+2. `uniffi-bindgen generate` → `.swift` + `.h` + `.modulemap`
+3. `lipo` (fat sim binary) → `xcodebuild -create-xcframework`
+4. Import XCFramework into Xcode + copy generated `.swift`
 
 *Alternative:* `cargo-swift` automates all into `cargo swift package`.
 
