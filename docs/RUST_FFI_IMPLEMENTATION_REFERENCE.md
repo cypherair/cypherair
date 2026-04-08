@@ -49,7 +49,7 @@ This document is the implementation reference, not a parking lot for unresolved 
 - Active-roadmap families in this document must be specific enough that an implementer does not need to choose semantic meaning, safety boundaries, or validation scope on the fly.
 - Some families in this document are still recorded at the semantic-baseline level rather than the exact type-name level.
 - If a future option is intentionally left for later, it belongs in `Deferred / Out-of-Scope`, not in `Open Questions`.
-- `Open Questions` are reserved for current blockers that still affect interface semantics, helper requirements, or validation commitments.
+- `Open Questions` are reserved for current blockers that still affect interface semantics, helper requirements, or validation commitments, not merely later naming freeze work.
 - If implementation work needs to change a conclusion recorded here, update this reference first and then implement the code change.
 
 ## 2. Global Rust / FFI Rules
@@ -62,9 +62,9 @@ Default rule: exported `PgpEngine` expansion is additive only.
 - New semantics should be introduced through parallel methods and parallel result records instead of mutating legacy result shapes in place.
 - `Sources/PgpMobile/pgp_mobile.swift` is generated output and must only change through UniFFI regeneration.
 
-### 2.2 Input Format Classes
+### 2.2 Input Format Classes For OpenPGP Payload Inputs
 
-Every new exported input that crosses the FFI boundary must be classified explicitly as one of:
+Every new byte-oriented OpenPGP payload input that crosses the FFI boundary must be classified explicitly as one of:
 
 - `binary-only`: the caller must pass raw OpenPGP bytes; any armor normalization is outside the method contract
 - `armored-only`: the caller must pass ASCII-armored bytes; binary input is a precondition failure
@@ -72,7 +72,8 @@ Every new exported input that crosses the FFI boundary must be classified explic
 
 Rules:
 
-- Each capability family below must declare the format class for its FFI inputs.
+- Each capability family below must declare the format class for its byte-oriented OpenPGP payload inputs.
+- Scalar and structured non-payload parameters such as passwords, fingerprints, and selectors are described by their own semantic rules and are not forced into this taxonomy.
 - New families must not rely on implicit repository habits about armor acceptance.
 - If a method inherits legacy parser behavior, the family must say so explicitly instead of using an informal shorthand term.
 
@@ -229,8 +230,8 @@ Provide a bounded Rust / FFI wrapper for same-fingerprint public-certificate upd
 - Current product truth remains unchanged until a separate product/service change is approved:
   - [PRD.md](PRD.md) still treats same-fingerprint public-key re-import as duplicate/no-op.
   - [`Sources/Services/ContactService.swift`](../Sources/Services/ContactService.swift) still treats same-fingerprint contact import as duplicate/no-op.
-- Version 1 baseline uses `merge_public` only.
-- Version 1 must not automatically run `insert_packets` or any `insert_packets_merge` follow-up after `merge_public`.
+- This family remains broader than a `merge_public`-only wrapper and is aligned with the companion roadmap/audit description of same-fingerprint public-certificate update absorption.
+- The wrapper may use `merge_public` and bounded packet-update paths where needed to cover current-scope update categories.
 - Both inputs must parse as same-fingerprint public certificates.
 - Secret-bearing input is an unmet API precondition and returns `Err(InvalidKeyData)`.
 - Fingerprint mismatch is an unmet API precondition and returns `Err(InvalidKeyData)`.
@@ -270,7 +271,7 @@ Provide a bounded Rust / FFI wrapper for same-fingerprint public-certificate upd
 
 #### Open Questions
 
-- Whether the first public merge result should expose a dedicated outcome enum or another equally narrow semantic shape, while still distinguishing duplicate/no-op from material update.
+- none currently
 
 ### 3.2 Revocation Construction
 
@@ -363,7 +364,6 @@ Add the password-encrypted message surface that is currently absent from `pgp-mo
 
 - `plaintext`: `binary-only`
 - `encrypted_message` for password decrypt: `dual-format`
-- `password`: Swift `String`
 
 #### Required Semantics
 
@@ -414,6 +414,7 @@ Add the password-encrypted message surface that is currently absent from `pgp-mo
 - `password_rejected` classification
 - tampered ciphertext
 - malformed input
+- unsupported algorithm classification
 - explicit assertion that outbound payload algorithm is `AES-256`
 - explicit assertion that `seipdv2` pins `AEADAlgorithm::OCB`
 - explicit assertion of the pinned SKESK `S2K::default()` baseline
@@ -426,10 +427,11 @@ Add the password-encrypted message surface that is currently absent from `pgp-mo
 - no-`SKESK` smoke test
 - `password_rejected` smoke test
 - tamper/auth-failure smoke tests
+- unsupported-algorithm smoke test
 
 #### Open Questions
 
-- What exact public names should the password-message format type and decrypt-result type use once a later implementation-detail document freezes names.
+- none currently
 
 ### 3.4 Certification And Binding Verification
 
@@ -519,7 +521,7 @@ Expose certificate-signature semantics needed for certification-related Rust com
 
 #### Open Questions
 
-- What exact public names should the certificate-signature result and certification-kind types use once name freezing is intentional.
+- none currently
 
 ### 3.5 Richer Signature Results
 
@@ -603,6 +605,7 @@ Preserve multi-signature information that is currently collapsed into one legacy
 - multiple signatures with different outcomes
 - same signer repeated
 - known signer + missing verification key mixture
+- expired-signature outcome coverage
 - empty-signature-array semantics
 - compatibility tests proving `legacy_status` and `legacy_signer_fingerprint` match the legacy APIs exactly
 - cleartext early-setup behavior with missing content
@@ -615,6 +618,7 @@ Preserve multi-signature information that is currently collapsed into one legacy
 - detailed detached verification smoke test
 - detailed file verify smoke test
 - detailed decrypt and file decrypt smoke tests
+- expired-signature smoke test
 - compatibility smoke tests proving legacy APIs still behave as before
 
 ## 4. Validation And Review Rules
@@ -652,6 +656,7 @@ This document must stay aligned with the repository's broader validation and rev
 - [CODE_REVIEW.md](CODE_REVIEW.md) remains the checklist for build, binding, error-mapping, and cross-profile review expectations.
 - [TESTING.md](TESTING.md) remains the source of truth for test-layer expectations, FFI round-trip coverage, and `PgpError` mapping coverage.
 - This document may add family-specific minimum tests, but it must not define a lower bar than those documents.
+- Every public semantic rule in family sections must map to a Rust minimum test and, when the API is public across UniFFI, to a Swift FFI minimum test.
 
 ### 4.4 Family Sections Are The Single Source Of Truth
 
@@ -659,9 +664,9 @@ This document must stay aligned with the repository's broader validation and rev
 - Only current blocker-level open questions should be summarized separately.
 - Do not silently diverge in code from an existing rule in this document.
 
-## 5. Open Questions Summary
+## 5. Naming To Freeze Later
 
-This section is only an index of current blocker-level questions that already appear in the family sections above.
+This section tracks public naming that is intentionally deferred even though the surrounding semantic contracts are already fixed.
 
 ### 5.1 Certificate Merge / Update
 
