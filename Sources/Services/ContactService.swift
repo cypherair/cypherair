@@ -4,8 +4,10 @@ import Foundation
 enum AddContactResult {
     /// Contact was added successfully.
     case added(Contact)
-    /// Contact already exists (same fingerprint). No changes made.
+    /// Contact already exists (same fingerprint). No material changes were needed.
     case duplicate(Contact)
+    /// Existing same-fingerprint contact absorbed new public update material.
+    case updated(Contact)
     /// Same userId but different fingerprint detected. The caller must confirm
     /// before the old key is replaced. Call `confirmKeyUpdate` to proceed.
     case keyUpdateDetected(newContact: Contact, existingContact: Contact, keyData: Data)
@@ -108,15 +110,48 @@ final class ContactService {
             throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
         }
 
-        // Check for duplicate
+        // Check for same-fingerprint duplicate/update
         if let existingIndex = contacts.firstIndex(where: { $0.fingerprint == contact.fingerprint }) {
-            if verificationState == .verified && !contacts[existingIndex].isVerified {
-                contacts[existingIndex].verificationState = .verified
-                verificationStates[contact.fingerprint] = .verified
+            let existingContact = contacts[existingIndex]
+            let mergedResult = try engine.mergePublicCertificateUpdate(
+                existingCert: existingContact.publicKeyData,
+                incomingCertOrUpdate: binaryData
+            )
+            let resolvedVerificationState: ContactVerificationState =
+                (existingContact.isVerified || verificationState == .verified)
+                ? .verified
+                : existingContact.verificationState
+
+            switch mergedResult.outcome {
+            case .noOp:
+                if contacts[existingIndex].verificationState != resolvedVerificationState {
+                    contacts[existingIndex].verificationState = resolvedVerificationState
+                    verificationStates[contact.fingerprint] = resolvedVerificationState
+                    try saveVerificationStates()
+                }
+                return .duplicate(contacts[existingIndex])
+
+            case .updated:
+                if !FileManager.default.fileExists(atPath: contactsDirectory.path) {
+                    try FileManager.default.createDirectory(
+                        at: contactsDirectory,
+                        withIntermediateDirectories: true
+                    )
+                }
+
+                let filename = "\(existingContact.fingerprint).gpg"
+                let fileURL = contactsDirectory.appendingPathComponent(filename)
+                try mergedResult.mergedCertData.write(to: fileURL, options: .atomic)
+
+                let updatedContact = try parseContact(
+                    from: mergedResult.mergedCertData,
+                    verificationState: resolvedVerificationState
+                )
+                verificationStates[updatedContact.fingerprint] = updatedContact.verificationState
                 try saveVerificationStates()
+                contacts[existingIndex] = updatedContact
+                return .updated(updatedContact)
             }
-            // Same fingerprint = same key, no update needed
-            return .duplicate(contacts[existingIndex])
         }
 
         // Check for same userId but different fingerprint (key update)

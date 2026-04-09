@@ -676,6 +676,14 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func matchRecipientsFromFile(inputPath: String, localCerts: [Data]) throws  -> [String]
     
     /**
+     * Merge same-fingerprint public certificate update material into an existing public certificate.
+     *
+     * Both inputs must be binary OpenPGP public certificate bytes. Secret-bearing
+     * input and fingerprint mismatches are rejected with `InvalidKeyData`.
+     */
+    func mergePublicCertificateUpdate(existingCert: Data, incomingCertOrUpdate: Data) throws  -> CertificateMergeResult
+    
+    /**
      * Modify the expiration time of an existing certificate.
      * Requires the full certificate (with secret key material) to re-sign binding signatures.
      *
@@ -1062,6 +1070,22 @@ open func matchRecipientsFromFile(inputPath: String, localCerts: [Data])throws  
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
         FfiConverterSequenceData.lower(localCerts),$0
+    )
+})
+}
+    
+    /**
+     * Merge same-fingerprint public certificate update material into an existing public certificate.
+     *
+     * Both inputs must be binary OpenPGP public certificate bytes. Secret-bearing
+     * input and fingerprint mismatches are rejected with `InvalidKeyData`.
+     */
+open func mergePublicCertificateUpdate(existingCert: Data, incomingCertOrUpdate: Data)throws  -> CertificateMergeResult  {
+    return try  FfiConverterTypeCertificateMergeResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_merge_public_certificate_update(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(existingCert),
+        FfiConverterData.lower(incomingCertOrUpdate),$0
     )
 })
 }
@@ -1483,6 +1507,75 @@ public func FfiConverterTypeProgressReporter_lower(_ value: ProgressReporter) ->
 }
 
 
+
+
+/**
+ * Result of merging same-fingerprint public certificate update material.
+ */
+public struct CertificateMergeResult: Equatable, Hashable {
+    /**
+     * Merged public certificate bytes in binary OpenPGP format.
+     */
+    public var mergedCertData: Data
+    /**
+     * Whether the merge materially changed the public certificate.
+     */
+    public var outcome: CertificateMergeOutcome
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Merged public certificate bytes in binary OpenPGP format.
+         */mergedCertData: Data, 
+        /**
+         * Whether the merge materially changed the public certificate.
+         */outcome: CertificateMergeOutcome) {
+        self.mergedCertData = mergedCertData
+        self.outcome = outcome
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension CertificateMergeResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCertificateMergeResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertificateMergeResult {
+        return
+            try CertificateMergeResult(
+                mergedCertData: FfiConverterData.read(from: &buf), 
+                outcome: FfiConverterTypeCertificateMergeOutcome.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CertificateMergeResult, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.mergedCertData, into: &buf)
+        FfiConverterTypeCertificateMergeOutcome.write(value.outcome, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertificateMergeResult_lift(_ buf: RustBuffer) throws -> CertificateMergeResult {
+    return try FfiConverterTypeCertificateMergeResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertificateMergeResult_lower(_ value: CertificateMergeResult) -> RustBuffer {
+    return FfiConverterTypeCertificateMergeResult.lower(value)
+}
 
 
 /**
@@ -2261,6 +2354,82 @@ public func FfiConverterTypeArmorKind_lower(_ value: ArmorKind) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * Semantic outcome of a same-fingerprint public certificate merge/update.
+ */
+
+public enum CertificateMergeOutcome: Equatable, Hashable {
+    
+    /**
+     * Incoming material was already present; the merged public cert is a no-op.
+     */
+    case noOp
+    /**
+     * Incoming material changed the public cert (for example, new bindings or revocations).
+     */
+    case updated
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension CertificateMergeOutcome: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCertificateMergeOutcome: FfiConverterRustBuffer {
+    typealias SwiftType = CertificateMergeOutcome
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertificateMergeOutcome {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .noOp
+        
+        case 2: return .updated
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: CertificateMergeOutcome, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .noOp:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .updated:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertificateMergeOutcome_lift(_ buf: RustBuffer) throws -> CertificateMergeOutcome {
+    return try FfiConverterTypeCertificateMergeOutcome.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertificateMergeOutcome_lower(_ value: CertificateMergeOutcome) -> RustBuffer {
+    return FfiConverterTypeCertificateMergeOutcome.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Encryption profile selection.
  * Profile A (Universal): v4, Ed25519+X25519, SEIPDv1, Iterated+Salted S2K.
  * Profile B (Advanced): v6, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id S2K.
@@ -3001,6 +3170,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients_from_file() != 13204) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_merge_public_certificate_update() != 44096) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry() != 7301) {

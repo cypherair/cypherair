@@ -20,7 +20,9 @@ use zeroize::Zeroizing;
 use crate::armor::ArmorKind;
 use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
-use crate::keys::{GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult, S2kInfo};
+use crate::keys::{
+    CertificateMergeResult, GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult, S2kInfo,
+};
 use crate::streaming::FileDecryptResult;
 use crate::verify::VerifyResult;
 
@@ -71,6 +73,20 @@ impl PgpEngine {
     /// Detect the profile of a key (Universal or Advanced).
     pub fn detect_profile(&self, cert_data: Vec<u8>) -> Result<KeyProfile, PgpError> {
         keys::detect_profile(&cert_data)
+    }
+
+    // ── Certificate Merge / Update ──────────────────────────────────
+
+    /// Merge same-fingerprint public certificate update material into an existing public certificate.
+    ///
+    /// Both inputs must be binary OpenPGP public certificate bytes. Secret-bearing
+    /// input and fingerprint mismatches are rejected with `InvalidKeyData`.
+    pub fn merge_public_certificate_update(
+        &self,
+        existing_cert: Vec<u8>,
+        incoming_cert_or_update: Vec<u8>,
+    ) -> Result<CertificateMergeResult, PgpError> {
+        keys::merge_public_certificate_update(&existing_cert, &incoming_cert_or_update)
     }
 
     // ── Key Modification ──────────────────────────────────────────────

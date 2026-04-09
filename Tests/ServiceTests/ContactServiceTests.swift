@@ -74,6 +74,104 @@ final class ContactServiceTests: XCTestCase {
                        "Duplicate should not increase contact count")
     }
 
+    func test_addContact_sameFingerprintMaterialUpdate_returnsUpdated() throws {
+        let generated = try engine.generateKey(
+            name: "Update", email: "update@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+        let refreshed = try engine.modifyExpiry(
+            certData: generated.certData,
+            newExpirySeconds: 60 * 60 * 24 * 365
+        )
+
+        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        let result = try contactService.addContact(publicKeyData: refreshed.publicKeyData)
+
+        guard case .updated(let updatedContact) = result else {
+            return XCTFail("Expected .updated, got \(result)")
+        }
+
+        XCTAssertEqual(contactService.contacts.count, 1)
+        XCTAssertEqual(updatedContact.fingerprint, generated.fingerprint)
+        XCTAssertEqual(
+            try engine.parseKeyInfo(keyData: updatedContact.publicKeyData).expiryTimestamp,
+            refreshed.keyInfo.expiryTimestamp
+        )
+
+        let storedFile = tempDir.appendingPathComponent("\(generated.fingerprint).gpg")
+        let storedData = try Data(contentsOf: storedFile)
+        XCTAssertEqual(
+            try engine.parseKeyInfo(keyData: storedData).expiryTimestamp,
+            refreshed.keyInfo.expiryTimestamp,
+            "Stored contact file should be updated in place"
+        )
+
+        let restarted = ContactService(engine: engine, contactsDirectory: tempDir)
+        try restarted.loadContacts()
+        XCTAssertEqual(restarted.contacts.count, 1)
+        XCTAssertEqual(
+            try engine.parseKeyInfo(keyData: restarted.contacts[0].publicKeyData).expiryTimestamp,
+            refreshed.keyInfo.expiryTimestamp
+        )
+    }
+
+    func test_addContact_sameFingerprintMaterialUpdate_preservesUnverifiedState() throws {
+        let generated = try engine.generateKey(
+            name: "Update Unverified", email: "update-unverified@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+        let refreshed = try engine.modifyExpiry(
+            certData: generated.certData,
+            newExpirySeconds: 60 * 60 * 24 * 365
+        )
+
+        _ = try contactService.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .unverified
+        )
+
+        let result = try contactService.addContact(
+            publicKeyData: refreshed.publicKeyData,
+            verificationState: .unverified
+        )
+        guard case .updated(let updatedContact) = result else {
+            return XCTFail("Expected .updated, got \(result)")
+        }
+
+        XCTAssertFalse(updatedContact.isVerified)
+
+        let restarted = ContactService(engine: engine, contactsDirectory: tempDir)
+        try restarted.loadContacts()
+        XCTAssertFalse(restarted.contacts[0].isVerified)
+    }
+
+    func test_addContact_sameFingerprintMaterialUpdate_verifiedImportPromotesExistingUnverifiedContact() throws {
+        let generated = try engine.generateKey(
+            name: "Update Promote", email: "update-promote@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+        let refreshed = try engine.modifyExpiry(
+            certData: generated.certData,
+            newExpirySeconds: 60 * 60 * 24 * 365
+        )
+
+        _ = try contactService.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .unverified
+        )
+
+        let result = try contactService.addContact(
+            publicKeyData: refreshed.publicKeyData,
+            verificationState: .verified
+        )
+        guard case .updated(let updatedContact) = result else {
+            return XCTFail("Expected .updated, got \(result)")
+        }
+
+        XCTAssertTrue(updatedContact.isVerified)
+        XCTAssertTrue(contactService.contact(forFingerprint: updatedContact.fingerprint)?.isVerified == true)
+    }
+
     func test_addContact_sameUserIdDifferentFingerprint_returnsKeyUpdateDetected() throws {
         // Generate two keys with the same userId but different fingerprints
         let key1 = try engine.generateKey(

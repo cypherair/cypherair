@@ -36,6 +36,8 @@ Default rules:
 
 ### 2.1 Certificate Merge/Update Family
 
+Status: implemented
+
 **Purpose**
 
 Close the current-build omission around same-fingerprint public-certificate updates, while establishing a bounded certificate-update family instead of a one-off merge hook.
@@ -63,8 +65,8 @@ Close the current-build omission around same-fingerprint public-certificate upda
 
 **Service stance**
 
-- Default: `service adoption deferred`
-- Current production-flow exception: same-fingerprint contact update absorption is already a product gap and should be the first downstream consumer when service work is scheduled
+- Implemented in `ContactService` for same-fingerprint public certificate update absorption.
+- Same-UID different-fingerprint replacement policy remains a separate product workflow.
 
 **Minimum testing**
 

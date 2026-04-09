@@ -68,7 +68,7 @@ struct ContactImportWorkflow {
                 verificationState: verificationState
             )
             switch result {
-            case .added(let contact), .duplicate(let contact):
+            case .added(let contact), .updated(let contact), .duplicate(let contact):
                 onSuccess(contact)
             case .keyUpdateDetected(let newContact, let existingContact, let replacementKeyData):
                 let pendingUpdate = PendingContactKeyUpdate(
