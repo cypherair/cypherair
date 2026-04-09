@@ -182,6 +182,8 @@ Add the current-build symmetric-message surface to `pgp-mobile` even if CypherAi
 
 ### 2.4 Certification And Binding Verification Family
 
+Status: implemented in Rust, FFI, and tests; service adoption deferred
+
 **Purpose**
 
 Expose typed certificate-signature semantics needed for future certification features, trust-related tooling, and richer certificate validation.
@@ -191,7 +193,7 @@ Expose typed certificate-signature semantics needed for future certification fea
 - Wrap:
   - direct-key verification
   - User ID binding verification
-  - related third-party certification checks
+  - third-party User ID certification verification through the same crypto-only User ID binding path
 - Include the broader certification surface needed to create third-party certification material built on current-build Sequoia flows such as `UserID::certify`.
 - Define compact certificate-signature result models distinct from message verification results.
 
@@ -211,12 +213,17 @@ Expose typed certificate-signature semantics needed for future certification fea
 - Rust tests:
   - valid direct-key verification
   - valid User ID binding verification
-  - invalid signature
-  - mismatched certificate/signature inputs
+  - invalid-vs-`Err(...)` boundary coverage
+  - signer-missing direct-key and User ID binding coverage
+  - issuer-guided success and missing-issuer fallback success
   - third-party certification generation followed by successful verification
+  - all four OpenPGP certification kinds preserved through generation and verification
+  - primary-vs-subkey signer fingerprint contract coverage
 - FFI tests:
-  - result mapping across the boundary
+  - direct-key and User ID binding result mapping across the boundary
   - invalid-input behavior across the boundary
+  - certification-kind preservation across the boundary
+  - primary / subkey / signer-missing fingerprint mapping across the boundary
 
 **Interface compatibility notes**
 

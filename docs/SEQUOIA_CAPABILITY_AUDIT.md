@@ -97,7 +97,7 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Cleartext verification with graded results | Sign/verify | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | CypherAir exposes `valid`, `unknownSigner`, `bad`, `expired`, and `notSigned`. |
 | Detached verification with graded results | Sign/verify | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Includes streaming file verification. |
 | Generic multi-signature result model | Sign/verify | Yes | Yes | No | No | No | No | Missing wrapper | Current wrapper collapses signature groups to a single `status` and optional single signer fingerprint. |
-| Third-party certification and binding verification (`verify_direct_key`, `verify_userid_binding`, related checks) | Sign/verify | Yes | Yes | No | No | No | No | Missing wrapper | Not currently surfaced in Rust, FFI, or services. |
+| Certificate-signature verification (`verify_direct_key`, `verify_userid_binding`) | Sign/verify | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | Exposed as crypto-only direct-key and User ID binding verification with certification-kind and signer-fingerprint result records. |
 | Generic ASCII armor encode for arbitrary OpenPGP kinds | Parsing/tools | Yes | Yes | Yes | Yes | No | Yes | Exported but unused | `engine.armor` is exported and tested indirectly via FFI, but production services use only `dearmor` and `armorPublicKey`. |
 | Generic dearmor | Parsing/tools | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Used by contacts, keys, decrypt, QR tests, and service interop. |
 | Public-key armor convenience | Parsing/tools | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Used by public-key export and import normalization flows. |
@@ -110,7 +110,7 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Add or merge new User IDs, subkeys, and updated bindings | Cert structure | Yes | Yes | Yes | Yes | Yes | Yes | Implemented through certificate merge/update wrapper | Same-fingerprint public certificate updates can now absorb new User IDs, new subkeys, and refreshed binding packets through the bounded merge/update API. |
 | Subkey-specific revocation builders | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | `SubkeyRevocationBuilder` is wrapped and tested, but selector discovery remains deferred on the Swift product side. |
 | User ID-specific revocation builders | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | `UserIDRevocationBuilder` is wrapped and tested, but raw User ID discovery remains deferred on the Swift product side. |
-| Third-party certifications (`UserID::certify`, related flows) | Cert structure | Yes | Yes | No | No | No | No | Missing wrapper | Relevant to future certification features, but absent today. |
+| User ID certification generation (`UserID::certify`, related flows) | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | Returned as raw certification-signature bytes for later insertion or verification. |
 | Runtime policy customization beyond `StandardPolicy` | Policy | Yes | Yes | No | No | No | No | Intentionally excluded by product/security policy | Current wrapper hardcodes `StandardPolicy` and product-default algorithm decisions. |
 | Algorithm/backend selection knobs exposed to callers | Policy | Yes | Yes | No | No | No | No | Intentionally excluded by product/security policy | Product fixes OpenSSL backend, outgoing compression policy, and format-selection behavior. |
 
@@ -167,7 +167,8 @@ The following families are part of the companion Rust roadmap in [`RUST_SEQUOIA_
    - Current stance: dedicated service adoption delivered; UI exposure deferred
 
 4. **Certification and binding verification family**
-   - Includes direct-key verification, User ID binding verification, related certification checks, and the broader certification surface required for typed certificate-signature semantics.
+   - Status: implemented in Rust, FFI, and tests; service adoption deferred.
+   - Includes direct-key verification, User ID binding verification, and User ID certification generation with typed certificate-signature semantics.
    - Default stance: `service adoption deferred`
 
 5. **Richer signature result family**

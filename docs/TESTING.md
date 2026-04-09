@@ -152,6 +152,23 @@ When changing password-message behavior, validation must cover:
 - targeted auth/integrity tamper coverage that flips bytes in the encrypted payload/tag area
 - generic bit-flip coverage may still return `CorruptData` / `NoMatchingKey`; keep those expectations separate from the targeted auth/integrity tests
 
+## 2.5 Certification / Binding Verification Coverage
+
+When changing certificate-signature verification or User ID certification behavior, validation must cover:
+
+- direct-key verification with `Valid`, `Invalid`, and `SignerMissing` outcomes
+- User ID binding verification with `Valid`, `Invalid`, and `SignerMissing` outcomes
+- issuer-guided success plus a missing-issuer fallback success path
+- parse/type/precondition failure returning `Err(...)` instead of a family-local invalid result
+- third-party certification generation followed by successful crypto verification
+- all four OpenPGP certification kinds: `Generic`, `Persona`, `Casual`, and `Positive`
+- verify-result `certificationKind` matching the signature type for User ID certification signatures
+- signer fingerprint contract coverage:
+- primary signer path returns the signer certificate primary fingerprint and no subkey fingerprint
+- certification-subkey signer path returns the signer certificate primary fingerprint plus the selected subkey fingerprint
+- `SignerMissing` returns neither fingerprint
+- public-only certification input rejection and secret-cert-with-no-usable-certifier rejection
+
 ## 3. Profile Test Matrix
 
 **Every crypto test must run for both profiles unless explicitly scoped.**
