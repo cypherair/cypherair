@@ -18,7 +18,12 @@
   "testTargets" : [
     {
       "skippedTests" : [
-        "DeviceSecurityTests"
+        "DeviceSecureEnclaveTests",
+        "DeviceAuthenticationManagerTests",
+        "DeviceModeSwitchTests",
+        "DeviceMIETests",
+        "DeviceSystemMemoryTests",
+        "DevicePerformanceTests"
       ],
       "target" : {
         "containerPath" : "container:CypherAir.xcodeproj",
