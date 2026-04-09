@@ -67,6 +67,7 @@ Orchestrates user-facing operations by coordinating the Security layer and the R
 |---------|---------------|
 | `EncryptionService` | Text/file encryption with recipient selection, encrypt-to-self, signature toggle, **auto format selection** (SEIPDv1/v2 by recipient key version) |
 | `DecryptionService` | Two-phase decryption: header parse (Phase 1, no auth) → decrypt (Phase 2, auth required). Handles both SEIPDv1 and SEIPDv2. **Security-critical: Phase 1/Phase 2 boundary must never be bypassed.** |
+| `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing. Separate from the recipient-key/two-phase decrypt flow; no Secure Enclave unwrap or PKESK matching. |
 | `SigningService` | Cleartext text signatures, detached file signatures, verification with graded results |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, and revocation export (including imported-key availability parity with lazy backfill for legacy imports) |
 | `ContactService` | Public key storage, same-fingerprint public update absorption, different-fingerprint replacement detection, flat list management |
@@ -110,6 +111,7 @@ pgp-mobile/
 │   ├── keys.rs       # Profile-aware generation (Cv25519/RFC4880 vs Cv448/RFC9580)
 │   ├── encrypt.rs    # Auto format selection by recipient key version
 │   ├── decrypt.rs    # SEIPDv1 + SEIPDv2 (OCB/GCM), AEAD hard-fail
+│   ├── password.rs   # Password / SKESK message encrypt/decrypt
 │   ├── sign.rs       # Signing (cleartext + detached)
 │   ├── verify.rs     # Signature verification with graded results
 │   ├── streaming.rs  # File-path-based streaming I/O with progress reporting and cancellation

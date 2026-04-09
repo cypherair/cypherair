@@ -10,7 +10,7 @@ CypherAir has four test layers, each with different runtime requirements.
 ### Layer 1: Rust Unit Tests
 
 **Run on:** macOS (host), CI.
-**What they cover:** Sequoia PGP operations in isolation — key generation (both profiles), encrypt/decrypt, sign/verify, armor encode/decode, error mapping, S2K (Iterated+Salted and Argon2id) export/import.
+**What they cover:** Sequoia PGP operations in isolation — key generation (both profiles), recipient-key encrypt/decrypt, password/SKESK encrypt/decrypt, sign/verify, armor encode/decode, error mapping, and S2K (Iterated+Salted and Argon2id) export/import.
 **No device needed.** These test the `pgp-mobile` crate without any iOS dependency.
 
 ```bash
@@ -20,7 +20,7 @@ cargo test --manifest-path pgp-mobile/Cargo.toml
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
-**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic. Uses protocol-based mocks for Keychain and SE.
+**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, and dedicated password-message service behavior. Uses protocol-based mocks for Keychain and SE.
 
 ```bash
 # Practical local path used in this repository
@@ -35,7 +35,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 ### Layer 3: FFI Integration Tests
 
 **Run on:** iOS Simulator + Physical device.
-**What they cover:** Round-trips across the Rust-Swift boundary (both profiles) — generate key in Rust, pass to Swift, pass back, verify identical. Unicode strings (Chinese, emoji) survive round-trip. Each `PgpError` variant maps to the correct Swift enum case. `KeyProfile` enum crossing FFI boundary.
+**What they cover:** Round-trips across the Rust-Swift boundary (both profiles) — generate key in Rust, pass to Swift, pass back, verify identical. Unicode strings (Chinese, emoji) survive round-trip. Each `PgpError` variant maps to the correct Swift enum case. `KeyProfile`, password-message format/status enums, and password decrypt result records cross the FFI boundary.
 
 These tests exist in the Swift test target but call through the UniFFI bindings into Rust.
 
@@ -139,6 +139,19 @@ When changing revocation-construction behavior, validation must cover:
 - export of existing revocation without Secure Enclave unwrap
 - ASCII-armored revocation export matching the stored binary signature after `dearmor`
 
+## 2.4 Password / SKESK Coverage
+
+When changing password-message behavior, validation must cover:
+
+- armored and binary round-trip coverage for `seipdv1` and `seipdv2`
+- signed and unsigned password-message round-trips
+- `noSkesk` classification for recipient-only messages
+- deterministic `passwordRejected` coverage only for `SKESK6` / `SEIPDv2`; do not freeze `SKESK4` wrong-password behavior into a cross-layer contract
+- mixed `PKESK + SKESK` decrypt through the password path
+- packet assertions for `AES-256`, `AEADAlgorithm::OCB` on `seipdv2`, and the pinned `S2K::default()` baseline
+- targeted auth/integrity tamper coverage that flips bytes in the encrypted payload/tag area
+- generic bit-flip coverage may still return `CorruptData` / `NoMatchingKey`; keep those expectations separate from the targeted auth/integrity tests
+
 ## 3. Profile Test Matrix
 
 **Every crypto test must run for both profiles unless explicitly scoped.**
@@ -147,8 +160,10 @@ When changing revocation-construction behavior, validation must cover:
 |--------------|-----------|-----------|-------|
 | Key generation | v4 Ed25519+X25519 | v6 Ed448+X448 | Verify key version + algo |
 | Encrypt/decrypt round-trip | SEIPDv1 | SEIPDv2 OCB | |
+| Password/SKESK round-trip | SEIPDv1 | SEIPDv2 OCB | Includes armored + binary coverage |
 | Sign/verify | v4 sigs | v6 sigs | |
 | Tamper (1-bit flip) | Both | Both | |
+| Targeted password-message auth/integrity tamper | MDC fatal | AEAD/integrity fatal | Use targeted payload/tag-area mutations, not arbitrary bit-flips |
 | Cross-profile encrypt | A→B recipient | B→A recipient | Format auto-selection |
 | Mixed recipients | — | v4+v6 → SEIPDv1 | |
 | Key export/import | Iterated+Salted | Argon2id | |

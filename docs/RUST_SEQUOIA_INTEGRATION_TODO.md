@@ -135,6 +135,8 @@ Restore revocation-construction coverage for imported secret certificates and pr
 
 ### 2.3 Password/SKESK Symmetric-Message Family
 
+Status: implemented
+
 **Purpose**
 
 Add the current-build symmetric-message surface to `pgp-mobile` even if CypherAir does not currently expose it as a product workflow.
@@ -143,7 +145,7 @@ Add the current-build symmetric-message surface to `pgp-mobile` even if CypherAi
 
 - Add password-based encryption wrappers.
 - Add password/SKESK decryption wrappers.
-- Extend error mapping so wrong password, authentication/integrity failure, and malformed/corrupt message remain distinguishable.
+- Extend result and error mapping so `passwordRejected`, authentication/integrity failure, malformed/corrupt message, and unsupported-algorithm outcomes remain distinguishable without reusing `WrongPassphrase`.
 - Handle `SKESK` packets explicitly instead of ignoring them.
 - Keep this family separate from recipient-key workflows.
 
@@ -155,19 +157,22 @@ Add the current-build symmetric-message surface to `pgp-mobile` even if CypherAi
 
 **Service stance**
 
-- Default: `service adoption deferred`
-- No current CypherAir product commitment is implied by adding these Rust/FFI capabilities
+- Delivered: dedicated `PasswordMessageService` adoption approved
+- UI / product exposure remains deferred
 
 **Minimum testing**
 
 - Rust tests:
   - password encrypt/decrypt round-trip
-  - wrong password
+  - deterministic `passwordRejected` coverage for `SKESK6` / `SEIPDv2`
   - tampered symmetric ciphertext
+  - `noSkesk` classification
+  - mixed `PKESK + SKESK` decrypt through the password path
   - compatibility coverage across Profile A / Profile B message handling where applicable
 - FFI tests:
   - password encrypt/decrypt round-trip
-  - wrong-password error mapping
+  - deterministic `passwordRejected` mapping for `SKESK6` / `SEIPDv2`
+  - `noSkesk` mapping
   - integrity/authentication failure mapping
 
 **Interface compatibility notes**

@@ -358,7 +358,7 @@ Add the password-encrypted message surface that is currently absent from `pgp-mo
 
 #### Deferred / Out-of-Scope
 
-- Swift product adoption
+- new UI / product exposure beyond the dedicated Swift service wrapper
 - streaming password file APIs
 - reusing `KeyProfile` as the password-message format selector
 
@@ -386,6 +386,11 @@ Add the password-encrypted message surface that is currently absent from `pgp-mo
   - password rejected after attempting the password path
 - The decrypted category requires plaintext to be present.
 - The two non-success categories require plaintext to be absent.
+- `password_rejected` is only returned when:
+  - at least one `SKESK` was present
+  - the password path was attempted
+  - no candidate session key completed payload decryption successfully
+  - and no fatal payload authentication / integrity failure occurred
 - If a candidate session key is tried and message authentication or integrity then fails, the API returns the existing fatal error instead of a family-local status:
   - `AeadAuthenticationFailed`
   - `IntegrityCheckFailed`

@@ -598,6 +598,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func decryptFile(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileDecryptResult
     
     /**
+     * Decrypt a password-encrypted message without falling back to recipient-key decryption.
+     */
+    func decryptWithPassword(ciphertext: Data, password: String, verificationKeys: [Data]) throws  -> PasswordDecryptResult
+    
+    /**
      * Detect the profile of a key (Universal or Advanced).
      */
     func detectProfile(certData: Data) throws  -> KeyProfile
@@ -627,10 +632,20 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func encryptBinary(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?) throws  -> Data
     
     /**
+     * Encrypt plaintext with a password and return binary ciphertext.
+     */
+    func encryptBinaryWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?) throws  -> Data
+    
+    /**
      * Encrypt a file using streaming I/O. Constant memory usage.
      * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
      */
     func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: ProgressReporter?) throws 
+    
+    /**
+     * Encrypt plaintext with a password and return ASCII-armored ciphertext.
+     */
+    func encryptWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?) throws  -> Data
     
     /**
      * Export a secret key protected with a passphrase (ASCII-armored).
@@ -917,6 +932,20 @@ open func decryptFile(inputPath: String, outputPath: String, secretKeys: [Data],
 }
     
     /**
+     * Decrypt a password-encrypted message without falling back to recipient-key decryption.
+     */
+open func decryptWithPassword(ciphertext: Data, password: String, verificationKeys: [Data])throws  -> PasswordDecryptResult  {
+    return try  FfiConverterTypePasswordDecryptResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_decrypt_with_password(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(ciphertext),
+        FfiConverterString.lower(password),
+        FfiConverterSequenceData.lower(verificationKeys),$0
+    )
+})
+}
+    
+    /**
      * Detect the profile of a key (Universal or Advanced).
      */
 open func detectProfile(certData: Data)throws  -> KeyProfile  {
@@ -980,6 +1009,21 @@ open func encryptBinary(plaintext: Data, recipients: [Data], signingKey: Data?, 
 }
     
     /**
+     * Encrypt plaintext with a password and return binary ciphertext.
+     */
+open func encryptBinaryWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary_with_password(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(plaintext),
+        FfiConverterString.lower(password),
+        FfiConverterTypePasswordMessageFormat_lower(format),
+        FfiConverterOptionData.lower(signingKey),$0
+    )
+})
+}
+    
+    /**
      * Encrypt a file using streaming I/O. Constant memory usage.
      * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
      */
@@ -994,6 +1038,21 @@ open func encryptFile(inputPath: String, outputPath: String, recipients: [Data],
         FfiConverterOptionTypeProgressReporter.lower(progress),$0
     )
 }
+}
+    
+    /**
+     * Encrypt plaintext with a password and return ASCII-armored ciphertext.
+     */
+open func encryptWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_password(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(plaintext),
+        FfiConverterString.lower(password),
+        FfiConverterTypePasswordMessageFormat_lower(format),
+        FfiConverterOptionData.lower(signingKey),$0
+    )
+})
 }
     
     /**
@@ -2142,6 +2201,74 @@ public func FfiConverterTypeModifyExpiryResult_lower(_ value: ModifyExpiryResult
 
 
 /**
+ * Result of password-based decryption.
+ *
+ * SECURITY: If `plaintext` is present, the Swift caller must zeroize the returned
+ * data (via `resetBytes(in:)`) once it is no longer needed.
+ */
+public struct PasswordDecryptResult: Equatable, Hashable {
+    public var status: PasswordDecryptStatus
+    public var plaintext: Data?
+    public var signatureStatus: SignatureStatus?
+    public var signerFingerprint: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(status: PasswordDecryptStatus, plaintext: Data?, signatureStatus: SignatureStatus?, signerFingerprint: String?) {
+        self.status = status
+        self.plaintext = plaintext
+        self.signatureStatus = signatureStatus
+        self.signerFingerprint = signerFingerprint
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PasswordDecryptResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePasswordDecryptResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordDecryptResult {
+        return
+            try PasswordDecryptResult(
+                status: FfiConverterTypePasswordDecryptStatus.read(from: &buf), 
+                plaintext: FfiConverterOptionData.read(from: &buf), 
+                signatureStatus: FfiConverterOptionTypeSignatureStatus.read(from: &buf), 
+                signerFingerprint: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PasswordDecryptResult, into buf: inout [UInt8]) {
+        FfiConverterTypePasswordDecryptStatus.write(value.status, into: &buf)
+        FfiConverterOptionData.write(value.plaintext, into: &buf)
+        FfiConverterOptionTypeSignatureStatus.write(value.signatureStatus, into: &buf)
+        FfiConverterOptionString.write(value.signerFingerprint, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordDecryptResult_lift(_ buf: RustBuffer) throws -> PasswordDecryptResult {
+    return try FfiConverterTypePasswordDecryptResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordDecryptResult_lower(_ value: PasswordDecryptResult) -> RustBuffer {
+    return FfiConverterTypePasswordDecryptResult.lower(value)
+}
+
+
+/**
  * S2K (String-to-Key) parameters extracted from a passphrase-protected key.
  * Used by Swift side to check memory requirements before importing.
  */
@@ -2555,6 +2682,153 @@ public func FfiConverterTypeKeyProfile_lift(_ buf: RustBuffer) throws -> KeyProf
 #endif
 public func FfiConverterTypeKeyProfile_lower(_ value: KeyProfile) -> RustBuffer {
     return FfiConverterTypeKeyProfile.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Result status for password-based decryption.
+ */
+
+public enum PasswordDecryptStatus: Equatable, Hashable {
+    
+    case decrypted
+    case noSkesk
+    case passwordRejected
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension PasswordDecryptStatus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePasswordDecryptStatus: FfiConverterRustBuffer {
+    typealias SwiftType = PasswordDecryptStatus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordDecryptStatus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .decrypted
+        
+        case 2: return .noSkesk
+        
+        case 3: return .passwordRejected
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: PasswordDecryptStatus, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .decrypted:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .noSkesk:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .passwordRejected:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordDecryptStatus_lift(_ buf: RustBuffer) throws -> PasswordDecryptStatus {
+    return try FfiConverterTypePasswordDecryptStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordDecryptStatus_lower(_ value: PasswordDecryptStatus) -> RustBuffer {
+    return FfiConverterTypePasswordDecryptStatus.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Message format for password-encrypted messages.
+ */
+
+public enum PasswordMessageFormat: Equatable, Hashable {
+    
+    case seipdv1
+    case seipdv2
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension PasswordMessageFormat: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePasswordMessageFormat: FfiConverterRustBuffer {
+    typealias SwiftType = PasswordMessageFormat
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordMessageFormat {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .seipdv1
+        
+        case 2: return .seipdv2
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: PasswordMessageFormat, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .seipdv1:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .seipdv2:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordMessageFormat_lift(_ buf: RustBuffer) throws -> PasswordMessageFormat {
+    return try FfiConverterTypePasswordMessageFormat.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordMessageFormat_lower(_ value: PasswordMessageFormat) -> RustBuffer {
+    return FfiConverterTypePasswordMessageFormat.lower(value)
 }
 
 
@@ -3192,6 +3466,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file() != 29596) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_with_password() != 33951) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_detect_profile() != 25919) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -3204,7 +3481,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary() != 46131) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password() != 45737) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 55907) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password() != 3472) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 10460) {

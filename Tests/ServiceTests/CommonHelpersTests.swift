@@ -394,6 +394,11 @@ final class CommonHelpersTests: XCTestCase {
             keyManagement: keyManagement,
             contactService: contactService
         )
+        let passwordMessageService = PasswordMessageService(
+            engine: engine,
+            keyManagement: keyManagement,
+            contactService: contactService
+        )
         let signingService = SigningService(
             engine: engine,
             keyManagement: keyManagement,
@@ -411,6 +416,7 @@ final class CommonHelpersTests: XCTestCase {
             contactService: contactService,
             encryptionService: encryptionService,
             decryptionService: decryptionService,
+            passwordMessageService: passwordMessageService,
             signingService: signingService,
             qrService: qrService,
             selfTestService: selfTestService,

@@ -85,8 +85,8 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Recipient-based decryption with AEAD/MDC hard-fail | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Rust explicitly zeroizes partial plaintext on error; services enforce two-phase auth flow. |
 | Read incoming compressed messages using deflate/zlib-compatible paths | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Enabled by `compression-deflate`; validated through GnuPG interop tests and service tests. |
 | Streaming file encryption/decryption with progress and cancellation | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Includes secure temp-file handling and cancellation propagation. |
-| Password/SKESK message encryption | Encrypt/decrypt | Yes | Yes | No | No | No | No | Missing wrapper | Sequoia supports `Encryptor::with_passwords` and `add_passwords`; CypherAir exposes only recipient-based encryption. |
-| Password/SKESK message decryption | Encrypt/decrypt | Yes | Yes | No | No | No | No | Missing wrapper | Current `DecryptHelper` ignores `SKESK` packets and only tries recipient key decryption. |
+| Password/SKESK message encryption | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Exposed through additive password-message methods, optional signing, and dedicated `PasswordMessageService`; UI exposure remains deferred. |
+| Password/SKESK message decryption | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Uses password-only `SKESK` handling, dedicated decrypt result statuses, and fatal auth/integrity errors when a candidate session key reaches payload decryption. |
 
 ### 3.3 Signing, Verification, And Parsing Helpers
 
@@ -163,8 +163,8 @@ The following families are part of the companion Rust roadmap in [`RUST_SEQUOIA_
    - Current production-flow exception: imported-key revocation availability parity
 
 3. **Password/SKESK symmetric-message family**
-   - Includes password-based encryption/decryption wrappers and the error-mapping work needed to distinguish wrong-password, integrity/authentication, and malformed-message outcomes.
-   - Default stance: `service adoption deferred`
+   - Includes password-based encryption/decryption wrappers and the result/error semantics needed to distinguish `passwordRejected`, integrity/authentication, malformed-message, and unsupported-algorithm outcomes.
+   - Current stance: dedicated service adoption delivered; UI exposure deferred
 
 4. **Certification and binding verification family**
    - Includes direct-key verification, User ID binding verification, related certification checks, and the broader certification surface required for typed certificate-signature semantics.
