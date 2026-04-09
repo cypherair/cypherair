@@ -1137,6 +1137,22 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertNil(result.signingKeyFingerprint)
     }
 
+    func test_certificateSignature_directKeyMissingSigner_returnsSignerMissingAcrossFFI() throws {
+        let target = try loadFixture("ffi_direct_key_target")
+        let signature = try loadArmoredFixture("ffi_direct_key_signature", ext: "sig")
+
+        let result = try engine.verifyDirectKeySignature(
+            signature: signature,
+            targetCert: target,
+            candidateSigners: []
+        )
+
+        XCTAssertEqual(result.status, .signerMissing)
+        XCTAssertNil(result.certificationKind)
+        XCTAssertNil(result.signerPrimaryFingerprint)
+        XCTAssertNil(result.signingKeyFingerprint)
+    }
+
     func test_certificateSignature_wrongTypeBoundary_throwsCorruptData() throws {
         let target = try loadFixture("ffi_cert_binding_target")
         let signature = try loadArmoredFixture("ffi_cert_binding_missing_issuer_positive", ext: "sig")
@@ -1185,6 +1201,48 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertEqual(result.status, .valid)
         XCTAssertEqual(result.certificationKind, .persona)
         XCTAssertEqual(result.signerPrimaryFingerprint, signer.fingerprint)
+        XCTAssertNil(result.signingKeyFingerprint)
+    }
+
+    func test_certificateSignature_userIdBindingWrongTargetWithMatchingUserId_returnsInvalidAcrossFFI()
+        throws
+    {
+        let signer = try engine.generateKey(
+            name: "FFI Invalid Signer",
+            email: "ffi-invalid-signer@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let target = try engine.generateKey(
+            name: "Shared Identity",
+            email: "shared-identity@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let wrongTarget = try engine.generateKey(
+            name: "Shared Identity",
+            email: "shared-identity@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let userIdData = Data("Shared Identity <shared-identity@example.com>".utf8)
+
+        let signature = try engine.generateUserIdCertification(
+            signerSecretCert: signer.certData,
+            targetCert: target.publicKeyData,
+            userIdData: userIdData,
+            certificationKind: .positive
+        )
+        let result = try engine.verifyUserIdBindingSignature(
+            signature: signature,
+            targetCert: wrongTarget.publicKeyData,
+            userIdData: userIdData,
+            candidateSigners: [signer.publicKeyData]
+        )
+
+        XCTAssertEqual(result.status, .invalid)
+        XCTAssertEqual(result.certificationKind, .positive)
+        XCTAssertNil(result.signerPrimaryFingerprint)
         XCTAssertNil(result.signingKeyFingerprint)
     }
 
