@@ -1,13 +1,11 @@
 use openpgp::cert::prelude::*;
-use openpgp::packet::signature::subpacket::{Subpacket, SubpacketTag, SubpacketValue};
 use openpgp::packet::signature;
+use openpgp::packet::signature::subpacket::{Subpacket, SubpacketTag, SubpacketValue};
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Marshal;
 use openpgp::types::{KeyFlags, SignatureType};
-use pgp_mobile::cert_signature::{
-    self, CertificateSignatureStatus, CertificationKind,
-};
+use pgp_mobile::cert_signature::{self, CertificateSignatureStatus, CertificationKind};
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use sequoia_openpgp as openpgp;
@@ -124,8 +122,7 @@ fn positive_certification_without_issuer(
         .expect("target cert should have a User ID")
         .userid();
 
-    let builder = signature::SignatureBuilder::new(SignatureType::PositiveCertification)
-        ;
+    let builder = signature::SignatureBuilder::new(SignatureType::PositiveCertification);
     let mut builder = builder;
     builder
         .unhashed_area_mut()
@@ -137,7 +134,9 @@ fn positive_certification_without_issuer(
     let mut signature = user_id
         .bind(&mut signer, target_cert, builder)
         .expect("certification should sign");
-    signature.unhashed_area_mut().remove_all(SubpacketTag::Issuer);
+    signature
+        .unhashed_area_mut()
+        .remove_all(SubpacketTag::Issuer);
     assert!(
         signature.get_issuers().is_empty(),
         "signature should not advertise issuer information"
@@ -338,7 +337,10 @@ fn test_generate_user_id_certification_prefers_primary_over_certification_subkey
     .expect("verification should succeed");
 
     assert_eq!(result.status, CertificateSignatureStatus::Valid);
-    assert_eq!(result.signer_primary_fingerprint, Some(signer_cert.fingerprint().to_hex().to_lowercase()));
+    assert_eq!(
+        result.signer_primary_fingerprint,
+        Some(signer_cert.fingerprint().to_hex().to_lowercase())
+    );
     assert_eq!(result.signing_key_fingerprint, None);
 }
 
