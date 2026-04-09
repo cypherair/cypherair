@@ -5,13 +5,18 @@ mod common;
 use std::io::Write;
 
 use common::detect_message_format;
-use openpgp::crypto::{Password, S2K};
+use openpgp::crypto::symmetric::BlockCipherMode;
+use openpgp::crypto::symmetric::{Encryptor as SymmetricEncryptor, PaddingMode};
+use openpgp::crypto::{Password, SessionKey, S2K};
+use openpgp::packet::skesk::{SKESK4, SKESK6};
 use openpgp::packet::{SEIP, SKESK};
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
-use openpgp::serialize::Serialize;
 use openpgp::serialize::stream::{Encryptor, LiteralWriter, Message};
+use openpgp::serialize::Serialize;
 use openpgp::types::{AEADAlgorithm, HashAlgorithm, SymmetricAlgorithm};
+use openssl::kdf::{hkdf, HkdfMode};
+use openssl::md::Md;
 use pgp_mobile::decrypt::SignatureStatus;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
@@ -36,12 +41,17 @@ fn top_level_packets(ciphertext: &[u8]) -> Vec<openpgp::Packet> {
         .collect()
 }
 
+fn serialize_packet_pile(pile: &openpgp::PacketPile) -> Vec<u8> {
+    let mut serialized = Vec::new();
+    pile.serialize(&mut serialized)
+        .expect("mutated pile should serialize");
+    serialized
+}
+
 fn assert_default_s2k(s2k: &S2K) {
     match s2k {
         S2K::Iterated {
-            hash,
-            hash_bytes,
-            ..
+            hash, hash_bytes, ..
         } => {
             assert_eq!(*hash, HashAlgorithm::SHA256);
             assert_eq!(*hash_bytes, 0x3e00000);
@@ -50,11 +60,7 @@ fn assert_default_s2k(s2k: &S2K) {
     }
 }
 
-fn encrypt_mixed_message(
-    plaintext: &[u8],
-    password: &Password,
-    recipient_cert: &[u8],
-) -> Vec<u8> {
+fn encrypt_mixed_message(plaintext: &[u8], password: &Password, recipient_cert: &[u8]) -> Vec<u8> {
     let policy = StandardPolicy::new();
     let cert = openpgp::Cert::from_bytes(recipient_cert).expect("recipient cert should parse");
     let recipients = cert
@@ -80,19 +86,47 @@ fn encrypt_mixed_message(
     sink
 }
 
-fn mutate_skesk4_symmetric_algo(ciphertext: &[u8], algo: SymmetricAlgorithm) -> Vec<u8> {
+fn encrypt_message_with_passwords(
+    plaintext: &[u8],
+    passwords: &[Password],
+    format: PasswordMessageFormat,
+) -> Vec<u8> {
+    let mut sink = Vec::new();
+    let message = Message::new(&mut sink);
+    let encryptor = Encryptor::with_passwords(message, passwords.iter().cloned())
+        .symmetric_algo(SymmetricAlgorithm::AES256);
+    let encryptor = match format {
+        PasswordMessageFormat::Seipdv1 => encryptor,
+        PasswordMessageFormat::Seipdv2 => encryptor.aead_algo(AEADAlgorithm::OCB),
+    };
+    let message = encryptor.build().expect("password encryptor should build");
+    let mut literal = LiteralWriter::new(message)
+        .build()
+        .expect("literal writer should build");
+    literal.write_all(plaintext).expect("write should succeed");
+    literal.finalize().expect("finalize should succeed");
+
+    sink
+}
+
+fn mutate_nth_skesk4_symmetric_algo(
+    ciphertext: &[u8],
+    skesk_index: usize,
+    algo: SymmetricAlgorithm,
+) -> Vec<u8> {
     let mut pile = openpgp::PacketPile::from_bytes(ciphertext).expect("ciphertext should parse");
-    match pile.path_ref_mut(&[0]) {
+    match pile.path_ref_mut(&[skesk_index]) {
         Some(openpgp::Packet::SKESK(SKESK::V4(skesk))) => {
             skesk.set_symmetric_algo(algo);
         }
-        other => panic!("expected first packet to be SKESK4, got {other:?}"),
+        other => panic!("expected SKESK4 packet at index {skesk_index}, got {other:?}"),
     }
 
-    let mut serialized = Vec::new();
-    pile.serialize(&mut serialized)
-        .expect("mutated pile should serialize");
-    serialized
+    serialize_packet_pile(&pile)
+}
+
+fn mutate_skesk4_symmetric_algo(ciphertext: &[u8], algo: SymmetricAlgorithm) -> Vec<u8> {
+    mutate_nth_skesk4_symmetric_algo(ciphertext, 0, algo)
 }
 
 fn mutate_seip2_aead_algo(ciphertext: &[u8], algo: AEADAlgorithm) -> Vec<u8> {
@@ -104,10 +138,132 @@ fn mutate_seip2_aead_algo(ciphertext: &[u8], algo: AEADAlgorithm) -> Vec<u8> {
         other => panic!("expected second packet to be SEIP2, got {other:?}"),
     }
 
-    let mut serialized = Vec::new();
-    pile.serialize(&mut serialized)
-        .expect("mutated pile should serialize");
-    serialized
+    serialize_packet_pile(&pile)
+}
+
+fn rewrite_skesk4_esk_with_payload_algo(
+    skesk: &mut SKESK4,
+    password: &Password,
+    payload_algo: SymmetricAlgorithm,
+) {
+    let (_, session_key) = skesk
+        .decrypt(password)
+        .expect("SKESK4 should decrypt with the known password");
+    let esk_algo = skesk.symmetric_algo();
+    let key = skesk
+        .s2k()
+        .derive_key(password, esk_algo.key_size().expect("supported esk algo"))
+        .expect("S2K should derive key");
+
+    let mut prefixed_session_key: SessionKey = vec![0; 1 + session_key.len()].into();
+    prefixed_session_key[0] = payload_algo.into();
+    prefixed_session_key[1..].copy_from_slice(&session_key);
+
+    let mut esk = Vec::new();
+    let mut encryptor = SymmetricEncryptor::new(
+        esk_algo,
+        BlockCipherMode::CFB,
+        PaddingMode::None,
+        &key,
+        None,
+        &mut esk,
+    )
+    .expect("CFB encryptor should build");
+    encryptor
+        .write_all(&prefixed_session_key)
+        .expect("ESK write should succeed");
+    encryptor.finalize().expect("ESK finalize should succeed");
+
+    skesk.set_esk(Some(esk.into_boxed_slice()));
+}
+
+fn mutate_nth_skesk4_inner_payload_algo(
+    ciphertext: &[u8],
+    skesk_index: usize,
+    password: &Password,
+    payload_algo: SymmetricAlgorithm,
+) -> Vec<u8> {
+    let mut pile = openpgp::PacketPile::from_bytes(ciphertext).expect("ciphertext should parse");
+    match pile.path_ref_mut(&[skesk_index]) {
+        Some(openpgp::Packet::SKESK(SKESK::V4(skesk))) => {
+            rewrite_skesk4_esk_with_payload_algo(skesk, password, payload_algo);
+        }
+        other => panic!("expected SKESK4 packet at index {skesk_index}, got {other:?}"),
+    }
+
+    serialize_packet_pile(&pile)
+}
+
+fn rewrite_skesk6_with_session_key(
+    skesk: &mut SKESK6,
+    payload_algo: SymmetricAlgorithm,
+    password: &Password,
+    session_key: &SessionKey,
+) {
+    assert_eq!(
+        payload_algo.key_size().expect("supported payload algo"),
+        session_key.len()
+    );
+
+    let esk_algo = skesk.symmetric_algo();
+    let esk_aead = skesk.aead_algo();
+    let s2k = skesk.s2k().clone();
+    let ad = [0xc3, 6, esk_algo.into(), esk_aead.into()];
+    let key = s2k
+        .derive_key(password, esk_algo.key_size().expect("supported esk algo"))
+        .expect("S2K should derive key");
+
+    let mut kek: SessionKey = vec![0; esk_algo.key_size().expect("supported esk algo")].into();
+    hkdf(
+        Md::sha256(),
+        key.as_ref(),
+        None,
+        Some(&ad),
+        HkdfMode::ExtractAndExpand,
+        None,
+        kek.as_mut(),
+    )
+    .expect("HKDF should derive KEK");
+
+    let iv = vec![0x5a; esk_aead.nonce_size().expect("supported AEAD algo")].into_boxed_slice();
+    let mut context = esk_aead
+        .context(esk_algo, &kek, &ad, &iv)
+        .expect("AEAD context should build")
+        .for_encryption()
+        .expect("AEAD encryptor should build");
+    let mut esk = vec![0u8; session_key.len() + esk_aead.digest_size().expect("digest size")];
+    context
+        .encrypt_seal(&mut esk, session_key)
+        .expect("ESK sealing should succeed");
+
+    *skesk = SKESK6::new(esk_algo, esk_aead, s2k, iv, esk.into_boxed_slice())
+        .expect("mutated SKESK6 should build");
+}
+
+fn mutate_nth_skesk6_with_wrong_session_key(
+    ciphertext: &[u8],
+    skesk_index: usize,
+    password: &Password,
+) -> Vec<u8> {
+    let payload_algo = match top_level_packets(ciphertext).last() {
+        Some(openpgp::Packet::SEIP(SEIP::V2(seip))) => seip.symmetric_algo(),
+        other => panic!("expected trailing SEIP2 packet, got {other:?}"),
+    };
+
+    let mut pile = openpgp::PacketPile::from_bytes(ciphertext).expect("ciphertext should parse");
+    match pile.path_ref_mut(&[skesk_index]) {
+        Some(openpgp::Packet::SKESK(SKESK::V6(skesk))) => {
+            let session_key = skesk
+                .decrypt(password)
+                .expect("SKESK6 should decrypt with the known password");
+            let mut wrong_session_key = session_key.clone();
+            wrong_session_key[0] ^= 0x01;
+            rewrite_skesk6_with_session_key(skesk, payload_algo, password, &wrong_session_key);
+        }
+        other => panic!("expected SKESK6 packet at index {skesk_index}, got {other:?}"),
+    }
+
+    serialize_packet_pile(&pile)
 }
 
 fn find_auth_failure_tamper(ciphertext: &[u8], password: &Password) -> Vec<u8> {
@@ -140,8 +296,8 @@ fn test_password_encrypt_decrypt_armored_seipdv1_round_trip_unsigned() {
     assert!(has_v1);
     assert!(!has_v2);
 
-    let result = password::decrypt(&ciphertext, &password, &[])
-        .expect("password decryption should succeed");
+    let result =
+        password::decrypt(&ciphertext, &password, &[]).expect("password decryption should succeed");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
     assert_eq!(result.signature_status, Some(SignatureStatus::NotSigned));
@@ -204,8 +360,8 @@ fn test_password_encrypt_decrypt_binary_seipdv2_round_trip_unsigned() {
         password::encrypt_binary(plaintext, &password, PasswordMessageFormat::Seipdv2, None)
             .expect("password encryption should succeed");
 
-    let result = password::decrypt(&ciphertext, &password, &[])
-        .expect("password decryption should succeed");
+    let result =
+        password::decrypt(&ciphertext, &password, &[]).expect("password decryption should succeed");
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
     assert_eq!(result.signature_status, Some(SignatureStatus::NotSigned));
@@ -299,6 +455,26 @@ fn test_password_decrypt_password_rejected_is_deterministic_for_skesk6() {
 }
 
 #[test]
+fn test_password_decrypt_multi_password_message_accepts_second_password() {
+    let plaintext = b"multi password message";
+    let passwords = vec![
+        Password::from("first-password"),
+        Password::from("second-password"),
+    ];
+    let ciphertext =
+        encrypt_message_with_passwords(plaintext, &passwords, PasswordMessageFormat::Seipdv1);
+
+    let packets = top_level_packets(&ciphertext);
+    assert!(matches!(&packets[0], openpgp::Packet::SKESK(SKESK::V4(_))));
+    assert!(matches!(&packets[1], openpgp::Packet::SKESK(SKESK::V4(_))));
+
+    let result = password::decrypt(&ciphertext, &passwords[1], &[])
+        .expect("second password should decrypt multi-password message");
+    assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
+    assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
+}
+
+#[test]
 fn test_password_decrypt_mixed_pkesk_skesk_message_succeeds() {
     let password: Password = "mixed-message-password".into();
     let recipient = gen_key("Mixed Recipient", KeyProfile::Universal);
@@ -328,6 +504,63 @@ fn test_password_decrypt_tampered_seipdv1_tail_returns_integrity_error() {
 }
 
 #[test]
+fn test_password_decrypt_multi_skesk4_inner_unsupported_algo_can_fall_through_to_later_candidate() {
+    let shared_password = Password::from("shared-skesk4-password");
+    let plaintext = b"skesk4 fallthrough message";
+    let ciphertext = encrypt_message_with_passwords(
+        plaintext,
+        &[shared_password.clone(), shared_password.clone()],
+        PasswordMessageFormat::Seipdv1,
+    );
+    let mutated = mutate_nth_skesk4_inner_payload_algo(
+        &ciphertext,
+        0,
+        &shared_password,
+        SymmetricAlgorithm::Private(100),
+    );
+
+    let result = password::decrypt(&mutated, &shared_password, &[])
+        .expect("later SKESK4 candidate should still decrypt");
+    assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
+    assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
+}
+
+#[test]
+fn test_password_decrypt_multi_skesk6_auth_failure_can_fall_through_to_later_candidate() {
+    let shared_password = Password::from("shared-skesk6-password");
+    let plaintext = b"skesk6 fallthrough message";
+    let ciphertext = encrypt_message_with_passwords(
+        plaintext,
+        &[shared_password.clone(), shared_password.clone()],
+        PasswordMessageFormat::Seipdv2,
+    );
+    let mutated = mutate_nth_skesk6_with_wrong_session_key(&ciphertext, 0, &shared_password);
+
+    let result = password::decrypt(&mutated, &shared_password, &[])
+        .expect("later SKESK6 candidate should still decrypt");
+    assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
+    assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
+}
+
+#[test]
+fn test_password_decrypt_multi_skesk_outer_unsupported_algo_can_fall_through_to_later_candidate() {
+    let shared_password = Password::from("shared-outer-unsupported-password");
+    let plaintext = b"outer unsupported fallthrough";
+    let ciphertext = encrypt_message_with_passwords(
+        plaintext,
+        &[shared_password.clone(), shared_password.clone()],
+        PasswordMessageFormat::Seipdv1,
+    );
+    let mutated =
+        mutate_nth_skesk4_symmetric_algo(&ciphertext, 0, SymmetricAlgorithm::Private(100));
+
+    let result = password::decrypt(&mutated, &shared_password, &[])
+        .expect("later SKESK candidate should still decrypt");
+    assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
+    assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
+}
+
+#[test]
 fn test_password_decrypt_tampered_seipdv2_tail_returns_auth_or_integrity_error() {
     let password: Password = "tamper-v2".into();
     let ciphertext = password::encrypt_binary(
@@ -350,6 +583,25 @@ fn test_password_decrypt_tampered_seipdv2_tail_returns_auth_or_integrity_error()
 fn test_password_decrypt_malformed_input_returns_corrupt_data() {
     let result = password::decrypt(b"not a valid OpenPGP message", &Password::from("pw"), &[]);
     assert!(matches!(result, Err(PgpError::CorruptData { .. })));
+}
+
+#[test]
+fn test_password_decrypt_single_skesk4_inner_unsupported_algo_returns_error() {
+    let password = Password::from("single-skesk4-password");
+    let ciphertext = encrypt_message_with_passwords(
+        b"single skesk4 inner unsupported",
+        &[password.clone()],
+        PasswordMessageFormat::Seipdv1,
+    );
+    let mutated = mutate_nth_skesk4_inner_payload_algo(
+        &ciphertext,
+        0,
+        &password,
+        SymmetricAlgorithm::Private(100),
+    );
+
+    let result = password::decrypt(&mutated, &password, &[]);
+    assert!(matches!(result, Err(PgpError::UnsupportedAlgorithm { .. })));
 }
 
 #[test]
