@@ -754,6 +754,18 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertFalse(revocation.isEmpty)
     }
 
+    func test_generateSubkeyRevocation_fixtureUppercaseFingerprint_returnsSignatureBytes() throws {
+        let secretCert = try loadArmoredFixtureAsBinary("gpg_secretkey")
+        let subkeyFingerprint = "6F579248C0931BA1480F2CF967DDEEA6EF08B374"
+
+        let revocation = try engine.generateSubkeyRevocation(
+            secretCert: secretCert,
+            subkeyFingerprint: subkeyFingerprint
+        )
+
+        XCTAssertFalse(revocation.isEmpty)
+    }
+
     func test_generateUserIdRevocation_fixtureBinaryInput_returnsSignatureBytes() throws {
         let secretCert = try loadArmoredFixtureAsBinary("gpg_secretkey")
         let userIdData = Data("GnuPG Test User <gnupg-test@example.com>".utf8)

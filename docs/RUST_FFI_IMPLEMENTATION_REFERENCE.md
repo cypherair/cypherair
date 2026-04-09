@@ -294,7 +294,7 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 #### Input Format Classification
 
 - `secret_cert`: `binary-only`
-- `subkey_fingerprint`: lowercase hex fingerprint string
+- `subkey_fingerprint`: hex fingerprint string, matched case-insensitively after lowercase normalization
 - `user_id_data`: `binary-only`
 
 #### Required Semantics
