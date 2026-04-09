@@ -21,6 +21,14 @@ final class FFIIntegrationTests: XCTestCase {
         try FixtureLoader.loadData(name, ext: "gpg")
     }
 
+    private func loadArmoredFixture(_ name: String, ext: String = "asc") throws -> Data {
+        try FixtureLoader.loadData(name, ext: ext)
+    }
+
+    private func loadArmoredFixtureAsBinary(_ name: String, ext: String = "asc") throws -> Data {
+        try engine.dearmor(armored: loadArmoredFixture(name, ext: ext))
+    }
+
     // MARK: - C5.1 Binary Round-Trip
 
     /// C5.1: Generate key → encrypt → decrypt. Verify Data↔Vec<u8> integrity.
@@ -713,6 +721,119 @@ final class FFIIntegrationTests: XCTestCase {
                 break // acceptable for garbage revocation data
             default:
                 XCTFail("Expected RevocationError, InvalidKeyData, CorruptData, or InternalError, got \(pgpError)")
+            }
+        }
+    }
+
+    func test_generateKeyRevocation_roundTrip_validatesAgainstSourceCert() throws {
+        let key = try engine.generateKey(
+            name: "Generated Revocation",
+            email: nil,
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        let generatedRevocation = try engine.generateKeyRevocation(secretCert: key.certData)
+        let validation = try engine.parseRevocationCert(
+            revData: generatedRevocation,
+            certData: key.publicKeyData
+        )
+
+        XCTAssertTrue(validation.lowercased().contains(key.fingerprint.lowercased()))
+    }
+
+    func test_generateSubkeyRevocation_fixtureBinaryInput_returnsSignatureBytes() throws {
+        let secretCert = try loadArmoredFixtureAsBinary("gpg_secretkey")
+        let subkeyFingerprint = "6f579248c0931ba1480f2cf967ddeea6ef08b374"
+
+        let revocation = try engine.generateSubkeyRevocation(
+            secretCert: secretCert,
+            subkeyFingerprint: subkeyFingerprint
+        )
+
+        XCTAssertFalse(revocation.isEmpty)
+    }
+
+    func test_generateUserIdRevocation_fixtureBinaryInput_returnsSignatureBytes() throws {
+        let secretCert = try loadArmoredFixtureAsBinary("gpg_secretkey")
+        let userIdData = Data("GnuPG Test User <gnupg-test@example.com>".utf8)
+
+        let revocation = try engine.generateUserIdRevocation(
+            secretCert: secretCert,
+            userIdData: userIdData
+        )
+
+        XCTAssertFalse(revocation.isEmpty)
+    }
+
+    func test_generateKeyRevocation_publicOnlyInput_throwsInvalidKeyData() throws {
+        let publicCert = try loadArmoredFixtureAsBinary("gpg_pubkey")
+
+        XCTAssertThrowsError(
+            try engine.generateKeyRevocation(secretCert: publicCert)
+        ) { error in
+            guard case .InvalidKeyData = error as? PgpError else {
+                return XCTFail("Expected InvalidKeyData, got \(error)")
+            }
+        }
+    }
+
+    func test_generateSubkeyRevocation_publicOnlyInput_throwsInvalidKeyData() throws {
+        let publicCert = try loadArmoredFixtureAsBinary("gpg_pubkey")
+
+        XCTAssertThrowsError(
+            try engine.generateSubkeyRevocation(
+                secretCert: publicCert,
+                subkeyFingerprint: "6f579248c0931ba1480f2cf967ddeea6ef08b374"
+            )
+        ) { error in
+            guard case .InvalidKeyData = error as? PgpError else {
+                return XCTFail("Expected InvalidKeyData, got \(error)")
+            }
+        }
+    }
+
+    func test_generateUserIdRevocation_publicOnlyInput_throwsInvalidKeyData() throws {
+        let publicCert = try loadArmoredFixtureAsBinary("gpg_pubkey")
+
+        XCTAssertThrowsError(
+            try engine.generateUserIdRevocation(
+                secretCert: publicCert,
+                userIdData: Data("GnuPG Test User <gnupg-test@example.com>".utf8)
+            )
+        ) { error in
+            guard case .InvalidKeyData = error as? PgpError else {
+                return XCTFail("Expected InvalidKeyData, got \(error)")
+            }
+        }
+    }
+
+    func test_generateSubkeyRevocation_selectorMiss_throwsInvalidKeyData() throws {
+        let secretCert = try loadArmoredFixtureAsBinary("gpg_secretkey")
+
+        XCTAssertThrowsError(
+            try engine.generateSubkeyRevocation(
+                secretCert: secretCert,
+                subkeyFingerprint: "0000000000000000000000000000000000000000"
+            )
+        ) { error in
+            guard case .InvalidKeyData = error as? PgpError else {
+                return XCTFail("Expected InvalidKeyData, got \(error)")
+            }
+        }
+    }
+
+    func test_generateUserIdRevocation_selectorMiss_throwsInvalidKeyData() throws {
+        let secretCert = try loadArmoredFixtureAsBinary("gpg_secretkey")
+
+        XCTAssertThrowsError(
+            try engine.generateUserIdRevocation(
+                secretCert: secretCert,
+                userIdData: Data("missing@example.com".utf8)
+            )
+        ) { error in
+            guard case .InvalidKeyData = error as? PgpError else {
+                return XCTFail("Expected InvalidKeyData, got \(error)")
             }
         }
     }

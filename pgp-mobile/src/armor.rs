@@ -20,8 +20,8 @@ pub fn encode_armor(data: &[u8], kind: ArmorKind) -> Result<Vec<u8>, PgpError> {
     };
 
     let mut output = Vec::new();
-    let mut writer = armor::Writer::new(&mut output, armor_kind)
-        .map_err(|e| PgpError::ArmorError {
+    let mut writer =
+        armor::Writer::new(&mut output, armor_kind).map_err(|e| PgpError::ArmorError {
             reason: e.to_string(),
         })?;
 
@@ -43,8 +43,7 @@ pub fn decode_armor(armored: &[u8]) -> Result<(Vec<u8>, ArmorKind), PgpError> {
     // or .gpg files) or ASCII-armored text (e.g., from clipboard paste or .asc files).
     // The reader auto-detects format. Passing binary to a strict armor reader would
     // reject valid input; tolerant mode avoids requiring callers to pre-detect format.
-    let mut reader =
-        armor::Reader::from_bytes(armored, armor::ReaderMode::Tolerant(None));
+    let mut reader = armor::Reader::from_bytes(armored, armor::ReaderMode::Tolerant(None));
 
     let mut data = Vec::new();
     std::io::Read::read_to_end(&mut reader, &mut data).map_err(|e| PgpError::ArmorError {
@@ -91,10 +90,11 @@ pub fn armor_public_key(cert_data: &[u8]) -> Result<Vec<u8>, PgpError> {
     })?;
 
     let mut output = Vec::new();
-    let mut writer = armor::Writer::new(&mut output, armor::Kind::PublicKey)
-        .map_err(|e| PgpError::ArmorError {
+    let mut writer = armor::Writer::new(&mut output, armor::Kind::PublicKey).map_err(|e| {
+        PgpError::ArmorError {
             reason: e.to_string(),
-        })?;
+        }
+    })?;
 
     cert.serialize(&mut writer)
         .map_err(|e| PgpError::ArmorError {

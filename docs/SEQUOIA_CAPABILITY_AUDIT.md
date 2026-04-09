@@ -72,7 +72,7 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Modify certificate expiry by re-signing bindings | Cert lifecycle | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Backed by `Cert::set_expiration_time`; consumed by `KeyManagementService.modifyExpiry`. |
 | Validate a standalone key revocation signature against a target certificate | Cert lifecycle | Yes | Yes | Yes | Yes | No | Yes | Exported but unused | `parse_revocation_cert` is exported and tested, but production services do not consume it. |
 | Merge same-fingerprint public certificate updates into an existing local certificate | Cert lifecycle | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Implemented via the certificate merge/update wrapper on `PgpEngine`; `ContactService.addContact` now absorbs same-fingerprint public updates and preserves duplicate/no-op semantics for exact re-imports. |
-| Regenerate a new key revocation signature from an existing private key | Cert lifecycle | Yes | Yes | No | No | No | No | Missing wrapper | Sequoia exposes `Cert::revoke`, but CypherAir only stores the revocation cert emitted at generation time. Imported keys lose revocation-export parity after import. |
+| Regenerate a new key revocation signature from an existing private key | Cert lifecycle | Yes | Yes | Yes | Yes | Yes | Yes | Implemented with key-level Swift adoption | Backed by `Cert::revoke`; Swift adopts the key-level path for imported-key revocation availability parity and armored export, while generation-time revocations keep Sequoia's existing semantics. |
 
 ### 3.2 Message Encryption And Decryption
 
@@ -108,8 +108,8 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Capability | Domain | Sequoia | Build | Rust | FFI | Services | Tests | Conclusion | Notes |
 |---|---|---:|---:|---:|---:|---:|---:|---|---|
 | Add or merge new User IDs, subkeys, and updated bindings | Cert structure | Yes | Yes | Yes | Yes | Yes | Yes | Implemented through certificate merge/update wrapper | Same-fingerprint public certificate updates can now absorb new User IDs, new subkeys, and refreshed binding packets through the bounded merge/update API. |
-| Subkey-specific revocation builders | Cert structure | Yes | Yes | No | No | No | No | Missing wrapper | `SubkeyRevocationBuilder` is not wrapped. |
-| User ID-specific revocation builders | Cert structure | Yes | Yes | No | No | No | No | Missing wrapper | `UserIDRevocationBuilder` is not wrapped. |
+| Subkey-specific revocation builders | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | `SubkeyRevocationBuilder` is wrapped and tested, but selector discovery remains deferred on the Swift product side. |
+| User ID-specific revocation builders | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | `UserIDRevocationBuilder` is wrapped and tested, but raw User ID discovery remains deferred on the Swift product side. |
 | Third-party certifications (`UserID::certify`, related flows) | Cert structure | Yes | Yes | No | No | No | No | Missing wrapper | Relevant to future certification features, but absent today. |
 | Runtime policy customization beyond `StandardPolicy` | Policy | Yes | Yes | No | No | No | No | Intentionally excluded by product/security policy | Current wrapper hardcodes `StandardPolicy` and product-default algorithm decisions. |
 | Algorithm/backend selection knobs exposed to callers | Policy | Yes | Yes | No | No | No | No | Intentionally excluded by product/security policy | Product fixes OpenSSL backend, outgoing compression policy, and format-selection behavior. |
@@ -160,7 +160,7 @@ The following families are part of the companion Rust roadmap in [`RUST_SEQUOIA_
 2. **Revocation construction family**
    - Includes generating a key revocation certificate from an existing secret cert, plus selective subkey and User ID revocation builders.
    - Default stance: `service adoption deferred`
-   - Current production-flow exception: imported-key revocation parity
+   - Current production-flow exception: imported-key revocation availability parity
 
 3. **Password/SKESK symmetric-message family**
    - Includes password-based encryption/decryption wrappers and the error-mapping work needed to distinguish wrong-password, integrity/authentication, and malformed-message outcomes.

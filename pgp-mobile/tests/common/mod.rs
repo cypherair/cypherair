@@ -1,7 +1,7 @@
 //! Shared test utilities for pgp-mobile integration tests.
 
-use sequoia_openpgp as openpgp;
 use openpgp::parse::Parse;
+use sequoia_openpgp as openpgp;
 
 /// Detect whether binary ciphertext uses SEIPDv1 or SEIPDv2.
 /// Uses PacketParser to inspect packet headers without fully decrypting.
@@ -10,8 +10,8 @@ use openpgp::parse::Parse;
 pub fn detect_message_format(ciphertext: &[u8]) -> (bool, bool) {
     let mut has_v1 = false;
     let mut has_v2 = false;
-    let mut ppr = openpgp::parse::PacketParser::from_bytes(ciphertext)
-        .expect("Should parse ciphertext");
+    let mut ppr =
+        openpgp::parse::PacketParser::from_bytes(ciphertext).expect("Should parse ciphertext");
     while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
         match &pp.packet {
             openpgp::Packet::SEIP(seip) => {

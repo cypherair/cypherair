@@ -107,7 +107,10 @@ fn test_encrypt_decrypt_file_profile_a_roundtrip() {
 
     assert!(decrypted_path.exists(), "Decrypted file should exist");
     let decrypted = fs::read(&decrypted_path).unwrap();
-    assert_eq!(decrypted, plaintext, "Decrypted content must match original");
+    assert_eq!(
+        decrypted, plaintext,
+        "Decrypted content must match original"
+    );
 
     // No signing key was used, so signature should be NotSigned
     assert_eq!(
@@ -459,12 +462,9 @@ fn test_sign_verify_detached_file_profile_a() {
     fs::write(&data_path, data).unwrap();
 
     // Sign
-    let signature = streaming::sign_detached_file(
-        data_path.to_str().unwrap(),
-        &key.cert_data,
-        None,
-    )
-    .expect("Signing should succeed");
+    let signature =
+        streaming::sign_detached_file(data_path.to_str().unwrap(), &key.cert_data, None)
+            .expect("Signing should succeed");
 
     assert!(!signature.is_empty(), "Signature should not be empty");
 
@@ -490,12 +490,9 @@ fn test_sign_verify_detached_file_profile_b() {
     let data_path = dir.path().join("document.txt");
     fs::write(&data_path, data).unwrap();
 
-    let signature = streaming::sign_detached_file(
-        data_path.to_str().unwrap(),
-        &key.cert_data,
-        None,
-    )
-    .expect("Signing should succeed");
+    let signature =
+        streaming::sign_detached_file(data_path.to_str().unwrap(), &key.cert_data, None)
+            .expect("Signing should succeed");
 
     let result = streaming::verify_detached_file(
         data_path.to_str().unwrap(),

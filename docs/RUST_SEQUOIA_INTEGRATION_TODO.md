@@ -110,7 +110,10 @@ Restore revocation-construction coverage for imported secret certificates and pr
 **Service stance**
 
 - Default: `service adoption deferred`
-- Current production-flow exception: imported-key revocation parity is already a product gap and should be the first downstream consumer when service work is scheduled
+- Current production-flow exception: imported-key revocation availability parity is the approved first downstream consumer
+- Current delivery boundary:
+  - key-level revocation generation is adopted in Swift for imported-key revocation export capability
+  - subkey and User ID revocation builders remain Rust / FFI only until selector discovery helpers are added
 
 **Minimum testing**
 

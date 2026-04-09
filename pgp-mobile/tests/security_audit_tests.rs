@@ -34,13 +34,9 @@ use pgp_mobile::verify;
 /// see streaming_tests::test_streaming_decrypt_tampered_profile_a_returns_specific_error.
 #[test]
 fn test_error_classification_tampered_profile_a() {
-    let key = keys::generate_key_with_profile(
-        "Audit".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Audit".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
     let mut ciphertext = encrypt::encrypt_binary(
         b"error classification test",
@@ -63,9 +59,7 @@ fn test_error_classification_tampered_profile_a() {
         Err(pgp_mobile::error::PgpError::AeadAuthenticationFailed) => {}
         Err(pgp_mobile::error::PgpError::CorruptData { .. }) => {}
         Err(pgp_mobile::error::PgpError::NoMatchingKey) => {} // PKESK header corrupted
-        Err(other) => panic!(
-            "Unexpected error for tampered Profile A data: {other}"
-        ),
+        Err(other) => panic!("Unexpected error for tampered Profile A data: {other}"),
     }
 }
 
@@ -77,13 +71,9 @@ fn test_error_classification_tampered_profile_a() {
 /// see streaming_tests::test_streaming_decrypt_tampered_profile_b_returns_specific_error.
 #[test]
 fn test_error_classification_tampered_profile_b() {
-    let key = keys::generate_key_with_profile(
-        "Audit".to_string(),
-        None,
-        None,
-        KeyProfile::Advanced,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Audit".to_string(), None, None, KeyProfile::Advanced)
+            .expect("Key gen should succeed");
 
     let mut ciphertext = encrypt::encrypt_binary(
         b"error classification test",
@@ -104,9 +94,7 @@ fn test_error_classification_tampered_profile_b() {
         Err(pgp_mobile::error::PgpError::IntegrityCheckFailed) => {}
         Err(pgp_mobile::error::PgpError::CorruptData { .. }) => {}
         Err(pgp_mobile::error::PgpError::NoMatchingKey) => {}
-        Err(other) => panic!(
-            "Unexpected error for tampered Profile B data: {other}"
-        ),
+        Err(other) => panic!("Unexpected error for tampered Profile B data: {other}"),
     }
 }
 
@@ -114,21 +102,12 @@ fn test_error_classification_tampered_profile_b() {
 /// Verifies the hard-fail security invariant.
 #[test]
 fn test_decrypt_wrong_key_no_plaintext_leak() {
-    let alice = keys::generate_key_with_profile(
-        "Alice".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let alice =
+        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_profile(
-        "Bob".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Universal)
+        .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt(
         b"secret for alice only",
@@ -152,24 +131,16 @@ fn test_decrypt_wrong_key_no_plaintext_leak() {
 /// parse_recipients() returns valid hex key IDs for a Profile A message.
 #[test]
 fn test_parse_recipients_valid_message_profile_a() {
-    let key = keys::generate_key_with_profile(
-        "Alice".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
-    let ciphertext = encrypt::encrypt_binary(
-        b"Phase 1 test",
-        &[key.public_key_data.clone()],
-        None,
-        None,
-    )
-    .expect("Encrypt should succeed");
+    let ciphertext =
+        encrypt::encrypt_binary(b"Phase 1 test", &[key.public_key_data.clone()], None, None)
+            .expect("Encrypt should succeed");
 
-    let recipients = decrypt::parse_recipients(&ciphertext)
-        .expect("parse_recipients should succeed");
+    let recipients =
+        decrypt::parse_recipients(&ciphertext).expect("parse_recipients should succeed");
 
     assert!(!recipients.is_empty(), "Must have at least one recipient");
     // All recipient IDs should be hex strings
@@ -184,13 +155,9 @@ fn test_parse_recipients_valid_message_profile_a() {
 /// parse_recipients() returns valid key IDs for a Profile B message.
 #[test]
 fn test_parse_recipients_valid_message_profile_b() {
-    let key = keys::generate_key_with_profile(
-        "Alice".to_string(),
-        None,
-        None,
-        KeyProfile::Advanced,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+            .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"Phase 1 test B",
@@ -200,8 +167,8 @@ fn test_parse_recipients_valid_message_profile_b() {
     )
     .expect("Encrypt should succeed");
 
-    let recipients = decrypt::parse_recipients(&ciphertext)
-        .expect("parse_recipients should succeed");
+    let recipients =
+        decrypt::parse_recipients(&ciphertext).expect("parse_recipients should succeed");
 
     assert!(!recipients.is_empty(), "Must have at least one recipient");
 }
@@ -209,35 +176,23 @@ fn test_parse_recipients_valid_message_profile_b() {
 /// parse_recipients() returns multiple IDs for multi-recipient messages.
 #[test]
 fn test_parse_recipients_multi_recipient() {
-    let alice = keys::generate_key_with_profile(
-        "Alice".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let alice =
+        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_profile(
-        "Bob".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Universal)
+        .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"Multi-recipient test",
-        &[
-            alice.public_key_data.clone(),
-            bob.public_key_data.clone(),
-        ],
+        &[alice.public_key_data.clone(), bob.public_key_data.clone()],
         None,
         None,
     )
     .expect("Encrypt should succeed");
 
-    let recipients = decrypt::parse_recipients(&ciphertext)
-        .expect("parse_recipients should succeed");
+    let recipients =
+        decrypt::parse_recipients(&ciphertext).expect("parse_recipients should succeed");
 
     assert!(
         recipients.len() >= 2,
@@ -251,19 +206,18 @@ fn test_parse_recipients_multi_recipient() {
 fn test_parse_recipients_corrupt_data() {
     let garbage = b"This is not an OpenPGP message at all.";
     let result = decrypt::parse_recipients(garbage);
-    assert!(result.is_err(), "parse_recipients must fail on non-OpenPGP data");
+    assert!(
+        result.is_err(),
+        "parse_recipients must fail on non-OpenPGP data"
+    );
 }
 
 /// parse_recipients() fails on a cleartext-signed message (no PKESK).
 #[test]
 fn test_parse_recipients_signed_not_encrypted() {
-    let key = keys::generate_key_with_profile(
-        "Alice".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
     let signed = sign::sign_cleartext(b"Just signed, not encrypted", &key.cert_data)
         .expect("Sign should succeed");
@@ -292,17 +246,10 @@ fn test_encrypt_to_expired_key_rejected_profile_a() {
     // Wait for the key to expire
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = encrypt::encrypt_binary(
-        b"Should fail",
-        &[key.public_key_data.clone()],
-        None,
-        None,
-    );
+    let result =
+        encrypt::encrypt_binary(b"Should fail", &[key.public_key_data.clone()], None, None);
 
-    assert!(
-        result.is_err(),
-        "Encrypting to an expired v4 key must fail"
-    );
+    assert!(result.is_err(), "Encrypting to an expired v4 key must fail");
 }
 
 /// Encrypting to an expired key must fail (Profile B).
@@ -318,17 +265,10 @@ fn test_encrypt_to_expired_key_rejected_profile_b() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = encrypt::encrypt_binary(
-        b"Should fail",
-        &[key.public_key_data.clone()],
-        None,
-        None,
-    );
+    let result =
+        encrypt::encrypt_binary(b"Should fail", &[key.public_key_data.clone()], None, None);
 
-    assert!(
-        result.is_err(),
-        "Encrypting to an expired v6 key must fail"
-    );
+    assert!(result.is_err(), "Encrypting to an expired v6 key must fail");
 }
 
 // ── Revoked key encryption rejection ──────────────────────────────────────
@@ -337,42 +277,32 @@ fn test_encrypt_to_expired_key_rejected_profile_b() {
 /// Applies the auto-generated revocation cert to the key, then attempts encryption.
 #[test]
 fn test_encrypt_to_revoked_key_rejected() {
-    use sequoia_openpgp as openpgp;
     use openpgp::parse::Parse;
     use openpgp::serialize::Serialize;
+    use sequoia_openpgp as openpgp;
 
-    let key = keys::generate_key_with_profile(
-        "Revocable".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Revocable".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
     // Apply the revocation cert to create a revoked certificate
-    let cert = openpgp::Cert::from_bytes(&key.public_key_data)
-        .expect("Parse public key should succeed");
+    let cert =
+        openpgp::Cert::from_bytes(&key.public_key_data).expect("Parse public key should succeed");
     let rev_sig = openpgp::Packet::from_bytes(&key.revocation_cert)
         .expect("Parse revocation cert should succeed");
-    let (revoked_cert, _) = cert.insert_packets(vec![rev_sig])
+    let (revoked_cert, _) = cert
+        .insert_packets(vec![rev_sig])
         .expect("Insert revocation should succeed");
 
     // Serialize the revoked cert
     let mut revoked_pubkey = Vec::new();
-    revoked_cert.serialize(&mut revoked_pubkey)
+    revoked_cert
+        .serialize(&mut revoked_pubkey)
         .expect("Serialize revoked cert should succeed");
 
-    let result = encrypt::encrypt_binary(
-        b"Should fail",
-        &[revoked_pubkey],
-        None,
-        None,
-    );
+    let result = encrypt::encrypt_binary(b"Should fail", &[revoked_pubkey], None, None);
 
-    assert!(
-        result.is_err(),
-        "Encrypting to a revoked key must fail"
-    );
+    assert!(result.is_err(), "Encrypting to a revoked key must fail");
 }
 
 // ── Legacy SEIPD (no MDC) rejection ──────────────────────────────────────
@@ -385,13 +315,9 @@ fn test_encrypt_to_revoked_key_rejected() {
 /// with the legacy SED packet tag (9) in the OpenPGP new-format header.
 #[test]
 fn test_decrypt_legacy_seipd_no_mdc_rejected() {
-    let key = keys::generate_key_with_profile(
-        "Alice".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
         b"Legacy SEIPD test",
@@ -454,13 +380,9 @@ fn test_encrypt_empty_recipients_rejected() {
 /// Encrypting with no recipients but with encrypt-to-self should succeed.
 #[test]
 fn test_encrypt_empty_recipients_but_encrypt_to_self_succeeds() {
-    let key = keys::generate_key_with_profile(
-        "Self".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Self".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
     let result = encrypt::encrypt(
         b"encrypt to self only",
@@ -480,17 +402,12 @@ fn test_encrypt_empty_recipients_but_encrypt_to_self_succeeds() {
 /// Validates verify.rs graded result handling for cleartext signatures.
 #[test]
 fn test_verify_tampered_cleartext_returns_bad() {
-    let key = keys::generate_key_with_profile(
-        "Signer".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Signer".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
     let text = b"Original cleartext message";
-    let signed = sign::sign_cleartext(text, &key.cert_data)
-        .expect("Signing should succeed");
+    let signed = sign::sign_cleartext(text, &key.cert_data).expect("Signing should succeed");
 
     // Tamper: modify the signed content within the cleartext structure.
     // Cleartext signatures embed the text between the header and the armor.
@@ -518,28 +435,21 @@ fn test_verify_tampered_cleartext_returns_bad() {
 /// Validates verify.rs graded result handling for detached signatures.
 #[test]
 fn test_verify_tampered_detached_returns_bad() {
-    let key = keys::generate_key_with_profile(
-        "Signer".to_string(),
-        None,
-        None,
-        KeyProfile::Advanced,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Signer".to_string(), None, None, KeyProfile::Advanced)
+            .expect("Key gen should succeed");
 
     let data = b"Original file content for detached signing";
-    let signature = sign::sign_detached(data, &key.cert_data)
-        .expect("Detached signing should succeed");
+    let signature =
+        sign::sign_detached(data, &key.cert_data).expect("Detached signing should succeed");
 
     // Tamper: modify the data after signing
     let mut tampered_data = data.to_vec();
     tampered_data[0] ^= 0x01;
 
-    let result = verify::verify_detached(
-        &tampered_data,
-        &signature,
-        &[key.public_key_data.clone()],
-    )
-    .expect("Verification should return a graded result, not throw");
+    let result =
+        verify::verify_detached(&tampered_data, &signature, &[key.public_key_data.clone()])
+            .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
         result.status,
@@ -554,9 +464,9 @@ fn test_verify_tampered_detached_returns_bad() {
 /// Complements test_encrypt_to_revoked_key_rejected (Profile A).
 #[test]
 fn test_encrypt_to_revoked_key_profile_b_rejected() {
-    use sequoia_openpgp as openpgp;
     use openpgp::parse::Parse;
     use openpgp::serialize::Serialize;
+    use sequoia_openpgp as openpgp;
 
     let key = keys::generate_key_with_profile(
         "Revocable B".to_string(),
@@ -569,24 +479,21 @@ fn test_encrypt_to_revoked_key_profile_b_rejected() {
     assert_eq!(key.key_version, 6, "Profile B must produce v6 key");
 
     // Apply the revocation cert to create a revoked certificate
-    let cert = openpgp::Cert::from_bytes(&key.public_key_data)
-        .expect("Parse public key should succeed");
+    let cert =
+        openpgp::Cert::from_bytes(&key.public_key_data).expect("Parse public key should succeed");
     let rev_sig = openpgp::Packet::from_bytes(&key.revocation_cert)
         .expect("Parse revocation cert should succeed");
-    let (revoked_cert, _) = cert.insert_packets(vec![rev_sig])
+    let (revoked_cert, _) = cert
+        .insert_packets(vec![rev_sig])
         .expect("Insert revocation should succeed");
 
     // Serialize the revoked cert
     let mut revoked_pubkey = Vec::new();
-    revoked_cert.serialize(&mut revoked_pubkey)
+    revoked_cert
+        .serialize(&mut revoked_pubkey)
         .expect("Serialize revoked cert should succeed");
 
-    let result = encrypt::encrypt_binary(
-        b"Should fail",
-        &[revoked_pubkey],
-        None,
-        None,
-    );
+    let result = encrypt::encrypt_binary(b"Should fail", &[revoked_pubkey], None, None);
 
     assert!(
         result.is_err(),
@@ -608,17 +515,11 @@ fn make_expired_signer(profile: KeyProfile) -> (GeneratedKey, Vec<u8>, Vec<u8>) 
     .expect("Key gen should succeed");
 
     // Sign immediately while the key is still valid
-    let cleartext_signed = sign::sign_cleartext(
-        b"Signed while key was valid",
-        &signer.cert_data,
-    )
-    .expect("Cleartext signing should succeed while key is valid");
+    let cleartext_signed = sign::sign_cleartext(b"Signed while key was valid", &signer.cert_data)
+        .expect("Cleartext signing should succeed while key is valid");
 
-    let detached_sig = sign::sign_detached(
-        b"Data for detached sig",
-        &signer.cert_data,
-    )
-    .expect("Detached signing should succeed while key is valid");
+    let detached_sig = sign::sign_detached(b"Data for detached sig", &signer.cert_data)
+        .expect("Detached signing should succeed while key is valid");
 
     (signer, cleartext_signed, detached_sig)
 }
@@ -631,11 +532,8 @@ fn test_verify_cleartext_expired_signer_profile_a() {
     // Wait for the key to expire
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = verify::verify_cleartext(
-        &cleartext_signed,
-        &[signer.public_key_data.clone()],
-    )
-    .expect("Verification should return a graded result, not throw");
+    let result = verify::verify_cleartext(&cleartext_signed, &[signer.public_key_data.clone()])
+        .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
         result.status,
@@ -651,11 +549,8 @@ fn test_verify_cleartext_expired_signer_profile_b() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = verify::verify_cleartext(
-        &cleartext_signed,
-        &[signer.public_key_data.clone()],
-    )
-    .expect("Verification should return a graded result, not throw");
+    let result = verify::verify_cleartext(&cleartext_signed, &[signer.public_key_data.clone()])
+        .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
         result.status,
@@ -853,11 +748,11 @@ fn test_armor_decode_known_kinds_not_unknown() {
     )
     .expect("Key gen should succeed");
 
-    let armored = armor::armor_public_key(&key.public_key_data)
-        .expect("armor_public_key should succeed");
+    let armored =
+        armor::armor_public_key(&key.public_key_data).expect("armor_public_key should succeed");
 
-    let (_, kind) = armor::decode_armor(&armored)
-        .expect("decode_armor should succeed for armored public key");
+    let (_, kind) =
+        armor::decode_armor(&armored).expect("decode_armor should succeed for armored public key");
 
     assert_eq!(
         kind,
@@ -893,21 +788,12 @@ fn test_armor_decode_known_kinds_not_unknown() {
 /// Complements test_decrypt_wrong_key_no_plaintext_leak (Profile A only).
 #[test]
 fn test_decrypt_wrong_key_no_plaintext_leak_profile_b() {
-    let alice = keys::generate_key_with_profile(
-        "Alice".to_string(),
-        None,
-        None,
-        KeyProfile::Advanced,
-    )
-    .expect("Key gen should succeed");
+    let alice =
+        keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
+            .expect("Key gen should succeed");
 
-    let bob = keys::generate_key_with_profile(
-        "Bob".to_string(),
-        None,
-        None,
-        KeyProfile::Advanced,
-    )
-    .expect("Key gen should succeed");
+    let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
+        .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt(
         b"secret for alice only (AEAD)",
@@ -932,17 +818,12 @@ fn test_decrypt_wrong_key_no_plaintext_leak_profile_b() {
 /// Complements test_verify_tampered_cleartext_returns_bad (Profile A only).
 #[test]
 fn test_verify_tampered_cleartext_returns_bad_profile_b() {
-    let key = keys::generate_key_with_profile(
-        "Signer".to_string(),
-        None,
-        None,
-        KeyProfile::Advanced,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Signer".to_string(), None, None, KeyProfile::Advanced)
+            .expect("Key gen should succeed");
 
     let text = b"Original cleartext message";
-    let signed = sign::sign_cleartext(text, &key.cert_data)
-        .expect("Signing should succeed");
+    let signed = sign::sign_cleartext(text, &key.cert_data).expect("Signing should succeed");
 
     let mut tampered = signed.clone();
     let signed_str = String::from_utf8_lossy(&tampered);
@@ -966,27 +847,20 @@ fn test_verify_tampered_cleartext_returns_bad_profile_b() {
 /// Complements test_verify_tampered_detached_returns_bad (Profile B only).
 #[test]
 fn test_verify_tampered_detached_returns_bad_profile_a() {
-    let key = keys::generate_key_with_profile(
-        "Signer".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Signer".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
     let data = b"Original file content for detached signing";
-    let signature = sign::sign_detached(data, &key.cert_data)
-        .expect("Detached signing should succeed");
+    let signature =
+        sign::sign_detached(data, &key.cert_data).expect("Detached signing should succeed");
 
     let mut tampered_data = data.to_vec();
     tampered_data[0] ^= 0x01;
 
-    let result = verify::verify_detached(
-        &tampered_data,
-        &signature,
-        &[key.public_key_data.clone()],
-    )
-    .expect("Verification should return a graded result, not throw");
+    let result =
+        verify::verify_detached(&tampered_data, &signature, &[key.public_key_data.clone()])
+            .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
         result.status,
@@ -1025,11 +899,9 @@ fn test_sign_with_expired_key_not_accepted_as_valid() {
             }
             Ok(signed) => {
                 // Sequoia allowed signing but verification must NOT return Valid.
-                let verify_result = verify::verify_cleartext(
-                    &signed,
-                    &[key.public_key_data.clone()],
-                )
-                .expect("Verification should return a graded result");
+                let verify_result =
+                    verify::verify_cleartext(&signed, &[key.public_key_data.clone()])
+                        .expect("Verification should return a graded result");
                 assert_ne!(
                     verify_result.status,
                     SignatureStatus::Valid,
@@ -1052,28 +924,15 @@ fn test_encrypt_decrypt_unicode_plaintext_round_trip() {
         (KeyProfile::Universal, "Profile A"),
         (KeyProfile::Advanced, "Profile B"),
     ] {
-        let key = keys::generate_key_with_profile(
-            "Unicode Test".to_string(),
-            None,
-            None,
-            profile,
-        )
-        .expect("Key gen should succeed");
+        let key = keys::generate_key_with_profile("Unicode Test".to_string(), None, None, profile)
+            .expect("Key gen should succeed");
 
-        let ciphertext = encrypt::encrypt(
-            plaintext_bytes,
-            &[key.public_key_data.clone()],
-            None,
-            None,
-        )
-        .unwrap_or_else(|e| panic!("Encryption should succeed ({label}): {e}"));
+        let ciphertext =
+            encrypt::encrypt(plaintext_bytes, &[key.public_key_data.clone()], None, None)
+                .unwrap_or_else(|e| panic!("Encryption should succeed ({label}): {e}"));
 
-        let result = decrypt::decrypt(
-            &ciphertext,
-            &[key.cert_data.clone()],
-            &[],
-        )
-        .unwrap_or_else(|e| panic!("Decryption should succeed ({label}): {e}"));
+        let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+            .unwrap_or_else(|e| panic!("Decryption should succeed ({label}): {e}"));
 
         assert_eq!(
             result.plaintext, plaintext_bytes,
@@ -1094,9 +953,9 @@ fn test_encrypt_decrypt_unicode_plaintext_round_trip() {
 /// profile_a_tests.rs.
 #[test]
 fn test_encrypt_rejects_signing_only_cert_profile_b() {
-    use sequoia_openpgp as openpgp;
     use openpgp::cert::prelude::*;
     use openpgp::serialize::Serialize;
+    use sequoia_openpgp as openpgp;
 
     // Create a v6 cert with ONLY signing capability, no encryption subkey
     let (cert, _rev) = CertBuilder::new()
@@ -1112,23 +971,20 @@ fn test_encrypt_rejects_signing_only_cert_profile_b() {
     assert_eq!(cert.primary_key().key().version(), 6, "Must be v6 cert");
 
     let mut pubkey_data = Vec::new();
-    cert.serialize(&mut pubkey_data).expect("Serialize should succeed");
+    cert.serialize(&mut pubkey_data)
+        .expect("Serialize should succeed");
 
-    let result = encrypt::encrypt(
-        b"Should fail",
-        &[pubkey_data.clone()],
-        None,
-        None,
+    let result = encrypt::encrypt(b"Should fail", &[pubkey_data.clone()], None, None);
+    assert!(
+        result.is_err(),
+        "encrypt should reject v6 recipient without encryption subkey"
     );
-    assert!(result.is_err(), "encrypt should reject v6 recipient without encryption subkey");
 
-    let result_binary = encrypt::encrypt_binary(
-        b"Should fail",
-        &[pubkey_data],
-        None,
-        None,
+    let result_binary = encrypt::encrypt_binary(b"Should fail", &[pubkey_data], None, None);
+    assert!(
+        result_binary.is_err(),
+        "encrypt_binary should reject v6 recipient without encryption subkey"
     );
-    assert!(result_binary.is_err(), "encrypt_binary should reject v6 recipient without encryption subkey");
 }
 
 // ── L2: Expired key should still report expiry timestamp ───────────────
@@ -1166,9 +1022,9 @@ fn test_parse_key_info_expired_cert_still_has_expiry_timestamp() {
 /// is handled appropriately during verification.
 #[test]
 fn test_verify_signature_from_revoked_key() {
-    use sequoia_openpgp as openpgp;
     use openpgp::parse::Parse;
     use openpgp::serialize::Serialize;
+    use sequoia_openpgp as openpgp;
 
     // Generate key and sign a message before revocation
     let key = keys::generate_key_with_profile(
@@ -1184,15 +1040,17 @@ fn test_verify_signature_from_revoked_key() {
         .expect("Signing should succeed before revocation");
 
     // Apply revocation cert to create revoked public key
-    let cert = openpgp::Cert::from_bytes(&key.public_key_data)
-        .expect("Parse public key should succeed");
+    let cert =
+        openpgp::Cert::from_bytes(&key.public_key_data).expect("Parse public key should succeed");
     let rev_sig = openpgp::Packet::from_bytes(&key.revocation_cert)
         .expect("Parse revocation cert should succeed");
-    let (revoked_cert, _) = cert.insert_packets(vec![rev_sig])
+    let (revoked_cert, _) = cert
+        .insert_packets(vec![rev_sig])
         .expect("Insert revocation should succeed");
 
     let mut revoked_pubkey = Vec::new();
-    revoked_cert.serialize(&mut revoked_pubkey)
+    revoked_cert
+        .serialize(&mut revoked_pubkey)
         .expect("Serialize revoked cert should succeed");
 
     // Verify the signature with the revoked public key
@@ -1203,7 +1061,8 @@ fn test_verify_signature_from_revoked_key() {
     match result {
         Ok(vr) => {
             assert_ne!(
-                vr.status, SignatureStatus::Valid,
+                vr.status,
+                SignatureStatus::Valid,
                 "Signature from revoked key should not be reported as Valid"
             );
         }

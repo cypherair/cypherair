@@ -647,6 +647,21 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func generateKey(name: String, email: String?, expirySeconds: UInt64?, profile: KeyProfile) throws  -> GeneratedKey
     
     /**
+     * Generate a key-level revocation signature from an existing secret certificate.
+     */
+    func generateKeyRevocation(secretCert: Data) throws  -> Data
+    
+    /**
+     * Generate a subkey-specific revocation signature from an existing secret certificate.
+     */
+    func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String) throws  -> Data
+    
+    /**
+     * Generate a User ID-specific revocation signature from an existing secret certificate.
+     */
+    func generateUserIdRevocation(secretCert: Data, userIdData: Data) throws  -> Data
+    
+    /**
      * Get the key version from binary certificate data.
      */
     func getKeyVersion(certData: Data) throws  -> UInt8
@@ -1010,6 +1025,44 @@ open func generateKey(name: String, email: String?, expirySeconds: UInt64?, prof
         FfiConverterOptionString.lower(email),
         FfiConverterOptionUInt64.lower(expirySeconds),
         FfiConverterTypeKeyProfile_lower(profile),$0
+    )
+})
+}
+    
+    /**
+     * Generate a key-level revocation signature from an existing secret certificate.
+     */
+open func generateKeyRevocation(secretCert: Data)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_key_revocation(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(secretCert),$0
+    )
+})
+}
+    
+    /**
+     * Generate a subkey-specific revocation signature from an existing secret certificate.
+     */
+open func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_subkey_revocation(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(secretCert),
+        FfiConverterString.lower(subkeyFingerprint),$0
+    )
+})
+}
+    
+    /**
+     * Generate a User ID-specific revocation signature from an existing secret certificate.
+     */
+open func generateUserIdRevocation(secretCert: Data, userIdData: Data)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_revocation(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(secretCert),
+        FfiConverterData.lower(userIdData),$0
     )
 })
 }
@@ -1867,7 +1920,7 @@ public struct KeyInfo: Equatable, Hashable {
      */
     public var keyVersion: UInt8
     /**
-     * Primary User ID string (name + email).
+     * Policy-selected primary User ID string for display and identity matching.
      */
     public var userId: String?
     /**
@@ -1909,7 +1962,7 @@ public struct KeyInfo: Equatable, Hashable {
          * Key version (4 or 6).
          */keyVersion: UInt8, 
         /**
-         * Primary User ID string (name + email).
+         * Policy-selected primary User ID string for display and identity matching.
          */userId: String?, 
         /**
          * Whether the key has a valid encryption subkey.
@@ -3158,6 +3211,15 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key() != 9133) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key_revocation() != 32937) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation() != 46816) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation() != 41268) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_get_key_version() != 2783) {

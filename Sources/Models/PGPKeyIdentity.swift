@@ -41,8 +41,10 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// Mutable because expiry modification creates new binding signatures.
     var publicKeyData: Data
 
-    /// Revocation certificate data (auto-generated at key creation).
-    let revocationCert: Data
+    /// Binary revocation signature data used for export.
+    /// Generated at key creation for local keys and backfilled on demand for
+    /// imported keys that predate revocation-construction support.
+    var revocationCert: Data
 
     /// Primary algorithm description (e.g., "Ed25519", "Ed448").
     let primaryAlgo: String

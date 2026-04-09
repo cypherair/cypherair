@@ -124,6 +124,20 @@ Typical stale-artifact symptom:
 
 If that happens, first suspect stale Rust `release` artifacts rather than stale Swift source.
 
+## 2.3 Revocation Construction Coverage
+
+When changing revocation-construction behavior, validation must cover:
+
+- key-level generation for both profiles
+- subkey and User ID revocation construction on the Rust / FFI surface
+- if Swift FFI tests reuse armored secret-key fixtures, dearmor them first so the tests exercise the documented `binary-only` revocation-construction contract
+- selector-miss rejection for subkey fingerprint and raw User ID inputs
+- public-only / unusable-secret rejection returning `InvalidKeyData`
+- imported-key availability parity: import immediately stores a key-level revocation signature
+- lazy backfill for legacy imported keys with empty `revocationCert`
+- export of existing revocation without Secure Enclave unwrap
+- ASCII-armored revocation export matching the stored binary signature after `dearmor`
+
 ## 3. Profile Test Matrix
 
 **Every crypto test must run for both profiles unless explicitly scoped.**
@@ -137,6 +151,7 @@ If that happens, first suspect stale Rust `release` artifacts rather than stale 
 | Cross-profile encrypt | A→B recipient | B→A recipient | Format auto-selection |
 | Mixed recipients | — | v4+v6 → SEIPDv1 | |
 | Key export/import | Iterated+Salted | Argon2id | |
+| Key revocation construction | Yes | Yes | Key-level for both profiles; selector tests where applicable |
 | GnuPG interop | Profile A only | N/A | |
 | Argon2id memory guard | N/A | Profile B only | |
 | SE wrap/unwrap | Both | Both | Same wrapping scheme |

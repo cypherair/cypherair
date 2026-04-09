@@ -25,10 +25,8 @@ pub(crate) fn collect_recipients(
     let mut seen_fingerprints = std::collections::HashSet::new();
 
     for cert_data in recipient_certs {
-        let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| {
-            PgpError::InvalidKeyData {
-                reason: format!("Invalid recipient key: {e}"),
-            }
+        let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Invalid recipient key: {e}"),
         })?;
         let fp = cert.fingerprint().to_hex();
         if seen_fingerprints.insert(fp) {
@@ -37,11 +35,10 @@ pub(crate) fn collect_recipients(
     }
 
     if let Some(self_cert_data) = encrypt_to_self {
-        let self_cert = openpgp::Cert::from_bytes(self_cert_data).map_err(|e| {
-            PgpError::InvalidKeyData {
+        let self_cert =
+            openpgp::Cert::from_bytes(self_cert_data).map_err(|e| PgpError::InvalidKeyData {
                 reason: format!("Invalid self key: {e}"),
-            }
-        })?;
+            })?;
         // Deduplicate: skip if already in recipients (e.g., encrypt-to-self with own key as recipient)
         let fp = self_cert.fingerprint().to_hex();
         if seen_fingerprints.insert(fp) {
@@ -57,10 +54,7 @@ pub(crate) fn collect_recipients(
             RevocationStatus::Revoked(_)
         ) {
             return Err(PgpError::EncryptionFailed {
-                reason: format!(
-                    "Recipient {} key is revoked",
-                    cert.fingerprint()
-                ),
+                reason: format!("Recipient {} key is revoked", cert.fingerprint()),
             });
         }
 
@@ -113,11 +107,10 @@ pub(crate) fn setup_signer<'a>(
     policy: &StandardPolicy,
 ) -> Result<Message<'a>, PgpError> {
     if let Some(signer_data) = signing_key {
-        let signer_cert = openpgp::Cert::from_bytes(signer_data).map_err(|e| {
-            PgpError::InvalidKeyData {
+        let signer_cert =
+            openpgp::Cert::from_bytes(signer_data).map_err(|e| PgpError::InvalidKeyData {
                 reason: format!("Invalid signing key: {e}"),
-            }
-        })?;
+            })?;
 
         let signing_keypair = signer_cert
             .keys()
@@ -151,15 +144,18 @@ pub(crate) fn setup_signer<'a>(
 
 /// Write plaintext to the message pipeline and finalize.
 fn write_and_finalize(message: Message, plaintext: &[u8]) -> Result<(), PgpError> {
-    let mut literal = LiteralWriter::new(message)
-        .build()
-        .map_err(|e| PgpError::EncryptionFailed {
-            reason: format!("Literal writer setup failed: {e}"),
-        })?;
+    let mut literal =
+        LiteralWriter::new(message)
+            .build()
+            .map_err(|e| PgpError::EncryptionFailed {
+                reason: format!("Literal writer setup failed: {e}"),
+            })?;
 
-    literal.write_all(plaintext).map_err(|e| PgpError::EncryptionFailed {
-        reason: format!("Write failed: {e}"),
-    })?;
+    literal
+        .write_all(plaintext)
+        .map_err(|e| PgpError::EncryptionFailed {
+            reason: format!("Write failed: {e}"),
+        })?;
 
     literal.finalize().map_err(|e| PgpError::EncryptionFailed {
         reason: format!("Finalize failed: {e}"),

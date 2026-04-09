@@ -221,11 +221,12 @@ pub fn encrypt_file(
 
     let message = encrypt::setup_signer(message, signing_key, &policy)?;
 
-    let mut literal = LiteralWriter::new(message)
-        .build()
-        .map_err(|e| PgpError::EncryptionFailed {
-            reason: format!("Literal writer setup failed: {e}"),
-        })?;
+    let mut literal =
+        LiteralWriter::new(message)
+            .build()
+            .map_err(|e| PgpError::EncryptionFailed {
+                reason: format!("Literal writer setup failed: {e}"),
+            })?;
 
     // Stream data through the pipeline with progress reporting
     if let Err(e) = zeroing_copy(&mut progress_reader, &mut literal, STREAM_BUFFER_SIZE) {
@@ -272,9 +273,10 @@ pub fn decrypt_file<K: AsRef<[u8]>>(
     // Parse secret key certificates
     let mut certs = Vec::new();
     for key_data in secret_keys {
-        let cert = openpgp::Cert::from_bytes(key_data.as_ref()).map_err(|e| PgpError::InvalidKeyData {
-            reason: format!("Invalid secret key: {e}"),
-        })?;
+        let cert =
+            openpgp::Cert::from_bytes(key_data.as_ref()).map_err(|e| PgpError::InvalidKeyData {
+                reason: format!("Invalid secret key: {e}"),
+            })?;
         certs.push(cert);
     }
 
