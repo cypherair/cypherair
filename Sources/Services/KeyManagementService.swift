@@ -277,16 +277,25 @@ final class KeyManagementService {
             engine: engine,
             certData: secretKey
         )
-
-        var updated = keys[index]
-        updated.revocationCert = generatedRevocation
-        try metadataStore.update(updated)
-        keys[index] = updated
-
-        return try await Self.armorRevocationOffMainActor(
+        let armoredRevocation = try await Self.armorRevocationOffMainActor(
             engine: engine,
             revocationData: generatedRevocation
         )
+
+        let previous = keys[index]
+        var updated = previous
+        updated.revocationCert = generatedRevocation
+        keys[index] = updated
+        // The export already succeeded once we have generated and armored the
+        // revocation signature. Keep metadata persistence best-effort so a
+        // transient Keychain metadata failure does not block an urgent export.
+        do {
+            try metadataStore.update(updated)
+        } catch {
+            try? metadataStore.save(previous)
+        }
+
+        return armoredRevocation
     }
 
     // MARK: - Key Expiry Modification

@@ -2,7 +2,6 @@ use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use sequoia_openpgp as openpgp;
 
-use openpgp::cert::prelude::*;
 use openpgp::packet::signature;
 use openpgp::packet::UserID;
 use openpgp::parse::Parse;
@@ -199,6 +198,26 @@ fn test_generate_subkey_revocation_revokes_selected_subkey() {
         ),
         "subkey should be revoked after inserting revocation signature"
     );
+}
+
+#[test]
+fn test_generate_subkey_revocation_uppercase_fingerprint_succeeds() {
+    let generated = generate_key(KeyProfile::Universal, "UppercaseSubkey");
+    let cert = openpgp::Cert::from_bytes(&generated.cert_data).expect("secret cert should parse");
+    let fingerprint = cert
+        .keys()
+        .subkeys()
+        .next()
+        .expect("subkey should exist")
+        .key()
+        .fingerprint()
+        .to_hex()
+        .to_uppercase();
+
+    let revocation = keys::generate_subkey_revocation(&generated.cert_data, &fingerprint)
+        .expect("uppercase subkey fingerprint should normalize and match");
+
+    assert!(!revocation.is_empty());
 }
 
 #[test]

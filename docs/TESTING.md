@@ -131,10 +131,11 @@ When changing revocation-construction behavior, validation must cover:
 - key-level generation for both profiles
 - subkey and User ID revocation construction on the Rust / FFI surface
 - if Swift FFI tests reuse armored secret-key fixtures, dearmor them first so the tests exercise the documented `binary-only` revocation-construction contract
-- selector-miss rejection for subkey fingerprint and raw User ID inputs
+- case-insensitive subkey fingerprint acceptance plus selector-miss rejection for subkey fingerprint and raw User ID inputs
 - public-only / unusable-secret rejection returning `InvalidKeyData`
 - imported-key availability parity: import immediately stores a key-level revocation signature
 - lazy backfill for legacy imported keys with empty `revocationCert`
+- revocation export still succeeds when legacy backfill metadata persistence fails, while a fresh service still observes the old persisted state
 - export of existing revocation without Secure Enclave unwrap
 - ASCII-armored revocation export matching the stored binary signature after `dearmor`
 

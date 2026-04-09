@@ -780,10 +780,11 @@ pub fn generate_subkey_revocation(
 ) -> Result<Vec<u8>, PgpError> {
     let cert = parse_cert_for_revocation(secret_cert)?;
     let mut signer = primary_signer_for_revocation(&cert)?;
+    let normalized_subkey_fingerprint = subkey_fingerprint.to_lowercase();
     let subkey = cert
         .keys()
         .subkeys()
-        .find(|ka| ka.key().fingerprint().to_hex().to_lowercase() == subkey_fingerprint)
+        .find(|ka| ka.key().fingerprint().to_hex().to_lowercase() == normalized_subkey_fingerprint)
         .ok_or_else(|| PgpError::InvalidKeyData {
             reason: "Subkey fingerprint not found in certificate".to_string(),
         })?;
