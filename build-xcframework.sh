@@ -89,6 +89,13 @@ fi
 echo "  ✓ macOS library: $MACOS_LIB"
 ls -lh "$MACOS_LIB"
 
+# Xcode links CypherAir against `-lpgp_mobile`, which prefers a `.dylib`
+# over a static archive when both exist in the same search path.  A stale
+# target-specific dylib from an earlier bindgen build would shadow the freshly
+# built static archive and break new UniFFI symbols at link time.
+rm -f "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
+rm -f "$SCRIPT_DIR/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
+
 # ── Step 5: Build host dylib for UniFFI bindgen ──────────────────
 echo ""
 echo "[5/9] Building host dylib for UniFFI bindgen..."

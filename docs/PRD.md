@@ -210,7 +210,7 @@ The App offers two authentication modes, selectable in Settings:
 
 - **Generation:** Ed25519+X25519 (Profile A) or Ed448+X448 (Profile B). Revocation cert auto-generated.
 - **Multi-Key:** Multiple keys with different profiles supported. One key = "Default."
-- **Public Key Update:** Same UID + same fingerprint = key content unchanged (re-import, no action needed). Same UID + different fingerprint = key regenerated (warning: verify with contact before accepting update).
+- **Public Key Update:** Same UID + same fingerprint = absorb any new public update material (revocations, refreshed bindings, added User IDs/subkeys); exact duplicate re-import remains a no-op. Same UID + different fingerprint = key regenerated (warning: verify with contact before accepting update).
 - **Key Detail Page:** Full fingerprint, Short Key ID (de-emphasized), profile indicator (A/B), backup status badge, expiry modification (MVP).
 
 ### 5.2 Encryption / Decryption

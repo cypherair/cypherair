@@ -217,7 +217,7 @@ Provide a bounded Rust / FFI wrapper for same-fingerprint public-certificate upd
 - generic policy engines
 - secret-key merge behavior
 - same-UID different-fingerprint product workflow
-- Swift contact-service adoption
+- broader Swift adoption beyond same-fingerprint contact import/update
 
 #### Input Format Classification
 
@@ -226,16 +226,15 @@ Provide a bounded Rust / FFI wrapper for same-fingerprint public-certificate upd
 
 #### Required Semantics
 
-- This family defines a wrapper-only additive contract. It does not by itself approve production Contacts behavior changes.
-- Current product truth remains unchanged until a separate product/service change is approved:
-  - [PRD.md](PRD.md) still treats same-fingerprint public-key re-import as duplicate/no-op.
-  - [`Sources/Services/ContactService.swift`](../Sources/Services/ContactService.swift) still treats same-fingerprint contact import as duplicate/no-op.
 - This family remains broader than a `merge_public`-only wrapper and is aligned with the companion roadmap/audit description of same-fingerprint public-certificate update absorption.
 - The wrapper may use `merge_public` and bounded packet-update paths where needed to cover current-scope update categories.
 - Both inputs must parse as same-fingerprint public certificates.
 - Secret-bearing input is an unmet API precondition and returns `Err(InvalidKeyData)`.
 - Fingerprint mismatch is an unmet API precondition and returns `Err(InvalidKeyData)`.
 - The merge result must remain public-certificate-only.
+- Current product behavior for same-fingerprint contact import is now:
+  - absorb material public updates through the merge/update wrapper
+  - preserve duplicate/no-op semantics for exact re-imports
 - The public semantic contract must distinguish:
   - duplicate / no-op merge
   - material update

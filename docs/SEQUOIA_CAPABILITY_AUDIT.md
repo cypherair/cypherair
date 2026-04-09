@@ -71,7 +71,7 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Parse S2K parameters before import | Cert lifecycle | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Used by `Argon2idMemoryGuard` before import. |
 | Modify certificate expiry by re-signing bindings | Cert lifecycle | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Backed by `Cert::set_expiration_time`; consumed by `KeyManagementService.modifyExpiry`. |
 | Validate a standalone key revocation signature against a target certificate | Cert lifecycle | Yes | Yes | Yes | Yes | No | Yes | Exported but unused | `parse_revocation_cert` is exported and tested, but production services do not consume it. |
-| Merge same-fingerprint public certificate updates into an existing local certificate | Cert lifecycle | Yes | Yes | No | No | No | No | Missing wrapper | Sequoia has `merge_public` and packet insertion paths, but `ContactService.addContact` treats same-fingerprint imports as duplicates and never merges updates. |
+| Merge same-fingerprint public certificate updates into an existing local certificate | Cert lifecycle | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Implemented via the certificate merge/update wrapper on `PgpEngine`; `ContactService.addContact` now absorbs same-fingerprint public updates and preserves duplicate/no-op semantics for exact re-imports. |
 | Regenerate a new key revocation signature from an existing private key | Cert lifecycle | Yes | Yes | No | No | No | No | Missing wrapper | Sequoia exposes `Cert::revoke`, but CypherAir only stores the revocation cert emitted at generation time. Imported keys lose revocation-export parity after import. |
 
 ### 3.2 Message Encryption And Decryption
@@ -107,7 +107,7 @@ All current `PgpEngine` exports and the major current-build omission families ar
 
 | Capability | Domain | Sequoia | Build | Rust | FFI | Services | Tests | Conclusion | Notes |
 |---|---|---:|---:|---:|---:|---:|---:|---|---|
-| Add or merge new User IDs, subkeys, and updated bindings | Cert structure | Yes | Yes | No | No | No | No | Missing wrapper | Sequoia exposes `bind`, `insert_packets`, and merge APIs; CypherAir does not wrap them. |
+| Add or merge new User IDs, subkeys, and updated bindings | Cert structure | Yes | Yes | Yes | Yes | Yes | Yes | Implemented through certificate merge/update wrapper | Same-fingerprint public certificate updates can now absorb new User IDs, new subkeys, and refreshed binding packets through the bounded merge/update API. |
 | Subkey-specific revocation builders | Cert structure | Yes | Yes | No | No | No | No | Missing wrapper | `SubkeyRevocationBuilder` is not wrapped. |
 | User ID-specific revocation builders | Cert structure | Yes | Yes | No | No | No | No | Missing wrapper | `UserIDRevocationBuilder` is not wrapped. |
 | Third-party certifications (`UserID::certify`, related flows) | Cert structure | Yes | Yes | No | No | No | No | Missing wrapper | Relevant to future certification features, but absent today. |
@@ -147,16 +147,15 @@ One internal item looks like a wrapper surface, but is not currently needed by t
 
 ## 5. Current-Build Omission Families
 
-This section summarizes the current-build omissions recorded above. It intentionally separates the **active Rust roadmap** from broader omissions that remain tracked here in the audit.
+This section summarizes the roadmap families referenced above. It intentionally separates remaining active Rust roadmap work from broader omissions that remain tracked here in the audit.
 
 ### 5.1 Families On The Active Rust Roadmap
 
-The following omission families are part of the companion active Rust roadmap in [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md):
+The following families are part of the companion Rust roadmap in [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md):
 
 1. **Certificate merge/update family**
-   - Includes same-fingerprint public certificate update absorption and the broader certificate-structure update wrappers for new User IDs, new subkeys, and updated binding packets.
-   - Default stance: `service adoption deferred`
-   - Current production-flow exception: same-fingerprint contact update absorption
+   - Status: implemented in Rust, FFI, tests, and same-fingerprint `ContactService` adoption.
+   - Scope delivered: same-fingerprint public certificate update absorption, including new User IDs, new subkeys, and updated binding packets carried by the incoming public certificate/update.
 
 2. **Revocation construction family**
    - Includes generating a key revocation certificate from an existing secret cert, plus selective subkey and User ID revocation builders.

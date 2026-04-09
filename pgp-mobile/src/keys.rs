@@ -72,6 +72,24 @@ pub struct KeyInfo {
     pub expiry_timestamp: Option<u64>,
 }
 
+/// Semantic outcome of a same-fingerprint public certificate merge/update.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum CertificateMergeOutcome {
+    /// Incoming material was already present; the merged public cert is a no-op.
+    NoOp,
+    /// Incoming material changed the public cert (for example, new bindings or revocations).
+    Updated,
+}
+
+/// Result of merging same-fingerprint public certificate update material.
+#[derive(Debug, uniffi::Record)]
+pub struct CertificateMergeResult {
+    /// Merged public certificate bytes in binary OpenPGP format.
+    pub merged_cert_data: Vec<u8>,
+    /// Whether the merge materially changed the public certificate.
+    pub outcome: CertificateMergeOutcome,
+}
+
 /// Generate a new key pair with the specified profile.
 ///
 /// - Profile A (Universal): CipherSuite::Cv25519, Profile::RFC4880 → v4 key
@@ -293,6 +311,71 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         primary_algo,
         subkey_algo,
         expiry_timestamp,
+    })
+}
+
+fn serialize_public_cert(cert: &openpgp::Cert) -> Result<Vec<u8>, PgpError> {
+    let mut public_key_data = Vec::new();
+    cert.serialize(&mut public_key_data)
+        .map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Failed to serialize public certificate: {e}"),
+        })?;
+    Ok(public_key_data)
+}
+
+/// Merge same-fingerprint public certificate update material into an existing public certificate.
+///
+/// Both inputs must parse as public certificates with the same primary fingerprint.
+/// Secret-bearing input is rejected as an API precondition failure.
+pub fn merge_public_certificate_update(
+    existing_cert: &[u8],
+    incoming_cert_or_update: &[u8],
+) -> Result<CertificateMergeResult, PgpError> {
+    let existing_cert =
+        openpgp::Cert::from_bytes(existing_cert).map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Invalid existing public certificate: {e}"),
+        })?;
+    if existing_cert.is_tsk() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "Existing certificate contains secret key material; merge/update accepts public certificates only.".to_string(),
+        });
+    }
+
+    let incoming_cert =
+        openpgp::Cert::from_bytes(incoming_cert_or_update).map_err(|e| {
+            PgpError::InvalidKeyData {
+                reason: format!("Invalid incoming public certificate update: {e}"),
+            }
+        })?;
+    if incoming_cert.is_tsk() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "Incoming certificate update contains secret key material; merge/update accepts public certificates only.".to_string(),
+        });
+    }
+
+    if existing_cert.fingerprint() != incoming_cert.fingerprint() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "Public certificate merge/update requires both inputs to have the same fingerprint.".to_string(),
+        });
+    }
+
+    let existing_public = serialize_public_cert(&existing_cert)?;
+    let merged_cert = existing_cert
+        .merge_public(incoming_cert)
+        .map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Failed to merge public certificates: {e}"),
+        })?;
+    let merged_cert_data = serialize_public_cert(&merged_cert)?;
+
+    let outcome = if merged_cert_data == existing_public {
+        CertificateMergeOutcome::NoOp
+    } else {
+        CertificateMergeOutcome::Updated
+    };
+
+    Ok(CertificateMergeResult {
+        merged_cert_data,
+        outcome,
     })
 }
 

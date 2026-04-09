@@ -201,6 +201,73 @@ final class FFIIntegrationTests: XCTestCase {
         )
     }
 
+    // MARK: - C5.2B Certificate Merge / Update
+
+    func test_certificateMergeUpdate_profileA_expiryRefreshReturnsUpdated() throws {
+        let generated = try engine.generateKey(
+            name: "Merge A",
+            email: "merge-a@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let refreshed = try engine.modifyExpiry(
+            certData: generated.certData,
+            newExpirySeconds: 60 * 60 * 24 * 365
+        )
+
+        let result = try engine.mergePublicCertificateUpdate(
+            existingCert: generated.publicKeyData,
+            incomingCertOrUpdate: refreshed.publicKeyData
+        )
+
+        XCTAssertEqual(result.outcome, .updated)
+        let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
+        XCTAssertEqual(info.fingerprint, generated.fingerprint)
+        XCTAssertEqual(info.expiryTimestamp, refreshed.keyInfo.expiryTimestamp)
+    }
+
+    func test_certificateMergeUpdate_profileB_expiryRefreshReturnsUpdated() throws {
+        let generated = try engine.generateKey(
+            name: "Merge B",
+            email: "merge-b@example.com",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+        let refreshed = try engine.modifyExpiry(
+            certData: generated.certData,
+            newExpirySeconds: 60 * 60 * 24 * 365
+        )
+
+        let result = try engine.mergePublicCertificateUpdate(
+            existingCert: generated.publicKeyData,
+            incomingCertOrUpdate: refreshed.publicKeyData
+        )
+
+        XCTAssertEqual(result.outcome, .updated)
+        let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
+        XCTAssertEqual(info.fingerprint, generated.fingerprint)
+        XCTAssertEqual(info.profile, .advanced)
+        XCTAssertEqual(info.expiryTimestamp, refreshed.keyInfo.expiryTimestamp)
+    }
+
+    func test_certificateMergeUpdate_duplicateReturnsNoOp() throws {
+        let generated = try engine.generateKey(
+            name: "Merge Duplicate",
+            email: nil,
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        let result = try engine.mergePublicCertificateUpdate(
+            existingCert: generated.publicKeyData,
+            incomingCertOrUpdate: generated.publicKeyData
+        )
+
+        XCTAssertEqual(result.outcome, .noOp)
+        let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
+        XCTAssertEqual(info.fingerprint, generated.fingerprint)
+    }
+
     // MARK: - C5.3 Error Enum Mapping
 
     /// C5.3: NoMatchingKey error when decrypting with wrong key.
@@ -383,6 +450,32 @@ final class FFIIntegrationTests: XCTestCase {
         ) { error in
             guard error is PgpError else {
                 return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+        }
+    }
+
+    func test_errorMapping_invalidKeyData_secretBearingCertificateMergeInput() throws {
+        let generated = try engine.generateKey(
+            name: "Merge Secret Reject",
+            email: nil,
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        XCTAssertThrowsError(
+            try engine.mergePublicCertificateUpdate(
+                existingCert: generated.publicKeyData,
+                incomingCertOrUpdate: generated.certData
+            )
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            switch pgpError {
+            case .InvalidKeyData:
+                break
+            default:
+                XCTFail("Expected InvalidKeyData, got \(pgpError)")
             }
         }
     }
