@@ -86,8 +86,10 @@ final class ContactService {
     /// Import a public key and add it as a contact.
     /// Handles both binary and ASCII-armored input.
     ///
-    /// Returns `.keyUpdateDetected` if the same userId has a different fingerprint.
-    /// In that case, the caller must present a warning and call `confirmKeyUpdate` if the user approves.
+    /// Returns `.keyUpdateDetected` if the parsed userId conflicts with another
+    /// contact's fingerprint, including after a same-fingerprint merge/update.
+    /// In that case, the caller must present a warning and call `confirmKeyUpdate`
+    /// if the user approves.
     ///
     /// - Parameter publicKeyData: The public key data (binary or armored).
     /// - Returns: The result of the add operation.
@@ -132,6 +134,24 @@ final class ContactService {
                 return .duplicate(contacts[existingIndex])
 
             case .updated:
+                let updatedContact = try parseContact(
+                    from: mergedResult.mergedCertData,
+                    verificationState: resolvedVerificationState
+                )
+
+                if let conflictingContact = conflictingContact(
+                    forUserId: updatedContact.userId,
+                    excludingFingerprint: updatedContact.fingerprint
+                ) {
+                    var replacementContact = updatedContact
+                    replacementContact.verificationState = .verified
+                    return .keyUpdateDetected(
+                        newContact: replacementContact,
+                        existingContact: conflictingContact,
+                        keyData: mergedResult.mergedCertData
+                    )
+                }
+
                 if !FileManager.default.fileExists(atPath: contactsDirectory.path) {
                     try FileManager.default.createDirectory(
                         at: contactsDirectory,
@@ -143,10 +163,6 @@ final class ContactService {
                 let fileURL = contactsDirectory.appendingPathComponent(filename)
                 try mergedResult.mergedCertData.write(to: fileURL, options: .atomic)
 
-                let updatedContact = try parseContact(
-                    from: mergedResult.mergedCertData,
-                    verificationState: resolvedVerificationState
-                )
                 verificationStates[updatedContact.fingerprint] = updatedContact.verificationState
                 try saveVerificationStates()
                 contacts[existingIndex] = updatedContact
@@ -155,13 +171,15 @@ final class ContactService {
         }
 
         // Check for same userId but different fingerprint (key update)
-        if let userId = contact.userId,
-           let existingIndex = contacts.firstIndex(where: { $0.userId == userId && $0.fingerprint != contact.fingerprint }) {
+        if let existingContact = conflictingContact(
+            forUserId: contact.userId,
+            excludingFingerprint: contact.fingerprint
+        ) {
             contact.verificationState = .verified
             // Different fingerprint = key regenerated — caller must confirm before replacing.
             return .keyUpdateDetected(
                 newContact: contact,
-                existingContact: contacts[existingIndex],
+                existingContact: existingContact,
                 keyData: binaryData
             )
         }
@@ -180,26 +198,44 @@ final class ContactService {
         return .added(contact)
     }
 
-    /// Replace an existing contact's key after the user has confirmed the key update.
-    /// Called when `addContact` returns `.keyUpdateDetected`.
+    /// Apply a user-confirmed key replacement after `addContact` returns
+    /// `.keyUpdateDetected`. Supports both classic different-fingerprint replacement
+    /// and same-fingerprint merged updates that now conflict with another contact.
     ///
     /// - Parameters:
-    ///   - existingFingerprint: Fingerprint of the old contact to replace.
+    ///   - existingFingerprint: Fingerprint of the contact being removed/replaced.
     ///   - newContact: The new contact parsed from the incoming key.
     ///   - keyData: Binary public key data for the new contact.
     func confirmKeyUpdate(existingFingerprint: String, newContact: Contact, keyData: Data) throws {
+        if !FileManager.default.fileExists(atPath: contactsDirectory.path) {
+            try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
+        }
+
         // Write new key first — if this fails, the old contact remains intact
         let filename = "\(newContact.fingerprint).gpg"
         let fileURL = contactsDirectory.appendingPathComponent(filename)
         try keyData.write(to: fileURL, options: .atomic)
 
-        // Now safe to remove old contact
-        try removeContact(fingerprint: existingFingerprint)
+        if existingFingerprint != newContact.fingerprint {
+            let existingFileURL = contactsDirectory.appendingPathComponent("\(existingFingerprint).gpg")
+            if FileManager.default.fileExists(atPath: existingFileURL.path) {
+                try FileManager.default.removeItem(at: existingFileURL)
+            }
+            contacts.removeAll { $0.fingerprint == existingFingerprint }
+            verificationStates.removeValue(forKey: existingFingerprint)
+        }
+
         var verifiedContact = newContact
         verifiedContact.verificationState = .verified
         verificationStates[verifiedContact.fingerprint] = .verified
+
+        if let existingIndex = contacts.firstIndex(where: { $0.fingerprint == verifiedContact.fingerprint }) {
+            contacts[existingIndex] = verifiedContact
+        } else {
+            contacts.append(verifiedContact)
+        }
+
         try saveVerificationStates()
-        contacts.append(verifiedContact)
     }
 
     // MARK: - Remove Contact
@@ -289,6 +325,19 @@ final class ContactService {
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo
         )
+    }
+
+    private func conflictingContact(
+        forUserId userId: String?,
+        excludingFingerprint fingerprint: String
+    ) -> Contact? {
+        guard let userId else {
+            return nil
+        }
+
+        return contacts.first {
+            $0.userId == userId && $0.fingerprint != fingerprint
+        }
     }
 
     private func loadVerificationStates() -> [String: ContactVerificationState] {

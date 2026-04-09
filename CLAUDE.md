@@ -129,6 +129,9 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
 - MIE: test on iPhone 17 or iPhone Air (A19/A19 Pro) with Hardware Memory Tagging diagnostics enabled.
 - Test plans: `CypherAir-UnitTests.xctestplan` (simulator/CI), `CypherAir-DeviceTests.xctestplan` (physical device).
+- Rust changes under `pgp-mobile/src` do **not** automatically refresh the Rust `release` static libraries that Xcode links for Swift/FFI tests.
+- If a Rust change can affect Swift-visible behavior, rebuild the Rust `release` artifacts (or run `./build-xcframework.sh --release`) before running `xcodebuild test`.
+- See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
 - **GitHub Actions caveat:** the hosted `macos-26` runner image may still report macOS 26.3, which is older than the project's current 26.4 deployment target. When that happens, hosted Swift tests can fail before execution even though local macOS validation passes.
 - Full testing guide: @docs/TESTING.md
 - Code review checklist: @docs/CODE_REVIEW.md
@@ -141,8 +144,15 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 - Run `cargo test` and `xcodebuild test` before considering a task complete.
 - Commit messages: conventional format — `feat:`, `fix:`, `refactor:`, `test:`, `docs:`.
 - Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.
-- Treat `CypherAir.xcodeproj/project.pbxproj` and other Xcode project file changes as explicit-scope changes that require user confirmation. Do not revert, rewrite, or "clean up" existing project file edits you did not make. If the correct implementation requires modifying Xcode project files, call that out proactively to the user, explain why the change is needed, and obtain approval before making those edits.
-- Do not compromise the intended implementation or force code into unrelated files merely to avoid touching project files.
+- Treat `CypherAir.xcodeproj/project.pbxproj` and other Xcode project file changes as explicit-scope changes that require user confirmation, not as changes to avoid by default.
+- Do not revert, rewrite, or "clean up" existing project file edits you did not make.
+- If the correct implementation requires, or may require, modifying Xcode project files, you must proactively raise that with the user.
+- State which file or file type may need to change, explain why the change appears necessary, and ask for approval before editing it.
+- If you are still planning the work, that approval is a planning prerequisite, not only an editing prerequisite.
+- Until the user answers, do not produce an implementation plan that assumes the project file edits are approved or forbidden.
+- In that state, limit yourself to investigation, impact analysis, and explaining why the project file change may be needed.
+- Once the user approves, proceed with the required project file edits as part of the correct implementation.
+- Do not invent workarounds, move logic into unrelated files, or weaken the implementation merely to avoid requesting approval for a required project file change.
 - **Before text replacement, verify match count.** Before executing any string replacement, check how many matches exist in the file. If multiple matches exist, handle each one individually to avoid unintended changes to other locations.
 - **After reverting changes, verify with `git diff`.** Never rely on memory to confirm a revert is complete. Always run `git diff` (or `git diff origin/main`) to confirm the file matches the expected state.
 - **After code changes, run tests — not just build.** A successful build does not guarantee correctness. Always run the relevant test suite to verify no regressions were introduced.
