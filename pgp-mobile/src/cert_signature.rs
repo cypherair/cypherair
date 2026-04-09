@@ -1,4 +1,3 @@
-use openpgp::cert::amalgamation::key::PrimaryKey;
 use openpgp::packet::{Signature, UserID};
 use openpgp::parse::Parse;
 use openpgp::serialize::Marshal;
@@ -205,6 +204,37 @@ fn certification_kind_from_signature_type(
     }
 }
 
+type VerificationPublicKey =
+    openpgp::packet::Key<openpgp::packet::key::PublicParts, openpgp::packet::key::UnspecifiedRole>;
+
+struct EligibleVerificationKey<'a> {
+    cert: &'a openpgp::Cert,
+    key: VerificationPublicKey,
+    selected_key_is_primary: bool,
+}
+
+fn eligible_verification_keys(cert: &openpgp::Cert) -> Vec<EligibleVerificationKey<'_>> {
+    let mut eligible_keys = vec![EligibleVerificationKey {
+        cert,
+        key: cert.primary_key().key().clone().role_into_unspecified(),
+        selected_key_is_primary: true,
+    }];
+
+    for subkey in cert.keys().subkeys() {
+        if !is_explicit_certification_capable(&subkey) {
+            continue;
+        }
+
+        eligible_keys.push(EligibleVerificationKey {
+            cert,
+            key: subkey.key().clone().role_into_unspecified(),
+            selected_key_is_primary: false,
+        });
+    }
+
+    eligible_keys
+}
+
 fn verify_direct_key_issuer_guided(
     signature: &Signature,
     target_cert: &openpgp::Cert,
@@ -217,20 +247,20 @@ fn verify_direct_key_issuer_guided(
 
     let mut saw_match = false;
     for cert in candidate_signers {
-        for key in cert.keys() {
+        for key in eligible_verification_keys(cert) {
             if issuers
                 .iter()
-                .any(|issuer| issuer.aliases(key.key().key_handle()))
+                .any(|issuer| issuer.aliases(key.key.key_handle()))
             {
                 saw_match = true;
                 if signature
-                    .verify_direct_key(key.key(), target_cert.primary_key().key())
+                    .verify_direct_key(&key.key, target_cert.primary_key().key())
                     .is_ok()
                 {
                     return Some(valid_result(
-                        cert,
-                        key.primary(),
-                        key.key().fingerprint().to_hex().to_lowercase(),
+                        key.cert,
+                        key.selected_key_is_primary,
+                        key.key.fingerprint().to_hex().to_lowercase(),
                         None,
                     ));
                 }
@@ -250,35 +280,15 @@ fn verify_direct_key_fallback(
 
     for cert in candidate_signers {
         attempted = true;
-        if signature
-            .verify_direct_key(cert.primary_key().key(), target_cert.primary_key().key())
-            .is_ok()
-        {
-            return Ok(valid_result(
-                cert,
-                true,
-                cert.primary_key()
-                    .key()
-                    .fingerprint()
-                    .to_hex()
-                    .to_lowercase(),
-                None,
-            ));
-        }
-
-        for subkey in cert.keys().subkeys() {
-            if !is_explicit_certification_capable(&subkey) {
-                continue;
-            }
-            attempted = true;
+        for key in eligible_verification_keys(cert) {
             if signature
-                .verify_direct_key(subkey.key(), target_cert.primary_key().key())
+                .verify_direct_key(&key.key, target_cert.primary_key().key())
                 .is_ok()
             {
                 return Ok(valid_result(
-                    cert,
-                    false,
-                    subkey.key().fingerprint().to_hex().to_lowercase(),
+                    key.cert,
+                    key.selected_key_is_primary,
+                    key.key.fingerprint().to_hex().to_lowercase(),
                     None,
                 ));
             }
@@ -306,20 +316,20 @@ fn verify_user_id_issuer_guided(
 
     let mut saw_match = false;
     for cert in candidate_signers {
-        for key in cert.keys() {
+        for key in eligible_verification_keys(cert) {
             if issuers
                 .iter()
-                .any(|issuer| issuer.aliases(key.key().key_handle()))
+                .any(|issuer| issuer.aliases(key.key.key_handle()))
             {
                 saw_match = true;
                 if signature
-                    .verify_userid_binding(key.key(), target_cert.primary_key().key(), user_id)
+                    .verify_userid_binding(&key.key, target_cert.primary_key().key(), user_id)
                     .is_ok()
                 {
                     return Some(valid_result(
-                        cert,
-                        key.primary(),
-                        key.key().fingerprint().to_hex().to_lowercase(),
+                        key.cert,
+                        key.selected_key_is_primary,
+                        key.key.fingerprint().to_hex().to_lowercase(),
                         Some(certification_kind),
                     ));
                 }
@@ -341,39 +351,15 @@ fn verify_user_id_fallback(
 
     for cert in candidate_signers {
         attempted = true;
-        if signature
-            .verify_userid_binding(
-                cert.primary_key().key(),
-                target_cert.primary_key().key(),
-                user_id,
-            )
-            .is_ok()
-        {
-            return Ok(valid_result(
-                cert,
-                true,
-                cert.primary_key()
-                    .key()
-                    .fingerprint()
-                    .to_hex()
-                    .to_lowercase(),
-                Some(certification_kind),
-            ));
-        }
-
-        for subkey in cert.keys().subkeys() {
-            if !is_explicit_certification_capable(&subkey) {
-                continue;
-            }
-            attempted = true;
+        for key in eligible_verification_keys(cert) {
             if signature
-                .verify_userid_binding(subkey.key(), target_cert.primary_key().key(), user_id)
+                .verify_userid_binding(&key.key, target_cert.primary_key().key(), user_id)
                 .is_ok()
             {
                 return Ok(valid_result(
-                    cert,
-                    false,
-                    subkey.key().fingerprint().to_hex().to_lowercase(),
+                    key.cert,
+                    key.selected_key_is_primary,
+                    key.key.fingerprint().to_hex().to_lowercase(),
                     Some(certification_kind),
                 ));
             }

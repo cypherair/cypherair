@@ -11,6 +11,15 @@ use openpgp::types::{KeyFlags, SignatureType};
 use pgp_mobile::keys::{self, KeyProfile};
 use sequoia_openpgp as openpgp;
 
+fn strip_issuer_metadata(signature: &mut openpgp::packet::Signature) {
+    for tag in [SubpacketTag::Issuer, SubpacketTag::IssuerFingerprint] {
+        signature.hashed_area_mut().remove_all(tag);
+        signature.unhashed_area_mut().remove_all(tag);
+    }
+
+    assert!(signature.get_issuers().is_empty());
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -67,9 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         false,
     )?)?;
     let mut signature = user_id.bind(&mut signer, &target_cert, builder)?;
-    signature
-        .unhashed_area_mut()
-        .remove_all(SubpacketTag::Issuer);
+    strip_issuer_metadata(&mut signature);
 
     let mut signature_bytes = Vec::new();
     openpgp::Packet::from(signature).serialize(&mut signature_bytes)?;
