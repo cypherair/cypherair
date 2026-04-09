@@ -4,14 +4,14 @@ use sequoia_openpgp as openpgp;
 use std::fs;
 use std::path::PathBuf;
 
-use openpgp::Packet;
-use openpgp::packet::UserID;
 use openpgp::packet::key;
 use openpgp::packet::signature;
+use openpgp::packet::UserID;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Serialize;
 use openpgp::types::{KeyFlags, SignatureType};
+use openpgp::Packet;
 
 fn generate_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
     keys::generate_key_with_profile(
@@ -35,24 +35,23 @@ fn load_fixture(name: &str) -> Vec<u8> {
         .join("tests")
         .join("fixtures")
         .join(name);
-    fs::read(&path).unwrap_or_else(|error| {
-        panic!("Failed to load fixture {}: {}", path.display(), error)
-    })
+    fs::read(&path)
+        .unwrap_or_else(|error| panic!("Failed to load fixture {}: {}", path.display(), error))
 }
 
 fn make_revocation_update(generated: &keys::GeneratedKey) -> Vec<u8> {
     let cert = openpgp::Cert::from_bytes(&generated.public_key_data)
         .expect("public certificate should parse");
-    let revocation = Packet::from_bytes(&generated.revocation_cert)
-        .expect("revocation packet should parse");
-    let (revoked_cert, _) = cert.insert_packets(vec![revocation])
+    let revocation =
+        Packet::from_bytes(&generated.revocation_cert).expect("revocation packet should parse");
+    let (revoked_cert, _) = cert
+        .insert_packets(vec![revocation])
         .expect("revocation should insert");
     serialize_public_cert(&revoked_cert)
 }
 
 fn make_userid_update(secret_cert: &[u8], new_user_id: &str) -> Vec<u8> {
-    let cert = openpgp::Cert::from_bytes(secret_cert)
-        .expect("secret cert should parse");
+    let cert = openpgp::Cert::from_bytes(secret_cert).expect("secret cert should parse");
     let policy = StandardPolicy::new();
     let template: signature::SignatureBuilder = cert
         .with_policy(&policy, None)
@@ -82,14 +81,14 @@ fn make_userid_update(secret_cert: &[u8], new_user_id: &str) -> Vec<u8> {
         )
         .expect("userid binding should succeed");
 
-    let (updated_cert, _) = cert.insert_packets(vec![Packet::from(userid), binding.into()])
+    let (updated_cert, _) = cert
+        .insert_packets(vec![Packet::from(userid), binding.into()])
         .expect("userid packets should insert");
     serialize_public_cert(&updated_cert.strip_secret_key_material())
 }
 
 fn make_subkey_update(secret_cert: &[u8]) -> Vec<u8> {
-    let cert = openpgp::Cert::from_bytes(secret_cert)
-        .expect("secret cert should parse");
+    let cert = openpgp::Cert::from_bytes(secret_cert).expect("secret cert should parse");
     let mut signer = cert
         .primary_key()
         .key()
@@ -101,29 +100,27 @@ fn make_subkey_update(secret_cert: &[u8]) -> Vec<u8> {
 
     let subkey: openpgp::packet::Key<key::SecretParts, key::SubordinateRole> =
         match cert.primary_key().key().version() {
-        4 => key::Key4::generate_x25519()
-            .expect("v4 subkey generation should succeed")
-            .into(),
-        6 => key::Key6::generate_x448()
-            .expect("v6 subkey generation should succeed")
-            .into(),
-        version => panic!("unexpected key version: {version}"),
-    };
+            4 => key::Key4::generate_x25519()
+                .expect("v4 subkey generation should succeed")
+                .into(),
+            6 => key::Key6::generate_x448()
+                .expect("v6 subkey generation should succeed")
+                .into(),
+            version => panic!("unexpected key version: {version}"),
+        };
 
     let binding = subkey
         .bind(
             &mut signer,
             &cert,
             signature::SignatureBuilder::new(SignatureType::SubkeyBinding)
-                .set_key_flags(
-                    KeyFlags::empty()
-                        .set_transport_encryption(),
-                )
+                .set_key_flags(KeyFlags::empty().set_transport_encryption())
                 .expect("subkey binding flags should be valid"),
         )
         .expect("subkey binding should succeed");
 
-    let (updated_cert, _) = cert.insert_packets(vec![Packet::from(subkey), binding.into()])
+    let (updated_cert, _) = cert
+        .insert_packets(vec![Packet::from(subkey), binding.into()])
         .expect("subkey packets should insert");
     serialize_public_cert(&updated_cert.strip_secret_key_material())
 }
@@ -139,8 +136,7 @@ fn test_merge_public_certificate_duplicate_no_op_profile_a() {
     .expect("duplicate merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::NoOp);
-    let info = keys::parse_key_info(&result.merged_cert_data)
-        .expect("merged cert should parse");
+    let info = keys::parse_key_info(&result.merged_cert_data).expect("merged cert should parse");
     assert_eq!(info.fingerprint, generated.fingerprint);
 }
 
@@ -155,8 +151,7 @@ fn test_merge_public_certificate_duplicate_no_op_profile_b() {
     .expect("duplicate merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::NoOp);
-    let info = keys::parse_key_info(&result.merged_cert_data)
-        .expect("merged cert should parse");
+    let info = keys::parse_key_info(&result.merged_cert_data).expect("merged cert should parse");
     assert_eq!(info.fingerprint, generated.fingerprint);
     assert_eq!(info.profile, KeyProfile::Advanced);
 }
@@ -174,8 +169,7 @@ fn test_merge_public_certificate_expiry_refresh_profile_a() {
     .expect("expiry merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
-    let info = keys::parse_key_info(&result.merged_cert_data)
-        .expect("merged cert should parse");
+    let info = keys::parse_key_info(&result.merged_cert_data).expect("merged cert should parse");
     assert_eq!(info.fingerprint, generated.fingerprint);
     assert_eq!(info.expiry_timestamp, refreshed.key_info.expiry_timestamp);
 }
@@ -193,8 +187,7 @@ fn test_merge_public_certificate_expiry_refresh_profile_b() {
     .expect("expiry merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
-    let info = keys::parse_key_info(&result.merged_cert_data)
-        .expect("merged cert should parse");
+    let info = keys::parse_key_info(&result.merged_cert_data).expect("merged cert should parse");
     assert_eq!(info.fingerprint, generated.fingerprint);
     assert_eq!(info.profile, KeyProfile::Advanced);
     assert_eq!(info.expiry_timestamp, refreshed.key_info.expiry_timestamp);
@@ -205,15 +198,12 @@ fn test_merge_public_certificate_absorbs_revocation_update() {
     let generated = generate_key(KeyProfile::Universal, "Revocation");
     let revocation_update = make_revocation_update(&generated);
 
-    let result = keys::merge_public_certificate_update(
-        &generated.public_key_data,
-        &revocation_update,
-    )
-    .expect("revocation merge should succeed");
+    let result =
+        keys::merge_public_certificate_update(&generated.public_key_data, &revocation_update)
+            .expect("revocation merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
-    let info = keys::parse_key_info(&result.merged_cert_data)
-        .expect("merged cert should parse");
+    let info = keys::parse_key_info(&result.merged_cert_data).expect("merged cert should parse");
     assert!(info.is_revoked, "merged cert should be revoked");
 }
 
@@ -223,17 +213,16 @@ fn test_merge_public_certificate_absorbs_new_user_id() {
     let new_user_id = "Userid Secondary <secondary@example.com>";
     let userid_update = make_userid_update(&generated.cert_data, new_user_id);
 
-    let result = keys::merge_public_certificate_update(
-        &generated.public_key_data,
-        &userid_update,
-    )
-    .expect("userid merge should succeed");
+    let result = keys::merge_public_certificate_update(&generated.public_key_data, &userid_update)
+        .expect("userid merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
-    let merged_cert = openpgp::Cert::from_bytes(&result.merged_cert_data)
-        .expect("merged cert should parse");
+    let merged_cert =
+        openpgp::Cert::from_bytes(&result.merged_cert_data).expect("merged cert should parse");
     assert!(
-        merged_cert.userids().any(|userid| userid.userid().value() == new_user_id.as_bytes()),
+        merged_cert
+            .userids()
+            .any(|userid| userid.userid().value() == new_user_id.as_bytes()),
         "merged cert should contain the new user id"
     );
 }
@@ -242,18 +231,15 @@ fn test_merge_public_certificate_absorbs_new_user_id() {
 fn test_merge_public_certificate_absorbs_new_subkey() {
     let generated = generate_key(KeyProfile::Universal, "Subkey");
     let subkey_update = make_subkey_update(&generated.cert_data);
-    let existing_cert = openpgp::Cert::from_bytes(&generated.public_key_data)
-        .expect("existing cert should parse");
+    let existing_cert =
+        openpgp::Cert::from_bytes(&generated.public_key_data).expect("existing cert should parse");
 
-    let result = keys::merge_public_certificate_update(
-        &generated.public_key_data,
-        &subkey_update,
-    )
-    .expect("subkey merge should succeed");
+    let result = keys::merge_public_certificate_update(&generated.public_key_data, &subkey_update)
+        .expect("subkey merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
-    let merged_cert = openpgp::Cert::from_bytes(&result.merged_cert_data)
-        .expect("merged cert should parse");
+    let merged_cert =
+        openpgp::Cert::from_bytes(&result.merged_cert_data).expect("merged cert should parse");
     assert_eq!(
         merged_cert.keys().subkeys().count(),
         existing_cert.keys().subkeys().count() + 1,
@@ -271,8 +257,8 @@ fn test_parse_key_info_prefers_primary_user_id_after_merge_fixture() {
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
 
-    let merged_cert = openpgp::Cert::from_bytes(&result.merged_cert_data)
-        .expect("merged cert should parse");
+    let merged_cert =
+        openpgp::Cert::from_bytes(&result.merged_cert_data).expect("merged cert should parse");
     let policy = StandardPolicy::new();
     assert_eq!(
         merged_cert.userids().next().unwrap().userid().value(),
@@ -280,7 +266,8 @@ fn test_parse_key_info_prefers_primary_user_id_after_merge_fixture() {
         "raw user id order should keep the original user id first"
     );
     assert_eq!(
-        merged_cert.with_policy(&policy, None)
+        merged_cert
+            .with_policy(&policy, None)
             .expect("merged cert should validate")
             .primary_userid()
             .expect("merged cert should have a primary user id")
@@ -357,8 +344,8 @@ fn test_merge_public_certificate_adds_encryption_subkey_profile_a_fixture() {
         .expect("profile A subkey merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
-    let merged_info = keys::parse_key_info(&result.merged_cert_data)
-        .expect("profile A merged cert should parse");
+    let merged_info =
+        keys::parse_key_info(&result.merged_cert_data).expect("profile A merged cert should parse");
     assert!(merged_info.has_encryption_subkey);
     assert_eq!(merged_info.profile, KeyProfile::Universal);
 }
@@ -375,8 +362,8 @@ fn test_merge_public_certificate_adds_encryption_subkey_profile_b_fixture() {
         .expect("profile B subkey merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
-    let merged_info = keys::parse_key_info(&result.merged_cert_data)
-        .expect("profile B merged cert should parse");
+    let merged_info =
+        keys::parse_key_info(&result.merged_cert_data).expect("profile B merged cert should parse");
     assert!(merged_info.has_encryption_subkey);
     assert_eq!(merged_info.profile, KeyProfile::Advanced);
 }
@@ -386,11 +373,8 @@ fn test_merge_public_certificate_rejects_fingerprint_mismatch() {
     let alice = generate_key(KeyProfile::Universal, "MismatchAlice");
     let bob = generate_key(KeyProfile::Universal, "MismatchBob");
 
-    let error = keys::merge_public_certificate_update(
-        &alice.public_key_data,
-        &bob.public_key_data,
-    )
-    .expect_err("mismatched fingerprints must be rejected");
+    let error = keys::merge_public_certificate_update(&alice.public_key_data, &bob.public_key_data)
+        .expect_err("mismatched fingerprints must be rejected");
 
     assert!(
         matches!(error, PgpError::InvalidKeyData { .. }),
@@ -402,11 +386,9 @@ fn test_merge_public_certificate_rejects_fingerprint_mismatch() {
 fn test_merge_public_certificate_rejects_secret_bearing_input() {
     let generated = generate_key(KeyProfile::Universal, "SecretReject");
 
-    let error = keys::merge_public_certificate_update(
-        &generated.public_key_data,
-        &generated.cert_data,
-    )
-    .expect_err("secret-bearing input must be rejected");
+    let error =
+        keys::merge_public_certificate_update(&generated.public_key_data, &generated.cert_data)
+            .expect_err("secret-bearing input must be rejected");
 
     assert!(
         matches!(error, PgpError::InvalidKeyData { .. }),

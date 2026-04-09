@@ -63,15 +63,18 @@ Export (backup):
 
 Import (restore):
     .asc file → User enters passphrase → S2K derive (detect mode automatically) → Recover key
+    → Generate key-level revocation signature for imported key
     → Generate new SE wrapping key → SE wrap → Store in Keychain
 
 Revocation:
-    Export revocation cert → Distribute to contacts → They import → Key marked revoked
+    Export ASCII-armored revocation signature → Distribute to contacts → They import → Key marked revoked
 
 Deletion:
     Double-confirm → Delete SE key from Keychain → Delete salt + sealed box
     → Key permanently inaccessible
 ```
+
+**Revocation storage/export note:** CypherAir stores revocation signatures internally as binary OpenPGP signature packets. Export converts those bytes to ASCII armor on demand. Imported keys now receive key-level revocation export capability as part of import. Older imported keys that predate this support lazily backfill the binary revocation at export time, then immediately zeroize the temporarily unwrapped secret certificate bytes after use.
 
 **Profile-specific behavior:**
 - **Generation:** Profile A → `CipherSuite::Cv25519` + `Profile::RFC4880`. Profile B → `CipherSuite::Cv448` + `Profile::RFC9580`.

@@ -188,21 +188,13 @@ impl PgpEngine {
     // ── Signing ─────────────────────────────────────────────────────
 
     /// Create a cleartext signature for text.
-    pub fn sign_cleartext(
-        &self,
-        text: Vec<u8>,
-        signer_cert: Vec<u8>,
-    ) -> Result<Vec<u8>, PgpError> {
+    pub fn sign_cleartext(&self, text: Vec<u8>, signer_cert: Vec<u8>) -> Result<Vec<u8>, PgpError> {
         let signer_cert = Zeroizing::new(signer_cert);
         sign::sign_cleartext(&text, &signer_cert)
     }
 
     /// Create a detached signature for data (files).
-    pub fn sign_detached(
-        &self,
-        data: Vec<u8>,
-        signer_cert: Vec<u8>,
-    ) -> Result<Vec<u8>, PgpError> {
+    pub fn sign_detached(&self, data: Vec<u8>, signer_cert: Vec<u8>) -> Result<Vec<u8>, PgpError> {
         let signer_cert = Zeroizing::new(signer_cert);
         sign::sign_detached(&data, &signer_cert)
     }
@@ -245,10 +237,7 @@ impl PgpEngine {
     /// Parse S2K parameters from a passphrase-protected key without importing it.
     /// Use this to check Argon2id memory requirements before calling import_secret_key.
     /// Returns S2K type, memory requirement (KiB), parallelism, and time passes.
-    pub fn parse_s2k_params(
-        &self,
-        armored_data: Vec<u8>,
-    ) -> Result<S2kInfo, PgpError> {
+    pub fn parse_s2k_params(&self, armored_data: Vec<u8>) -> Result<S2kInfo, PgpError> {
         keys::parse_s2k_params(&armored_data)
     }
 
@@ -272,6 +261,32 @@ impl PgpEngine {
     ) -> Result<String, PgpError> {
         let cert_data = Zeroizing::new(cert_data);
         keys::parse_revocation_cert(&rev_data, &cert_data)
+    }
+
+    /// Generate a key-level revocation signature from an existing secret certificate.
+    pub fn generate_key_revocation(&self, secret_cert: Vec<u8>) -> Result<Vec<u8>, PgpError> {
+        let secret_cert = Zeroizing::new(secret_cert);
+        keys::generate_key_revocation(&secret_cert)
+    }
+
+    /// Generate a subkey-specific revocation signature from an existing secret certificate.
+    pub fn generate_subkey_revocation(
+        &self,
+        secret_cert: Vec<u8>,
+        subkey_fingerprint: String,
+    ) -> Result<Vec<u8>, PgpError> {
+        let secret_cert = Zeroizing::new(secret_cert);
+        keys::generate_subkey_revocation(&secret_cert, &subkey_fingerprint)
+    }
+
+    /// Generate a User ID-specific revocation signature from an existing secret certificate.
+    pub fn generate_user_id_revocation(
+        &self,
+        secret_cert: Vec<u8>,
+        user_id_data: Vec<u8>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let secret_cert = Zeroizing::new(secret_cert);
+        keys::generate_user_id_revocation(&secret_cert, &user_id_data)
     }
 
     // ── Armor ───────────────────────────────────────────────────────
@@ -429,11 +444,11 @@ impl PgpEngine {
         }
 
         let b64_data = &url[prefix.len()..];
-        let key_bytes = URL_SAFE_NO_PAD.decode(b64_data).map_err(|e| {
-            PgpError::CorruptData {
+        let key_bytes = URL_SAFE_NO_PAD
+            .decode(b64_data)
+            .map_err(|e| PgpError::CorruptData {
                 reason: format!("Invalid base64url data: {e}"),
-            }
-        })?;
+            })?;
 
         // Single parse: validate it's a valid OpenPGP key and check for secret material.
         // (Previously this parsed the key twice — once in parse_key_info and again for is_tsk.)

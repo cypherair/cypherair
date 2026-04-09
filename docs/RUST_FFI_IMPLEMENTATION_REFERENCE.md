@@ -287,9 +287,9 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 
 #### Deferred / Out-of-Scope
 
-- Swift persistence and UI policy
+- full Swift revocation-application flows
 - configurable reason strings, notations, or hash selection
-- revocation application in Swift production flows
+- subkey/User ID Swift production adoption beyond Rust / FFI exposure
 
 #### Input Format Classification
 
@@ -320,7 +320,7 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 
 #### Required Helper / Discovery Support
 
-- key-level revocation does not require new discovery helpers
+- key-level revocation does not require new discovery helpers and is the only revocation-construction path approved for current Swift production adoption
 - subkey fingerprint discovery and raw User ID discovery remain explicitly deferred
 - until those helpers exist, Swift production adoption for subkey/User ID revocation remains deferred even if the Rust / FFI exports exist
 
@@ -332,6 +332,8 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 - generated revocation validates against the source certificate
 - mismatched-certificate validation fails
 - public-only input rejection returns `InvalidKeyData` under the documented family rule
+- selector-miss rejection returns `InvalidKeyData`
+- no-usable-primary-signer rejection returns `InvalidKeyData`
 
 #### Minimum Swift FFI Tests
 
@@ -339,6 +341,7 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 - key revocation bytes validate through the existing `parse_revocation_cert` path
 - subkey revocation smoke test across UniFFI
 - User ID revocation smoke test across UniFFI
+- selector-miss rejection for subkey/User ID exports maps through UniFFI
 
 ### 3.3 Password / SKESK Symmetric Messages
 

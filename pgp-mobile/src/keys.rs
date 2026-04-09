@@ -5,7 +5,7 @@ use openpgp::cert::prelude::*;
 use openpgp::parse::Parse;
 use openpgp::policy::{HashAlgoSecurity, Policy, StandardPolicy};
 use openpgp::serialize::Serialize;
-use openpgp::types::RevocationStatus;
+use openpgp::types::{ReasonForRevocation, RevocationStatus};
 use sequoia_openpgp as openpgp;
 use zeroize::Zeroizing;
 
@@ -160,14 +160,15 @@ pub fn generate_key_with_profile(
         builder = builder.set_validity_period(Some(std::time::Duration::from_secs(secs)));
     } else {
         // Default: 2 years
-        builder = builder.set_validity_period(Some(std::time::Duration::from_secs(
-            2 * 365 * 24 * 60 * 60,
-        )));
+        builder = builder
+            .set_validity_period(Some(std::time::Duration::from_secs(2 * 365 * 24 * 60 * 60)));
     }
 
-    let (cert, rev) = builder.generate().map_err(|e| PgpError::KeyGenerationFailed {
-        reason: e.to_string(),
-    })?;
+    let (cert, rev) = builder
+        .generate()
+        .map_err(|e| PgpError::KeyGenerationFailed {
+            reason: e.to_string(),
+        })?;
 
     // Serialize full cert (public + secret).
     // SECURITY: cert_data contains unencrypted secret key material. Wrapped in Zeroizing<>
@@ -209,10 +210,9 @@ pub fn generate_key_with_profile(
 
 /// Parse a certificate (public key or full key) and extract key information.
 pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
-    let cert =
-        openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
-            reason: e.to_string(),
-        })?;
+    let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
+        reason: e.to_string(),
+    })?;
 
     let policy = StandardPolicy::new();
     let now = SystemTime::now();
@@ -280,7 +280,10 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
             // This does NOT affect encryption operations — encrypt() independently
             // uses with_policy() to find valid encryption subkeys and will correctly
             // reject keys with no valid encryption-capable subkey.
-            cert.keys().subkeys().next().map(|ka| ka.key().pk_algo().to_string())
+            cert.keys()
+                .subkeys()
+                .next()
+                .map(|ka| ka.key().pk_algo().to_string())
         });
 
     // Extract expiry timestamp from the primary key's self-signature.
@@ -390,7 +393,10 @@ fn compare_user_id_candidates(left: &UserIdCandidate, right: &UserIdCandidate) -
         ordering => return ordering,
     }
 
-    match left.signature_creation_time.cmp(&right.signature_creation_time) {
+    match left
+        .signature_creation_time
+        .cmp(&right.signature_creation_time)
+    {
         Ordering::Equal => {}
         ordering => return ordering,
     }
@@ -429,12 +435,11 @@ pub fn merge_public_certificate_update(
         });
     }
 
-    let incoming_cert =
-        openpgp::Cert::from_bytes(incoming_cert_or_update).map_err(|e| {
-            PgpError::InvalidKeyData {
-                reason: format!("Invalid incoming public certificate update: {e}"),
-            }
-        })?;
+    let incoming_cert = openpgp::Cert::from_bytes(incoming_cert_or_update).map_err(|e| {
+        PgpError::InvalidKeyData {
+            reason: format!("Invalid incoming public certificate update: {e}"),
+        }
+    })?;
     if incoming_cert.is_tsk() {
         return Err(PgpError::InvalidKeyData {
             reason: "Incoming certificate update contains secret key material; merge/update accepts public certificates only.".to_string(),
@@ -443,16 +448,19 @@ pub fn merge_public_certificate_update(
 
     if existing_cert.fingerprint() != incoming_cert.fingerprint() {
         return Err(PgpError::InvalidKeyData {
-            reason: "Public certificate merge/update requires both inputs to have the same fingerprint.".to_string(),
+            reason:
+                "Public certificate merge/update requires both inputs to have the same fingerprint."
+                    .to_string(),
         });
     }
 
     let existing_public = serialize_public_cert(&existing_cert)?;
-    let merged_cert = existing_cert
-        .merge_public(incoming_cert)
-        .map_err(|e| PgpError::InvalidKeyData {
-            reason: format!("Failed to merge public certificates: {e}"),
-        })?;
+    let merged_cert =
+        existing_cert
+            .merge_public(incoming_cert)
+            .map_err(|e| PgpError::InvalidKeyData {
+                reason: format!("Failed to merge public certificates: {e}"),
+            })?;
     let merged_cert_data = serialize_public_cert(&merged_cert)?;
 
     let outcome = if merged_cert_data == existing_public {
@@ -537,10 +545,9 @@ pub fn export_secret_key(
     passphrase: &str,
     profile: KeyProfile,
 ) -> Result<Vec<u8>, PgpError> {
-    let cert =
-        openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
-            reason: e.to_string(),
-        })?;
+    let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
+        reason: e.to_string(),
+    })?;
 
     // Validate that the provided profile matches the key's actual version.
     let key_version = cert.primary_key().key().version();
@@ -572,19 +579,19 @@ pub fn export_secret_key(
     // It is consumed (moved) by encrypt_secret()/encrypt_key_argon2id() on success.
     // On error, it is dropped; Sequoia's SecretKeyMaterial Drop zeroizes the secret bytes.
     {
-        let primary = cert.primary_key().key().clone()
+        let primary = cert
+            .primary_key()
+            .key()
+            .clone()
             .parts_into_secret()
             .map_err(|e| PgpError::S2kError {
                 reason: format!("Primary key has no secret parts: {e}"),
             })?;
         let encrypted = match profile {
-            KeyProfile::Universal => {
-                primary.encrypt_secret(&password)
-            }
-            KeyProfile::Advanced => {
-                encrypt_key_argon2id(primary, &password)
-            }
-        }.map_err(|e| PgpError::S2kError {
+            KeyProfile::Universal => primary.encrypt_secret(&password),
+            KeyProfile::Advanced => encrypt_key_argon2id(primary, &password),
+        }
+        .map_err(|e| PgpError::S2kError {
             reason: format!("Failed to encrypt primary key: {e}"),
         })?;
         encrypted_packets.push(encrypted.role_into_primary().into());
@@ -594,13 +601,10 @@ pub fn export_secret_key(
     for ka in cert.keys().subkeys().secret() {
         let key = ka.key().clone();
         let encrypted = match profile {
-            KeyProfile::Universal => {
-                key.encrypt_secret(&password)
-            }
-            KeyProfile::Advanced => {
-                encrypt_key_argon2id(key, &password)
-            }
-        }.map_err(|e| PgpError::S2kError {
+            KeyProfile::Universal => key.encrypt_secret(&password),
+            KeyProfile::Advanced => encrypt_key_argon2id(key, &password),
+        }
+        .map_err(|e| PgpError::S2kError {
             reason: format!("Failed to encrypt subkey: {e}"),
         })?;
         encrypted_packets.push(encrypted.role_into_subordinate().into());
@@ -608,10 +612,11 @@ pub fn export_secret_key(
 
     // Merge the encrypted key packets back into the cert.
     // insert_packets replaces matching keys with the encrypted versions.
-    let (encrypted_cert, _changed) = cert.insert_packets(encrypted_packets)
-        .map_err(|e| PgpError::S2kError {
-            reason: format!("Failed to merge encrypted keys: {e}"),
-        })?;
+    let (encrypted_cert, _changed) =
+        cert.insert_packets(encrypted_packets)
+            .map_err(|e| PgpError::S2kError {
+                reason: format!("Failed to merge encrypted keys: {e}"),
+            })?;
 
     // Serialize the cert with encrypted secret keys as armored output.
     let mut sink = Vec::new();
@@ -652,7 +657,10 @@ pub fn import_secret_key(armored_data: &[u8], passphrase: &str) -> Result<Vec<u8
     // Consumed by decrypt_secret() on success. On error, dropped; Sequoia's
     // SecretKeyMaterial Drop zeroizes the secret bytes.
     {
-        let primary = cert.primary_key().key().clone()
+        let primary = cert
+            .primary_key()
+            .key()
+            .clone()
             .parts_into_secret()
             .map_err(|_| PgpError::WrongPassphrase)?;
         let decrypted = primary
@@ -671,10 +679,11 @@ pub fn import_secret_key(armored_data: &[u8], passphrase: &str) -> Result<Vec<u8
     }
 
     // Merge decrypted key packets back into the cert, replacing the encrypted versions.
-    let (decrypted_cert, _changed) = cert.insert_packets(decrypted_packets)
-        .map_err(|e| PgpError::InvalidKeyData {
-            reason: format!("Failed to merge decrypted keys: {e}"),
-        })?;
+    let (decrypted_cert, _changed) =
+        cert.insert_packets(decrypted_packets)
+            .map_err(|e| PgpError::InvalidKeyData {
+                reason: format!("Failed to merge decrypted keys: {e}"),
+            })?;
 
     // Serialize the cert with decrypted secret keys.
     // SECURITY: output contains unencrypted secret key material. Wrapped in Zeroizing<>
@@ -704,10 +713,9 @@ pub fn import_secret_key(armored_data: &[u8], passphrase: &str) -> Result<Vec<u8
 /// See ARCHITECTURE.md Section 3 "SE Key Wrapping" data flow.
 #[allow(dead_code)]
 pub fn extract_secret_key_bytes(cert_data: &[u8]) -> Result<Vec<u8>, PgpError> {
-    let cert =
-        openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
-            reason: e.to_string(),
-        })?;
+    let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
+        reason: e.to_string(),
+    })?;
 
     // SECURITY: Wrapped in Zeroizing<> so secret bytes are zeroized on drop
     // if an error occurs or the caller drops the result without explicit cleanup.
@@ -719,6 +727,105 @@ pub fn extract_secret_key_bytes(cert_data: &[u8]) -> Result<Vec<u8>, PgpError> {
         })?;
 
     Ok(std::mem::take(&mut *secret_bytes))
+}
+
+fn parse_cert_for_revocation(secret_cert: &[u8]) -> Result<openpgp::Cert, PgpError> {
+    openpgp::Cert::from_bytes(secret_cert).map_err(|e| PgpError::InvalidKeyData {
+        reason: format!("Secret certificate required: {e}"),
+    })
+}
+
+fn primary_signer_for_revocation(
+    cert: &openpgp::Cert,
+) -> Result<openpgp::crypto::KeyPair, PgpError> {
+    cert.primary_key()
+        .key()
+        .clone()
+        .parts_into_secret()
+        .map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Secret certificate required: {e}"),
+        })?
+        .into_keypair()
+        .map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Secret certificate required: {e}"),
+        })
+}
+
+fn serialize_revocation_signature(sig: openpgp::packet::Signature) -> Result<Vec<u8>, PgpError> {
+    let mut revocation = Vec::new();
+    openpgp::Packet::from(sig)
+        .serialize(&mut revocation)
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Failed to serialize revocation signature: {e}"),
+        })?;
+    Ok(revocation)
+}
+
+/// Generate a key-level revocation signature from an existing secret certificate.
+pub fn generate_key_revocation(secret_cert: &[u8]) -> Result<Vec<u8>, PgpError> {
+    let cert = parse_cert_for_revocation(secret_cert)?;
+    let mut signer = primary_signer_for_revocation(&cert)?;
+    let sig = cert
+        .revoke(&mut signer, ReasonForRevocation::KeyRetired, b"")
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Failed to generate key revocation: {e}"),
+        })?;
+    serialize_revocation_signature(sig)
+}
+
+/// Generate a subkey-specific revocation signature from an existing secret certificate.
+pub fn generate_subkey_revocation(
+    secret_cert: &[u8],
+    subkey_fingerprint: &str,
+) -> Result<Vec<u8>, PgpError> {
+    let cert = parse_cert_for_revocation(secret_cert)?;
+    let mut signer = primary_signer_for_revocation(&cert)?;
+    let subkey = cert
+        .keys()
+        .subkeys()
+        .find(|ka| ka.key().fingerprint().to_hex().to_lowercase() == subkey_fingerprint)
+        .ok_or_else(|| PgpError::InvalidKeyData {
+            reason: "Subkey fingerprint not found in certificate".to_string(),
+        })?;
+
+    let sig = SubkeyRevocationBuilder::new()
+        .set_reason_for_revocation(ReasonForRevocation::KeyRetired, b"")
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Failed to configure subkey revocation: {e}"),
+        })?
+        .build(&mut signer, &cert, subkey.key(), None)
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Failed to generate subkey revocation: {e}"),
+        })?;
+
+    serialize_revocation_signature(sig)
+}
+
+/// Generate a User ID-specific revocation signature from an existing secret certificate.
+pub fn generate_user_id_revocation(
+    secret_cert: &[u8],
+    user_id_data: &[u8],
+) -> Result<Vec<u8>, PgpError> {
+    let cert = parse_cert_for_revocation(secret_cert)?;
+    let mut signer = primary_signer_for_revocation(&cert)?;
+    let user_id = cert
+        .userids()
+        .find(|ua| ua.userid().value() == user_id_data)
+        .ok_or_else(|| PgpError::InvalidKeyData {
+            reason: "User ID bytes not found in certificate".to_string(),
+        })?;
+
+    let sig = UserIDRevocationBuilder::new()
+        .set_reason_for_revocation(ReasonForRevocation::UIDRetired, b"")
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Failed to configure User ID revocation: {e}"),
+        })?
+        .build(&mut signer, &cert, user_id.userid(), None)
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Failed to generate User ID revocation: {e}"),
+        })?;
+
+    serialize_revocation_signature(sig)
 }
 
 /// Parse a revocation certificate and cryptographically verify it against the target key.
@@ -744,10 +851,9 @@ pub fn parse_revocation_cert(rev_data: &[u8], cert_data: &[u8]) -> Result<String
         }
     };
 
-    let cert =
-        openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
-            reason: e.to_string(),
-        })?;
+    let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
+        reason: e.to_string(),
+    })?;
 
     // Cryptographically verify the revocation signature against the target key.
     let primary_key = cert.primary_key().key();
@@ -762,10 +868,9 @@ pub fn parse_revocation_cert(rev_data: &[u8], cert_data: &[u8]) -> Result<String
 
 /// Get the key version from binary certificate data.
 pub fn get_key_version(cert_data: &[u8]) -> Result<u8, PgpError> {
-    let cert =
-        openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
-            reason: e.to_string(),
-        })?;
+    let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
+        reason: e.to_string(),
+    })?;
     Ok(cert.primary_key().key().version())
 }
 
@@ -801,51 +906,51 @@ pub struct S2kInfo {
 /// highest memory requirement. This handles keys where the primary key and
 /// subkeys may use different S2K parameters (e.g., imported from external tools).
 pub fn parse_s2k_params(armored_data: &[u8]) -> Result<S2kInfo, PgpError> {
-    let cert =
-        openpgp::Cert::from_bytes(armored_data).map_err(|e| PgpError::InvalidKeyData {
-            reason: e.to_string(),
-        })?;
+    let cert = openpgp::Cert::from_bytes(armored_data).map_err(|e| PgpError::InvalidKeyData {
+        reason: e.to_string(),
+    })?;
 
     // Iterate primary key + all subkeys, extract S2K info from each encrypted key.
     let mut best: Option<S2kInfo> = None;
     let mut has_unencrypted = false;
 
     // Helper closure to extract S2K info from secret key material
-    let mut check_secret = |secret: Option<&openpgp::packet::key::SecretKeyMaterial>| {
-        match secret {
-            Some(openpgp::packet::key::SecretKeyMaterial::Encrypted(encrypted)) => {
-                let info = match encrypted.s2k() {
-                    openpgp::crypto::S2K::Argon2 { t, p, m, .. } => {
-                        let memory_kib: u64 = 1u64 << (*m as u64);
-                        S2kInfo {
-                            s2k_type: "argon2id".to_string(),
-                            memory_kib,
-                            parallelism: *p as u32,
-                            time_passes: *t as u32,
-                        }
+    let mut check_secret = |secret: Option<&openpgp::packet::key::SecretKeyMaterial>| match secret {
+        Some(openpgp::packet::key::SecretKeyMaterial::Encrypted(encrypted)) => {
+            let info = match encrypted.s2k() {
+                openpgp::crypto::S2K::Argon2 { t, p, m, .. } => {
+                    let memory_kib: u64 = 1u64 << (*m as u64);
+                    S2kInfo {
+                        s2k_type: "argon2id".to_string(),
+                        memory_kib,
+                        parallelism: *p as u32,
+                        time_passes: *t as u32,
                     }
-                    openpgp::crypto::S2K::Iterated { .. } => S2kInfo {
-                        s2k_type: "iterated-salted".to_string(),
-                        memory_kib: 0,
-                        parallelism: 0,
-                        time_passes: 0,
-                    },
-                    _ => S2kInfo {
-                        s2k_type: "unknown".to_string(),
-                        memory_kib: 0,
-                        parallelism: 0,
-                        time_passes: 0,
-                    },
-                };
-                if best.as_ref().map_or(true, |b| info.memory_kib > b.memory_kib) {
-                    best = Some(info);
                 }
+                openpgp::crypto::S2K::Iterated { .. } => S2kInfo {
+                    s2k_type: "iterated-salted".to_string(),
+                    memory_kib: 0,
+                    parallelism: 0,
+                    time_passes: 0,
+                },
+                _ => S2kInfo {
+                    s2k_type: "unknown".to_string(),
+                    memory_kib: 0,
+                    parallelism: 0,
+                    time_passes: 0,
+                },
+            };
+            if best
+                .as_ref()
+                .map_or(true, |b| info.memory_kib > b.memory_kib)
+            {
+                best = Some(info);
             }
-            Some(openpgp::packet::key::SecretKeyMaterial::Unencrypted(_)) => {
-                has_unencrypted = true;
-            }
-            None => {}
         }
+        Some(openpgp::packet::key::SecretKeyMaterial::Unencrypted(_)) => {
+            has_unencrypted = true;
+        }
+        None => {}
     };
 
     // Check primary key
@@ -922,9 +1027,8 @@ pub fn modify_expiry(
         })?;
 
     // Compute the target expiration time.
-    let expiration = new_expiry_seconds.map(|secs| {
-        SystemTime::now() + std::time::Duration::from_secs(secs)
-    });
+    let expiration =
+        new_expiry_seconds.map(|secs| SystemTime::now() + std::time::Duration::from_secs(secs));
 
     // Generate new binding signatures with the updated expiry.
     // This updates: direct key signature + all valid, non-revoked User ID binding signatures.
@@ -935,9 +1039,11 @@ pub fn modify_expiry(
         })?;
 
     // Insert the new signatures into the certificate.
-    let (updated_cert, _) = cert.insert_packets(sigs).map_err(|e| PgpError::KeyGenerationFailed {
-        reason: format!("Failed to update certificate with new signatures: {e}"),
-    })?;
+    let (updated_cert, _) =
+        cert.insert_packets(sigs)
+            .map_err(|e| PgpError::KeyGenerationFailed {
+                reason: format!("Failed to update certificate with new signatures: {e}"),
+            })?;
 
     // Serialize the updated full cert (public + secret).
     // SECURITY: Wrapped in Zeroizing<> for automatic cleanup on error paths.

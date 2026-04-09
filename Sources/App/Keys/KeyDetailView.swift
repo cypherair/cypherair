@@ -30,8 +30,10 @@ struct KeyDetailView: View {
     @State private var error: CypherAirError?
     @State private var showError = false
     @State private var armoredPublicKey: Data?
+    @State private var armoredRevocation: Data?
     @State private var showCopiedNotice = false
     @State private var activeExport: ExportType?
+    @State private var isPreparingRevocationExport = false
     @State private var showExpirySheet = false
     @State private var newExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
 
@@ -217,30 +219,36 @@ struct KeyDetailView: View {
                         .tutorialAnchor(.keyDetailBackupButton)
                         .accessibilityIdentifier("keydetail.backup")
 
-                        if !key.revocationCert.isEmpty {
-                            Button {
-                                guard configuration.allowsRevocationExport,
-                                      !key.revocationCert.isEmpty else { return }
+                        Button {
+                            guard configuration.allowsRevocationExport,
+                                  !isPreparingRevocationExport else { return }
+                            isPreparingRevocationExport = true
+                            Task {
+                                defer { isPreparingRevocationExport = false }
                                 do {
+                                    let exported = try await keyManagement.exportRevocationCertificate(
+                                        fingerprint: fingerprint
+                                    )
                                     if try configuration.outputInterceptionPolicy.interceptDataExport?(
-                                        key.revocationCert,
+                                        exported,
                                         exportFilename(for: .revocation),
                                         .revocation
                                     ) != true {
+                                        armoredRevocation = exported
                                         activeExport = .revocation
                                     }
                                 } catch {
                                     self.error = CypherAirError.from(error) { .keychainError($0) }
                                     showError = true
                                 }
-                            } label: {
-                                Label(
-                                    String(localized: "keydetail.exportRevocation", defaultValue: "Export Revocation Certificate"),
-                                    systemImage: "xmark.seal"
-                                )
                             }
-                            .disabled(!key.revocationCert.isEmpty && !configuration.allowsRevocationExport)
+                        } label: {
+                            Label(
+                                String(localized: "keydetail.exportRevocation", defaultValue: "Export Revocation Certificate"),
+                                systemImage: "xmark.seal"
+                            )
                         }
+                        .disabled(!configuration.allowsRevocationExport || isPreparingRevocationExport)
                     } header: {
                         Text(String(localized: "keydetail.actions", defaultValue: "Actions"))
                     }
@@ -342,13 +350,19 @@ struct KeyDetailView: View {
         .fileExporter(
             isPresented: Binding(
                 get: { activeExport != nil },
-                set: { if !$0 { activeExport = nil } }
+                set: {
+                    if !$0 {
+                        activeExport = nil
+                        armoredRevocation = nil
+                    }
+                }
             ),
             item: exportItem,
             contentTypes: [.data],
             defaultFilename: exportFilename
         ) { result in
             activeExport = nil
+            armoredRevocation = nil
             if case .failure(let exportError) = result {
                 error = CypherAirError.from(exportError) { .keychainError($0) }
                 showError = true
@@ -361,7 +375,7 @@ struct KeyDetailView: View {
         case .publicKey:
             armoredPublicKey
         case .revocation:
-            key?.revocationCert
+            armoredRevocation
         case nil:
             nil
         }

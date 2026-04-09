@@ -251,8 +251,8 @@ fn test_gpg_verifies_sequoia_cleartext_signature() {
 
     // Sign a message with Sequoia (cleartext)
     let message = b"This message is signed by Sequoia for GnuPG verification.";
-    let signed = sign::sign_cleartext(message, &signer.cert_data)
-        .expect("Cleartext signing should succeed");
+    let signed =
+        sign::sign_cleartext(message, &signer.cert_data).expect("Cleartext signing should succeed");
 
     // Write signed message to temp file
     let signed_file = gnupghome.path().join("sequoia_signed.asc");
@@ -403,13 +403,8 @@ fn test_gpg_decrypts_sequoia_signed_encrypted_message() {
 
     // Encrypt + sign with Sequoia
     let plaintext = b"Signed and encrypted by Sequoia for GnuPG.";
-    let ciphertext = encrypt::encrypt(
-        plaintext,
-        &[gpg_pubkey],
-        Some(&signer.cert_data),
-        None,
-    )
-    .expect("Encrypt+sign should succeed");
+    let ciphertext = encrypt::encrypt(plaintext, &[gpg_pubkey], Some(&signer.cert_data), None)
+        .expect("Encrypt+sign should succeed");
 
     // Write ciphertext to temp file
     let ct_file = gnupghome.path().join("signed_encrypted.asc");

@@ -3,7 +3,7 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use sequoia_openpgp as openpgp;
 
-use crate::decrypt::{SignatureStatus, is_expired_error};
+use crate::decrypt::{is_expired_error, SignatureStatus};
 use crate::error::PgpError;
 
 /// Result of signature verification.
@@ -27,10 +27,8 @@ pub fn verify_cleartext(
 
     let mut certs = Vec::new();
     for key_data in verification_keys {
-        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| {
-            PgpError::InvalidKeyData {
-                reason: format!("Invalid verification key: {e}"),
-            }
+        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Invalid verification key: {e}"),
         })?;
         certs.push(cert);
     }
@@ -67,10 +65,8 @@ pub fn verify_cleartext(
     };
 
     let mut content = Vec::new();
-    std::io::Read::read_to_end(&mut verifier, &mut content).map_err(|e| {
-        PgpError::CorruptData {
-            reason: format!("Read failed: {e}"),
-        }
+    std::io::Read::read_to_end(&mut verifier, &mut content).map_err(|e| PgpError::CorruptData {
+        reason: format!("Read failed: {e}"),
     })?;
 
     let helper = verifier.into_helper();
@@ -92,10 +88,8 @@ pub fn verify_detached(
 
     let mut certs = Vec::new();
     for key_data in verification_keys {
-        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| {
-            PgpError::InvalidKeyData {
-                reason: format!("Invalid verification key: {e}"),
-            }
+        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Invalid verification key: {e}"),
         })?;
         certs.push(cert);
     }
@@ -157,10 +151,7 @@ pub(crate) struct VerifyHelper<'a> {
 }
 
 impl<'a> VerificationHelper for VerifyHelper<'a> {
-    fn get_certs(
-        &mut self,
-        _ids: &[openpgp::KeyHandle],
-    ) -> openpgp::Result<Vec<openpgp::Cert>> {
+    fn get_certs(&mut self, _ids: &[openpgp::KeyHandle]) -> openpgp::Result<Vec<openpgp::Cert>> {
         Ok(self.certs.to_vec())
     }
 
@@ -172,9 +163,8 @@ impl<'a> VerificationHelper for VerifyHelper<'a> {
                         match result {
                             Ok(GoodChecksum { ka, .. }) => {
                                 self.status = SignatureStatus::Valid;
-                                self.signer_fingerprint = Some(
-                                    ka.cert().fingerprint().to_hex().to_lowercase(),
-                                );
+                                self.signer_fingerprint =
+                                    Some(ka.cert().fingerprint().to_hex().to_lowercase());
                                 return Ok(());
                             }
                             // INTENTIONAL: No `return Ok(())` here — fall through to continue
@@ -190,9 +180,8 @@ impl<'a> VerificationHelper for VerifyHelper<'a> {
                                 // Distinguish expired signer key from other key issues
                                 if is_expired_error(&error) {
                                     self.status = SignatureStatus::Expired;
-                                    self.signer_fingerprint = Some(
-                                        ka.cert().fingerprint().to_hex().to_lowercase(),
-                                    );
+                                    self.signer_fingerprint =
+                                        Some(ka.cert().fingerprint().to_hex().to_lowercase());
                                 } else {
                                     self.status = SignatureStatus::Bad;
                                 }

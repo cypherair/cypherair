@@ -153,7 +153,7 @@ final class KeyManagementService {
         try memoryGuard.validate(s2kInfo: s2kInfo)
 
         // Heavy engine calls — off main thread via @concurrent static helper
-        var (secretKeyData, keyInfo, profile, publicKeyData) = try await Self.importKeyOffMainActor(
+        var (secretKeyData, keyInfo, profile, publicKeyData, revocationCert) = try await Self.importKeyOffMainActor(
             engine: engine, armoredData: armoredData, passphrase: passphrase
         )
         defer {
@@ -191,7 +191,7 @@ final class KeyManagementService {
             isDefault: keys.isEmpty,
             isBackedUp: false,
             publicKeyData: publicKeyData,
-            revocationCert: Data(),
+            revocationCert: revocationCert,
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map {
@@ -250,6 +250,43 @@ final class KeyManagementService {
         }
 
         return exported
+    }
+
+    /// Export the key's revocation signature as an ASCII-armored signature.
+    /// If the key predates revocation-construction support, this lazily backfills
+    /// the binary revocation signature, persists it, and then exports the armored form.
+    func exportRevocationCertificate(fingerprint: String) async throws -> Data {
+        guard let index = keys.firstIndex(where: { $0.fingerprint == fingerprint }) else {
+            throw CypherAirError.noMatchingKey
+        }
+
+        let existingRevocation = keys[index].revocationCert
+        if !existingRevocation.isEmpty {
+            return try await Self.armorRevocationOffMainActor(
+                engine: engine,
+                revocationData: existingRevocation
+            )
+        }
+
+        var secretKey = try unwrapPrivateKey(fingerprint: fingerprint)
+        defer {
+            secretKey.resetBytes(in: 0..<secretKey.count)
+        }
+
+        let generatedRevocation = try await Self.generateKeyRevocationOffMainActor(
+            engine: engine,
+            certData: secretKey
+        )
+
+        var updated = keys[index]
+        updated.revocationCert = generatedRevocation
+        try metadataStore.update(updated)
+        keys[index] = updated
+
+        return try await Self.armorRevocationOffMainActor(
+            engine: engine,
+            revocationData: generatedRevocation
+        )
     }
 
     // MARK: - Key Expiry Modification
@@ -530,11 +567,12 @@ final class KeyManagementService {
 
     /// Run key import + parsing off the main actor.
     /// Includes importSecretKey (Argon2id ~3s for Profile B), parseKeyInfo,
-    /// detectProfile, and public key extraction (binary format).
+    /// detectProfile, public key extraction (binary format), and key-level
+    /// revocation construction for imported-key availability parity.
     @concurrent
     private static func importKeyOffMainActor(
         engine: PgpEngine, armoredData: Data, passphrase: String
-    ) async throws -> (secretKeyData: Data, keyInfo: KeyInfo, profile: KeyProfile, publicKeyData: Data) {
+    ) async throws -> (secretKeyData: Data, keyInfo: KeyInfo, profile: KeyProfile, publicKeyData: Data, revocationCert: Data) {
         do {
             let secretKeyData = try engine.importSecretKey(
                 armoredData: armoredData,
@@ -546,7 +584,8 @@ final class KeyManagementService {
             // This ensures publicKeyData is binary OpenPGP format, consistent with key generation path.
             let armoredPubKey = try engine.armorPublicKey(certData: secretKeyData)
             let publicKeyData = try engine.dearmor(armored: armoredPubKey)
-            return (secretKeyData, keyInfo, profile, publicKeyData)
+            let revocationCert = try engine.generateKeyRevocation(secretCert: secretKeyData)
+            return (secretKeyData, keyInfo, profile, publicKeyData, revocationCert)
         } catch {
             throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
         }
@@ -580,6 +619,28 @@ final class KeyManagementService {
             )
         } catch {
             throw CypherAirError.from(error) { .keyGenerationFailed(reason: $0) }
+        }
+    }
+
+    @concurrent
+    private static func generateKeyRevocationOffMainActor(
+        engine: PgpEngine, certData: Data
+    ) async throws -> Data {
+        do {
+            return try engine.generateKeyRevocation(secretCert: certData)
+        } catch {
+            throw CypherAirError.from(error) { .revocationError(reason: $0) }
+        }
+    }
+
+    @concurrent
+    private static func armorRevocationOffMainActor(
+        engine: PgpEngine, revocationData: Data
+    ) async throws -> Data {
+        do {
+            return try engine.armor(data: revocationData, kind: .signature)
+        } catch {
+            throw CypherAirError.from(error) { .armorError(reason: $0) }
         }
     }
 

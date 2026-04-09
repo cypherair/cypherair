@@ -47,7 +47,10 @@ fn test_c3_1_import_gpg_pubkey() {
 
     assert_eq!(info.key_version, 4, "GnuPG key must be v4");
     assert_eq!(info.profile, KeyProfile::Universal);
-    assert!(info.has_encryption_subkey, "Must have Cv25519 encryption subkey");
+    assert!(
+        info.has_encryption_subkey,
+        "Must have Cv25519 encryption subkey"
+    );
     assert!(!info.is_revoked);
     assert!(!info.is_expired);
     assert_eq!(
@@ -86,7 +89,10 @@ fn test_c3_2_app_encrypt_to_gpg_key() {
         .expect("Binary encryption should succeed");
     let (has_v1, has_v2) = detect_message_format(&ciphertext_binary);
     assert!(has_v1, "Encryption to v4 GnuPG key must produce SEIPDv1");
-    assert!(!has_v2, "Encryption to v4 GnuPG key must NOT produce SEIPDv2");
+    assert!(
+        !has_v2,
+        "Encryption to v4 GnuPG key must NOT produce SEIPDv2"
+    );
 
     // Decrypt with the GnuPG secret key (imported into Sequoia)
     // This simulates what gpg --decrypt would do
@@ -143,13 +149,9 @@ fn test_c3_2_app_encrypt_signed_to_gpg_key() {
 /// C3.3: Sequoia Profile A cleartext signature is valid.
 #[test]
 fn test_c3_3_app_sign_profile_a() {
-    let sender = keys::generate_key_with_profile(
-        "Signer".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let sender =
+        keys::generate_key_with_profile("Signer".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
     let plaintext = b"This message is signed by CypherAir Profile A";
     let signed = sign::sign_cleartext(plaintext, &sender.cert_data)
@@ -272,9 +274,7 @@ fn test_c3_6_tampered_gpg_ciphertext_fails() {
         | Err(PgpError::AeadAuthenticationFailed)
         | Err(PgpError::CorruptData { .. })
         | Err(PgpError::NoMatchingKey) => {}
-        Err(other) => panic!(
-            "Expected integrity/corruption/no-matching-key error, got: {other}"
-        ),
+        Err(other) => panic!("Expected integrity/corruption/no-matching-key error, got: {other}"),
         Ok(_) => unreachable!("Already asserted result.is_err()"),
     }
 }
@@ -305,9 +305,7 @@ fn test_c3_6_tampered_sequoia_ciphertext_for_gpg_key() {
         | Err(PgpError::AeadAuthenticationFailed)
         | Err(PgpError::CorruptData { .. })
         | Err(PgpError::NoMatchingKey) => {}
-        Err(other) => panic!(
-            "Expected integrity/corruption/no-matching-key error, got: {other}"
-        ),
+        Err(other) => panic!("Expected integrity/corruption/no-matching-key error, got: {other}"),
         Ok(_) => unreachable!("Already asserted result.is_err()"),
     }
 }
@@ -398,8 +396,8 @@ fn test_c3_8_profile_b_key_is_v6_gnupg_incompatible() {
 
     assert_eq!(key_b.key_version, 6, "Profile B must produce v6 key");
 
-    let info = keys::parse_key_info(&key_b.public_key_data)
-        .expect("Should parse Profile B public key");
+    let info =
+        keys::parse_key_info(&key_b.public_key_data).expect("Should parse Profile B public key");
     assert_eq!(info.key_version, 6);
     assert_eq!(info.profile, KeyProfile::Advanced);
 
@@ -411,22 +409,13 @@ fn test_c3_8_profile_b_key_is_v6_gnupg_incompatible() {
 /// C3.8 (encryption): Profile B encryption produces SEIPDv2 (incompatible with GnuPG).
 #[test]
 fn test_c3_8_profile_b_encryption_not_gnupg_compatible() {
-    let key_b = keys::generate_key_with_profile(
-        "Profile B".to_string(),
-        None,
-        None,
-        KeyProfile::Advanced,
-    )
-    .expect("Key gen should succeed");
+    let key_b =
+        keys::generate_key_with_profile("Profile B".to_string(), None, None, KeyProfile::Advanced)
+            .expect("Key gen should succeed");
 
     let plaintext = b"This is encrypted with SEIPDv2 AEAD";
-    let ciphertext = encrypt::encrypt(
-        plaintext,
-        &[key_b.public_key_data.clone()],
-        None,
-        None,
-    )
-    .expect("Encrypt should succeed");
+    let ciphertext = encrypt::encrypt(plaintext, &[key_b.public_key_data.clone()], None, None)
+        .expect("Encrypt should succeed");
 
     // Verify Sequoia can decrypt it (Profile B → Profile B works)
     let result = decrypt::decrypt(&ciphertext, &[key_b.cert_data], &[key_b.public_key_data])
@@ -518,13 +507,9 @@ fn test_c2b_10_compressed_seipd2_verified_by_composition() {
     assert_eq!(result.plaintext, expected);
 
     // Verify SEIPDv2 decrypt works (C2B.3 dependency)
-    let key_b = keys::generate_key_with_profile(
-        "B User".to_string(),
-        None,
-        None,
-        KeyProfile::Advanced,
-    )
-    .expect("Key gen should succeed");
+    let key_b =
+        keys::generate_key_with_profile("B User".to_string(), None, None, KeyProfile::Advanced)
+            .expect("Key gen should succeed");
 
     let plaintext = b"SEIPDv2 decrypt test for composition";
     let ct = encrypt::encrypt(plaintext, &[key_b.public_key_data.clone()], None, None)
@@ -546,8 +531,8 @@ fn test_gpg_key_armor_roundtrip() {
     let gpg_pubkey_armored = load_fixture("gpg_pubkey.asc");
 
     // Dearmor the armored key
-    let (dearmored, _kind) = armor::decode_armor(&gpg_pubkey_armored)
-        .expect("Should dearmor GnuPG public key");
+    let (dearmored, _kind) =
+        armor::decode_armor(&gpg_pubkey_armored).expect("Should dearmor GnuPG public key");
 
     // Both should parse to the same key
     let info_binary = keys::parse_key_info(&gpg_pubkey_binary).expect("Parse binary");
@@ -576,13 +561,9 @@ fn test_cross_impl_encrypt_to_self_with_gpg_recipient() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
 
-    let sender = keys::generate_key_with_profile(
-        "Sender".to_string(),
-        None,
-        None,
-        KeyProfile::Universal,
-    )
-    .expect("Key gen should succeed");
+    let sender =
+        keys::generate_key_with_profile("Sender".to_string(), None, None, KeyProfile::Universal)
+            .expect("Key gen should succeed");
 
     let plaintext = b"Encrypt-to-self with GnuPG recipient";
 
@@ -640,16 +621,17 @@ fn test_profile_b_sender_to_gpg_v4_recipient_uses_seipdv1() {
     .expect("Encrypt should succeed (auto-downgrade to SEIPDv1)");
 
     // Verify format is SEIPDv1 (binary check)
-    let ciphertext_binary = encrypt::encrypt_binary(
-        plaintext,
-        &[gpg_pubkey.clone()],
-        None,
-        None,
-    )
-    .expect("Binary encryption should succeed");
+    let ciphertext_binary = encrypt::encrypt_binary(plaintext, &[gpg_pubkey.clone()], None, None)
+        .expect("Binary encryption should succeed");
     let (has_v1, has_v2) = detect_message_format(&ciphertext_binary);
-    assert!(has_v1, "Profile B sender to v4 recipient must produce SEIPDv1");
-    assert!(!has_v2, "Profile B sender to v4 recipient must NOT produce SEIPDv2");
+    assert!(
+        has_v1,
+        "Profile B sender to v4 recipient must produce SEIPDv1"
+    );
+    assert!(
+        !has_v2,
+        "Profile B sender to v4 recipient must NOT produce SEIPDv2"
+    );
 
     // GnuPG v4 recipient decrypts successfully
     let result = decrypt::decrypt(
@@ -715,7 +697,11 @@ fn test_generate_v6_fixture() {
     std::fs::write(&fixture_path, &key_b.public_key_data)
         .expect("Should write v6 public key fixture");
 
-    println!("Generated v6 fixture: {:?} ({} bytes)", fixture_path, key_b.public_key_data.len());
+    println!(
+        "Generated v6 fixture: {:?} ({} bytes)",
+        fixture_path,
+        key_b.public_key_data.len()
+    );
 }
 
 /// C3.8: Verify that GnuPG rejection output was captured by fixture generation.
@@ -738,8 +724,8 @@ fn test_c3_8_gpg_rejection_output_recorded() {
         return;
     }
 
-    let content = std::fs::read_to_string(&fixture_path)
-        .expect("Should read rejection output file");
+    let content =
+        std::fs::read_to_string(&fixture_path).expect("Should read rejection output file");
 
     // GnuPG should have produced some output (error or warning)
     assert!(
@@ -762,7 +748,10 @@ fn test_c3_8_gpg_rejection_output_recorded() {
     );
 
     // L8: If exit code is recorded, verify it is NOT zero (GnuPG must reject v6)
-    if let Some(line) = content.lines().find(|l| l.starts_with("gpg_import_exit_code=")) {
+    if let Some(line) = content
+        .lines()
+        .find(|l| l.starts_with("gpg_import_exit_code="))
+    {
         let code = line.trim_start_matches("gpg_import_exit_code=").trim();
         assert_ne!(
             code, "0",
@@ -819,7 +808,10 @@ fn test_c3_gpg_revoked_key_fixture() {
 
     let info = keys::parse_key_info(&pubkey).expect("Should parse revoked GnuPG key");
     assert_eq!(info.key_version, 4);
-    assert!(info.is_revoked, "Key must be marked as revoked after importing revocation cert");
+    assert!(
+        info.is_revoked,
+        "Key must be marked as revoked after importing revocation cert"
+    );
 
     // Encryption to a revoked key should fail
     let plaintext = b"Should not encrypt to revoked key";

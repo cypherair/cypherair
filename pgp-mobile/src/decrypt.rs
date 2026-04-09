@@ -204,21 +204,18 @@ pub fn decrypt<K: AsRef<[u8]>>(
     // Parse secret key certificates
     let mut certs = Vec::new();
     for key_data in secret_keys {
-        let cert = openpgp::Cert::from_bytes(key_data.as_ref()).map_err(|e| {
-            PgpError::InvalidKeyData {
+        let cert =
+            openpgp::Cert::from_bytes(key_data.as_ref()).map_err(|e| PgpError::InvalidKeyData {
                 reason: format!("Invalid secret key: {e}"),
-            }
-        })?;
+            })?;
         certs.push(cert);
     }
 
     // Parse verification key certificates
     let mut verifier_certs = Vec::new();
     for key_data in verification_keys {
-        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| {
-            PgpError::InvalidKeyData {
-                reason: format!("Invalid verification key: {e}"),
-            }
+        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Invalid verification key: {e}"),
         })?;
         verifier_certs.push(cert);
     }
@@ -266,10 +263,7 @@ pub(crate) struct DecryptHelper<'a> {
 }
 
 impl<'a> VerificationHelper for DecryptHelper<'a> {
-    fn get_certs(
-        &mut self,
-        _ids: &[openpgp::KeyHandle],
-    ) -> openpgp::Result<Vec<openpgp::Cert>> {
+    fn get_certs(&mut self, _ids: &[openpgp::KeyHandle]) -> openpgp::Result<Vec<openpgp::Cert>> {
         // Return all verification certs + secret certs (which also contain public keys)
         let mut all_certs: Vec<openpgp::Cert> = self.verifier_certs.to_vec();
         all_certs.extend(self.secret_certs.iter().cloned());
@@ -301,9 +295,8 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
                         match result {
                             Ok(GoodChecksum { ka, .. }) => {
                                 self.signature_status = Some(SignatureStatus::Valid);
-                                self.signer_fingerprint = Some(
-                                    ka.cert().fingerprint().to_hex().to_lowercase(),
-                                );
+                                self.signer_fingerprint =
+                                    Some(ka.cert().fingerprint().to_hex().to_lowercase());
                                 return Ok(());
                             }
                             Err(VerificationError::MissingKey { .. }) => {
@@ -314,9 +307,8 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
                                 // (revoked, not signing-capable, etc.)
                                 if is_expired_error(&error) {
                                     self.signature_status = Some(SignatureStatus::Expired);
-                                    self.signer_fingerprint = Some(
-                                        ka.cert().fingerprint().to_hex().to_lowercase(),
-                                    );
+                                    self.signer_fingerprint =
+                                        Some(ka.cert().fingerprint().to_hex().to_lowercase());
                                 } else {
                                     self.signature_status = Some(SignatureStatus::Bad);
                                 }
@@ -451,7 +443,10 @@ fn map_openpgp_error(err: &openpgp::Error, original: &openpgp::anyhow::Error) ->
 /// 3. String fallback (defense-in-depth)
 pub(crate) fn is_expired_error(error: &openpgp::anyhow::Error) -> bool {
     // Strategy 1: Direct downcast
-    if matches!(error.downcast_ref::<openpgp::Error>(), Some(openpgp::Error::Expired(_))) {
+    if matches!(
+        error.downcast_ref::<openpgp::Error>(),
+        Some(openpgp::Error::Expired(_))
+    ) {
         return true;
     }
     // Strategy 2: Walk the error chain for nested Expired variants
@@ -492,9 +487,12 @@ impl<'a> DecryptionHelper for DecryptHelper<'a> {
                     .key_handles(pkesk.recipient())
                     .for_transport_encryption()
                 {
-                    if let Some((algo, session_key)) =
-                        ka.key().clone().into_keypair().ok()
-                            .and_then(|mut kp| pkesk.decrypt(&mut kp, sym_algo))
+                    if let Some((algo, session_key)) = ka
+                        .key()
+                        .clone()
+                        .into_keypair()
+                        .ok()
+                        .and_then(|mut kp| pkesk.decrypt(&mut kp, sym_algo))
                     {
                         if decrypt(algo, &session_key) {
                             return Ok(None);
