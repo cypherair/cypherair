@@ -46,7 +46,8 @@ pub fn verify_direct_key_signature(
     let target_cert = parse_cert(target_cert, "Invalid target certificate")?;
     let candidate_signers = parse_candidate_signers(candidate_signers)?;
 
-    if let Some(result) = verify_direct_key_issuer_guided(&signature, &target_cert, &candidate_signers)
+    if let Some(result) =
+        verify_direct_key_issuer_guided(&signature, &target_cert, &candidate_signers)
     {
         return Ok(result);
     }
@@ -146,14 +147,15 @@ fn parse_user_id_binding_signature(
     signature: &[u8],
 ) -> Result<(Signature, CertificationKind), PgpError> {
     let signature = parse_signature_packet(signature)?;
-    let certification_kind = certification_kind_from_signature_type(signature.typ()).ok_or_else(|| {
-        PgpError::CorruptData {
-            reason: format!(
-                "Expected User ID certification signature, found {:?}",
-                signature.typ()
-            ),
-        }
-    })?;
+    let certification_kind =
+        certification_kind_from_signature_type(signature.typ()).ok_or_else(|| {
+            PgpError::CorruptData {
+                reason: format!(
+                    "Expected User ID certification signature, found {:?}",
+                    signature.typ()
+                ),
+            }
+        })?;
     Ok((signature, certification_kind))
 }
 
@@ -191,7 +193,9 @@ fn find_user_id<'a>(cert: &'a openpgp::Cert, user_id_data: &[u8]) -> Result<&'a 
         })
 }
 
-fn certification_kind_from_signature_type(signature_type: SignatureType) -> Option<CertificationKind> {
+fn certification_kind_from_signature_type(
+    signature_type: SignatureType,
+) -> Option<CertificationKind> {
     match signature_type {
         SignatureType::GenericCertification => Some(CertificationKind::Generic),
         SignatureType::PersonaCertification => Some(CertificationKind::Persona),
@@ -223,7 +227,12 @@ fn verify_direct_key_issuer_guided(
                     .verify_direct_key(key.key(), target_cert.primary_key().key())
                     .is_ok()
                 {
-                    return Some(valid_result(cert, key.primary(), key.key().fingerprint().to_hex().to_lowercase(), None));
+                    return Some(valid_result(
+                        cert,
+                        key.primary(),
+                        key.key().fingerprint().to_hex().to_lowercase(),
+                        None,
+                    ));
                 }
             }
         }
@@ -248,7 +257,11 @@ fn verify_direct_key_fallback(
             return Ok(valid_result(
                 cert,
                 true,
-                cert.primary_key().key().fingerprint().to_hex().to_lowercase(),
+                cert.primary_key()
+                    .key()
+                    .fingerprint()
+                    .to_hex()
+                    .to_lowercase(),
                 None,
             ));
         }
@@ -329,13 +342,21 @@ fn verify_user_id_fallback(
     for cert in candidate_signers {
         attempted = true;
         if signature
-            .verify_userid_binding(cert.primary_key().key(), target_cert.primary_key().key(), user_id)
+            .verify_userid_binding(
+                cert.primary_key().key(),
+                target_cert.primary_key().key(),
+                user_id,
+            )
             .is_ok()
         {
             return Ok(valid_result(
                 cert,
                 true,
-                cert.primary_key().key().fingerprint().to_hex().to_lowercase(),
+                cert.primary_key()
+                    .key()
+                    .fingerprint()
+                    .to_hex()
+                    .to_lowercase(),
                 Some(certification_kind),
             ));
         }
@@ -393,7 +414,9 @@ fn invalid_result(certification_kind: Option<CertificationKind>) -> CertificateS
     }
 }
 
-fn signer_missing_result(certification_kind: Option<CertificationKind>) -> CertificateSignatureResult {
+fn signer_missing_result(
+    certification_kind: Option<CertificationKind>,
+) -> CertificateSignatureResult {
     CertificateSignatureResult {
         status: CertificateSignatureStatus::SignerMissing,
         certification_kind,
@@ -402,9 +425,7 @@ fn signer_missing_result(certification_kind: Option<CertificationKind>) -> Certi
     }
 }
 
-fn select_certification_signer(
-    cert: &openpgp::Cert,
-) -> Result<openpgp::crypto::KeyPair, PgpError> {
+fn select_certification_signer(cert: &openpgp::Cert) -> Result<openpgp::crypto::KeyPair, PgpError> {
     if let Ok(primary) = cert
         .primary_key()
         .key()

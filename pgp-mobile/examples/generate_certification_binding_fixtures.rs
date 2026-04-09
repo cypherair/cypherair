@@ -2,8 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use openpgp::cert::prelude::*;
-use openpgp::packet::signature::subpacket::{Subpacket, SubpacketTag, SubpacketValue};
 use openpgp::packet::signature;
+use openpgp::packet::signature::subpacket::{Subpacket, SubpacketTag, SubpacketValue};
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Marshal;
@@ -67,7 +67,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         false,
     )?)?;
     let mut signature = user_id.bind(&mut signer, &target_cert, builder)?;
-    signature.unhashed_area_mut().remove_all(SubpacketTag::Issuer);
+    signature
+        .unhashed_area_mut()
+        .remove_all(SubpacketTag::Issuer);
 
     let mut signature_bytes = Vec::new();
     openpgp::Packet::from(signature).serialize(&mut signature_bytes)?;
