@@ -672,6 +672,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String) throws  -> Data
     
     /**
+     * Generate raw certification-signature bytes for a specific User ID on the target certificate.
+     */
+    func generateUserIdCertification(signerSecretCert: Data, targetCert: Data, userIdData: Data, certificationKind: CertificationKind) throws  -> Data
+    
+    /**
      * Generate a User ID-specific revocation signature from an existing secret certificate.
      */
     func generateUserIdRevocation(secretCert: Data, userIdData: Data) throws  -> Data
@@ -778,6 +783,16 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Verify a detached signature against a file using streaming I/O.
      */
     func verifyDetachedFile(dataPath: String, signature: Data, verificationKeys: [Data], progress: ProgressReporter?) throws  -> VerifyResult
+    
+    /**
+     * Verify a direct-key signature against a target certificate using crypto-only semantics.
+     */
+    func verifyDirectKeySignature(signature: Data, targetCert: Data, candidateSigners: [Data]) throws  -> CertificateSignatureResult
+    
+    /**
+     * Verify a User ID binding signature against a target certificate using crypto-only semantics.
+     */
+    func verifyUserIdBindingSignature(signature: Data, targetCert: Data, userIdData: Data, candidateSigners: [Data]) throws  -> CertificateSignatureResult
     
 }
 /**
@@ -1114,6 +1129,21 @@ open func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String)t
 }
     
     /**
+     * Generate raw certification-signature bytes for a specific User ID on the target certificate.
+     */
+open func generateUserIdCertification(signerSecretCert: Data, targetCert: Data, userIdData: Data, certificationKind: CertificationKind)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_certification(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(signerSecretCert),
+        FfiConverterData.lower(targetCert),
+        FfiConverterData.lower(userIdData),
+        FfiConverterTypeCertificationKind_lower(certificationKind),$0
+    )
+})
+}
+    
+    /**
      * Generate a User ID-specific revocation signature from an existing secret certificate.
      */
 open func generateUserIdRevocation(secretCert: Data, userIdData: Data)throws  -> Data  {
@@ -1353,6 +1383,35 @@ open func verifyDetachedFile(dataPath: String, signature: Data, verificationKeys
         FfiConverterData.lower(signature),
         FfiConverterSequenceData.lower(verificationKeys),
         FfiConverterOptionTypeProgressReporter.lower(progress),$0
+    )
+})
+}
+    
+    /**
+     * Verify a direct-key signature against a target certificate using crypto-only semantics.
+     */
+open func verifyDirectKeySignature(signature: Data, targetCert: Data, candidateSigners: [Data])throws  -> CertificateSignatureResult  {
+    return try  FfiConverterTypeCertificateSignatureResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_verify_direct_key_signature(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(signature),
+        FfiConverterData.lower(targetCert),
+        FfiConverterSequenceData.lower(candidateSigners),$0
+    )
+})
+}
+    
+    /**
+     * Verify a User ID binding signature against a target certificate using crypto-only semantics.
+     */
+open func verifyUserIdBindingSignature(signature: Data, targetCert: Data, userIdData: Data, candidateSigners: [Data])throws  -> CertificateSignatureResult  {
+    return try  FfiConverterTypeCertificateSignatureResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_verify_user_id_binding_signature(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(signature),
+        FfiConverterData.lower(targetCert),
+        FfiConverterData.lower(userIdData),
+        FfiConverterSequenceData.lower(candidateSigners),$0
     )
 })
 }
@@ -1687,6 +1746,95 @@ public func FfiConverterTypeCertificateMergeResult_lift(_ buf: RustBuffer) throw
 #endif
 public func FfiConverterTypeCertificateMergeResult_lower(_ value: CertificateMergeResult) -> RustBuffer {
     return FfiConverterTypeCertificateMergeResult.lower(value)
+}
+
+
+/**
+ * Result of certificate-signature verification.
+ */
+public struct CertificateSignatureResult: Equatable, Hashable {
+    /**
+     * Crypto-only verification status.
+     */
+    public var status: CertificateSignatureStatus
+    /**
+     * Certification kind for User ID binding signatures.
+     */
+    public var certificationKind: CertificationKind?
+    /**
+     * Primary fingerprint of the selected signer certificate when known.
+     */
+    public var signerPrimaryFingerprint: String?
+    /**
+     * Signing subkey fingerprint when a non-primary signer key is selected.
+     */
+    public var signingKeyFingerprint: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Crypto-only verification status.
+         */status: CertificateSignatureStatus, 
+        /**
+         * Certification kind for User ID binding signatures.
+         */certificationKind: CertificationKind?, 
+        /**
+         * Primary fingerprint of the selected signer certificate when known.
+         */signerPrimaryFingerprint: String?, 
+        /**
+         * Signing subkey fingerprint when a non-primary signer key is selected.
+         */signingKeyFingerprint: String?) {
+        self.status = status
+        self.certificationKind = certificationKind
+        self.signerPrimaryFingerprint = signerPrimaryFingerprint
+        self.signingKeyFingerprint = signingKeyFingerprint
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension CertificateSignatureResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCertificateSignatureResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertificateSignatureResult {
+        return
+            try CertificateSignatureResult(
+                status: FfiConverterTypeCertificateSignatureStatus.read(from: &buf), 
+                certificationKind: FfiConverterOptionTypeCertificationKind.read(from: &buf), 
+                signerPrimaryFingerprint: FfiConverterOptionString.read(from: &buf), 
+                signingKeyFingerprint: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CertificateSignatureResult, into buf: inout [UInt8]) {
+        FfiConverterTypeCertificateSignatureStatus.write(value.status, into: &buf)
+        FfiConverterOptionTypeCertificationKind.write(value.certificationKind, into: &buf)
+        FfiConverterOptionString.write(value.signerPrimaryFingerprint, into: &buf)
+        FfiConverterOptionString.write(value.signingKeyFingerprint, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertificateSignatureResult_lift(_ buf: RustBuffer) throws -> CertificateSignatureResult {
+    return try FfiConverterTypeCertificateSignatureResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertificateSignatureResult_lower(_ value: CertificateSignatureResult) -> RustBuffer {
+    return FfiConverterTypeCertificateSignatureResult.lower(value)
 }
 
 
@@ -2610,6 +2758,167 @@ public func FfiConverterTypeCertificateMergeOutcome_lower(_ value: CertificateMe
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * Status for certificate-signature verification results.
+ */
+
+public enum CertificateSignatureStatus: Equatable, Hashable {
+    
+    case valid
+    case invalid
+    case signerMissing
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension CertificateSignatureStatus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCertificateSignatureStatus: FfiConverterRustBuffer {
+    typealias SwiftType = CertificateSignatureStatus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertificateSignatureStatus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .valid
+        
+        case 2: return .invalid
+        
+        case 3: return .signerMissing
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: CertificateSignatureStatus, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .valid:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .invalid:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .signerMissing:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertificateSignatureStatus_lift(_ buf: RustBuffer) throws -> CertificateSignatureStatus {
+    return try FfiConverterTypeCertificateSignatureStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertificateSignatureStatus_lower(_ value: CertificateSignatureStatus) -> RustBuffer {
+    return FfiConverterTypeCertificateSignatureStatus.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * OpenPGP certification signature kinds preserved across the FFI boundary.
+ */
+
+public enum CertificationKind: Equatable, Hashable {
+    
+    case generic
+    case persona
+    case casual
+    case positive
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension CertificationKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCertificationKind: FfiConverterRustBuffer {
+    typealias SwiftType = CertificationKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertificationKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .generic
+        
+        case 2: return .persona
+        
+        case 3: return .casual
+        
+        case 4: return .positive
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: CertificationKind, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .generic:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .persona:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .casual:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .positive:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertificationKind_lift(_ buf: RustBuffer) throws -> CertificationKind {
+    return try FfiConverterTypeCertificationKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCertificationKind_lower(_ value: CertificationKind) -> RustBuffer {
+    return FfiConverterTypeCertificationKind.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Encryption profile selection.
  * Profile A (Universal): v4, Ed25519+X25519, SEIPDv1, Iterated+Salted S2K.
  * Profile B (Advanced): v6, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id S2K.
@@ -3362,6 +3671,30 @@ fileprivate struct FfiConverterOptionTypeProgressReporter: FfiConverterRustBuffe
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeCertificationKind: FfiConverterRustBuffer {
+    typealias SwiftType = CertificationKind?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeCertificationKind.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeCertificationKind.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeSignatureStatus: FfiConverterRustBuffer {
     typealias SwiftType = SignatureStatus?
 
@@ -3502,6 +3835,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation() != 46816) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification() != 13160) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation() != 41268) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -3551,6 +3887,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file() != 4775) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_direct_key_signature() != 31324) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_user_id_binding_signature() != 57491) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_progressreporter_on_progress() != 45018) {

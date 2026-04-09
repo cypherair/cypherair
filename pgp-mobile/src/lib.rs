@@ -5,6 +5,7 @@
 //! All Sequoia internal types are hidden behind this boundary.
 
 pub mod armor;
+pub mod cert_signature;
 pub mod decrypt;
 pub mod encrypt;
 pub mod error;
@@ -21,6 +22,7 @@ use sequoia_openpgp as openpgp;
 use zeroize::Zeroizing;
 
 use crate::armor::ArmorKind;
+use crate::cert_signature::{CertificateSignatureResult, CertificationKind};
 use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
 use crate::keys::{
@@ -269,6 +271,51 @@ impl PgpEngine {
         verification_keys: Vec<Vec<u8>>,
     ) -> Result<VerifyResult, PgpError> {
         verify::verify_detached(&data, &signature, &verification_keys)
+    }
+
+    // ── Certificate Signature Verification ────────────────────────
+
+    /// Verify a direct-key signature against a target certificate using crypto-only semantics.
+    pub fn verify_direct_key_signature(
+        &self,
+        signature: Vec<u8>,
+        target_cert: Vec<u8>,
+        candidate_signers: Vec<Vec<u8>>,
+    ) -> Result<CertificateSignatureResult, PgpError> {
+        cert_signature::verify_direct_key_signature(&signature, &target_cert, &candidate_signers)
+    }
+
+    /// Verify a User ID binding signature against a target certificate using crypto-only semantics.
+    pub fn verify_user_id_binding_signature(
+        &self,
+        signature: Vec<u8>,
+        target_cert: Vec<u8>,
+        user_id_data: Vec<u8>,
+        candidate_signers: Vec<Vec<u8>>,
+    ) -> Result<CertificateSignatureResult, PgpError> {
+        cert_signature::verify_user_id_binding_signature(
+            &signature,
+            &target_cert,
+            &user_id_data,
+            &candidate_signers,
+        )
+    }
+
+    /// Generate raw certification-signature bytes for a specific User ID on the target certificate.
+    pub fn generate_user_id_certification(
+        &self,
+        signer_secret_cert: Vec<u8>,
+        target_cert: Vec<u8>,
+        user_id_data: Vec<u8>,
+        certification_kind: CertificationKind,
+    ) -> Result<Vec<u8>, PgpError> {
+        let signer_secret_cert = Zeroizing::new(signer_secret_cert);
+        cert_signature::generate_user_id_certification(
+            &signer_secret_cert,
+            &target_cert,
+            &user_id_data,
+            certification_kind,
+        )
     }
 
     // ── Key Export/Import ────────────────────────────────────────────
