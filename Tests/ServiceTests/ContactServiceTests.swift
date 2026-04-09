@@ -25,6 +25,10 @@ final class ContactServiceTests: XCTestCase {
         super.tearDown()
     }
 
+    private func loadFixture(_ name: String) throws -> Data {
+        try FixtureLoader.loadData(name, ext: "gpg")
+    }
+
     // MARK: - Load Contacts
 
     func test_loadContacts_emptyDirectory_returnsEmpty() throws {
@@ -170,6 +174,179 @@ final class ContactServiceTests: XCTestCase {
 
         XCTAssertTrue(updatedContact.isVerified)
         XCTAssertTrue(contactService.contact(forFingerprint: updatedContact.fingerprint)?.isVerified == true)
+    }
+
+    func test_addContact_sameFingerprintPrimaryUserIdUpdate_returnsUpdatedAndRefreshesDisplayIdentity() throws {
+        let base = try loadFixture("merge_primary_uid_base")
+        let update = try loadFixture("merge_primary_uid_update")
+
+        let baseInfo = try engine.parseKeyInfo(keyData: base)
+        XCTAssertEqual(baseInfo.userId, "aaaaa")
+
+        _ = try contactService.addContact(publicKeyData: base)
+        let result = try contactService.addContact(publicKeyData: update)
+
+        guard case .updated(let updatedContact) = result else {
+            return XCTFail("Expected .updated, got \(result)")
+        }
+
+        XCTAssertEqual(updatedContact.fingerprint, baseInfo.fingerprint)
+        XCTAssertEqual(updatedContact.userId, "bbbbb")
+        XCTAssertEqual(updatedContact.displayName, "bbbbb")
+        XCTAssertEqual(contactService.contacts.count, 1)
+
+        let storedData = try Data(contentsOf: tempDir.appendingPathComponent("\(baseInfo.fingerprint).gpg"))
+        XCTAssertEqual(try engine.parseKeyInfo(keyData: storedData).userId, "bbbbb")
+    }
+
+    func test_addContact_sameFingerprintPrimaryUserIdCollision_returnsKeyUpdateDetectedWithoutPersistingMerge() throws {
+        let base = try loadFixture("merge_primary_uid_base")
+        let update = try loadFixture("merge_primary_uid_update")
+        let conflictingKey = try engine.generateKey(
+            name: "bbbbb",
+            email: nil,
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        let originalInfo = try engine.parseKeyInfo(keyData: base)
+
+        _ = try contactService.addContact(publicKeyData: base)
+        _ = try contactService.addContact(publicKeyData: conflictingKey.publicKeyData)
+
+        let result = try contactService.addContact(publicKeyData: update)
+        guard case .keyUpdateDetected(let newContact, let existingContact, let keyData) = result else {
+            return XCTFail("Expected .keyUpdateDetected, got \(result)")
+        }
+
+        XCTAssertEqual(newContact.fingerprint, originalInfo.fingerprint)
+        XCTAssertEqual(newContact.userId, "bbbbb")
+        XCTAssertEqual(existingContact.fingerprint, conflictingKey.fingerprint)
+        XCTAssertEqual(contactService.contacts.count, 2)
+        XCTAssertEqual(contactService.contact(forFingerprint: originalInfo.fingerprint)?.userId, "aaaaa")
+        XCTAssertEqual(try engine.parseKeyInfo(keyData: keyData).userId, "bbbbb")
+
+        let storedData = try Data(contentsOf: tempDir.appendingPathComponent("\(originalInfo.fingerprint).gpg"))
+        XCTAssertEqual(try engine.parseKeyInfo(keyData: storedData).userId, "aaaaa")
+    }
+
+    func test_confirmKeyUpdate_sameFingerprintMergeCollisionRemovesConflictingContact() throws {
+        let base = try loadFixture("merge_primary_uid_base")
+        let update = try loadFixture("merge_primary_uid_update")
+        let conflictingKey = try engine.generateKey(
+            name: "bbbbb",
+            email: nil,
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        let originalInfo = try engine.parseKeyInfo(keyData: base)
+
+        _ = try contactService.addContact(publicKeyData: base)
+        _ = try contactService.addContact(publicKeyData: conflictingKey.publicKeyData)
+
+        let result = try contactService.addContact(publicKeyData: update)
+        guard case .keyUpdateDetected(let newContact, let existingContact, let keyData) = result else {
+            return XCTFail("Expected .keyUpdateDetected, got \(result)")
+        }
+
+        try contactService.confirmKeyUpdate(
+            existingFingerprint: existingContact.fingerprint,
+            newContact: newContact,
+            keyData: keyData
+        )
+
+        XCTAssertEqual(contactService.contacts.count, 1)
+        let survivingContact = try XCTUnwrap(contactService.contact(forFingerprint: originalInfo.fingerprint))
+        XCTAssertEqual(survivingContact.userId, "bbbbb")
+        XCTAssertTrue(survivingContact.isVerified)
+        XCTAssertFalse(contactService.contacts.contains { $0.fingerprint == existingContact.fingerprint })
+
+        let survivingFile = tempDir.appendingPathComponent("\(originalInfo.fingerprint).gpg")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: survivingFile.path))
+        XCTAssertEqual(
+            try engine.parseKeyInfo(keyData: Data(contentsOf: survivingFile)).userId,
+            "bbbbb"
+        )
+
+        let removedFile = tempDir.appendingPathComponent("\(existingContact.fingerprint).gpg")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: removedFile.path))
+    }
+
+    func test_addContact_sameFingerprintRevocationUpdate_profileA_refreshesRevocationState() throws {
+        let base = try loadFixture("merge_revocation_profile_a_base")
+        let update = try loadFixture("merge_revocation_profile_a_update")
+
+        _ = try contactService.addContact(publicKeyData: base)
+        let result = try contactService.addContact(publicKeyData: update)
+
+        guard case .updated(let updatedContact) = result else {
+            return XCTFail("Expected .updated, got \(result)")
+        }
+
+        XCTAssertTrue(updatedContact.isRevoked)
+        XCTAssertFalse(updatedContact.canEncryptTo)
+
+        let restarted = ContactService(engine: engine, contactsDirectory: tempDir)
+        try restarted.loadContacts()
+        XCTAssertTrue(restarted.contacts[0].isRevoked)
+    }
+
+    func test_addContact_sameFingerprintRevocationUpdate_profileB_refreshesRevocationState() throws {
+        let base = try loadFixture("merge_revocation_profile_b_base")
+        let update = try loadFixture("merge_revocation_profile_b_update")
+
+        _ = try contactService.addContact(publicKeyData: base)
+        let result = try contactService.addContact(publicKeyData: update)
+
+        guard case .updated(let updatedContact) = result else {
+            return XCTFail("Expected .updated, got \(result)")
+        }
+
+        XCTAssertTrue(updatedContact.isRevoked)
+        XCTAssertFalse(updatedContact.canEncryptTo)
+        XCTAssertEqual(updatedContact.profile, .advanced)
+    }
+
+    func test_addContact_sameFingerprintEncryptionSubkeyUpdate_profileA_refreshesEncryptionCapability() throws {
+        let base = try loadFixture("merge_add_encryption_subkey_profile_a_base")
+        let update = try loadFixture("merge_add_encryption_subkey_profile_a_update")
+
+        let added = try contactService.addContact(publicKeyData: base)
+        guard case .added(let baseContact) = added else {
+            return XCTFail("Expected .added, got \(added)")
+        }
+        XCTAssertFalse(baseContact.hasEncryptionSubkey)
+        XCTAssertFalse(baseContact.canEncryptTo)
+
+        let result = try contactService.addContact(publicKeyData: update)
+        guard case .updated(let updatedContact) = result else {
+            return XCTFail("Expected .updated, got \(result)")
+        }
+
+        XCTAssertTrue(updatedContact.hasEncryptionSubkey)
+        XCTAssertTrue(updatedContact.canEncryptTo)
+    }
+
+    func test_addContact_sameFingerprintEncryptionSubkeyUpdate_profileB_refreshesEncryptionCapability() throws {
+        let base = try loadFixture("merge_add_encryption_subkey_profile_b_base")
+        let update = try loadFixture("merge_add_encryption_subkey_profile_b_update")
+
+        let added = try contactService.addContact(publicKeyData: base)
+        guard case .added(let baseContact) = added else {
+            return XCTFail("Expected .added, got \(added)")
+        }
+        XCTAssertFalse(baseContact.hasEncryptionSubkey)
+        XCTAssertFalse(baseContact.canEncryptTo)
+
+        let result = try contactService.addContact(publicKeyData: update)
+        guard case .updated(let updatedContact) = result else {
+            return XCTFail("Expected .updated, got \(result)")
+        }
+
+        XCTAssertTrue(updatedContact.hasEncryptionSubkey)
+        XCTAssertTrue(updatedContact.canEncryptTo)
+        XCTAssertEqual(updatedContact.profile, .advanced)
     }
 
     func test_addContact_sameUserIdDifferentFingerprint_returnsKeyUpdateDetected() throws {

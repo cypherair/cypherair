@@ -87,6 +87,43 @@ Impact:
 - The hosted Swift unit-test job can fail before test execution because the runner OS is older than the app/test deployment target.
 - Local macOS validation remains the source of truth until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 
+## 2.2 Rust Release Artifacts and Xcode Validation
+
+Rust changes under `pgp-mobile/src` do **not** automatically refresh the Rust `release` static libraries that Xcode links for Swift and FFI tests.
+
+Today, the Xcode project links the target-specific `release` archives under:
+
+- `pgp-mobile/target/aarch64-apple-ios/release`
+- `pgp-mobile/target/aarch64-apple-ios-sim/release`
+- `pgp-mobile/target/aarch64-apple-darwin/release`
+
+Implications:
+
+- `cargo test --manifest-path pgp-mobile/Cargo.toml` is still required for Rust validation, but it does **not** guarantee that the binaries used by `xcodebuild test` have been refreshed.
+- If a Rust change can affect Swift-visible behavior, FFI behavior, or any UniFFI-backed service logic, rebuild the Rust `release` artifacts before running `xcodebuild test`.
+- If the UniFFI surface or generated bindings changed, use `./build-xcframework.sh --release` so the static libraries, generated bindings, headers, and XCFramework stay in sync.
+- If the UniFFI surface did **not** change, rebuilding the target-specific Rust `release` archives is sufficient for Xcode validation.
+
+Recommended validation flow for Rust-backed behavior changes:
+
+```bash
+# 1. Validate Rust behavior
+cargo test --manifest-path pgp-mobile/Cargo.toml
+
+# 2. Refresh the Rust release artifacts that Xcode links
+./build-xcframework.sh --release
+
+# 3. Validate Swift/FFI behavior
+xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
+    -destination 'platform=macOS'
+```
+
+Typical stale-artifact symptom:
+
+- Rust tests reflect the new behavior, but Swift unit tests, FFI integration tests, or app-side debugging still show the old behavior.
+
+If that happens, first suspect stale Rust `release` artifacts rather than stale Swift source.
+
 ## 3. Profile Test Matrix
 
 **Every crypto test must run for both profiles unless explicitly scoped.**

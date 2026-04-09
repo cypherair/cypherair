@@ -17,6 +17,10 @@ final class FFIIntegrationTests: XCTestCase {
         super.tearDown()
     }
 
+    private func loadFixture(_ name: String) throws -> Data {
+        try FixtureLoader.loadData(name, ext: "gpg")
+    }
+
     // MARK: - C5.1 Binary Round-Trip
 
     /// C5.1: Generate key → encrypt → decrypt. Verify Data↔Vec<u8> integrity.
@@ -266,6 +270,87 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertEqual(result.outcome, .noOp)
         let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
         XCTAssertEqual(info.fingerprint, generated.fingerprint)
+    }
+
+    func test_certificateMergeUpdate_primaryUserIdSwitchUsesPrimaryIdentity() throws {
+        let base = try loadFixture("merge_primary_uid_base")
+        let update = try loadFixture("merge_primary_uid_update")
+
+        let baseInfo = try engine.parseKeyInfo(keyData: base)
+        XCTAssertEqual(baseInfo.userId, "aaaaa")
+
+        let result = try engine.mergePublicCertificateUpdate(
+            existingCert: base,
+            incomingCertOrUpdate: update
+        )
+
+        XCTAssertEqual(result.outcome, .updated)
+        let mergedInfo = try engine.parseKeyInfo(keyData: result.mergedCertData)
+        XCTAssertEqual(mergedInfo.userId, "bbbbb")
+    }
+
+    func test_certificateMergeUpdate_profileA_revocationFixtureReturnsUpdated() throws {
+        let base = try loadFixture("merge_revocation_profile_a_base")
+        let update = try loadFixture("merge_revocation_profile_a_update")
+
+        let result = try engine.mergePublicCertificateUpdate(
+            existingCert: base,
+            incomingCertOrUpdate: update
+        )
+
+        XCTAssertEqual(result.outcome, .updated)
+        let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
+        XCTAssertTrue(info.isRevoked)
+        XCTAssertEqual(info.profile, .universal)
+    }
+
+    func test_certificateMergeUpdate_profileB_revocationFixtureReturnsUpdated() throws {
+        let base = try loadFixture("merge_revocation_profile_b_base")
+        let update = try loadFixture("merge_revocation_profile_b_update")
+
+        let result = try engine.mergePublicCertificateUpdate(
+            existingCert: base,
+            incomingCertOrUpdate: update
+        )
+
+        XCTAssertEqual(result.outcome, .updated)
+        let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
+        XCTAssertTrue(info.isRevoked)
+        XCTAssertEqual(info.profile, .advanced)
+    }
+
+    func test_certificateMergeUpdate_profileA_encryptionSubkeyFixtureReturnsUpdated() throws {
+        let base = try loadFixture("merge_add_encryption_subkey_profile_a_base")
+        let update = try loadFixture("merge_add_encryption_subkey_profile_a_update")
+
+        XCTAssertFalse(try engine.parseKeyInfo(keyData: base).hasEncryptionSubkey)
+
+        let result = try engine.mergePublicCertificateUpdate(
+            existingCert: base,
+            incomingCertOrUpdate: update
+        )
+
+        XCTAssertEqual(result.outcome, .updated)
+        let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
+        XCTAssertTrue(info.hasEncryptionSubkey)
+        XCTAssertEqual(info.profile, .universal)
+    }
+
+    func test_certificateMergeUpdate_profileB_encryptionSubkeyFixtureReturnsUpdated() throws {
+        let base = try loadFixture("merge_add_encryption_subkey_profile_b_base")
+        let update = try loadFixture("merge_add_encryption_subkey_profile_b_update")
+
+        XCTAssertFalse(try engine.parseKeyInfo(keyData: base).hasEncryptionSubkey)
+
+        let result = try engine.mergePublicCertificateUpdate(
+            existingCert: base,
+            incomingCertOrUpdate: update
+        )
+
+        XCTAssertEqual(result.outcome, .updated)
+        let info = try engine.parseKeyInfo(keyData: result.mergedCertData)
+        XCTAssertTrue(info.hasEncryptionSubkey)
+        XCTAssertEqual(info.profile, .advanced)
     }
 
     // MARK: - C5.3 Error Enum Mapping

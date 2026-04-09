@@ -1,8 +1,9 @@
+use std::cmp::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use openpgp::cert::prelude::*;
 use openpgp::parse::Parse;
-use openpgp::policy::StandardPolicy;
+use openpgp::policy::{HashAlgoSecurity, Policy, StandardPolicy};
 use openpgp::serialize::Serialize;
 use openpgp::types::RevocationStatus;
 use sequoia_openpgp as openpgp;
@@ -54,7 +55,7 @@ pub struct KeyInfo {
     pub fingerprint: String,
     /// Key version (4 or 6).
     pub key_version: u8,
-    /// Primary User ID string (name + email).
+    /// Policy-selected primary User ID string for display and identity matching.
     pub user_id: Option<String>,
     /// Whether the key has a valid encryption subkey.
     pub has_encryption_subkey: bool,
@@ -88,6 +89,14 @@ pub struct CertificateMergeResult {
     pub merged_cert_data: Vec<u8>,
     /// Whether the merge materially changed the public certificate.
     pub outcome: CertificateMergeOutcome,
+}
+
+#[derive(Debug)]
+struct UserIdCandidate {
+    user_id_bytes: Vec<u8>,
+    revoked: bool,
+    primary: bool,
+    signature_creation_time: SystemTime,
 }
 
 /// Generate a new key pair with the specified profile.
@@ -211,21 +220,11 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
     let fingerprint = cert.fingerprint().to_hex().to_lowercase();
     let key_version = cert.primary_key().key().version();
 
-    // Extract primary User ID — prefer policy-validated UID, fall back to raw for
-    // expired/revoked certs that still need to display a UID.
-    let user_id = cert
-        .with_policy(&policy, Some(now))
-        .ok()
-        .and_then(|valid_cert| {
-            valid_cert.userids().next().map(|uid| {
-                String::from_utf8_lossy(uid.component().value()).to_string()
-            })
-        })
-        .or_else(|| {
-            cert.userids().next().map(|uid| {
-                String::from_utf8_lossy(uid.component().value()).to_string()
-            })
-        });
+    // Extract the primary User ID using Sequoia's policy-selected value when the
+    // certificate is fully valid. If the certificate is expired or revoked, fall back
+    // to a best-effort ranking that keeps display identity aligned with Sequoia's
+    // primary-selection rules as closely as possible.
+    let user_id = select_display_user_id(&cert, &policy, now);
 
     // Check for valid encryption subkey
     let has_encryption_subkey = cert
@@ -312,6 +311,95 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         subkey_algo,
         expiry_timestamp,
     })
+}
+
+fn select_display_user_id(
+    cert: &openpgp::Cert,
+    policy: &StandardPolicy,
+    now: SystemTime,
+) -> Option<String> {
+    if let Ok(valid_cert) = cert.with_policy(policy, Some(now)) {
+        if let Ok(primary_user_id) = valid_cert.primary_userid() {
+            return Some(user_id_bytes_to_string(primary_user_id.userid().value()));
+        }
+    }
+
+    select_ranked_user_id(cert, policy, Some(now))
+        .or_else(|| select_ranked_user_id(cert, policy, None))
+        .or_else(|| {
+            cert.userids()
+                .next()
+                .map(|user_id| user_id_bytes_to_string(user_id.userid().value()))
+        })
+}
+
+fn select_ranked_user_id(
+    cert: &openpgp::Cert,
+    policy: &StandardPolicy,
+    now: Option<SystemTime>,
+) -> Option<String> {
+    cert.userids()
+        .filter_map(|user_id| make_user_id_candidate(user_id, policy, now))
+        .max_by(compare_user_id_candidates)
+        .map(|candidate| user_id_bytes_to_string(&candidate.user_id_bytes))
+}
+
+fn make_user_id_candidate(
+    user_id: UserIDAmalgamation<'_>,
+    policy: &StandardPolicy,
+    now: Option<SystemTime>,
+) -> Option<UserIdCandidate> {
+    let signature = match now {
+        Some(time) => user_id
+            .binding_signature(policy, Some(time))
+            .ok()
+            .or_else(|| user_id.self_signatures().next())?,
+        None => user_id.self_signatures().next()?,
+    };
+
+    let signature_creation_time = signature.signature_creation_time()?;
+    let latest_self_revocation_time = user_id
+        .self_revocations()
+        .filter(|signature| {
+            policy
+                .signature(signature, HashAlgoSecurity::SecondPreImageResistance)
+                .is_ok()
+        })
+        .filter_map(|signature| signature.signature_creation_time())
+        .max();
+
+    Some(UserIdCandidate {
+        user_id_bytes: user_id.userid().value().to_vec(),
+        revoked: latest_self_revocation_time
+            .map(|revocation_time| revocation_time >= signature_creation_time)
+            .unwrap_or(false),
+        primary: signature.primary_userid().unwrap_or(false),
+        signature_creation_time,
+    })
+}
+
+fn compare_user_id_candidates(left: &UserIdCandidate, right: &UserIdCandidate) -> Ordering {
+    match (left.revoked, right.revoked) {
+        (false, true) => return Ordering::Greater,
+        (true, false) => return Ordering::Less,
+        _ => {}
+    }
+
+    match left.primary.cmp(&right.primary) {
+        Ordering::Equal => {}
+        ordering => return ordering,
+    }
+
+    match left.signature_creation_time.cmp(&right.signature_creation_time) {
+        Ordering::Equal => {}
+        ordering => return ordering,
+    }
+
+    left.user_id_bytes.cmp(&right.user_id_bytes)
+}
+
+fn user_id_bytes_to_string(user_id: &[u8]) -> String {
+    String::from_utf8_lossy(user_id).to_string()
 }
 
 fn serialize_public_cert(cert: &openpgp::Cert) -> Result<Vec<u8>, PgpError> {

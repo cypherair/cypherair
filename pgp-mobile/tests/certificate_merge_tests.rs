@@ -1,6 +1,8 @@
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, CertificateMergeOutcome, KeyProfile};
 use sequoia_openpgp as openpgp;
+use std::fs;
+use std::path::PathBuf;
 
 use openpgp::Packet;
 use openpgp::packet::UserID;
@@ -26,6 +28,16 @@ fn serialize_public_cert(cert: &openpgp::Cert) -> Vec<u8> {
     cert.serialize(&mut bytes)
         .expect("public cert serialization should succeed");
     bytes
+}
+
+fn load_fixture(name: &str) -> Vec<u8> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join(name);
+    fs::read(&path).unwrap_or_else(|error| {
+        panic!("Failed to load fixture {}: {}", path.display(), error)
+    })
 }
 
 fn make_revocation_update(generated: &keys::GeneratedKey) -> Vec<u8> {
@@ -247,6 +259,126 @@ fn test_merge_public_certificate_absorbs_new_subkey() {
         existing_cert.keys().subkeys().count() + 1,
         "merged cert should contain one additional subkey"
     );
+}
+
+#[test]
+fn test_parse_key_info_prefers_primary_user_id_after_merge_fixture() {
+    let base = load_fixture("merge_primary_uid_base.gpg");
+    let update = load_fixture("merge_primary_uid_update.gpg");
+
+    let result = keys::merge_public_certificate_update(&base, &update)
+        .expect("primary user id merge should succeed");
+
+    assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
+
+    let merged_cert = openpgp::Cert::from_bytes(&result.merged_cert_data)
+        .expect("merged cert should parse");
+    let policy = StandardPolicy::new();
+    assert_eq!(
+        merged_cert.userids().next().unwrap().userid().value(),
+        b"aaaaa",
+        "raw user id order should keep the original user id first"
+    );
+    assert_eq!(
+        merged_cert.with_policy(&policy, None)
+            .expect("merged cert should validate")
+            .primary_userid()
+            .expect("merged cert should have a primary user id")
+            .userid()
+            .value(),
+        b"bbbbb",
+        "Sequoia should pick the newer primary identity"
+    );
+
+    let info = keys::parse_key_info(&result.merged_cert_data)
+        .expect("merged cert should parse via parse_key_info");
+    assert_eq!(info.user_id.as_deref(), Some("bbbbb"));
+}
+
+#[test]
+fn test_parse_key_info_revoked_cert_uses_relaxed_display_user_id_fallback() {
+    let generated = keys::generate_key_with_profile(
+        "Expired Display".to_string(),
+        Some("expired-display@example.com".to_string()),
+        Some(1),
+        KeyProfile::Universal,
+    )
+    .expect("short-lived key generation should succeed");
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
+    let info = keys::parse_key_info(&generated.public_key_data)
+        .expect("expired cert should still parse for display");
+    assert_eq!(
+        info.user_id.as_deref(),
+        Some("Expired Display <expired-display@example.com>")
+    );
+    assert!(info.is_expired);
+}
+
+#[test]
+fn test_merge_public_certificate_absorbs_revocation_update_profile_a_fixture() {
+    let base = load_fixture("merge_revocation_profile_a_base.gpg");
+    let update = load_fixture("merge_revocation_profile_a_update.gpg");
+
+    let result = keys::merge_public_certificate_update(&base, &update)
+        .expect("profile A revocation merge should succeed");
+
+    assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
+    let info = keys::parse_key_info(&result.merged_cert_data)
+        .expect("merged profile A revocation cert should parse");
+    assert!(info.is_revoked);
+    assert_eq!(info.profile, KeyProfile::Universal);
+}
+
+#[test]
+fn test_merge_public_certificate_absorbs_revocation_update_profile_b_fixture() {
+    let base = load_fixture("merge_revocation_profile_b_base.gpg");
+    let update = load_fixture("merge_revocation_profile_b_update.gpg");
+
+    let result = keys::merge_public_certificate_update(&base, &update)
+        .expect("profile B revocation merge should succeed");
+
+    assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
+    let info = keys::parse_key_info(&result.merged_cert_data)
+        .expect("merged profile B revocation cert should parse");
+    assert!(info.is_revoked);
+    assert_eq!(info.profile, KeyProfile::Advanced);
+}
+
+#[test]
+fn test_merge_public_certificate_adds_encryption_subkey_profile_a_fixture() {
+    let base = load_fixture("merge_add_encryption_subkey_profile_a_base.gpg");
+    let update = load_fixture("merge_add_encryption_subkey_profile_a_update.gpg");
+
+    let base_info = keys::parse_key_info(&base).expect("profile A base cert should parse");
+    assert!(!base_info.has_encryption_subkey);
+
+    let result = keys::merge_public_certificate_update(&base, &update)
+        .expect("profile A subkey merge should succeed");
+
+    assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
+    let merged_info = keys::parse_key_info(&result.merged_cert_data)
+        .expect("profile A merged cert should parse");
+    assert!(merged_info.has_encryption_subkey);
+    assert_eq!(merged_info.profile, KeyProfile::Universal);
+}
+
+#[test]
+fn test_merge_public_certificate_adds_encryption_subkey_profile_b_fixture() {
+    let base = load_fixture("merge_add_encryption_subkey_profile_b_base.gpg");
+    let update = load_fixture("merge_add_encryption_subkey_profile_b_update.gpg");
+
+    let base_info = keys::parse_key_info(&base).expect("profile B base cert should parse");
+    assert!(!base_info.has_encryption_subkey);
+
+    let result = keys::merge_public_certificate_update(&base, &update)
+        .expect("profile B subkey merge should succeed");
+
+    assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
+    let merged_info = keys::parse_key_info(&result.merged_cert_data)
+        .expect("profile B merged cert should parse");
+    assert!(merged_info.has_encryption_subkey);
+    assert_eq!(merged_info.profile, KeyProfile::Advanced);
 }
 
 #[test]
