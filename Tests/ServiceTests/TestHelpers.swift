@@ -94,7 +94,8 @@ enum TestHelpers {
 
     // MARK: - Full Service Stack Factory
 
-    /// Create a complete service stack (KeyManagement + Contact + Encryption + Decryption + Signing)
+    /// Create a complete service stack (KeyManagement + Contact + Encryption + Decryption
+    /// + PasswordMessage + Signing)
     /// backed by mocks. Useful for end-to-end integration tests.
     static func makeServiceStack(
         engine: PgpEngine = PgpEngine(),
@@ -105,6 +106,11 @@ enum TestHelpers {
 
         let encryptionSvc = EncryptionService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)
         let decryptionSvc = DecryptionService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)
+        let passwordMessageSvc = PasswordMessageService(
+            engine: engine,
+            keyManagement: keyMgmt,
+            contactService: contactSvc
+        )
         let signingSvc = SigningService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)
 
         return ServiceStack(
@@ -113,6 +119,7 @@ enum TestHelpers {
             contactService: contactSvc,
             encryptionService: encryptionSvc,
             decryptionService: decryptionSvc,
+            passwordMessageService: passwordMessageSvc,
             signingService: signingSvc,
             mockSE: mockSE,
             mockKC: mockKC,
@@ -128,6 +135,7 @@ enum TestHelpers {
         let contactService: ContactService
         let encryptionService: EncryptionService
         let decryptionService: DecryptionService
+        let passwordMessageService: PasswordMessageService
         let signingService: SigningService
         let mockSE: MockSecureEnclave
         let mockKC: MockKeychain

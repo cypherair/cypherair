@@ -143,7 +143,7 @@ pub(crate) fn setup_signer<'a>(
 }
 
 /// Write plaintext to the message pipeline and finalize.
-fn write_and_finalize(message: Message, plaintext: &[u8]) -> Result<(), PgpError> {
+pub(crate) fn write_and_finalize(message: Message, plaintext: &[u8]) -> Result<(), PgpError> {
     let mut literal =
         LiteralWriter::new(message)
             .build()

@@ -45,6 +45,19 @@ pub enum SignatureStatus {
     Expired,
 }
 
+pub(crate) fn parse_verification_certs(
+    verification_keys: &[Vec<u8>],
+) -> Result<Vec<openpgp::Cert>, PgpError> {
+    let mut verifier_certs = Vec::new();
+    for key_data in verification_keys {
+        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Invalid verification key: {e}"),
+        })?;
+        verifier_certs.push(cert);
+    }
+    Ok(verifier_certs)
+}
+
 /// Parse the recipients of an encrypted message without decrypting.
 /// This is Phase 1 of the two-phase decryption protocol — no authentication needed.
 ///
@@ -212,13 +225,7 @@ pub fn decrypt<K: AsRef<[u8]>>(
     }
 
     // Parse verification key certificates
-    let mut verifier_certs = Vec::new();
-    for key_data in verification_keys {
-        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
-            reason: format!("Invalid verification key: {e}"),
-        })?;
-        verifier_certs.push(cert);
-    }
+    let verifier_certs = parse_verification_certs(verification_keys)?;
 
     let helper = DecryptHelper {
         policy: &policy,
@@ -252,6 +259,42 @@ pub fn decrypt<K: AsRef<[u8]>>(
     })
 }
 
+pub(crate) fn decrypt_with_fixed_session_key(
+    ciphertext: &[u8],
+    session_key_algo: Option<SymmetricAlgorithm>,
+    session_key: SessionKey,
+    verifier_certs: &[openpgp::Cert],
+) -> Result<DecryptResult, PgpError> {
+    let policy = StandardPolicy::new();
+    let helper = FixedSessionKeyDecryptHelper {
+        verifier_certs,
+        signature_status: None,
+        signer_fingerprint: None,
+        session_key,
+        session_key_algo,
+    };
+
+    let mut decryptor = DecryptorBuilder::from_bytes(ciphertext)
+        .map_err(|e| PgpError::CorruptData {
+            reason: format!("Failed to parse message: {e}"),
+        })?
+        .with_policy(&policy, None, helper)
+        .map_err(classify_decrypt_error)?;
+
+    let mut plaintext = Vec::new();
+    if let Err(e) = decryptor.read_to_end(&mut plaintext) {
+        plaintext.zeroize();
+        return Err(classify_decrypt_error(e.into()));
+    }
+
+    let helper = decryptor.into_helper();
+    Ok(DecryptResult {
+        plaintext,
+        signature_status: helper.signature_status,
+        signer_fingerprint: helper.signer_fingerprint,
+    })
+}
+
 /// Helper struct for Sequoia's streaming decryption API.
 /// `pub(crate)` so that `streaming.rs` can construct this for file-based decryption.
 pub(crate) struct DecryptHelper<'a> {
@@ -260,6 +303,14 @@ pub(crate) struct DecryptHelper<'a> {
     pub(crate) verifier_certs: &'a [openpgp::Cert],
     pub(crate) signature_status: Option<SignatureStatus>,
     pub(crate) signer_fingerprint: Option<String>,
+}
+
+struct FixedSessionKeyDecryptHelper<'a> {
+    verifier_certs: &'a [openpgp::Cert],
+    signature_status: Option<SignatureStatus>,
+    signer_fingerprint: Option<String>,
+    session_key: SessionKey,
+    session_key_algo: Option<SymmetricAlgorithm>,
 }
 
 impl<'a> VerificationHelper for DecryptHelper<'a> {
@@ -286,48 +337,72 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
     // during decryption, signature verification is "graded" — decryption succeeds
     // regardless of signature status.
     fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
-        for layer in structure {
-            match layer {
-                MessageLayer::Encryption { .. } => {}
-                MessageLayer::Compression { .. } => {}
-                MessageLayer::SignatureGroup { results } => {
-                    for result in results {
-                        match result {
-                            Ok(GoodChecksum { ka, .. }) => {
-                                self.signature_status = Some(SignatureStatus::Valid);
-                                self.signer_fingerprint =
+        apply_signature_results(
+            structure,
+            &mut self.signature_status,
+            &mut self.signer_fingerprint,
+        )
+    }
+}
+
+impl<'a> VerificationHelper for FixedSessionKeyDecryptHelper<'a> {
+    fn get_certs(&mut self, _ids: &[openpgp::KeyHandle]) -> openpgp::Result<Vec<openpgp::Cert>> {
+        Ok(self.verifier_certs.to_vec())
+    }
+
+    fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
+        apply_signature_results(
+            structure,
+            &mut self.signature_status,
+            &mut self.signer_fingerprint,
+        )
+    }
+}
+
+fn apply_signature_results(
+    structure: MessageStructure,
+    signature_status: &mut Option<SignatureStatus>,
+    signer_fingerprint: &mut Option<String>,
+) -> openpgp::Result<()> {
+    for layer in structure {
+        match layer {
+            MessageLayer::Encryption { .. } => {}
+            MessageLayer::Compression { .. } => {}
+            MessageLayer::SignatureGroup { results } => {
+                for result in results {
+                    match result {
+                        Ok(GoodChecksum { ka, .. }) => {
+                            *signature_status = Some(SignatureStatus::Valid);
+                            *signer_fingerprint =
+                                Some(ka.cert().fingerprint().to_hex().to_lowercase());
+                            return Ok(());
+                        }
+                        Err(VerificationError::MissingKey { .. }) => {
+                            *signature_status = Some(SignatureStatus::UnknownSigner);
+                        }
+                        Err(VerificationError::BadKey { ka, error, .. }) => {
+                            if is_expired_error(&error) {
+                                *signature_status = Some(SignatureStatus::Expired);
+                                *signer_fingerprint =
                                     Some(ka.cert().fingerprint().to_hex().to_lowercase());
-                                return Ok(());
+                            } else {
+                                *signature_status = Some(SignatureStatus::Bad);
                             }
-                            Err(VerificationError::MissingKey { .. }) => {
-                                self.signature_status = Some(SignatureStatus::UnknownSigner);
-                            }
-                            Err(VerificationError::BadKey { ka, error, .. }) => {
-                                // Distinguish expired signer key from other key issues
-                                // (revoked, not signing-capable, etc.)
-                                if is_expired_error(&error) {
-                                    self.signature_status = Some(SignatureStatus::Expired);
-                                    self.signer_fingerprint =
-                                        Some(ka.cert().fingerprint().to_hex().to_lowercase());
-                                } else {
-                                    self.signature_status = Some(SignatureStatus::Bad);
-                                }
-                            }
-                            Err(_) => {
-                                self.signature_status = Some(SignatureStatus::Bad);
-                            }
+                        }
+                        Err(_) => {
+                            *signature_status = Some(SignatureStatus::Bad);
                         }
                     }
                 }
             }
         }
-
-        if self.signature_status.is_none() {
-            self.signature_status = Some(SignatureStatus::NotSigned);
-        }
-
-        Ok(())
     }
+
+    if signature_status.is_none() {
+        *signature_status = Some(SignatureStatus::NotSigned);
+    }
+
+    Ok(())
 }
 
 /// Classify a Sequoia decryption error into the appropriate PgpError variant.
@@ -503,5 +578,25 @@ impl<'a> DecryptionHelper for DecryptHelper<'a> {
         }
 
         Err(openpgp::anyhow::anyhow!("No key to decrypt message"))
+    }
+}
+
+impl<'a> DecryptionHelper for FixedSessionKeyDecryptHelper<'a> {
+    fn decrypt(
+        &mut self,
+        _pkesks: &[openpgp::packet::PKESK],
+        _skesks: &[openpgp::packet::SKESK],
+        _sym_algo: Option<SymmetricAlgorithm>,
+        decrypt: &mut dyn FnMut(Option<SymmetricAlgorithm>, &SessionKey) -> bool,
+    ) -> openpgp::Result<Option<openpgp::Cert>> {
+        if decrypt(self.session_key_algo, &self.session_key) {
+            Ok(None)
+        } else if self.session_key_algo.is_none() {
+            Err(openpgp::anyhow::anyhow!(
+                "Fixed session key failed payload authentication"
+            ))
+        } else {
+            Err(openpgp::anyhow::anyhow!("No key to decrypt message"))
+        }
     }
 }

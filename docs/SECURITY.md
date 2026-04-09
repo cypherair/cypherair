@@ -251,9 +251,9 @@ The Enhanced Security capability is additive. It never breaks compatibility with
 
 ### 7.1 Passphrase `String` Cannot Be Reliably Zeroized
 
-**Scope:** Affects only private key import and export operations — not routine decryption or signing, which use SE-unwrapped key bytes (`Data`) that are properly zeroized.
+**Scope:** Affects passphrase-based flows that originate in Swift `String`, specifically private key import/export and password-message encrypt/decrypt operations. It does **not** affect routine recipient-key decryption or signing, which use SE-unwrapped key bytes (`Data`) that are properly zeroized.
 
-**Issue:** Swift `String` is a value type with copy-on-write semantics. There is no supported API to overwrite a `String`'s internal buffer in place. When the user enters a passphrase for key export (S2K protection) or key import (S2K unlock), the passphrase exists as a `String` in memory until ARC deallocates it. The exact lifetime depends on the Swift runtime and is not deterministic.
+**Issue:** Swift `String` is a value type with copy-on-write semantics. There is no supported API to overwrite a `String`'s internal buffer in place. When the user enters a passphrase for key export (S2K protection), key import (S2K unlock), or password-message encrypt/decrypt (`SKESK`), the passphrase exists as a `String` in memory until ARC deallocates it. The exact lifetime depends on the Swift runtime and is not deterministic.
 
 **Why this is not fixed:**
 
@@ -263,10 +263,10 @@ The Enhanced Security capability is additive. It never breaks compatibility with
 
 **Mitigations:**
 
-- **Short lifetime:** The passphrase `String` is only alive for the duration of the import/export call. It is not stored in any persistent state, UserDefaults, or Keychain.
+- **Short lifetime:** The passphrase `String` is only alive for the duration of the active import/export or password-message call. It is not stored in any persistent state, UserDefaults, or Keychain.
 - **Rust-side zeroize:** The `zeroize` crate ensures the Rust copy of the passphrase is overwritten after use.
 - **iOS memory protections:** ASLR, sandboxing, and MIE (on A19+ devices) make memory scanning attacks significantly harder.
-- **Low frequency:** Import and export are infrequent operations (typically once during setup and for backups), minimizing the window of exposure.
+- **Immediate Rust conversion:** Password-message APIs convert the Swift `String` into Sequoia `Password` at the FFI boundary so the Rust-side representation is encrypted in memory and only decrypted on demand.
 
 **Rejected alternatives:**
 

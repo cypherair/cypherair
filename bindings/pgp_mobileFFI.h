@@ -305,6 +305,11 @@ RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_decrypt(uint64_t ptr, RustBuffe
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file(uint64_t ptr, RustBuffer input_path, RustBuffer output_path, RustBuffer secret_keys, RustBuffer verification_keys, RustBuffer progress, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT_WITH_PASSWORD
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT_WITH_PASSWORD
+RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_decrypt_with_password(uint64_t ptr, RustBuffer ciphertext, RustBuffer password, RustBuffer verification_keys, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DETECT_PROFILE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DETECT_PROFILE
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_detect_profile(uint64_t ptr, RustBuffer cert_data, RustCallStatus *_Nonnull out_status
@@ -325,9 +330,19 @@ RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_encrypt(uint64_t ptr, RustBuffe
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary(uint64_t ptr, RustBuffer plaintext, RustBuffer recipients, RustBuffer signing_key, RustBuffer encrypt_to_self, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ENCRYPT_BINARY_WITH_PASSWORD
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ENCRYPT_BINARY_WITH_PASSWORD
+RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary_with_password(uint64_t ptr, RustBuffer plaintext, RustBuffer password, RustBuffer format, RustBuffer signing_key, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ENCRYPT_FILE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ENCRYPT_FILE
 void uniffi_pgp_mobile_fn_method_pgpengine_encrypt_file(uint64_t ptr, RustBuffer input_path, RustBuffer output_path, RustBuffer recipients, RustBuffer signing_key, RustBuffer encrypt_to_self, RustBuffer progress, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ENCRYPT_WITH_PASSWORD
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ENCRYPT_WITH_PASSWORD
+RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_password(uint64_t ptr, RustBuffer plaintext, RustBuffer password, RustBuffer format, RustBuffer signing_key, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_EXPORT_SECRET_KEY
@@ -751,6 +766,12 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_WITH_PASSWORD
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_WITH_PASSWORD
+uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_with_password(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DETECT_PROFILE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DETECT_PROFILE
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_detect_profile(void
@@ -775,9 +796,21 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_BINARY_WITH_PASSWORD
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_BINARY_WITH_PASSWORD
+uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_FILE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_FILE
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_WITH_PASSWORD
+#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_WITH_PASSWORD
+uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password(void
     
 );
 #endif

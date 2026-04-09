@@ -9,12 +9,15 @@ pub mod decrypt;
 pub mod encrypt;
 pub mod error;
 pub mod keys;
+pub mod password;
 pub mod sign;
 pub mod streaming;
 pub mod verify;
 
 use std::sync::Arc;
 
+use openpgp::crypto::Password;
+use sequoia_openpgp as openpgp;
 use zeroize::Zeroizing;
 
 use crate::armor::ArmorKind;
@@ -23,6 +26,7 @@ use crate::error::PgpError;
 use crate::keys::{
     CertificateMergeResult, GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult, S2kInfo,
 };
+use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::streaming::FileDecryptResult;
 use crate::verify::VerifyResult;
 
@@ -146,6 +150,42 @@ impl PgpEngine {
         )
     }
 
+    /// Encrypt plaintext with a password and return ASCII-armored ciphertext.
+    pub fn encrypt_with_password(
+        &self,
+        plaintext: Vec<u8>,
+        password: String,
+        format: PasswordMessageFormat,
+        signing_key: Option<Vec<u8>>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let password = Password::from(password);
+        let signing_key = signing_key.map(Zeroizing::new);
+        password::encrypt(
+            &plaintext,
+            &password,
+            format,
+            signing_key.as_ref().map(|z| z.as_slice()),
+        )
+    }
+
+    /// Encrypt plaintext with a password and return binary ciphertext.
+    pub fn encrypt_binary_with_password(
+        &self,
+        plaintext: Vec<u8>,
+        password: String,
+        format: PasswordMessageFormat,
+        signing_key: Option<Vec<u8>>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let password = Password::from(password);
+        let signing_key = signing_key.map(Zeroizing::new);
+        password::encrypt_binary(
+            &plaintext,
+            &password,
+            format,
+            signing_key.as_ref().map(|z| z.as_slice()),
+        )
+    }
+
     // ── Decryption ──────────────────────────────────────────────────
 
     /// Parse recipients of an encrypted message (Phase 1 — no auth needed).
@@ -183,6 +223,17 @@ impl PgpEngine {
         let secret_keys: Vec<Zeroizing<Vec<u8>>> =
             secret_keys.into_iter().map(Zeroizing::new).collect();
         decrypt::decrypt(&ciphertext, &secret_keys, &verification_keys)
+    }
+
+    /// Decrypt a password-encrypted message without falling back to recipient-key decryption.
+    pub fn decrypt_with_password(
+        &self,
+        ciphertext: Vec<u8>,
+        password: String,
+        verification_keys: Vec<Vec<u8>>,
+    ) -> Result<PasswordDecryptResult, PgpError> {
+        let password = Password::from(password);
+        password::decrypt(&ciphertext, &password, &verification_keys)
     }
 
     // ── Signing ─────────────────────────────────────────────────────

@@ -165,6 +165,7 @@
 				Services/EncryptionService.swift,
 				Services/FileProgressReporter.swift,
 				Services/KeyManagementService.swift,
+				Services/PasswordMessageService.swift,
 				Services/QRService.swift,
 				Services/SelfTestService.swift,
 				Services/SigningService.swift,
