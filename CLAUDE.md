@@ -24,10 +24,10 @@ Sources/
 ├── Security/         # SE wrapping, Keychain, auth modes, Argon2id memory guard, memory zeroing
 ├── Models/           # Data types, PGP key representations, error types
 ├── Extensions/       # Swift/Foundation extensions
-└── Resources/        # Assets, String Catalog, Info.plist
+└── Resources/        # Assets, String Catalog
 pgp-mobile/           # Rust wrapper crate (Sequoia + UniFFI)
-PgpMobile.xcframework # Built artifact (not in source)
 docs/                 # PRD, TDD, POC, architecture, security, testing, conventions
+CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
 Detailed module breakdown: @docs/ARCHITECTURE.md
@@ -45,38 +45,27 @@ cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/
 # Rust: cross-compile for macOS Apple Silicon
 cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
 
-# Generate Swift bindings (via build-xcframework.sh, which uses a host macOS dylib for bindgen)
-cargo run --release --manifest-path pgp-mobile/Cargo.toml \
-    --bin uniffi-bindgen generate \
-    --library target/release/libpgp_mobile.dylib \
-    --language swift --out-dir bindings/
-
-# Create XCFramework (all three platform slices)
-xcodebuild -create-xcframework \
-    -library target/aarch64-apple-ios/release/libpgp_mobile.a -headers bindings/ \
-    -library target/aarch64-apple-ios-sim/release/libpgp_mobile.a -headers bindings/ \
-    -library target/aarch64-apple-darwin/release/libpgp_mobile.a -headers bindings/ \
-    -output PgpMobile.xcframework
-
-# Recommended: use the automated build script (handles all of the above)
+# Full Rust + UniFFI + XCFramework sync
 ./build-xcframework.sh --release
 
 # Run Rust tests
 cargo test --manifest-path pgp-mobile/Cargo.toml
 
-# Run Swift unit + FFI tests (simulator, uses CypherAir-UnitTests test plan)
+# Run Swift unit + FFI tests locally (source of truth for Swift validation)
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=iOS Simulator,name=iPhone 17'
+    -destination 'platform=macOS'
 
 # Run device-only tests (SE, biometrics, MIE — uses CypherAir-DeviceTests test plan)
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
     -destination 'platform=iOS,name=<DEVICE_NAME>'
 ```
 
+For the full Rust artifact refresh, UniFFI/bindings sync, and Xcode validation workflow, see @docs/TESTING.md.
+
 ## Hard Constraints — NEVER Violate
 
 1. **Zero network access.** No HTTP(S), no networked SDKs, no telemetry. Code audit must confirm zero network code paths. No network URL loading (http/https). No NWConnection. No URLSession. Custom app URL scheme handling (`cypherair://`) is permitted — it is local IPC, not network access.
-2. **Minimal permissions.** The only Info.plist usage description is `NSFaceIDUsageDescription` (required by iOS for Face ID / Touch ID authentication via `LAContext`). No camera, photo library, contacts, or network entitlements. All I/O through system pickers, Share Sheet, URL scheme.
+2. **Minimal permissions.** The app configures only `NSFaceIDUsageDescription` as a usage description (required by iOS for Face ID / Touch ID authentication via `LAContext`). No camera, photo library, contacts, or network entitlements. All I/O through system pickers, Share Sheet, URL scheme.
 3. **AEAD hard-fail.** Authentication failure during decryption must abort immediately. Never show partial plaintext.
 4. **No plaintext or private keys in logs.** Never `print()`, `os_log()`, or `NSLog()` any key material, passphrase, or decrypted content. Not even in DEBUG builds.
 5. **Memory zeroing.** All sensitive data (`Data` buffers containing keys, passphrases, plaintext) must be overwritten with zeros when no longer needed. Rust side: `zeroize` crate. Swift side: `resetBytes(in:)` on `Data`.
@@ -97,7 +86,8 @@ STOP and describe proposed changes before editing any file in these areas:
 - `pgp-mobile/src/` — any Rust cryptographic code
 - `CypherAir.xcodeproj/project.pbxproj` and other Xcode project files — adding files, targets, build settings, or test wiring
 - `CypherAir.entitlements` — capability entitlements
-- `Info.plist` — permission descriptions (only `NSFaceIDUsageDescription` permitted)
+- `CypherAirMacOS.entitlements` — macOS capability entitlements
+- `CypherAir-Info.plist` — permission descriptions (only `NSFaceIDUsageDescription` permitted)
 
 Full security model and red lines: @docs/SECURITY.md
 

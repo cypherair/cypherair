@@ -30,10 +30,11 @@ Sources/
 ├── Security/         # Secure Enclave wrapping, Keychain, auth mode logic
 ├── Models/           # Data models and error types
 ├── Extensions/       # Small Foundation/Swift helpers
-└── Resources/        # String catalogs, previews, Info.plist resources
+└── Resources/        # String catalogs, previews
 
 pgp-mobile/           # Rust wrapper crate
 docs/                 # PRD, architecture, testing, conventions, security
+CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
 Start with `docs/ARCHITECTURE.md` and `docs/SECURITY.md` when working in unfamiliar areas.
@@ -46,17 +47,13 @@ cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Carg
 cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
 cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
 
-# Recommended XCFramework build path
+# Full Rust + UniFFI + XCFramework sync
 ./build-xcframework.sh --release
 
 # Rust tests
 cargo test --manifest-path pgp-mobile/Cargo.toml
 
-# Swift unit + FFI tests
-xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=iOS Simulator,name=iPhone 17'
-
-# macOS-local validation often used in this repo
+# macOS-local Swift unit + FFI validation
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
 
@@ -64,6 +61,8 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
     -destination 'platform=iOS,name=<DEVICE_NAME>'
 ```
+
+For the full Rust artifact refresh, UniFFI/bindings sync, and Xcode validation workflow, see `docs/TESTING.md`.
 
 ## Non-Negotiable Constraints
 
@@ -89,17 +88,17 @@ Never violate these:
 
 Pause and explicitly call out the intended change before editing these areas:
 
-- `Sources/Security/`
-- `Sources/Security/SecureEnclaveManager.swift`
-- `Sources/Security/KeychainManager.swift`
-- `Sources/Security/AuthenticationManager.swift`
-- `Sources/Services/DecryptionService.swift`
-- `Sources/Services/QRService.swift`
-- `pgp-mobile/src/`
-- `CypherAir.xcodeproj/project.pbxproj` and other Xcode project files
-- `CypherAir.entitlements`
-- `CypherAirMacOS.entitlements`
-- permission-related plist settings
+- `Sources/Security/` — SE wrapping, Keychain access, auth mode logic
+- `Sources/Security/SecureEnclaveManager.swift` — wrapping/unwrapping flow
+- `Sources/Security/KeychainManager.swift` — access control flags
+- `Sources/Security/AuthenticationManager.swift` — Standard/High Security mode switching
+- `Sources/Services/DecryptionService.swift` — Phase 1/Phase 2 authentication boundary
+- `Sources/Services/QRService.swift` — external URL input parsing (untrusted data)
+- `pgp-mobile/src/` — any Rust cryptographic code
+- `CypherAir.xcodeproj/project.pbxproj` and other Xcode project files — adding files, targets, build settings, or test wiring
+- `CypherAir.entitlements` — capability entitlements
+- `CypherAirMacOS.entitlements` — macOS capability entitlements
+- `CypherAir-Info.plist` — permission descriptions (only `NSFaceIDUsageDescription` permitted)
 
 These areas define security invariants and failure behavior.
 
@@ -133,14 +132,11 @@ Mode switching requires re-wrapping all Secure Enclave protected keys.
 
 ## Coding Conventions
 
-- Follow Swift API Design Guidelines.
-- Prefer `guard` early exits.
-- No force unwraps in production paths.
-- Use `async/await`.
-- Use `@Observable` for app state models/services.
-- Use `NavigationStack`, not deprecated `NavigationView`.
-- Put user-facing strings in the String Catalog.
-- Respect `docs/CONVENTIONS.md` for full project rules.
+- Swift API Design Guidelines. `guard` early exits over force unwraps. `async/await` over Combine.
+- `@Observable` for state. `NavigationStack` with typed paths. No `NavigationView`.
+- iOS 26 Liquid Glass: standard components auto-adopt. Custom controls use `.glassEffect()`.
+- One type per file. Group by feature. All user strings in the String Catalog.
+- Full conventions: `docs/CONVENTIONS.md`.
 
 ## Testing Expectations
 

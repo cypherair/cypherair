@@ -66,7 +66,8 @@ final class ContactService {
         var loadedContacts: [Contact] = []
         for file in files {
             let data = try Data(contentsOf: file)
-            if let contact = try? parseContact(from: data) {
+            if let validation = try? ContactImportPublicCertificateValidator.validate(data, using: engine) {
+                let contact = makeContact(from: validation)
                 loadedContacts.append(contact)
             }
         }

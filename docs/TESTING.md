@@ -2,6 +2,7 @@
 
 > Purpose: Test strategy, how to run and write tests, and expectations for AI-assisted development.
 > Audience: Human developers and AI coding tools.
+> Source of truth: validation commands, Rust artifact refresh, and UniFFI/bindings sync for the current workspace.
 
 ## 1. Test Layers
 
@@ -64,11 +65,13 @@ Guard MIE tests for A19:
 
 ## 2. Test Plans
 
-Configure two Xcode Test Plans:
+The workspace currently includes three Xcode Test Plans:
 
-**CypherAir-UnitTests.xctestplan** — Layers 2–3 (Swift unit tests + FFI integration tests). Runs in simulator and CI. Excludes device-only tests. Layer 1 (Rust unit tests) runs independently via `cargo test` as a separate CI step. This is the default test plan bound to the `CypherAir` scheme.
+**CypherAir-UnitTests.xctestplan** — Layers 2–3 (Swift unit tests + FFI integration tests). Runs in macOS local validation, simulator, and CI. Excludes device-only tests. Layer 1 (Rust unit tests) runs independently via `cargo test` as a separate CI step. This is the default test plan bound to the `CypherAir` scheme.
 
 **CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, biometric auth modes, mode switching, crash recovery, MIE validation.
+
+**CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for macOS UI automation.
 
 **All test commands in CLAUDE.md and CI configuration must use `-testPlan` to ensure consistent scope.**
 
@@ -87,42 +90,98 @@ Impact:
 - The hosted Swift unit-test job can fail before test execution because the runner OS is older than the app/test deployment target.
 - Local macOS validation remains the source of truth until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 
-## 2.2 Rust Release Artifacts and Xcode Validation
+## 2.2 Rust Artifacts, UniFFI Outputs, and Xcode Validation
 
-Rust changes under `pgp-mobile/src` do **not** automatically refresh the Rust `release` static libraries that Xcode links for Swift and FFI tests.
+Rust changes under `pgp-mobile/src` do **not** automatically refresh the build products that Xcode uses for Swift and FFI validation.
 
-Today, the Xcode project links the target-specific `release` archives under:
+Today, the Xcode project is wired directly to:
 
 - `pgp-mobile/target/aarch64-apple-ios/release`
 - `pgp-mobile/target/aarch64-apple-ios-sim/release`
 - `pgp-mobile/target/aarch64-apple-darwin/release`
+- `bindings/module.modulemap`
+- `Sources/PgpMobile/pgp_mobile.swift`
 
-Implications:
+The local `PgpMobile.xcframework` output may still be produced by the build script and can exist in the working tree, but it is ignored by git, not tracked in source control, and not used directly for the current Xcode link step.
 
-- `cargo test --manifest-path pgp-mobile/Cargo.toml` is still required for Rust validation, but it does **not** guarantee that the binaries used by `xcodebuild test` have been refreshed.
-- If a Rust change can affect Swift-visible behavior, FFI behavior, or any UniFFI-backed service logic, rebuild the Rust `release` artifacts before running `xcodebuild test`.
-- If the UniFFI surface or generated bindings changed, use `./build-xcframework.sh --release` so the static libraries, generated bindings, headers, and XCFramework stay in sync.
-- If the UniFFI surface did **not** change, rebuilding the target-specific Rust `release` archives is sufficient for Xcode validation.
+This means there are three distinct workflows:
 
-Recommended validation flow for Rust-backed behavior changes:
+### A. Rust behavior validation only
+
+Use this when you want to validate Rust logic in isolation.
 
 ```bash
-# 1. Validate Rust behavior
 cargo test --manifest-path pgp-mobile/Cargo.toml
+```
 
-# 2. Refresh the Rust release artifacts that Xcode links
+This does **not** refresh the release archives or generated UniFFI outputs that Xcode consumes.
+
+### B. Refresh the Rust release archives that Xcode links
+
+Use this when Rust implementation changed but the UniFFI surface and generated bindings did not.
+
+```bash
+cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
+```
+
+### C. Full UniFFI / bindings / XCFramework sync
+
+Use this when the UniFFI surface, generated bindings, headers, or packaged XCFramework artifacts changed, or whenever you want the safest full refresh.
+
+Recommended path:
+
+```bash
 ./build-xcframework.sh --release
+```
 
-# 3. Validate Swift/FFI behavior
+If you must run the underlying bindgen step manually, run it from `pgp-mobile/`, not from the repo root:
+
+```bash
+cd pgp-mobile
+cargo run --release --bin uniffi-bindgen generate \
+    --library target/release/libpgp_mobile.dylib \
+    --language swift --out-dir ../bindings
+```
+
+The repo-root form of this command is not valid in the current workspace because the root directory does not contain a `Cargo.toml`.
+
+### Local Xcode validation
+
+After refreshing the artifacts that apply to your change, validate Swift / FFI behavior locally with:
+
+```bash
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
 ```
 
-Typical stale-artifact symptom:
+Treat this macOS-local path as the source of truth for Swift validation until GitHub's hosted macOS image catches up to the project's deployment target.
 
-- Rust tests reflect the new behavior, but Swift unit tests, FFI integration tests, or app-side debugging still show the old behavior.
+Recommended flows:
 
-If that happens, first suspect stale Rust `release` artifacts rather than stale Swift source.
+```bash
+# Rust-only behavior change
+cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
+xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
+    -destination 'platform=macOS'
+
+# UniFFI surface / bindings / packaged artifact change
+cargo test --manifest-path pgp-mobile/Cargo.toml
+./build-xcframework.sh --release
+xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
+    -destination 'platform=macOS'
+```
+
+Typical stale-artifact symptoms:
+
+- Rust tests reflect the new behavior, but Swift unit tests or FFI integration tests still show the old behavior.
+- The app links successfully against `-lpgp_mobile`, but new UniFFI symbols or generated Swift types are missing.
+
+If that happens, first suspect stale Rust release archives or generated UniFFI outputs rather than stale Swift source.
 
 If a Rust / UniFFI change affects contact import validation, validation must also prove the
 stable public-only contract end to end:
