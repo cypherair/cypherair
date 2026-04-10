@@ -71,7 +71,7 @@ The workspace currently includes three Xcode Test Plans:
 
 **CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, biometric auth modes, mode switching, crash recovery, MIE validation.
 
-**CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for macOS UI automation.
+**CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for macOS UI automation, including `UITests/MacUISmokeTests.swift` coverage for main, settings, and tutorial launch/smoke flows.
 
 **All test commands in CLAUDE.md and CI configuration must use `-testPlan` to ensure consistent scope.**
 
@@ -535,6 +535,7 @@ Run on iPhone 17 or iPhone Air (A19/A19 Pro) with Hardware Memory Tagging enable
 - For security changes: both positive and negative tests (see Section 6).
 - For new PgpError variants: test that the error is thrown and maps correctly to Swift.
 - For UI changes: at minimum, verify the view compiles and renders (snapshot or manual).
+- For screen ownership, launch, routing, or tutorial-host refactors: run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted `MacUISmokeTests` subset.
 
 ### Coverage Goals
 

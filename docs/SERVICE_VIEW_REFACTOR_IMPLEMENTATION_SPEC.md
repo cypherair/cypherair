@@ -4,6 +4,7 @@
 > Audience: Human developers, reviewers, and AI coding tools.
 > Companion documents: [SERVICE_VIEW_REFACTOR_ASSESSMENT](SERVICE_VIEW_REFACTOR_ASSESSMENT.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [CONVENTIONS](CONVENTIONS.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
 > Spec posture: This document is an execution baseline for future refactor work. It is intentionally more specific than the assessment, but it does not authorize implementation before the assessment is reviewed and accepted.
+> Important framing: This specification is intentionally grounded in the repository's real starting point. That grounding does **not** reduce the need for refactor; it prevents the plan from depending on abstractions or ownership seams that the codebase does not yet have.
 
 ## 1. Intent
 
@@ -11,7 +12,7 @@ This refactor exists to solve a structural problem, not a product problem.
 
 CypherAir already has working behavior across the current production app and the guided tutorial. The problem is that several services and screens now mix rendering, coordination, state machines, persistence decisions, and integration seams in ways that increase review cost and slow safe iteration.
 
-The intent of the refactor is to:
+The refactor must:
 
 - keep every current user-visible behavior intact
 - keep every current security semantic intact
@@ -21,41 +22,77 @@ The intent of the refactor is to:
 
 This specification assumes the assessment in [SERVICE_VIEW_REFACTOR_ASSESSMENT](SERVICE_VIEW_REFACTOR_ASSESSMENT.md) has already been reviewed and accepted. No implementation phase should start before that review gate is passed.
 
-## 2. Refactor Goals
+## 2. Stability Contract
 
-The refactor must achieve all of the following:
+The refactor is architecture-preserving. Unless a later, separately reviewed document says otherwise, this specification does **not** authorize:
 
-1. Keep the existing production service entry points stable for downstream callers.
-2. Reduce `KeyManagementService` and `ContactService` from multi-owner implementations into facades over smaller internal collaborators.
-3. Move workflow coordination out of the largest production screens and into dedicated `@Observable` screen models.
-4. Preserve the current `Configuration`-driven tutorial adaptation pattern so the tutorial continues to wrap real production pages instead of forking them.
-5. Reduce `CypherAirApp` back toward a composition root by moving app-flow coordination into dedicated coordinators.
-6. Stage the work in four function-cluster waves so validation and review stay bounded.
+- renaming or removing the existing environment-injected facades
+- changing public service entry points used by the App layer
+- changing `Configuration` source compatibility for current production pages
+- changing strings, routes, ready markers, tutorial module order, import/export naming, or output-interception semantics
+- changing behavior in `Sources/Security/`, `AuthenticationManager`, or Rust code as part of this structural work
 
-The refactor does not need to make every screen tiny. It does need to restore clear ownership boundaries.
+The document also does **not** imply that every named collaborator must become a public or user-visible type. Internal helper and collaborator names may be private. What matters is stable ownership boundaries, not type visibility.
 
-## 3. Target Architecture
+## 3. Architecture Contract
 
-### 3.1 Service Layer
+### 3.1 Definitions
 
-#### 3.1.1 General Rule
+- `Facade`: an existing environment-injected service that remains the App layer entry point. In this repository that means `KeyManagementService`, `ContactService`, `EncryptionService`, `DecryptionService`, `SigningService`, `PasswordMessageService`, `QRService`, and `SelfTestService`.
+- `Screen model`: an `@Observable` owner for one production screen's workflow state, async actions, transient results, importer/exporter state, and confirmation/error state.
+- `Coordinator`: an owner for app-flow or cross-screen presentation state that does not belong inside a single production page.
 
-Current environment-injected service types remain the public app-level facade layer:
+### 3.2 Required Screen-Model Ownership Pattern
 
-- `KeyManagementService`
-- `ContactService`
-- `EncryptionService`
-- `DecryptionService`
-- `SigningService`
-- `QRService`
+There is no pre-existing screen-model pattern in the repository, so this refactor must use one explicit pattern consistently.
 
-The first refactor wave must not require widespread caller migration away from those names.
+The required pattern is:
 
-#### 3.1.2 `KeyManagementService`
+1. the public top-level production page remains the route/call-site type and may keep its existing `Configuration`
+2. that top-level view reads `@Environment` dependencies and passes concrete dependencies plus `Configuration` into a private owning host view
+3. the private owning host view initializes `@State private var model` in its initializer from those explicit dependencies
+4. the screen model itself does **not** read `@Environment` directly and does **not** construct its own facade instances
+5. the view binds to the model via `@Bindable` or direct property access and keeps only layout, binding glue, and presentation modifiers
 
-`KeyManagementService` remains the facade exposed to views and other services, but its internal ownership is split into smaller collaborators with stable, narrow responsibilities.
+This two-step route-view and owning-host pattern is required because the current views rely on `@Environment`, while SwiftUI still requires stable ownership semantics for `@State` reference types.
 
-Target collaborator boundaries:
+### 3.3 Lifecycle And Cleanup Contract
+
+The current overloaded screens contain significant lifecycle-owned behavior. That ownership must move deliberately.
+
+Rules:
+
+- one-time prefill or initial setup moves into an explicit model method such as `prepareIfNeeded()`
+- cleanup and invalidation that currently lives in `onDisappear` / `onChange` moves into explicit model methods such as `handleDisappear()` or `invalidateFor...(...)`
+- the view may still trigger lifecycle hooks via `.task`, `.onAppear`, `.onDisappear`, or `.onChange`, but it must not continue to implement the cleanup logic inline
+- the screen model owns long-running operation state, importer/exporter state, transient files, confirmation state, and error state
+
+The view remains responsible for:
+
+- layout
+- control bindings
+- local rendering-only derivations
+- wiring toolbar, sheet, alert, and navigation modifiers to model state
+
+### 3.4 Helper Reuse Contract
+
+The refactor must treat the following App-layer helpers as reuse points, not as default rewrite targets:
+
+- `OperationController`
+- `FileExportController`
+- `SecurityScopedFileAccess`
+- `ImportedTextInputState`
+- `PublicKeyImportLoader`
+- `ContactImportWorkflow`
+- `ImportConfirmationCoordinator`
+
+Preferred rule: relocate ownership before replacing implementation. For example, a screen model may own an `OperationController`, but the helper itself should remain reusable unless a later phase explicitly proves it is no longer fit for purpose.
+
+### 3.5 Facade And Internal Collaborator Contract
+
+#### `KeyManagementService`
+
+`KeyManagementService` remains the public facade exposed to views and other services. Its internal ownership should be split into collaborators with the following stable boundaries:
 
 - `KeyCatalogStore`
   - owns loading, in-memory key collection updates, default-key state, and metadata persistence coordination
@@ -70,120 +107,33 @@ Target collaborator boundaries:
 
 Rules:
 
-- `KeyManagementService` keeps the current public methods in the first wave.
-- `keys` and `defaultKey` remain observable through the facade.
-- security-sensitive sequencing must remain unchanged even if internal ownership moves.
-- no first-wave change may alter the current behavior of `AuthenticationManager`, Secure Enclave wrapping, Keychain access-control semantics, or crash-recovery semantics.
+- `KeyManagementService` keeps the current public methods
+- `keys` and `defaultKey` remain observable through the facade
+- security-sensitive sequencing remains unchanged even if internal ownership moves
+- no refactor phase may alter current `AuthenticationManager`, Secure Enclave, Keychain access-control, or crash-recovery semantics
 
-#### 3.1.3 `ContactService`
+#### `ContactService`
 
-`ContactService` remains the facade exposed to the App layer, but internal ownership is split into:
+`ContactService` remains the public facade exposed to the App layer. The only collaborator boundary that is mandatory at the start of contact refactor work is persistence:
 
 - `ContactRepository`
-  - owns contact file persistence, metadata manifest persistence, and load/save operations
-- `ContactImportService`
-  - owns validation, same-fingerprint merge decisions, replacement detection, and import/update result shaping
+  - owns contact file persistence, metadata manifest persistence, load/save operations, and file-layout conventions
 
 Rules:
 
-- the current `ContactService` public methods remain compatible in the first wave.
-- the contact-import public-only validation path must remain intact.
-- file naming, metadata format, duplicate/update/replacement semantics, and verification-state persistence remain unchanged.
+- `ContactService` public methods remain compatible
+- file naming, metadata format, duplicate/update/replacement semantics, and verification-state persistence remain unchanged
+- `ContactImportWorkflow` remains the App-layer confirmation/orchestration helper
+- an additional internal import-policy collaborator is optional, not mandatory; it may be introduced only if its boundary is narrower than the current `ContactService` logic and does not duplicate responsibility already held by `ContactImportWorkflow`
 
-#### 3.1.4 Other Services
-
-First-wave treatment of the remaining services:
+#### Other Services
 
 - `EncryptionService`: keep public API unchanged; internal helper extraction is allowed only to support cleaner screen-model integration.
 - `DecryptionService`: keep public API unchanged and preserve the Phase 1 / Phase 2 boundary exactly.
 - `SigningService`: keep public API unchanged; internal helper extraction is allowed but not required.
-- `PasswordMessageService` and `SelfTestService`: no structural refactor required in the first wave.
+- `PasswordMessageService` and `SelfTestService`: no structural refactor required as part of this work.
 
-### 3.2 View Layer
-
-#### 3.2.1 General Rule
-
-Large production pages move to a screen-model-backed structure:
-
-- the top-level view remains the routing and call-site type
-- a dedicated `@Observable` screen model owns workflow state, async actions, transient results, and presentation state
-- the rendered content binds to that screen model
-
-The screen model becomes the owner of:
-
-- task and progress lifecycle
-- async action orchestration
-- input/output state invalidation
-- file importer and exporter state
-- error and confirmation state
-- output interception decisions
-
-The view remains responsible for:
-
-- layout
-- bindings
-- local rendering-only derivations
-- wiring toolbar, sheet, alert, and navigation modifiers to model state
-
-#### 3.2.2 Required First-Wave Screen Models
-
-The first refactor wave must explicitly target these screen models:
-
-- `EncryptScreenModel`
-- `DecryptScreenModel`
-- `SignScreenModel`
-- `VerifyScreenModel`
-- `SettingsScreenModel`
-- `KeyDetailScreenModel`
-- `AddContactScreenModel`
-
-These are the mandatory screen-model surfaces for the first wave because they correspond to the largest current coordination hotspots.
-
-#### 3.2.3 First-Wave Pages Not Required To Become Screen Models
-
-The following pages are not mandatory screen-model targets in the first wave:
-
-- `KeyGenerationView`
-- `ImportKeyView`
-- `BackupKeyView`
-- `ModifyExpirySheetView`
-- tutorial hub and onboarding screens
-
-They may receive smaller helper extraction if needed for compatibility, but they are not the first-wave architecture drivers.
-
-#### 3.2.4 Shared App Helpers
-
-The refactor should preserve and reuse the current App-layer helper seams instead of replacing them wholesale:
-
-- `OperationController`
-- `FileExportController`
-- `SecurityScopedFileAccess`
-- `ImportedTextInputState`
-- `PublicKeyImportLoader`
-- `ContactImportWorkflow`
-- `ImportConfirmationCoordinator`
-
-The preferred change is ownership relocation, not helper deletion. For example, a screen model may own an `OperationController`, but the utility itself should remain reusable.
-
-### 3.3 Tutorial / Onboarding Compatibility
-
-Tutorial compatibility is a hard constraint, not a nice-to-have.
-
-The first refactor wave must keep the current adaptation model:
-
-- production screens keep their `Configuration` structs
-- tutorial restrictions continue to flow through `TutorialConfigurationFactory`
-- tutorial route hosting continues to flow through `TutorialRouteDestinationView`, `TutorialSurfaceView`, and `TutorialShellDefinitionsBuilder`
-- `TutorialSessionStore` remains the tutorial state machine and artifact owner
-- `TutorialSandboxContainer` remains a separate composition root
-
-Rules:
-
-- do not rewrite the tutorial state machine in the first wave
-- do not merge the production and tutorial containers
-- do not remove the existing callback-driven `Configuration` hooks before replacement seams are proven
-
-### 3.4 App Root And Flow Coordination
+### 3.6 Coordinator Contract
 
 `CypherAirApp` should end the refactor as a composition root plus top-level scene declaration, not as a multi-flow coordinator.
 
@@ -191,8 +141,10 @@ Target coordinator boundaries:
 
 - `AppPresentationCoordinator`
   - owns onboarding/tutorial presentation state and handoff rules
+  - wraps and reuses the current `TutorialOnboardingHandoffState` and environment presentation bridges
 - `IncomingURLImportCoordinator`
-  - owns `cypherair://` public-key import coordination and alert state
+  - owns `cypherair://` public-key import coordination, import confirmation presentation, and related alert state
+  - wraps and reuses the current import loader/workflow/coordinator seams rather than replacing them wholesale
 
 Rules:
 
@@ -200,20 +152,212 @@ Rules:
 - tutorial launch semantics and onboarding dismissal rules remain unchanged
 - global alert content and timing remain unchanged
 
-## 4. Compatibility Rules
+## 4. Front-Loaded Design Gates
 
-The following are non-negotiable first-wave constraints:
+Before any broad implementation phase starts, the following must be locked explicitly:
+
+1. the route-view and owning-host screen-model pattern described above
+2. the lifecycle contract for current `onAppear` / `onDisappear` / `onChange` behavior on target screens
+3. the `ContactService` boundary against existing App-layer import helpers
+4. the exact compatibility expectations for tutorial `Configuration` callbacks
+5. the validation plan for launch, settings, and tutorial smoke coverage through `CypherAir-MacUITests`
+
+No phase may proceed on the assumption that these are "local implementation details." They are repo-wide architecture decisions.
+
+## 5. Phased Rollout
+
+Implementation is fixed to five phases. Do not collapse them into one rewrite branch.
+
+### 5.1 Phase 1: Architecture Baseline And Compatibility Gates
+
+**Why this phase exists**
+
+The repository currently has no established screen-model pattern. Starting with surface migrations would force each screen to invent its own ownership and lifecycle rules.
+
+**Scope**
+
+- establish the shared route-view and owning-host screen-model pattern
+- establish the lifecycle forwarding contract for setup, invalidation, and cleanup
+- prove that existing `Configuration` types remain source-compatible with tutorial and production call sites
+- pin helper reuse rules so later phases default to ownership relocation rather than helper replacement
+
+**Required outputs**
+
+- a single, documented screen-model ownership pattern that later phases must reuse
+- explicit lifecycle method conventions for preparation, cleanup, and invalidation
+- compatibility tests or assertions that protect current `Configuration` seams and launch/smoke wiring
+
+**Completion definition**
+
+- subsequent phases can introduce screen models without reopening ownership, dependency-injection, or cleanup design
+- tutorial production-page hosting still compiles and routes without changing existing `Configuration` call sites
+
+**Out of scope**
+
+- service collaborator splits
+- production workflow migrations beyond what is strictly needed to lock the pattern
+- app-root coordinator extraction
+
+### 5.2 Phase 2: Key Lifecycle + Settings / Key Detail
+
+**Why this phase exists**
+
+`KeyManagementService` is the broadest service, while `SettingsView` and `KeyDetailView` are already coordination-heavy and tightly coupled to it.
+
+**Scope**
+
+- internal split of `KeyManagementService`
+- `SettingsScreenModel`
+- `KeyDetailScreenModel`
+- minimal adapter work needed to keep key-detail and settings flows compatible with the new internals
+
+**Required outputs**
+
+- `KeyManagementService` facade preserved
+- internal collaborator boundaries established behind the facade
+- `SettingsView` no longer directly coordinates auth-mode switching or presentation fallback state
+- `KeyDetailView` no longer directly owns export/delete/revocation/expiry workflow state
+
+**Completion definition**
+
+- callers still use `KeyManagementService`
+- key detail and settings retain current behavior
+- no behavior change to auth-mode warnings, mode switching, revocation export, default-key changes, delete flow, or modify-expiry flow
+
+**What this phase proves for later phases**
+
+- the screen-model pattern works for sheet/alert/export coordination
+- the facade-splitting pattern works without changing App-layer callers
+
+**Out of scope**
+
+- `AuthenticationManager` behavior changes
+- `KeyGenerationView`, `ImportKeyView`, `BackupKeyView`, and `ModifyExpirySheetView` full screen-model conversion
+
+### 5.3 Phase 3: Encrypt / Decrypt Reference Slice
+
+**Why this phase exists**
+
+`EncryptView` and `DecryptView` are the most overloaded workflow screens. They are the right place to define the reference pattern for long-running tool screens, importer/exporter state, cleanup, and output interception.
+
+**Scope**
+
+- `EncryptScreenModel`
+- `DecryptScreenModel`
+- thin host/content restructuring for the two production screens
+- helper extraction in `EncryptionService` and `DecryptionService` only when needed to support the screen-model split
+
+**Required outputs**
+
+- workflow state moves out of both views
+- current `Configuration` structs remain usable by both production and tutorial hosts
+- export/import/cancel/error/presentation behavior remains unchanged
+- file inspection, invalidation, and cleanup logic move behind model methods instead of remaining inline in the views
+
+**Completion definition**
+
+- `EncryptView` and `DecryptView` primarily bind to screen-model state
+- `DecryptView` cleanup semantics remain intact without leaving temp-file deletion and invalidation inline in the view
+- `DecryptionService` Phase 1 / Phase 2 semantics are unchanged
+
+**What this phase proves for later phases**
+
+- the screen-model pattern works for long-running file operations, import/export helpers, and output-interception callbacks
+- tutorial `Configuration` compatibility still holds for the heaviest tool screens
+
+**Out of scope**
+
+- service facade renaming
+- password-message UI activation
+
+### 5.4 Phase 4: Sign / Verify / Add Contact + Contact Persistence Boundary
+
+**Why this phase exists**
+
+Once the long-running tool-screen pattern is proven, the remaining workflow-heavy screens can follow it. Contact persistence should be split in the same phase only after the App-layer import-helper boundary is explicit.
+
+**Scope**
+
+- `SignScreenModel`
+- `VerifyScreenModel`
+- `AddContactScreenModel`
+- `ContactRepository`
+- compatibility updates for QR-photo import, confirmation-host flows, and tutorial add-contact wiring
+
+**Required outputs**
+
+- workflow state moves out of `SignView`, `VerifyView`, and `AddContactView`
+- `ContactService` facade preserved
+- contact file/manifest persistence moves behind `ContactRepository`
+- `ContactImportWorkflow` remains the App-layer confirmation/orchestration helper
+- no duplicate import state machines are introduced across App and Service layers
+
+**Completion definition**
+
+- duplicate/update/replacement semantics remain unchanged
+- current confirmation coordinator and import-confirmation UI remain intact
+- tutorial add-contact flow still works through `TutorialConfigurationFactory`
+- any additional internal contact import-policy collaborator is either clearly narrower than the existing App helper boundary or is deferred
+
+**What this phase proves for later phases**
+
+- the same screen-model pattern works for smaller tool screens and partially extracted screens
+- contact persistence can be split without destabilizing confirmation and replacement flows
+
+**Out of scope**
+
+- redesign of the contact-import user experience
+- tutorial-specific contact flow rewrite
+
+### 5.5 Phase 5: App Root Coordination + Tutorial Host Finalization
+
+**Why this phase exists**
+
+`CypherAirApp` is still overloaded, but the repository already has partial seams. This phase is cleanup and relocation work after service and screen ownership patterns are already stable.
+
+**Scope**
+
+- `AppPresentationCoordinator`
+- `IncomingURLImportCoordinator`
+- relocation of remaining app-root coordination into those coordinators
+- adaptation of tutorial host layers to the final screen-model-backed production pages
+
+**Required outputs**
+
+- `CypherAirApp` is reduced to composition and top-level scene wiring
+- onboarding/tutorial handoff logic moves behind a dedicated coordinator that reuses the current handoff state machinery
+- URL import coordination moves out of the app root and reuses the current import loader/workflow/coordinator seams
+- tutorial host wrappers remain compatible with production-page configuration
+
+**Completion definition**
+
+- tutorial launch, replay, and dismissal behavior are unchanged
+- startup warnings and import alerts are unchanged
+- production pages still render correctly in tutorial and onboarding-connected contexts
+- `CypherAirApp` no longer owns the main presentation-state and URL-import coordination logic directly
+
+**Out of scope**
+
+- rewriting `TutorialSessionStore`
+- merging tutorial and production containers
+- redesigning tutorial host UX
+
+## 6. Compatibility Rules
+
+The following are non-negotiable across all phases:
 
 - No user-visible behavior changes.
 - No string changes, route changes, tutorial module-order changes, or export filename changes.
 - No changes to current import/export semantics, clipboard behavior, or output-interception behavior.
 - No changes to current ready markers used by UI tests.
 - No changes to `UITEST_*` launch-environment semantics.
-- No first-wave Rust changes.
-- No first-wave behavior changes under `Sources/Security/`.
-- No first-wave behavioral changes to `AuthenticationManager`.
+- No Rust changes.
+- No behavior changes under `Sources/Security/`.
+- No behavioral changes to `AuthenticationManager`.
 - `Configuration` types for existing production pages remain source-compatible.
 - Existing environment-injected facade types remain the primary entry points for the App layer.
+- Helper migration takes priority over helper replacement.
+- Existing seams should be reused before new parallel abstractions are introduced.
 
 Specific compatibility rules by area:
 
@@ -222,120 +366,9 @@ Specific compatibility rules by area:
 - `ContactService` duplicate/update/replacement semantics must remain externally identical.
 - `TutorialConfigurationFactory` must remain capable of expressing current tutorial restrictions and callbacks without requiring tutorial-only forks of production pages.
 
-## 5. Phased Rollout
+## 7. Testing And Validation Gates
 
-Implementation is fixed to four function-cluster phases. Do not collapse them into one branch-sized rewrite.
-
-### 5.1 Phase 1: Key Lifecycle + Settings
-
-**Scope**
-
-- internal split of `KeyManagementService`
-- `SettingsScreenModel`
-- `KeyDetailScreenModel`
-- any minimal adapter work needed to keep key-detail and settings flows compatible with the new internals
-
-**Required outputs**
-
-- `KeyManagementService` facade preserved
-- internal collaborator boundaries established and covered by unit tests
-- `SettingsView` no longer directly coordinates mode switching
-- `KeyDetailView` no longer directly owns its export/delete/revocation/expiry workflow state
-
-**Completion definition**
-
-- callers still use `KeyManagementService`
-- key detail and settings retain current behavior
-- no behavior change to auth-mode warnings, mode switching, revocation export, default-key changes, delete flow, or modify-expiry flow
-
-**Out of scope**
-
-- `AuthenticationManager` behavior changes
-- `KeyGenerationView`, `ImportKeyView`, `BackupKeyView`, and `ModifyExpirySheetView` full screen-model conversion
-
-### 5.2 Phase 2: Encrypt / Decrypt / Sign / Verify
-
-**Scope**
-
-- `EncryptScreenModel`
-- `DecryptScreenModel`
-- `SignScreenModel`
-- `VerifyScreenModel`
-- thin host/content restructuring for the four production screens
-- helper extraction in `EncryptionService`, `DecryptionService`, and `SigningService` only when needed to support the screen-model split
-
-**Required outputs**
-
-- workflow state moves out of the four views
-- current `Configuration` structs remain usable by both production and tutorial hosts
-- export/import/cancel/error/presentation behavior remains unchanged
-
-**Completion definition**
-
-- `EncryptView`, `DecryptView`, `SignView`, and `VerifyView` primarily bind to screen-model state
-- file inspection, invalidation, and cleanup logic are no longer interleaved with rendering code
-- `DecryptionService` Phase 1 / Phase 2 semantics are unchanged
-
-**Out of scope**
-
-- service facade renaming
-- password-message UI activation
-
-### 5.3 Phase 3: Contacts Import Flows
-
-**Scope**
-
-- internal split of `ContactService`
-- `AddContactScreenModel`
-- compatibility updates for QR-photo import and confirmation-host flows
-
-**Required outputs**
-
-- `ContactService` facade preserved
-- contact persistence and contact-import workflow responsibilities split internally
-- `AddContactView` no longer owns the main import workflow state machine
-
-**Completion definition**
-
-- duplicate/update/replacement semantics remain unchanged
-- current confirmation coordinator and import-confirmation UI remain intact
-- tutorial add-contact flow still works through `TutorialConfigurationFactory`
-
-**Out of scope**
-
-- redesign of the contact-import user experience
-- tutorial-specific contact flow rewrite
-
-### 5.4 Phase 4: App Root + Tutorial / Onboarding Host
-
-**Scope**
-
-- `AppPresentationCoordinator`
-- `IncomingURLImportCoordinator`
-- adaptation of tutorial host layers to the new screen-model-backed production pages
-
-**Required outputs**
-
-- `CypherAirApp` is reduced to composition and top-level scene wiring
-- onboarding/tutorial handoff logic moves into a dedicated coordinator
-- URL import coordination moves out of the app root
-- tutorial host wrappers remain compatible with production-page configuration
-
-**Completion definition**
-
-- tutorial launch, replay, and dismissal behavior are unchanged
-- startup warnings and import alerts are unchanged
-- production pages still render correctly in tutorial and onboarding-connected contexts
-
-**Out of scope**
-
-- rewriting `TutorialSessionStore`
-- merging tutorial and production containers
-- redesigning tutorial host UX
-
-## 6. Testing And Validation Gates
-
-### 6.1 Baseline Gate Before Any Code Phase
+### 7.1 Baseline Gate Before Any Code Phase
 
 Before starting any implementation phase, confirm the branch baseline with the current repository commands:
 
@@ -349,60 +382,66 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
 
 If baseline is not green, fix or isolate baseline breakage before beginning refactor work.
 
-### 6.2 Mandatory Validation For Every Phase
+### 7.2 Mandatory Validation For Every Phase
 
 Every phase must end with:
 
 - `cargo test --manifest-path pgp-mobile/Cargo.toml`
 - `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
-- `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'`
+- `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` whenever launch flow, screen ownership, ready markers, or tutorial/settings routing could be affected
 - targeted review against [CODE_REVIEW](CODE_REVIEW.md)
 
-### 6.3 Phase-Specific Test Expectations
+### 7.3 Phase-Specific Test Expectations
 
 #### Phase 1
 
-- expand or add unit tests for new `KeyManagementService` collaborators
-- keep `KeyManagementServiceTests` green
-- keep relevant tutorial tests green when key detail and settings surfaces are exercised indirectly
+- add or update tests that pin the screen-model ownership pattern and `Configuration` compatibility expectations
+- keep `TutorialSessionStoreTests` green
+- keep `MacUISmokeTests` settings and tutorial launch flows green
 
 #### Phase 2
 
-- keep `EncryptionServiceTests`, `DecryptionServiceTests`, `SigningServiceTests`, and `StreamingServiceTests` green
+- keep `KeyManagementServiceTests` green
+- keep `MacUISmokeTests` key-detail and settings/auth-mode flows green
+- add screen-model tests for settings and key-detail state transitions, export state, delete flow, and modify-expiry presentation
+
+#### Phase 3
+
+- keep `EncryptionServiceTests`, `DecryptionServiceTests`, and relevant `StreamingServiceTests` coverage green
 - add screen-model tests for:
   - import/export state transitions
   - cancellation behavior
   - invalidation and cleanup behavior
-  - warning/confirmation state transitions
-- extend macOS smoke coverage when new ready-state ownership changes require it
-
-#### Phase 3
-
-- keep `ContactServiceTests` green
-- keep `TutorialSessionStoreTests` add-contact paths green
-- add screen-model tests for add-contact mode switching, QR/file import, and replacement confirmation flow
+  - warning and confirmation state transitions
+- extend macOS smoke coverage only if ready-state ownership changes require it
 
 #### Phase 4
+
+- keep `SigningServiceTests`, `StreamingServiceTests`, `ContactServiceTests`, and `TutorialSessionStoreTests` green
+- add screen-model tests for add-contact mode switching, QR/file import, and replacement confirmation flow
+- explicitly verify that contact persistence extraction did not duplicate or bypass App-layer confirmation workflow behavior
+
+#### Phase 5
 
 - keep `TutorialSessionStoreTests` green
 - keep `MacUISmokeTests` tutorial and settings launch flows green
 - add coordinator tests for onboarding/tutorial handoff and URL import coordination
 
-### 6.4 Device-Test Rule
+### 7.4 Device-Test Rule
 
-Device-only test plans are required only if a phase unexpectedly changes behavior close to device-auth or Secure Enclave semantics. The intended first-wave design should avoid that by keeping security behavior unchanged.
+Device-only test plans are required only if a phase unexpectedly changes behavior close to device-auth or Secure Enclave semantics. The intended structural refactor should avoid that by keeping security behavior unchanged.
 
-## 7. Review Checkpoints
+## 8. Review Checkpoints
 
-### 7.1 Documentation Gate
+### 8.1 Documentation Gate
 
 No code implementation starts until:
 
 - [SERVICE_VIEW_REFACTOR_ASSESSMENT](SERVICE_VIEW_REFACTOR_ASSESSMENT.md) is reviewed
 - this implementation specification is reviewed
-- the phase order is accepted without reopening the architecture scope
+- the five-phase order is accepted without reopening the architecture scope
 
-### 7.2 Per-Phase Design Review
+### 8.2 Per-Phase Design Review
 
 Before each phase starts, confirm:
 
@@ -411,7 +450,7 @@ Before each phase starts, confirm:
 - the tests that must be updated or added
 - whether any sensitive boundary is being approached
 
-### 7.3 Sensitive-Boundary Review
+### 8.3 Sensitive-Boundary Review
 
 If a phase touches or risks touching any of the following, human review is mandatory before merge:
 
@@ -421,7 +460,7 @@ If a phase touches or risks touching any of the following, human review is manda
 - `CypherAir.xcodeproj/project.pbxproj`
 - onboarding/tutorial launch and auth-mode confirmation behavior
 
-### 7.4 Behavior-Parity Review
+### 8.4 Behavior-Parity Review
 
 At the end of each phase, perform a behavior-parity review against current production expectations:
 
@@ -431,29 +470,16 @@ At the end of each phase, perform a behavior-parity review against current produ
 - no import/export naming changes
 - no changed settings semantics
 
-## 8. Deferred Items
+## 9. Deferred Items
 
-The following are explicitly deferred beyond the first refactor wave:
+The following are explicitly deferred beyond this structural refactor:
 
 - rewriting the tutorial state machine in `TutorialSessionStore`
 - unifying tutorial and production containers
 - narrowing or renaming public service facades
 - activating new product surfaces for `PasswordMessageService`
-- broad conversion of every key-related screen to a first-wave screen-model requirement
+- broad conversion of every key-related screen into a mandatory screen-model target
 - redesigning tutorial hub, onboarding copy, or tutorial host UX
 - changing Rust, Secure Enclave, Keychain, or auth-mode behavior semantics
 
-These deferments are intentional. They keep the first structural refactor focused on ownership boundaries and coordination flow.
-
-## 9. Execution Summary
-
-The future refactor should be treated as an architecture-preserving internal rewrite with strict compatibility constraints:
-
-- preserve facades
-- split internal ownership
-- move screen workflow logic into dedicated `@Observable` screen models
-- preserve tutorial `Configuration` compatibility
-- preserve current security semantics
-- move app-root coordination into dedicated coordinators
-
-If an implementation proposal cannot satisfy those constraints, it should be treated as out of spec for the first wave and deferred rather than folded into the same refactor.
+These deferments are intentional. They keep the refactor focused on ownership boundaries, workflow relocation, and compatibility flow.

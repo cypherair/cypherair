@@ -48,3 +48,4 @@ Changes to `Sources/App/`.
 - [ ] 44×44pt minimum touch targets
 - [ ] Liquid Glass compliance (see [LIQUID_GLASS.md](LIQUID_GLASS.md))
 - [ ] No business logic in views
+- [ ] If a screen model is introduced, the view retains layout, bindings, and presentation wiring only; workflow state, async actions, importer/exporter state, and cleanup move into the model

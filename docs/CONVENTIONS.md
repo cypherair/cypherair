@@ -86,6 +86,8 @@ struct ContentView: View {
 
 - Views are thin. No business logic in `body`. No network calls, no Keychain access, no crypto operations in views.
 - Views observe `@Observable` services injected via `@Environment` or `@State`.
+- Workflow-heavy screens may use an owning `@Observable` screen model. The route view reads `@Environment`, passes explicit dependencies into a private owning host view, and that host owns the model via `@State`. The model should not read `@Environment` directly.
+- When a screen model is used, move async orchestration, importer/exporter state, invalidation, cleanup, and transient confirmation/error state into the model. The view keeps layout, bindings, and lifecycle wiring only.
 - Extract complex subviews into separate files when `body` exceeds ~50 lines.
 - Use `ViewModifier` for reusable styling (e.g., the privacy screen blur overlay).
 
