@@ -15,6 +15,7 @@ final class SettingsScreenModel {
     private let authModeSwitchAction: AuthModeSwitchAction
 
     var pendingMode: AuthenticationMode?
+    private var pendingModeRequestID: UUID?
     var presentedAuthModeRequest: AuthModeChangeConfirmationRequest?
     var isSwitching = false
     var switchError: String?
@@ -75,16 +76,19 @@ final class SettingsScreenModel {
             return
         }
 
+        let requestID = UUID()
         pendingMode = newMode
+        pendingModeRequestID = requestID
         presentedAuthModeRequest = nil
 
         let request = SettingsAuthModeRequestBuilder.makeRequest(
+            id: requestID,
             for: newMode,
             hasBackup: hasBackup
         ) { [weak self] in
-            self?.confirmPendingModeChange()
+            self?.confirmPendingModeChange(requestID: requestID, mode: newMode)
         } onCancel: { [weak self] in
-            self?.cancelPendingModeChange()
+            self?.cancelPendingModeChange(requestID: requestID)
         }
 
         if let onAuthModeConfirmationRequested = configuration.onAuthModeConfirmationRequested {
@@ -97,7 +101,8 @@ final class SettingsScreenModel {
     }
 
     func dismissLocalModeRequest() {
-        cancelPendingModeChange()
+        guard let request = presentedAuthModeRequest else { return }
+        cancelPendingModeChange(requestID: request.id)
     }
 
     func dismissSwitchError() {
@@ -149,19 +154,28 @@ final class SettingsScreenModel {
         keyManagement.keys.contains(where: \.isBackedUp)
     }
 
-    private func confirmPendingModeChange() {
-        guard let pendingMode else { return }
-
-        presentedAuthModeRequest = nil
-        performModeSwitch(to: pendingMode)
+    private func confirmPendingModeChange(
+        requestID: UUID,
+        mode: AuthenticationMode
+    ) {
+        if presentedAuthModeRequest?.id == requestID {
+            presentedAuthModeRequest = nil
+        }
+        performModeSwitch(to: mode, requestID: requestID)
     }
 
-    private func cancelPendingModeChange() {
+    private func cancelPendingModeChange(requestID: UUID) {
+        guard pendingModeRequestID == requestID else { return }
+
         pendingMode = nil
+        pendingModeRequestID = nil
         presentedAuthModeRequest = nil
     }
 
-    private func performModeSwitch(to newMode: AuthenticationMode) {
+    private func performModeSwitch(
+        to newMode: AuthenticationMode,
+        requestID: UUID
+    ) {
         isSwitching = true
         let fingerprints = keyManagement.keys.map(\.fingerprint)
         let hasBackup = hasBackup
@@ -175,7 +189,11 @@ final class SettingsScreenModel {
                 showSwitchError = true
             }
 
-            pendingMode = nil
+            if pendingModeRequestID == requestID {
+                pendingMode = nil
+                pendingModeRequestID = nil
+                presentedAuthModeRequest = nil
+            }
             isSwitching = false
         }
     }

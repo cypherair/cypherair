@@ -2,13 +2,31 @@ import SwiftUI
 
 @MainActor
 struct AuthModeChangeConfirmationRequest: Identifiable {
-    let id = UUID()
+    let id: UUID
     let pendingMode: AuthenticationMode
     let title: String
     let message: String
     let requiresRiskAcknowledgement: Bool
     let onConfirm: @MainActor () -> Void
     let onCancel: @MainActor () -> Void
+
+    init(
+        id: UUID = UUID(),
+        pendingMode: AuthenticationMode,
+        title: String,
+        message: String,
+        requiresRiskAcknowledgement: Bool,
+        onConfirm: @escaping @MainActor () -> Void,
+        onCancel: @escaping @MainActor () -> Void
+    ) {
+        self.id = id
+        self.pendingMode = pendingMode
+        self.title = title
+        self.message = message
+        self.requiresRiskAcknowledgement = requiresRiskAcknowledgement
+        self.onConfirm = onConfirm
+        self.onCancel = onCancel
+    }
 }
 
 struct SettingsAuthModeConfirmationSheetView: View {

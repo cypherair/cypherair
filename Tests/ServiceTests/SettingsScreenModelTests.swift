@@ -154,6 +154,78 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_staleRequestConfirm_executesItsCapturedMode() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+
+        var capturedRequests: [AuthModeChangeConfirmationRequest] = []
+        var receivedModes: [AuthenticationMode] = []
+        var configuration = SettingsView.Configuration()
+        configuration.onAuthModeConfirmationRequested = { request in
+            capturedRequests.append(request)
+        }
+
+        let model = makeModel(configuration: configuration) { newMode, _, _ in
+            receivedModes.append(newMode)
+        }
+
+        model.handleAuthModeSelection(.highSecurity)
+        let firstRequest = try XCTUnwrap(capturedRequests.first)
+
+        config.authMode = .highSecurity
+        model.handleAuthModeSelection(.standard)
+
+        XCTAssertEqual(capturedRequests.count, 2)
+        XCTAssertEqual(model.pendingMode, .standard)
+
+        firstRequest.onConfirm()
+
+        await waitUntil("stale request confirm to finish") {
+            model.isSwitching == false
+        }
+
+        XCTAssertEqual(receivedModes, [.highSecurity])
+        XCTAssertEqual(config.authMode, .highSecurity)
+        XCTAssertEqual(model.pendingMode, .standard)
+    }
+
+    @MainActor
+    func test_staleRequestCancel_doesNotClearNewerPendingRequest() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+
+        var capturedRequests: [AuthModeChangeConfirmationRequest] = []
+        var receivedModes: [AuthenticationMode] = []
+        var configuration = SettingsView.Configuration()
+        configuration.onAuthModeConfirmationRequested = { request in
+            capturedRequests.append(request)
+        }
+
+        let model = makeModel(configuration: configuration) { newMode, _, _ in
+            receivedModes.append(newMode)
+        }
+
+        model.handleAuthModeSelection(.highSecurity)
+        let firstRequest = try XCTUnwrap(capturedRequests.first)
+
+        config.authMode = .highSecurity
+        model.handleAuthModeSelection(.standard)
+        let secondRequest = try XCTUnwrap(capturedRequests.last)
+
+        firstRequest.onCancel()
+
+        XCTAssertEqual(model.pendingMode, .standard)
+
+        secondRequest.onConfirm()
+
+        await waitUntil("newer request confirm to finish") {
+            model.isSwitching == false
+        }
+
+        XCTAssertEqual(receivedModes, [.standard])
+        XCTAssertEqual(config.authMode, .standard)
+        XCTAssertNil(model.pendingMode)
+    }
+
+    @MainActor
     func test_tutorialConfiguration_routesRequestToTutorialStore() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
         let store = TutorialSessionStore()

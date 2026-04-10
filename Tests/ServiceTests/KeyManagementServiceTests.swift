@@ -356,6 +356,24 @@ final class KeyManagementServiceTests: XCTestCase {
                       "Remaining key should become default after default deleted")
     }
 
+    func test_deleteKey_partialFailure_stillSyncsCurrentSessionState() async throws {
+        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
+        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
+
+        mockKC.deleteError = MockKeychainError.deleteFailed
+
+        XCTAssertThrowsError(try service.deleteKey(fingerprint: first.fingerprint)) { error in
+            guard case .keychainError(let message) = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError.keychainError, got \(error)")
+            }
+            XCTAssertTrue(message.contains("Partial key deletion"))
+        }
+
+        XCTAssertEqual(service.keys.map(\.fingerprint), [second.fingerprint])
+        XCTAssertEqual(service.defaultKey?.fingerprint, second.fingerprint)
+        XCTAssertTrue(try XCTUnwrap(service.keys.first).isDefault)
+    }
+
     func test_deleteKey_interruptedModifyExpiry_clearsRecoveryStateAndBlocksRestore() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: service)
         let fp = identity.fingerprint
@@ -501,6 +519,24 @@ final class KeyManagementServiceTests: XCTestCase {
 
         XCTAssertFalse(service.keys.first(where: { $0.fingerprint == first.fingerprint })!.isDefault)
         XCTAssertTrue(service.keys.first(where: { $0.fingerprint == second.fingerprint })!.isDefault)
+    }
+
+    func test_setDefaultKey_metadataSaveFailure_stillSyncsCurrentSessionState() async throws {
+        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
+        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
+
+        mockKC.saveError = MockKeychainError.saveFailed
+
+        XCTAssertThrowsError(try service.setDefaultKey(fingerprint: second.fingerprint)) { error in
+            guard let keychainError = error as? MockKeychainError,
+                  case .saveFailed = keychainError else {
+                return XCTFail("Expected MockKeychainError.saveFailed, got \(error)")
+            }
+        }
+
+        XCTAssertFalse(try XCTUnwrap(service.keys.first(where: { $0.fingerprint == first.fingerprint })).isDefault)
+        XCTAssertTrue(try XCTUnwrap(service.keys.first(where: { $0.fingerprint == second.fingerprint })).isDefault)
+        XCTAssertEqual(service.defaultKey?.fingerprint, second.fingerprint)
     }
 
     func test_defaultKey_returnsFirstDefault() async throws {
