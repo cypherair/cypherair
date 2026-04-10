@@ -21,32 +21,24 @@ struct SignView: View {
         static let `default` = Configuration()
     }
 
-    @Environment(SigningService.self) private var signingService
-    @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppConfiguration.self) private var config
-
     enum SignMode: String, CaseIterable {
-        case text, file
+        case text
+        case file
+
         var label: String {
             switch self {
-            case .text: String(localized: "sign.mode.text", defaultValue: "Text")
-            case .file: String(localized: "sign.mode.file", defaultValue: "File")
+            case .text:
+                String(localized: "sign.mode.text", defaultValue: "Text")
+            case .file:
+                String(localized: "sign.mode.file", defaultValue: "File")
             }
         }
     }
 
-    @State private var signMode: SignMode = .text
-    @State private var text = ""
-    @State private var signerFingerprint: String?
-    @State private var signedMessage: String?
-    @State private var detachedSignature: Data?
-    @State private var showFileImporter = false
-    @State private var selectedFileURL: URL?
-    @State private var selectedFileName: String?
-    @State private var operation = OperationController()
-    @State private var exportController = FileExportController()
-    @State private var textInputSectionEpoch = 0
-    
+    @Environment(SigningService.self) private var signingService
+    @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(AppConfiguration.self) private var config
+
     let configuration: Configuration
 
     init(configuration: Configuration = .default) {
@@ -54,10 +46,43 @@ struct SignView: View {
     }
 
     var body: some View {
+        SignScreenHostView(
+            signingService: signingService,
+            keyManagement: keyManagement,
+            config: config,
+            configuration: configuration
+        )
+    }
+}
+
+private struct SignScreenHostView: View {
+    @State private var model: SignScreenModel
+
+    init(
+        signingService: SigningService,
+        keyManagement: KeyManagementService,
+        config: AppConfiguration,
+        configuration: SignView.Configuration
+    ) {
+        _model = State(
+            initialValue: SignScreenModel(
+                signingService: signingService,
+                keyManagement: keyManagement,
+                config: config,
+                configuration: configuration
+            )
+        )
+    }
+
+    var body: some View {
+        @Bindable var model = model
+        let operation = model.operation
+        let exportController = model.exportController
+
         Form {
             Section {
-                Picker(String(localized: "sign.mode", defaultValue: "Mode"), selection: $signMode) {
-                    ForEach(SignMode.allCases, id: \.self) { mode in
+                Picker(String(localized: "sign.mode", defaultValue: "Mode"), selection: $model.signMode) {
+                    ForEach(SignView.SignMode.allCases, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
@@ -65,7 +90,7 @@ struct SignView: View {
                 .disabled(operation.isRunning)
             }
 
-            if signMode == .text {
+            if model.signMode == .text {
                 textSigningContent
                     .disabled(operation.isRunning)
             } else {
@@ -74,12 +99,12 @@ struct SignView: View {
             }
 
             Section {
-                if keyManagement.keys.count > 1 {
+                if model.signingKeys.count > 1 {
                     Picker(
                         String(localized: "sign.signingKey", defaultValue: "Signing Key"),
-                        selection: $signerFingerprint
+                        selection: $model.signerFingerprint
                     ) {
-                        ForEach(keyManagement.keys) { key in
+                        ForEach(model.signingKeys) { key in
                             Text(key.userId ?? key.shortKeyId)
                                 .tag(Optional(key.fingerprint))
                         }
@@ -90,15 +115,11 @@ struct SignView: View {
 
             Section {
                 Button {
-                    if signMode == .text {
-                        signText()
-                    } else {
-                        signFile()
-                    }
+                    model.sign()
                 } label: {
                     if operation.isRunning {
                         HStack {
-                            if signMode == .file, let progress = operation.progress {
+                            if model.signMode == .file, let progress = operation.progress {
                                 ProgressView(value: progress.fractionCompleted)
                                     .progressViewStyle(.linear)
                                 Text(
@@ -120,10 +141,10 @@ struct SignView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(signButtonDisabled)
+                .disabled(model.signButtonDisabled)
             }
 
-            if showsFileCancelAction {
+            if model.showsFileCancelAction {
                 Section {
                     if operation.isCancelling {
                         LabeledContent {
@@ -140,89 +161,51 @@ struct SignView: View {
                 }
             }
 
-            if signMode == .text, let signedMessage {
+            if model.signMode == .text, let signedMessage = model.signedMessage {
                 Section {
                     Text(signedMessage)
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
 
                     Button {
-                        if configuration.allowsClipboardWrite,
-                           configuration.outputInterceptionPolicy.interceptClipboardCopy?(
-                               signedMessage,
-                               config,
-                               .generic
-                           ) != true {
-                            operation.copyToClipboard(signedMessage, config: config)
-                        }
+                        model.copySignedMessageToClipboard()
                     } label: {
                         Label(
                             String(localized: "common.copy", defaultValue: "Copy"),
                             systemImage: "doc.on.doc"
                         )
                     }
-                    .disabled(!configuration.allowsClipboardWrite)
+                    .disabled(!model.configuration.allowsClipboardWrite)
 
                     Button {
-                        guard configuration.allowsTextResultExport else { return }
-                        do {
-                            let exportData = Data(signedMessage.utf8)
-                            if try configuration.outputInterceptionPolicy.interceptDataExport?(
-                                exportData,
-                                "signed.asc",
-                                .generic
-                            ) != true {
-                                try exportController.prepareDataExport(
-                                    exportData,
-                                    suggestedFilename: "signed.asc"
-                                )
-                            }
-                        } catch {
-                            operation.present(error: mapSigningError(error))
-                        }
+                        model.exportSignedMessage()
                     } label: {
                         Label(
                             String(localized: "common.save", defaultValue: "Save"),
                             systemImage: "square.and.arrow.down"
                         )
                     }
-                    .disabled(!configuration.allowsTextResultExport)
+                    .disabled(!model.configuration.allowsTextResultExport)
                 } header: {
                     Text(String(localized: "sign.result", defaultValue: "Signed Message"))
                 } footer: {
-                    if let resultRestrictionMessage = configuration.resultRestrictionMessage {
+                    if let resultRestrictionMessage = model.configuration.resultRestrictionMessage {
                         Text(resultRestrictionMessage)
                     }
                 }
             }
 
-            if signMode == .file, detachedSignature != nil {
+            if model.signMode == .file, model.detachedSignature != nil {
                 Section {
                     Button {
-                        guard let detachedSignature else { return }
-                        guard configuration.allowsFileResultExport else { return }
-                        do {
-                            let suggestedFilename = (selectedFileName ?? "file") + ".sig"
-                            if try configuration.outputInterceptionPolicy.interceptDataExport?(
-                                detachedSignature,
-                                suggestedFilename,
-                                .generic
-                            ) != true {
-                                try exportController.prepareDataExport(
-                                    detachedSignature,
-                                    suggestedFilename: suggestedFilename
-                                )
-                            }
-                        } catch {
-                            operation.present(error: mapSigningError(error))
-                        }
+                        model.exportDetachedSignature()
                     } label: {
                         Label(
                             String(localized: "sign.share.signature", defaultValue: "Save .sig File"),
                             systemImage: "square.and.arrow.down"
                         )
                     }
-                    .disabled(!configuration.allowsFileResultExport)
+                    .disabled(!model.configuration.allowsFileResultExport)
                 } header: {
                     Text(String(localized: "sign.detached.result", defaultValue: "Detached Signature"))
                 }
@@ -239,7 +222,7 @@ struct SignView: View {
             String(localized: "error.title", defaultValue: "Error"),
             isPresented: Binding(
                 get: { operation.isShowingError },
-                set: { if !$0 { operation.dismissError() } }
+                set: { if !$0 { model.dismissError() } }
             ),
             presenting: operation.error
         ) { _ in
@@ -251,82 +234,80 @@ struct SignView: View {
             String(localized: "clipboard.notice.title", defaultValue: "Copied to Clipboard"),
             isPresented: Binding(
                 get: { operation.isShowingClipboardNotice },
-                set: { if !$0 { operation.dismissClipboardNotice() } }
+                set: { if !$0 { model.dismissClipboardNotice() } }
             )
         ) {
             Button(String(localized: "clipboard.notice.dismiss", defaultValue: "OK")) {
-                operation.dismissClipboardNotice()
+                model.dismissClipboardNotice()
             }
             Button(String(localized: "clipboard.notice.dontShow", defaultValue: "Don't Show Again")) {
-                operation.dismissClipboardNotice(disableFutureNoticesIn: config)
+                model.dismissClipboardNotice(disableFutureNotices: true)
             }
         } message: {
             Text(String(localized: "clipboard.notice.message", defaultValue: "The signed message has been copied. Remember to clear your clipboard after pasting."))
         }
         .fileImporter(
-            isPresented: $showFileImporter,
+            isPresented: $model.showFileImporter,
             allowedContentTypes: [.data],
             allowsMultipleSelection: false
         ) { result in
             if case .success(let urls) = result, let url = urls.first {
-                selectedFileURL = url
-                selectedFileName = url.lastPathComponent
+                model.handleImportedFile(url)
             }
         }
         .fileExporter(
             isPresented: Binding(
                 get: { exportController.isPresented },
-                set: { if !$0 { exportController.finish() } }
+                set: { if !$0 { model.finishExport() } }
             ),
             item: exportController.payload,
             contentTypes: [.data],
             defaultFilename: exportController.defaultFilename
         ) { result in
-            exportController.finish()
+            model.finishExport()
             if case .failure(let exportError) = result {
-                operation.present(error: mapSigningError(exportError))
+                model.handleExportError(exportError)
             }
         }
         .onAppear {
-            signerFingerprint = keyManagement.defaultKey?.fingerprint
+            model.prepareIfNeeded()
         }
     }
 
-    // MARK: - Subviews
-
     @ViewBuilder
     private var textSigningContent: some View {
+        @Bindable var model = model
+
         Section {
             CypherMultilineTextInput(
-                text: $text,
+                text: $model.text,
                 mode: .prose
             )
-                .frame(
-                    minHeight: editorHeightRange.min,
-                    idealHeight: editorHeightRange.ideal,
-                    maxHeight: editorHeightRange.max
-                )
+            .frame(
+                minHeight: editorHeightRange.min,
+                idealHeight: editorHeightRange.ideal,
+                maxHeight: editorHeightRange.max
+            )
         } header: {
             Text(String(localized: "sign.input", defaultValue: "Message to Sign"))
         }
-        .id(textInputSectionEpoch)
+        .id(model.textInputSectionEpoch)
     }
 
     @ViewBuilder
     private var fileSigningContent: some View {
         Section {
             Button {
-                guard configuration.allowsFileInput else { return }
-                showFileImporter = true
+                model.requestFileImport()
             } label: {
                 Label(
                     String(localized: "sign.selectFile", defaultValue: "Select File"),
                     systemImage: "doc"
                 )
             }
-            .disabled(!configuration.allowsFileInput)
+            .disabled(!model.configuration.allowsFileInput)
 
-            if let selectedFileName {
+            if let selectedFileName = model.selectedFileName {
                 LabeledContent(
                     String(localized: "sign.selectedFile", defaultValue: "Selected"),
                     value: selectedFileName
@@ -335,80 +316,17 @@ struct SignView: View {
         } header: {
             Text(String(localized: "sign.file.header", defaultValue: "File to Sign"))
         } footer: {
-            if let fileRestrictionMessage = configuration.fileRestrictionMessage {
+            if let fileRestrictionMessage = model.configuration.fileRestrictionMessage {
                 Text(fileRestrictionMessage)
             }
         }
     }
 
-    // MARK: - State
-
-    private var signButtonDisabled: Bool {
-        if operation.isRunning { return true }
-        if keyManagement.defaultKey == nil && signerFingerprint == nil { return true }
-        switch signMode {
-        case .text: return text.isEmpty
-        case .file: return !configuration.allowsFileInput || selectedFileURL == nil
-        }
-    }
-
     private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
         #if canImport(UIKit)
-        return (110, 160, 240)
+        (110, 160, 240)
         #else
-        return (150, 220, 320)
+        (150, 220, 320)
         #endif
-    }
-
-    private var showsFileCancelAction: Bool {
-        signMode == .file && operation.isRunning && operation.progress != nil
-    }
-
-    // MARK: - Actions
-
-    private func signText() {
-        guard let signerFp = signerFingerprint ?? keyManagement.defaultKey?.fingerprint else { return }
-        let service = signingService
-        let message = text
-        signedMessage = nil
-        operation.run(mapError: mapSigningError) {
-            let signed = try await service.signCleartext(message, signerFingerprint: signerFp)
-            signedMessage = String(data: signed, encoding: .utf8)
-            textInputSectionEpoch &+= 1
-        }
-    }
-
-    private func signFile() {
-        guard let fileURL = selectedFileURL,
-              let signerFp = signerFingerprint ?? keyManagement.defaultKey?.fingerprint else { return }
-        let service = signingService
-        detachedSignature = nil
-        operation.runFileOperation(mapError: mapSigningError) { progress in
-            let sig = try await SecurityScopedFileAccess.withAccess(
-                to: [
-                    SecurityScopedAccessRequest(
-                        resource: fileURL,
-                        failure: .internalError(
-                            reason: String(
-                                localized: "sign.cannotAccessFile",
-                                defaultValue: "Cannot access selected file"
-                            )
-                        )
-                    )
-                ]
-            ) {
-                try await service.signDetachedStreaming(
-                    fileURL: fileURL,
-                    signerFingerprint: signerFp,
-                    progress: progress
-                )
-            }
-            try Task.checkCancellation()
-            detachedSignature = sig
-        }
-    }
-
-    private func mapSigningError(_ error: Error) -> CypherAirError {
-        CypherAirError.from(error) { .signingFailed(reason: $0) }
     }
 }

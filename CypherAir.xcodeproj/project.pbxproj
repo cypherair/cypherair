@@ -122,6 +122,7 @@
 				App/Shell/ScreenReadyModifier.swift,
 				App/Shell/SharedIOSTabShellView.swift,
 				App/Sign/SignView.swift,
+				App/Sign/SignScreenModel.swift,
 				App/Sign/VerifyView.swift,
 				"Extensions/Data+Zeroing.swift",
 				"Extensions/KeyProfile+Codable.swift",

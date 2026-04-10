@@ -182,22 +182,25 @@ The repository already has guidance for a screen-model pattern, but it does not 
 - establish the lifecycle forwarding contract for setup, invalidation, and cleanup
 - prove that existing `Configuration` types remain source-compatible with tutorial and production call sites
 - pin helper reuse rules so later phases default to ownership relocation rather than helper replacement
+- implement `SignView` as the first in-repo pilot of that pattern without changing its external call sites or behavior
 
 **Required outputs**
 
 - a single, documented screen-model ownership pattern that later phases must reuse
 - explicit lifecycle method conventions for preparation, cleanup, and invalidation
 - compatibility tests or assertions that protect current `Configuration` seams and launch/smoke wiring
+- `SignScreenModel` as the reference implementation for a route-view plus private-owning-host slice
 
 **Completion definition**
 
 - subsequent phases can introduce screen models without reopening ownership, dependency-injection, or cleanup design
 - tutorial production-page hosting still compiles and routes without changing existing `Configuration` call sites
+- `SignView` remains source-compatible at all current production and tutorial call sites while no longer directly owning operation/export workflow state
 
 **Out of scope**
 
 - service collaborator splits
-- production workflow migrations beyond what is strictly needed to lock the pattern
+- production workflow migrations beyond the `SignView` pilot and what is strictly needed to lock the pattern
 - app-root coordinator extraction
 
 ### 5.2 Phase 2: Key Lifecycle + Settings / Key Detail
