@@ -1869,6 +1869,9 @@ public func FfiConverterTypeCertificateMergeResult_lower(_ value: CertificateMer
 
 /**
  * Result of certificate-signature verification.
+ *
+ * Fingerprint fields are only populated after successful cryptographic
+ * verification. `Invalid` and `SignerMissing` results clear both fields.
  */
 public struct CertificateSignatureResult: Equatable, Hashable {
     /**
@@ -1880,11 +1883,13 @@ public struct CertificateSignatureResult: Equatable, Hashable {
      */
     public var certificationKind: CertificationKind?
     /**
-     * Primary fingerprint of the selected signer certificate when known.
+     * Primary fingerprint of the cryptographically confirmed signer
+     * certificate. Populated only when `status == Valid`.
      */
     public var signerPrimaryFingerprint: String?
     /**
-     * Signing subkey fingerprint when a non-primary signer key is selected.
+     * Signing subkey fingerprint when `status == Valid` and the successful
+     * verification path used a non-primary signer key.
      */
     public var signingKeyFingerprint: String?
 
@@ -1898,10 +1903,12 @@ public struct CertificateSignatureResult: Equatable, Hashable {
          * Certification kind for User ID binding signatures.
          */certificationKind: CertificationKind?, 
         /**
-         * Primary fingerprint of the selected signer certificate when known.
+         * Primary fingerprint of the cryptographically confirmed signer
+         * certificate. Populated only when `status == Valid`.
          */signerPrimaryFingerprint: String?, 
         /**
-         * Signing subkey fingerprint when a non-primary signer key is selected.
+         * Signing subkey fingerprint when `status == Valid` and the successful
+         * verification path used a non-primary signer key.
          */signingKeyFingerprint: String?) {
         self.status = status
         self.certificationKind = certificationKind

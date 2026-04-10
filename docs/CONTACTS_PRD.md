@@ -150,6 +150,9 @@ The target persistence model is:
 - one encrypted contacts vault file
 - versioned
 - stored under `Application Support`
+- encrypted with a random local contacts-vault master key
+- local vault master key protected by a dedicated Secure Enclave wrapping scheme
+- no plaintext search indexes or derivative contact caches persisted outside the vault
 - unlocked for the authenticated app session
 
 The vault is the source of truth for Contacts data after migration completes.
@@ -159,9 +162,12 @@ The vault is the source of truth for Contacts data after migration completes.
 The Contacts vault follows app session authentication semantics:
 
 - unlock after successful launch or resume authentication
+- remain unlocked for the current authenticated app session
 - relock after app lock, session loss, or grace-period expiry
+- ordinary Contacts browsing, search, tag/list management, and recipient selection do not trigger a separate Contacts-specific authentication prompt
+- exporting Contacts vault recovery data requires a fresh authentication immediately before export
 
-The Contacts vault does not mirror private-key per-operation gating and does not inherit the loss semantics of `Special Security Mode`.
+The Contacts vault does not mirror private-key per-operation gating and does not inherit the loss semantics of `Special Security Mode`. High-risk externalization actions such as export are treated separately from ordinary in-session use.
 
 ### 5.4 Recovery Position
 
@@ -172,8 +178,20 @@ The formal recovery direction for this initiative is:
 - contacts vault export
 - contacts vault import
 - restoration of contact identities, keys, tags, recipient lists, preferred-key state, and verification metadata
+- portable recovery artifacts protected by a user passphrase using a memory-hard KDF and authenticated encryption
+- import that restores Contacts state on a target device while re-establishing fresh device-local vault protection there
 
-System backup or device migration may still exist as environmental behavior, but they are not the sole product promise for Contacts recovery.
+The local contacts-vault master key is device-bound and uses `WhenUnlockedThisDeviceOnly` semantics. System backup or device migration may still exist as environmental behavior, but they are not the product promise for Contacts recovery.
+
+### 5.5 Failure Position
+
+Contacts vault failure states must remain explicit.
+
+Required product behavior:
+
+- locked vault state is presented as locked, not as an empty Contacts dataset
+- unreadable vault or undecryptable local vault key is presented as a `recovery needed` state
+- the app must not silently create a new empty vault or silently discard unreadable Contacts data
 
 ## 6. Search Requirements
 
@@ -399,6 +417,7 @@ After cutover succeeds:
 
 - legacy plaintext data enters a quarantine state
 - legacy plaintext is not kept as a permanent fallback
+- legacy plaintext is no longer loaded for search, recipient resolution, or routine Contacts display
 - final deletion happens only after the next successful opening of the new vault
 
 This creates a safer rollback window than immediate deletion while still honoring the privacy goal of eliminating long-lived plaintext contacts storage.
@@ -415,7 +434,11 @@ The product must support:
 The exact cryptographic packaging is a TDD concern, but product-level expectations are fixed:
 
 - the export is user-driven
+- the export requires a fresh authentication immediately before backup generation
+- the export requires a user passphrase and produces a passphrase-protected recovery artifact rather than a raw local vault file
+- the export is delivered through the system file export/share flow so the user chooses where the offline backup is stored
 - the import restores Contacts state coherently
+- the import re-establishes local device-bound protection on the target installation rather than transporting the original device's local wrapping material
 - recovery is not left as an implicit property of platform backup behavior alone
 
 ## 14. Authentication Mode Boundary
@@ -430,6 +453,8 @@ Boundary rule:
 
 - authentication modes define private-key access semantics
 - the Contacts vault follows app session authentication semantics
+- authentication modes do not add a routine second prompt for ordinary Contacts use inside an already authenticated app session
+- the Contacts vault does not require mode-coupled rewrap when private-key authentication mode changes
 - `Special Security Mode` does not redefine Contacts-vault recoverability or session unlock behavior
 
 ## 15. Acceptance Criteria
@@ -442,10 +467,15 @@ This initiative is product-complete only if all of the following are true:
 - users can merge contacts explicitly
 - multi-key contacts are understandable in the UI
 - preferred-key behavior is deterministic and user-controllable
+- entering Contacts or Encrypt during an already authenticated session does not trigger redundant Contacts-specific authentication prompts
+- grace-period expiry or app lock relocks Contacts access explicitly
 - decrypt does not silently lose signer recognition when the vault is locked
 - verify does not silently continue without full contacts-aware verification
 - legacy plaintext storage is retired through quarantine and next-successful-open deletion
 - contacts vault export/import exists in the product scope
+- contacts vault export requires fresh authentication and produces a passphrase-protected recovery artifact
+- passphrase-protected Contacts backup import restores state coherently on a new device or installation
+- vault damage or local key-unlock failure results in an explicit `recovery needed` state rather than an empty Contacts list
 - manual verification and certification are both represented clearly and separately
 
 ## 16. Product Scenarios
@@ -477,6 +507,27 @@ This initiative is product-complete only if all of the following are true:
 1. User exports Contacts vault recovery data.
 2. User later imports it.
 3. Contact identities, key records, tags, recipient lists, preferred-key state, and verification/certification integration state are restored coherently.
+
+### Scenario E: Use Contacts Within An Authenticated Session
+
+1. User has already completed app launch or resume authentication.
+2. User opens `Contacts` and later opens recipient selection in `Encrypt`.
+3. The app does not show a second Contacts-specific authentication prompt.
+4. If the grace period later expires, Contacts returns to an explicit locked state.
+
+### Scenario F: Export Contacts Recovery Data
+
+1. User opens the Contacts backup export action during an already unlocked session.
+2. App requires a fresh authentication before generating the backup.
+3. User enters a backup passphrase.
+4. App produces a passphrase-protected portable recovery artifact and hands it to the system export flow so the user can choose where to save it.
+
+### Scenario G: Contacts Vault Recovery Needed
+
+1. App starts and the local Contacts vault cannot be opened because the vault is damaged or the local vault key cannot be unwrapped.
+2. `Contacts` does not appear empty.
+3. The app presents an explicit `recovery needed` state.
+4. The user is directed toward import-based recovery rather than silent reset.
 
 ## 17. Out Of Scope For This Document
 

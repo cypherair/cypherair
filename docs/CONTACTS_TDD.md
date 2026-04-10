@@ -16,6 +16,7 @@ This TDD covers:
 - person-centered Contacts modeling
 - multi-key contact support
 - contacts vault architecture
+- contacts-vault cryptographic container and vault-key protection
 - search, tags, recipient lists, and merge behavior
 - manual verification and certification integration
 - migration, quarantine, and final legacy deletion
@@ -30,10 +31,12 @@ The implementation must satisfy these principles:
 - person-centered contact management
 - offline-only operation
 - no plaintext source of truth for the Contacts domain after migration
+- no plaintext derivative caches persisted outside the encrypted vault
 - session-authenticated contacts access
 - deterministic behavior for multi-key contacts
 - conservative identity-linking behavior
 - explicit recovery path for user data
+- deterministic crash recovery with no silent reset to an empty vault
 - stable UI dependency through a single `ContactService` facade
 
 ## 3. Domain Model
@@ -291,15 +294,45 @@ Normalization is applied at write time, not only at display time.
 
 The Contacts domain source of truth is one encrypted, versioned contacts vault file stored under `Application Support`.
 
-The vault contains:
+Primary on-disk artifacts:
+
+- `contacts.vault` - current authoritative generation
+- `contacts.vault.previous` - previous readable generation retained for rollback
+- `contacts.vault.pending` - transient staging file during write or startup recovery
+
+The vault payload contains:
 
 - `ContactIdentity` records
 - `ContactKeyRecord` records
 - recipient lists
 - normalized tag representations or equivalent
+- certification projection state and reconciliation metadata
 - vault metadata
 
-### 7.2 Runtime Model
+No plaintext search index, tag cache, recipient-resolution cache, or signer-recognition cache may be persisted outside the encrypted vault payload.
+
+### 7.2 Cryptographic Container
+
+`contacts.vault` is stored as a versioned envelope.
+
+Required envelope fields:
+
+- vault format version
+- vault-wrap version
+- generation counter
+- random 96-bit nonce
+- ciphertext
+- AEAD authentication tag
+- minimal pre-decryption metadata required for deterministic recovery
+
+Cryptographic requirements:
+
+- encrypt the serialized vault payload with `AES.GCM` using `contactsVaultMasterKey`
+- bind envelope metadata through AEAD associated data
+- any header mismatch, AEAD tag failure, or associated-data mismatch is a hard failure
+- unreadable ciphertext must not produce partial plaintext or partial runtime state
+
+### 7.3 Runtime Model
 
 Runtime state is loaded from the vault after successful contacts-vault unlock.
 
@@ -309,33 +342,76 @@ The unlocked runtime state contains:
 - key graph
 - recipient list graph
 - search index
+- contacts-aware signer-recognition lookup cache
 
-### 7.3 Write Model
+`ContactService` exposes three runtime states:
+
+- `locked`
+- `unlocked`
+- `recoveryNeeded`
+
+`recoveryNeeded` is entered when no readable vault generation can be recovered or the local wrapped master key cannot be unwrapped.
+
+### 7.4 Write And Recovery Model
+
+`ContactsVaultStore` is a single-writer subsystem.
 
 Write sequence:
 
 1. mutate unlocked in-memory model
-2. serialize a new vault payload
-3. encrypt the payload
-4. write to a temporary file
-5. verify structural readability
-6. atomically replace the current vault
+2. serialize a canonical vault snapshot
+3. encrypt the payload into a new envelope using the next generation counter and a fresh random nonce
+4. write the envelope to `contacts.vault.pending`
+5. read back `contacts.vault.pending`, decrypt it, and parse it to verify structural readability before promotion
+6. atomically promote the existing `contacts.vault` to `contacts.vault.previous`
+7. atomically promote `contacts.vault.pending` to `contacts.vault`
+8. remove stale pending artifacts only after successful promotion
+
+Startup recovery sequence:
+
+1. inspect `current`, `previous`, and `pending`
+2. attempt to open each candidate using the local wrapped master key
+3. keep only structurally valid, decryptable generations
+4. select the highest readable generation as authoritative
+5. select the next-highest readable generation, if any, as `previous`
+6. if no readable generation exists or the local wrapped master key cannot be unwrapped, enter `recoveryNeeded`
+
+The implementation must never silently create a new empty vault because a previous generation is unreadable.
 
 ## 8. Vault Key And Session Lifecycle
 
 ### 8.1 Vault Key
 
-The contacts vault master key is Keychain-protected.
+`contactsVaultMasterKey` is a random 256-bit symmetric key.
+
+The master key is never stored in plaintext. It is wrapped using a dedicated Secure Enclave wrapping key and a contacts-specific wrapping context.
+
+Required Keychain namespace:
+
+- `com.cypherair.contacts.v1.vault-se-key`
+- `com.cypherair.contacts.v1.vault-salt`
+- `com.cypherair.contacts.v1.vault-sealed-master-key`
+- `com.cypherair.contacts.v1.vault-metadata`
+
+Required properties:
+
+- `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` for all vault-key Keychain items
+- a contacts-specific wrap version distinct from private-key wrapping
+- a contacts-specific HKDF info string such as `CypherAir-Contacts-Vault-Wrap-v1`
+- device-bound local protection that does not attempt to survive device migration, backup restore, or Secure Enclave loss
 
 This document does not redefine the final certification feature or private-key access-control implementation. It does define the contacts-vault lifecycle:
 
 - session-auth-gated
 - not per-operation gated
+- not rewrapped when private-key authentication mode changes
 - not bound to private-key loss semantics from `Special Security Mode`
 
 ### 8.2 Unlock Lifecycle
 
 The vault unlocks after successful app launch or resume authentication.
+
+`ContactsVaultKeyManager` unwraps `contactsVaultMasterKey` once per authenticated app session by reusing the authenticated context from the launch or resume authentication path. Ordinary Contacts browsing, search, tag/list management, and recipient selection reuse this in-memory session unlock and do not trigger an additional Contacts-specific prompt.
 
 The vault relocks when:
 
@@ -346,19 +422,35 @@ The vault relocks when:
 
 Relock invalidates:
 
+- in-memory `contactsVaultMasterKey`
 - decrypted vault contents in memory
+- serialization scratch buffers that held plaintext vault bytes
 - in-memory search indexes
 - contacts-aware signer-recognition lookup state
 
-### 8.3 Locked-State UX Contract
+All sensitive buffers listed above must be zeroized rather than merely dereferenced.
 
-Locked vault state is explicit.
+### 8.3 Export Authentication Boundary
+
+Contacts backup export is treated as a high-risk externalization action.
+
+Required behavior:
+
+- export requires an already unlocked Contacts session
+- export requires a fresh authentication immediately before snapshot generation
+- import requires an unlocked app session but does not require a second fresh-auth prompt beyond session unlock
+
+### 8.4 Locked-State And Recovery UX Contract
+
+Locked and unrecoverable vault states are explicit.
 
 Required runtime/UI contract:
 
 - `Contacts` shows a locked state, not an empty state
 - `Encrypt` shows locked recipient state, not an empty recipient list
 - actions that need unlocked Contacts data are blocked or placed into pending state according to product rules
+- `Contacts` shows a `recoveryNeeded` state when the local vault cannot be opened and no readable fallback generation exists
+- `recoveryNeeded` offers import-based recovery guidance rather than silent reset
 
 ## 9. Decrypt And Verify Integration
 
@@ -401,9 +493,11 @@ Contacts assumes a pre-existing certification feature and integrates with it.
 
 Contacts-side requirements:
 
-- each `ContactKeyRecord` stores certification state from the certification system
+- each `ContactKeyRecord` stores a certification projection used by Contacts surfaces
+- each stored certification projection includes enough source reference or revision information for later reconciliation
 - contact detail exposes certification actions
 - import flow does not perform certification
+- unlock and import flows may trigger reconciliation against the certification subsystem so stale projected state can be corrected
 - Contacts surfaces keep manual verification and certification visually separate
 
 Contacts does not define:
@@ -440,6 +534,7 @@ Quarantine requirements:
 - old plaintext is no longer treated as active source of truth
 - old plaintext is not deleted immediately on first cutover success
 - old plaintext remains available only as a short rollback safety window
+- old plaintext is not loaded into normal search, recipient selection, or Contacts display paths during quarantine
 - final deletion requires one later successful vault-open confirmation
 
 ### 11.4 Interrupted Migration
@@ -454,20 +549,63 @@ If migration is interrupted:
 
 The Contacts subsystem must provide a first-class export/import path.
 
-Minimum technical direction:
+### 12.1 Export Package
 
-- export produces a portable recovery artifact
-- import restores vault contents into a new contacts vault on the target device or installation
-- restored state must include:
-  - contact identities
-  - key records
-  - tags
-  - recipient lists
-  - preferred-key selection
-  - manual verification state
-  - certification integration state as exposed to the Contacts subsystem
+Export produces a portable recovery artifact rather than a copy of the raw local vault file.
 
-The exact packaging and passphrase/keying model remains an implementation detail, but export/import is not optional.
+Required export envelope fields:
+
+- export format version
+- Argon2id parameters
+- random nonce
+- ciphertext
+- AEAD authentication tag
+- minimal metadata required to validate and open the export package
+
+The encrypted export payload restores:
+
+- contact identities
+- key records
+- tags
+- recipient lists
+- preferred-key selection
+- manual verification state
+- certification integration state as exposed to the Contacts subsystem
+
+Export encryption requirements:
+
+- require a user passphrase for every export
+- derive the export encryption key with the app's canonical Argon2id backup profile
+- encrypt the export payload with `AES.GCM`
+- never export the local device-bound wrapped master key or any source-device Secure Enclave wrapping material
+
+### 12.2 Export Flow
+
+Export flow:
+
+1. require a currently unlocked Contacts session
+2. require a fresh authentication immediately before export
+3. serialize a canonical contacts snapshot from unlocked runtime state
+4. derive an export key from the user passphrase using Argon2id
+5. encrypt the snapshot into the versioned export envelope
+6. write a temporary export file for the system file exporter / Share Sheet
+7. delete the temporary export file after completion or cancellation
+
+The implementation must reuse the existing memory-safety posture for Argon2id-backed operations and refuse import-time Argon2id parameters that exceed the app's memory guard threshold.
+
+### 12.3 Import Flow
+
+Import flow:
+
+1. open the portable recovery artifact
+2. validate the encoded Argon2id parameters against the memory guard before key derivation
+3. derive the export key from the user passphrase
+4. decrypt and parse the exported contacts snapshot
+5. generate a brand-new local `contactsVaultMasterKey` on the target installation
+6. wrap the new local master key with the target device's dedicated Secure Enclave wrapping key
+7. write the imported snapshot as a fresh local vault generation
+
+Import restores vault contents into a new contacts vault on the target device or installation. The source device's local wrapping material is never migrated.
 
 ## 13. Service Architecture
 
@@ -483,11 +621,17 @@ Planned subsystem components:
 
 Responsibilities:
 
-- `ContactService`: UI-facing state and orchestration
-- `ContactsVaultStore`: encrypted vault read/write and atomic replacement
-- `ContactsVaultKeyManager`: vault key access and session unlock/relock behavior
+- `ContactService`: UI-facing state, orchestration, and `locked` / `unlocked` / `recoveryNeeded` runtime state
+- `ContactsVaultStore`: vault-envelope encode/decode, atomic generation promotion, and startup recovery
+- `ContactsVaultKeyManager`: local vault-key creation, Secure Enclave wrapping, session unlock/relock behavior, export fresh-auth enforcement, and memory zeroization
 - `ContactsMigrationCoordinator`: legacy import, quarantine, and final cleanup flow
 - `ContactsSearchIndex`: in-memory search and ranking over unlocked contacts data
+
+Minimum supporting internal types:
+
+- `ContactsVaultEnvelopeHeader`
+- `ContactsVaultGeneration`
+- `ContactsVaultRecoveryState`
 
 ## 14. Validation Matrix
 
@@ -520,16 +664,29 @@ Responsibilities:
 - decrypt completes plaintext while verification stays pending
 - verify requires unlock
 - unlock cancel/failure results in hard stop for verify
+- ordinary Contacts use within an already authenticated app session does not trigger redundant prompts
+- export requires fresh authentication and cancellation produces no offline backup file
 
-### 14.5 Migration And Recovery
+### 14.5 Vault Integrity And Recovery
+
+- incorrect AEAD tag hard-fails
+- incorrect envelope header or associated data hard-fails
+- local wrapped master-key unwrap failure enters `recoveryNeeded`
+- startup recovery from `pending` / `current` / `previous` is deterministic
+- unreadable vault never silently resets to an empty dataset
+- relock zeroizes in-memory search and signer-recognition state
+
+### 14.6 Migration And Recovery
 
 - cutover succeeds
 - quarantine is created
+- quarantine storage is inactive for normal Contacts resolution
 - final deletion happens only after next successful vault open
 - interrupted migration recovers deterministically
 - export/import restores contacts state coherently
+- import with wrong passphrase fails gracefully
 
-### 14.6 Search And Tags
+### 14.7 Search And Tags
 
 - exact/prefix/substring ranking tiers work as specified
 - tag normalization prevents common duplicates
@@ -540,6 +697,5 @@ Responsibilities:
 This document does not define:
 
 - the internals of the certification feature
-- the final vault cryptographic container format
-- passphrase UX for export/import
+- the final localized UI copy for passphrase education and recovery messaging
 - implementation details for unrelated canonical documents outside the Contacts initiative

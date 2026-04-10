@@ -230,9 +230,10 @@ When changing certificate-signature verification or User ID certification behavi
 - all four OpenPGP certification kinds: `Generic`, `Persona`, `Casual`, and `Positive`
 - verify-result `certificationKind` matching the signature type for User ID certification signatures
 - signer fingerprint contract coverage:
-- primary signer path returns the signer certificate primary fingerprint and no subkey fingerprint
-- certification-subkey signer path returns the signer certificate primary fingerprint plus the selected subkey fingerprint
-- `SignerMissing` returns neither fingerprint
+- `Valid` + primary signer path returns the signer certificate primary fingerprint and no subkey fingerprint
+- `Valid` + certification-subkey signer path returns the signer certificate primary fingerprint plus the selected subkey fingerprint
+- `Invalid` clears both fingerprint fields
+- `SignerMissing` clears both fingerprint fields
 - public-only certification input rejection and secret-cert-with-no-usable-certifier rejection
 
 ## 2.6 Richer Signature Result Coverage
