@@ -7,22 +7,17 @@ on:
       - main
 
 jobs:
-  rust-fast-tests:
+  rust-full-tests:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Run Rust fast suite
+      - name: Run full Rust suite
         run: |
-          cargo test --manifest-path pgp-mobile/Cargo.toml --lib
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test cross_profile_tests
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test gnupg_binary_tests
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test gnupg_interop_tests
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_a_tests
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test qr_url_tests
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test security_audit_tests
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test streaming_tests
+          cargo test --manifest-path pgp-mobile/Cargo.toml
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
 
   swift-unit-tests:
     runs-on: macos-26

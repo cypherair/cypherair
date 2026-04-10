@@ -140,8 +140,9 @@ Rules:
 Target coordinator boundaries:
 
 - `AppPresentationCoordinator`
-  - owns onboarding/tutorial presentation state and handoff rules
-  - wraps and reuses the current `TutorialOnboardingHandoffState` and environment presentation bridges
+  - owns cross-platform presentation state, handoff rules, and top-level presentation decisions for onboarding, tutorial, and other app-owned presentation flows
+  - reuses the current `TutorialOnboardingHandoffState` as the iOS-specific handoff mechanism inside a broader coordinator design, rather than treating that state as the whole coordinator
+  - is the long-term owner of presentation decisions currently split across `CypherAirApp`, `MacSettingsRootView`, and related presentation entry points
 - `IncomingURLImportCoordinator`
   - owns `cypherair://` public-key import coordination, import confirmation presentation, and related alert state
   - wraps and reuses the current import loader/workflow/coordinator seams rather than replacing them wholesale
@@ -151,6 +152,7 @@ Rules:
 - startup behavior currently performed by `AppStartupCoordinator` remains intact
 - tutorial launch semantics and onboarding dismissal rules remain unchanged
 - global alert content and timing remain unchanged
+- `MacPresentationHost`, `MacPresentationController`, and comparable host wrappers may remain as rendering/bridging adapters; the coordinator contract is about centralizing state and decision ownership, not about eliminating every host type
 
 ## 4. Front-Loaded Design Gates
 
@@ -160,7 +162,7 @@ Before any broad implementation phase starts, the following must be locked expli
 2. the lifecycle contract for current `onAppear` / `onDisappear` / `onChange` behavior on target screens
 3. the `ContactService` boundary against existing App-layer import helpers
 4. the exact compatibility expectations for tutorial `Configuration` callbacks
-5. the validation plan for launch, settings, and tutorial smoke coverage through `CypherAir-MacUITests`
+5. the validation plan for launch, settings, and tutorial smoke coverage through `CypherAir-MacUITests`, including the presentation-ownership assumptions that span iOS and macOS paths
 
 No phase may proceed on the assumption that these are "local implementation details." They are repo-wide architecture decisions.
 
@@ -209,6 +211,7 @@ The repository already has guidance for a screen-model pattern, but it does not 
 - internal split of `KeyManagementService`
 - `SettingsScreenModel`
 - `KeyDetailScreenModel`
+- auth-mode confirmation request shaping and the settings-owned presentation compatibility needed to keep the full settings/auth-mode flow coherent across iOS, macOS, and fallback presentation paths
 - minimal adapter work needed to keep key-detail and settings flows compatible with the new internals
 
 **Required outputs**
@@ -216,12 +219,14 @@ The repository already has guidance for a screen-model pattern, but it does not 
 - `KeyManagementService` facade preserved
 - internal collaborator boundaries established behind the facade
 - `SettingsView` no longer directly coordinates auth-mode switching or presentation fallback state
+- the settings/auth-mode surface is treated as one refactor target, including the state and decision flow that feeds confirmation requests, confirmation presentation, and launch-triggered macOS settings presentation
 - `KeyDetailView` no longer directly owns export/delete/revocation/expiry workflow state
 
 **Completion definition**
 
 - callers still use `KeyManagementService`
 - key detail and settings retain current behavior
+- completing Phase 2 means the auth-mode flow's state and decisions are no longer scattered across multiple settings-related UI entry points, even if dedicated confirmation views and host adapters still exist
 - no behavior change to auth-mode warnings, mode switching, revocation export, default-key changes, delete flow, or modify-expiry flow
 
 **What this phase proves for later phases**
@@ -232,6 +237,7 @@ The repository already has guidance for a screen-model pattern, but it does not 
 **Out of scope**
 
 - `AuthenticationManager` behavior changes
+- removing `SettingsAuthModeConfirmationSheetView`, `MacSettingsRootView`, or `MacPresentationHost` as UI host/adaptation types
 - `KeyGenerationView`, `ImportKeyView`, `BackupKeyView`, and `ModifyExpirySheetView` full screen-model conversion
 
 ### 5.3 Phase 3: Encrypt / Decrypt Reference Slice
@@ -326,19 +332,24 @@ Once the long-running tool-screen pattern is proven, the remaining workflow-heav
 - `AppPresentationCoordinator`
 - `IncomingURLImportCoordinator`
 - relocation of remaining app-root coordination into those coordinators
+- consolidation of presentation-state and presentation-decision ownership currently split across iOS app-root flows and macOS presentation entry points
 - adaptation of tutorial host layers to the final screen-model-backed production pages
 
 **Required outputs**
 
 - `CypherAirApp` is reduced to composition and top-level scene wiring
-- onboarding/tutorial handoff logic moves behind a dedicated coordinator that reuses the current handoff state machinery
+- onboarding/tutorial handoff logic moves behind a dedicated coordinator that reuses the current handoff state machinery where appropriate
 - URL import coordination moves out of the app root and reuses the current import loader/workflow/coordinator seams
+- cross-platform presentation ownership is centralized even if platform-specific hosts such as `MacPresentationHost` remain in place as rendering adapters
 - tutorial host wrappers remain compatible with production-page configuration
 
 **Completion definition**
 
 - tutorial launch, replay, and dismissal behavior are unchanged
 - startup warnings and import alerts are unchanged
+- iOS sheet/fullScreenCover/alert/onOpenURL coordination is no longer primarily owned by `CypherAirApp`
+- macOS onboarding/tutorial/auth/import presentation state is also driven by the shared coordination layer rather than by isolated per-entry-point decision logic
+- host modifiers and wrappers remain responsible for rendering and environment bridging, not for owning the main presentation decisions
 - production pages still render correctly in tutorial and onboarding-connected contexts
 - `CypherAirApp` no longer owns the main presentation-state and URL-import coordination logic directly
 
@@ -413,6 +424,7 @@ Every phase must end with:
 - keep `KeyManagementServiceTests` green
 - keep `MacUISmokeTests` key-detail and settings/auth-mode flows green
 - add screen-model tests for settings and key-detail state transitions, export state, delete flow, and modify-expiry presentation
+- cover auth-mode confirmation flow across the macOS presentation path and the launch-triggered macOS settings path, not just the in-view picker interaction
 
 #### Phase 3
 
@@ -436,6 +448,7 @@ Every phase must end with:
 - keep `TutorialSessionStoreTests` green
 - keep `MacUISmokeTests` tutorial and settings launch flows green
 - add coordinator tests for onboarding/tutorial handoff and URL import coordination
+- cover both reuse of iOS handoff state and macOS presentation-state routing, rather than testing only the iOS tutorial handoff path
 
 ### 7.4 Device-Test Rule
 
