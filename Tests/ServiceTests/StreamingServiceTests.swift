@@ -221,6 +221,44 @@ final class StreamingServiceTests: XCTestCase {
         }
     }
 
+    func test_verifyDetachedStreaming_cancellation_throwsOperationCancelled() async throws {
+        let signer = try await generateKeyAndContact(profile: .universal, name: "Verify Signer")
+
+        let fileData = Data(repeating: 0x42, count: 256 * 1024)  // 256 KB
+        let inputURL = try writeTempFile(fileData)
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+
+        let signature = try await stack.signingService.signDetachedStreaming(
+            fileURL: inputURL,
+            signerFingerprint: signer.fingerprint,
+            progress: nil
+        )
+
+        let progress = FileProgressReporter()
+        progress.cancel()
+
+        do {
+            _ = try await stack.signingService.verifyDetachedStreaming(
+                fileURL: inputURL,
+                signature: signature,
+                progress: progress
+            )
+            XCTFail("Expected operationCancelled error")
+        } catch let error as CypherAirError {
+            if case .operationCancelled = error {
+                // Expected
+            } else {
+                XCTFail("Expected operationCancelled, got: \(error)")
+            }
+        } catch let error as PgpError {
+            if case .OperationCancelled = error {
+                // Expected
+            } else {
+                XCTFail("Expected OperationCancelled, got: \(error)")
+            }
+        }
+    }
+
     // MARK: - Insufficient Disk Space
 
     func test_encryptFileStreaming_insufficientDiskSpace_throws() async throws {

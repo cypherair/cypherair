@@ -13,6 +13,7 @@
 //!   `PgpError::OperationCancelled` and cleans up partial output.
 
 use std::fs::{self, File, OpenOptions};
+use std::fmt;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
@@ -23,7 +24,10 @@ use openpgp::serialize::stream::{Encryptor, LiteralWriter, Message};
 use sequoia_openpgp as openpgp;
 use zeroize::Zeroizing;
 
-use crate::decrypt::{classify_decrypt_error, is_expired_error, DecryptHelper, SignatureStatus};
+use crate::decrypt::{
+    classify_decrypt_error, is_expired_error, parse_verification_certs, DecryptHelper,
+    SignatureStatus,
+};
 use crate::encrypt;
 use crate::error::PgpError;
 use crate::sign;
@@ -87,6 +91,62 @@ impl<R: Read> Read for ProgressReader<R> {
     }
 }
 
+/// Marker error for detached verify cancellation.
+///
+/// `buffered-reader` automatically retries `io::ErrorKind::Interrupted`, so detached
+/// file verification needs a distinct non-retryable error to propagate cancellation.
+#[derive(Debug)]
+struct DetachedVerifyCancelled;
+
+impl fmt::Display for DetachedVerifyCancelled {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Operation cancelled by user")
+    }
+}
+
+impl std::error::Error for DetachedVerifyCancelled {}
+
+/// Reader used only for detached file verification.
+///
+/// Unlike `ProgressReader`, cancellation is surfaced as a non-retryable error so that
+/// `buffered-reader` does not transparently retry reads and hang the operation.
+struct DetachedVerifyProgressReader<R: Read> {
+    inner: R,
+    bytes_read: u64,
+    total_bytes: u64,
+    reporter: Option<Arc<dyn ProgressReporter>>,
+}
+
+impl<R: Read> DetachedVerifyProgressReader<R> {
+    fn new(inner: R, total_bytes: u64, reporter: Option<Arc<dyn ProgressReporter>>) -> Self {
+        Self {
+            inner,
+            bytes_read: 0,
+            total_bytes,
+            reporter,
+        }
+    }
+}
+
+impl<R: Read> Read for DetachedVerifyProgressReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.bytes_read += n as u64;
+
+        if let Some(ref reporter) = self.reporter {
+            let should_continue = reporter.on_progress(self.bytes_read, self.total_bytes);
+            if !should_continue {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    DetachedVerifyCancelled,
+                ));
+            }
+        }
+
+        Ok(n)
+    }
+}
+
 // ── Zeroing Copy Utilities ─────────────────────────────────────────────
 
 /// Internal error type for zeroing_copy that preserves the original io::Error
@@ -134,6 +194,32 @@ fn zeroing_copy<R: Read, W: Write>(
     }
 
     Ok(total)
+}
+
+/// Map detached file verify runtime errors that originate from the streaming reader.
+///
+/// Detached verification failures are graded results, but file-read failures and user
+/// cancellation must still surface as hard errors instead of collapsing to `Bad`.
+fn classify_detached_verify_reader_error(error: &openpgp::anyhow::Error) -> Option<PgpError> {
+    for cause in error.chain() {
+        if cause.downcast_ref::<DetachedVerifyCancelled>().is_some() {
+            return Some(PgpError::OperationCancelled);
+        }
+        if let Some(io_error) = cause.downcast_ref::<std::io::Error>() {
+            if io_error
+                .get_ref()
+                .and_then(|inner| inner.downcast_ref::<DetachedVerifyCancelled>())
+                .is_some()
+            {
+                return Some(PgpError::OperationCancelled);
+            }
+            return Some(PgpError::FileIoError {
+                reason: format!("Read failed: {io_error}"),
+            });
+        }
+    }
+
+    None
 }
 // ── Secure File Deletion ───────────────────────────────────────────────
 
@@ -467,15 +553,7 @@ pub fn verify_detached_file(
     progress: Option<Arc<dyn ProgressReporter>>,
 ) -> Result<VerifyResult, PgpError> {
     let policy = StandardPolicy::new();
-
-    // Parse verification key certificates
-    let mut certs = Vec::new();
-    for key_data in verification_keys {
-        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
-            reason: format!("Invalid verification key: {e}"),
-        })?;
-        certs.push(cert);
-    }
+    let certs = parse_verification_certs(verification_keys)?;
 
     let helper = VerifyHelper::new(&certs);
 
@@ -508,10 +586,14 @@ pub fn verify_detached_file(
         reason: format!("Cannot open data file '{}': {e}", data_path),
     })?;
     let total_bytes = data_file.metadata().map(|m| m.len()).unwrap_or(0);
-    let mut progress_reader = ProgressReader::new(data_file, total_bytes, progress);
+    let mut progress_reader = DetachedVerifyProgressReader::new(data_file, total_bytes, progress);
 
     // Verify by streaming the data through the verifier
-    if verifier.verify_reader(&mut progress_reader).is_err() {
+    if let Err(error) = verifier.verify_reader(&mut progress_reader) {
+        if let Some(classified) = classify_detached_verify_reader_error(&error) {
+            return Err(classified);
+        }
+
         let helper = verifier.into_helper();
         return Ok(VerifyResult {
             status: SignatureStatus::Bad,
@@ -536,29 +618,60 @@ pub fn verify_detached_file_detailed(
     verification_keys: &[Vec<u8>],
     progress: Option<Arc<dyn ProgressReporter>>,
 ) -> Result<FileVerifyDetailedResult, PgpError> {
+    let policy = StandardPolicy::new();
+    let certs = parse_verification_certs(verification_keys)?;
+    let helper = VerifyHelper::new(&certs);
+
+    let verifier_result = DetachedVerifierBuilder::from_bytes(signature)
+        .map_err(|e| PgpError::CorruptData {
+            reason: format!("Failed to parse signature: {e}"),
+        })?
+        .with_policy(&policy, None, helper);
+
+    // Match the current early-setup grading: no observed per-signature results means
+    // an empty detailed array and a legacy Bad/Expired status.
+    let mut verifier = match verifier_result {
+        Ok(v) => v,
+        Err(e) => {
+            let status = if is_expired_error(&e) {
+                SignatureStatus::Expired
+            } else {
+                SignatureStatus::Bad
+            };
+            return Ok(FileVerifyDetailedResult {
+                legacy_status: status,
+                legacy_signer_fingerprint: None,
+                signatures: Vec::new(),
+            });
+        }
+    };
+
     let data_file = File::open(data_path).map_err(|e| PgpError::FileIoError {
         reason: format!("Cannot open data file '{}': {e}", data_path),
     })?;
     let total_bytes = data_file.metadata().map(|m| m.len()).unwrap_or(0);
-    let mut progress_reader = ProgressReader::new(data_file, total_bytes, progress);
-    let mut data = Vec::new();
-    if let Err(error) = zeroing_copy(&mut progress_reader, &mut data, STREAM_BUFFER_SIZE) {
-        return Err(match error {
-            CopyError::Cancelled => PgpError::OperationCancelled,
-            CopyError::Read(io_error) => PgpError::FileIoError {
-                reason: format!("Read failed: {io_error}"),
-            },
-            CopyError::Write(io_error) => PgpError::FileIoError {
-                reason: format!("Buffering failed: {io_error}"),
-            },
+    let mut progress_reader = DetachedVerifyProgressReader::new(data_file, total_bytes, progress);
+
+    if let Err(error) = verifier.verify_reader(&mut progress_reader) {
+        if let Some(classified) = classify_detached_verify_reader_error(&error) {
+            return Err(classified);
+        }
+
+        let helper = verifier.into_helper();
+        return Ok(FileVerifyDetailedResult {
+            legacy_status: SignatureStatus::Bad,
+            legacy_signer_fingerprint: helper.collector.legacy_signer_fingerprint(),
+            signatures: helper.collector.signatures(),
         });
     }
 
-    let detailed = crate::verify::verify_detached_detailed(&data, signature, verification_keys)?;
+    let helper = verifier.into_helper();
+    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
+
     Ok(FileVerifyDetailedResult {
-        legacy_status: detailed.legacy_status,
-        legacy_signer_fingerprint: detailed.legacy_signer_fingerprint,
-        signatures: detailed.signatures,
+        legacy_status,
+        legacy_signer_fingerprint,
+        signatures,
     })
 }
 
