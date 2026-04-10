@@ -69,6 +69,27 @@ final class SignScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_syncSignerFromDefaultOnAppear_resetsManualSelectionToCurrentDefault() async throws {
+        let firstIdentity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Default"
+        )
+        let secondIdentity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Alternate"
+        )
+        let model = makeModel()
+
+        model.syncSignerFromDefaultOnAppear()
+        XCTAssertEqual(model.signerFingerprint, firstIdentity.fingerprint)
+
+        model.signerFingerprint = secondIdentity.fingerprint
+        model.syncSignerFromDefaultOnAppear()
+
+        XCTAssertEqual(model.signerFingerprint, firstIdentity.fingerprint)
+    }
+
+    @MainActor
     func test_syncSignerFromDefaultOnAppear_recoversAfterDefaultKeyDeletion() async throws {
         let firstIdentity = try await TestHelpers.generateProfileAKey(
             service: stack.keyManagement,
@@ -173,6 +194,10 @@ final class SignScreenModelTests: XCTestCase {
 
     @MainActor
     func test_signFile_cancellation_clearsProgress_andDoesNotPublishSignature() async throws {
+        _ = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Signer"
+        )
         let gate = SignOperationGate()
         let model = makeModel(
             detachedFileSigningAction: { _, _, progress in
@@ -188,9 +213,9 @@ final class SignScreenModelTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        model.signerFingerprint = "test-signer"
         model.handleImportedFile(fileURL)
         model.signMode = SignView.SignMode.file
+        model.syncSignerFromDefaultOnAppear()
         model.signFile()
 
         await waitUntil("file signing to suspend with progress") {
