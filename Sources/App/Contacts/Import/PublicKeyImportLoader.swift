@@ -20,10 +20,11 @@ struct PublicKeyImportLoader {
     let qrService: QRService
 
     func inspect(keyData: Data) throws -> PublicKeyImportInspection {
-        PublicKeyImportInspection(
-            keyData: keyData,
-            keyInfo: try qrService.inspectKeyInfo(keyData: keyData),
-            profile: try qrService.detectKeyProfile(keyData: keyData)
+        let validated = try qrService.inspectImportablePublicCertificate(keyData: keyData)
+        return PublicKeyImportInspection(
+            keyData: validated.publicCertData,
+            keyInfo: validated.keyInfo,
+            profile: validated.profile
         )
     }
 

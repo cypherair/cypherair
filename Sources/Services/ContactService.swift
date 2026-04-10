@@ -98,27 +98,25 @@ final class ContactService {
         publicKeyData: Data,
         verificationState: ContactVerificationState = .verified
     ) throws -> AddContactResult {
-        // Try to dearmor if it looks like ASCII armor
-        let binaryData: Data
-        var contact: Contact
-        do {
-            if let firstChar = publicKeyData.first, firstChar == 0x2D { // '-' = ASCII armor header
-                binaryData = try engine.dearmor(armored: publicKeyData)
-            } else {
-                binaryData = publicKeyData
-            }
-            contact = try parseContact(from: binaryData, verificationState: verificationState)
-        } catch {
-            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-        }
+        let validation = try ContactImportPublicCertificateValidator.validate(
+            publicKeyData,
+            using: engine
+        )
+        let binaryData = validation.publicCertData
+        var contact = makeContact(from: validation, verificationState: verificationState)
 
         // Check for same-fingerprint duplicate/update
         if let existingIndex = contacts.firstIndex(where: { $0.fingerprint == contact.fingerprint }) {
             let existingContact = contacts[existingIndex]
-            let mergedResult = try engine.mergePublicCertificateUpdate(
-                existingCert: existingContact.publicKeyData,
-                incomingCertOrUpdate: binaryData
-            )
+            let mergedResult: CertificateMergeResult
+            do {
+                mergedResult = try engine.mergePublicCertificateUpdate(
+                    existingCert: existingContact.publicKeyData,
+                    incomingCertOrUpdate: binaryData
+                )
+            } catch {
+                throw ContactImportPublicCertificateValidator.mapError(error)
+            }
             let resolvedVerificationState: ContactVerificationState =
                 (existingContact.isVerified || verificationState == .verified)
                 ? .verified
@@ -134,8 +132,12 @@ final class ContactService {
                 return .duplicate(contacts[existingIndex])
 
             case .updated:
-                let updatedContact = try parseContact(
-                    from: mergedResult.mergedCertData,
+                let updatedValidation = try ContactImportPublicCertificateValidator.validate(
+                    mergedResult.mergedCertData,
+                    using: engine
+                )
+                let updatedContact = makeContact(
+                    from: updatedValidation,
                     verificationState: resolvedVerificationState
                 )
 
@@ -204,19 +206,23 @@ final class ContactService {
     ///
     /// - Parameters:
     ///   - existingFingerprint: Fingerprint of the contact being removed/replaced.
-    ///   - newContact: The new contact parsed from the incoming key.
     ///   - keyData: Binary public key data for the new contact.
-    func confirmKeyUpdate(existingFingerprint: String, newContact: Contact, keyData: Data) throws {
+    /// - Returns: The authoritative verified contact rebuilt from validated public bytes.
+    @discardableResult
+    func confirmKeyUpdate(existingFingerprint: String, keyData: Data) throws -> Contact {
+        let validation = try ContactImportPublicCertificateValidator.validate(keyData, using: engine)
+        let verifiedContact = makeContact(from: validation, verificationState: .verified)
+
         if !FileManager.default.fileExists(atPath: contactsDirectory.path) {
             try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
         }
 
         // Write new key first — if this fails, the old contact remains intact
-        let filename = "\(newContact.fingerprint).gpg"
+        let filename = "\(verifiedContact.fingerprint).gpg"
         let fileURL = contactsDirectory.appendingPathComponent(filename)
-        try keyData.write(to: fileURL, options: .atomic)
+        try validation.publicCertData.write(to: fileURL, options: .atomic)
 
-        if existingFingerprint != newContact.fingerprint {
+        if existingFingerprint != verifiedContact.fingerprint {
             let existingFileURL = contactsDirectory.appendingPathComponent("\(existingFingerprint).gpg")
             if FileManager.default.fileExists(atPath: existingFileURL.path) {
                 try FileManager.default.removeItem(at: existingFileURL)
@@ -225,8 +231,6 @@ final class ContactService {
             verificationStates.removeValue(forKey: existingFingerprint)
         }
 
-        var verifiedContact = newContact
-        verifiedContact.verificationState = .verified
         verificationStates[verifiedContact.fingerprint] = .verified
 
         if let existingIndex = contacts.firstIndex(where: { $0.fingerprint == verifiedContact.fingerprint }) {
@@ -236,6 +240,7 @@ final class ContactService {
         }
 
         try saveVerificationStates()
+        return verifiedContact
     }
 
     // MARK: - Remove Contact
@@ -324,6 +329,29 @@ final class ContactService {
             publicKeyData: binaryData,
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo
+        )
+    }
+
+    private func makeContact(
+        from validation: PublicCertificateValidationResult,
+        verificationState: ContactVerificationState? = nil
+    ) -> Contact {
+        let resolvedVerificationState = verificationState
+            ?? verificationStates[validation.keyInfo.fingerprint]
+            ?? .verified
+
+        return Contact(
+            fingerprint: validation.keyInfo.fingerprint,
+            keyVersion: validation.keyInfo.keyVersion,
+            profile: validation.profile,
+            userId: validation.keyInfo.userId,
+            isRevoked: validation.keyInfo.isRevoked,
+            isExpired: validation.keyInfo.isExpired,
+            hasEncryptionSubkey: validation.keyInfo.hasEncryptionSubkey,
+            verificationState: resolvedVerificationState,
+            publicKeyData: validation.publicCertData,
+            primaryAlgo: validation.keyInfo.primaryAlgo,
+            subkeyAlgo: validation.keyInfo.subkeyAlgo
         )
     }
 

@@ -95,6 +95,7 @@ STOP and describe proposed changes before editing any file in these areas:
 - `Sources/Services/DecryptionService.swift` — Phase 1/Phase 2 authentication boundary
 - `Sources/Services/QRService.swift` — external URL input parsing (untrusted data)
 - `pgp-mobile/src/` — any Rust cryptographic code
+- `CypherAir.xcodeproj/project.pbxproj` and other Xcode project files — adding files, targets, build settings, or test wiring
 - `CypherAir.entitlements` — capability entitlements
 - `Info.plist` — permission descriptions (only `NSFaceIDUsageDescription` permitted)
 
@@ -144,15 +145,6 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 - Run `cargo test` and `xcodebuild test` before considering a task complete.
 - Commit messages: conventional format — `feat:`, `fix:`, `refactor:`, `test:`, `docs:`.
 - Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.
-- Treat `CypherAir.xcodeproj/project.pbxproj` and other Xcode project file changes as explicit-scope changes that require user confirmation, not as changes to avoid by default.
-- Do not revert, rewrite, or "clean up" existing project file edits you did not make.
-- If the correct implementation requires, or may require, modifying Xcode project files, you must proactively raise that with the user.
-- State which file or file type may need to change, explain why the change appears necessary, and ask for approval before editing it.
-- If you are still planning the work, that approval is a planning prerequisite, not only an editing prerequisite.
-- Until the user answers, do not produce an implementation plan that assumes the project file edits are approved or forbidden.
-- In that state, limit yourself to investigation, impact analysis, and explaining why the project file change may be needed.
-- Once the user approves, proceed with the required project file edits as part of the correct implementation.
-- Do not invent workarounds, move logic into unrelated files, or weaken the implementation merely to avoid requesting approval for a required project file change.
 - **Before text replacement, verify match count.** Before executing any string replacement, check how many matches exist in the file. If multiple matches exist, handle each one individually to avoid unintended changes to other locations.
 - **After reverting changes, verify with `git diff`.** Never rely on memory to confirm a revert is complete. Always run `git diff` (or `git diff origin/main`) to confirm the file matches the expected state.
 - **After code changes, run tests — not just build.** A successful build does not guarantee correctness. Always run the relevant test suite to verify no regressions were introduced.

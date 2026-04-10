@@ -96,6 +96,7 @@ Pause and explicitly call out the intended change before editing these areas:
 - `Sources/Services/DecryptionService.swift`
 - `Sources/Services/QRService.swift`
 - `pgp-mobile/src/`
+- `CypherAir.xcodeproj/project.pbxproj` and other Xcode project files
 - `CypherAir.entitlements`
 - `CypherAirMacOS.entitlements`
 - permission-related plist settings
@@ -125,15 +126,6 @@ Mode switching requires re-wrapping all Secure Enclave protected keys.
 - Read relevant files before editing.
 - Keep changes scoped to the user request.
   This means only make changes that are directly required to complete the requested task; it is not permission to normalize, revert, or clean up unrelated local changes that are already in the worktree.
-- Treat `CypherAir.xcodeproj/project.pbxproj` and other Xcode project file changes as explicit-scope changes that require user confirmation, not as changes to avoid by default.
-  Do not revert, rewrite, or “clean up” existing project file edits you did not make.
-  If the correct implementation requires, or may require, modifying Xcode project files, you must proactively raise that with the user.
-  State which file or file type may need to change, explain why the change appears necessary, and ask for approval before editing it.
-  If you are still planning the work, that approval is a planning prerequisite, not only an editing prerequisite.
-  Until the user answers, do not produce an implementation plan that assumes the project file edits are approved or forbidden.
-  In that state, limit yourself to investigation, impact analysis, and explaining why the project file change may be needed.
-  Once the user approves, proceed with the required project file edits as part of the correct implementation.
-  Do not invent workarounds, move logic into unrelated files, or weaken the implementation merely to avoid requesting approval for a required project file change.
 - Do not add “nice to have” refactors unless they directly support the requested work.
 - Prefer small, reviewable diffs.
 - Maintain existing user-visible behavior unless the task explicitly changes it.

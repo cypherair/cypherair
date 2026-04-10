@@ -780,6 +780,13 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func signDetachedFile(inputPath: String, signerCert: Data, progress: ProgressReporter?) throws  -> Data
     
     /**
+     * Validate contact-import data as a public certificate and return normalized metadata.
+     *
+     * Secret-bearing input is rejected with `InvalidKeyData` using a stable reason token.
+     */
+    func validatePublicCertificate(certData: Data) throws  -> PublicCertificateValidationResult
+    
+    /**
      * Verify a cleartext-signed message.
      */
     func verifyCleartext(signedMessage: Data, verificationKeys: [Data]) throws  -> VerifyResult
@@ -1396,6 +1403,20 @@ open func signDetachedFile(inputPath: String, signerCert: Data, progress: Progre
         FfiConverterString.lower(inputPath),
         FfiConverterData.lower(signerCert),
         FfiConverterOptionTypeProgressReporter.lower(progress),$0
+    )
+})
+}
+    
+    /**
+     * Validate contact-import data as a public certificate and return normalized metadata.
+     *
+     * Secret-bearing input is rejected with `InvalidKeyData` using a stable reason token.
+     */
+open func validatePublicCertificate(certData: Data)throws  -> PublicCertificateValidationResult  {
+    return try  FfiConverterTypePublicCertificateValidationResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_validate_public_certificate(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(certData),$0
     )
 })
 }
@@ -2757,6 +2778,85 @@ public func FfiConverterTypePasswordDecryptResult_lift(_ buf: RustBuffer) throws
 #endif
 public func FfiConverterTypePasswordDecryptResult_lower(_ value: PasswordDecryptResult) -> RustBuffer {
     return FfiConverterTypePasswordDecryptResult.lower(value)
+}
+
+
+/**
+ * Public-certificate validation result for contact import.
+ */
+public struct PublicCertificateValidationResult: Equatable, Hashable {
+    /**
+     * Canonical binary OpenPGP public certificate bytes.
+     */
+    public var publicCertData: Data
+    /**
+     * Parsed key metadata for the validated public certificate.
+     */
+    public var keyInfo: KeyInfo
+    /**
+     * Detected profile of the validated public certificate.
+     */
+    public var profile: KeyProfile
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Canonical binary OpenPGP public certificate bytes.
+         */publicCertData: Data, 
+        /**
+         * Parsed key metadata for the validated public certificate.
+         */keyInfo: KeyInfo, 
+        /**
+         * Detected profile of the validated public certificate.
+         */profile: KeyProfile) {
+        self.publicCertData = publicCertData
+        self.keyInfo = keyInfo
+        self.profile = profile
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PublicCertificateValidationResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePublicCertificateValidationResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PublicCertificateValidationResult {
+        return
+            try PublicCertificateValidationResult(
+                publicCertData: FfiConverterData.read(from: &buf), 
+                keyInfo: FfiConverterTypeKeyInfo.read(from: &buf), 
+                profile: FfiConverterTypeKeyProfile.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PublicCertificateValidationResult, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.publicCertData, into: &buf)
+        FfiConverterTypeKeyInfo.write(value.keyInfo, into: &buf)
+        FfiConverterTypeKeyProfile.write(value.profile, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePublicCertificateValidationResult_lift(_ buf: RustBuffer) throws -> PublicCertificateValidationResult {
+    return try FfiConverterTypePublicCertificateValidationResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePublicCertificateValidationResult_lower(_ value: PublicCertificateValidationResult) -> RustBuffer {
+    return FfiConverterTypePublicCertificateValidationResult.lower(value)
 }
 
 
@@ -4402,6 +4502,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file() != 18095) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_validate_public_certificate() != 24365) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext() != 52338) {
