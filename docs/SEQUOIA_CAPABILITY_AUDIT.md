@@ -96,7 +96,7 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Detached signing | Sign/verify | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Includes in-memory and streaming file variants. |
 | Cleartext verification with graded results | Sign/verify | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | CypherAir exposes `valid`, `unknownSigner`, `bad`, `expired`, and `notSigned`. |
 | Detached verification with graded results | Sign/verify | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Includes streaming file verification. |
-| Generic multi-signature result model | Sign/verify | Yes | Yes | No | No | No | No | Missing wrapper | Current wrapper collapses signature groups to a single `status` and optional single signer fingerprint. |
+| Generic multi-signature result model | Sign/verify | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | Detailed `verify_*`, `decrypt*`, and file variants now preserve per-signature parser-order results while keeping legacy folded fields for compatibility; production Swift services still use the legacy single-status surface. |
 | Certificate-signature verification (`verify_direct_key`, `verify_userid_binding`) | Sign/verify | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | Exposed as crypto-only direct-key and User ID binding verification with certification-kind and signer-fingerprint result records. |
 | Generic ASCII armor encode for arbitrary OpenPGP kinds | Parsing/tools | Yes | Yes | Yes | Yes | No | Yes | Exported but unused | `engine.armor` is exported and tested indirectly via FFI, but production services use only `dearmor` and `armorPublicKey`. |
 | Generic dearmor | Parsing/tools | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Used by contacts, keys, decrypt, QR tests, and service interop. |
@@ -172,8 +172,8 @@ The following families are part of the companion Rust roadmap in [`RUST_SEQUOIA_
    - Default stance: `service adoption deferred`
 
 5. **Richer signature result family**
+   - Status: implemented in Rust, FFI, and tests; service adoption deferred.
    - Includes multi-signature-aware verification/decryption result models that preserve Sequoia semantics instead of collapsing them into one status.
-   - Default stance: `service adoption deferred`
 
 ### 5.2 Current-Build Omissions Tracked Here, But Not On The Active Rust Roadmap
 

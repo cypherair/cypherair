@@ -3,8 +3,9 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use sequoia_openpgp as openpgp;
 
-use crate::decrypt::{is_expired_error, SignatureStatus};
+use crate::decrypt::{is_expired_error, parse_verification_certs, SignatureStatus};
 use crate::error::PgpError;
+use crate::signature_details::{LegacyFoldMode, SignatureCollector, VerifyDetailedResult};
 
 /// Result of signature verification.
 #[derive(uniffi::Record)]
@@ -17,27 +18,37 @@ pub struct VerifyResult {
     pub content: Option<Vec<u8>>,
 }
 
+fn empty_detailed_result(status: SignatureStatus) -> VerifyDetailedResult {
+    VerifyDetailedResult {
+        legacy_status: status,
+        legacy_signer_fingerprint: None,
+        signatures: Vec::new(),
+        content: None,
+    }
+}
+
 /// Verify a cleartext-signed message.
 /// Returns the message content and verification result.
 pub fn verify_cleartext(
     signed_message: &[u8],
     verification_keys: &[Vec<u8>],
 ) -> Result<VerifyResult, PgpError> {
+    let detailed = verify_cleartext_detailed(signed_message, verification_keys)?;
+    Ok(VerifyResult {
+        status: detailed.legacy_status,
+        signer_fingerprint: detailed.legacy_signer_fingerprint,
+        content: detailed.content,
+    })
+}
+
+/// Verify a cleartext-signed message and preserve detailed per-signature results.
+pub fn verify_cleartext_detailed(
+    signed_message: &[u8],
+    verification_keys: &[Vec<u8>],
+) -> Result<VerifyDetailedResult, PgpError> {
     let policy = StandardPolicy::new();
-
-    let mut certs = Vec::new();
-    for key_data in verification_keys {
-        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
-            reason: format!("Invalid verification key: {e}"),
-        })?;
-        certs.push(cert);
-    }
-
-    let helper = VerifyHelper {
-        certs: &certs,
-        status: SignatureStatus::NotSigned,
-        signer_fingerprint: None,
-    };
+    let certs = parse_verification_certs(verification_keys)?;
+    let helper = VerifyHelper::new(&certs);
 
     let verifier_result = VerifierBuilder::from_bytes(signed_message)
         .map_err(|e| PgpError::CorruptData {
@@ -45,9 +56,8 @@ pub fn verify_cleartext(
         })?
         .with_policy(&policy, None, helper);
 
-    // Graded result: if with_policy() fails, inspect the error before defaulting
-    // to Bad. A policy failure due to key expiry should produce Expired status so
-    // the UI can show "Ask sender to update" instead of "Content may have been modified."
+    // Match the current early-setup grading: no observed per-signature results means
+    // an empty detailed array and a legacy Bad/Expired status with no content.
     let mut verifier = match verifier_result {
         Ok(v) => v,
         Err(e) => {
@@ -56,11 +66,7 @@ pub fn verify_cleartext(
             } else {
                 SignatureStatus::Bad
             };
-            return Ok(VerifyResult {
-                status,
-                signer_fingerprint: None,
-                content: None,
-            });
+            return Ok(empty_detailed_result(status));
         }
     };
 
@@ -70,10 +76,12 @@ pub fn verify_cleartext(
     })?;
 
     let helper = verifier.into_helper();
+    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
 
-    Ok(VerifyResult {
-        status: helper.status,
-        signer_fingerprint: helper.signer_fingerprint,
+    Ok(VerifyDetailedResult {
+        legacy_status,
+        legacy_signer_fingerprint,
+        signatures,
         content: Some(content),
     })
 }
@@ -84,21 +92,23 @@ pub fn verify_detached(
     signature: &[u8],
     verification_keys: &[Vec<u8>],
 ) -> Result<VerifyResult, PgpError> {
+    let detailed = verify_detached_detailed(data, signature, verification_keys)?;
+    Ok(VerifyResult {
+        status: detailed.legacy_status,
+        signer_fingerprint: detailed.legacy_signer_fingerprint,
+        content: None,
+    })
+}
+
+/// Verify a detached signature and preserve detailed per-signature results.
+pub fn verify_detached_detailed(
+    data: &[u8],
+    signature: &[u8],
+    verification_keys: &[Vec<u8>],
+) -> Result<VerifyDetailedResult, PgpError> {
     let policy = StandardPolicy::new();
-
-    let mut certs = Vec::new();
-    for key_data in verification_keys {
-        let cert = openpgp::Cert::from_bytes(key_data).map_err(|e| PgpError::InvalidKeyData {
-            reason: format!("Invalid verification key: {e}"),
-        })?;
-        certs.push(cert);
-    }
-
-    let helper = VerifyHelper {
-        certs: &certs,
-        status: SignatureStatus::NotSigned,
-        signer_fingerprint: None,
-    };
+    let certs = parse_verification_certs(verification_keys)?;
+    let helper = VerifyHelper::new(&certs);
 
     let verifier_result = DetachedVerifierBuilder::from_bytes(signature)
         .map_err(|e| PgpError::CorruptData {
@@ -106,7 +116,6 @@ pub fn verify_detached(
         })?
         .with_policy(&policy, None, helper);
 
-    // Graded result: if with_policy() fails, inspect the error before defaulting to Bad.
     let mut verifier = match verifier_result {
         Ok(v) => v,
         Err(e) => {
@@ -115,29 +124,27 @@ pub fn verify_detached(
             } else {
                 SignatureStatus::Bad
             };
-            return Ok(VerifyResult {
-                status,
-                signer_fingerprint: None,
-                content: None,
-            });
+            return Ok(empty_detailed_result(status));
         }
     };
 
-    // verify_bytes may fail for tampered data — return Bad status as graded result.
     if verifier.verify_bytes(data).is_err() {
         let helper = verifier.into_helper();
-        return Ok(VerifyResult {
-            status: SignatureStatus::Bad,
-            signer_fingerprint: helper.signer_fingerprint,
+        return Ok(VerifyDetailedResult {
+            legacy_status: SignatureStatus::Bad,
+            legacy_signer_fingerprint: helper.collector.legacy_signer_fingerprint(),
+            signatures: helper.collector.signatures(),
             content: None,
         });
     }
 
     let helper = verifier.into_helper();
+    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
 
-    Ok(VerifyResult {
-        status: helper.status,
-        signer_fingerprint: helper.signer_fingerprint,
+    Ok(VerifyDetailedResult {
+        legacy_status,
+        legacy_signer_fingerprint,
+        signatures,
         content: None,
     })
 }
@@ -146,8 +153,16 @@ pub fn verify_detached(
 /// `pub(crate)` so that `streaming.rs` can construct this for file-based verification.
 pub(crate) struct VerifyHelper<'a> {
     pub(crate) certs: &'a [openpgp::Cert],
-    pub(crate) status: SignatureStatus,
-    pub(crate) signer_fingerprint: Option<String>,
+    pub(crate) collector: SignatureCollector,
+}
+
+impl<'a> VerifyHelper<'a> {
+    pub(crate) fn new(certs: &'a [openpgp::Cert]) -> Self {
+        Self {
+            certs,
+            collector: SignatureCollector::new(LegacyFoldMode::VerifyLike),
+        }
+    }
 }
 
 impl<'a> VerificationHelper for VerifyHelper<'a> {
@@ -156,52 +171,7 @@ impl<'a> VerificationHelper for VerifyHelper<'a> {
     }
 
     fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
-        for layer in structure {
-            match layer {
-                MessageLayer::SignatureGroup { results } => {
-                    for result in results {
-                        match result {
-                            Ok(GoodChecksum { ka, .. }) => {
-                                self.status = SignatureStatus::Valid;
-                                self.signer_fingerprint =
-                                    Some(ka.cert().fingerprint().to_hex().to_lowercase());
-                                return Ok(());
-                            }
-                            // INTENTIONAL: No `return Ok(())` here — fall through to continue
-                            // checking subsequent signatures. If a message has multiple signatures
-                            // and one signer is unknown, a later signature may match a known key.
-                            // This differs from BadKey/catch-all which return immediately because
-                            // those represent definitive outcomes for a known key, while MissingKey
-                            // means we cannot evaluate this particular signature.
-                            Err(VerificationError::MissingKey { .. }) => {
-                                self.status = SignatureStatus::UnknownSigner;
-                            }
-                            Err(VerificationError::BadKey { ka, error, .. }) => {
-                                // Distinguish expired signer key from other key issues
-                                if is_expired_error(&error) {
-                                    self.status = SignatureStatus::Expired;
-                                    self.signer_fingerprint =
-                                        Some(ka.cert().fingerprint().to_hex().to_lowercase());
-                                } else {
-                                    self.status = SignatureStatus::Bad;
-                                }
-                                return Ok(());
-                            }
-                            Err(_) => {
-                                // Graded result: set status but return Ok so the caller
-                                // can inspect helper.status. This is consistent with
-                                // DecryptHelper::check() which also returns Ok for all
-                                // verification outcomes to support graded results.
-                                self.status = SignatureStatus::Bad;
-                                return Ok(());
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-
+        self.collector.observe_structure(structure);
         Ok(())
     }
 }

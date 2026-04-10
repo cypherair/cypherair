@@ -1,0 +1,1 @@
+FFI detailed multi-signer detached

@@ -592,10 +592,20 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func decrypt(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data]) throws  -> DecryptResult
     
     /**
+     * Decrypt a message and preserve per-signature detailed results.
+     */
+    func decryptDetailed(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data]) throws  -> DecryptDetailedResult
+    
+    /**
      * Decrypt a file using streaming I/O. Phase 2 — requires authenticated key access.
      * Handles both SEIPDv1 and SEIPDv2. AEAD/MDC failure → hard-fail (no partial output).
      */
     func decryptFile(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileDecryptResult
+    
+    /**
+     * Decrypt a file using streaming I/O and preserve per-signature detailed results.
+     */
+    func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileDecryptDetailedResult
     
     /**
      * Decrypt a password-encrypted message without falling back to recipient-key decryption.
@@ -775,14 +785,29 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func verifyCleartext(signedMessage: Data, verificationKeys: [Data]) throws  -> VerifyResult
     
     /**
+     * Verify a cleartext-signed message and preserve per-signature detailed results.
+     */
+    func verifyCleartextDetailed(signedMessage: Data, verificationKeys: [Data]) throws  -> VerifyDetailedResult
+    
+    /**
      * Verify a detached signature.
      */
     func verifyDetached(data: Data, signature: Data, verificationKeys: [Data]) throws  -> VerifyResult
     
     /**
+     * Verify a detached signature and preserve per-signature detailed results.
+     */
+    func verifyDetachedDetailed(data: Data, signature: Data, verificationKeys: [Data]) throws  -> VerifyDetailedResult
+    
+    /**
      * Verify a detached signature against a file using streaming I/O.
      */
     func verifyDetachedFile(dataPath: String, signature: Data, verificationKeys: [Data], progress: ProgressReporter?) throws  -> VerifyResult
+    
+    /**
+     * Verify a detached file signature using streaming I/O and preserve per-signature details.
+     */
+    func verifyDetachedFileDetailed(dataPath: String, signature: Data, verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileVerifyDetailedResult
     
     /**
      * Verify a direct-key signature against a target certificate using crypto-only semantics.
@@ -930,12 +955,42 @@ open func decrypt(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data]
 }
     
     /**
+     * Decrypt a message and preserve per-signature detailed results.
+     */
+open func decryptDetailed(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data])throws  -> DecryptDetailedResult  {
+    return try  FfiConverterTypeDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_decrypt_detailed(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(ciphertext),
+        FfiConverterSequenceData.lower(secretKeys),
+        FfiConverterSequenceData.lower(verificationKeys),$0
+    )
+})
+}
+    
+    /**
      * Decrypt a file using streaming I/O. Phase 2 — requires authenticated key access.
      * Handles both SEIPDv1 and SEIPDv2. AEAD/MDC failure → hard-fail (no partial output).
      */
 open func decryptFile(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: ProgressReporter?)throws  -> FileDecryptResult  {
     return try  FfiConverterTypeFileDecryptResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(inputPath),
+        FfiConverterString.lower(outputPath),
+        FfiConverterSequenceData.lower(secretKeys),
+        FfiConverterSequenceData.lower(verificationKeys),
+        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+    )
+})
+}
+    
+    /**
+     * Decrypt a file using streaming I/O and preserve per-signature detailed results.
+     */
+open func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: ProgressReporter?)throws  -> FileDecryptDetailedResult  {
+    return try  FfiConverterTypeFileDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file_detailed(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
         FfiConverterString.lower(outputPath),
@@ -1359,6 +1414,19 @@ open func verifyCleartext(signedMessage: Data, verificationKeys: [Data])throws  
 }
     
     /**
+     * Verify a cleartext-signed message and preserve per-signature detailed results.
+     */
+open func verifyCleartextDetailed(signedMessage: Data, verificationKeys: [Data])throws  -> VerifyDetailedResult  {
+    return try  FfiConverterTypeVerifyDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_verify_cleartext_detailed(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(signedMessage),
+        FfiConverterSequenceData.lower(verificationKeys),$0
+    )
+})
+}
+    
+    /**
      * Verify a detached signature.
      */
 open func verifyDetached(data: Data, signature: Data, verificationKeys: [Data])throws  -> VerifyResult  {
@@ -1373,11 +1441,40 @@ open func verifyDetached(data: Data, signature: Data, verificationKeys: [Data])t
 }
     
     /**
+     * Verify a detached signature and preserve per-signature detailed results.
+     */
+open func verifyDetachedDetailed(data: Data, signature: Data, verificationKeys: [Data])throws  -> VerifyDetailedResult  {
+    return try  FfiConverterTypeVerifyDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_verify_detached_detailed(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(data),
+        FfiConverterData.lower(signature),
+        FfiConverterSequenceData.lower(verificationKeys),$0
+    )
+})
+}
+    
+    /**
      * Verify a detached signature against a file using streaming I/O.
      */
 open func verifyDetachedFile(dataPath: String, signature: Data, verificationKeys: [Data], progress: ProgressReporter?)throws  -> VerifyResult  {
     return try  FfiConverterTypeVerifyResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_verify_detached_file(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dataPath),
+        FfiConverterData.lower(signature),
+        FfiConverterSequenceData.lower(verificationKeys),
+        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+    )
+})
+}
+    
+    /**
+     * Verify a detached file signature using streaming I/O and preserve per-signature details.
+     */
+open func verifyDetachedFileDetailed(dataPath: String, signature: Data, verificationKeys: [Data], progress: ProgressReporter?)throws  -> FileVerifyDetailedResult  {
+    return try  FfiConverterTypeFileVerifyDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_verify_detached_file_detailed(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dataPath),
         FfiConverterData.lower(signature),
@@ -1839,6 +1936,74 @@ public func FfiConverterTypeCertificateSignatureResult_lower(_ value: Certificat
 
 
 /**
+ * Detailed result for in-memory decrypt APIs.
+ *
+ * SECURITY: `plaintext` contains sensitive decrypted content. The Swift caller must
+ * zeroize this data after use.
+ */
+public struct DecryptDetailedResult: Equatable, Hashable {
+    public var legacyStatus: SignatureStatus
+    public var legacySignerFingerprint: String?
+    public var signatures: [DetailedSignatureEntry]
+    public var plaintext: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, signatures: [DetailedSignatureEntry], plaintext: Data) {
+        self.legacyStatus = legacyStatus
+        self.legacySignerFingerprint = legacySignerFingerprint
+        self.signatures = signatures
+        self.plaintext = plaintext
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DecryptDetailedResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDecryptDetailedResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DecryptDetailedResult {
+        return
+            try DecryptDetailedResult(
+                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf), 
+                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf), 
+                signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf), 
+                plaintext: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DecryptDetailedResult, into buf: inout [UInt8]) {
+        FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
+        FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
+        FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
+        FfiConverterData.write(value.plaintext, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDecryptDetailedResult_lift(_ buf: RustBuffer) throws -> DecryptDetailedResult {
+    return try FfiConverterTypeDecryptDetailedResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDecryptDetailedResult_lower(_ value: DecryptDetailedResult) -> RustBuffer {
+    return FfiConverterTypeDecryptDetailedResult.lower(value)
+}
+
+
+/**
  * Result of a decryption operation.
  *
  * SECURITY: `plaintext` contains sensitive decrypted content. The Swift caller must
@@ -1926,6 +2091,124 @@ public func FfiConverterTypeDecryptResult_lower(_ value: DecryptResult) -> RustB
 
 
 /**
+ * One observed signature result in parser order.
+ */
+public struct DetailedSignatureEntry: Equatable, Hashable {
+    public var status: DetailedSignatureStatus
+    public var signerPrimaryFingerprint: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(status: DetailedSignatureStatus, signerPrimaryFingerprint: String?) {
+        self.status = status
+        self.signerPrimaryFingerprint = signerPrimaryFingerprint
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DetailedSignatureEntry: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDetailedSignatureEntry: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DetailedSignatureEntry {
+        return
+            try DetailedSignatureEntry(
+                status: FfiConverterTypeDetailedSignatureStatus.read(from: &buf), 
+                signerPrimaryFingerprint: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DetailedSignatureEntry, into buf: inout [UInt8]) {
+        FfiConverterTypeDetailedSignatureStatus.write(value.status, into: &buf)
+        FfiConverterOptionString.write(value.signerPrimaryFingerprint, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDetailedSignatureEntry_lift(_ buf: RustBuffer) throws -> DetailedSignatureEntry {
+    return try FfiConverterTypeDetailedSignatureEntry.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDetailedSignatureEntry_lower(_ value: DetailedSignatureEntry) -> RustBuffer {
+    return FfiConverterTypeDetailedSignatureEntry.lower(value)
+}
+
+
+/**
+ * Detailed result for file decrypt APIs.
+ */
+public struct FileDecryptDetailedResult: Equatable, Hashable {
+    public var legacyStatus: SignatureStatus
+    public var legacySignerFingerprint: String?
+    public var signatures: [DetailedSignatureEntry]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, signatures: [DetailedSignatureEntry]) {
+        self.legacyStatus = legacyStatus
+        self.legacySignerFingerprint = legacySignerFingerprint
+        self.signatures = signatures
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FileDecryptDetailedResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFileDecryptDetailedResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileDecryptDetailedResult {
+        return
+            try FileDecryptDetailedResult(
+                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf), 
+                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf), 
+                signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FileDecryptDetailedResult, into buf: inout [UInt8]) {
+        FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
+        FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
+        FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileDecryptDetailedResult_lift(_ buf: RustBuffer) throws -> FileDecryptDetailedResult {
+    return try FfiConverterTypeFileDecryptDetailedResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileDecryptDetailedResult_lower(_ value: FileDecryptDetailedResult) -> RustBuffer {
+    return FfiConverterTypeFileDecryptDetailedResult.lower(value)
+}
+
+
+/**
  * Result of streaming file decryption.
  * Contains signature verification info (plaintext is written to output file, not returned).
  */
@@ -1992,6 +2275,67 @@ public func FfiConverterTypeFileDecryptResult_lift(_ buf: RustBuffer) throws -> 
 #endif
 public func FfiConverterTypeFileDecryptResult_lower(_ value: FileDecryptResult) -> RustBuffer {
     return FfiConverterTypeFileDecryptResult.lower(value)
+}
+
+
+/**
+ * Detailed result for file verification APIs.
+ */
+public struct FileVerifyDetailedResult: Equatable, Hashable {
+    public var legacyStatus: SignatureStatus
+    public var legacySignerFingerprint: String?
+    public var signatures: [DetailedSignatureEntry]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, signatures: [DetailedSignatureEntry]) {
+        self.legacyStatus = legacyStatus
+        self.legacySignerFingerprint = legacySignerFingerprint
+        self.signatures = signatures
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FileVerifyDetailedResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFileVerifyDetailedResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileVerifyDetailedResult {
+        return
+            try FileVerifyDetailedResult(
+                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf), 
+                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf), 
+                signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FileVerifyDetailedResult, into buf: inout [UInt8]) {
+        FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
+        FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
+        FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileVerifyDetailedResult_lift(_ buf: RustBuffer) throws -> FileVerifyDetailedResult {
+    return try FfiConverterTypeFileVerifyDetailedResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileVerifyDetailedResult_lower(_ value: FileVerifyDetailedResult) -> RustBuffer {
+    return FfiConverterTypeFileVerifyDetailedResult.lower(value)
 }
 
 
@@ -2507,6 +2851,71 @@ public func FfiConverterTypeS2kInfo_lower(_ value: S2kInfo) -> RustBuffer {
 
 
 /**
+ * Detailed result for in-memory verification APIs.
+ */
+public struct VerifyDetailedResult: Equatable, Hashable {
+    public var legacyStatus: SignatureStatus
+    public var legacySignerFingerprint: String?
+    public var signatures: [DetailedSignatureEntry]
+    public var content: Data?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, signatures: [DetailedSignatureEntry], content: Data?) {
+        self.legacyStatus = legacyStatus
+        self.legacySignerFingerprint = legacySignerFingerprint
+        self.signatures = signatures
+        self.content = content
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension VerifyDetailedResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeVerifyDetailedResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> VerifyDetailedResult {
+        return
+            try VerifyDetailedResult(
+                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf), 
+                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf), 
+                signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf), 
+                content: FfiConverterOptionData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: VerifyDetailedResult, into buf: inout [UInt8]) {
+        FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
+        FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
+        FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
+        FfiConverterOptionData.write(value.content, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeVerifyDetailedResult_lift(_ buf: RustBuffer) throws -> VerifyDetailedResult {
+    return try FfiConverterTypeVerifyDetailedResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeVerifyDetailedResult_lower(_ value: VerifyDetailedResult) -> RustBuffer {
+    return FfiConverterTypeVerifyDetailedResult.lower(value)
+}
+
+
+/**
  * Result of signature verification.
  */
 public struct VerifyResult: Equatable, Hashable {
@@ -2913,6 +3322,90 @@ public func FfiConverterTypeCertificationKind_lift(_ buf: RustBuffer) throws -> 
 #endif
 public func FfiConverterTypeCertificationKind_lower(_ value: CertificationKind) -> RustBuffer {
     return FfiConverterTypeCertificationKind.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Per-signature status preserved by the additive detailed APIs.
+ */
+
+public enum DetailedSignatureStatus: Equatable, Hashable {
+    
+    case valid
+    case unknownSigner
+    case bad
+    case expired
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension DetailedSignatureStatus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDetailedSignatureStatus: FfiConverterRustBuffer {
+    typealias SwiftType = DetailedSignatureStatus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DetailedSignatureStatus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .valid
+        
+        case 2: return .unknownSigner
+        
+        case 3: return .bad
+        
+        case 4: return .expired
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: DetailedSignatureStatus, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .valid:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .unknownSigner:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .bad:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .expired:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDetailedSignatureStatus_lift(_ buf: RustBuffer) throws -> DetailedSignatureStatus {
+    return try FfiConverterTypeDetailedSignatureStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDetailedSignatureStatus_lower(_ value: DetailedSignatureStatus) -> RustBuffer {
+    return FfiConverterTypeDetailedSignatureStatus.lower(value)
 }
 
 
@@ -3766,6 +4259,31 @@ fileprivate struct FfiConverterSequenceData: FfiConverterRustBuffer {
     }
 }
 
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeDetailedSignatureEntry: FfiConverterRustBuffer {
+    typealias SwiftType = [DetailedSignatureEntry]
+
+    public static func write(_ value: [DetailedSignatureEntry], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeDetailedSignatureEntry.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [DetailedSignatureEntry] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [DetailedSignatureEntry]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeDetailedSignatureEntry.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -3796,7 +4314,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt() != 23459) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed() != 61958) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file() != 29596) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed() != 34778) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_with_password() != 33951) {
@@ -3883,10 +4407,19 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext() != 52338) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext_detailed() != 33764) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached() != 29734) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_detailed() != 60053) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file() != 4775) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file_detailed() != 64315) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_direct_key_signature() != 31324) {

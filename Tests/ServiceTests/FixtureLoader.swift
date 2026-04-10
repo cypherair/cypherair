@@ -1,8 +1,8 @@
 import Foundation
 import XCTest
 
-/// Loads pre-generated GnuPG fixture files from the test bundle.
-/// Fixtures are copied from pgp-mobile/tests/fixtures/ via a Run Script build phase.
+/// Loads pre-generated fixture files from the test bundle.
+/// Fixtures are copied from Tests/Fixtures/ via a Run Script build phase.
 enum FixtureLoader {
     private final class BundleMarker {}
     static let bundle = Bundle(for: BundleMarker.self)

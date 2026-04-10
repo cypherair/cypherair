@@ -169,6 +169,21 @@ When changing certificate-signature verification or User ID certification behavi
 - `SignerMissing` returns neither fingerprint
 - public-only certification input rejection and secret-cert-with-no-usable-certifier rejection
 
+## 2.6 Richer Signature Result Coverage
+
+When changing the richer-signature-result family, validation must cover:
+
+- additive `verify_*_detailed`, `decrypt_detailed`, and file detailed APIs without changing legacy record shapes
+- collector preservation of every observed signature result in global parser order, including repeated signers
+- compatibility assertions proving `legacy_status` and `legacy_signer_fingerprint` exactly match the corresponding legacy API on the same input
+- mixed `valid + unknown`, `expired + bad`, and `expired + unknown` fold behavior
+- `UnknownSigner` detailed entries carrying no fingerprint
+- unsigned coverage only on detailed APIs that already support unsigned input (`decrypt_detailed` / `decrypt_file_detailed`)
+- detached verify setup-failure and payload-failure paths, including `signatures = []` when no per-signature result was observed
+- `verify_detached_file_detailed` cancellation returning `OperationCancelled`
+- fixed multi-signer Swift FFI fixtures for UniFFI array/record mapping and legacy-compat comparisons
+- password-message regression coverage because password decrypt reuses the fixed-session-key decrypt path
+
 ## 3. Profile Test Matrix
 
 **Every crypto test must run for both profiles unless explicitly scoped.**

@@ -232,6 +232,8 @@ Expose typed certificate-signature semantics needed for future certification fea
 
 ### 2.5 Richer Signature Result Family
 
+Status: implemented in Rust, FFI, and tests; service adoption deferred
+
 **Purpose**
 
 Preserve Sequoia's multi-signature semantics instead of collapsing verification and decryption results to one status and one optional signer fingerprint.
@@ -253,7 +255,7 @@ Preserve Sequoia's multi-signature semantics instead of collapsing verification 
 **Service stance**
 
 - Default: `service adoption deferred`
-- Rust completeness remains the objective even without current CypherAir exposure
+- Rust completeness is delivered; production Swift adoption remains a later follow-up
 
 **Minimum testing**
 
