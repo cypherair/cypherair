@@ -270,7 +270,7 @@ private struct SignScreenHostView: View {
             }
         }
         .onAppear {
-            model.prepareIfNeeded()
+            model.syncSignerFromDefaultOnAppear()
         }
     }
 

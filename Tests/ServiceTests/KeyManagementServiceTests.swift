@@ -267,6 +267,24 @@ final class KeyManagementServiceTests: XCTestCase {
                       "Key should be marked as backed up after export")
     }
 
+    func test_exportKey_metadataUpdateFailure_keepsSessionBackedUp_butFreshServiceSeesOldState() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        mockKC.deleteError = MockKeychainError.deleteFailed
+
+        _ = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: "backup-pass"
+        )
+
+        XCTAssertTrue(try XCTUnwrap(service.keys.first).isBackedUp)
+
+        let freshService = makeFreshService()
+        try freshService.loadKeys()
+
+        XCTAssertEqual(freshService.keys.count, 1)
+        XCTAssertFalse(try XCTUnwrap(freshService.keys.first).isBackedUp)
+    }
+
     func test_exportKey_nonexistentFingerprint_throwsError() async {
         do {
             _ = try await service.exportKey(fingerprint: "nonexistent", passphrase: "pass")

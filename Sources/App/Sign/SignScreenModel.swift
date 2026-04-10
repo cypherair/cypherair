@@ -15,8 +15,6 @@ final class SignScreenModel {
     private let cleartextSigningAction: CleartextSigningAction
     private let detachedFileSigningAction: DetachedFileSigningAction
 
-    private var hasPrepared = false
-
     var signMode: SignView.SignMode = .text
     var text = ""
     var signerFingerprint: String?
@@ -92,10 +90,8 @@ final class SignScreenModel {
         signMode == .file && operation.isRunning && operation.progress != nil
     }
 
-    func prepareIfNeeded() {
-        guard !hasPrepared else { return }
-        signerFingerprint = signerFingerprint ?? keyManagement.defaultKey?.fingerprint
-        hasPrepared = true
+    func syncSignerFromDefaultOnAppear() {
+        signerFingerprint = keyManagement.defaultKey?.fingerprint
     }
 
     func requestFileImport() {

@@ -539,8 +539,8 @@ final class TutorialSessionStoreTests: XCTestCase {
             "SignView should forward into a private owning host"
         )
         XCTAssertTrue(
-            signScreenModelContents.contains("func prepareIfNeeded()"),
-            "SignScreenModel should own one-time screen preparation"
+            signScreenModelContents.contains("func syncSignerFromDefaultOnAppear()"),
+            "SignScreenModel should own default signer synchronization for repeated appearances"
         )
     }
 

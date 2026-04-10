@@ -48,7 +48,7 @@ final class SignScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_prepareIfNeeded_isIdempotent_afterUserSelectsDifferentSigner() async throws {
+    func test_syncSignerFromDefaultOnAppear_updatesToLatestDefaultKey() async throws {
         let firstIdentity = try await TestHelpers.generateProfileAKey(
             service: stack.keyManagement,
             name: "First"
@@ -57,18 +57,36 @@ final class SignScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Second"
         )
-        let expectedDefault = try XCTUnwrap(stack.keyManagement.defaultKey?.fingerprint)
-        let alternateFingerprint = [firstIdentity.fingerprint, secondIdentity.fingerprint]
-            .first { $0 != expectedDefault }
         let model = makeModel()
 
-        model.prepareIfNeeded()
-        XCTAssertEqual(model.signerFingerprint, expectedDefault)
+        model.syncSignerFromDefaultOnAppear()
+        XCTAssertEqual(model.signerFingerprint, firstIdentity.fingerprint)
 
-        model.signerFingerprint = try XCTUnwrap(alternateFingerprint)
-        model.prepareIfNeeded()
+        try stack.keyManagement.setDefaultKey(fingerprint: secondIdentity.fingerprint)
+        model.syncSignerFromDefaultOnAppear()
 
-        XCTAssertEqual(model.signerFingerprint, alternateFingerprint)
+        XCTAssertEqual(model.signerFingerprint, secondIdentity.fingerprint)
+    }
+
+    @MainActor
+    func test_syncSignerFromDefaultOnAppear_recoversAfterDefaultKeyDeletion() async throws {
+        let firstIdentity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Default"
+        )
+        let secondIdentity = try await TestHelpers.generateProfileBKey(
+            service: stack.keyManagement,
+            name: "Other"
+        )
+        let model = makeModel()
+
+        model.syncSignerFromDefaultOnAppear()
+        XCTAssertEqual(model.signerFingerprint, firstIdentity.fingerprint)
+
+        try stack.keyManagement.deleteKey(fingerprint: firstIdentity.fingerprint)
+        model.syncSignerFromDefaultOnAppear()
+
+        XCTAssertEqual(model.signerFingerprint, secondIdentity.fingerprint)
     }
 
     @MainActor
@@ -93,7 +111,7 @@ final class SignScreenModelTests: XCTestCase {
 
         let model = makeModel(configuration: configuration)
         model.text = "A screen-model signing message"
-        model.prepareIfNeeded()
+        model.syncSignerFromDefaultOnAppear()
         model.signText()
 
         await waitUntil("text signing to finish") {
@@ -116,6 +134,10 @@ final class SignScreenModelTests: XCTestCase {
 
     @MainActor
     func test_signFile_handlesSelection_and_preparesSigExport() async throws {
+        _ = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Signer"
+        )
         let model = makeModel(
             detachedFileSigningAction: { _, _, _ in
                 Data("detached-signature".utf8)
@@ -127,10 +149,9 @@ final class SignScreenModelTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        model.signerFingerprint = "test-signer"
         model.handleImportedFile(fileURL)
         model.signMode = SignView.SignMode.file
-        model.prepareIfNeeded()
+        model.syncSignerFromDefaultOnAppear()
         model.signFile()
 
         await waitUntil("file signing to finish") {
