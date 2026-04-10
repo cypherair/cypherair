@@ -26,7 +26,7 @@ This specification assumes the assessment in [SERVICE_VIEW_REFACTOR_ASSESSMENT](
 
 The refactor is architecture-preserving. Unless a later, separately reviewed document says otherwise, this specification does **not** authorize:
 
-- renaming or removing the existing environment-injected facades
+- renaming or removing the existing App-layer environment-injected facades
 - changing public service entry points used by the App layer
 - changing `Configuration` source compatibility for current production pages
 - changing strings, routes, ready markers, tutorial module order, import/export naming, or output-interception semantics
@@ -38,13 +38,13 @@ The document also does **not** imply that every named collaborator must become a
 
 ### 3.1 Definitions
 
-- `Facade`: an existing environment-injected service that remains the App layer entry point. In this repository that means `KeyManagementService`, `ContactService`, `EncryptionService`, `DecryptionService`, `SigningService`, `PasswordMessageService`, `QRService`, and `SelfTestService`.
+- `Facade`: an existing public service type that remains the stable entry point for its current callers. In the App layer that means `KeyManagementService`, `ContactService`, `EncryptionService`, `DecryptionService`, `SigningService`, `QRService`, and `SelfTestService`. `PasswordMessageService` remains a current public service facade for service-level callers and tests, but it is not presently an environment-injected App-layer entry point.
 - `Screen model`: an `@Observable` owner for one production screen's workflow state, async actions, transient results, importer/exporter state, and confirmation/error state.
 - `Coordinator`: an owner for app-flow or cross-screen presentation state that does not belong inside a single production page.
 
 ### 3.2 Required Screen-Model Ownership Pattern
 
-There is no pre-existing screen-model pattern in the repository, so this refactor must use one explicit pattern consistently.
+The repository already defines the recommended screen-model ownership pattern in [CONVENTIONS](CONVENTIONS.md), but it does not yet have a mature, repo-validated implementation example in `Sources/App/`. This refactor should therefore adopt one explicit pattern consistently and turn it into the first validated baseline.
 
 The required pattern is:
 
@@ -172,7 +172,7 @@ Implementation is fixed to five phases. Do not collapse them into one rewrite br
 
 **Why this phase exists**
 
-The repository currently has no established screen-model pattern. Starting with surface migrations would force each screen to invent its own ownership and lifecycle rules.
+The repository already has guidance for a screen-model pattern, but it does not yet have a proven in-repo implementation baseline. Starting with surface migrations would force each screen to interpret that guidance independently.
 
 **Scope**
 
@@ -282,7 +282,8 @@ Once the long-running tool-screen pattern is proven, the remaining workflow-heav
 - `VerifyScreenModel`
 - `AddContactScreenModel`
 - `ContactRepository`
-- compatibility updates for QR-photo import, confirmation-host flows, and tutorial add-contact wiring
+- explicit disposition for `QRPhotoImportView` as a deprecated standalone page with no current production navigation entry point
+- compatibility updates for Add Contact QR-photo mode, confirmation-host flows, and tutorial add-contact wiring
 
 **Required outputs**
 
@@ -290,6 +291,8 @@ Once the long-running tool-screen pattern is proven, the remaining workflow-heav
 - `ContactService` facade preserved
 - contact file/manifest persistence moves behind `ContactRepository`
 - `ContactImportWorkflow` remains the App-layer confirmation/orchestration helper
+- `AddContactView` remains the primary production contact-import surface, including QR-photo import through its existing mode picker
+- `QRPhotoImportView` is documented as a deprecated standalone page; Phase 4 does not require a dedicated screen-model migration for it
 - no duplicate import state machines are introduced across App and Service layers
 
 **Completion definition**
@@ -297,6 +300,8 @@ Once the long-running tool-screen pattern is proven, the remaining workflow-heav
 - duplicate/update/replacement semantics remain unchanged
 - current confirmation coordinator and import-confirmation UI remain intact
 - tutorial add-contact flow still works through `TutorialConfigurationFactory`
+- the current system-camera `cypherair://` handoff path remains the formal QR entry point
+- if the `.qrPhotoImport` route remains in code, it stays outside the primary contact-import architecture and must not drive Phase 4 screen-model design
 - any additional internal contact import-policy collaborator is either clearly narrower than the existing App helper boundary or is deferred
 
 **What this phase proves for later phases**
@@ -307,6 +312,7 @@ Once the long-running tool-screen pattern is proven, the remaining workflow-heav
 **Out of scope**
 
 - redesign of the contact-import user experience
+- revitalizing `QRPhotoImportView` as a first-class product entry point
 - tutorial-specific contact flow rewrite
 
 ### 5.5 Phase 5: App Root Coordination + Tutorial Host Finalization
@@ -364,6 +370,9 @@ Specific compatibility rules by area:
 - `DecryptionService` Phase 1 / Phase 2 behavior must remain byte-for-byte compatible from the caller perspective.
 - `KeyManagementService` recovery and unwrap behavior must remain externally identical.
 - `ContactService` duplicate/update/replacement semantics must remain externally identical.
+- `AddContactView` remains the primary production contact-import surface, including the active QR-photo import mode.
+- `QRPhotoImportView`, if retained, is treated as a deprecated standalone route rather than as a primary production workflow.
+- `cypherair://` URL import remains the formal system-camera QR handoff path.
 - `TutorialConfigurationFactory` must remain capable of expressing current tutorial restrictions and callbacks without requiring tutorial-only forks of production pages.
 
 ## 7. Testing And Validation Gates
@@ -418,7 +427,8 @@ Every phase must end with:
 #### Phase 4
 
 - keep `SigningServiceTests`, `StreamingServiceTests`, `ContactServiceTests`, and `TutorialSessionStoreTests` green
-- add screen-model tests for add-contact mode switching, QR/file import, and replacement confirmation flow
+- add screen-model tests for add-contact mode switching, including the built-in QR-photo mode, file import, and replacement confirmation flow
+- if the `.qrPhotoImport` route is retained, verify it does not reintroduce a parallel primary contact-import state machine or a new required screen-model target
 - explicitly verify that contact persistence extraction did not duplicate or bypass App-layer confirmation workflow behavior
 
 #### Phase 5
