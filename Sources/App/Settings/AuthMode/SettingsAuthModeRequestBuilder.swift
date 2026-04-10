@@ -4,12 +4,14 @@ import Foundation
 enum SettingsAuthModeRequestBuilder {
     @MainActor
     static func makeRequest(
+        id: UUID = UUID(),
         for mode: AuthenticationMode,
         hasBackup: Bool,
         onConfirm: @escaping @MainActor () -> Void,
         onCancel: @escaping @MainActor () -> Void
     ) -> AuthModeChangeConfirmationRequest {
         AuthModeChangeConfirmationRequest(
+            id: id,
             pendingMode: mode,
             title: warningTitle(for: mode),
             message: warningMessage(for: mode, hasBackup: hasBackup),
@@ -25,6 +27,7 @@ enum SettingsAuthModeRequestBuilder {
         onCancel: @escaping @MainActor () -> Void = {}
     ) -> AuthModeChangeConfirmationRequest {
         makeRequest(
+            id: UUID(),
             for: .highSecurity,
             hasBackup: true,
             onConfirm: onConfirm,

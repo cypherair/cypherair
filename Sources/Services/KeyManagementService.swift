@@ -187,8 +187,8 @@ final class KeyManagementService {
     /// Keychain deletions are best-effort: `itemNotFound` is benign (idempotent delete),
     /// but other errors are collected and reported after all items are attempted.
     func deleteKey(fingerprint: String) throws {
+        defer { syncKeys() }
         try mutationService.deleteKey(fingerprint: fingerprint)
-        syncKeys()
     }
 
     // MARK: - Default Key
@@ -196,8 +196,8 @@ final class KeyManagementService {
     /// Set a key as the default signing/encryption identity.
     /// Persists the change to Keychain metadata so it survives cold restart.
     func setDefaultKey(fingerprint: String) throws {
+        defer { syncKeys() }
         try mutationService.setDefaultKey(fingerprint: fingerprint)
-        syncKeys()
     }
 
     /// The current default key identity.
