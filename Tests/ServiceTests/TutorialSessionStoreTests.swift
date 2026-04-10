@@ -544,6 +544,80 @@ final class TutorialSessionStoreTests: XCTestCase {
         )
     }
 
+    func test_encryptAndDecryptViews_establish_screenModelHostBaseline() throws {
+        let rootURL = repositoryRootURL()
+        let encryptViewContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Encrypt/EncryptView.swift"),
+            encoding: .utf8
+        )
+        let encryptScreenModelContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Encrypt/EncryptScreenModel.swift"),
+            encoding: .utf8
+        )
+        let decryptViewContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Decrypt/DecryptView.swift"),
+            encoding: .utf8
+        )
+        let decryptScreenModelContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Decrypt/DecryptScreenModel.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(
+            encryptViewContents.contains("@State private var operation = OperationController()"),
+            "EncryptView should not directly own OperationController"
+        )
+        XCTAssertFalse(
+            encryptViewContents.contains("@State private var exportController = FileExportController()"),
+            "EncryptView should not directly own FileExportController"
+        )
+        XCTAssertFalse(
+            encryptViewContents.contains("contactService.contacts.filter"),
+            "EncryptView should bind to screen-model contact state instead of querying contacts inline"
+        )
+        XCTAssertTrue(
+            encryptViewContents.contains("EncryptScreenHostView"),
+            "EncryptView should forward into a private owning host"
+        )
+        XCTAssertTrue(
+            encryptScreenModelContents.contains("func handleAppear()"),
+            "EncryptScreenModel should own repeated onAppear synchronization"
+        )
+
+        XCTAssertFalse(
+            decryptViewContents.contains("@State private var operation = OperationController()"),
+            "DecryptView should not directly own OperationController"
+        )
+        XCTAssertFalse(
+            decryptViewContents.contains("@State private var exportController = FileExportController()"),
+            "DecryptView should not directly own FileExportController"
+        )
+        XCTAssertFalse(
+            decryptViewContents.contains("try? FileManager.default.removeItem"),
+            "DecryptView should not inline temporary-file cleanup"
+        )
+        XCTAssertFalse(
+            decryptViewContents.contains("importedCiphertext.clear()"),
+            "DecryptView should not inline imported-text cleanup"
+        )
+        XCTAssertTrue(
+            decryptViewContents.contains("DecryptScreenHostView"),
+            "DecryptView should forward into a private owning host"
+        )
+        XCTAssertTrue(
+            decryptScreenModelContents.contains("func handleAppear()"),
+            "DecryptScreenModel should own repeated onAppear synchronization"
+        )
+        XCTAssertTrue(
+            decryptScreenModelContents.contains("func handleDisappear()"),
+            "DecryptScreenModel should own disappear cleanup"
+        )
+        XCTAssertTrue(
+            decryptScreenModelContents.contains("func handleContentClearGenerationChange()"),
+            "DecryptScreenModel should own content-clear invalidation"
+        )
+    }
+
     func test_outputPages_removeTutorialOutputCouplingFromPageImplementations() throws {
         let rootURL = repositoryRootURL()
         let files = [
