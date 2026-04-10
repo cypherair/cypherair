@@ -222,8 +222,9 @@ Sources/
 │   └── KeyProfile+Codable.swift
 └── Resources/
     ├── Assets.xcassets
-    ├── Localizable.xcstrings
-    └── Info.plist
+    └── Localizable.xcstrings
+
+CypherAir-Info.plist              # Root-level app Info.plist source
 ```
 
 When multiple screens share the same lifecycle/platform behavior, prefer extracting common infrastructure (`OperationController`, `SecurityScopedFileAccess`, `FileExportController`) instead of re-implementing per-view task/progress/export state machines.

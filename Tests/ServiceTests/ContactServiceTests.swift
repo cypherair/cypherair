@@ -37,6 +37,54 @@ final class ContactServiceTests: XCTestCase {
                       "Loading from empty directory should produce no contacts")
     }
 
+    func test_loadContacts_secretCertificateOnDisk_skipsFileAndPrunesMetadata() throws {
+        let valid = try engine.generateKey(
+            name: "Stored Valid",
+            email: nil,
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let secretBearing = try engine.generateKey(
+            name: "Stored Secret",
+            email: nil,
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        try valid.publicKeyData.write(
+            to: tempDir.appendingPathComponent("\(valid.fingerprint).gpg"),
+            options: .atomic
+        )
+        try secretBearing.certData.write(
+            to: tempDir.appendingPathComponent("\(secretBearing.fingerprint).gpg"),
+            options: .atomic
+        )
+
+        let metadataURL = tempDir.appendingPathComponent("contact-metadata.json")
+        let manifest: [String: Any] = [
+            "verificationStates": [
+                valid.fingerprint: ContactVerificationState.verified.rawValue,
+                secretBearing.fingerprint: ContactVerificationState.verified.rawValue,
+            ]
+        ]
+        let metadata = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+        try metadata.write(to: metadataURL, options: .atomic)
+
+        try contactService.loadContacts()
+
+        XCTAssertEqual(contactService.contacts.count, 1)
+        XCTAssertEqual(contactService.contacts.first?.fingerprint, valid.fingerprint)
+
+        let storedMetadata = try Data(contentsOf: metadataURL)
+        let json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: storedMetadata) as? [String: Any]
+        )
+        let verificationStates = try XCTUnwrap(json["verificationStates"] as? [String: String])
+        XCTAssertEqual(verificationStates.count, 1)
+        XCTAssertEqual(verificationStates[valid.fingerprint], ContactVerificationState.verified.rawValue)
+        XCTAssertNil(verificationStates[secretBearing.fingerprint])
+    }
+
     // MARK: - Add Contact
 
     func test_addContact_validPublicKey_returnsAdded() throws {

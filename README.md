@@ -63,7 +63,7 @@ Sources/
 ├── Security/         # SE wrapping, Keychain, auth modes, memory zeroing
 ├── Models/           # Data types, PGP key representations, error types
 ├── Extensions/       # Swift/Foundation extensions
-└── Resources/        # Assets, String Catalog, Info.plist
+└── Resources/        # Assets, String Catalog
 
 pgp-mobile/           # Rust wrapper crate (Sequoia PGP + UniFFI)
 ├── src/
@@ -79,6 +79,7 @@ pgp-mobile/           # Rust wrapper crate (Sequoia PGP + UniFFI)
 └── tests/
 
 docs/                 # Design documents
+CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
 ## Recent Internal Improvements
@@ -102,39 +103,25 @@ Recent refactors focused on maintainability and safety without changing the app'
 ### Commands
 
 ```bash
-# Cross-compile Rust for iOS device
-# First build compiles vendored OpenSSL from source (~3-5 min)
-cargo build --release --target aarch64-apple-ios \
-    --manifest-path pgp-mobile/Cargo.toml
-
-# Cross-compile for Apple Silicon simulator
-cargo build --release --target aarch64-apple-ios-sim \
-    --manifest-path pgp-mobile/Cargo.toml
-
-# Cross-compile for macOS Apple Silicon
-cargo build --release --target aarch64-apple-darwin \
-    --manifest-path pgp-mobile/Cargo.toml
-
-# Build host dylib for UniFFI bindgen
-cargo build --release --manifest-path pgp-mobile/Cargo.toml
-
-# Generate Swift bindings
-cargo run --bin uniffi-bindgen generate \
-    --library target/release/libpgp_mobile.dylib \
-    --language swift --out-dir bindings/
-
-# Create XCFramework (all three platform slices)
-xcodebuild -create-xcframework \
-    -library target/aarch64-apple-ios/release/libpgp_mobile.a -headers bindings/ \
-    -library target/aarch64-apple-ios-sim/release/libpgp_mobile.a -headers bindings/ \
-    -library target/aarch64-apple-darwin/release/libpgp_mobile.a -headers bindings/ \
-    -output PgpMobile.xcframework
-
-# Run Rust tests
+# 1. Validate Rust behavior
 cargo test --manifest-path pgp-mobile/Cargo.toml
+
+# 2. Refresh Rust artifacts, bindings, and packaged outputs used by Xcode
+./build-xcframework.sh --release
+
+# 3. Validate Swift unit + FFI behavior locally
+xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
+    -destination 'platform=macOS'
 ```
 
-Then open the Xcode project and build normally.
+For Secure Enclave, biometrics, and MIE coverage on hardware:
+
+```bash
+xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
+    -destination 'platform=iOS,name=<DEVICE_NAME>'
+```
+
+For the full Rust / UniFFI / Xcode workflow, including artifact refresh details and stale-output troubleshooting, see [docs/TESTING.md](docs/TESTING.md) and [CLAUDE.md](CLAUDE.md).
 
 ### CI Note
 
