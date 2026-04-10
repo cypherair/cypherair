@@ -511,6 +511,39 @@ final class TutorialSessionStoreTests: XCTestCase {
         }
     }
 
+    func test_signView_establishesScreenModelHostBaseline() throws {
+        let rootURL = repositoryRootURL()
+        let signViewContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Sign/SignView.swift"),
+            encoding: .utf8
+        )
+        let signScreenModelContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Sign/SignScreenModel.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(
+            signViewContents.contains("@State private var operation = OperationController()"),
+            "SignView should not directly own OperationController"
+        )
+        XCTAssertFalse(
+            signViewContents.contains("@State private var exportController = FileExportController()"),
+            "SignView should not directly own FileExportController"
+        )
+        XCTAssertFalse(
+            signViewContents.contains("signerFingerprint = keyManagement.defaultKey?.fingerprint"),
+            "SignView should not inline default signer preparation"
+        )
+        XCTAssertTrue(
+            signViewContents.contains("SignScreenHostView"),
+            "SignView should forward into a private owning host"
+        )
+        XCTAssertTrue(
+            signScreenModelContents.contains("func prepareIfNeeded()"),
+            "SignScreenModel should own one-time screen preparation"
+        )
+    }
+
     func test_outputPages_removeTutorialOutputCouplingFromPageImplementations() throws {
         let rootURL = repositoryRootURL()
         let files = [
