@@ -85,7 +85,7 @@ struct ContactImportWorkflow {
                 )
             }
         } catch {
-            onFailure(CypherAirError.from(error) { .invalidKeyData(reason: $0) })
+            onFailure(ContactImportPublicCertificateValidator.mapError(error))
         }
     }
 
@@ -113,16 +113,13 @@ struct ContactImportWorkflow {
         onFailure: @escaping @MainActor (CypherAirError) -> Void
     ) {
         do {
-            try contactService.confirmKeyUpdate(
+            let contact = try contactService.confirmKeyUpdate(
                 existingFingerprint: pendingUpdate.existingContact.fingerprint,
-                newContact: pendingUpdate.newContact,
                 keyData: pendingUpdate.keyData
             )
-            var contact = pendingUpdate.newContact
-            contact.verificationState = .verified
             onSuccess(contact)
         } catch {
-            onFailure(CypherAirError.from(error) { .invalidKeyData(reason: $0) })
+            onFailure(ContactImportPublicCertificateValidator.mapError(error))
         }
     }
 }

@@ -569,6 +569,44 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertEqual(info.profile, .advanced)
     }
 
+    func test_validatePublicCertificate_returnsNormalizedPublicCertAndMetadata() throws {
+        let generated = try engine.generateKey(
+            name: "Validate Public",
+            email: nil,
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        let result = try engine.validatePublicCertificate(certData: generated.publicKeyData)
+
+        XCTAssertEqual(result.publicCertData, generated.publicKeyData)
+        XCTAssertEqual(result.keyInfo.fingerprint, generated.fingerprint)
+        XCTAssertEqual(result.profile, .universal)
+    }
+
+    func test_validatePublicCertificate_secretBearingInput_throwsInvalidKeyDataWithStableToken() throws {
+        let generated = try engine.generateKey(
+            name: "Validate Secret",
+            email: nil,
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        XCTAssertThrowsError(
+            try engine.validatePublicCertificate(certData: generated.certData)
+        ) { error in
+            guard let pgpError = error as? PgpError else {
+                return XCTFail("Expected PgpError, got \(type(of: error))")
+            }
+            switch pgpError {
+            case .InvalidKeyData(let reason):
+                XCTAssertEqual(reason, ContactImportPublicCertificateValidator.publicOnlyReasonToken)
+            default:
+                XCTFail("Expected InvalidKeyData, got \(pgpError)")
+            }
+        }
+    }
+
     // MARK: - C5.3 Error Enum Mapping
 
     /// C5.3: NoMatchingKey error when decrypting with wrong key.

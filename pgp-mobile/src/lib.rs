@@ -27,7 +27,8 @@ use crate::cert_signature::{CertificateSignatureResult, CertificationKind};
 use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
 use crate::keys::{
-    CertificateMergeResult, GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult, S2kInfo,
+    CertificateMergeResult, GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult,
+    PublicCertificateValidationResult, S2kInfo,
 };
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::signature_details::{
@@ -84,6 +85,16 @@ impl PgpEngine {
     /// Detect the profile of a key (Universal or Advanced).
     pub fn detect_profile(&self, cert_data: Vec<u8>) -> Result<KeyProfile, PgpError> {
         keys::detect_profile(&cert_data)
+    }
+
+    /// Validate contact-import data as a public certificate and return normalized metadata.
+    ///
+    /// Secret-bearing input is rejected with `InvalidKeyData` using a stable reason token.
+    pub fn validate_public_certificate(
+        &self,
+        cert_data: Vec<u8>,
+    ) -> Result<PublicCertificateValidationResult, PgpError> {
+        keys::validate_public_certificate(&cert_data)
     }
 
     // ── Certificate Merge / Update ──────────────────────────────────

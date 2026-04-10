@@ -197,6 +197,7 @@ final class ModelTests: XCTestCase {
             .keychainError("test"),
             .invalidQRCode,
             .unsupportedQRVersion,
+            .contactImportRequiresPublicCertificate,
             .fileTooLarge(sizeMB: 200),
             .noKeySelected,
             .noRecipientsSelected,

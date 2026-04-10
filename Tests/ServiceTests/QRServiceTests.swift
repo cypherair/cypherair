@@ -223,6 +223,24 @@ final class QRServiceTests: XCTestCase {
         }
     }
 
+    func test_inspectImportablePublicCertificate_secretKeyMaterial_throwsSpecificContactImportError() throws {
+        let generated = try engine.generateKey(
+            name: "Import Secret Reject",
+            email: nil,
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        XCTAssertThrowsError(try qrService.inspectImportablePublicCertificate(keyData: generated.certData)) { error in
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            guard case .contactImportRequiresPublicCertificate = cypherError else {
+                return XCTFail("Expected .contactImportRequiresPublicCertificate, got \(cypherError)")
+            }
+        }
+    }
+
     // MARK: - Negative: URL Length Limit (Anti-DoS)
 
     func test_parseImportURL_exceedsMaxLength_throwsInvalidQRCode() {

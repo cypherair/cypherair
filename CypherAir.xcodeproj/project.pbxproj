@@ -160,6 +160,7 @@
 				Security/SecureEnclaveManageable.swift,
 				Security/SecureEnclaveManager.swift,
 				Services/ContactService.swift,
+				Services/ContactImportPublicCertificateValidator.swift,
 				Services/DecryptionService.swift,
 				Services/DiskSpaceChecker.swift,
 				Services/EncryptionService.swift,

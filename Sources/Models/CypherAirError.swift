@@ -34,6 +34,7 @@ enum CypherAirError: Error, LocalizedError {
     // App-layer errors
     case invalidQRCode
     case unsupportedQRVersion
+    case contactImportRequiresPublicCertificate
     case fileTooLarge(sizeMB: Int)
     case insufficientDiskSpace(fileSizeMB: Int, requiredMB: Int, availableMB: Int)
     case noKeySelected
@@ -97,6 +98,8 @@ enum CypherAirError: Error, LocalizedError {
             String(localized: "error.invalidQR", defaultValue: "Not a valid CypherAir public key.")
         case .unsupportedQRVersion:
             String(localized: "error.unsupportedQRVersion", defaultValue: "This QR code requires a newer version of the app. Please update.")
+        case .contactImportRequiresPublicCertificate:
+            String(localized: "error.contactImportRequiresPublicCertificate", defaultValue: "Contacts only accept public certificates. Remove any private key material and try again.")
         case .fileTooLarge(let sizeMB):
             String(localized: "error.fileTooLarge", defaultValue: "File is too large (\(sizeMB) MB). Maximum size is 100 MB.")
         case .insufficientDiskSpace(let fileSizeMB, _, let availableMB):

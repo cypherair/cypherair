@@ -124,6 +124,13 @@ Typical stale-artifact symptom:
 
 If that happens, first suspect stale Rust `release` artifacts rather than stale Swift source.
 
+If a Rust / UniFFI change affects contact import validation, validation must also prove the
+stable public-only contract end to end:
+
+- secret-bearing contact-import input is rejected before inspection and persistence
+- the Rust surface returns `InvalidKeyData` with the stable contact-import reason token
+- Swift maps that stable token to the explicit contact-import public-certificate error
+
 ## 2.3 Revocation Construction Coverage
 
 When changing revocation-construction behavior, validation must cover:

@@ -56,6 +56,51 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(contactService.contacts.count, 1)
     }
 
+    func test_addContact_secretCertificateRejectedWithoutPersisting() throws {
+        let generated = try engine.generateKey(
+            name: "Secret Contact Reject",
+            email: nil,
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        XCTAssertThrowsError(try contactService.addContact(publicKeyData: generated.certData)) { error in
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            guard case .contactImportRequiresPublicCertificate = cypherError else {
+                return XCTFail("Expected .contactImportRequiresPublicCertificate, got \(cypherError)")
+            }
+        }
+
+        XCTAssertTrue(contactService.contacts.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("\(generated.fingerprint).gpg").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("contact-metadata.json").path))
+    }
+
+    func test_addContact_armoredSecretCertificateRejectedWithoutPersisting() throws {
+        let generated = try engine.generateKey(
+            name: "Armored Secret Contact Reject",
+            email: nil,
+            expirySeconds: nil,
+            profile: .advanced
+        )
+        let armoredSecret = try engine.armor(data: generated.certData, kind: .secretKey)
+
+        XCTAssertThrowsError(try contactService.addContact(publicKeyData: armoredSecret)) { error in
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            guard case .contactImportRequiresPublicCertificate = cypherError else {
+                return XCTFail("Expected .contactImportRequiresPublicCertificate, got \(cypherError)")
+            }
+        }
+
+        XCTAssertTrue(contactService.contacts.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("\(generated.fingerprint).gpg").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("contact-metadata.json").path))
+    }
+
     func test_addContact_duplicateFingerprint_returnsDuplicate() throws {
         let generated = try engine.generateKey(
             name: "Bob", email: "bob@example.com",
@@ -246,13 +291,12 @@ final class ContactServiceTests: XCTestCase {
         _ = try contactService.addContact(publicKeyData: conflictingKey.publicKeyData)
 
         let result = try contactService.addContact(publicKeyData: update)
-        guard case .keyUpdateDetected(let newContact, let existingContact, let keyData) = result else {
+        guard case .keyUpdateDetected(_, let existingContact, let keyData) = result else {
             return XCTFail("Expected .keyUpdateDetected, got \(result)")
         }
 
         try contactService.confirmKeyUpdate(
             existingFingerprint: existingContact.fingerprint,
-            newContact: newContact,
             keyData: keyData
         )
 
@@ -419,9 +463,8 @@ final class ContactServiceTests: XCTestCase {
         }
 
         // Confirm update
-        try contactService.confirmKeyUpdate(
+        let confirmedContact = try contactService.confirmKeyUpdate(
             existingFingerprint: oldFingerprint,
-            newContact: newContact,
             keyData: keyData
         )
 
@@ -429,6 +472,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(contactService.contacts.count, 1)
         XCTAssertEqual(contactService.contacts[0].fingerprint, newContact.fingerprint)
         XCTAssertNotEqual(contactService.contacts[0].fingerprint, oldFingerprint)
+        XCTAssertEqual(confirmedContact.fingerprint, newContact.fingerprint)
 
         // Verify: new file exists on disk
         let newFile = tempDir.appendingPathComponent("\(newContact.fingerprint).gpg")
@@ -439,6 +483,44 @@ final class ContactServiceTests: XCTestCase {
         let oldFile = tempDir.appendingPathComponent("\(oldFingerprint).gpg")
         XCTAssertFalse(FileManager.default.fileExists(atPath: oldFile.path),
                        "Old key file should be removed after confirmKeyUpdate")
+    }
+
+    func test_confirmKeyUpdate_secretKeyDataRejectedWithoutReplacingExistingContact() throws {
+        let key1 = try engine.generateKey(
+            name: "Carol", email: "carol@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+        let key2 = try engine.generateKey(
+            name: "Carol", email: "carol@example.com",
+            expirySeconds: nil, profile: .universal
+        )
+
+        _ = try contactService.addContact(publicKeyData: key1.publicKeyData)
+        let oldFingerprint = contactService.contacts[0].fingerprint
+
+        let result = try contactService.addContact(publicKeyData: key2.publicKeyData)
+        guard case .keyUpdateDetected = result else {
+            return XCTFail("Expected .keyUpdateDetected")
+        }
+
+        XCTAssertThrowsError(
+            try contactService.confirmKeyUpdate(
+                existingFingerprint: oldFingerprint,
+                keyData: key2.certData
+            )
+        ) { error in
+            guard let cypherError = error as? CypherAirError else {
+                return XCTFail("Expected CypherAirError, got \(type(of: error))")
+            }
+            guard case .contactImportRequiresPublicCertificate = cypherError else {
+                return XCTFail("Expected .contactImportRequiresPublicCertificate, got \(cypherError)")
+            }
+        }
+
+        XCTAssertEqual(contactService.contacts.count, 1)
+        XCTAssertEqual(contactService.contacts[0].fingerprint, oldFingerprint)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("\(oldFingerprint).gpg").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("\(key2.fingerprint).gpg").path))
     }
 
     // MARK: - Binary Key Import

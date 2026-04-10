@@ -73,6 +73,20 @@ pub struct KeyInfo {
     pub expiry_timestamp: Option<u64>,
 }
 
+/// Public-certificate validation result for contact import.
+#[derive(Debug, uniffi::Record)]
+pub struct PublicCertificateValidationResult {
+    /// Canonical binary OpenPGP public certificate bytes.
+    pub public_cert_data: Vec<u8>,
+    /// Parsed key metadata for the validated public certificate.
+    pub key_info: KeyInfo,
+    /// Detected profile of the validated public certificate.
+    pub profile: KeyProfile,
+}
+
+/// Stable `InvalidKeyData.reason` token for contact-import public-only violations.
+pub const CONTACT_IMPORT_PUBLIC_ONLY_REASON: &str = "contact_import_public_only";
+
 /// Semantic outcome of a same-fingerprint public certificate merge/update.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum CertificateMergeOutcome {
@@ -313,6 +327,31 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         primary_algo,
         subkey_algo,
         expiry_timestamp,
+    })
+}
+
+/// Validate that contact-import data is a public certificate and return normalized metadata.
+pub fn validate_public_certificate(
+    cert_data: &[u8],
+) -> Result<PublicCertificateValidationResult, PgpError> {
+    let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
+        reason: e.to_string(),
+    })?;
+
+    if cert.is_tsk() {
+        return Err(PgpError::InvalidKeyData {
+            reason: CONTACT_IMPORT_PUBLIC_ONLY_REASON.to_string(),
+        });
+    }
+
+    let public_cert_data = serialize_public_cert(&cert)?;
+    let key_info = parse_key_info(&public_cert_data)?;
+    let profile = key_info.profile;
+
+    Ok(PublicCertificateValidationResult {
+        public_cert_data,
+        key_info,
+        profile,
     })
 }
 

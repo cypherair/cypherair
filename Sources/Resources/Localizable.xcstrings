@@ -3318,6 +3318,22 @@
         }
       }
     },
+    "error.contactImportRequiresPublicCertificate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacts only accept public certificates. Remove any private key material and try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人只接受公钥证书。请移除任何私钥材料后再试。"
+          }
+        }
+      }
+    },
     "error.keychain" : {
       "localizations" : {
         "en" : {
