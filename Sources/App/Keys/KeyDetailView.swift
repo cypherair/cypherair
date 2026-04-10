@@ -1,10 +1,10 @@
 import SwiftUI
 import UniformTypeIdentifiers
-#if canImport(UIKit)
-import UIKit
-#endif
 #if canImport(AppKit)
 import AppKit
+#endif
+#if canImport(UIKit)
+import UIKit
 #endif
 
 /// Detailed view of a single key identity.
@@ -26,26 +26,6 @@ struct KeyDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.macPresentationController) private var macPresentationController
 
-    @State private var showDeleteConfirmation = false
-    @State private var error: CypherAirError?
-    @State private var showError = false
-    @State private var armoredPublicKey: Data?
-    @State private var armoredRevocation: Data?
-    @State private var showCopiedNotice = false
-    @State private var activeExport: ExportType?
-    @State private var isPreparingRevocationExport = false
-    @State private var showExpirySheet = false
-    @State private var newExpiryDate = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
-
-    private enum ExportType {
-        case publicKey
-        case revocation
-    }
-
-    private var key: PGPKeyIdentity? {
-        keyManagement.keys.first { $0.fingerprint == fingerprint }
-    }
-
     init(
         fingerprint: String,
         configuration: Configuration = .default
@@ -55,8 +35,46 @@ struct KeyDetailView: View {
     }
 
     var body: some View {
+        KeyDetailScreenHostView(
+            fingerprint: fingerprint,
+            config: config,
+            keyManagement: keyManagement,
+            macPresentationController: macPresentationController,
+            configuration: configuration,
+            dismissAction: { dismiss() }
+        )
+    }
+}
+
+private struct KeyDetailScreenHostView: View {
+    @State private var model: KeyDetailScreenModel
+
+    init(
+        fingerprint: String,
+        config: AppConfiguration,
+        keyManagement: KeyManagementService,
+        macPresentationController: MacPresentationController?,
+        configuration: KeyDetailView.Configuration,
+        dismissAction: @escaping @MainActor () -> Void
+    ) {
+        _model = State(
+            initialValue: KeyDetailScreenModel(
+                fingerprint: fingerprint,
+                config: config,
+                keyManagement: keyManagement,
+                macPresentationController: macPresentationController,
+                configuration: configuration,
+                dismissAction: dismissAction
+            )
+        )
+    }
+
+    var body: some View {
+        @Bindable var model = model
+        let exportController = model.exportController
+
         Group {
-            if let key {
+            if let key = model.key {
                 List {
                     Section {
                         LabeledContent(
@@ -110,7 +128,7 @@ struct KeyDetailView: View {
                         }
 
                         Button {
-                            presentModifyExpiry()
+                            model.presentModifyExpiry()
                         } label: {
                             Label(
                                 String(localized: "keydetail.modifyExpiry", defaultValue: "Modify Expiry"),
@@ -129,29 +147,16 @@ struct KeyDetailView: View {
                     }
 
                     Section {
-                        if armoredPublicKey != nil {
+                        if model.armoredPublicKey != nil {
                             Button {
-                                guard configuration.allowsPublicKeySave,
-                                      let armoredPublicKey else { return }
-                                do {
-                                    if try configuration.outputInterceptionPolicy.interceptDataExport?(
-                                        armoredPublicKey,
-                                        exportFilename(for: .publicKey),
-                                        .publicKey
-                                    ) != true {
-                                        activeExport = .publicKey
-                                    }
-                                } catch {
-                                    self.error = CypherAirError.from(error) { .keychainError($0) }
-                                    showError = true
-                                }
+                                model.exportPublicKey()
                             } label: {
                                 Label(
                                     String(localized: "keydetail.sharePublicKey", defaultValue: "Save Public Key"),
                                     systemImage: "square.and.arrow.down"
                                 )
                             }
-                            .disabled(armoredPublicKey == nil || !configuration.allowsPublicKeySave)
+                            .disabled(model.armoredPublicKey == nil || !model.configuration.allowsPublicKeySave)
                         }
 
                         NavigationLink(value: AppRoute.qrDisplay(publicKeyData: key.publicKeyData, displayName: key.userId ?? key.shortKeyId)) {
@@ -163,30 +168,14 @@ struct KeyDetailView: View {
                         .accessibilityIdentifier("keydetail.qr")
 
                         Button {
-                            guard configuration.allowsPublicKeyCopy else { return }
-                            if let armoredPublicKey,
-                               let armoredString = String(data: armoredPublicKey, encoding: .utf8) {
-                                if configuration.outputInterceptionPolicy.interceptClipboardCopy?(
-                                    armoredString,
-                                    config,
-                                    .publicKey
-                                ) != true {
-                                    #if canImport(UIKit)
-                                    UIPasteboard.general.string = armoredString
-                                    #elseif canImport(AppKit)
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(armoredString, forType: .string)
-                                    #endif
-                                    showCopiedNotice = true
-                                }
-                            }
+                            model.copyPublicKey()
                         } label: {
                             Label(
                                 String(localized: "keydetail.copyPublicKey", defaultValue: "Copy Public Key"),
                                 systemImage: "doc.on.doc"
                             )
                         }
-                        .disabled(armoredPublicKey == nil || !configuration.allowsPublicKeyCopy)
+                        .disabled(model.armoredPublicKey == nil || !model.configuration.allowsPublicKeyCopy)
                     } header: {
                         Text(String(localized: "keydetail.publicKey", defaultValue: "Public Key"))
                     }
@@ -210,7 +199,7 @@ struct KeyDetailView: View {
                             }
                         }
 
-                        NavigationLink(value: AppRoute.backupKey(fingerprint: fingerprint)) {
+                        NavigationLink(value: AppRoute.backupKey(fingerprint: model.fingerprint)) {
                             Label(
                                 String(localized: "keydetail.exportBackup", defaultValue: "Export Backup"),
                                 systemImage: "square.and.arrow.up"
@@ -220,35 +209,14 @@ struct KeyDetailView: View {
                         .accessibilityIdentifier("keydetail.backup")
 
                         Button {
-                            guard configuration.allowsRevocationExport,
-                                  !isPreparingRevocationExport else { return }
-                            isPreparingRevocationExport = true
-                            Task {
-                                defer { isPreparingRevocationExport = false }
-                                do {
-                                    let exported = try await keyManagement.exportRevocationCertificate(
-                                        fingerprint: fingerprint
-                                    )
-                                    if try configuration.outputInterceptionPolicy.interceptDataExport?(
-                                        exported,
-                                        exportFilename(for: .revocation),
-                                        .revocation
-                                    ) != true {
-                                        armoredRevocation = exported
-                                        activeExport = .revocation
-                                    }
-                                } catch {
-                                    self.error = CypherAirError.from(error) { .keychainError($0) }
-                                    showError = true
-                                }
-                            }
+                            model.exportRevocationCertificate()
                         } label: {
                             Label(
                                 String(localized: "keydetail.exportRevocation", defaultValue: "Export Revocation Certificate"),
                                 systemImage: "xmark.seal"
                             )
                         }
-                        .disabled(!configuration.allowsRevocationExport || isPreparingRevocationExport)
+                        .disabled(!model.configuration.allowsRevocationExport || model.isPreparingRevocationExport)
                     } header: {
                         Text(String(localized: "keydetail.actions", defaultValue: "Actions"))
                     }
@@ -256,12 +224,7 @@ struct KeyDetailView: View {
                     if !key.isDefault {
                         Section {
                             Button {
-                                do {
-                                    try keyManagement.setDefaultKey(fingerprint: fingerprint)
-                                } catch {
-                                    self.error = CypherAirError.from(error) { .keychainError($0) }
-                                    showError = true
-                                }
+                                model.setDefaultKey()
                             } label: {
                                 Label(
                                     String(localized: "keydetail.setDefault", defaultValue: "Set as Default"),
@@ -273,7 +236,7 @@ struct KeyDetailView: View {
 
                     Section {
                         Button(role: .destructive) {
-                            showDeleteConfirmation = true
+                            model.showDeleteConfirmation = true
                         } label: {
                             Label(
                                 String(localized: "keydetail.delete", defaultValue: "Delete Key"),
@@ -297,41 +260,48 @@ struct KeyDetailView: View {
         .navigationTitle(String(localized: "keydetail.title", defaultValue: "Key Detail"))
         .confirmationDialog(
             String(localized: "keydetail.delete.title", defaultValue: "Delete Key"),
-            isPresented: $showDeleteConfirmation,
+            isPresented: $model.showDeleteConfirmation,
             titleVisibility: .visible
         ) {
             Button(String(localized: "keydetail.delete.confirm", defaultValue: "Delete Permanently"), role: .destructive) {
-                do {
-                    try keyManagement.deleteKey(fingerprint: fingerprint)
-                    dismiss()
-                } catch {
-                    self.error = CypherAirError.from(error) { .keychainError($0) }
-                    showError = true
-                }
+                model.deleteKey()
             }
         } message: {
             Text(String(localized: "keydetail.delete.message", defaultValue: "This will permanently delete this key from your device. This action cannot be undone. Make sure you have a backup."))
         }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
+            isPresented: Binding(
+                get: { model.showError },
+                set: { if !$0 { model.dismissError() } }
+            ),
+            presenting: model.error
         ) { _ in
-            Button(String(localized: "error.ok", defaultValue: "OK")) {}
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                model.dismissError()
+            }
         } message: { err in
             Text(err.localizedDescription)
         }
         .alert(
             String(localized: "clipboard.copied.title", defaultValue: "Copied"),
-            isPresented: $showCopiedNotice
+            isPresented: Binding(
+                get: { model.showCopiedNotice },
+                set: { if !$0 { model.dismissCopiedNotice() } }
+            )
         ) {
-            Button(String(localized: "clipboard.copied.ok", defaultValue: "OK")) {}
+            Button(String(localized: "clipboard.copied.ok", defaultValue: "OK")) {
+                model.dismissCopiedNotice()
+            }
         } message: {
             Text(String(localized: "clipboard.copied.publicKey", defaultValue: "Public key copied to clipboard."))
         }
-        .sheet(isPresented: $showExpirySheet) {
+        .sheet(item: Binding(
+            get: { model.localModifyExpiryRequest },
+            set: { if $0 == nil { model.dismissModifyExpiryPresentation() } }
+        )) { request in
             NavigationStack {
-                ModifyExpirySheetView(request: modifyExpiryRequest)
+                ModifyExpirySheetView(request: request)
             }
             #if os(macOS)
             .frame(minWidth: 500, idealWidth: 540, minHeight: 320, idealHeight: 380)
@@ -340,79 +310,22 @@ struct KeyDetailView: View {
             .presentationDetents([.medium])
             #endif
         }
-        .task {
-            do {
-                armoredPublicKey = try keyManagement.exportPublicKey(fingerprint: fingerprint)
-            } catch {
-                // Non-critical — sharing buttons will be disabled.
-            }
-        }
         .fileExporter(
             isPresented: Binding(
-                get: { activeExport != nil },
-                set: {
-                    if !$0 {
-                        activeExport = nil
-                        armoredRevocation = nil
-                    }
-                }
+                get: { exportController.isPresented },
+                set: { if !$0 { model.finishExport() } }
             ),
-            item: exportItem,
+            item: exportController.payload,
             contentTypes: [.data],
-            defaultFilename: exportFilename
+            defaultFilename: exportController.defaultFilename
         ) { result in
-            activeExport = nil
-            armoredRevocation = nil
+            model.finishExport()
             if case .failure(let exportError) = result {
-                error = CypherAirError.from(exportError) { .keychainError($0) }
-                showError = true
+                model.handleExportError(exportError)
             }
         }
-    }
-
-    private var exportItem: Data? {
-        switch activeExport {
-        case .publicKey:
-            armoredPublicKey
-        case .revocation:
-            armoredRevocation
-        case nil:
-            nil
-        }
-    }
-
-    private var exportFilename: String {
-        exportFilename(for: activeExport)
-    }
-
-    private func exportFilename(for exportType: ExportType?) -> String {
-        switch exportType {
-        case .publicKey:
-            "\(key?.shortKeyId ?? "key").asc"
-        case .revocation:
-            "revocation-\(key?.shortKeyId ?? "key").asc"
-        case nil:
-            "export.asc"
-        }
-    }
-
-    private var modifyExpiryRequest: ModifyExpiryRequest {
-        ModifyExpiryRequest(
-            fingerprint: fingerprint,
-            initialDate: newExpiryDate
-        ) {
-            armoredPublicKey = try? keyManagement.exportPublicKey(fingerprint: fingerprint)
-            showExpirySheet = false
-        }
-    }
-
-    private func presentModifyExpiry() {
-        if let macPresentationController {
-            macPresentationController.present(
-                .modifyExpiry(modifyExpiryRequest)
-            )
-        } else {
-            showExpirySheet = true
+        .onAppear {
+            model.prepareIfNeeded()
         }
     }
 }
