@@ -13,7 +13,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run full Rust suite
-        run: cargo test --manifest-path pgp-mobile/Cargo.toml
+        run: |
+          cargo test --manifest-path pgp-mobile/Cargo.toml
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
       - name: Run CypherAir unit tests
         run: |
           xcodebuild test \

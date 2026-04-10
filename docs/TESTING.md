@@ -18,6 +18,20 @@ CypherAir has four test layers, each with different runtime requirements.
 cargo test --manifest-path pgp-mobile/Cargo.toml
 ```
 
+The local default command above skips tests marked `#[ignore = "slow"]`, including
+`profile_b_slow_tests` and `large_payload_tests`.
+
+GitHub Actions runs the default suite plus the slow Rust targets explicitly:
+
+```bash
+cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
+cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
+```
+
+Fixture-dependent ignored tests in `gnupg_fixture_regression_tests.rs` remain manual and
+are not part of the standard GitHub workflows.
+
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
@@ -114,7 +128,8 @@ Use this when you want to validate Rust logic in isolation.
 cargo test --manifest-path pgp-mobile/Cargo.toml
 ```
 
-This does **not** refresh the release archives or generated UniFFI outputs that Xcode consumes.
+This is the default local path and skips `#[ignore = "slow"]` Rust tests.
+It does **not** refresh the release archives or generated UniFFI outputs that Xcode consumes.
 
 ### B. Refresh the Rust release archives that Xcode links
 

@@ -186,10 +186,11 @@ These are not the first pattern-definition targets, but they should follow the s
 - It directly coordinates auth-mode interception, warning generation, async mode switching, and onboarding/tutorial launch routing.
 - It branches across `iosPresentationController`, `macPresentationController`, and local fallback sheet state.
 - It computes risk messaging based on backup presence from [`KeyManagementService`](../Sources/Services/KeyManagementService.swift).
+- The auth-mode flow is not fully local to the main list view. Related ownership also passes through auth-mode confirmation request shaping, the dedicated confirmation sheet view, the macOS settings-root launch path, and the macOS presentation host.
 
 **Assessment**
 
-The problem is not visual complexity. The problem is that UI concerns, security-adjacent intent handling, and cross-platform presentation routing all live together in one view.
+The problem is not visual complexity. The problem is that UI concerns, security-adjacent intent handling, and cross-platform presentation routing all live together in what still behaves like one Settings surface. The refactor boundary here should include the auth-mode confirmation and presentation path, not just the visible list page.
 
 #### [`KeyDetailView`](../Sources/App/Keys/KeyDetailView.swift)
 
@@ -425,7 +426,7 @@ These are not yet a complete coordinator layer, but they are already real bounda
 | P1 | [`KeyManagementService`](../Sources/Services/KeyManagementService.swift) | Largest service, broadest responsibility spread, closest to security-sensitive behavior | High | Split internal ownership behind the existing facade |
 | P1 | [`DecryptView`](../Sources/App/Decrypt/DecryptView.swift) | Most overloaded production screen and the clearest workflow state machine in the App layer | High | Use it to define the screen-model cleanup and long-running-operation pattern |
 | P1 | [`EncryptView`](../Sources/App/Encrypt/EncryptView.swift) | Same architectural pressure as decrypt, with heavy exporter and output-interception state | High | Refactor in the same pattern once decrypt is defined |
-| P1 | [`SettingsView`](../Sources/App/Settings/SettingsView.swift) | Security-adjacent coordination hidden inside a view | High | Extract a screen model without changing `AuthenticationManager` behavior |
+| P1 | [`SettingsView`](../Sources/App/Settings/SettingsView.swift) | Security-adjacent coordination hidden inside a view, with auth-mode flow split across confirmation and presentation helpers | High | Extract a screen model and pull auth-mode flow ownership together without changing `AuthenticationManager` behavior |
 | P2 | [`KeyDetailView`](../Sources/App/Keys/KeyDetailView.swift) | Detail page is already a workflow coordinator | Medium | Move export/delete/revocation/expiry state out of the view |
 | P2 | [`ContactService`](../Sources/Services/ContactService.swift) | Persistence and import-policy concerns are still mixed | Medium | Split persistence first; do not duplicate App-layer workflow helpers |
 | P2 | [`AddContactView`](../Sources/App/Contacts/AddContactView.swift) | Active production contact-import entry point; partially extracted already, but the remaining coordination is still view-owned | Medium | Reuse the existing helpers and move the remaining state machine out of the view |
@@ -459,7 +460,7 @@ The current repository does not have a generic "everything is too big" problem. 
 
 - one clear god service: [`KeyManagementService`](../Sources/Services/KeyManagementService.swift)
 - one second-tier service with mixed persistence and import-policy ownership: [`ContactService`](../Sources/Services/ContactService.swift)
-- several production pages that have grown into workflow coordinators: [`EncryptView`](../Sources/App/Encrypt/EncryptView.swift), [`DecryptView`](../Sources/App/Decrypt/DecryptView.swift), [`SettingsView`](../Sources/App/Settings/SettingsView.swift), [`KeyDetailView`](../Sources/App/Keys/KeyDetailView.swift), and the active contact-import surface [`AddContactView`](../Sources/App/Contacts/AddContactView.swift)
+- several production pages that have grown into workflow coordinators: [`EncryptView`](../Sources/App/Encrypt/EncryptView.swift), [`DecryptView`](../Sources/App/Decrypt/DecryptView.swift), the broader Settings/auth-mode surface centered on [`SettingsView`](../Sources/App/Settings/SettingsView.swift), [`KeyDetailView`](../Sources/App/Keys/KeyDetailView.swift), and the active contact-import surface [`AddContactView`](../Sources/App/Contacts/AddContactView.swift)
 - an app root that is still doing too much coordination work even though some seams have already been extracted: [`CypherAirApp`](../Sources/App/CypherAirApp.swift)
 - tutorial host seams that are currently valuable and should be preserved, not rewritten
 - one deprecated standalone page that should not drive the main refactor design: [`QRPhotoImportView`](../Sources/App/Contacts/QRPhotoImportView.swift)
@@ -470,4 +471,6 @@ That means the next implementation spec should focus on:
 - preserving current facades and tutorial `Configuration` compatibility
 - defining the missing screen-model ownership pattern before broad screen migration
 - extracting internal ownership only where the current code clearly justifies it
+- treating the Settings/auth-mode flow as a cross-view surface rather than as a single-page cleanup
+- describing app-presentation coordination in cross-platform terms rather than as an iOS-only handoff problem
 - reusing existing helpers and coordinators instead of assuming a blank-slate rewrite

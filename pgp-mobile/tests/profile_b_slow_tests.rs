@@ -1,6 +1,8 @@
 //! Profile B slow tests.
 //! These preserve full Argon2id export/import coverage without keeping the default
 //! `cargo test` path stuck on long-running passphrase-protected key operations.
+//! GitHub PR and nightly workflows run this target explicitly with:
+//! `cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored`.
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;

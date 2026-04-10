@@ -1,5 +1,7 @@
 //! Large payload integration tests.
 //! Kept ignored by default to preserve coverage without slowing the default test path.
+//! GitHub PR and nightly workflows run this target explicitly with:
+//! `cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored`.
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
