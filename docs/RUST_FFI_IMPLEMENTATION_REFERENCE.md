@@ -479,8 +479,9 @@ Expose certificate-signature semantics needed for certification-related Rust com
 - Cryptographic invalidity after successful parsing returns a family-local invalid result, not `Err(...)`.
 - If no candidate signer can be selected for cryptographic checking, verification returns a family-local signer-missing result, not `Err(...)`.
 - Signer output for new APIs is two-layered:
-  - signer certificate primary fingerprint is required
-  - signing-subkey fingerprint is optional and returned when the path can determine it reliably
+  - signer certificate primary fingerprint is returned only after successful crypto verification and only for the cryptographically confirmed signer
+  - signing-subkey fingerprint is optional and returned only after successful crypto verification when the successful path used a non-primary signer key
+  - `Invalid` and `SignerMissing` results return neither fingerprint
 - Verification signer selection is fixed:
   - first, issuer-guided selection from the signature packet
   - second, fallback scan in caller-provided candidate order

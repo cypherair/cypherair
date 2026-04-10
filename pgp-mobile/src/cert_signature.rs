@@ -24,15 +24,20 @@ pub enum CertificateSignatureStatus {
 }
 
 /// Result of certificate-signature verification.
+///
+/// Fingerprint fields are only populated after successful cryptographic
+/// verification. `Invalid` and `SignerMissing` results clear both fields.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct CertificateSignatureResult {
     /// Crypto-only verification status.
     pub status: CertificateSignatureStatus,
     /// Certification kind for User ID binding signatures.
     pub certification_kind: Option<CertificationKind>,
-    /// Primary fingerprint of the selected signer certificate when known.
+    /// Primary fingerprint of the cryptographically confirmed signer
+    /// certificate. Populated only when `status == Valid`.
     pub signer_primary_fingerprint: Option<String>,
-    /// Signing subkey fingerprint when a non-primary signer key is selected.
+    /// Signing subkey fingerprint when `status == Valid` and the successful
+    /// verification path used a non-primary signer key.
     pub signing_key_fingerprint: Option<String>,
 }
 
