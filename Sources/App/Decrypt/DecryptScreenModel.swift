@@ -16,7 +16,7 @@ final class DecryptScreenModel {
         FileProgressReporter
     ) async throws -> (outputURL: URL, signature: SignatureVerification)
 
-    let configuration: DecryptView.Configuration
+    private(set) var configuration: DecryptView.Configuration
     let operation: OperationController
     let exportController: FileExportController
 
@@ -197,12 +197,21 @@ final class DecryptScreenModel {
     }
 
     func handleAppear() {
-        if ciphertextInput.isEmpty,
-           let prefilledCiphertext = configuration.prefilledCiphertext {
-            ciphertextInput = prefilledCiphertext
+        applyPrefilledCiphertextIfNeeded(from: configuration)
+        applyInitialPhase1ResultIfPresent(from: configuration)
+    }
+
+    func updateConfiguration(_ configuration: DecryptView.Configuration) {
+        let previousConfiguration = self.configuration
+        self.configuration = configuration
+
+        if previousConfiguration.prefilledCiphertext != configuration.prefilledCiphertext {
+            applyPrefilledCiphertextIfNeeded(from: configuration)
         }
-        if let initialPhase1Result = configuration.initialPhase1Result {
-            phase1Result = initialPhase1Result
+
+        if Self.phase1Seed(from: previousConfiguration.initialPhase1Result) !=
+            Self.phase1Seed(from: configuration.initialPhase1Result) {
+            syncRuntimeInitialPhase1Result(from: configuration)
         }
     }
 
@@ -263,12 +272,13 @@ final class DecryptScreenModel {
         let inputData = importedCiphertext.rawData ?? Data(ciphertextInput.utf8)
         decryptedText = nil
         signatureVerification = nil
+        let onParsed = configuration.onParsed
 
         operation.run(mapError: mapDecryptError) { [self] in
             let result = try await self.parseTextRecipientsAction(inputData)
             self.phase1Result = result
             self.textInputSectionEpoch &+= 1
-            self.configuration.onParsed?(result)
+            onParsed?(result)
         }
     }
 
@@ -285,6 +295,7 @@ final class DecryptScreenModel {
 
     func decryptText() {
         guard let phase1Result else { return }
+        let onDecrypted = configuration.onDecrypted
 
         operation.run(mapError: mapDecryptError) { [self] in
             let result = try await self.textDecryptionAction(phase1Result)
@@ -293,7 +304,7 @@ final class DecryptScreenModel {
                 self.decryptedText = text
             }
             self.signatureVerification = result.signature
-            self.configuration.onDecrypted?(result.plaintext, result.signature)
+            onDecrypted?(result.plaintext, result.signature)
 
             var mutablePlaintext = result.plaintext
             mutablePlaintext.resetBytes(in: 0..<mutablePlaintext.count)
@@ -486,7 +497,42 @@ final class DecryptScreenModel {
         }
     }
 
+    private func applyPrefilledCiphertextIfNeeded(from configuration: DecryptView.Configuration) {
+        if ciphertextInput.isEmpty,
+           let prefilledCiphertext = configuration.prefilledCiphertext {
+            ciphertextInput = prefilledCiphertext
+        }
+    }
+
+    private func applyInitialPhase1ResultIfPresent(from configuration: DecryptView.Configuration) {
+        if let initialPhase1Result = configuration.initialPhase1Result {
+            phase1Result = initialPhase1Result
+        }
+    }
+
+    private func syncRuntimeInitialPhase1Result(from configuration: DecryptView.Configuration) {
+        phase1Result = configuration.initialPhase1Result
+    }
+
+    private static func phase1Seed(
+        from result: DecryptionService.Phase1Result?
+    ) -> Phase1Seed? {
+        result.map(Phase1Seed.init)
+    }
+
     private func mapDecryptError(_ error: Error) -> CypherAirError {
         CypherAirError.from(error) { .corruptData(reason: $0) }
+    }
+}
+
+private struct Phase1Seed: Equatable {
+    let recipientKeyIds: [String]
+    let matchedKeyFingerprint: String?
+    let ciphertext: Data
+
+    init(_ result: DecryptionService.Phase1Result) {
+        recipientKeyIds = result.recipientKeyIds
+        matchedKeyFingerprint = result.matchedKey?.fingerprint
+        ciphertext = result.ciphertext
     }
 }

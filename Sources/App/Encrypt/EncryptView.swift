@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 /// Unified text and file encryption view with segmented mode picker.
 struct EncryptView: View {
     struct Configuration {
-        enum TogglePolicy {
+        enum TogglePolicy: Equatable {
             case appDefault
             case initial(Bool)
             case fixed(Bool)
@@ -46,6 +46,45 @@ struct EncryptView: View {
         var onEncrypted: (@MainActor (Data) -> Void)?
 
         static let `default` = Configuration()
+    }
+
+    struct RuntimeSyncKey: Equatable {
+        let prefilledPlaintext: String?
+        let initialRecipientFingerprints: [String]
+        let initialSignerFingerprint: String?
+        let signingPolicy: Configuration.TogglePolicy
+        let encryptToSelfPolicy: Configuration.TogglePolicy
+        let allowsClipboardWrite: Bool
+        let allowsResultExport: Bool
+        let allowsFileInput: Bool
+        let allowsFileResultExport: Bool
+        let fileRestrictionMessage: String?
+        let hasClipboardCopyInterceptor: Bool
+        let hasDataExportInterceptor: Bool
+        let hasFileExportInterceptor: Bool
+        let hasOnEncrypted: Bool
+
+        init(configuration: Configuration) {
+            // When adding configuration fields, evaluate whether they should
+            // participate in runtime host-to-model sync.
+            prefilledPlaintext = configuration.prefilledPlaintext
+            initialRecipientFingerprints = configuration.initialRecipientFingerprints
+            initialSignerFingerprint = configuration.initialSignerFingerprint
+            signingPolicy = configuration.signingPolicy
+            encryptToSelfPolicy = configuration.encryptToSelfPolicy
+            allowsClipboardWrite = configuration.allowsClipboardWrite
+            allowsResultExport = configuration.allowsResultExport
+            allowsFileInput = configuration.allowsFileInput
+            allowsFileResultExport = configuration.allowsFileResultExport
+            fileRestrictionMessage = configuration.fileRestrictionMessage
+            hasClipboardCopyInterceptor =
+                configuration.outputInterceptionPolicy.interceptClipboardCopy != nil
+            hasDataExportInterceptor =
+                configuration.outputInterceptionPolicy.interceptDataExport != nil
+            hasFileExportInterceptor =
+                configuration.outputInterceptionPolicy.interceptFileExport != nil
+            hasOnEncrypted = configuration.onEncrypted != nil
+        }
     }
 
     enum EncryptMode: String, CaseIterable {
@@ -85,6 +124,8 @@ struct EncryptView: View {
 }
 
 private struct EncryptScreenHostView: View {
+    let configuration: EncryptView.Configuration
+
     @State private var model: EncryptScreenModel
 
     init(
@@ -94,6 +135,7 @@ private struct EncryptScreenHostView: View {
         config: AppConfiguration,
         configuration: EncryptView.Configuration
     ) {
+        self.configuration = configuration
         _model = State(
             initialValue: EncryptScreenModel(
                 encryptionService: encryptionService,
@@ -382,6 +424,9 @@ private struct EncryptScreenHostView: View {
         } message: {
             Text(model.unverifiedRecipientsWarningMessage)
         }
+        .onChange(of: runtimeSyncKey) { _, _ in
+            model.updateConfiguration(configuration)
+        }
         .onAppear {
             model.handleAppear()
         }
@@ -461,5 +506,9 @@ private struct EncryptScreenHostView: View {
         #else
         (150, 220, 320)
         #endif
+    }
+
+    private var runtimeSyncKey: EncryptView.RuntimeSyncKey {
+        EncryptView.RuntimeSyncKey(configuration: configuration)
     }
 }

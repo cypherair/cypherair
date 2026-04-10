@@ -21,6 +21,47 @@ struct DecryptView: View {
         static let `default` = Configuration()
     }
 
+    struct RuntimeSyncKey: Equatable {
+        struct InitialPhase1Seed: Equatable {
+            let recipientKeyIds: [String]
+            let matchedKeyFingerprint: String?
+            let ciphertext: Data
+
+            init(_ result: DecryptionService.Phase1Result) {
+                recipientKeyIds = result.recipientKeyIds
+                matchedKeyFingerprint = result.matchedKey?.fingerprint
+                ciphertext = result.ciphertext
+            }
+        }
+
+        let prefilledCiphertext: String?
+        let initialPhase1Result: InitialPhase1Seed?
+        let allowsTextFileImport: Bool
+        let allowsFileInput: Bool
+        let allowsFileResultExport: Bool
+        let textFileRestrictionMessage: String?
+        let fileRestrictionMessage: String?
+        let hasFileExportInterceptor: Bool
+        let hasOnParsed: Bool
+        let hasOnDecrypted: Bool
+
+        init(configuration: Configuration) {
+            // When adding configuration fields, evaluate whether they should
+            // participate in runtime host-to-model sync.
+            prefilledCiphertext = configuration.prefilledCiphertext
+            initialPhase1Result = configuration.initialPhase1Result.map(InitialPhase1Seed.init)
+            allowsTextFileImport = configuration.allowsTextFileImport
+            allowsFileInput = configuration.allowsFileInput
+            allowsFileResultExport = configuration.allowsFileResultExport
+            textFileRestrictionMessage = configuration.textFileRestrictionMessage
+            fileRestrictionMessage = configuration.fileRestrictionMessage
+            hasFileExportInterceptor =
+                configuration.outputInterceptionPolicy.interceptFileExport != nil
+            hasOnParsed = configuration.onParsed != nil
+            hasOnDecrypted = configuration.onDecrypted != nil
+        }
+    }
+
     enum DecryptMode: String, CaseIterable {
         case text
         case file
@@ -60,6 +101,7 @@ struct DecryptView: View {
 
 private struct DecryptScreenHostView: View {
     let appConfiguration: AppConfiguration
+    let configuration: DecryptView.Configuration
 
     @State private var model: DecryptScreenModel
 
@@ -69,6 +111,7 @@ private struct DecryptScreenHostView: View {
         configuration: DecryptView.Configuration
     ) {
         self.appConfiguration = appConfiguration
+        self.configuration = configuration
         _model = State(
             initialValue: DecryptScreenModel(
                 decryptionService: decryptionService,
@@ -312,6 +355,9 @@ private struct DecryptScreenHostView: View {
         .onChange(of: appConfiguration.contentClearGeneration) {
             model.handleContentClearGenerationChange()
         }
+        .onChange(of: runtimeSyncKey) { _, _ in
+            model.updateConfiguration(configuration)
+        }
         .onAppear {
             model.handleAppear()
         }
@@ -434,5 +480,9 @@ private struct DecryptScreenHostView: View {
             get: { model.ciphertextInput },
             set: { model.setCiphertextInput($0) }
         )
+    }
+
+    private var runtimeSyncKey: DecryptView.RuntimeSyncKey {
+        DecryptView.RuntimeSyncKey(configuration: configuration)
     }
 }
