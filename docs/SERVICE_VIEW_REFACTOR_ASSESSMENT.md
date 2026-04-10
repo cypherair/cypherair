@@ -46,7 +46,8 @@ Boundary judgments are based on current code shape, current integration seams, a
 | [`VerifyView`](../Sources/App/Sign/VerifyView.swift) | Cleartext/detached verify screen | 475 lines | `Large but coherent` | Shares the same pattern as `SignView`, with additional file-import and streaming-verify coordination | Similar treatment to `SignView`; lower urgency than decrypt/encrypt |
 | [`SettingsView`](../Sources/App/Settings/SettingsView.swift) | Settings UI plus auth-mode switching and onboarding/tutorial launch coordination | 433 lines | `Coordination hotspot`, `Sensitive / constrained` | The view coordinates auth-mode confirmation, backup-aware risk messaging, async mode switching, and cross-platform presentation fallbacks | This is already a coordinator hidden inside a view |
 | [`KeyDetailView`](../Sources/App/Keys/KeyDetailView.swift) | Key detail UI plus export, default-key, delete, revocation, and modify-expiry coordination | 418 lines | `Coordination hotspot` | The view drives async revocation export, clipboard writes, default-key updates, destructive delete, and modal presentation | Clear candidate for screen-model extraction |
-| [`AddContactView`](../Sources/App/Contacts/AddContactView.swift) | Contact import UI with paste/QR/file modes | 349 lines | `Coordination hotspot` | Better factored than other screens because it already uses `PublicKeyImportLoader` and `ContactImportWorkflow`, but the remaining import-mode, QR, fallback-host, and alert coordination is still view-owned | This is a good reuse baseline, not yet a fully thin view |
+| [`AddContactView`](../Sources/App/Contacts/AddContactView.swift) | Primary contact import UI with paste/QR/file modes | 349 lines | `Coordination hotspot` | Better factored than other screens because it already uses `PublicKeyImportLoader` and `ContactImportWorkflow`, but the remaining import-mode, QR, fallback-host, and alert coordination is still view-owned | This is the active production contact-import surface and a good reuse baseline, not yet a fully thin view |
+| [`QRPhotoImportView`](../Sources/App/Contacts/QRPhotoImportView.swift) | Standalone QR-photo contact import page | 157 lines | `Within boundary` | The page is still registered as a route, but no current production navigation entry point opens it, tutorial explicitly blocks it, and `AddContactView` already owns the active QR-photo import mode | Treat this as a deprecated standalone page, not as a primary refactor target |
 | [`CypherAirApp`](../Sources/App/CypherAirApp.swift) | App composition root plus startup, onboarding/tutorial handoff, URL import coordination, and global alerts | 380 lines | `Coordination hotspot`, `Sensitive / constrained` | The app root still builds the container, wires startup, owns iOS presentation state, handles URL import, and owns global alert presentation, even though some seams have already been extracted | Still overloaded, but not starting from zero: existing seams should be reused rather than replaced wholesale |
 | [`TutorialSessionStore`](../Sources/App/Onboarding/TutorialSessionStore.swift) | Tutorial session state machine and sandbox-flow owner | 432 lines | `Large but coherent`, `Coordination hotspot` | Central state owner for tutorial lifecycle, sandbox artifacts, navigation, modal routing, and task progression | This is intentionally central and should be preserved, not rewritten, in the first structural refactor |
 | [`TutorialView`](../Sources/App/Onboarding/TutorialView.swift) | Tutorial host UI and hub/completion presentation | 382 lines | `Large but coherent` | Large host view, but the responsibilities still align with the tutorial experience rather than leaking into unrelated domains | Lower priority than production screens; keep stable while adapting integrations around it |
@@ -225,7 +226,24 @@ This is already a mini workflow surface rather than a passive detail page.
 
 **Assessment**
 
-This screen proves that helper extraction is already paying off, but it also shows the limit of helper-only factoring. The remaining coordination logic is still view-owned.
+This screen proves that helper extraction is already paying off, but it also shows the limit of helper-only factoring. The remaining coordination logic is still view-owned. It is also the active production entry point for QR-photo import, file import, and paste import.
+
+#### [`QRPhotoImportView`](../Sources/App/Contacts/QRPhotoImportView.swift)
+
+**Classification**
+
+- `Within boundary`
+
+**Verified evidence**
+
+- The page is still registered as the `.qrPhotoImport` route in production route resolution.
+- No current production navigation entry point opens `.qrPhotoImport`.
+- Tutorial explicitly blocks the route instead of using the page.
+- The user-facing QR-photo import capability already exists inside [`AddContactView`](../Sources/App/Contacts/AddContactView.swift) via its `QR Photo` mode.
+
+**Assessment**
+
+This is no longer a primary product surface. The QR-photo import capability still exists, but the standalone page is currently dormant in production navigation and should be treated as a deprecated page rather than as a mainline refactor target.
 
 ### 3.3 App Root And Tutorial Compatibility
 
@@ -330,9 +348,9 @@ This boundary is working for the current product. The current tests support conc
 
 The current repository has real reusable seams, but it is still missing several refactor prerequisites that the previous implementation spec treated as if they already existed.
 
-### 4.1 No Established Screen-Model Pattern Yet
+### 4.1 No Repo-Validated Screen-Model Example Yet
 
-There is currently no shared `ScreenModel` / `ViewModel` layer in `Sources/App/`. The repository does not already show one canonical pattern for:
+The repository already defines the recommended screen-model ownership pattern in [CONVENTIONS](CONVENTIONS.md). What it still lacks in `Sources/App/` is a mature, shared, code-level example that demonstrates one canonical pattern for:
 
 - a top-level route view reading `@Environment`
 - a view owning an `@Observable` reference type via `@State`
@@ -340,7 +358,7 @@ There is currently no shared `ScreenModel` / `ViewModel` layer in `Sources/App/`
 - one-time preparation versus repeated appearance
 - model-owned cleanup for current `onDisappear` / `onChange` logic
 
-That absence matters because the current overloaded views depend heavily on direct `@State`, `@Environment`, and lifecycle modifiers.
+That missing implementation baseline matters because the current overloaded views depend heavily on direct `@State`, `@Environment`, and lifecycle modifiers.
 
 ### 4.2 Cleanup Ownership Is Still View-Centric
 
@@ -380,7 +398,7 @@ The repository is not starting from zero. Several already-existing seams should 
 - [`ContactImportWorkflow`](../Sources/App/Contacts/Import/ContactImportWorkflow.swift): confirmation and replacement request shaping
 - [`ImportConfirmationCoordinator`](../Sources/App/Contacts/ImportConfirmationCoordinator.swift): presentation host for import confirmation
 
-These helpers already separate some concerns from [`AddContactView`](../Sources/App/Contacts/AddContactView.swift) and from URL import handling in [`CypherAirApp`](../Sources/App/CypherAirApp.swift).
+These helpers already separate some concerns from [`AddContactView`](../Sources/App/Contacts/AddContactView.swift), [`QRPhotoImportView`](../Sources/App/Contacts/QRPhotoImportView.swift), and URL import handling in [`CypherAirApp`](../Sources/App/CypherAirApp.swift).
 
 ### 5.3 Tutorial Compatibility Seams
 
@@ -410,10 +428,11 @@ These are not yet a complete coordinator layer, but they are already real bounda
 | P1 | [`SettingsView`](../Sources/App/Settings/SettingsView.swift) | Security-adjacent coordination hidden inside a view | High | Extract a screen model without changing `AuthenticationManager` behavior |
 | P2 | [`KeyDetailView`](../Sources/App/Keys/KeyDetailView.swift) | Detail page is already a workflow coordinator | Medium | Move export/delete/revocation/expiry state out of the view |
 | P2 | [`ContactService`](../Sources/Services/ContactService.swift) | Persistence and import-policy concerns are still mixed | Medium | Split persistence first; do not duplicate App-layer workflow helpers |
-| P2 | [`AddContactView`](../Sources/App/Contacts/AddContactView.swift) | Partially extracted already, but the remaining coordination is still view-owned | Medium | Reuse the existing helpers and move the remaining state machine out of the view |
+| P2 | [`AddContactView`](../Sources/App/Contacts/AddContactView.swift) | Active production contact-import entry point; partially extracted already, but the remaining coordination is still view-owned | Medium | Reuse the existing helpers and move the remaining state machine out of the view |
 | P2 | [`CypherAirApp`](../Sources/App/CypherAirApp.swift) | App root is still overloaded, but existing seams mean it can be tackled after the screen-model pattern is proven | Medium | Wrap and relocate existing startup/presentation/import seams into coordinators |
 | P3 | [`SignView`](../Sources/App/Sign/SignView.swift) and [`VerifyView`](../Sources/App/Sign/VerifyView.swift) | Less urgent, but architecturally aligned with encrypt/decrypt changes | Medium | Migrate after the long-running-tool-screen pattern is established |
 | P3 | Tutorial host adapters | Large, but not currently the main source of boundary drift | Low | Keep stable; adapt only for compatibility |
+| P4 | [`QRPhotoImportView`](../Sources/App/Contacts/QRPhotoImportView.swift) | Registered standalone page with no current production navigation entry point; capability already covered by `AddContactView` | Low | Document as a deprecated standalone page; do not treat it as a primary screen-model target |
 | P4 | Smaller helpers and single-purpose services | Most are already narrow and useful | Low | Leave them alone unless a higher-priority change proves they need adjustment |
 
 ## 7. Risks And Non-Goals
@@ -440,10 +459,11 @@ The current repository does not have a generic "everything is too big" problem. 
 
 - one clear god service: [`KeyManagementService`](../Sources/Services/KeyManagementService.swift)
 - one second-tier service with mixed persistence and import-policy ownership: [`ContactService`](../Sources/Services/ContactService.swift)
-- several production pages that have grown into workflow coordinators: [`EncryptView`](../Sources/App/Encrypt/EncryptView.swift), [`DecryptView`](../Sources/App/Decrypt/DecryptView.swift), [`SettingsView`](../Sources/App/Settings/SettingsView.swift), [`KeyDetailView`](../Sources/App/Keys/KeyDetailView.swift), and [`AddContactView`](../Sources/App/Contacts/AddContactView.swift)
+- several production pages that have grown into workflow coordinators: [`EncryptView`](../Sources/App/Encrypt/EncryptView.swift), [`DecryptView`](../Sources/App/Decrypt/DecryptView.swift), [`SettingsView`](../Sources/App/Settings/SettingsView.swift), [`KeyDetailView`](../Sources/App/Keys/KeyDetailView.swift), and the active contact-import surface [`AddContactView`](../Sources/App/Contacts/AddContactView.swift)
 - an app root that is still doing too much coordination work even though some seams have already been extracted: [`CypherAirApp`](../Sources/App/CypherAirApp.swift)
 - tutorial host seams that are currently valuable and should be preserved, not rewritten
-- one major missing prerequisite: the repository still has no shared, decision-complete screen-model pattern
+- one deprecated standalone page that should not drive the main refactor design: [`QRPhotoImportView`](../Sources/App/Contacts/QRPhotoImportView.swift)
+- one major missing prerequisite: the repository still has no shared, repo-validated implementation baseline for the documented screen-model pattern
 
 That means the next implementation spec should focus on:
 
