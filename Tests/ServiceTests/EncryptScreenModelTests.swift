@@ -93,6 +93,111 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_updateConfiguration_updatesTutorialState_withoutOverwritingEditedPlaintext() async throws {
+        let signerIdentity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Signer"
+        )
+        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+
+        let model = makeModel()
+        model.plaintext = "User edited plaintext"
+        model.selectedRecipients = ["manual-recipient"]
+        model.signerFingerprint = "manual-signer"
+        model.encryptToSelfFingerprint = "manual-self"
+        model.signMessage = true
+        model.encryptToSelf = false
+
+        var configuration = EncryptView.Configuration()
+        configuration.prefilledPlaintext = "Prefilled message"
+        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        configuration.initialSignerFingerprint = signerIdentity.fingerprint
+        configuration.signingPolicy = .initial(false)
+        configuration.encryptToSelfPolicy = .initial(true)
+        configuration.allowsResultExport = false
+
+        model.updateConfiguration(configuration)
+
+        XCTAssertEqual(model.plaintext, "User edited plaintext")
+        XCTAssertEqual(model.selectedRecipients, [recipientIdentity.fingerprint])
+        XCTAssertEqual(model.signerFingerprint, signerIdentity.fingerprint)
+        XCTAssertEqual(model.encryptToSelfFingerprint, signerIdentity.fingerprint)
+        XCTAssertFalse(model.signMessage)
+        XCTAssertEqual(model.encryptToSelf, true)
+        XCTAssertFalse(model.configuration.allowsResultExport)
+    }
+
+    @MainActor
+    func test_updateConfiguration_clearsTutorialRecipientSeed_whenConfigurationBecomesInactive() async throws {
+        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+
+        let model = makeModel()
+        model.plaintext = "User edited plaintext"
+
+        var activeConfiguration = EncryptView.Configuration()
+        activeConfiguration.prefilledPlaintext = "Prefilled message"
+        activeConfiguration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+
+        model.updateConfiguration(activeConfiguration)
+
+        XCTAssertEqual(model.plaintext, "User edited plaintext")
+        XCTAssertEqual(model.selectedRecipients, [recipientIdentity.fingerprint])
+
+        model.updateConfiguration(.default)
+
+        XCTAssertEqual(model.plaintext, "User edited plaintext")
+        XCTAssertTrue(model.selectedRecipients.isEmpty)
+    }
+
+    @MainActor
+    func test_encryptText_usesCallbackCapturedAtOperationStart_whenConfigurationChangesMidFlight() async {
+        let gate = EncryptOperationGate()
+        var firstCallbackCiphertext: Data?
+        var secondCallbackCiphertext: Data?
+
+        var configuration = EncryptView.Configuration()
+        configuration.onEncrypted = { firstCallbackCiphertext = $0 }
+
+        let model = makeModel(
+            configuration: configuration,
+            textEncryptionAction: { _, _, _, _, _ in
+                await gate.suspend()
+                return Data("ciphertext".utf8)
+            }
+        )
+        model.plaintext = "Secret"
+        model.selectedRecipients = ["recipient"]
+
+        model.encryptText()
+
+        await waitUntil("text encryption to suspend") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        configuration.onEncrypted = { secondCallbackCiphertext = $0 }
+        configuration.allowsResultExport = false
+        model.updateConfiguration(configuration)
+
+        await gate.resume()
+
+        await waitUntil("text encryption to finish") {
+            model.operation.isRunning == false
+        }
+
+        XCTAssertEqual(firstCallbackCiphertext, Data("ciphertext".utf8))
+        XCTAssertNil(secondCallbackCiphertext)
+    }
+
+    @MainActor
     func test_requestEncrypt_withUnverifiedRecipients_showsWarningUntilConfirmed() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
         let recipientIdentity = try await TestHelpers.generateProfileBKey(

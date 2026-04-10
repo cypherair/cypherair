@@ -19,7 +19,7 @@ final class EncryptScreenModel {
         FileProgressReporter
     ) async throws -> URL
 
-    let configuration: EncryptView.Configuration
+    private(set) var configuration: EncryptView.Configuration
     let operation: OperationController
     let exportController: FileExportController
 
@@ -164,21 +164,36 @@ final class EncryptScreenModel {
     }
 
     func handleAppear() {
-        if plaintext.isEmpty,
-           let prefilledPlaintext = configuration.prefilledPlaintext {
-            plaintext = prefilledPlaintext
-        }
-        if !configuration.initialRecipientFingerprints.isEmpty {
-            selectedRecipients = Set(configuration.initialRecipientFingerprints)
+        applyPrefilledPlaintextIfNeeded(from: configuration)
+        applyInitialRecipientSelection(from: configuration)
+        applyInitialSignerSelection(from: configuration)
+        applySigningPolicy(from: configuration)
+        applyEncryptToSelfPolicy(from: configuration)
+    }
+
+    func updateConfiguration(_ configuration: EncryptView.Configuration) {
+        let previousConfiguration = self.configuration
+        self.configuration = configuration
+
+        if previousConfiguration.prefilledPlaintext != configuration.prefilledPlaintext {
+            applyPrefilledPlaintextIfNeeded(from: configuration)
         }
 
-        let defaultSigner = configuration.initialSignerFingerprint ?? keyManagement.defaultKey?.fingerprint
-        signerFingerprint = defaultSigner
-        encryptToSelfFingerprint = defaultSigner
-        signMessage = configuration.signingPolicy.initialValue(appDefault: true)
-        encryptToSelf = configuration.encryptToSelfPolicy.initialValue(
-            appDefault: appConfiguration.encryptToSelf
-        )
+        if previousConfiguration.initialRecipientFingerprints != configuration.initialRecipientFingerprints {
+            syncRuntimeRecipientSelection(from: configuration)
+        }
+
+        if previousConfiguration.initialSignerFingerprint != configuration.initialSignerFingerprint {
+            applyInitialSignerSelection(from: configuration)
+        }
+
+        if previousConfiguration.signingPolicy != configuration.signingPolicy {
+            applySigningPolicy(from: configuration)
+        }
+
+        if previousConfiguration.encryptToSelfPolicy != configuration.encryptToSelfPolicy {
+            applyEncryptToSelfPolicy(from: configuration)
+        }
     }
 
     func toggleRecipient(_ fingerprint: String, isOn: Bool) {
@@ -223,6 +238,7 @@ final class EncryptScreenModel {
         let signerFingerprint = signMessage ? signerFingerprint : nil
         let encryptToSelf = resolvedEncryptToSelf
         let encryptToSelfFingerprint = encryptToSelf ? self.encryptToSelfFingerprint : nil
+        let onEncrypted = configuration.onEncrypted
 
         ciphertext = nil
 
@@ -236,7 +252,7 @@ final class EncryptScreenModel {
             )
             self.ciphertext = result
             self.textInputSectionEpoch &+= 1
-            self.configuration.onEncrypted?(result)
+            onEncrypted?(result)
         }
     }
 
@@ -358,6 +374,39 @@ final class EncryptScreenModel {
         case .file:
             encryptFile()
         }
+    }
+
+    private func applyPrefilledPlaintextIfNeeded(from configuration: EncryptView.Configuration) {
+        if plaintext.isEmpty,
+           let prefilledPlaintext = configuration.prefilledPlaintext {
+            plaintext = prefilledPlaintext
+        }
+    }
+
+    private func applyInitialRecipientSelection(from configuration: EncryptView.Configuration) {
+        if !configuration.initialRecipientFingerprints.isEmpty {
+            selectedRecipients = Set(configuration.initialRecipientFingerprints)
+        }
+    }
+
+    private func syncRuntimeRecipientSelection(from configuration: EncryptView.Configuration) {
+        selectedRecipients = Set(configuration.initialRecipientFingerprints)
+    }
+
+    private func applyInitialSignerSelection(from configuration: EncryptView.Configuration) {
+        let defaultSigner = configuration.initialSignerFingerprint ?? keyManagement.defaultKey?.fingerprint
+        signerFingerprint = defaultSigner
+        encryptToSelfFingerprint = defaultSigner
+    }
+
+    private func applySigningPolicy(from configuration: EncryptView.Configuration) {
+        signMessage = configuration.signingPolicy.initialValue(appDefault: true)
+    }
+
+    private func applyEncryptToSelfPolicy(from configuration: EncryptView.Configuration) {
+        encryptToSelf = configuration.encryptToSelfPolicy.initialValue(
+            appDefault: appConfiguration.encryptToSelf
+        )
     }
 
     private func mapEncryptionError(_ error: Error) -> CypherAirError {

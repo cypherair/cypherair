@@ -84,6 +84,172 @@ final class DecryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_updateConfiguration_updatesTutorialState_withoutOverwritingEditedCiphertext() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+        let initialPhase1Result = makePhase1Result(
+            matchedKey: identity,
+            ciphertext: Data("initial-ciphertext".utf8)
+        )
+
+        let model = makeModel()
+        model.ciphertextInput = "User edited ciphertext"
+        model.phase1Result = makePhase1Result(
+            matchedKey: nil,
+            ciphertext: Data("override".utf8)
+        )
+
+        var configuration = DecryptView.Configuration()
+        configuration.prefilledCiphertext = "Prefilled ciphertext"
+        configuration.initialPhase1Result = initialPhase1Result
+        configuration.allowsFileResultExport = false
+
+        model.updateConfiguration(configuration)
+
+        XCTAssertEqual(model.ciphertextInput, "User edited ciphertext")
+        XCTAssertEqual(model.phase1Result?.matchedKey?.fingerprint, identity.fingerprint)
+        XCTAssertEqual(model.phase1Result?.ciphertext, Data("initial-ciphertext".utf8))
+        XCTAssertFalse(model.configuration.allowsFileResultExport)
+    }
+
+    @MainActor
+    func test_updateConfiguration_clearsTutorialPhase1Seed_whenConfigurationBecomesInactive() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+        let initialPhase1Result = makePhase1Result(
+            matchedKey: identity,
+            ciphertext: Data("initial-ciphertext".utf8)
+        )
+
+        let model = makeModel()
+        model.ciphertextInput = "User edited ciphertext"
+
+        var activeConfiguration = DecryptView.Configuration()
+        activeConfiguration.prefilledCiphertext = "Prefilled ciphertext"
+        activeConfiguration.initialPhase1Result = initialPhase1Result
+
+        model.updateConfiguration(activeConfiguration)
+
+        XCTAssertEqual(model.ciphertextInput, "User edited ciphertext")
+        XCTAssertEqual(model.phase1Result?.matchedKey?.fingerprint, identity.fingerprint)
+
+        model.updateConfiguration(.default)
+
+        XCTAssertEqual(model.ciphertextInput, "User edited ciphertext")
+        XCTAssertNil(model.phase1Result)
+    }
+
+    @MainActor
+    func test_parseRecipientsText_usesCallbackCapturedAtOperationStart_whenConfigurationChangesMidFlight() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+        let gate = DecryptOperationGate()
+        let phase1Result = makePhase1Result(
+            matchedKey: identity,
+            ciphertext: Data("ciphertext".utf8)
+        )
+
+        var firstParsedFingerprint: String?
+        var secondParsedFingerprint: String?
+        var configuration = DecryptView.Configuration()
+        configuration.onParsed = { result in
+            firstParsedFingerprint = result.matchedKey?.fingerprint
+        }
+
+        let model = makeModel(
+            configuration: configuration,
+            parseTextRecipientsAction: { _ in
+                await gate.suspend()
+                return phase1Result
+            }
+        )
+        model.ciphertextInput = "ciphertext"
+
+        model.parseRecipientsText()
+
+        await waitUntil("text parse to suspend") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        configuration.onParsed = { result in
+            secondParsedFingerprint = result.matchedKey?.fingerprint
+        }
+        configuration.allowsFileInput = false
+        model.updateConfiguration(configuration)
+
+        await gate.resume()
+
+        await waitUntil("text parse to finish") {
+            model.operation.isRunning == false
+        }
+
+        XCTAssertEqual(firstParsedFingerprint, identity.fingerprint)
+        XCTAssertNil(secondParsedFingerprint)
+    }
+
+    @MainActor
+    func test_decryptText_usesCallbackCapturedAtOperationStart_whenConfigurationChangesMidFlight() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+        let gate = DecryptOperationGate()
+        let signature = makeSignature(status: .valid, signerFingerprint: identity.fingerprint)
+
+        var firstDecryptedPlaintext: Data?
+        var secondDecryptedPlaintext: Data?
+        var configuration = DecryptView.Configuration()
+        configuration.onDecrypted = { plaintext, _ in
+            firstDecryptedPlaintext = plaintext
+        }
+
+        let model = makeModel(
+            configuration: configuration,
+            textDecryptionAction: { _ in
+                await gate.suspend()
+                return (Data("decrypted-text".utf8), signature)
+            }
+        )
+        model.phase1Result = makePhase1Result(
+            matchedKey: identity,
+            ciphertext: Data("ciphertext".utf8)
+        )
+
+        model.decryptText()
+
+        await waitUntil("text decrypt to suspend") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        configuration.onDecrypted = { plaintext, _ in
+            secondDecryptedPlaintext = plaintext
+        }
+        configuration.allowsFileResultExport = false
+        model.updateConfiguration(configuration)
+
+        await gate.resume()
+
+        await waitUntil("text decrypt to finish") {
+            model.operation.isRunning == false
+        }
+
+        XCTAssertEqual(firstDecryptedPlaintext, Data("decrypted-text".utf8))
+        XCTAssertNil(secondDecryptedPlaintext)
+    }
+
+    @MainActor
     func test_setCiphertextInput_invalidatesImportedTextAndTextPhase1State() async throws {
         let identity = try await TestHelpers.generateProfileAKey(
             service: stack.keyManagement,

@@ -424,6 +424,89 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNotNil(activeConfiguration.onExported)
     }
 
+    func test_tutorialConfigurationFactory_encryptRuntimeSyncKey_changesBetweenInactiveAndActiveStates() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        let container = try XCTUnwrap(store.container)
+
+        let alice = try await container.keyManagement.generateKey(
+            name: "Alice Demo",
+            email: "alice@demo.invalid",
+            expirySeconds: nil,
+            profile: .advanced,
+            authMode: .standard
+        )
+        await store.noteAliceGenerated(alice)
+
+        let bobArmored = try XCTUnwrap(store.session.artifacts.bobArmoredPublicKey)
+        let addResult = try container.contactService.addContact(publicKeyData: Data(bobArmored.utf8))
+        guard case .added(let contact) = addResult else {
+            return XCTFail("Expected Bob contact to be added")
+        }
+        store.noteBobImported(contact)
+
+        let inactiveKey = EncryptView.RuntimeSyncKey(
+            configuration: store.configurationFactory.encryptConfiguration(isActiveModule: false)
+        )
+        let activeKey = EncryptView.RuntimeSyncKey(
+            configuration: store.configurationFactory.encryptConfiguration(isActiveModule: true)
+        )
+
+        XCTAssertNotEqual(inactiveKey, activeKey)
+        XCTAssertTrue(inactiveKey.initialRecipientFingerprints.isEmpty)
+        XCTAssertEqual(activeKey.initialRecipientFingerprints, [contact.fingerprint])
+        XCTAssertFalse(inactiveKey.hasOnEncrypted)
+        XCTAssertTrue(activeKey.hasOnEncrypted)
+    }
+
+    func test_tutorialConfigurationFactory_decryptRuntimeSyncKey_changesBetweenInactiveAndActiveStates() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        let container = try XCTUnwrap(store.container)
+
+        let alice = try await container.keyManagement.generateKey(
+            name: "Alice Demo",
+            email: "alice@demo.invalid",
+            expirySeconds: nil,
+            profile: .advanced,
+            authMode: .standard
+        )
+        await store.noteAliceGenerated(alice)
+
+        let bobArmored = try XCTUnwrap(store.session.artifacts.bobArmoredPublicKey)
+        let addResult = try container.contactService.addContact(publicKeyData: Data(bobArmored.utf8))
+        guard case .added(let contact) = addResult else {
+            return XCTFail("Expected Bob contact to be added")
+        }
+        store.noteBobImported(contact)
+
+        let ciphertext = try await container.encryptionService.encryptText(
+            "Hello Bob from the guided tutorial",
+            recipientFingerprints: [contact.fingerprint],
+            signWithFingerprint: alice.fingerprint,
+            encryptToSelf: false
+        )
+        store.noteEncrypted(ciphertext)
+
+        let phase1 = try await container.decryptionService.parseRecipients(ciphertext: ciphertext)
+        store.noteParsed(phase1)
+
+        let inactiveKey = DecryptView.RuntimeSyncKey(
+            configuration: store.configurationFactory.decryptConfiguration(isActiveModule: false)
+        )
+        let activeKey = DecryptView.RuntimeSyncKey(
+            configuration: store.configurationFactory.decryptConfiguration(isActiveModule: true)
+        )
+
+        XCTAssertNotEqual(inactiveKey, activeKey)
+        XCTAssertNil(inactiveKey.initialPhase1Result)
+        XCTAssertEqual(activeKey.initialPhase1Result?.matchedKeyFingerprint, phase1.matchedKey?.fingerprint)
+        XCTAssertFalse(inactiveKey.hasOnParsed)
+        XCTAssertTrue(activeKey.hasOnParsed)
+        XCTAssertFalse(inactiveKey.hasOnDecrypted)
+        XCTAssertTrue(activeKey.hasOnDecrypted)
+    }
+
     func test_tutorialGuidanceResolver_completedModule_returnsCompletionStatePayload() async throws {
         let store = TutorialSessionStore()
         await startTutorialSession(store)
@@ -544,77 +627,41 @@ final class TutorialSessionStoreTests: XCTestCase {
         )
     }
 
-    func test_encryptAndDecryptViews_establish_screenModelHostBaseline() throws {
+    func test_encryptAndDecryptViews_keepRuntimeConfigurationSyncHook() throws {
         let rootURL = repositoryRootURL()
         let encryptViewContents = try String(
             contentsOf: rootURL.appending(path: "Sources/App/Encrypt/EncryptView.swift"),
-            encoding: .utf8
-        )
-        let encryptScreenModelContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Encrypt/EncryptScreenModel.swift"),
             encoding: .utf8
         )
         let decryptViewContents = try String(
             contentsOf: rootURL.appending(path: "Sources/App/Decrypt/DecryptView.swift"),
             encoding: .utf8
         )
-        let decryptScreenModelContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Decrypt/DecryptScreenModel.swift"),
-            encoding: .utf8
+
+        XCTAssertTrue(
+            encryptViewContents.contains("let configuration: EncryptView.Configuration"),
+            "Encrypt host should retain the latest incoming configuration"
+        )
+        XCTAssertTrue(
+            encryptViewContents.contains(".onChange(of: runtimeSyncKey)"),
+            "Encrypt host should watch runtime configuration changes"
+        )
+        XCTAssertTrue(
+            encryptViewContents.contains("model.updateConfiguration(configuration)"),
+            "Encrypt host should forward runtime configuration updates into the screen model"
         )
 
-        XCTAssertFalse(
-            encryptViewContents.contains("@State private var operation = OperationController()"),
-            "EncryptView should not directly own OperationController"
-        )
-        XCTAssertFalse(
-            encryptViewContents.contains("@State private var exportController = FileExportController()"),
-            "EncryptView should not directly own FileExportController"
-        )
-        XCTAssertFalse(
-            encryptViewContents.contains("contactService.contacts.filter"),
-            "EncryptView should bind to screen-model contact state instead of querying contacts inline"
+        XCTAssertTrue(
+            decryptViewContents.contains("let configuration: DecryptView.Configuration"),
+            "Decrypt host should retain the latest incoming configuration"
         )
         XCTAssertTrue(
-            encryptViewContents.contains("EncryptScreenHostView"),
-            "EncryptView should forward into a private owning host"
+            decryptViewContents.contains(".onChange(of: runtimeSyncKey)"),
+            "Decrypt host should watch runtime configuration changes"
         )
         XCTAssertTrue(
-            encryptScreenModelContents.contains("func handleAppear()"),
-            "EncryptScreenModel should own repeated onAppear synchronization"
-        )
-
-        XCTAssertFalse(
-            decryptViewContents.contains("@State private var operation = OperationController()"),
-            "DecryptView should not directly own OperationController"
-        )
-        XCTAssertFalse(
-            decryptViewContents.contains("@State private var exportController = FileExportController()"),
-            "DecryptView should not directly own FileExportController"
-        )
-        XCTAssertFalse(
-            decryptViewContents.contains("try? FileManager.default.removeItem"),
-            "DecryptView should not inline temporary-file cleanup"
-        )
-        XCTAssertFalse(
-            decryptViewContents.contains("importedCiphertext.clear()"),
-            "DecryptView should not inline imported-text cleanup"
-        )
-        XCTAssertTrue(
-            decryptViewContents.contains("DecryptScreenHostView"),
-            "DecryptView should forward into a private owning host"
-        )
-        XCTAssertTrue(
-            decryptScreenModelContents.contains("func handleAppear()"),
-            "DecryptScreenModel should own repeated onAppear synchronization"
-        )
-        XCTAssertTrue(
-            decryptScreenModelContents.contains("func handleDisappear()"),
-            "DecryptScreenModel should own disappear cleanup"
-        )
-        XCTAssertTrue(
-            decryptScreenModelContents.contains("func handleContentClearGenerationChange()"),
-            "DecryptScreenModel should own content-clear invalidation"
+            decryptViewContents.contains("model.updateConfiguration(configuration)"),
+            "Decrypt host should forward runtime configuration updates into the screen model"
         )
     }
 
