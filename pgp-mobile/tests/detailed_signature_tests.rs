@@ -280,6 +280,87 @@ fn test_verify_detached_detailed_tampered_data_matches_legacy_bad() {
 }
 
 #[test]
+fn test_verify_detached_file_detailed_matches_in_memory_and_legacy_fields() {
+    let signer_a = generate_key("Signer A", KeyProfile::Universal, None);
+    let signer_b = generate_key("Signer B", KeyProfile::Universal, None);
+    let data = b"detached file detailed";
+    let signature = sign_detached_multi(data, &[&signer_a.cert_data, &signer_b.cert_data]);
+    let input = NamedTempFile::new().expect("temp input should be created");
+    std::fs::write(input.path(), data).expect("input file should be written");
+
+    let file_detailed = streaming::verify_detached_file_detailed(
+        input.path().to_str().unwrap(),
+        &signature,
+        &[signer_a.public_key_data.clone()],
+        None,
+    )
+    .expect("file detailed verification should succeed");
+    let in_memory_detailed =
+        verify::verify_detached_detailed(data, &signature, &[signer_a.public_key_data.clone()])
+            .expect("in-memory detailed verification should succeed");
+    let legacy = streaming::verify_detached_file(
+        input.path().to_str().unwrap(),
+        &signature,
+        &[signer_a.public_key_data],
+        None,
+    )
+    .expect("legacy file verification should succeed");
+
+    assert_eq!(file_detailed.legacy_status, in_memory_detailed.legacy_status);
+    assert_eq!(
+        file_detailed.legacy_signer_fingerprint,
+        in_memory_detailed.legacy_signer_fingerprint
+    );
+    assert_eq!(file_detailed.signatures, in_memory_detailed.signatures);
+    assert_eq!(file_detailed.legacy_status, legacy.status);
+    assert_eq!(file_detailed.legacy_signer_fingerprint, legacy.signer_fingerprint);
+    assert_eq!(file_detailed.signatures.len(), 2);
+    assert!(file_detailed.signatures.iter().any(|entry| {
+        entry.status == DetailedSignatureStatus::UnknownSigner
+            && entry.signer_primary_fingerprint.is_none()
+    }));
+}
+
+#[test]
+fn test_verify_detached_file_detailed_tampered_data_matches_in_memory_bad() {
+    let signer = generate_key("Signer", KeyProfile::Universal, None);
+    let data = b"tampered detached file";
+    let signature = sign_detached_multi(data, &[&signer.cert_data]);
+    let input = NamedTempFile::new().expect("temp input should be created");
+    let mut tampered = data.to_vec();
+    tampered[0] ^= 0x01;
+    std::fs::write(input.path(), &tampered).expect("tampered file should be written");
+
+    let file_detailed = streaming::verify_detached_file_detailed(
+        input.path().to_str().unwrap(),
+        &signature,
+        &[signer.public_key_data.clone()],
+        None,
+    )
+    .expect("file detailed verification should grade");
+    let in_memory_detailed =
+        verify::verify_detached_detailed(&tampered, &signature, &[signer.public_key_data.clone()])
+            .expect("in-memory detailed verification should grade");
+    let legacy = streaming::verify_detached_file(
+        input.path().to_str().unwrap(),
+        &signature,
+        &[signer.public_key_data],
+        None,
+    )
+    .expect("legacy file verification should grade");
+
+    assert_eq!(file_detailed.legacy_status, SignatureStatus::Bad);
+    assert_eq!(file_detailed.legacy_status, in_memory_detailed.legacy_status);
+    assert_eq!(
+        file_detailed.legacy_signer_fingerprint,
+        in_memory_detailed.legacy_signer_fingerprint
+    );
+    assert_eq!(file_detailed.signatures, in_memory_detailed.signatures);
+    assert_eq!(file_detailed.legacy_status, legacy.status);
+    assert_eq!(file_detailed.legacy_signer_fingerprint, legacy.signer_fingerprint);
+}
+
+#[test]
 fn test_decrypt_detailed_multi_signature_matches_legacy_and_preserves_entries() {
     let signer_a = generate_key("Signer A", KeyProfile::Universal, None);
     let signer_b = generate_key("Signer B", KeyProfile::Universal, None);

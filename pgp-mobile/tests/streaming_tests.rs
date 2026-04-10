@@ -506,6 +506,33 @@ fn test_sign_verify_detached_file_profile_b() {
     assert_eq!(result.signer_fingerprint.unwrap(), key.fingerprint);
 }
 
+#[test]
+fn test_verify_detached_file_cancellation_returns_operation_cancelled() {
+    let dir = tempfile::tempdir().unwrap();
+    let key = gen_key("Alice", KeyProfile::Universal);
+
+    let data = vec![0x42u8; 256 * 1024];
+    let data_path = dir.path().join("document.bin");
+    fs::write(&data_path, &data).unwrap();
+
+    let signature = streaming::sign_detached_file(data_path.to_str().unwrap(), &key.cert_data, None)
+        .expect("Signing should succeed");
+    let reporter = Arc::new(TestProgressReporter::with_cancel_after(32 * 1024));
+
+    let result = streaming::verify_detached_file(
+        data_path.to_str().unwrap(),
+        &signature,
+        &[key.public_key_data],
+        Some(reporter),
+    );
+
+    match result {
+        Err(PgpError::OperationCancelled) => {}
+        Ok(_) => panic!("expected OperationCancelled, got Ok(..)"),
+        Err(other) => panic!("expected OperationCancelled, got Err({other})"),
+    }
+}
+
 // ── Match Recipients From File Test ────────────────────────────────────
 
 #[test]

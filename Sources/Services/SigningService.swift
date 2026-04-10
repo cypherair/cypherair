@@ -197,9 +197,9 @@ final class SigningService {
     ) async throws -> SignatureVerification {
         let verificationKeys = allVerificationKeys()
 
-        let result: VerifyResult
+        let result: FileVerifyDetailedResult
         do {
-            result = try await Self.performVerifyDetachedFile(
+            result = try await Self.performVerifyDetachedFileDetailed(
                 engine: engine, dataPath: fileURL.path,
                 signature: signature, verificationKeys: verificationKeys,
                 progress: progress
@@ -208,17 +208,17 @@ final class SigningService {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
-        let signerContact = result.signerFingerprint.flatMap {
+        let signerContact = result.legacySignerFingerprint.flatMap {
             contactService.contact(forFingerprint: $0)
         }
         let signerIdentity = SignatureVerification.SignerIdentity.resolve(
-            fingerprint: result.signerFingerprint,
+            fingerprint: result.legacySignerFingerprint,
             contacts: contactService.contacts,
             ownKeys: keyManagement.keys
         )
         return SignatureVerification(
-            status: result.status,
-            signerFingerprint: result.signerFingerprint,
+            status: result.legacyStatus,
+            signerFingerprint: result.legacySignerFingerprint,
             signerContact: signerContact,
             signerIdentity: signerIdentity
         )
@@ -278,11 +278,11 @@ final class SigningService {
     }
 
     @concurrent
-    private static func performVerifyDetachedFile(
+    private static func performVerifyDetachedFileDetailed(
         engine: PgpEngine, dataPath: String, signature: Data,
         verificationKeys: [Data], progress: FileProgressReporter?
-    ) async throws -> VerifyResult {
-        try engine.verifyDetachedFile(
+    ) async throws -> FileVerifyDetailedResult {
+        try engine.verifyDetachedFileDetailed(
             dataPath: dataPath, signature: signature,
             verificationKeys: verificationKeys, progress: progress
         )

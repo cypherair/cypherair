@@ -1484,6 +1484,45 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertEqual(detailed.signatures.count, 2)
     }
 
+    func test_detailedVerifyDetachedFile_fixtureKnownPlusUnknown_matchesInMemoryAndLegacyFields() throws {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let data = try loadTextFixture("ffi_detailed_detached_data")
+        let signature = try loadArmoredFixture("ffi_detailed_multisig_detached", ext: "sig")
+        let inputURL = try writeTempFile(
+            data,
+            filename: "ffi-detailed-detached-input-\(UUID().uuidString).txt"
+        )
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+
+        let fileDetailed = try engine.verifyDetachedFileDetailed(
+            dataPath: inputURL.path,
+            signature: signature,
+            verificationKeys: [signerA],
+            progress: nil
+        )
+        let inMemoryDetailed = try engine.verifyDetachedDetailed(
+            data: data,
+            signature: signature,
+            verificationKeys: [signerA]
+        )
+        let legacyFile = try engine.verifyDetachedFile(
+            dataPath: inputURL.path,
+            signature: signature,
+            verificationKeys: [signerA],
+            progress: nil
+        )
+
+        XCTAssertEqual(fileDetailed.legacyStatus, inMemoryDetailed.legacyStatus)
+        XCTAssertEqual(fileDetailed.legacySignerFingerprint, inMemoryDetailed.legacySignerFingerprint)
+        XCTAssertEqual(fileDetailed.signatures, inMemoryDetailed.signatures)
+        XCTAssertEqual(fileDetailed.legacyStatus, legacyFile.status)
+        XCTAssertEqual(fileDetailed.legacySignerFingerprint, legacyFile.signerFingerprint)
+        XCTAssertEqual(fileDetailed.signatures.count, 2)
+        XCTAssertTrue(fileDetailed.signatures.contains {
+            $0.status == .unknownSigner && $0.signerPrimaryFingerprint == nil
+        })
+    }
+
     func test_detailedVerifyDetachedFile_cancel_returnsOperationCancelled() throws {
         let signerA = try loadFixture("ffi_detailed_signer_a")
         let data = try loadTextFixture("ffi_detailed_detached_data")
@@ -1496,6 +1535,33 @@ final class FFIIntegrationTests: XCTestCase {
 
         XCTAssertThrowsError(
             try engine.verifyDetachedFileDetailed(
+                dataPath: inputURL.path,
+                signature: signature,
+                verificationKeys: [signerA],
+                progress: progress
+            )
+        ) { error in
+            guard case .OperationCancelled = error as? PgpError else {
+                return XCTFail("Expected OperationCancelled, got \(error)")
+            }
+        }
+    }
+
+    func test_legacyVerifyDetachedFile_cancel_returnsOperationCancelled() throws {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let data = try loadTextFixture("ffi_detailed_detached_data")
+        let signature = try loadArmoredFixture("ffi_detailed_multisig_detached", ext: "sig")
+        let inputURL = try writeTempFile(
+            data,
+            filename: "ffi-legacy-detached-\(UUID().uuidString).txt"
+        )
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+
+        let progress = FileProgressReporter()
+        progress.cancel()
+
+        XCTAssertThrowsError(
+            try engine.verifyDetachedFile(
                 dataPath: inputURL.path,
                 signature: signature,
                 verificationKeys: [signerA],
