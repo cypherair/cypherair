@@ -69,32 +69,51 @@ struct EncryptView: View {
 
     let configuration: Configuration
 
-    @State private var encryptMode: EncryptMode = .text
-    @State private var plaintext = ""
-    @State private var selectedRecipients: Set<String> = []
-    @State private var signMessage = true
-    @State private var signerFingerprint: String?
-    @State private var ciphertext: Data?
-    @State private var encryptToSelf: Bool?
-    @State private var encryptToSelfFingerprint: String?
-    @State private var operation = OperationController()
-    @State private var showFileImporter = false
-    @State private var selectedFileURL: URL?
-    @State private var selectedFileName: String?
-    @State private var encryptedFileURL: URL?
-    @State private var exportController = FileExportController()
-    @State private var showUnverifiedRecipientsWarning = false
-    @State private var textInputSectionEpoch = 0
-
     init(configuration: Configuration = .default) {
         self.configuration = configuration
     }
 
     var body: some View {
+        EncryptScreenHostView(
+            encryptionService: encryptionService,
+            keyManagement: keyManagement,
+            contactService: contactService,
+            config: config,
+            configuration: configuration
+        )
+    }
+}
+
+private struct EncryptScreenHostView: View {
+    @State private var model: EncryptScreenModel
+
+    init(
+        encryptionService: EncryptionService,
+        keyManagement: KeyManagementService,
+        contactService: ContactService,
+        config: AppConfiguration,
+        configuration: EncryptView.Configuration
+    ) {
+        _model = State(
+            initialValue: EncryptScreenModel(
+                encryptionService: encryptionService,
+                keyManagement: keyManagement,
+                contactService: contactService,
+                config: config,
+                configuration: configuration
+            )
+        )
+    }
+
+    var body: some View {
+        @Bindable var model = model
+        let operation = model.operation
+        let exportController = model.exportController
+
         Form {
             Section {
-                Picker(String(localized: "encrypt.mode", defaultValue: "Mode"), selection: $encryptMode) {
-                    ForEach(EncryptMode.allCases, id: \.self) { mode in
+                Picker(String(localized: "encrypt.mode", defaultValue: "Mode"), selection: $model.encryptMode) {
+                    ForEach(EncryptView.EncryptMode.allCases, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
@@ -102,7 +121,7 @@ struct EncryptView: View {
                 .disabled(operation.isRunning)
             }
 
-            if encryptMode == .text {
+            if model.encryptMode == .text {
                 textInputContent
                     .disabled(operation.isRunning)
             } else {
@@ -111,15 +130,11 @@ struct EncryptView: View {
             }
 
             Section {
-                ForEach(contactService.contacts.filter(\.canEncryptTo)) { contact in
+                ForEach(model.encryptableContacts) { contact in
                     Toggle(isOn: Binding(
-                        get: { selectedRecipients.contains(contact.fingerprint) },
+                        get: { model.selectedRecipients.contains(contact.fingerprint) },
                         set: { isOn in
-                            if isOn {
-                                selectedRecipients.insert(contact.fingerprint)
-                            } else {
-                                selectedRecipients.remove(contact.fingerprint)
-                            }
+                            model.toggleRecipient(contact.fingerprint, isOn: isOn)
                         }
                     )) {
                         HStack {
@@ -144,7 +159,7 @@ struct EncryptView: View {
                     }
                 }
 
-                if !selectedUnverifiedContacts.isEmpty {
+                if !model.selectedUnverifiedContacts.isEmpty {
                     Label(
                         String(
                             localized: "encrypt.unverified.warning",
@@ -164,18 +179,18 @@ struct EncryptView: View {
                 Toggle(
                     String(localized: "encrypt.encryptToSelf", defaultValue: "Encrypt to Self"),
                     isOn: Binding(
-                        get: { encryptToSelf ?? config.encryptToSelf },
-                        set: { encryptToSelf = $0 }
+                        get: { model.resolvedEncryptToSelf },
+                        set: { model.encryptToSelf = $0 }
                     )
                 )
-                .disabled(configuration.encryptToSelfPolicy.isLocked)
+                .disabled(model.configuration.encryptToSelfPolicy.isLocked)
 
-                if (encryptToSelf ?? config.encryptToSelf) && keyManagement.keys.count > 1 {
+                if model.resolvedEncryptToSelf && model.ownKeys.count > 1 {
                     Picker(
                         String(localized: "encrypt.encryptToSelfKey", defaultValue: "Encrypt to Self With"),
-                        selection: $encryptToSelfFingerprint
+                        selection: $model.encryptToSelfFingerprint
                     ) {
-                        ForEach(keyManagement.keys) { key in
+                        ForEach(model.ownKeys) { key in
                             Text(key.userId ?? key.shortKeyId)
                                 .tag(Optional(key.fingerprint))
                         }
@@ -184,16 +199,16 @@ struct EncryptView: View {
 
                 Toggle(
                     String(localized: "encrypt.sign", defaultValue: "Sign Message"),
-                    isOn: $signMessage
+                    isOn: $model.signMessage
                 )
-                .disabled(configuration.signingPolicy.isLocked)
+                .disabled(model.configuration.signingPolicy.isLocked)
 
-                if signMessage && keyManagement.keys.count > 1 {
+                if model.signMessage && model.ownKeys.count > 1 {
                     Picker(
                         String(localized: "encrypt.signingKey", defaultValue: "Signing Key"),
-                        selection: $signerFingerprint
+                        selection: $model.signerFingerprint
                     ) {
-                        ForEach(keyManagement.keys) { key in
+                        ForEach(model.ownKeys) { key in
                             Text(key.userId ?? key.shortKeyId)
                                 .tag(Optional(key.fingerprint))
                         }
@@ -204,11 +219,11 @@ struct EncryptView: View {
 
             Section {
                 Button {
-                    requestEncrypt()
+                    model.requestEncrypt()
                 } label: {
                     if operation.isRunning {
                         HStack {
-                            if encryptMode == .file, let progress = operation.progress {
+                            if model.encryptMode == .file, let progress = operation.progress {
                                 ProgressView(value: progress.fractionCompleted)
                                     .progressViewStyle(.linear)
                                 Text(
@@ -230,10 +245,10 @@ struct EncryptView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(encryptButtonDisabled)
+                .disabled(model.encryptButtonDisabled)
             }
 
-            if showsFileCancelAction {
+            if model.showsFileCancelAction {
                 Section {
                     if operation.isCancelling {
                         LabeledContent {
@@ -250,98 +265,47 @@ struct EncryptView: View {
                 }
             }
 
-            if encryptMode == .text, let ciphertext, let ciphertextString = String(data: ciphertext, encoding: .utf8) {
+            if model.encryptMode == .text, let ciphertextString = model.ciphertextString {
                 Section {
                     Text(ciphertextString)
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
 
                     Button {
-                        if configuration.allowsClipboardWrite,
-                           configuration.outputInterceptionPolicy.interceptClipboardCopy?(
-                               ciphertextString,
-                               config,
-                               .ciphertext
-                           ) != true {
-                            operation.copyToClipboard(ciphertextString, config: config)
-                        }
+                        model.copyCiphertextToClipboard()
                     } label: {
                         Label(
                             String(localized: "common.copy", defaultValue: "Copy"),
                             systemImage: "doc.on.doc"
                         )
                     }
-                    .disabled(!configuration.allowsClipboardWrite)
+                    .disabled(!model.configuration.allowsClipboardWrite)
 
                     Button {
-                        guard configuration.allowsResultExport else { return }
-                        do {
-                            if try configuration.outputInterceptionPolicy.interceptDataExport?(
-                                ciphertext,
-                                "encrypted.asc",
-                                .ciphertext
-                            ) != true {
-                                try exportController.prepareDataExport(
-                                    ciphertext,
-                                    suggestedFilename: "encrypted.asc"
-                                )
-                            }
-                        } catch {
-                            operation.present(
-                                error: .encryptionFailed(
-                                    reason: String(
-                                        localized: "fileEncrypt.readFailed",
-                                        defaultValue: "Could not read encrypted file"
-                                    )
-                                )
-                            )
-                        }
+                        model.exportCiphertext()
                     } label: {
                         Label(
                             String(localized: "common.save", defaultValue: "Save"),
                             systemImage: "square.and.arrow.down"
                         )
                     }
-                    .disabled(!configuration.allowsResultExport)
+                    .disabled(!model.configuration.allowsResultExport)
                 } header: {
                     Text(String(localized: "encrypt.result", defaultValue: "Encrypted Message"))
                 }
             }
 
-            if encryptMode == .file, encryptedFileURL != nil {
+            if model.encryptMode == .file, model.encryptedFileURL != nil {
                 Section {
                     Button {
-                        guard configuration.allowsFileResultExport else { return }
-                        if let url = encryptedFileURL {
-                            guard FileManager.default.fileExists(atPath: url.path) else {
-                                operation.present(
-                                    error: .encryptionFailed(
-                                        reason: String(
-                                            localized: "fileEncrypt.readFailed",
-                                            defaultValue: "Could not read encrypted file"
-                                        )
-                                    )
-                                )
-                                return
-                            }
-                            if configuration.outputInterceptionPolicy.interceptFileExport?(
-                                url,
-                                (selectedFileName ?? "file") + ".gpg",
-                                .ciphertext
-                            ) != true {
-                                exportController.prepareFileExport(
-                                    fileURL: url,
-                                    suggestedFilename: (selectedFileName ?? "file") + ".gpg"
-                                )
-                            }
-                        }
+                        model.exportEncryptedFile()
                     } label: {
                         Label(
                             String(localized: "fileEncrypt.share", defaultValue: "Save Encrypted File"),
                             systemImage: "square.and.arrow.down"
                         )
                     }
-                    .disabled(!configuration.allowsFileResultExport)
+                    .disabled(!model.configuration.allowsFileResultExport)
                 }
             }
         }
@@ -353,20 +317,19 @@ struct EncryptView: View {
         #endif
         .navigationTitle(String(localized: "encrypt.title", defaultValue: "Encrypt"))
         .fileImporter(
-            isPresented: $showFileImporter,
+            isPresented: $model.showFileImporter,
             allowedContentTypes: [.data],
             allowsMultipleSelection: false
         ) { result in
             if case .success(let urls) = result, let url = urls.first {
-                selectedFileURL = url
-                selectedFileName = url.lastPathComponent
+                model.handleImportedFile(url)
             }
         }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
             isPresented: Binding(
                 get: { operation.isShowingError },
-                set: { if !$0 { operation.dismissError() } }
+                set: { if !$0 { model.dismissError() } }
             ),
             presenting: operation.error
         ) { _ in
@@ -378,14 +341,14 @@ struct EncryptView: View {
             String(localized: "clipboard.notice.title", defaultValue: "Copied to Clipboard"),
             isPresented: Binding(
                 get: { operation.isShowingClipboardNotice },
-                set: { if !$0 { operation.dismissClipboardNotice() } }
+                set: { if !$0 { model.dismissClipboardNotice() } }
             )
         ) {
             Button(String(localized: "clipboard.notice.dismiss", defaultValue: "OK")) {
-                operation.dismissClipboardNotice()
+                model.dismissClipboardNotice()
             }
             Button(String(localized: "clipboard.notice.dontShow", defaultValue: "Don't Show Again")) {
-                operation.dismissClipboardNotice(disableFutureNoticesIn: config)
+                model.dismissClipboardNotice(disableFutureNotices: true)
             }
         } message: {
             Text(String(localized: "clipboard.notice.message", defaultValue: "The encrypted message has been copied. Remember to clear your clipboard after pasting."))
@@ -393,58 +356,44 @@ struct EncryptView: View {
         .fileExporter(
             isPresented: Binding(
                 get: { exportController.isPresented },
-                set: { if !$0 { exportController.finish() } }
+                set: { if !$0 { model.finishExport() } }
             ),
             item: exportController.payload,
             contentTypes: [.data],
             defaultFilename: exportController.defaultFilename
         ) { result in
-            exportController.finish()
+            model.finishExport()
             if case .failure(let exportError) = result {
-                operation.present(error: mapEncryptionError(exportError))
+                model.handleExportError(exportError)
             }
         }
         .confirmationDialog(
             String(localized: "encrypt.unverified.confirm.title", defaultValue: "Use Unverified Recipients?"),
-            isPresented: $showUnverifiedRecipientsWarning,
+            isPresented: Binding(
+                get: { model.showUnverifiedRecipientsWarning },
+                set: { if !$0 { model.dismissUnverifiedRecipientsWarning() } }
+            ),
             titleVisibility: .visible
         ) {
             Button(String(localized: "encrypt.unverified.confirm.action", defaultValue: "Encrypt Anyway")) {
-                performEncrypt()
+                model.confirmEncryptWithUnverifiedRecipients()
             }
             Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) { }
         } message: {
-            Text(
-                String.localizedStringWithFormat(
-                    String(
-                        localized: "encrypt.unverified.confirm.message",
-                        defaultValue: "These recipients are not verified yet: %@. Continue only if you trust these keys."
-                    ),
-                    selectedUnverifiedContacts.map(\.displayName).joined(separator: ", ")
-                )
-            )
+            Text(model.unverifiedRecipientsWarningMessage)
         }
         .onAppear {
-            if plaintext.isEmpty, let prefilledPlaintext = configuration.prefilledPlaintext {
-                plaintext = prefilledPlaintext
-            }
-            if !configuration.initialRecipientFingerprints.isEmpty {
-                selectedRecipients = Set(configuration.initialRecipientFingerprints)
-            }
-
-            let defaultSigner = configuration.initialSignerFingerprint ?? keyManagement.defaultKey?.fingerprint
-            signerFingerprint = defaultSigner
-            encryptToSelfFingerprint = defaultSigner
-            signMessage = configuration.signingPolicy.initialValue(appDefault: true)
-            encryptToSelf = configuration.encryptToSelfPolicy.initialValue(appDefault: config.encryptToSelf)
+            model.handleAppear()
         }
     }
 
     @ViewBuilder
     private var textInputContent: some View {
+        @Bindable var model = model
+
         Section {
             CypherMultilineTextInput(
-                text: $plaintext,
+                text: $model.plaintext,
                 mode: .prose
             )
                 .frame(
@@ -455,24 +404,25 @@ struct EncryptView: View {
         } header: {
             Text(String(localized: "encrypt.plaintext", defaultValue: "Message"))
         }
-        .id(textInputSectionEpoch)
+        .id(model.textInputSectionEpoch)
     }
 
     @ViewBuilder
     private var fileInputContent: some View {
+        @Bindable var model = model
+
         Section {
             Button {
-                guard configuration.allowsFileInput else { return }
-                showFileImporter = true
+                model.requestFileImport()
             } label: {
                 Label(
                     String(localized: "fileEncrypt.selectFile", defaultValue: "Select File"),
                     systemImage: "doc.badge.plus"
                 )
             }
-            .disabled(!configuration.allowsFileInput)
+            .disabled(!model.configuration.allowsFileInput)
 
-            if let selectedFileName {
+            if let selectedFileName = model.selectedFileName {
                 LabeledContent(
                     String(localized: "fileEncrypt.selectedFile", defaultValue: "Selected"),
                     value: selectedFileName
@@ -481,7 +431,7 @@ struct EncryptView: View {
         } header: {
             Text(String(localized: "fileEncrypt.file", defaultValue: "File"))
         } footer: {
-            if let fileRestrictionMessage = configuration.fileRestrictionMessage {
+            if let fileRestrictionMessage = model.configuration.fileRestrictionMessage {
                 Text(fileRestrictionMessage)
             }
         }
@@ -493,7 +443,7 @@ struct EncryptView: View {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.red)
                     .accessibilityLabel(String(localized: "encrypt.compat.expired", defaultValue: "Key expired or revoked"))
-            } else if keyManagement.defaultKey?.keyVersion == 6 && contact.keyVersion == 4 {
+            } else if model.defaultKeyVersion == 6 && contact.keyVersion == 4 {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .accessibilityLabel(String(localized: "encrypt.compat.downgrade", defaultValue: "Format downgrade to SEIPDv1"))
@@ -505,110 +455,11 @@ struct EncryptView: View {
         }
     }
 
-    private var encryptButtonDisabled: Bool {
-        if operation.isRunning { return true }
-        if selectedRecipients.isEmpty { return true }
-        switch encryptMode {
-        case .text:
-            return plaintext.isEmpty
-        case .file:
-            return selectedFileURL == nil
-        }
-    }
-
-    private var selectedUnverifiedContacts: [Contact] {
-        contactService.contacts
-            .filter { selectedRecipients.contains($0.fingerprint) && !$0.isVerified }
-    }
-
     private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
         #if canImport(UIKit)
         (110, 160, 240)
         #else
         (150, 220, 320)
         #endif
-    }
-
-    private var showsFileCancelAction: Bool {
-        encryptMode == .file && operation.isRunning && operation.progress != nil
-    }
-
-    private func requestEncrypt() {
-        if !selectedUnverifiedContacts.isEmpty {
-            showUnverifiedRecipientsWarning = true
-            return
-        }
-
-        performEncrypt()
-    }
-
-    private func performEncrypt() {
-        if encryptMode == .text {
-            encryptText()
-        } else {
-            encryptFile()
-        }
-    }
-
-    private func encryptText() {
-        let service = encryptionService
-        let text = plaintext
-        let recipients = Array(selectedRecipients)
-        let signerFp = signMessage ? signerFingerprint : nil
-        let selfEncrypt = encryptToSelf ?? config.encryptToSelf
-        let selfEncryptFp = selfEncrypt ? encryptToSelfFingerprint : nil
-        ciphertext = nil
-        operation.run(mapError: mapEncryptionError) {
-            let result = try await service.encryptText(
-                text,
-                recipientFingerprints: recipients,
-                signWithFingerprint: signerFp,
-                encryptToSelf: selfEncrypt,
-                encryptToSelfFingerprint: selfEncryptFp
-            )
-            ciphertext = result
-            textInputSectionEpoch &+= 1
-            configuration.onEncrypted?(result)
-        }
-    }
-
-    private func encryptFile() {
-        guard let fileURL = selectedFileURL else { return }
-        let service = encryptionService
-        let recipients = Array(selectedRecipients)
-        let signerFp = signMessage ? signerFingerprint : nil
-        let selfEncrypt = encryptToSelf ?? config.encryptToSelf
-        let selfEncryptFp = selfEncrypt ? encryptToSelfFingerprint : nil
-        encryptedFileURL = nil
-        operation.runFileOperation(mapError: mapEncryptionError) { progress in
-            let result = try await SecurityScopedFileAccess.withAccess(
-                to: [
-                    SecurityScopedAccessRequest(
-                        resource: fileURL,
-                        failure: .corruptData(
-                            reason: String(
-                                localized: "fileEncrypt.cannotAccess",
-                                defaultValue: "Cannot access file"
-                            )
-                        )
-                    )
-                ]
-            ) {
-                try await service.encryptFileStreaming(
-                    inputURL: fileURL,
-                    recipientFingerprints: recipients,
-                    signWithFingerprint: signerFp,
-                    encryptToSelf: selfEncrypt,
-                    encryptToSelfFingerprint: selfEncryptFp,
-                    progress: progress
-                )
-            }
-            try Task.checkCancellation()
-            encryptedFileURL = result
-        }
-    }
-
-    private func mapEncryptionError(_ error: Error) -> CypherAirError {
-        CypherAirError.from(error) { .encryptionFailed(reason: $0) }
     }
 }
