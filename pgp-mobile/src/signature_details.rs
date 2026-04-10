@@ -100,7 +100,9 @@ impl SignatureCollector {
     }
 
     pub(crate) fn legacy_status(&self) -> SignatureStatus {
-        self.legacy_status.clone().unwrap_or(SignatureStatus::NotSigned)
+        self.legacy_status
+            .clone()
+            .unwrap_or(SignatureStatus::NotSigned)
     }
 
     pub(crate) fn legacy_signer_fingerprint(&self) -> Option<String> {
@@ -111,7 +113,9 @@ impl SignatureCollector {
         self.signatures.clone()
     }
 
-    pub(crate) fn into_parts(self) -> (SignatureStatus, Option<String>, Vec<DetailedSignatureEntry>) {
+    pub(crate) fn into_parts(
+        self,
+    ) -> (SignatureStatus, Option<String>, Vec<DetailedSignatureEntry>) {
         (
             self.legacy_status.unwrap_or(SignatureStatus::NotSigned),
             self.legacy_signer_fingerprint,
@@ -254,7 +258,10 @@ mod tests {
             Some("signer-a".to_string())
         );
         assert_eq!(collector.signatures.len(), 3);
-        assert_eq!(collector.signatures[0].status, DetailedSignatureStatus::Valid);
+        assert_eq!(
+            collector.signatures[0].status,
+            DetailedSignatureStatus::Valid
+        );
         assert_eq!(
             collector.signatures[1].status,
             DetailedSignatureStatus::UnknownSigner

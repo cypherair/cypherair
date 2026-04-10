@@ -40,7 +40,10 @@ fn sign_cleartext_multi(text: &[u8], signer_certs: &[&[u8]]) -> Vec<u8> {
             .add_signer(extract_signing_keypair(cert))
             .expect("additional signer should be added");
     }
-    let mut signer = signer.cleartext().build().expect("cleartext signer should build");
+    let mut signer = signer
+        .cleartext()
+        .build()
+        .expect("cleartext signer should build");
     signer
         .write_all(text)
         .expect("cleartext signer should accept plaintext");
@@ -62,7 +65,10 @@ fn sign_detached_multi(data: &[u8], signer_certs: &[&[u8]]) -> Vec<u8> {
             .add_signer(extract_signing_keypair(cert))
             .expect("additional signer should be added");
     }
-    let mut signer = signer.detached().build().expect("detached signer should build");
+    let mut signer = signer
+        .detached()
+        .build()
+        .expect("detached signer should build");
     signer
         .write_all(data)
         .expect("detached signer should accept data");
@@ -138,19 +144,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[&signer_a.cert_data, &signer_b.cert_data],
     );
     let detached_data = b"FFI detailed multi-signer detached".to_vec();
-    let detached_multisig = sign_detached_multi(
-        &detached_data,
-        &[&signer_a.cert_data, &signer_b.cert_data],
-    );
-    let detached_repeated = sign_detached_multi(&detached_data, &[&signer_a.cert_data, &signer_a.cert_data]);
+    let detached_multisig =
+        sign_detached_multi(&detached_data, &[&signer_a.cert_data, &signer_b.cert_data]);
+    let detached_repeated =
+        sign_detached_multi(&detached_data, &[&signer_a.cert_data, &signer_a.cert_data]);
     let encrypted = encrypt_multi_signed(
         b"FFI detailed encrypted payload",
         &recipient.public_key_data,
         &[&signer_a.cert_data, &signer_b.cert_data],
     );
 
-    fs::write(fixtures_dir.join("ffi_detailed_signer_a.gpg"), signer_a.public_key_data)?;
-    fs::write(fixtures_dir.join("ffi_detailed_signer_b.gpg"), signer_b.public_key_data)?;
+    fs::write(
+        fixtures_dir.join("ffi_detailed_signer_a.gpg"),
+        signer_a.public_key_data,
+    )?;
+    fs::write(
+        fixtures_dir.join("ffi_detailed_signer_b.gpg"),
+        signer_b.public_key_data,
+    )?;
     fs::write(
         fixtures_dir.join("ffi_detailed_recipient_secret.gpg"),
         recipient.cert_data,
