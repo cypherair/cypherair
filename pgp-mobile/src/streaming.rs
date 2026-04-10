@@ -27,6 +27,7 @@ use crate::decrypt::{classify_decrypt_error, is_expired_error, DecryptHelper, Si
 use crate::encrypt;
 use crate::error::PgpError;
 use crate::sign;
+use crate::signature_details::{FileDecryptDetailedResult, FileVerifyDetailedResult};
 use crate::verify::{VerifyHelper, VerifyResult};
 
 /// Buffer size for streaming copy operations.
@@ -134,7 +135,6 @@ fn zeroing_copy<R: Read, W: Write>(
 
     Ok(total)
 }
-
 // ── Secure File Deletion ───────────────────────────────────────────────
 
 /// Overwrite file contents with zeros before deleting.
@@ -268,6 +268,27 @@ pub fn decrypt_file<K: AsRef<[u8]>>(
     verification_keys: &[Vec<u8>],
     progress: Option<Arc<dyn ProgressReporter>>,
 ) -> Result<FileDecryptResult, PgpError> {
+    let detailed = decrypt_file_detailed(
+        input_path,
+        output_path,
+        secret_keys,
+        verification_keys,
+        progress,
+    )?;
+    Ok(FileDecryptResult {
+        signature_status: Some(detailed.legacy_status),
+        signer_fingerprint: detailed.legacy_signer_fingerprint,
+    })
+}
+
+/// Decrypt a file using streaming I/O and preserve detailed per-signature results.
+pub fn decrypt_file_detailed<K: AsRef<[u8]>>(
+    input_path: &str,
+    output_path: &str,
+    secret_keys: &[K],
+    verification_keys: &[Vec<u8>],
+    progress: Option<Arc<dyn ProgressReporter>>,
+) -> Result<FileDecryptDetailedResult, PgpError> {
     let policy = StandardPolicy::new();
 
     // Parse secret key certificates
@@ -301,8 +322,9 @@ pub fn decrypt_file<K: AsRef<[u8]>>(
         policy: &policy,
         secret_certs: &certs,
         verifier_certs: &verifier_certs,
-        signature_status: None,
-        signer_fingerprint: None,
+        collector: crate::signature_details::SignatureCollector::new(
+            crate::signature_details::LegacyFoldMode::DecryptLike,
+        ),
     };
 
     // Build decryptor from file reader
@@ -369,9 +391,12 @@ pub fn decrypt_file<K: AsRef<[u8]>>(
         }
     })?;
 
-    Ok(FileDecryptResult {
-        signature_status: helper.signature_status,
-        signer_fingerprint: helper.signer_fingerprint,
+    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
+
+    Ok(FileDecryptDetailedResult {
+        legacy_status,
+        legacy_signer_fingerprint,
+        signatures,
     })
 }
 
@@ -452,11 +477,7 @@ pub fn verify_detached_file(
         certs.push(cert);
     }
 
-    let helper = VerifyHelper {
-        certs: &certs,
-        status: SignatureStatus::NotSigned,
-        signer_fingerprint: None,
-    };
+    let helper = VerifyHelper::new(&certs);
 
     // Build the detached verifier from the signature bytes
     let verifier_result = DetachedVerifierBuilder::from_bytes(signature)
@@ -494,7 +515,7 @@ pub fn verify_detached_file(
         let helper = verifier.into_helper();
         return Ok(VerifyResult {
             status: SignatureStatus::Bad,
-            signer_fingerprint: helper.signer_fingerprint,
+            signer_fingerprint: helper.collector.legacy_signer_fingerprint(),
             content: None,
         });
     }
@@ -502,9 +523,42 @@ pub fn verify_detached_file(
     let helper = verifier.into_helper();
 
     Ok(VerifyResult {
-        status: helper.status,
-        signer_fingerprint: helper.signer_fingerprint,
+        status: helper.collector.legacy_status(),
+        signer_fingerprint: helper.collector.legacy_signer_fingerprint(),
         content: None,
+    })
+}
+
+/// Verify a detached signature against a file using streaming I/O and preserve details.
+pub fn verify_detached_file_detailed(
+    data_path: &str,
+    signature: &[u8],
+    verification_keys: &[Vec<u8>],
+    progress: Option<Arc<dyn ProgressReporter>>,
+) -> Result<FileVerifyDetailedResult, PgpError> {
+    let data_file = File::open(data_path).map_err(|e| PgpError::FileIoError {
+        reason: format!("Cannot open data file '{}': {e}", data_path),
+    })?;
+    let total_bytes = data_file.metadata().map(|m| m.len()).unwrap_or(0);
+    let mut progress_reader = ProgressReader::new(data_file, total_bytes, progress);
+    let mut data = Vec::new();
+    if let Err(error) = zeroing_copy(&mut progress_reader, &mut data, STREAM_BUFFER_SIZE) {
+        return Err(match error {
+            CopyError::Cancelled => PgpError::OperationCancelled,
+            CopyError::Read(io_error) => PgpError::FileIoError {
+                reason: format!("Read failed: {io_error}"),
+            },
+            CopyError::Write(io_error) => PgpError::FileIoError {
+                reason: format!("Buffering failed: {io_error}"),
+            },
+        });
+    }
+
+    let detailed = crate::verify::verify_detached_detailed(&data, signature, verification_keys)?;
+    Ok(FileVerifyDetailedResult {
+        legacy_status: detailed.legacy_status,
+        legacy_signer_fingerprint: detailed.legacy_signer_fingerprint,
+        signatures: detailed.signatures,
     })
 }
 

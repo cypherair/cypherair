@@ -9,6 +9,7 @@ use sequoia_openpgp as openpgp;
 use zeroize::Zeroize;
 
 use crate::error::PgpError;
+use crate::signature_details::{DecryptDetailedResult, LegacyFoldMode, SignatureCollector};
 
 /// Result of a decryption operation.
 ///
@@ -212,6 +213,20 @@ pub fn decrypt<K: AsRef<[u8]>>(
     secret_keys: &[K],
     verification_keys: &[Vec<u8>],
 ) -> Result<DecryptResult, PgpError> {
+    let detailed = decrypt_detailed(ciphertext, secret_keys, verification_keys)?;
+    Ok(DecryptResult {
+        plaintext: detailed.plaintext,
+        signature_status: Some(detailed.legacy_status),
+        signer_fingerprint: detailed.legacy_signer_fingerprint,
+    })
+}
+
+/// Decrypt a message and preserve detailed per-signature results.
+pub fn decrypt_detailed<K: AsRef<[u8]>>(
+    ciphertext: &[u8],
+    secret_keys: &[K],
+    verification_keys: &[Vec<u8>],
+) -> Result<DecryptDetailedResult, PgpError> {
     let policy = StandardPolicy::new();
 
     // Parse secret key certificates
@@ -231,8 +246,7 @@ pub fn decrypt<K: AsRef<[u8]>>(
         policy: &policy,
         secret_certs: &certs,
         verifier_certs: &verifier_certs,
-        signature_status: None,
-        signer_fingerprint: None,
+        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
     };
 
     let mut decryptor = DecryptorBuilder::from_bytes(ciphertext)
@@ -251,11 +265,13 @@ pub fn decrypt<K: AsRef<[u8]>>(
     }
 
     let helper = decryptor.into_helper();
+    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
 
-    Ok(DecryptResult {
+    Ok(DecryptDetailedResult {
+        legacy_status,
+        legacy_signer_fingerprint,
+        signatures,
         plaintext,
-        signature_status: helper.signature_status,
-        signer_fingerprint: helper.signer_fingerprint,
     })
 }
 
@@ -265,11 +281,29 @@ pub(crate) fn decrypt_with_fixed_session_key(
     session_key: SessionKey,
     verifier_certs: &[openpgp::Cert],
 ) -> Result<DecryptResult, PgpError> {
+    let detailed = decrypt_with_fixed_session_key_detailed(
+        ciphertext,
+        session_key_algo,
+        session_key,
+        verifier_certs,
+    )?;
+    Ok(DecryptResult {
+        plaintext: detailed.plaintext,
+        signature_status: Some(detailed.legacy_status),
+        signer_fingerprint: detailed.legacy_signer_fingerprint,
+    })
+}
+
+pub(crate) fn decrypt_with_fixed_session_key_detailed(
+    ciphertext: &[u8],
+    session_key_algo: Option<SymmetricAlgorithm>,
+    session_key: SessionKey,
+    verifier_certs: &[openpgp::Cert],
+) -> Result<DecryptDetailedResult, PgpError> {
     let policy = StandardPolicy::new();
     let helper = FixedSessionKeyDecryptHelper {
         verifier_certs,
-        signature_status: None,
-        signer_fingerprint: None,
+        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
         session_key,
         session_key_algo,
     };
@@ -288,10 +322,13 @@ pub(crate) fn decrypt_with_fixed_session_key(
     }
 
     let helper = decryptor.into_helper();
-    Ok(DecryptResult {
+    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
+
+    Ok(DecryptDetailedResult {
+        legacy_status,
+        legacy_signer_fingerprint,
+        signatures,
         plaintext,
-        signature_status: helper.signature_status,
-        signer_fingerprint: helper.signer_fingerprint,
     })
 }
 
@@ -301,14 +338,12 @@ pub(crate) struct DecryptHelper<'a> {
     pub(crate) policy: &'a StandardPolicy<'a>,
     pub(crate) secret_certs: &'a [openpgp::Cert],
     pub(crate) verifier_certs: &'a [openpgp::Cert],
-    pub(crate) signature_status: Option<SignatureStatus>,
-    pub(crate) signer_fingerprint: Option<String>,
+    pub(crate) collector: SignatureCollector,
 }
 
 struct FixedSessionKeyDecryptHelper<'a> {
     verifier_certs: &'a [openpgp::Cert],
-    signature_status: Option<SignatureStatus>,
-    signer_fingerprint: Option<String>,
+    collector: SignatureCollector,
     session_key: SessionKey,
     session_key_algo: Option<SymmetricAlgorithm>,
 }
@@ -337,11 +372,8 @@ impl<'a> VerificationHelper for DecryptHelper<'a> {
     // during decryption, signature verification is "graded" — decryption succeeds
     // regardless of signature status.
     fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
-        apply_signature_results(
-            structure,
-            &mut self.signature_status,
-            &mut self.signer_fingerprint,
-        )
+        self.collector.observe_structure(structure);
+        Ok(())
     }
 }
 
@@ -351,58 +383,9 @@ impl<'a> VerificationHelper for FixedSessionKeyDecryptHelper<'a> {
     }
 
     fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
-        apply_signature_results(
-            structure,
-            &mut self.signature_status,
-            &mut self.signer_fingerprint,
-        )
+        self.collector.observe_structure(structure);
+        Ok(())
     }
-}
-
-fn apply_signature_results(
-    structure: MessageStructure,
-    signature_status: &mut Option<SignatureStatus>,
-    signer_fingerprint: &mut Option<String>,
-) -> openpgp::Result<()> {
-    for layer in structure {
-        match layer {
-            MessageLayer::Encryption { .. } => {}
-            MessageLayer::Compression { .. } => {}
-            MessageLayer::SignatureGroup { results } => {
-                for result in results {
-                    match result {
-                        Ok(GoodChecksum { ka, .. }) => {
-                            *signature_status = Some(SignatureStatus::Valid);
-                            *signer_fingerprint =
-                                Some(ka.cert().fingerprint().to_hex().to_lowercase());
-                            return Ok(());
-                        }
-                        Err(VerificationError::MissingKey { .. }) => {
-                            *signature_status = Some(SignatureStatus::UnknownSigner);
-                        }
-                        Err(VerificationError::BadKey { ka, error, .. }) => {
-                            if is_expired_error(&error) {
-                                *signature_status = Some(SignatureStatus::Expired);
-                                *signer_fingerprint =
-                                    Some(ka.cert().fingerprint().to_hex().to_lowercase());
-                            } else {
-                                *signature_status = Some(SignatureStatus::Bad);
-                            }
-                        }
-                        Err(_) => {
-                            *signature_status = Some(SignatureStatus::Bad);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if signature_status.is_none() {
-        *signature_status = Some(SignatureStatus::NotSigned);
-    }
-
-    Ok(())
 }
 
 /// Classify a Sequoia decryption error into the appropriate PgpError variant.

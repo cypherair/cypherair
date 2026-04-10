@@ -12,6 +12,7 @@ pub mod error;
 pub mod keys;
 pub mod password;
 pub mod sign;
+pub mod signature_details;
 pub mod streaming;
 pub mod verify;
 
@@ -29,6 +30,10 @@ use crate::keys::{
     CertificateMergeResult, GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult, S2kInfo,
 };
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
+use crate::signature_details::{
+    DecryptDetailedResult, FileDecryptDetailedResult, FileVerifyDetailedResult,
+    VerifyDetailedResult,
+};
 use crate::streaming::FileDecryptResult;
 use crate::verify::VerifyResult;
 
@@ -227,6 +232,18 @@ impl PgpEngine {
         decrypt::decrypt(&ciphertext, &secret_keys, &verification_keys)
     }
 
+    /// Decrypt a message and preserve per-signature detailed results.
+    pub fn decrypt_detailed(
+        &self,
+        ciphertext: Vec<u8>,
+        secret_keys: Vec<Vec<u8>>,
+        verification_keys: Vec<Vec<u8>>,
+    ) -> Result<DecryptDetailedResult, PgpError> {
+        let secret_keys: Vec<Zeroizing<Vec<u8>>> =
+            secret_keys.into_iter().map(Zeroizing::new).collect();
+        decrypt::decrypt_detailed(&ciphertext, &secret_keys, &verification_keys)
+    }
+
     /// Decrypt a password-encrypted message without falling back to recipient-key decryption.
     pub fn decrypt_with_password(
         &self,
@@ -263,6 +280,15 @@ impl PgpEngine {
         verify::verify_cleartext(&signed_message, &verification_keys)
     }
 
+    /// Verify a cleartext-signed message and preserve per-signature detailed results.
+    pub fn verify_cleartext_detailed(
+        &self,
+        signed_message: Vec<u8>,
+        verification_keys: Vec<Vec<u8>>,
+    ) -> Result<VerifyDetailedResult, PgpError> {
+        verify::verify_cleartext_detailed(&signed_message, &verification_keys)
+    }
+
     /// Verify a detached signature.
     pub fn verify_detached(
         &self,
@@ -271,6 +297,16 @@ impl PgpEngine {
         verification_keys: Vec<Vec<u8>>,
     ) -> Result<VerifyResult, PgpError> {
         verify::verify_detached(&data, &signature, &verification_keys)
+    }
+
+    /// Verify a detached signature and preserve per-signature detailed results.
+    pub fn verify_detached_detailed(
+        &self,
+        data: Vec<u8>,
+        signature: Vec<u8>,
+        verification_keys: Vec<Vec<u8>>,
+    ) -> Result<VerifyDetailedResult, PgpError> {
+        verify::verify_detached_detailed(&data, &signature, &verification_keys)
     }
 
     // ── Certificate Signature Verification ────────────────────────
@@ -450,6 +486,26 @@ impl PgpEngine {
         )
     }
 
+    /// Decrypt a file using streaming I/O and preserve per-signature detailed results.
+    pub fn decrypt_file_detailed(
+        &self,
+        input_path: String,
+        output_path: String,
+        secret_keys: Vec<Vec<u8>>,
+        verification_keys: Vec<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+    ) -> Result<FileDecryptDetailedResult, PgpError> {
+        let secret_keys: Vec<Zeroizing<Vec<u8>>> =
+            secret_keys.into_iter().map(Zeroizing::new).collect();
+        streaming::decrypt_file_detailed(
+            &input_path,
+            &output_path,
+            &secret_keys,
+            &verification_keys,
+            progress,
+        )
+    }
+
     /// Create a detached signature for a file using streaming I/O.
     /// Returns the ASCII-armored signature.
     pub fn sign_detached_file(
@@ -471,6 +527,22 @@ impl PgpEngine {
         progress: Option<Arc<dyn streaming::ProgressReporter>>,
     ) -> Result<VerifyResult, PgpError> {
         streaming::verify_detached_file(&data_path, &signature, &verification_keys, progress)
+    }
+
+    /// Verify a detached file signature using streaming I/O and preserve per-signature details.
+    pub fn verify_detached_file_detailed(
+        &self,
+        data_path: String,
+        signature: Vec<u8>,
+        verification_keys: Vec<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+    ) -> Result<FileVerifyDetailedResult, PgpError> {
+        streaming::verify_detached_file_detailed(
+            &data_path,
+            &signature,
+            &verification_keys,
+            progress,
+        )
     }
 
     /// Match PKESK recipients from an encrypted file against local certificates (Phase 1).

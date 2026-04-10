@@ -29,6 +29,25 @@ final class FFIIntegrationTests: XCTestCase {
         try engine.dearmor(armored: loadArmoredFixture(name, ext: ext))
     }
 
+    private func loadTextFixture(_ name: String, ext: String = "txt") throws -> Data {
+        try FixtureLoader.loadData(name, ext: ext)
+    }
+
+    private func writeTempFile(
+        _ data: Data,
+        filename: String = "ffi-\(UUID().uuidString).bin"
+    ) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        try data.write(to: url)
+        return url
+    }
+
+    private func makeTempOutputURL(
+        filename: String = "ffi-out-\(UUID().uuidString).bin"
+    ) -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+    }
+
     private func findTargetedPasswordTamper(
         ciphertext: Data,
         password: String,
@@ -1302,6 +1321,256 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertEqual(result.certificationKind, .positive)
         XCTAssertNil(result.signerPrimaryFingerprint)
         XCTAssertNil(result.signingKeyFingerprint)
+    }
+
+    // MARK: - C5.4B Detailed Signature Results
+
+    func test_detailedVerifyCleartext_fixtureMultiSigner_preservesEntriesAndLegacyFields() throws {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let signerB = try loadFixture("ffi_detailed_signer_b")
+        let signerAInfo = try engine.parseKeyInfo(keyData: signerA)
+        let signerBInfo = try engine.parseKeyInfo(keyData: signerB)
+        let signedMessage = try loadArmoredFixture("ffi_detailed_multisig_cleartext")
+
+        let detailed = try engine.verifyCleartextDetailed(
+            signedMessage: signedMessage,
+            verificationKeys: [signerA, signerB]
+        )
+        let legacy = try engine.verifyCleartext(
+            signedMessage: signedMessage,
+            verificationKeys: [signerA, signerB]
+        )
+
+        XCTAssertEqual(detailed.legacyStatus, legacy.status)
+        XCTAssertEqual(detailed.legacySignerFingerprint, legacy.signerFingerprint)
+        XCTAssertEqual(detailed.content, legacy.content)
+        XCTAssertEqual(detailed.signatures.count, 2)
+        XCTAssertTrue(detailed.signatures.allSatisfy { $0.status == .valid })
+        let observedFingerprints = Set(
+            detailed.signatures.compactMap(\.signerPrimaryFingerprint)
+        )
+        XCTAssertEqual(
+            observedFingerprints,
+            Set([signerAInfo.fingerprint, signerBInfo.fingerprint])
+        )
+        XCTAssertEqual(
+            detailed.signatures.first?.signerPrimaryFingerprint,
+            detailed.legacySignerFingerprint
+        )
+    }
+
+    func test_detailedVerifyDetached_fixtureKnownPlusUnknown_preservesNilUnknownFingerprint() throws {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let signerAInfo = try engine.parseKeyInfo(keyData: signerA)
+        let data = try loadTextFixture("ffi_detailed_detached_data")
+        let signature = try loadArmoredFixture("ffi_detailed_multisig_detached", ext: "sig")
+
+        let detailed = try engine.verifyDetachedDetailed(
+            data: data,
+            signature: signature,
+            verificationKeys: [signerA]
+        )
+        let legacy = try engine.verifyDetached(
+            data: data,
+            signature: signature,
+            verificationKeys: [signerA]
+        )
+
+        XCTAssertEqual(detailed.legacyStatus, legacy.status)
+        XCTAssertEqual(detailed.legacySignerFingerprint, legacy.signerFingerprint)
+        XCTAssertEqual(detailed.signatures.count, 2)
+        XCTAssertTrue(detailed.signatures.contains {
+            $0.status == .valid && $0.signerPrimaryFingerprint == Optional(signerAInfo.fingerprint)
+        })
+        XCTAssertTrue(detailed.signatures.contains {
+            $0.status == .unknownSigner && $0.signerPrimaryFingerprint == nil
+        })
+    }
+
+    func test_detailedVerifyDetached_fixtureRepeatedSigner_preservesRepeatedEntries() throws {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let signerAInfo = try engine.parseKeyInfo(keyData: signerA)
+        let data = try loadTextFixture("ffi_detailed_detached_data")
+        let signature = try loadArmoredFixture("ffi_detailed_repeated_detached", ext: "sig")
+
+        let detailed = try engine.verifyDetachedDetailed(
+            data: data,
+            signature: signature,
+            verificationKeys: [signerA]
+        )
+
+        XCTAssertEqual(detailed.legacyStatus, .valid)
+        XCTAssertEqual(detailed.signatures.count, 2)
+        XCTAssertEqual(detailed.signatures[0].status, .valid)
+        XCTAssertEqual(detailed.signatures[1].status, .valid)
+        XCTAssertEqual(
+            detailed.signatures[0].signerPrimaryFingerprint,
+            Optional(signerAInfo.fingerprint)
+        )
+        XCTAssertEqual(
+            detailed.signatures[1].signerPrimaryFingerprint,
+            Optional(signerAInfo.fingerprint)
+        )
+    }
+
+    func test_detailedDecrypt_fixtureMultiSigner_preservesEntriesAndLegacyFields() throws {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let signerB = try loadFixture("ffi_detailed_signer_b")
+        let signerAInfo = try engine.parseKeyInfo(keyData: signerA)
+        let signerBInfo = try engine.parseKeyInfo(keyData: signerB)
+        let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let ciphertext = try loadFixture("ffi_detailed_multisig_encrypted")
+
+        let detailed = try engine.decryptDetailed(
+            ciphertext: ciphertext,
+            secretKeys: [recipientSecret],
+            verificationKeys: [signerA, signerB]
+        )
+        let legacy = try engine.decrypt(
+            ciphertext: ciphertext,
+            secretKeys: [recipientSecret],
+            verificationKeys: [signerA, signerB]
+        )
+
+        XCTAssertEqual(legacy.signatureStatus, Optional(detailed.legacyStatus))
+        XCTAssertEqual(detailed.legacySignerFingerprint, legacy.signerFingerprint)
+        XCTAssertEqual(detailed.plaintext, legacy.plaintext)
+        XCTAssertEqual(detailed.signatures.count, 2)
+        XCTAssertTrue(detailed.signatures.allSatisfy { $0.status == .valid })
+        let observedFingerprints = Set(
+            detailed.signatures.compactMap(\.signerPrimaryFingerprint)
+        )
+        XCTAssertEqual(
+            observedFingerprints,
+            Set([signerAInfo.fingerprint, signerBInfo.fingerprint])
+        )
+        XCTAssertEqual(
+            detailed.signatures.first?.signerPrimaryFingerprint,
+            detailed.legacySignerFingerprint
+        )
+    }
+
+    func test_detailedDecryptFile_fixtureMultiSigner_preservesEntriesAndLegacyFields() throws {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let signerB = try loadFixture("ffi_detailed_signer_b")
+        let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let ciphertext = try loadFixture("ffi_detailed_multisig_encrypted")
+        let inputURL = try writeTempFile(ciphertext, filename: "ffi-detailed-input-\(UUID().uuidString).gpg")
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+
+        let detailedOutputURL = makeTempOutputURL(filename: "ffi-detailed-out-\(UUID().uuidString).bin")
+        let legacyOutputURL = makeTempOutputURL(filename: "ffi-legacy-out-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: detailedOutputURL) }
+        defer { try? FileManager.default.removeItem(at: legacyOutputURL) }
+
+        let detailed = try engine.decryptFileDetailed(
+            inputPath: inputURL.path,
+            outputPath: detailedOutputURL.path,
+            secretKeys: [recipientSecret],
+            verificationKeys: [signerA, signerB],
+            progress: nil
+        )
+        let legacy = try engine.decryptFile(
+            inputPath: inputURL.path,
+            outputPath: legacyOutputURL.path,
+            secretKeys: [recipientSecret],
+            verificationKeys: [signerA, signerB],
+            progress: nil
+        )
+
+        XCTAssertEqual(legacy.signatureStatus, Optional(detailed.legacyStatus))
+        XCTAssertEqual(detailed.legacySignerFingerprint, legacy.signerFingerprint)
+        XCTAssertEqual(try Data(contentsOf: detailedOutputURL), try Data(contentsOf: legacyOutputURL))
+        XCTAssertEqual(detailed.signatures.count, 2)
+    }
+
+    func test_detailedVerifyDetachedFile_cancel_returnsOperationCancelled() throws {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let data = try loadTextFixture("ffi_detailed_detached_data")
+        let signature = try loadArmoredFixture("ffi_detailed_multisig_detached", ext: "sig")
+        let inputURL = try writeTempFile(data, filename: "ffi-detailed-detached-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+
+        let progress = FileProgressReporter()
+        progress.cancel()
+
+        XCTAssertThrowsError(
+            try engine.verifyDetachedFileDetailed(
+                dataPath: inputURL.path,
+                signature: signature,
+                verificationKeys: [signerA],
+                progress: progress
+            )
+        ) { error in
+            guard case .OperationCancelled = error as? PgpError else {
+                return XCTFail("Expected OperationCancelled, got \(error)")
+            }
+        }
+    }
+
+    func test_detailedDecrypt_unsignedRuntime_returnsEmptySignaturesAndNotSigned() throws {
+        let recipient = try engine.generateKey(
+            name: "FFI Detailed Recipient",
+            email: "ffi-detailed@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        let ciphertext = try engine.encryptBinary(
+            plaintext: Data("Unsigned detailed decrypt".utf8),
+            recipients: [recipient.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+
+        let detailed = try engine.decryptDetailed(
+            ciphertext: ciphertext,
+            secretKeys: [recipient.certData],
+            verificationKeys: []
+        )
+
+        XCTAssertEqual(detailed.legacyStatus, .notSigned)
+        XCTAssertTrue(detailed.signatures.isEmpty)
+    }
+
+    func test_detailedApis_profileB_runtimeSmoke() throws {
+        let signer = try engine.generateKey(
+            name: "FFI Detailed Profile B Signer",
+            email: "ffi-detailed-b@example.com",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+        let recipient = try engine.generateKey(
+            name: "FFI Detailed Profile B Recipient",
+            email: "ffi-detailed-b-recipient@example.com",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        let signed = try engine.signCleartext(
+            text: Data("Profile B detailed verify".utf8),
+            signerCert: signer.certData
+        )
+        let verifyDetailed = try engine.verifyCleartextDetailed(
+            signedMessage: signed,
+            verificationKeys: [signer.publicKeyData]
+        )
+        XCTAssertEqual(verifyDetailed.legacyStatus, .valid)
+        XCTAssertEqual(verifyDetailed.signatures.count, 1)
+
+        let ciphertext = try engine.encryptBinary(
+            plaintext: Data("Profile B detailed decrypt".utf8),
+            recipients: [recipient.publicKeyData],
+            signingKey: signer.certData,
+            encryptToSelf: nil
+        )
+        let decryptDetailed = try engine.decryptDetailed(
+            ciphertext: ciphertext,
+            secretKeys: [recipient.certData],
+            verificationKeys: [signer.publicKeyData]
+        )
+        XCTAssertEqual(decryptDetailed.legacyStatus, .valid)
+        XCTAssertEqual(decryptDetailed.signatures.count, 1)
     }
 
     // MARK: - C5.5 KeyProfile Enum

@@ -573,7 +573,11 @@ Preserve multi-signature information that is currently collapsed into one legacy
   - `DetailedSignatureStatus::bad`
   - `DetailedSignatureStatus::expired`
 - No detailed per-signature entry may represent `NotSigned`.
-- The per-signature entry record preserves one entry per observed signature result in parser order and must not collapse repeated signers.
+- The per-signature entry record preserves one entry per observed signature result in global parser order across all `MessageLayer::SignatureGroup` values and must not collapse repeated signers.
+- `DetailedSignatureStatus::unknown_signer` entries return no signer fingerprint.
+- Collector traversal and legacy folding are separate concerns:
+  - the collector must keep recording every observed result even after the legacy winner is known
+  - any "stop" behavior applies only to `legacy_status` / `legacy_signer_fingerprint` computation
 - Every top-level detailed result record must contain:
   - `legacy_status`
   - `legacy_signer_fingerprint`
@@ -590,11 +594,17 @@ Preserve multi-signature information that is currently collapsed into one legacy
   - compatibility is defined by observable result equality with the legacy APIs, not by reproducing a line-by-line internal algorithm in the reference text
 - `verify_cleartext_detailed` must use the same parser acceptance and early-setup behavior as legacy `verify_cleartext`.
 - `verify_cleartext_detailed` must not promise to always return content; early setup failure may still produce no content.
+- `verify_detached_detailed` and `verify_detached_file_detailed` must preserve the same graded legacy outcomes as the existing detached verify APIs for:
+  - `with_policy(...)` failure
+  - payload verification failure after setup
+  - when those paths observe no per-signature results, `signatures = []`
 - File-based detailed verification and decrypt must inherit current file semantics:
   - progress callbacks
   - cancellation mapped to `OperationCancelled`
   - temp-file cleanup
   - AEAD hard-fail with no partial plaintext exposure
+- `verify_detached_file_detailed` must surface progress cancellation as `Err(OperationCancelled)` instead of collapsing it into a graded `bad` result.
+- Refactors in this family must preserve password-message behavior because password decrypt reuses the fixed-session-key decrypt path.
 - Any detailed record carrying plaintext or signed content must document Swift-side zeroization requirements.
 
 #### Expected FFI Surface Shape
@@ -612,6 +622,8 @@ Preserve multi-signature information that is currently collapsed into one legacy
 - multiple signatures with different outcomes
 - same signer repeated
 - known signer + missing verification key mixture
+- mixed expired + bad legacy-fold compatibility
+- mixed expired + unknown-signer legacy-fold compatibility
 - expired-signature outcome coverage
 - empty-signature-array semantics
 - compatibility tests proving `legacy_status` and `legacy_signer_fingerprint` match the legacy APIs exactly
@@ -626,6 +638,7 @@ Preserve multi-signature information that is currently collapsed into one legacy
 - detailed file verify smoke test
 - detailed decrypt and file decrypt smoke tests
 - expired-signature smoke test
+- fixed multi-signer fixture coverage for UniFFI array/record mapping
 - compatibility smoke tests proving legacy APIs still behave as before
 
 ## 4. Validation And Review Rules
