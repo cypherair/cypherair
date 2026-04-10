@@ -2,12 +2,12 @@
 
 > Purpose: Provide the implementation reference for future `pgp-mobile` and UniFFI surface expansion.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [SEQUOIA_CAPABILITY_AUDIT](SEQUOIA_CAPABILITY_AUDIT.md) · [RUST_SEQUOIA_INTEGRATION_TODO](RUST_SEQUOIA_INTEGRATION_TODO.md) · [PRD](PRD.md) · [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
+> Companion documents: [SEQUOIA_CAPABILITY_AUDIT](SEQUOIA_CAPABILITY_AUDIT.md) · [archive/RUST_SEQUOIA_INTEGRATION_TODO](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) · [PRD](PRD.md) · [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
 
-This document does not replace the audit or the roadmap:
+This document does not replace the audit or the archived roadmap snapshot:
 
 - [SEQUOIA_CAPABILITY_AUDIT.md](SEQUOIA_CAPABILITY_AUDIT.md) remains the canonical current-build inventory.
-- [RUST_SEQUOIA_INTEGRATION_TODO.md](RUST_SEQUOIA_INTEGRATION_TODO.md) remains the active Rust roadmap.
+- [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) remains the historical roadmap snapshot from the Sequoia expansion phase.
 - This document is the implementation reference for future Rust / FFI expansion work.
 
 This document is intentionally narrower than a full design package:
@@ -28,7 +28,7 @@ Use the companion documents as follows:
 - product goals and user-facing requirements live in [PRD.md](PRD.md)
 - library choice, platform constraints, and existing FFI architecture live in [TDD.md](TDD.md)
 - current implementation coverage lives in [SEQUOIA_CAPABILITY_AUDIT.md](SEQUOIA_CAPABILITY_AUDIT.md)
-- workstream priority and recommended execution order live in [RUST_SEQUOIA_INTEGRATION_TODO.md](RUST_SEQUOIA_INTEGRATION_TODO.md)
+- historical workstream priority and recommended execution order from that phase live in [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](archive/RUST_SEQUOIA_INTEGRATION_TODO.md)
 - this document defines implementation-facing rules, semantics, and validation for Rust / FFI work
 
 ### 1.2 What This Document Must Answer

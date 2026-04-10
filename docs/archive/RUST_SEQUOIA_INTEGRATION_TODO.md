@@ -1,22 +1,24 @@
 # Rust Sequoia Integration Roadmap
 
-> Purpose: Translate the Sequoia audit into the active Rust roadmap for `pgp-mobile`.
+> Status: Archived roadmap snapshot. Kept for historical execution context; no longer treated as the active roadmap.
+
+> Purpose: Preserve the historical Sequoia expansion roadmap for `pgp-mobile`.
 > Audience: Human developers, reviewers, and AI coding tools.
 
 Primary objective:
 
 > Improve `pgp-mobile` as a more complete Sequoia wrapper surface, even when immediate CypherAir service adoption is deferred.
 
-This roadmap is derived from:
+This roadmap snapshot is derived from:
 
-- [`SEQUOIA_CAPABILITY_AUDIT.md`](SEQUOIA_CAPABILITY_AUDIT.md)
+- [`SEQUOIA_CAPABILITY_AUDIT.md`](../SEQUOIA_CAPABILITY_AUDIT.md)
 - [`SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md)
 
 This document is intentionally narrower than the main audit:
 
 - the audit is the **canonical inventory**
-- this file is the **active Rust roadmap**
-- the appendix records **out-of-boundary surface**
+- this file is the archived roadmap snapshot from the Sequoia expansion phase
+- the appendix records the archived `out-of-boundary surface` snapshot
 
 ## 1. Roadmap Framing
 

@@ -2,7 +2,7 @@
 
 > Purpose: Assess how the five recently added Rust / FFI capability families are wired into the Swift services layer, app entry points, and test stack.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [SEQUOIA_CAPABILITY_AUDIT](SEQUOIA_CAPABILITY_AUDIT.md) · [RUST_SEQUOIA_INTEGRATION_TODO](RUST_SEQUOIA_INTEGRATION_TODO.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md)
+> Companion documents: [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [SEQUOIA_CAPABILITY_AUDIT](SEQUOIA_CAPABILITY_AUDIT.md) · [archive/RUST_SEQUOIA_INTEGRATION_TODO](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md)
 
 ## 1. Scope And Classification
 
@@ -45,7 +45,7 @@ Classification labels used below:
 
 **Expected service stance**
 
-- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.1 and [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.1 both expect bounded same-fingerprint public-certificate update absorption in the Swift contacts flow.
+- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.1 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.1 both expect bounded same-fingerprint public-certificate update absorption in the Swift contacts flow.
 - [`SEQUOIA_CAPABILITY_AUDIT.md`](SEQUOIA_CAPABILITY_AUDIT.md) records this family as implemented end-to-end.
 
 **Current implementation evidence**
@@ -80,7 +80,7 @@ Classification labels used below:
 
 **Expected service stance**
 
-- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.2 and [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.2 explicitly approve only key-level production adoption.
+- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.2 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.2 explicitly approve only key-level production adoption.
 - Subkey and User ID revocation builders are intentionally deferred until selector discovery helpers exist.
 
 **Current implementation evidence**
@@ -116,7 +116,7 @@ Classification labels used below:
 
 **Expected service stance**
 
-- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.3 and [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.3 both allow and expect a dedicated Swift service wrapper while leaving product UI exposure deferred.
+- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.3 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.3 both allow and expect a dedicated Swift service wrapper while leaving product UI exposure deferred.
 
 **Current implementation evidence**
 
@@ -149,7 +149,7 @@ Classification labels used below:
 
 **Expected service stance**
 
-- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.4 and [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.4 both say service adoption is deferred by default.
+- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.4 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.4 both say service adoption is deferred by default.
 
 **Current implementation evidence**
 
@@ -169,7 +169,7 @@ Classification labels used below:
 
 **Expected service stance**
 
-- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.5 and [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.5 both record the detailed result family as additive and deferred for production service adoption.
+- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.5 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.5 both record the detailed result family as additive and deferred for production service adoption.
 
 **Current implementation evidence**
 

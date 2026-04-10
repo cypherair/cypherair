@@ -13,7 +13,7 @@ This audit uses two baselines:
    - enabled features: `crypto-openssl`, `compression-deflate`
    - source of truth: [`pgp-mobile/Cargo.toml`](../pgp-mobile/Cargo.toml)
 2. **Secondary baseline: broader Sequoia 2.2 surface**
-   - covered separately in [`SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md)
+   - historical background recorded in the archived appendix [`archive/SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](archive/SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md)
 
 Layers audited:
 
@@ -24,15 +24,15 @@ Layers audited:
 
 ## 2. How To Read This Audit
 
-This document is the **canonical inventory** for the current build. It is intentionally broader than the companion roadmap document:
+This document is the **canonical inventory** for the current build. It is intentionally broader than the archived roadmap snapshot:
 
-- [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) is the **active Rust roadmap**
-- [`SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md) records **out-of-boundary surface**
+- [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) is the archived roadmap snapshot from the Sequoia expansion phase
+- [`archive/SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](archive/SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md) records archived `out-of-boundary surface` context
 
 The companion documents use the following terms consistently:
 
 - `current-build omission`: a Sequoia capability that is available in the current repository build, but is still missing or disconnected at one or more CypherAir layers
-- `active Rust roadmap`: the subset of current-build omissions that CypherAir is actively tracking as wrapper/FFI work for `pgp-mobile`
+- `archived roadmap snapshot`: the historical Sequoia expansion roadmap kept for context and handoff history
 - `service adoption deferred`: Rust and FFI work may be completed before production Swift services adopt the capability
 - `out-of-boundary surface`: Sequoia surface that is either not compiled into the current repository build or intentionally outside CypherAir's current product/security boundary
 
@@ -147,11 +147,11 @@ One internal item looks like a wrapper surface, but is not currently needed by t
 
 ## 5. Current-Build Omission Families
 
-This section summarizes the roadmap families referenced above. It intentionally separates remaining active Rust roadmap work from broader omissions that remain tracked here in the audit.
+This section summarizes the historically roadmapped families referenced above. It intentionally separates those past roadmap items from broader omissions that remain tracked here in the audit.
 
-### 5.1 Families On The Active Rust Roadmap
+### 5.1 Families Previously Tracked On The Rust Roadmap
 
-The following families are part of the companion Rust roadmap in [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md):
+The following families are recorded in the archived roadmap snapshot [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md):
 
 1. **Certificate merge/update family**
    - Status: implemented in Rust, FFI, tests, and same-fingerprint `ContactService` adoption.
@@ -175,10 +175,10 @@ The following families are part of the companion Rust roadmap in [`RUST_SEQUOIA_
    - Status: implemented in Rust, FFI, and tests; service adoption deferred.
    - Includes multi-signature-aware verification/decryption result models that preserve Sequoia semantics instead of collapsing them into one status.
 
-### 5.2 Current-Build Omissions Tracked Here, But Not On The Active Rust Roadmap
+### 5.2 Current-Build Omissions Tracked Here, But Not In The Archived Roadmap Snapshot
 
 1. **Generic packet/metadata introspection beyond recipient header parsing**
-   - This remains a `current-build omission`, but it is not on the current active Rust roadmap.
+   - This remains a `current-build omission`, but it was not tracked in the archived roadmap snapshot.
    - Reason: no bounded consumer-facing schema has been selected, and the project does not currently want to grow a general packet-inspection API as incidental backlog.
 
 ### 5.3 Disconnected But Not Omitted
@@ -204,7 +204,7 @@ The following items should not be treated as defects in the primary audit:
 - **Generic helper functions in `pgp-mobile/src`**
   - Error classifiers, recipient builders, and zeroizing stream utilities are not public capability gaps.
 - **Alternative Sequoia feature-gated surfaces**
-  - These are recorded as `out-of-boundary surface` in the appendix, not as current-build omissions.
+  - These are recorded as historical `out-of-boundary surface` context in the archived appendix, not as current-build omissions.
 
 ## 7. Evidence Sources
 
