@@ -159,8 +159,8 @@
 				Security/Mocks/MockSecureEnclave.swift,
 				Security/SecureEnclaveManageable.swift,
 				Security/SecureEnclaveManager.swift,
-				Services/ContactService.swift,
 				Services/ContactImportPublicCertificateValidator.swift,
+				Services/ContactService.swift,
 				Services/DecryptionService.swift,
 				Services/DiskSpaceChecker.swift,
 				Services/EncryptionService.swift,
@@ -501,7 +501,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -543,7 +543,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.2.2;
+				MARKETING_VERSION = 1.2.3;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -736,7 +736,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -778,7 +778,7 @@
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.2.2;
+				MARKETING_VERSION = 1.2.3;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
