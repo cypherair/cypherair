@@ -274,23 +274,32 @@ private struct SettingsScreenHostView: View {
 }
 
 #if os(macOS)
+@MainActor
+private struct TutorialLaunchBlockedNotice: Identifiable {
+    let id = UUID()
+}
+
 struct MacSettingsRootView: View {
     let launchConfiguration: AppLaunchConfiguration?
     let tutorialLaunchRelay: MacTutorialLaunchRelay
+    let tutorialHostAvailability: MacTutorialHostAvailability
     let presentationHostMode: MacPresentationHostMode
 
     @Environment(\.openWindow) private var openWindow
 
     @State private var path: [AppRoute] = []
     @State private var activePresentation: MacPresentation?
+    @State private var tutorialLaunchBlockedNotice: TutorialLaunchBlockedNotice?
 
     init(
         launchConfiguration: AppLaunchConfiguration? = nil,
         tutorialLaunchRelay: MacTutorialLaunchRelay,
+        tutorialHostAvailability: MacTutorialHostAvailability,
         presentationHostMode: MacPresentationHostMode = .settingsScene
     ) {
         self.launchConfiguration = launchConfiguration
         self.tutorialLaunchRelay = tutorialLaunchRelay
+        self.tutorialHostAvailability = tutorialHostAvailability
         self.presentationHostMode = presentationHostMode
     }
 
@@ -313,8 +322,33 @@ struct MacSettingsRootView: View {
         .macPresentationHost(
             $activePresentation,
             hostMode: presentationHostMode,
-            tutorialLaunchRelay: tutorialLaunchRelay
+            tutorialLaunchRelay: tutorialLaunchRelay,
+            tutorialHostAvailability: tutorialHostAvailability,
+            onTutorialLaunchBlocked: {
+                tutorialLaunchBlockedNotice = TutorialLaunchBlockedNotice()
+            }
         )
+        .alert(
+            String(
+                localized: "guidedTutorial.launchBlocked.title",
+                defaultValue: "Finish Current Dialog First"
+            ),
+            isPresented: Binding(
+                get: { tutorialLaunchBlockedNotice != nil },
+                set: { if !$0 { tutorialLaunchBlockedNotice = nil } }
+            )
+        ) {
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                tutorialLaunchBlockedNotice = nil
+            }
+        } message: {
+            Text(
+                String(
+                    localized: "guidedTutorial.launchBlocked.message",
+                    defaultValue: "The main window is busy with another dialog. Finish or dismiss it, then start the Guided Tutorial again."
+                )
+            )
+        }
     }
 
     private var macPresentationController: MacPresentationController {
@@ -325,6 +359,10 @@ struct MacSettingsRootView: View {
             MacPresentationController.settingsScene(
                 activePresentation: $activePresentation,
                 tutorialLaunchRelay: tutorialLaunchRelay,
+                tutorialHostAvailability: tutorialHostAvailability,
+                onTutorialLaunchBlocked: {
+                    tutorialLaunchBlockedNotice = TutorialLaunchBlockedNotice()
+                },
                 openMainWindow: {
                     openWindow(id: macMainWindowID)
                 }

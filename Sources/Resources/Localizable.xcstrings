@@ -4540,6 +4540,38 @@
         }
       }
     },
+    "guidedTutorial.launchBlocked.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The main window is busy with another dialog. Finish or dismiss it, then start the Guided Tutorial again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主窗口当前正被另一个对话框占用。请先完成或关闭它，然后再次启动引导教程。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.launchBlocked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finish Current Dialog First"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先完成当前对话框"
+          }
+        }
+      }
+    },
     "guidedTutorial.keys.alice" : {
       "localizations" : {
         "en" : {
