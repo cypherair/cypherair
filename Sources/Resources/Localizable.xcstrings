@@ -4540,6 +4540,38 @@
         }
       }
     },
+    "guidedTutorial.alreadyOpen.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Guided Tutorial is already open in the main window. Return to that window to continue."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引导教程已经在主窗口中打开。请返回该窗口继续操作。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.alreadyOpen.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutorial Already Open"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "教程已打开"
+          }
+        }
+      }
+    },
     "guidedTutorial.launchBlocked.message" : {
       "localizations" : {
         "en" : {
