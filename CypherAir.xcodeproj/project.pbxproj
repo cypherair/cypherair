@@ -62,8 +62,8 @@
 				App/Common/SecurityScopedFileAccess.swift,
 				App/Common/SignatureIdentityCardView.swift,
 				App/Common/TextImport/ImportedTextInputState.swift,
-				App/Contacts/AddContactView.swift,
 				App/Contacts/AddContactScreenModel.swift,
+				App/Contacts/AddContactView.swift,
 				App/Contacts/ContactDetailView.swift,
 				App/Contacts/ContactsView.swift,
 				App/Contacts/Import/ContactImportWorkflow.swift,
@@ -514,7 +514,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -749,7 +749,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
