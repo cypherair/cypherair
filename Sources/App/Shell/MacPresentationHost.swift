@@ -4,6 +4,8 @@ private struct MacPresentationHostModifier: ViewModifier {
     @Binding var activePresentation: MacPresentation?
     let hostMode: MacPresentationHostMode
     let tutorialLaunchRelay: MacTutorialLaunchRelay
+    let tutorialHostAvailability: MacTutorialHostAvailability
+    let onTutorialLaunchBlocked: @MainActor () -> Void
 
     @Environment(AppConfiguration.self) private var config
     @Environment(TutorialSessionStore.self) private var tutorialStore
@@ -59,13 +61,20 @@ private struct MacPresentationHostModifier: ViewModifier {
             }
         }
         .onAppear {
+            syncTutorialHostAvailability()
             consumePendingTutorialLaunchIfPossible()
         }
         .onChange(of: tutorialLaunchRelay.pendingRequestID) { _, _ in
             consumePendingTutorialLaunchIfPossible()
         }
         .onChange(of: activePresentation?.id) { _, _ in
+            syncTutorialHostAvailability()
             consumePendingTutorialLaunchIfPossible()
+        }
+        .onDisappear {
+            if hostMode == .mainWindow {
+                tutorialHostAvailability.updateHostPresentation(nil)
+            }
         }
     }
 
@@ -131,6 +140,8 @@ private struct MacPresentationHostModifier: ViewModifier {
             MacPresentationController.settingsScene(
                 activePresentation: $activePresentation,
                 tutorialLaunchRelay: tutorialLaunchRelay,
+                tutorialHostAvailability: tutorialHostAvailability,
+                onTutorialLaunchBlocked: onTutorialLaunchBlocked,
                 openMainWindow: {
                     openWindow(id: macMainWindowID)
                 }
@@ -138,16 +149,20 @@ private struct MacPresentationHostModifier: ViewModifier {
         }
     }
 
+    private func syncTutorialHostAvailability() {
+        guard hostMode == .mainWindow else { return }
+        tutorialHostAvailability.updateHostPresentation(activePresentation)
+    }
+
     private func consumePendingTutorialLaunchIfPossible() {
         guard hostMode == .mainWindow,
+              tutorialHostAvailability.canPresentTutorialInMainWindow,
               let pendingRequest = tutorialLaunchRelay.pendingRequest,
-              let pendingPresentation = tutorialLaunchRelay.pendingPresentation(
-                currentPresentation: activePresentation
-              ) else {
+              activePresentation == nil else {
             return
         }
 
-        activePresentation = pendingPresentation
+        activePresentation = .tutorial(presentationContext: pendingRequest.presentationContext)
         tutorialLaunchRelay.clearIfMatches(pendingRequest.id)
     }
 }
@@ -156,13 +171,17 @@ extension View {
     func macPresentationHost(
         _ activePresentation: Binding<MacPresentation?>,
         hostMode: MacPresentationHostMode,
-        tutorialLaunchRelay: MacTutorialLaunchRelay
+        tutorialLaunchRelay: MacTutorialLaunchRelay,
+        tutorialHostAvailability: MacTutorialHostAvailability,
+        onTutorialLaunchBlocked: @escaping @MainActor () -> Void = {}
     ) -> some View {
         modifier(
             MacPresentationHostModifier(
                 activePresentation: activePresentation,
                 hostMode: hostMode,
-                tutorialLaunchRelay: tutorialLaunchRelay
+                tutorialLaunchRelay: tutorialLaunchRelay,
+                tutorialHostAvailability: tutorialHostAvailability,
+                onTutorialLaunchBlocked: onTutorialLaunchBlocked
             )
         )
     }

@@ -18,6 +18,7 @@ struct MacAppShellView: View {
     @Environment(AppConfiguration.self) private var config
 
     let tutorialLaunchRelay: MacTutorialLaunchRelay
+    let tutorialHostAvailability: MacTutorialHostAvailability
 
     @State private var navigationState = MacShellNavigationState()
 
@@ -52,7 +53,8 @@ struct MacAppShellView: View {
         .macPresentationHost(
             $navigationState.activePresentation,
             hostMode: .mainWindow,
-            tutorialLaunchRelay: tutorialLaunchRelay
+            tutorialLaunchRelay: tutorialLaunchRelay,
+            tutorialHostAvailability: tutorialHostAvailability
         )
         .task {
             if !config.hasCompletedOnboarding,

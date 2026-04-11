@@ -42,6 +42,42 @@ enum MacPresentationHostMode {
 }
 
 @MainActor
+enum MacTutorialHostBlocker: String, CaseIterable {
+    case importConfirmationSheet
+    case importErrorAlert
+    case keyUpdateAlert
+    case tutorialImportBlockedAlert
+    case loadWarningAlert
+    case hostImportConfirmation
+    case hostAuthModeConfirmation
+    case hostModifyExpiry
+    case hostOnboarding
+}
+
+@MainActor
+@Observable
+final class MacTutorialHostAvailability {
+    private(set) var appLevelBlockers: Set<MacTutorialHostBlocker> = []
+    private(set) var hostBlocker: MacTutorialHostBlocker?
+
+    var canPresentTutorialInMainWindow: Bool {
+        appLevelBlockers.isEmpty && hostBlocker == nil
+    }
+
+    func setAppLevelBlocker(_ blocker: MacTutorialHostBlocker, isActive: Bool) {
+        if isActive {
+            appLevelBlockers.insert(blocker)
+        } else {
+            appLevelBlockers.remove(blocker)
+        }
+    }
+
+    func updateHostPresentation(_ presentation: MacPresentation?) {
+        hostBlocker = presentation?.tutorialHostBlocker
+    }
+}
+
+@MainActor
 struct MacTutorialLaunchRequest: Identifiable {
     let id = UUID()
     let presentationContext: TutorialPresentationContext
@@ -60,15 +96,6 @@ final class MacTutorialLaunchRelay {
         pendingRequest = MacTutorialLaunchRequest(presentationContext: presentationContext)
     }
 
-    func pendingPresentation(currentPresentation: MacPresentation?) -> MacPresentation? {
-        guard let pendingRequest else { return nil }
-        guard currentPresentation?.blocksTutorialRelayConsumption != true else {
-            return nil
-        }
-
-        return .tutorial(presentationContext: pendingRequest.presentationContext)
-    }
-
     func clearIfMatches(_ requestID: UUID) {
         guard pendingRequest?.id == requestID else { return }
         pendingRequest = nil
@@ -76,12 +103,18 @@ final class MacTutorialLaunchRelay {
 }
 
 private extension MacPresentation {
-    var blocksTutorialRelayConsumption: Bool {
+    var tutorialHostBlocker: MacTutorialHostBlocker? {
         switch self {
-        case .importConfirmation, .authModeConfirmation, .modifyExpiry:
-            true
-        case .onboarding, .tutorial:
-            false
+        case .importConfirmation:
+            .hostImportConfirmation
+        case .authModeConfirmation:
+            .hostAuthModeConfirmation
+        case .modifyExpiry:
+            .hostModifyExpiry
+        case .onboarding:
+            .hostOnboarding
+        case .tutorial:
+            nil
         }
     }
 }
@@ -105,12 +138,19 @@ extension MacPresentationController {
     static func settingsScene(
         activePresentation: Binding<MacPresentation?>,
         tutorialLaunchRelay: MacTutorialLaunchRelay,
+        tutorialHostAvailability: MacTutorialHostAvailability,
+        onTutorialLaunchBlocked: @escaping @MainActor () -> Void,
         openMainWindow: @escaping @MainActor () -> Void
     ) -> MacPresentationController {
         MacPresentationController(
             present: { presentation in
                 switch presentation {
                 case .tutorial(let presentationContext):
+                    guard tutorialHostAvailability.canPresentTutorialInMainWindow else {
+                        onTutorialLaunchBlocked()
+                        return
+                    }
+
                     activePresentation.wrappedValue = nil
                     openMainWindow()
                     tutorialLaunchRelay.submit(presentationContext)

@@ -20,6 +20,7 @@ struct CypherAirApp: App {
     @State private var launchConfiguration: AppLaunchConfiguration
     #if os(macOS)
     @State private var macTutorialLaunchRelay = MacTutorialLaunchRelay()
+    @State private var macTutorialHostAvailability = MacTutorialHostAvailability()
     #endif
     #if os(iOS)
     @State private var iosPresentationState = TutorialOnboardingHandoffState()
@@ -84,7 +85,10 @@ struct CypherAirApp: App {
 
         #if os(macOS)
         Settings {
-            MacSettingsRootView(tutorialLaunchRelay: macTutorialLaunchRelay)
+            MacSettingsRootView(
+                tutorialLaunchRelay: macTutorialLaunchRelay,
+                tutorialHostAvailability: macTutorialHostAvailability
+            )
             .optionalTint(container.config.colorTheme.accentColor)
             .environment(container.config)
             .environment(container.authManager)
@@ -100,11 +104,15 @@ struct CypherAirApp: App {
         #if os(macOS)
         switch launchConfiguration.root {
         case .main:
-            MacAppShellView(tutorialLaunchRelay: macTutorialLaunchRelay)
+            MacAppShellView(
+                tutorialLaunchRelay: macTutorialLaunchRelay,
+                tutorialHostAvailability: macTutorialHostAvailability
+            )
         case .settings:
             MacSettingsRootView(
                 launchConfiguration: launchConfiguration,
                 tutorialLaunchRelay: macTutorialLaunchRelay,
+                tutorialHostAvailability: macTutorialHostAvailability,
                 presentationHostMode: .mainWindow
             )
         case .tutorial:
@@ -227,6 +235,26 @@ struct CypherAirApp: App {
                 isTutorialPresentationActive: tutorialStore.isTutorialPresentationActive
             )
         }
+        #if os(macOS)
+        .onAppear {
+            syncMacTutorialHostAvailability()
+        }
+        .onChange(of: incomingURLImportCoordinator.importConfirmationCoordinator.request?.id) { _, _ in
+            syncMacTutorialHostAvailability()
+        }
+        .onChange(of: incomingURLImportCoordinator.importError != nil) { _, _ in
+            syncMacTutorialHostAvailability()
+        }
+        .onChange(of: incomingURLImportCoordinator.pendingKeyUpdateRequest?.id) { _, _ in
+            syncMacTutorialHostAvailability()
+        }
+        .onChange(of: incomingURLImportCoordinator.isTutorialImportBlocked) { _, _ in
+            syncMacTutorialHostAvailability()
+        }
+        .onChange(of: loadError != nil) { _, _ in
+            syncMacTutorialHostAvailability()
+        }
+        #endif
     }
 
     #if os(iOS)
@@ -318,6 +346,31 @@ struct CypherAirApp: App {
                 iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
             }
         }
+    }
+    #endif
+
+    #if os(macOS)
+    private func syncMacTutorialHostAvailability() {
+        macTutorialHostAvailability.setAppLevelBlocker(
+            .importConfirmationSheet,
+            isActive: incomingURLImportCoordinator.importConfirmationCoordinator.request != nil
+        )
+        macTutorialHostAvailability.setAppLevelBlocker(
+            .importErrorAlert,
+            isActive: incomingURLImportCoordinator.importError != nil
+        )
+        macTutorialHostAvailability.setAppLevelBlocker(
+            .keyUpdateAlert,
+            isActive: incomingURLImportCoordinator.pendingKeyUpdateRequest != nil
+        )
+        macTutorialHostAvailability.setAppLevelBlocker(
+            .tutorialImportBlockedAlert,
+            isActive: incomingURLImportCoordinator.isTutorialImportBlocked
+        )
+        macTutorialHostAvailability.setAppLevelBlocker(
+            .loadWarningAlert,
+            isActive: loadError != nil
+        )
     }
     #endif
 
