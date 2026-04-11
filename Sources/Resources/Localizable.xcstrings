@@ -5967,6 +5967,38 @@
         }
       }
     },
+    "import.tutorialBlocked.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引导教程打开时，CypherAir 不会导入真实联系人。请关闭教程，然后重新打开二维码链接。"
+          }
+        }
+      }
+    },
+    "import.tutorialBlocked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close Tutorial to Import"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭教程后再导入"
+          }
+        }
+      }
+    },
     "import.expired" : {
       "localizations" : {
         "en" : {

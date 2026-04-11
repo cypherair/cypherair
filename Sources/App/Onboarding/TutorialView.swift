@@ -29,6 +29,12 @@ struct TutorialView: View {
             .sheet(item: activeModalBinding) { modal in
                 modalView(for: modal)
             }
+            .onAppear {
+                tutorialStore.setTutorialPresentationActive(true)
+            }
+            .onDisappear {
+                tutorialStore.setTutorialPresentationActive(false)
+            }
             .task {
                 guard !hasPreparedPresentation else { return }
                 hasPreparedPresentation = true
