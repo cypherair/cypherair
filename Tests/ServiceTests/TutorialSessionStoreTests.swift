@@ -400,6 +400,35 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNotNil(verifyConfiguration.detachedFileRestrictionMessage)
     }
 
+    func test_tutorialConfigurationFactory_addContactConfiguration_restrictsModesAndRoutesCallbacks() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        let container = try XCTUnwrap(store.container)
+
+        let alice = try await container.keyManagement.generateKey(
+            name: "Alice Demo",
+            email: "alice@demo.invalid",
+            expirySeconds: nil,
+            profile: .advanced,
+            authMode: .standard
+        )
+        await store.noteAliceGenerated(alice)
+
+        let inactiveConfiguration = store.configurationFactory.addContactConfiguration(isActiveModule: false)
+        XCTAssertEqual(inactiveConfiguration.allowedImportModes, [.paste])
+        XCTAssertEqual(inactiveConfiguration.verificationPolicy, .verifiedOnly)
+        XCTAssertNil(inactiveConfiguration.prefilledArmoredText)
+        XCTAssertNil(inactiveConfiguration.onImported)
+        XCTAssertNil(inactiveConfiguration.onImportConfirmationRequested)
+
+        let activeConfiguration = store.configurationFactory.addContactConfiguration(isActiveModule: true)
+        XCTAssertEqual(activeConfiguration.allowedImportModes, [.paste])
+        XCTAssertEqual(activeConfiguration.verificationPolicy, .verifiedOnly)
+        XCTAssertNotNil(activeConfiguration.prefilledArmoredText)
+        XCTAssertNotNil(activeConfiguration.onImported)
+        XCTAssertNotNil(activeConfiguration.onImportConfirmationRequested)
+    }
+
     func test_tutorialConfigurationFactory_keyDetailConfiguration_disablesNonTutorialOutputs() async throws {
         let store = TutorialSessionStore()
         await startTutorialSession(store)
@@ -505,6 +534,28 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertTrue(activeKey.hasOnParsed)
         XCTAssertFalse(inactiveKey.hasOnDecrypted)
         XCTAssertTrue(activeKey.hasOnDecrypted)
+    }
+
+    func test_tutorialConfigurationFactory_addContactRuntimeSyncKey_changesBetweenInactiveAndActiveStates() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+
+        let inactiveKey = AddContactView.RuntimeSyncKey(
+            configuration: store.configurationFactory.addContactConfiguration(isActiveModule: false)
+        )
+        let activeKey = AddContactView.RuntimeSyncKey(
+            configuration: store.configurationFactory.addContactConfiguration(isActiveModule: true)
+        )
+
+        XCTAssertNotEqual(inactiveKey, activeKey)
+        XCTAssertEqual(inactiveKey.allowedImportModes, [.paste])
+        XCTAssertEqual(activeKey.allowedImportModes, [.paste])
+        XCTAssertEqual(inactiveKey.verificationPolicy, .verifiedOnly)
+        XCTAssertEqual(activeKey.verificationPolicy, .verifiedOnly)
+        XCTAssertFalse(inactiveKey.hasOnImported)
+        XCTAssertTrue(activeKey.hasOnImported)
+        XCTAssertFalse(inactiveKey.hasOnImportConfirmationRequested)
+        XCTAssertTrue(activeKey.hasOnImportConfirmationRequested)
     }
 
     func test_tutorialGuidanceResolver_completedModule_returnsCompletionStatePayload() async throws {
@@ -624,6 +675,88 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertTrue(
             signScreenModelContents.contains("func syncSignerFromDefaultOnAppear()"),
             "SignScreenModel should own default signer synchronization for repeated appearances"
+        )
+    }
+
+    func test_verifyView_establishesScreenModelHostBaseline() throws {
+        let rootURL = repositoryRootURL()
+        let verifyViewContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Sign/VerifyView.swift"),
+            encoding: .utf8
+        )
+        let verifyScreenModelContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Sign/VerifyScreenModel.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(
+            verifyViewContents.contains("@State private var operation = OperationController()"),
+            "VerifyView should not directly own OperationController"
+        )
+        XCTAssertFalse(
+            verifyViewContents.contains("@State private var importedCleartext = ImportedTextInputState()"),
+            "VerifyView should not directly own imported cleartext state"
+        )
+        XCTAssertTrue(
+            verifyViewContents.contains("VerifyScreenHostView"),
+            "VerifyView should forward into a private owning host"
+        )
+        XCTAssertTrue(
+            verifyScreenModelContents.contains("func handleDisappear()"),
+            "VerifyScreenModel should own disappear cleanup"
+        )
+    }
+
+    func test_addContactView_establishesScreenModelHostBaselineAndRuntimeSyncHook() throws {
+        let rootURL = repositoryRootURL()
+        let addContactViewContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Contacts/AddContactView.swift"),
+            encoding: .utf8
+        )
+        let addContactScreenModelContents = try String(
+            contentsOf: rootURL.appending(path: "Sources/App/Contacts/AddContactScreenModel.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(
+            addContactViewContents.contains("@State private var error: CypherAirError?"),
+            "AddContactView should not directly own error state"
+        )
+        XCTAssertFalse(
+            addContactViewContents.contains("@State private var pendingKeyUpdateRequest: ContactKeyUpdateConfirmationRequest?"),
+            "AddContactView should not directly own key-update workflow state"
+        )
+        XCTAssertFalse(
+            addContactViewContents.contains("@State private var importedKeyData: Data?"),
+            "AddContactView should not directly own imported key payload state"
+        )
+        XCTAssertTrue(
+            addContactViewContents.contains("AddContactScreenHostView"),
+            "AddContactView should forward into a private owning host"
+        )
+        XCTAssertTrue(
+            addContactScreenModelContents.contains("func handleAppear()"),
+            "AddContactScreenModel should own repeated-appear synchronization"
+        )
+        XCTAssertTrue(
+            addContactViewContents.contains("let configuration: AddContactView.Configuration"),
+            "AddContact host should retain the latest incoming configuration"
+        )
+        XCTAssertTrue(
+            addContactViewContents.contains(".onChange(of: runtimeSyncKey)"),
+            "AddContact host should watch runtime configuration changes"
+        )
+        XCTAssertTrue(
+            addContactViewContents.contains("model.updateConfiguration(configuration)"),
+            "AddContact host should forward runtime configuration updates into the screen model"
+        )
+        XCTAssertTrue(
+            addContactViewContents.contains("ImportConfirmationSheetHost(coordinator: fallbackImportConfirmationCoordinator)"),
+            "AddContact host should retain the local fallback confirmation sheet"
+        )
+        XCTAssertTrue(
+            addContactViewContents.contains("configuration.onImportConfirmationRequested == nil"),
+            "AddContact fallback host should only install when no external confirmation presenter is supplied"
         )
     }
 

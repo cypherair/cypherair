@@ -19,53 +19,39 @@ enum AddContactResult {
 /// No Keychain access needed — contacts are public keys only.
 @Observable
 final class ContactService {
-
-    private struct ContactMetadataManifest: Codable {
-        var verificationStates: [String: ContactVerificationState]
-    }
-
     /// All imported contacts.
     private(set) var contacts: [Contact] = []
 
     private let engine: PgpEngine
-    private let contactsDirectory: URL
+    private let repository: ContactRepository
     private var verificationStates: [String: ContactVerificationState] = [:]
 
     init(engine: PgpEngine, contactsDirectory: URL? = nil) {
         self.engine = engine
-        if let dir = contactsDirectory {
-            self.contactsDirectory = dir
+        let resolvedContactsDirectory: URL
+        if let contactsDirectory {
+            resolvedContactsDirectory = contactsDirectory
         } else {
             let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            self.contactsDirectory = documentsDir.appendingPathComponent("contacts", isDirectory: true)
+            resolvedContactsDirectory = documentsDir.appendingPathComponent(
+                "contacts",
+                isDirectory: true
+            )
         }
-    }
-
-    private var metadataURL: URL {
-        contactsDirectory.appendingPathComponent("contact-metadata.json")
+        repository = ContactRepository(contactsDirectory: resolvedContactsDirectory)
     }
 
     // MARK: - Load Contacts
 
     /// Load all contacts from the contacts directory.
     func loadContacts() throws {
-        let fm = FileManager.default
+        try repository.ensureDirectoryExists()
 
-        // Create directory if needed
-        if !fm.fileExists(atPath: contactsDirectory.path) {
-            try fm.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
-        }
-
-        verificationStates = loadVerificationStates()
-
-        let files = try fm.contentsOfDirectory(
-            at: contactsDirectory,
-            includingPropertiesForKeys: nil
-        ).filter { $0.pathExtension == "gpg" }
+        verificationStates = repository.loadVerificationStates()
 
         var loadedContacts: [Contact] = []
-        for file in files {
-            let data = try Data(contentsOf: file)
+        for storedContact in try repository.loadStoredContacts() {
+            let data = storedContact.data
             if let validation = try? ContactImportPublicCertificateValidator.validate(data, using: engine) {
                 let contact = makeContact(from: validation)
                 loadedContacts.append(contact)
@@ -78,7 +64,7 @@ final class ContactService {
         let filteredStates = verificationStates.filter { loadedFingerprints.contains($0.key) }
         if filteredStates != verificationStates {
             verificationStates = filteredStates
-            try saveVerificationStates()
+            try repository.saveVerificationStates(verificationStates)
         }
     }
 
@@ -128,7 +114,7 @@ final class ContactService {
                 if contacts[existingIndex].verificationState != resolvedVerificationState {
                     contacts[existingIndex].verificationState = resolvedVerificationState
                     verificationStates[contact.fingerprint] = resolvedVerificationState
-                    try saveVerificationStates()
+                    try repository.saveVerificationStates(verificationStates)
                 }
                 return .duplicate(contacts[existingIndex])
 
@@ -155,19 +141,12 @@ final class ContactService {
                     )
                 }
 
-                if !FileManager.default.fileExists(atPath: contactsDirectory.path) {
-                    try FileManager.default.createDirectory(
-                        at: contactsDirectory,
-                        withIntermediateDirectories: true
-                    )
-                }
-
-                let filename = "\(existingContact.fingerprint).gpg"
-                let fileURL = contactsDirectory.appendingPathComponent(filename)
-                try mergedResult.mergedCertData.write(to: fileURL, options: .atomic)
-
+                try repository.savePublicKey(
+                    mergedResult.mergedCertData,
+                    fingerprint: existingContact.fingerprint
+                )
                 verificationStates[updatedContact.fingerprint] = updatedContact.verificationState
-                try saveVerificationStates()
+                try repository.saveVerificationStates(verificationStates)
                 contacts[existingIndex] = updatedContact
                 return .updated(updatedContact)
             }
@@ -187,16 +166,9 @@ final class ContactService {
             )
         }
 
-        // Save to filesystem
-        if !FileManager.default.fileExists(atPath: contactsDirectory.path) {
-            try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
-        }
-        let filename = "\(contact.fingerprint).gpg"
-        let fileURL = contactsDirectory.appendingPathComponent(filename)
-        try binaryData.write(to: fileURL, options: .atomic)
-
+        try repository.savePublicKey(binaryData, fingerprint: contact.fingerprint)
         verificationStates[contact.fingerprint] = contact.verificationState
-        try saveVerificationStates()
+        try repository.saveVerificationStates(verificationStates)
         contacts.append(contact)
         return .added(contact)
     }
@@ -214,20 +186,14 @@ final class ContactService {
         let validation = try ContactImportPublicCertificateValidator.validate(keyData, using: engine)
         let verifiedContact = makeContact(from: validation, verificationState: .verified)
 
-        if !FileManager.default.fileExists(atPath: contactsDirectory.path) {
-            try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
-        }
-
         // Write new key first — if this fails, the old contact remains intact
-        let filename = "\(verifiedContact.fingerprint).gpg"
-        let fileURL = contactsDirectory.appendingPathComponent(filename)
-        try validation.publicCertData.write(to: fileURL, options: .atomic)
+        try repository.savePublicKey(
+            validation.publicCertData,
+            fingerprint: verifiedContact.fingerprint
+        )
 
         if existingFingerprint != verifiedContact.fingerprint {
-            let existingFileURL = contactsDirectory.appendingPathComponent("\(existingFingerprint).gpg")
-            if FileManager.default.fileExists(atPath: existingFileURL.path) {
-                try FileManager.default.removeItem(at: existingFileURL)
-            }
+            try repository.removePublicKey(fingerprint: existingFingerprint)
             contacts.removeAll { $0.fingerprint == existingFingerprint }
             verificationStates.removeValue(forKey: existingFingerprint)
         }
@@ -240,7 +206,7 @@ final class ContactService {
             contacts.append(verifiedContact)
         }
 
-        try saveVerificationStates()
+        try repository.saveVerificationStates(verificationStates)
         return verifiedContact
     }
 
@@ -248,17 +214,10 @@ final class ContactService {
 
     /// Remove a contact and delete their public key file.
     func removeContact(fingerprint: String) throws {
-        let filename = "\(fingerprint).gpg"
-        let fileURL = contactsDirectory.appendingPathComponent(filename)
-
-        let fm = FileManager.default
-        if fm.fileExists(atPath: fileURL.path) {
-            try fm.removeItem(at: fileURL)
-        }
-
+        try repository.removePublicKey(fingerprint: fingerprint)
         contacts.removeAll { $0.fingerprint == fingerprint }
         verificationStates.removeValue(forKey: fingerprint)
-        try saveVerificationStates()
+        try repository.saveVerificationStates(verificationStates)
     }
 
     func setVerificationState(
@@ -273,7 +232,7 @@ final class ContactService {
 
         contacts[index].verificationState = verificationState
         verificationStates[fingerprint] = verificationState
-        try saveVerificationStates()
+        try repository.saveVerificationStates(verificationStates)
     }
 
     // MARK: - Lookup
@@ -367,19 +326,5 @@ final class ContactService {
         return contacts.first {
             $0.userId == userId && $0.fingerprint != fingerprint
         }
-    }
-
-    private func loadVerificationStates() -> [String: ContactVerificationState] {
-        guard let data = try? Data(contentsOf: metadataURL),
-              let manifest = try? JSONDecoder().decode(ContactMetadataManifest.self, from: data) else {
-            return [:]
-        }
-        return manifest.verificationStates
-    }
-
-    private func saveVerificationStates() throws {
-        let manifest = ContactMetadataManifest(verificationStates: verificationStates)
-        let data = try JSONEncoder().encode(manifest)
-        try data.write(to: metadataURL, options: .atomic)
     }
 }
