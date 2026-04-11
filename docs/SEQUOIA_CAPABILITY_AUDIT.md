@@ -26,6 +26,8 @@ Layers audited:
 
 This document is the **canonical inventory** for the current build. It is intentionally broader than the archived roadmap snapshot:
 
+- [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) is the active current-state document for Swift service ownership, app ownership, and current integration gaps
+- [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) is the active rollout document for service ownership, interface changes, and sequencing
 - [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) is the archived roadmap snapshot from the Sequoia expansion phase
 - [`archive/SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](archive/SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md) records archived `out-of-boundary surface` context
 
@@ -33,7 +35,7 @@ The companion documents use the following terms consistently:
 
 - `current-build omission`: a Sequoia capability that is available in the current repository build, but is still missing or disconnected at one or more CypherAir layers
 - `archived roadmap snapshot`: the historical Sequoia expansion roadmap kept for context and handoff history
-- `service adoption deferred`: Rust and FFI work may be completed before production Swift services adopt the capability
+- `service integration pending`: Rust and FFI work are complete enough for downstream adoption, but production Swift services or app workflows do not yet own the capability fully
 - `out-of-boundary surface`: Sequoia surface that is either not compiled into the current repository build or intentionally outside CypherAir's current product/security boundary
 
 ### Status Legend
@@ -41,6 +43,9 @@ The companion documents use the following terms consistently:
 Conclusions use the following fixed labels:
 
 - `Implemented end-to-end`
+- `Service implemented; app entry pending`
+- `Partially integrated at service boundary`
+- `Exported; service integration pending`
 - `Wrapped in Rust only`
 - `Exported but unused`
 - `Missing wrapper`
@@ -85,8 +90,8 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Recipient-based decryption with AEAD/MDC hard-fail | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Rust explicitly zeroizes partial plaintext on error; services enforce two-phase auth flow. |
 | Read incoming compressed messages using deflate/zlib-compatible paths | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Enabled by `compression-deflate`; validated through GnuPG interop tests and service tests. |
 | Streaming file encryption/decryption with progress and cancellation | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Includes secure temp-file handling and cancellation propagation. |
-| Password/SKESK message encryption | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Exposed through additive password-message methods, optional signing, and dedicated `PasswordMessageService`; UI exposure remains deferred. |
-| Password/SKESK message decryption | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Uses password-only `SKESK` handling, dedicated decrypt result statuses, and fatal auth/integrity errors when a candidate session key reaches payload decryption. |
+| Password/SKESK message encryption | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Service implemented; app entry pending | Exposed through additive password-message methods, optional signing, and dedicated `PasswordMessageService`; no app route or screen model consumes the service yet. See [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) and [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md). |
+| Password/SKESK message decryption | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Service implemented; app entry pending | Uses password-only `SKESK` handling, dedicated decrypt result statuses, and fatal auth/integrity errors when a candidate session key reaches payload decryption; app ownership is still pending. |
 
 ### 3.3 Signing, Verification, And Parsing Helpers
 
@@ -96,8 +101,8 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Detached signing | Sign/verify | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Includes in-memory and streaming file variants. |
 | Cleartext verification with graded results | Sign/verify | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | CypherAir exposes `valid`, `unknownSigner`, `bad`, `expired`, and `notSigned`. |
 | Detached verification with graded results | Sign/verify | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Includes streaming file verification. |
-| Generic multi-signature result model | Sign/verify | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | Detailed `verify_*`, `decrypt*`, and file variants now preserve per-signature parser-order results while keeping legacy folded fields for compatibility; production Swift services still use the legacy single-status surface. |
-| Certificate-signature verification (`verify_direct_key`, `verify_userid_binding`) | Sign/verify | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | Exposed as crypto-only direct-key and User ID binding verification with certification-kind and signer-fingerprint result records. |
+| Generic multi-signature result model | Sign/verify | Yes | Yes | Yes | Yes | No | Yes | Partially integrated at service boundary | Detailed `verify_*`, `decrypt*`, and file variants preserve per-signature parser-order results while keeping legacy folded fields for compatibility; `SigningService.verifyDetachedStreaming(...)` already uses the detailed file API internally, but production Swift services still expose legacy single-status semantics. |
+| Certificate-signature verification (`verify_direct_key`, `verify_userid_binding`) | Sign/verify | Yes | Yes | Yes | Yes | No | Yes | Exported; service integration pending | Exposed as crypto-only direct-key and User ID binding verification with certification-kind and signer-fingerprint result records; the planned downstream owner is `CertificateSignatureService`. |
 | Generic ASCII armor encode for arbitrary OpenPGP kinds | Parsing/tools | Yes | Yes | Yes | Yes | No | Yes | Exported but unused | `engine.armor` is exported and tested indirectly via FFI, but production services use only `dearmor` and `armorPublicKey`. |
 | Generic dearmor | Parsing/tools | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Used by contacts, keys, decrypt, QR tests, and service interop. |
 | Public-key armor convenience | Parsing/tools | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Used by public-key export and import normalization flows. |
@@ -108,9 +113,9 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Capability | Domain | Sequoia | Build | Rust | FFI | Services | Tests | Conclusion | Notes |
 |---|---|---:|---:|---:|---:|---:|---:|---|---|
 | Add or merge new User IDs, subkeys, and updated bindings | Cert structure | Yes | Yes | Yes | Yes | Yes | Yes | Implemented through certificate merge/update wrapper | Same-fingerprint public certificate updates can now absorb new User IDs, new subkeys, and refreshed binding packets through the bounded merge/update API. |
-| Subkey-specific revocation builders | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | `SubkeyRevocationBuilder` is wrapped and tested, but selector discovery remains deferred on the Swift product side. |
-| User ID-specific revocation builders | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | `UserIDRevocationBuilder` is wrapped and tested, but raw User ID discovery remains deferred on the Swift product side. |
-| User ID certification generation (`UserID::certify`, related flows) | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported but service adoption deferred | Returned as raw certification-signature bytes for later insertion or verification. |
+| Subkey-specific revocation builders | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported; service integration pending | `SubkeyRevocationBuilder` is wrapped and tested, but current Swift models do not yet expose selector-bearing subkey metadata for bounded `KeyManagementService` adoption. |
+| User ID-specific revocation builders | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported; service integration pending | `UserIDRevocationBuilder` is wrapped and tested, but current Swift models do not yet expose selector-bearing raw User ID data for bounded `KeyManagementService` adoption. |
+| User ID certification generation (`UserID::certify`, related flows) | Cert structure | Yes | Yes | Yes | Yes | No | Yes | Exported; service integration pending | Returned as raw certification-signature bytes for later insertion or verification; the planned downstream owner is `CertificateSignatureService`. |
 | Runtime policy customization beyond `StandardPolicy` | Policy | Yes | Yes | No | No | No | No | Intentionally excluded by product/security policy | Current wrapper hardcodes `StandardPolicy` and product-default algorithm decisions. |
 | Algorithm/backend selection knobs exposed to callers | Policy | Yes | Yes | No | No | No | No | Intentionally excluded by product/security policy | Product fixes OpenSSL backend, outgoing compression policy, and format-selection behavior. |
 
@@ -159,21 +164,25 @@ The following families are recorded in the archived roadmap snapshot [`archive/R
 
 2. **Revocation construction family**
    - Includes generating a key revocation certificate from an existing secret cert, plus selective subkey and User ID revocation builders.
-   - Default stance: `service adoption deferred`
-   - Current production-flow exception: imported-key revocation availability parity
+   - Current status lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
+   - Active planning now lives in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
 
 3. **Password/SKESK symmetric-message family**
    - Includes password-based encryption/decryption wrappers and the result/error semantics needed to distinguish `passwordRejected`, integrity/authentication, malformed-message, and unsupported-algorithm outcomes.
-   - Current stance: dedicated service adoption delivered; UI exposure deferred
+   - Current status lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
+   - Active planning lives in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
 
 4. **Certification and binding verification family**
-   - Status: implemented in Rust, FFI, and tests; service adoption deferred.
+   - Status: implemented in Rust, FFI, and tests; service integration is still pending.
    - Includes direct-key verification, User ID binding verification, and User ID certification generation with typed certificate-signature semantics.
-   - Default stance: `service adoption deferred`
+   - Current status lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
+   - Planned downstream owner and rollout live in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
 
 5. **Richer signature result family**
-   - Status: implemented in Rust, FFI, and tests; service adoption deferred.
+   - Status: implemented in Rust, FFI, and tests; partially integrated at the service boundary today.
    - Includes multi-signature-aware verification/decryption result models that preserve Sequoia semantics instead of collapsing them into one status.
+   - Current integration state lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
+   - Active planning now lives in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
 
 ### 5.2 Current-Build Omissions Tracked Here, But Not In The Archived Roadmap Snapshot
 
@@ -183,15 +192,15 @@ The following families are recorded in the archived roadmap snapshot [`archive/R
 
 ### 5.3 Disconnected But Not Omitted
 
-These are not `current-build omissions`, but they remain worth keeping visible because they illustrate capabilities that already crossed the Rust/FFI boundary while production services still defer adoption:
+These are not `current-build omissions`, but they remain worth keeping visible because they illustrate capabilities that already crossed the Rust/FFI boundary while downstream service ownership is still pending:
 
 1. **Standalone revocation-signature validation**
    - Exported through `parse_revocation_cert`
-   - Production service adoption is still deferred
+   - Production service ownership is still pending
 
 2. **Generic armor encode**
    - Exported through `engine.armor`
-   - Production service adoption is still deferred
+   - Production service ownership is still pending
 
 ## 6. Design Exclusions And Non-Gaps
 

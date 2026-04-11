@@ -1,13 +1,14 @@
 # Rust Sequoia Integration Roadmap
 
 > Status: Archived roadmap snapshot. Kept for historical execution context; no longer treated as the active roadmap.
+> Current service integration docs now live in [../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) and [../RUST_FFI_SERVICE_INTEGRATION_PLAN.md](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
 
 > Purpose: Preserve the historical Sequoia expansion roadmap for `pgp-mobile`.
 > Audience: Human developers, reviewers, and AI coding tools.
 
 Primary objective:
 
-> Improve `pgp-mobile` as a more complete Sequoia wrapper surface, even when immediate CypherAir service adoption is deferred.
+> Improve `pgp-mobile` as a more complete Sequoia wrapper surface, even when immediate CypherAir service adoption was still treated as deferred during the original roadmap phase.
 
 This roadmap snapshot is derived from:
 
@@ -28,7 +29,7 @@ Default rules:
 
 - Rust wrapper coverage is the primary objective.
 - FFI export is part of the roadmap whenever a wrapper family needs a stable boundary for later consumers.
-- `service adoption deferred` is the default stance unless explicitly stated otherwise.
+- `service adoption deferred` was the historical default stance for this roadmap phase; it no longer represents the current project direction.
 - If a workstream changes exported record shapes or public method shapes, the implementation must include:
   - UniFFI regeneration
   - FFI integration tests
