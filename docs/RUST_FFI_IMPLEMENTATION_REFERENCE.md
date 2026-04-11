@@ -2,10 +2,12 @@
 
 > Purpose: Provide the implementation reference for future `pgp-mobile` and UniFFI surface expansion.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [SEQUOIA_CAPABILITY_AUDIT](SEQUOIA_CAPABILITY_AUDIT.md) · [archive/RUST_SEQUOIA_INTEGRATION_TODO](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) · [PRD](PRD.md) · [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
+> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [SEQUOIA_CAPABILITY_AUDIT](SEQUOIA_CAPABILITY_AUDIT.md) · [archive/RUST_SEQUOIA_INTEGRATION_TODO](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) · [PRD](PRD.md) · [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
 
-This document does not replace the audit or the archived roadmap snapshot:
+This document does not replace the service baseline, rollout plan, audit, or the archived roadmap snapshot:
 
+- [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) is the active current-state document for Swift service ownership, app ownership, and current integration gaps.
+- [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) is the active planning document for Swift service ownership, app ownership, and integration sequencing.
 - [SEQUOIA_CAPABILITY_AUDIT.md](SEQUOIA_CAPABILITY_AUDIT.md) remains the canonical current-build inventory.
 - [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) remains the historical roadmap snapshot from the Sequoia expansion phase.
 - This document is the implementation reference for future Rust / FFI expansion work.
@@ -13,7 +15,9 @@ This document does not replace the audit or the archived roadmap snapshot:
 This document is intentionally narrower than a full design package:
 
 - it covers the Rust layer, the UniFFI export surface, Rust tests, and Swift FFI tests
-- it does not define production Swift service adoption unless a family explicitly says otherwise
+- it does not own current downstream Swift integration state or rollout planning
+- current service ownership, app ownership, and current gaps live in [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md)
+- rollout sequencing and next service-integration work live in [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md)
 - it is a hybrid reference spec: strong on semantics, boundaries, and validation, but not automatically a frozen public-API contract for every family
 - only current blockers that still affect interface semantics or validation belong in `Open Questions`
 
@@ -27,6 +31,8 @@ Use the companion documents as follows:
 
 - product goals and user-facing requirements live in [PRD.md](PRD.md)
 - library choice, platform constraints, and existing FFI architecture live in [TDD.md](TDD.md)
+- current Swift service ownership, app ownership, and current integration gaps live in [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md)
+- rollout sequencing and planned downstream service ownership live in [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md)
 - current implementation coverage lives in [SEQUOIA_CAPABILITY_AUDIT.md](SEQUOIA_CAPABILITY_AUDIT.md)
 - historical workstream priority and recommended execution order from that phase live in [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](archive/RUST_SEQUOIA_INTEGRATION_TODO.md)
 - this document defines implementation-facing rules, semantics, and validation for Rust / FFI work
@@ -289,7 +295,7 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 
 - full Swift revocation-application flows
 - configurable reason strings, notations, or hash selection
-- subkey/User ID Swift production adoption beyond Rust / FFI exposure
+- view-level selector construction without a bounded service contract
 
 #### Input Format Classification
 
@@ -300,6 +306,7 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 #### Required Semantics
 
 - These APIs require secret certificate material.
+- The current Swift production boundary is key-level only through `KeyManagementService`.
 - Public-only certificate input must use one uniform family-wide rule:
   - return `Err(InvalidKeyData)` under a family-wide "secret certificate required" semantic rule
 - User ID revocation uses raw User ID bytes as selector input.
@@ -309,6 +316,7 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
   - User ID revocation: `ReasonForRevocation::UIDRetired`
 - Default reason text is the empty byte string for all three APIs.
 - Outputs remain raw revocation-signature bytes.
+- Selective subkey/User ID revocation should reach production Swift through additive `KeyManagementService` APIs after selector discovery exists; it should not be framed as a UI-only direct FFI call path.
 
 #### Expected FFI Surface Shape
 
@@ -320,9 +328,11 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 
 #### Required Helper / Discovery Support
 
-- key-level revocation does not require new discovery helpers and is the only revocation-construction path approved for current Swift production adoption
-- subkey fingerprint discovery and raw User ID discovery remain explicitly deferred
-- until those helpers exist, Swift production adoption for subkey/User ID revocation remains deferred even if the Rust / FFI exports exist
+- key-level revocation does not require new discovery helpers and is already integrated through `KeyManagementService`
+- selective subkey/User ID adoption requires bounded selector discovery that exposes:
+  - selectable subkey identifiers
+  - selectable raw User ID bytes
+- service integration should introduce selector-bearing Swift models or equivalent bounded discovery helpers before adding selective `KeyManagementService` APIs
 
 #### Minimum Rust Tests
 
@@ -347,7 +357,7 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 
 #### Purpose
 
-Add the password-encrypted message surface that is currently absent from `pgp-mobile`.
+Define the password-encrypted message family that is already present in `pgp-mobile` and wrapped by a dedicated Swift service.
 
 #### In-Scope
 
@@ -408,7 +418,9 @@ Add the password-encrypted message surface that is currently absent from `pgp-mo
 
 #### Required Helper / Discovery Support
 
-- none required for the baseline use case; the inputs are self-contained
+- no new Rust-side discovery helper is required for the existing service boundary; the inputs are self-contained
+- the current Swift service owner is `PasswordMessageService`
+- the next adoption step is app-level route and screen-model ownership with an explicit UI-boundary plaintext handling contract
 
 #### Minimum Rust Tests
 
@@ -456,7 +468,7 @@ Expose certificate-signature semantics needed for certification-related Rust com
 
 - trust or web-of-trust semantics
 - policy-valid certificate acceptance
-- Swift service adoption
+- folding certificate-signature workflows into message-verification services
 
 #### Input Format Classification
 
@@ -469,6 +481,7 @@ Expose certificate-signature semantics needed for certification-related Rust com
 #### Required Semantics
 
 - Results in this family are `crypto-only`.
+- The current Swift production boundary is none; planned service ownership belongs to a dedicated `CertificateSignatureService`.
 - They must not imply signer validity under policy.
 - This family requires additive exports for:
   - direct-key verification
@@ -494,6 +507,7 @@ Expose certificate-signature semantics needed for certification-related Rust com
 - Public-only signer input for certification generation returns `Err(InvalidKeyData)`.
 - Secret signer certificate with no usable certification signer returns `Err(SigningFailed)`.
 - Certification generation returns raw certification-signature bytes suitable for later insertion or verification.
+- Service adoption for this family should introduce certificate-signature-specific Swift result types rather than reusing message verification result records.
 
 #### Expected FFI Surface Shape
 
@@ -503,8 +517,9 @@ Expose certificate-signature semantics needed for certification-related Rust com
 
 #### Required Helper / Discovery Support
 
-- raw User ID discovery helper remains explicitly deferred
-- until that helper exists, Swift production adoption for User ID-driven flows remains deferred even if the Rust / FFI exports exist
+- current Swift models do not expose selector-bearing raw User ID data for bounded service ownership
+- service integration should introduce selector-bearing discovery support for User ID-driven operations before or alongside `CertificateSignatureService`
+- the planned service owner for this family is `CertificateSignatureService`
 
 #### Minimum Rust Tests
 
@@ -547,7 +562,7 @@ Preserve multi-signature information that is currently collapsed into one legacy
 #### Deferred / Out-of-Scope
 
 - in-place mutation of existing legacy result records
-- Swift production adoption
+- replacing current legacy Swift service methods in place
 
 #### Input Format Classification
 
@@ -561,6 +576,10 @@ Preserve multi-signature information that is currently collapsed into one legacy
 #### Required Semantics
 
 - Detailed APIs must be parallel additions; legacy APIs remain unchanged.
+- The current Swift service boundary is partial:
+  - `SigningService.verifyDetachedStreaming(...)` already uses `verify_detached_file_detailed`
+  - the service immediately folds back to legacy fields
+  - `DecryptionService` still uses legacy decrypt result types only
 - Detailed method names are fixed to the corresponding legacy name plus `_detailed`.
 - The additive detailed methods are:
   - `verify_cleartext_detailed`
@@ -607,6 +626,7 @@ Preserve multi-signature information that is currently collapsed into one legacy
 - `verify_detached_file_detailed` must surface progress cancellation as `Err(OperationCancelled)` instead of collapsing it into a graded `bad` result.
 - Refactors in this family must preserve password-message behavior because password decrypt reuses the fixed-session-key decrypt path.
 - Any detailed record carrying plaintext or signed content must document Swift-side zeroization requirements.
+- Swift service adoption for this family should proceed through additive detailed result types in `SigningService` and `DecryptionService` while preserving current legacy service methods for compatibility.
 
 #### Expected FFI Surface Shape
 
@@ -617,6 +637,7 @@ Preserve multi-signature information that is currently collapsed into one legacy
 #### Required Helper / Discovery Support
 
 - none beyond the detailed result records themselves
+- service adoption requires dedicated Swift detailed result types instead of reusing the current legacy folded `SignatureVerification` surface
 
 #### Minimum Rust Tests
 

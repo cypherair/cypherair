@@ -1,8 +1,9 @@
 # Rust / FFI Service Adoption Assessment
 
-> Purpose: Assess how the five recently added Rust / FFI capability families are wired into the Swift services layer, app entry points, and test stack.
+> Status: Archived assessment snapshot. Superseded by [RUST_FFI_SERVICE_INTEGRATION_BASELINE](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) and [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md). Kept for historical context.
+> Purpose: Preserve the previous assessment of how the five Rust / FFI capability families were wired into the Swift services layer, app entry points, and test stack.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [SEQUOIA_CAPABILITY_AUDIT](SEQUOIA_CAPABILITY_AUDIT.md) · [archive/RUST_SEQUOIA_INTEGRATION_TODO](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md)
+> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [SEQUOIA_CAPABILITY_AUDIT](../SEQUOIA_CAPABILITY_AUDIT.md) · [RUST_SEQUOIA_INTEGRATION_TODO](RUST_SEQUOIA_INTEGRATION_TODO.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TESTING](../TESTING.md)
 
 ## 1. Scope And Classification
 
@@ -45,18 +46,18 @@ Classification labels used below:
 
 **Expected service stance**
 
-- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.1 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.1 both expect bounded same-fingerprint public-certificate update absorption in the Swift contacts flow.
-- [`SEQUOIA_CAPABILITY_AUDIT.md`](SEQUOIA_CAPABILITY_AUDIT.md) records this family as implemented end-to-end.
+- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.1 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.1 both expect bounded same-fingerprint public-certificate update absorption in the Swift contacts flow.
+- [`SEQUOIA_CAPABILITY_AUDIT.md`](../SEQUOIA_CAPABILITY_AUDIT.md) records this family as implemented end-to-end.
 
 **Current implementation evidence**
 
-- Rust / FFI export: [`pgp-mobile/src/lib.rs`](../pgp-mobile/src/lib.rs) exports `merge_public_certificate_update`.
-- Production service owner: [`Sources/Services/ContactService.swift`](../Sources/Services/ContactService.swift) calls `engine.mergePublicCertificateUpdate(...)` on the same-fingerprint path and preserves `.duplicate` vs `.updated` semantics.
-- App entry points: [`Sources/App/Contacts/Import/ContactImportWorkflow.swift`](../Sources/App/Contacts/Import/ContactImportWorkflow.swift), [`Sources/App/Contacts/AddContactView.swift`](../Sources/App/Contacts/AddContactView.swift), and the URL-import flow in [`Sources/App/CypherAirApp.swift`](../Sources/App/CypherAirApp.swift).
+- Rust / FFI export: [`pgp-mobile/src/lib.rs`](../../pgp-mobile/src/lib.rs) exports `merge_public_certificate_update`.
+- Production service owner: [`Sources/Services/ContactService.swift`](../../Sources/Services/ContactService.swift) calls `engine.mergePublicCertificateUpdate(...)` on the same-fingerprint path and preserves `.duplicate` vs `.updated` semantics.
+- App entry points: [`Sources/App/Contacts/Import/ContactImportWorkflow.swift`](../../Sources/App/Contacts/Import/ContactImportWorkflow.swift), [`Sources/App/Contacts/AddContactView.swift`](../../Sources/App/Contacts/AddContactView.swift), and the URL-import flow in [`Sources/App/CypherAirApp.swift`](../../Sources/App/CypherAirApp.swift).
 - Tests:
-  - Rust: [`pgp-mobile/tests/certificate_merge_tests.rs`](../pgp-mobile/tests/certificate_merge_tests.rs)
-  - FFI: [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../Tests/FFIIntegrationTests/FFIIntegrationTests.swift)
-  - Service: [`Tests/ServiceTests/ContactServiceTests.swift`](../Tests/ServiceTests/ContactServiceTests.swift)
+  - Rust: [`pgp-mobile/tests/certificate_merge_tests.rs`](../../pgp-mobile/tests/certificate_merge_tests.rs)
+  - FFI: [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../../Tests/FFIIntegrationTests/FFIIntegrationTests.swift)
+  - Service: [`Tests/ServiceTests/ContactServiceTests.swift`](../../Tests/ServiceTests/ContactServiceTests.swift)
 
 **What is aligned**
 
@@ -69,7 +70,7 @@ Classification labels used below:
 - Contact import now uses a dedicated public-certificate validation helper before both UI inspection and service persistence.
 - Rust / FFI exposes a public-certificate validator that rejects `cert.is_tsk()` with `InvalidKeyData` and a stable machine token for this contact-import violation.
 - The Swift contact-import helper maps that token to an explicit contact-import public-certificate error instead of relying on a human-readable reason string.
-- [`Sources/Services/ContactService.swift`](../Sources/Services/ContactService.swift) re-validates contact-replacement bytes inside `confirmKeyUpdate(...)` and rebuilds the authoritative `Contact` from the validated bytes, so file names, in-memory state, and verification metadata no longer trust caller-supplied contact objects.
+- [`Sources/Services/ContactService.swift`](../../Sources/Services/ContactService.swift) re-validates contact-replacement bytes inside `confirmKeyUpdate(...)` and rebuilds the authoritative `Contact` from the validated bytes, so file names, in-memory state, and verification metadata no longer trust caller-supplied contact objects.
 
 **Assessment**
 
@@ -80,21 +81,21 @@ Classification labels used below:
 
 **Expected service stance**
 
-- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.2 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.2 explicitly approve only key-level production adoption.
+- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.2 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.2 explicitly approve only key-level production adoption.
 - Subkey and User ID revocation builders are intentionally deferred until selector discovery helpers exist.
 
 **Current implementation evidence**
 
-- Rust / FFI exports: [`pgp-mobile/src/lib.rs`](../pgp-mobile/src/lib.rs) exports `generate_key_revocation`, `generate_subkey_revocation`, and `generate_user_id_revocation`.
-- Production service owner for the approved path: [`Sources/Services/KeyManagementService.swift`](../Sources/Services/KeyManagementService.swift)
+- Rust / FFI exports: [`pgp-mobile/src/lib.rs`](../../pgp-mobile/src/lib.rs) exports `generate_key_revocation`, `generate_subkey_revocation`, and `generate_user_id_revocation`.
+- Production service owner for the approved path: [`Sources/Services/KeyManagementService.swift`](../../Sources/Services/KeyManagementService.swift)
   - generation/import-time key-level revocation availability
   - lazy backfill for legacy imported keys
   - armored revocation export
-- App entry point: [`Sources/App/Keys/KeyDetailView.swift`](../Sources/App/Keys/KeyDetailView.swift) uses `exportRevocationCertificate(...)`.
+- App entry point: [`Sources/App/Keys/KeyDetailView.swift`](../../Sources/App/Keys/KeyDetailView.swift) uses `exportRevocationCertificate(...)`.
 - Tests:
-  - Rust: [`pgp-mobile/tests/revocation_construction_tests.rs`](../pgp-mobile/tests/revocation_construction_tests.rs)
-  - FFI: [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../Tests/FFIIntegrationTests/FFIIntegrationTests.swift)
-  - Service: [`Tests/ServiceTests/KeyManagementServiceTests.swift`](../Tests/ServiceTests/KeyManagementServiceTests.swift)
+  - Rust: [`pgp-mobile/tests/revocation_construction_tests.rs`](../../pgp-mobile/tests/revocation_construction_tests.rs)
+  - FFI: [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../../Tests/FFIIntegrationTests/FFIIntegrationTests.swift)
+  - Service: [`Tests/ServiceTests/KeyManagementServiceTests.swift`](../../Tests/ServiceTests/KeyManagementServiceTests.swift)
 
 **What is aligned**
 
@@ -116,18 +117,18 @@ Classification labels used below:
 
 **Expected service stance**
 
-- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.3 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.3 both allow and expect a dedicated Swift service wrapper while leaving product UI exposure deferred.
+- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.3 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.3 both allow and expect a dedicated Swift service wrapper while leaving product UI exposure deferred.
 
 **Current implementation evidence**
 
-- Rust / FFI exports: [`pgp-mobile/src/lib.rs`](../pgp-mobile/src/lib.rs) exports additive password encrypt/decrypt methods and dedicated password result enums/records.
-- Production service owner: [`Sources/Services/PasswordMessageService.swift`](../Sources/Services/PasswordMessageService.swift)
-- App wiring: [`Sources/App/AppContainer.swift`](../Sources/App/AppContainer.swift) constructs the service.
+- Rust / FFI exports: [`pgp-mobile/src/lib.rs`](../../pgp-mobile/src/lib.rs) exports additive password encrypt/decrypt methods and dedicated password result enums/records.
+- Production service owner: [`Sources/Services/PasswordMessageService.swift`](../../Sources/Services/PasswordMessageService.swift)
+- App wiring: [`Sources/App/AppContainer.swift`](../../Sources/App/AppContainer.swift) constructs the service.
 - App entry points: current source review of `Sources/App/` found no direct call sites beyond `AppContainer` construction.
 - Tests:
-  - Rust: [`pgp-mobile/tests/password_message_tests.rs`](../pgp-mobile/tests/password_message_tests.rs)
-  - FFI: [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../Tests/FFIIntegrationTests/FFIIntegrationTests.swift)
-  - Service: [`Tests/ServiceTests/PasswordMessageServiceTests.swift`](../Tests/ServiceTests/PasswordMessageServiceTests.swift)
+  - Rust: [`pgp-mobile/tests/password_message_tests.rs`](../../pgp-mobile/tests/password_message_tests.rs)
+  - FFI: [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../../Tests/FFIIntegrationTests/FFIIntegrationTests.swift)
+  - Service: [`Tests/ServiceTests/PasswordMessageServiceTests.swift`](../../Tests/ServiceTests/PasswordMessageServiceTests.swift)
 
 **What is aligned**
 
@@ -149,16 +150,16 @@ Classification labels used below:
 
 **Expected service stance**
 
-- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.4 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.4 both say service adoption is deferred by default.
+- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.4 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.4 both say service adoption is deferred by default.
 
 **Current implementation evidence**
 
-- Rust / FFI exports: [`pgp-mobile/src/lib.rs`](../pgp-mobile/src/lib.rs) exports direct-key verification, User ID binding verification, and User ID certification generation.
-- There is no production service wrapper under [`Sources/Services/`](../Sources/Services/).
-- No direct app entry point under [`Sources/App/`](../Sources/App/).
+- Rust / FFI exports: [`pgp-mobile/src/lib.rs`](../../pgp-mobile/src/lib.rs) exports direct-key verification, User ID binding verification, and User ID certification generation.
+- There is no production service wrapper under [`Sources/Services/`](../../Sources/Services/).
+- No direct app entry point under [`Sources/App/`](../../Sources/App/).
 - Tests:
-  - Rust: [`pgp-mobile/tests/certification_binding_tests.rs`](../pgp-mobile/tests/certification_binding_tests.rs)
-  - FFI: [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../Tests/FFIIntegrationTests/FFIIntegrationTests.swift)
+  - Rust: [`pgp-mobile/tests/certification_binding_tests.rs`](../../pgp-mobile/tests/certification_binding_tests.rs)
+  - FFI: [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../../Tests/FFIIntegrationTests/FFIIntegrationTests.swift)
 
 **Assessment**
 
@@ -169,20 +170,20 @@ Classification labels used below:
 
 **Expected service stance**
 
-- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.5 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.5 both record the detailed result family as additive and deferred for production service adoption.
+- [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.5 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.5 both record the detailed result family as additive and deferred for production service adoption.
 
 **Current implementation evidence**
 
-- Rust / FFI exports: [`pgp-mobile/src/lib.rs`](../pgp-mobile/src/lib.rs) exports `verify_*_detailed`, `decrypt_detailed`, and file detailed APIs.
+- Rust / FFI exports: [`pgp-mobile/src/lib.rs`](../../pgp-mobile/src/lib.rs) exports `verify_*_detailed`, `decrypt_detailed`, and file detailed APIs.
 - Production service use is narrow:
-  - [`Sources/Services/SigningService.swift`](../Sources/Services/SigningService.swift) `verifyDetachedStreaming(...)` calls `engine.verifyDetachedFileDetailed(...)`
+  - [`Sources/Services/SigningService.swift`](../../Sources/Services/SigningService.swift) `verifyDetachedStreaming(...)` calls `engine.verifyDetachedFileDetailed(...)`
   - it immediately folds the result back to `SignatureVerification` using only `legacyStatus` and `legacySignerFingerprint`
-- No corresponding detailed service owner exists in [`Sources/Services/DecryptionService.swift`](../Sources/Services/DecryptionService.swift) for `decrypt_detailed` or `decrypt_file_detailed`.
-- App entry point: [`Sources/App/Sign/VerifyView.swift`](../Sources/App/Sign/VerifyView.swift) uses the streaming detached verify path only.
+- No corresponding detailed service owner exists in [`Sources/Services/DecryptionService.swift`](../../Sources/Services/DecryptionService.swift) for `decrypt_detailed` or `decrypt_file_detailed`.
+- App entry point: [`Sources/App/Sign/VerifyView.swift`](../../Sources/App/Sign/VerifyView.swift) uses the streaming detached verify path only.
 - Tests:
-  - Rust: [`pgp-mobile/tests/detailed_signature_tests.rs`](../pgp-mobile/tests/detailed_signature_tests.rs)
-  - FFI: [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../Tests/FFIIntegrationTests/FFIIntegrationTests.swift)
-  - Service: [`Tests/ServiceTests/StreamingServiceTests.swift`](../Tests/ServiceTests/StreamingServiceTests.swift) exercises success/failure/cancellation for the streaming verify path, but does not assert detailed family semantics such as signature-array preservation, parser order, repeated signers, or unknown-signer entries
+  - Rust: [`pgp-mobile/tests/detailed_signature_tests.rs`](../../pgp-mobile/tests/detailed_signature_tests.rs)
+  - FFI: [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../../Tests/FFIIntegrationTests/FFIIntegrationTests.swift)
+  - Service: [`Tests/ServiceTests/StreamingServiceTests.swift`](../../Tests/ServiceTests/StreamingServiceTests.swift) exercises success/failure/cancellation for the streaming verify path, but does not assert detailed family semantics such as signature-array preservation, parser order, repeated signers, or unknown-signer entries
 
 **What is aligned**
 
@@ -213,7 +214,7 @@ Classification labels used below:
    - Decision boundary:
      - if the family stays deferred, switch the narrow call site back to the legacy file-verify API so the code reflects actual product semantics
      - if the family becomes active, define explicit service-layer result types for detailed verify/decrypt paths and add service tests for parser order, repeated signers, unknown signers, and legacy-compat fields
-   - Sensitive-boundary note: any future detailed decrypt adoption in [`Sources/Services/DecryptionService.swift`](../Sources/Services/DecryptionService.swift) requires human review under [`SECURITY.md`](SECURITY.md)
+   - Sensitive-boundary note: any future detailed decrypt adoption in [`Sources/Services/DecryptionService.swift`](../../Sources/Services/DecryptionService.swift) requires human review under [`SECURITY.md`](../SECURITY.md)
 
 ### P2
 
