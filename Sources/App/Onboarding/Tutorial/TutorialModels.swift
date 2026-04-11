@@ -155,12 +155,6 @@ struct TutorialUnsafeRouteBlocklist {
                 message: String(localized: "guidedTutorial.blocked.importKey.body", defaultValue: "Importing a real private key is disabled in the tutorial sandbox."),
                 systemImage: "key.badge.exclamationmark"
             )
-        case .qrPhotoImport:
-            TutorialBlockedSurface(
-                title: String(localized: "guidedTutorial.blocked.photo.title", defaultValue: "Photo Import Unavailable"),
-                message: String(localized: "guidedTutorial.blocked.photo.body", defaultValue: "The tutorial does not use the photo picker. Use the sandbox sample flow instead."),
-                systemImage: "photo.badge.exclamationmark"
-            )
         case .selfTest:
             TutorialBlockedSurface(
                 title: String(localized: "guidedTutorial.blocked.selfTest.title", defaultValue: "Self-Test Unavailable"),

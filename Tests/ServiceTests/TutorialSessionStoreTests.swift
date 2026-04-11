@@ -358,7 +358,6 @@ final class TutorialSessionStoreTests: XCTestCase {
         let blocklist = TutorialUnsafeRouteBlocklist()
 
         XCTAssertNotNil(blocklist.blockedRoute(for: .importKey))
-        XCTAssertNotNil(blocklist.blockedRoute(for: .qrPhotoImport))
         XCTAssertNotNil(blocklist.blockedRoute(for: .selfTest))
         XCTAssertNotNil(blocklist.blockedRoute(for: .appIcon))
         XCTAssertNil(blocklist.blockedRoot(for: .sign))

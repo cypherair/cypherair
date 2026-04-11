@@ -21,8 +21,6 @@ struct AppRouteDestinationView: View {
             AddContactView()
         case .qrDisplay(let publicKeyData, let displayName):
             QRDisplayView(publicKeyData: publicKeyData, displayName: displayName)
-        case .qrPhotoImport:
-            QRPhotoImportView()
         case .encrypt:
             EncryptView()
         case .decrypt:
