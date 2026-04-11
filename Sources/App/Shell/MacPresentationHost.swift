@@ -5,7 +5,7 @@ private struct MacPresentationHostModifier: ViewModifier {
     let hostMode: MacPresentationHostMode
     let tutorialLaunchRelay: MacTutorialLaunchRelay
     let tutorialHostAvailability: MacTutorialHostAvailability
-    let onTutorialLaunchBlocked: @MainActor () -> Void
+    let onTutorialLaunchBlocked: @MainActor (MacTutorialHostBlocker) -> Void
 
     @Environment(AppConfiguration.self) private var config
     @Environment(TutorialSessionStore.self) private var tutorialStore
@@ -173,7 +173,7 @@ extension View {
         hostMode: MacPresentationHostMode,
         tutorialLaunchRelay: MacTutorialLaunchRelay,
         tutorialHostAvailability: MacTutorialHostAvailability,
-        onTutorialLaunchBlocked: @escaping @MainActor () -> Void = {}
+        onTutorialLaunchBlocked: @escaping @MainActor (MacTutorialHostBlocker) -> Void = { _ in }
     ) -> some View {
         modifier(
             MacPresentationHostModifier(

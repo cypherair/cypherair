@@ -52,6 +52,7 @@ enum MacTutorialHostBlocker: String, CaseIterable {
     case hostAuthModeConfirmation
     case hostModifyExpiry
     case hostOnboarding
+    case tutorialAlreadyOpen
 }
 
 @MainActor
@@ -59,9 +60,18 @@ enum MacTutorialHostBlocker: String, CaseIterable {
 final class MacTutorialHostAvailability {
     private(set) var appLevelBlockers: Set<MacTutorialHostBlocker> = []
     private(set) var hostBlocker: MacTutorialHostBlocker?
+    private(set) var isTutorialOpenInMainWindow = false
 
     var canPresentTutorialInMainWindow: Bool {
-        appLevelBlockers.isEmpty && hostBlocker == nil
+        appLevelBlockers.isEmpty && hostBlocker == nil && !isTutorialOpenInMainWindow
+    }
+
+    var tutorialLaunchBlockedReason: MacTutorialHostBlocker? {
+        if isTutorialOpenInMainWindow {
+            return .tutorialAlreadyOpen
+        }
+
+        return hostBlocker ?? appLevelBlockers.sorted { $0.rawValue < $1.rawValue }.first
     }
 
     func setAppLevelBlocker(_ blocker: MacTutorialHostBlocker, isActive: Bool) {
@@ -74,6 +84,7 @@ final class MacTutorialHostAvailability {
 
     func updateHostPresentation(_ presentation: MacPresentation?) {
         hostBlocker = presentation?.tutorialHostBlocker
+        isTutorialOpenInMainWindow = presentation?.isTutorialPresentation == true
     }
 }
 
@@ -103,6 +114,11 @@ final class MacTutorialLaunchRelay {
 }
 
 private extension MacPresentation {
+    var isTutorialPresentation: Bool {
+        guard case .tutorial = self else { return false }
+        return true
+    }
+
     var tutorialHostBlocker: MacTutorialHostBlocker? {
         switch self {
         case .importConfirmation:
@@ -139,7 +155,7 @@ extension MacPresentationController {
         activePresentation: Binding<MacPresentation?>,
         tutorialLaunchRelay: MacTutorialLaunchRelay,
         tutorialHostAvailability: MacTutorialHostAvailability,
-        onTutorialLaunchBlocked: @escaping @MainActor () -> Void,
+        onTutorialLaunchBlocked: @escaping @MainActor (MacTutorialHostBlocker) -> Void,
         openMainWindow: @escaping @MainActor () -> Void
     ) -> MacPresentationController {
         MacPresentationController(
@@ -147,7 +163,9 @@ extension MacPresentationController {
                 switch presentation {
                 case .tutorial(let presentationContext):
                     guard tutorialHostAvailability.canPresentTutorialInMainWindow else {
-                        onTutorialLaunchBlocked()
+                        if let reason = tutorialHostAvailability.tutorialLaunchBlockedReason {
+                            onTutorialLaunchBlocked(reason)
+                        }
                         return
                     }
 

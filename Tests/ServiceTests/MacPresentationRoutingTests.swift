@@ -65,7 +65,8 @@ final class MacPresentationRoutingTests: XCTestCase {
         XCTAssertFalse(availability.canPresentTutorialInMainWindow)
 
         availability.updateHostPresentation(.tutorial(presentationContext: .inApp))
-        XCTAssertTrue(availability.canPresentTutorialInMainWindow)
+        XCTAssertFalse(availability.canPresentTutorialInMainWindow)
+        XCTAssertEqual(availability.tutorialLaunchBlockedReason, .tutorialAlreadyOpen)
 
         availability.updateHostPresentation(nil)
         XCTAssertTrue(availability.canPresentTutorialInMainWindow)
@@ -76,14 +77,14 @@ final class MacPresentationRoutingTests: XCTestCase {
         let relay = MacTutorialLaunchRelay()
         let availability = MacTutorialHostAvailability()
         var openMainWindowCount = 0
-        var blockedCount = 0
+        var blockedReasons: [MacTutorialHostBlocker] = []
 
         let controller = MacPresentationController.settingsScene(
             activePresentation: binding(for: storage),
             tutorialLaunchRelay: relay,
             tutorialHostAvailability: availability,
-            onTutorialLaunchBlocked: {
-                blockedCount += 1
+            onTutorialLaunchBlocked: { reason in
+                blockedReasons.append(reason)
             },
             openMainWindow: {
                 openMainWindowCount += 1
@@ -98,7 +99,7 @@ final class MacPresentationRoutingTests: XCTestCase {
         XCTAssertEqual(initialPage, 1)
         XCTAssertEqual(openMainWindowCount, 0)
         XCTAssertNil(relay.pendingRequest)
-        XCTAssertEqual(blockedCount, 0)
+        XCTAssertTrue(blockedReasons.isEmpty)
     }
 
     func test_settingsSceneController_routesDirectTutorialRequestToMainWindow() {
@@ -106,14 +107,14 @@ final class MacPresentationRoutingTests: XCTestCase {
         let relay = MacTutorialLaunchRelay()
         let availability = MacTutorialHostAvailability()
         var openMainWindowCount = 0
-        var blockedCount = 0
+        var blockedReasons: [MacTutorialHostBlocker] = []
 
         let controller = MacPresentationController.settingsScene(
             activePresentation: binding(for: storage),
             tutorialLaunchRelay: relay,
             tutorialHostAvailability: availability,
-            onTutorialLaunchBlocked: {
-                blockedCount += 1
+            onTutorialLaunchBlocked: { reason in
+                blockedReasons.append(reason)
             },
             openMainWindow: {
                 openMainWindowCount += 1
@@ -125,7 +126,7 @@ final class MacPresentationRoutingTests: XCTestCase {
         XCTAssertNil(storage.activePresentation)
         XCTAssertEqual(openMainWindowCount, 1)
         XCTAssertEqual(relay.pendingRequest?.presentationContext, .inApp)
-        XCTAssertEqual(blockedCount, 0)
+        XCTAssertTrue(blockedReasons.isEmpty)
     }
 
     func test_settingsSceneController_showsBlockedNoticeWhenMainWindowIsBusy() {
@@ -134,14 +135,14 @@ final class MacPresentationRoutingTests: XCTestCase {
         let availability = MacTutorialHostAvailability()
         availability.setAppLevelBlocker(.loadWarningAlert, isActive: true)
         var openMainWindowCount = 0
-        var blockedCount = 0
+        var blockedReasons: [MacTutorialHostBlocker] = []
 
         let controller = MacPresentationController.settingsScene(
             activePresentation: binding(for: storage),
             tutorialLaunchRelay: relay,
             tutorialHostAvailability: availability,
-            onTutorialLaunchBlocked: {
-                blockedCount += 1
+            onTutorialLaunchBlocked: { reason in
+                blockedReasons.append(reason)
             },
             openMainWindow: {
                 openMainWindowCount += 1
@@ -153,7 +154,7 @@ final class MacPresentationRoutingTests: XCTestCase {
         XCTAssertNil(storage.activePresentation)
         XCTAssertEqual(openMainWindowCount, 0)
         XCTAssertNil(relay.pendingRequest)
-        XCTAssertEqual(blockedCount, 1)
+        XCTAssertEqual(blockedReasons, [.loadWarningAlert])
     }
 
     func test_settingsSceneController_routesOnboardingToTutorialHandoffToMainWindow() {
@@ -161,14 +162,14 @@ final class MacPresentationRoutingTests: XCTestCase {
         let relay = MacTutorialLaunchRelay()
         let availability = MacTutorialHostAvailability()
         var openMainWindowCount = 0
-        var blockedCount = 0
+        var blockedReasons: [MacTutorialHostBlocker] = []
 
         let controller = MacPresentationController.settingsScene(
             activePresentation: binding(for: storage),
             tutorialLaunchRelay: relay,
             tutorialHostAvailability: availability,
-            onTutorialLaunchBlocked: {
-                blockedCount += 1
+            onTutorialLaunchBlocked: { reason in
+                blockedReasons.append(reason)
             },
             openMainWindow: {
                 openMainWindowCount += 1
@@ -181,7 +182,7 @@ final class MacPresentationRoutingTests: XCTestCase {
         XCTAssertNil(storage.activePresentation)
         XCTAssertEqual(openMainWindowCount, 1)
         XCTAssertEqual(relay.pendingRequest?.presentationContext, .onboardingFirstRun)
-        XCTAssertEqual(blockedCount, 0)
+        XCTAssertTrue(blockedReasons.isEmpty)
     }
 
     func test_settingsSceneController_keepsOnboardingOpenWhenTutorialLaunchIsBlocked() {
@@ -190,14 +191,14 @@ final class MacPresentationRoutingTests: XCTestCase {
         let availability = MacTutorialHostAvailability()
         availability.updateHostPresentation(.authModeConfirmation(SettingsAuthModeRequestBuilder.makeLaunchPreviewRequest()))
         var openMainWindowCount = 0
-        var blockedCount = 0
+        var blockedReasons: [MacTutorialHostBlocker] = []
 
         let controller = MacPresentationController.settingsScene(
             activePresentation: binding(for: storage),
             tutorialLaunchRelay: relay,
             tutorialHostAvailability: availability,
-            onTutorialLaunchBlocked: {
-                blockedCount += 1
+            onTutorialLaunchBlocked: { reason in
+                blockedReasons.append(reason)
             },
             openMainWindow: {
                 openMainWindowCount += 1
@@ -214,7 +215,68 @@ final class MacPresentationRoutingTests: XCTestCase {
         XCTAssertEqual(initialPage, 2)
         XCTAssertEqual(openMainWindowCount, 0)
         XCTAssertNil(relay.pendingRequest)
-        XCTAssertEqual(blockedCount, 1)
+        XCTAssertEqual(blockedReasons, [.hostAuthModeConfirmation])
+    }
+
+    func test_settingsSceneController_showsTutorialAlreadyOpenReasonWhenMainWindowTutorialIsVisible() {
+        let storage = PresentationStorage()
+        let relay = MacTutorialLaunchRelay()
+        let availability = MacTutorialHostAvailability()
+        availability.updateHostPresentation(.tutorial(presentationContext: .inApp))
+        var openMainWindowCount = 0
+        var blockedReasons: [MacTutorialHostBlocker] = []
+
+        let controller = MacPresentationController.settingsScene(
+            activePresentation: binding(for: storage),
+            tutorialLaunchRelay: relay,
+            tutorialHostAvailability: availability,
+            onTutorialLaunchBlocked: { reason in
+                blockedReasons.append(reason)
+            },
+            openMainWindow: {
+                openMainWindowCount += 1
+            }
+        )
+
+        controller.present(.tutorial(presentationContext: .inApp))
+
+        XCTAssertNil(storage.activePresentation)
+        XCTAssertEqual(openMainWindowCount, 0)
+        XCTAssertNil(relay.pendingRequest)
+        XCTAssertEqual(blockedReasons, [.tutorialAlreadyOpen])
+    }
+
+    func test_settingsSceneController_keepsOnboardingOpenWhenTutorialAlreadyOpenBlocksLaunch() {
+        let storage = PresentationStorage()
+        let relay = MacTutorialLaunchRelay()
+        let availability = MacTutorialHostAvailability()
+        availability.updateHostPresentation(.tutorial(presentationContext: .inApp))
+        var openMainWindowCount = 0
+        var blockedReasons: [MacTutorialHostBlocker] = []
+
+        let controller = MacPresentationController.settingsScene(
+            activePresentation: binding(for: storage),
+            tutorialLaunchRelay: relay,
+            tutorialHostAvailability: availability,
+            onTutorialLaunchBlocked: { reason in
+                blockedReasons.append(reason)
+            },
+            openMainWindow: {
+                openMainWindowCount += 1
+            }
+        )
+
+        controller.present(.onboarding(initialPage: 2))
+        controller.present(.tutorial(presentationContext: .onboardingFirstRun))
+
+        guard case .onboarding(let initialPage)? = storage.activePresentation else {
+            return XCTFail("Expected onboarding to stay visible when tutorial is already open")
+        }
+
+        XCTAssertEqual(initialPage, 2)
+        XCTAssertEqual(openMainWindowCount, 0)
+        XCTAssertNil(relay.pendingRequest)
+        XCTAssertEqual(blockedReasons, [.tutorialAlreadyOpen])
     }
 
     func test_relay_submit_sameContextTwice_generatesDistinctRequestIDs() throws {

@@ -277,6 +277,7 @@ private struct SettingsScreenHostView: View {
 @MainActor
 private struct TutorialLaunchBlockedNotice: Identifiable {
     let id = UUID()
+    let reason: MacTutorialHostBlocker
 }
 
 struct MacSettingsRootView: View {
@@ -324,15 +325,12 @@ struct MacSettingsRootView: View {
             hostMode: presentationHostMode,
             tutorialLaunchRelay: tutorialLaunchRelay,
             tutorialHostAvailability: tutorialHostAvailability,
-            onTutorialLaunchBlocked: {
-                tutorialLaunchBlockedNotice = TutorialLaunchBlockedNotice()
+            onTutorialLaunchBlocked: { reason in
+                tutorialLaunchBlockedNotice = TutorialLaunchBlockedNotice(reason: reason)
             }
         )
         .alert(
-            String(
-                localized: "guidedTutorial.launchBlocked.title",
-                defaultValue: "Finish Current Dialog First"
-            ),
+            tutorialLaunchBlockedTitle,
             isPresented: Binding(
                 get: { tutorialLaunchBlockedNotice != nil },
                 set: { if !$0 { tutorialLaunchBlockedNotice = nil } }
@@ -343,10 +341,7 @@ struct MacSettingsRootView: View {
             }
         } message: {
             Text(
-                String(
-                    localized: "guidedTutorial.launchBlocked.message",
-                    defaultValue: "The main window is busy with another dialog. Finish or dismiss it, then start the Guided Tutorial again."
-                )
+                tutorialLaunchBlockedMessage
             )
         }
     }
@@ -360,12 +355,44 @@ struct MacSettingsRootView: View {
                 activePresentation: $activePresentation,
                 tutorialLaunchRelay: tutorialLaunchRelay,
                 tutorialHostAvailability: tutorialHostAvailability,
-                onTutorialLaunchBlocked: {
-                    tutorialLaunchBlockedNotice = TutorialLaunchBlockedNotice()
+                onTutorialLaunchBlocked: { reason in
+                    tutorialLaunchBlockedNotice = TutorialLaunchBlockedNotice(reason: reason)
                 },
                 openMainWindow: {
                     openWindow(id: macMainWindowID)
                 }
+            )
+        }
+    }
+
+    private var tutorialLaunchBlockedTitle: String {
+        switch tutorialLaunchBlockedNotice?.reason {
+        case .tutorialAlreadyOpen:
+            String(
+                localized: "guidedTutorial.alreadyOpen.title",
+                defaultValue: "Tutorial Already Open"
+            )
+        case .none,
+             .some:
+            String(
+                localized: "guidedTutorial.launchBlocked.title",
+                defaultValue: "Finish Current Dialog First"
+            )
+        }
+    }
+
+    private var tutorialLaunchBlockedMessage: String {
+        switch tutorialLaunchBlockedNotice?.reason {
+        case .tutorialAlreadyOpen:
+            String(
+                localized: "guidedTutorial.alreadyOpen.message",
+                defaultValue: "The Guided Tutorial is already open in the main window. Return to that window to continue."
+            )
+        case .none,
+             .some:
+            String(
+                localized: "guidedTutorial.launchBlocked.message",
+                defaultValue: "The main window is busy with another dialog. Finish or dismiss it, then start the Guided Tutorial again."
             )
         }
     }
