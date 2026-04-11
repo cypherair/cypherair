@@ -33,7 +33,7 @@ The five families tracked here are:
 |---|---|---|---|---|---|---|
 | Certificate Merge / Update | `mergePublicCertificateUpdate(...)`, public-certificate validation helpers | `ContactService` | `ContactImportWorkflow`, `AddContactView`, `IncomingURLImportCoordinator`, URL import flow in `CypherAirApp` | Rust merge/validation tests, FFI integration tests, `ContactServiceTests` | None on the current same-fingerprint public-update path | Completed service baseline |
 | Revocation Construction | `generateKeyRevocation(...)`, `generateSubkeyRevocation(...)`, `generateUserIdRevocation(...)`, `parseRevocationCert(...)` | `KeyManagementService` for key-level generation/export only | `KeyDetailView` revocation export | Rust revocation tests, FFI integration tests, `KeyManagementServiceTests` | Swift models do not expose selector-bearing subkey/User ID data; no bounded service API yet for selective builders | Key-level integrated; selective builders not yet service-owned |
-| Password / SKESK Symmetric Messages | Additive password encrypt/decrypt methods plus password-family result types | `PasswordMessageService` | No direct app route or screen-model consumer; constructed in `AppContainer` only | Rust password tests, FFI integration tests, `PasswordMessageServiceTests` | Service exists, but there is no app entry, screen-model ownership, or UI-side plaintext handling contract | Service implemented; app consumer missing |
+| Password / SKESK Symmetric Messages | Additive password encrypt/decrypt methods, optional signing inputs, and password-family result types | `PasswordMessageService` | No direct app route or screen-model consumer; constructed in `AppContainer` only | Rust password tests, FFI integration tests, `PasswordMessageServiceTests` | Service exists, but there is no app entry, screen-model ownership, or UI-side plaintext handling contract | Service implemented; app consumer missing |
 | Certification And Binding Verification | `verifyDirectKeySignature(...)`, `verifyUserIdBindingSignature(...)`, `generateUserIdCertification(...)` | None | None | Rust certification/binding tests and FFI integration tests | No production service owner, no selector-bearing Swift surface for user-ID-driven flows, no app owner | FFI-complete; no Swift service owner |
 | Richer Signature Results | `verify*Detailed(...)`, `decryptDetailed(...)`, `decryptFileDetailed(...)`, `verifyDetachedFileDetailed(...)` | Partial use in `SigningService`; no detailed owner in `DecryptionService` | `VerifyScreenModel` reaches `SigningService.verifyDetachedStreaming(...)`, which folds detailed fields back to legacy semantics | Rust detailed-result tests, FFI integration tests, streaming service tests for legacy folded behavior | Detailed semantics do not cross the service boundary and are not protected by service-level detailed-result tests | Partially integrated at the service boundary |
 
@@ -68,12 +68,13 @@ Selective revocation is therefore not just missing service wiring. It is blocked
 
 This family already has a real Swift service owner.
 
-- `PasswordMessageService` wraps additive Rust / FFI password-message encrypt/decrypt methods.
+- `PasswordMessageService` wraps additive Rust / FFI password-message encrypt/decrypt methods, optional signing inputs, and successful-decrypt signature-result mapping.
 - It preserves the family-local decrypt outcomes that differ from recipient-key decryption:
   - `decrypted`
   - `noSkesk`
   - `passwordRejected`
-- It stays separate from the two-phase `DecryptionService` flow and does not use Secure Enclave unwrap or PKESK recipient matching.
+- Its password-decrypt path stays separate from the two-phase `DecryptionService` flow and does not use Secure Enclave unwrap or PKESK recipient matching.
+- Its optional-signing encrypt path does authenticate through `KeyManagementService.unwrapPrivateKey(...)` before handing the signing key to the password-message FFI surface.
 - Rust, FFI, and service tests already cover the family semantics.
 
 The remaining gap is app ownership, not service existence.
