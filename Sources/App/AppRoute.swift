@@ -13,7 +13,6 @@ enum AppRoute: Hashable {
     case contactDetail(fingerprint: String)
     case addContact
     case qrDisplay(publicKeyData: Data, displayName: String)
-    case qrPhotoImport
 
     // Encrypt / Decrypt
     case encrypt

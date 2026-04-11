@@ -71,7 +71,6 @@
 				App/Contacts/ImportConfirmationCoordinator.swift,
 				App/Contacts/ImportConfirmView.swift,
 				App/Contacts/QRDisplayView.swift,
-				App/Contacts/QRPhotoImportView.swift,
 				App/ContentView.swift,
 				App/CypherAirApp.swift,
 				App/Decrypt/DecryptScreenModel.swift,

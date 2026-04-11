@@ -94,8 +94,6 @@ struct TutorialRouteDestinationView: View {
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ContactDetailView(fingerprint: fingerprint) })
         case .qrDisplay(let publicKeyData, let displayName):
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { QRDisplayView(publicKeyData: publicKeyData, displayName: displayName) })
-        case .qrPhotoImport:
-            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { QRPhotoImportView() })
         case .importKey:
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ImportKeyView() })
         case .sign:

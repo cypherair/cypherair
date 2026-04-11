@@ -172,7 +172,6 @@ Sources/
 │   │   ├── ContactDetailView.swift
 │   │   ├── AddContactView.swift
 │   │   ├── QRDisplayView.swift
-│   │   ├── QRPhotoImportView.swift
 │   │   └── ImportConfirmView.swift
 │   └── Settings/
 │       ├── SettingsView.swift

@@ -4055,38 +4055,6 @@
         }
       }
     },
-    "guidedTutorial.blocked.photo.body" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The tutorial does not use the photo picker. Use the sandbox sample flow instead."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "教程不会使用照片选择器。请改用沙箱示例流程。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.blocked.photo.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Photo Import Unavailable"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法导入照片"
-          }
-        }
-      }
-    },
     "guidedTutorial.blocked.selfTest.body" : {
       "localizations" : {
         "en" : {
@@ -8045,86 +8013,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我的公钥"
-          }
-        }
-      }
-    },
-    "qrImport.instruction" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a photo containing a CypherAir QR code."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择一张包含 CypherAir 二维码的照片。"
-          }
-        }
-      }
-    },
-    "qrImport.processing" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scanning QR code..."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在扫描二维码…"
-          }
-        }
-      }
-    },
-    "qrImport.selectPhoto" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose Photo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择照片"
-          }
-        }
-      }
-    },
-    "qrImport.success.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact Added"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "联系人已添加"
-          }
-        }
-      }
-    },
-    "qrImport.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "QR from Photo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从照片导入二维码"
           }
         }
       }

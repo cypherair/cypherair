@@ -290,7 +290,7 @@ Once the long-running tool-screen pattern is proven, the remaining workflow-heav
 - `VerifyScreenModel`
 - `AddContactScreenModel`
 - `ContactRepository`
-- explicit disposition for `QRPhotoImportView` as a deprecated standalone page with no current production navigation entry point
+- removal of the former standalone QR-photo route, with the capability retained in Add Contact
 - compatibility updates for Add Contact QR-photo mode, confirmation-host flows, and tutorial add-contact wiring
 
 **Required outputs**
@@ -300,7 +300,7 @@ Once the long-running tool-screen pattern is proven, the remaining workflow-heav
 - contact file/manifest persistence moves behind `ContactRepository`
 - `ContactImportWorkflow` remains the App-layer confirmation/orchestration helper
 - `AddContactView` remains the primary production contact-import surface, including QR-photo import through its existing mode picker
-- `QRPhotoImportView` is documented as a deprecated standalone page; Phase 4 does not require a dedicated screen-model migration for it
+- the former standalone QR-photo page is removed rather than migrated to a dedicated screen model
 - no duplicate import state machines are introduced across App and Service layers
 
 **Completion definition**
@@ -309,7 +309,7 @@ Once the long-running tool-screen pattern is proven, the remaining workflow-heav
 - current confirmation coordinator and import-confirmation UI remain intact
 - tutorial add-contact flow still works through `TutorialConfigurationFactory`
 - the current system-camera `cypherair://` handoff path remains the formal QR entry point
-- if the `.qrPhotoImport` route remains in code, it stays outside the primary contact-import architecture and must not drive Phase 4 screen-model design
+- no standalone QR-photo route remains in code
 - any additional internal contact import-policy collaborator is either clearly narrower than the existing App helper boundary or is deferred
 
 **What this phase proves for later phases**
@@ -320,7 +320,7 @@ Once the long-running tool-screen pattern is proven, the remaining workflow-heav
 **Out of scope**
 
 - redesign of the contact-import user experience
-- revitalizing `QRPhotoImportView` as a first-class product entry point
+- reintroducing a standalone QR-photo page as a first-class product entry point
 - tutorial-specific contact flow rewrite
 
 ### 5.5 Phase 5: App Root Coordination + Tutorial Host Finalization
@@ -384,7 +384,7 @@ Specific compatibility rules by area:
 - `KeyManagementService` recovery and unwrap behavior must remain externally identical.
 - `ContactService` duplicate/update/replacement semantics must remain externally identical.
 - `AddContactView` remains the primary production contact-import surface, including the active QR-photo import mode.
-- `QRPhotoImportView`, if retained, is treated as a deprecated standalone route rather than as a primary production workflow.
+- The former standalone QR-photo page remains removed rather than becoming a primary production workflow.
 - `cypherair://` URL import remains the formal system-camera QR handoff path.
 - `TutorialConfigurationFactory` must remain capable of expressing current tutorial restrictions and callbacks without requiring tutorial-only forks of production pages.
 
@@ -442,7 +442,7 @@ Every phase must end with:
 
 - keep `SigningServiceTests`, `StreamingServiceTests`, `ContactServiceTests`, and `TutorialSessionStoreTests` green
 - add screen-model tests for add-contact mode switching, including the built-in QR-photo mode, file import, and replacement confirmation flow
-- if the `.qrPhotoImport` route is retained, verify it does not reintroduce a parallel primary contact-import state machine or a new required screen-model target
+- verify the former standalone QR-photo page does not reintroduce a parallel primary contact-import state machine or a new required screen-model target
 - explicitly verify that contact persistence extraction did not duplicate or bypass App-layer confirmation workflow behavior
 
 #### Phase 5
