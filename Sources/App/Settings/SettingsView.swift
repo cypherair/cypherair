@@ -276,12 +276,22 @@ private struct SettingsScreenHostView: View {
 #if os(macOS)
 struct MacSettingsRootView: View {
     let launchConfiguration: AppLaunchConfiguration?
+    let tutorialLaunchRelay: MacTutorialLaunchRelay
+    let presentationHostMode: MacPresentationHostMode
+
+    @Environment(\.openWindow) private var openWindow
 
     @State private var path: [AppRoute] = []
     @State private var activePresentation: MacPresentation?
 
-    init(launchConfiguration: AppLaunchConfiguration? = nil) {
+    init(
+        launchConfiguration: AppLaunchConfiguration? = nil,
+        tutorialLaunchRelay: MacTutorialLaunchRelay,
+        presentationHostMode: MacPresentationHostMode = .settingsScene
+    ) {
         self.launchConfiguration = launchConfiguration
+        self.tutorialLaunchRelay = tutorialLaunchRelay
+        self.presentationHostMode = presentationHostMode
     }
 
     var body: some View {
@@ -291,17 +301,7 @@ struct MacSettingsRootView: View {
         ) {
             SettingsView()
         }
-        .environment(
-            \.macPresentationController,
-            MacPresentationController(
-                present: { presentation in
-                    activePresentation = presentation
-                },
-                dismiss: {
-                    activePresentation = nil
-                }
-            )
-        )
+        .environment(\.macPresentationController, macPresentationController)
         .task {
             if launchConfiguration?.opensAuthModeConfirmation == true,
                activePresentation == nil {
@@ -310,7 +310,26 @@ struct MacSettingsRootView: View {
                 )
             }
         }
-        .macPresentationHost($activePresentation)
+        .macPresentationHost(
+            $activePresentation,
+            hostMode: presentationHostMode,
+            tutorialLaunchRelay: tutorialLaunchRelay
+        )
+    }
+
+    private var macPresentationController: MacPresentationController {
+        switch presentationHostMode {
+        case .mainWindow:
+            MacPresentationController.mainWindow(activePresentation: $activePresentation)
+        case .settingsScene:
+            MacPresentationController.settingsScene(
+                activePresentation: $activePresentation,
+                tutorialLaunchRelay: tutorialLaunchRelay,
+                openMainWindow: {
+                    openWindow(id: macMainWindowID)
+                }
+            )
+        }
     }
 }
 #endif
