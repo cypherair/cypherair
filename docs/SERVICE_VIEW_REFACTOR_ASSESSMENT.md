@@ -349,9 +349,9 @@ This boundary is working for the current product. The current tests support conc
 
 The current repository has real reusable seams, but it is still missing several refactor prerequisites that the previous implementation spec treated as if they already existed.
 
-### 4.1 No Repo-Validated Screen-Model Example Yet
+### 4.1 The Repo Now Has An Initial Screen-Model Example, But Reuse Coverage Is Still Limited
 
-The repository already defines the recommended screen-model ownership pattern in [CONVENTIONS](CONVENTIONS.md). What it still lacks in `Sources/App/` is a mature, shared, code-level example that demonstrates one canonical pattern for:
+The repository already defines the recommended screen-model ownership pattern in [CONVENTIONS](CONVENTIONS.md), and `SignView` / `SignScreenModel` now establish the first in-repo baseline for it. What the repository still lacks in `Sources/App/` is broader, repeated reuse of that pattern across the remaining workflow-heavy screens, including one canonical approach for:
 
 - a top-level route view reading `@Environment`
 - a view owning an `@Observable` reference type via `@State`
@@ -359,7 +359,7 @@ The repository already defines the recommended screen-model ownership pattern in
 - one-time preparation versus repeated appearance
 - model-owned cleanup for current `onDisappear` / `onChange` logic
 
-That missing implementation baseline matters because the current overloaded views depend heavily on direct `@State`, `@Environment`, and lifecycle modifiers.
+That limited reuse coverage still matters because the current overloaded views depend heavily on direct `@State`, `@Environment`, and lifecycle modifiers.
 
 ### 4.2 Cleanup Ownership Is Still View-Centric
 

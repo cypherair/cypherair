@@ -279,15 +279,14 @@ The repository already has guidance for a screen-model pattern, but it does not 
 - service facade renaming
 - password-message UI activation
 
-### 5.4 Phase 4: Sign / Verify / Add Contact + Contact Persistence Boundary
+### 5.4 Phase 4: Verify / Add Contact + Contact Persistence Boundary
 
 **Why this phase exists**
 
-Once the long-running tool-screen pattern is proven, the remaining workflow-heavy screens can follow it. Contact persistence should be split in the same phase only after the App-layer import-helper boundary is explicit.
+Once the long-running tool-screen pattern is proven, the remaining workflow-heavy screens can follow it. `SignView` already serves as the initial in-repo baseline from Phase 1, so this phase continues from that baseline rather than re-migrating sign. Contact persistence should be split in the same phase only after the App-layer import-helper boundary is explicit.
 
 **Scope**
 
-- `SignScreenModel`
 - `VerifyScreenModel`
 - `AddContactScreenModel`
 - `ContactRepository`
@@ -296,7 +295,7 @@ Once the long-running tool-screen pattern is proven, the remaining workflow-heav
 
 **Required outputs**
 
-- workflow state moves out of `SignView`, `VerifyView`, and `AddContactView`
+- workflow state moves out of `VerifyView` and `AddContactView`, while `SignView` remains the already-migrated reference slice
 - `ContactService` facade preserved
 - contact file/manifest persistence moves behind `ContactRepository`
 - `ContactImportWorkflow` remains the App-layer confirmation/orchestration helper

@@ -19,6 +19,22 @@ struct AddContactView: View {
         static let `default` = Configuration()
     }
 
+    struct RuntimeSyncKey: Equatable {
+        let allowedImportModes: [ImportMode]
+        let prefilledArmoredText: String?
+        let verificationPolicy: Configuration.VerificationPolicy
+        let hasOnImported: Bool
+        let hasOnImportConfirmationRequested: Bool
+
+        init(configuration: Configuration) {
+            allowedImportModes = configuration.allowedImportModes
+            prefilledArmoredText = configuration.prefilledArmoredText
+            verificationPolicy = configuration.verificationPolicy
+            hasOnImported = configuration.onImported != nil
+            hasOnImportConfirmationRequested = configuration.onImportConfirmationRequested != nil
+        }
+    }
+
     @Environment(ContactService.self) private var contactService
     @Environment(QRService.self) private var qrService
     @Environment(\.dismiss) private var dismiss
@@ -43,32 +59,74 @@ struct AddContactView: View {
 
     let configuration: Configuration
 
-    @State private var importMode: ImportMode = .paste
-    @State private var armoredText = ""
-    @State private var error: CypherAirError?
-    @State private var showError = false
-    @State private var pendingKeyUpdateRequest: ContactKeyUpdateConfirmationRequest?
-    @State private var showKeyUpdateAlert = false
-    @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var isProcessingQR = false
-    @State private var showFileImporter = false
-    @State private var importedKeyData: Data?
-    @State private var importedFileName: String?
-    @State private var fallbackImportConfirmationCoordinator = ImportConfirmationCoordinator()
-
     init(configuration: Configuration = .default) {
         self.configuration = configuration
     }
 
-    private var importLoader: PublicKeyImportLoader {
-        PublicKeyImportLoader(qrService: qrService)
+    var body: some View {
+        AddContactScreenHostView(
+            importLoader: PublicKeyImportLoader(qrService: qrService),
+            importWorkflow: ContactImportWorkflow(contactService: contactService),
+            importConfirmationCoordinator: importConfirmationCoordinator,
+            configuration: configuration,
+            dismissAction: { dismiss() }
+        )
     }
+}
 
-    private var importWorkflow: ContactImportWorkflow {
-        ContactImportWorkflow(contactService: contactService)
+private struct AddContactScreenHostView: View {
+    let importLoader: PublicKeyImportLoader
+    let importWorkflow: ContactImportWorkflow
+    let importConfirmationCoordinator: ImportConfirmationCoordinator?
+    let configuration: AddContactView.Configuration
+    let dismissAction: @MainActor () -> Void
+
+    @State private var model: AddContactScreenModel
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var fallbackImportConfirmationCoordinator = ImportConfirmationCoordinator()
+
+    init(
+        importLoader: PublicKeyImportLoader,
+        importWorkflow: ContactImportWorkflow,
+        importConfirmationCoordinator: ImportConfirmationCoordinator?,
+        configuration: AddContactView.Configuration,
+        dismissAction: @escaping @MainActor () -> Void
+    ) {
+        self.importLoader = importLoader
+        self.importWorkflow = importWorkflow
+        self.importConfirmationCoordinator = importConfirmationCoordinator
+        self.configuration = configuration
+        self.dismissAction = dismissAction
+        _model = State(
+            initialValue: AddContactScreenModel(
+                importLoader: importLoader,
+                importWorkflow: importWorkflow,
+                configuration: configuration
+            )
+        )
     }
 
     var body: some View {
+        wrappedContent
+            .onAppear {
+                model.handleAppear()
+            }
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                guard let newItem else {
+                    return
+                }
+
+                model.processSelectedQRPhoto {
+                    try await importLoader.loadKeyDataFromQRPhoto(newItem)
+                }
+            }
+            .onChange(of: runtimeSyncKey) { _, _ in
+                model.updateConfiguration(configuration)
+            }
+    }
+
+    @ViewBuilder
+    private var wrappedContent: some View {
         if importConfirmationCoordinator == nil,
            configuration.onImportConfirmationRequested == nil {
             ImportConfirmationSheetHost(coordinator: fallbackImportConfirmationCoordinator) {
@@ -80,18 +138,26 @@ struct AddContactView: View {
     }
 
     private var formContent: some View {
-        Form {
+        @Bindable var model = model
+
+        return Form {
             Section {
-                Picker(String(localized: "addcontact.mode", defaultValue: "Import Method"), selection: $importMode) {
-                    ForEach(configuration.allowedImportModes, id: \.self) { mode in
+                Picker(
+                    String(localized: "addcontact.mode", defaultValue: "Import Method"),
+                    selection: Binding(
+                        get: { model.importMode },
+                        set: { model.setImportMode($0) }
+                    )
+                ) {
+                    ForEach(model.configuration.allowedImportModes, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(configuration.allowedImportModes.count == 1)
+                .disabled(model.configuration.allowedImportModes.count == 1)
             }
 
-            switch importMode {
+            switch model.importMode {
             case .paste:
                 pasteContent
             case .qrPhoto:
@@ -102,13 +168,13 @@ struct AddContactView: View {
 
             Section {
                 Button {
-                    addContact()
+                    model.addContact(actions: hostActions)
                 } label: {
                     Text(String(localized: "addcontact.add", defaultValue: "Add Contact"))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(addButtonDisabled)
+                .disabled(model.addButtonDisabled)
                 .accessibilityIdentifier("addcontact.add")
             }
         }
@@ -121,8 +187,11 @@ struct AddContactView: View {
         .navigationTitle(String(localized: "addcontact.title", defaultValue: "Add Contact"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
+            isPresented: Binding(
+                get: { model.showError },
+                set: { if !$0 { model.dismissError() } }
+            ),
+            presenting: model.error
         ) { _ in
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: { err in
@@ -130,23 +199,24 @@ struct AddContactView: View {
         }
         .alert(
             String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
-            isPresented: $showKeyUpdateAlert,
-            presenting: pendingKeyUpdateRequest
+            isPresented: Binding(
+                get: { model.showKeyUpdateAlert },
+                set: { if !$0 { model.dismissPendingKeyUpdateRequest() } }
+            ),
+            presenting: model.pendingKeyUpdateRequest
         ) { request in
             Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
-                pendingKeyUpdateRequest = nil
-                request.onConfirm()
+                model.confirmPendingKeyUpdate()
             }
             Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
-                pendingKeyUpdateRequest = nil
-                request.onCancel()
+                model.cancelPendingKeyUpdate()
             }
         } message: { request in
             Text(String(localized: "addcontact.keyUpdate.message",
                         defaultValue: "This contact (\(request.pendingUpdate.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
         }
         .fileImporter(
-            isPresented: $showFileImporter,
+            isPresented: $model.showFileImporter,
             allowedContentTypes: [
                 UTType(filenameExtension: "asc") ?? .plainText,
                 UTType(filenameExtension: "gpg") ?? .data,
@@ -156,30 +226,18 @@ struct AddContactView: View {
             allowsMultipleSelection: false
         ) { result in
             if case .success(let urls) = result, let url = urls.first {
-                loadFileContents(from: url)
+                model.loadFileContents(from: url)
             }
-        }
-        .onChange(of: importMode) { _, _ in
-            importedKeyData = nil
-            importedFileName = nil
-        }
-        .onAppear {
-            importMode = configuration.allowedImportModes.first ?? .paste
-            if armoredText.isEmpty, let prefilled = configuration.prefilledArmoredText {
-                armoredText = prefilled
-            }
-        }
-        .onChange(of: selectedPhotoItem) { _, newItem in
-            guard let newItem else { return }
-            processQRPhoto(newItem)
         }
     }
 
     @ViewBuilder
     private var pasteContent: some View {
+        @Bindable var model = model
+
         Section {
             CypherMultilineTextInput(
-                text: $armoredText,
+                text: $model.armoredText,
                 mode: .machineText
             )
                 #if canImport(UIKit)
@@ -194,6 +252,8 @@ struct AddContactView: View {
 
     @ViewBuilder
     private var qrPhotoContent: some View {
+        @Bindable var model = model
+
         Section {
             PhotosPicker(
                 selection: $selectedPhotoItem,
@@ -205,7 +265,7 @@ struct AddContactView: View {
                 )
             }
 
-            if isProcessingQR {
+            if model.isProcessingQR {
                 ProgressView(String(localized: "addcontact.qr.scanning", defaultValue: "Scanning QR code..."))
             }
         } header: {
@@ -217,7 +277,7 @@ struct AddContactView: View {
     private var fileContent: some View {
         Section {
             Button {
-                showFileImporter = true
+                model.requestFileImport()
             } label: {
                 Label(
                     String(localized: "addcontact.file.select", defaultValue: "Select Key File"),
@@ -225,15 +285,14 @@ struct AddContactView: View {
                 )
             }
 
-            if let fileName = importedFileName, importedKeyData != nil {
+            if let fileName = model.importedFileName, model.importedKeyData != nil {
                 HStack {
                     Label(fileName, systemImage: "doc.fill")
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer()
                     Button {
-                        importedKeyData = nil
-                        importedFileName = nil
+                        model.clearImportedFile()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
@@ -249,101 +308,32 @@ struct AddContactView: View {
         }
     }
 
-    private var addButtonDisabled: Bool {
-        switch importMode {
-        case .paste:
-            armoredText.isEmpty
-        case .qrPhoto:
-            (armoredText.isEmpty && importedKeyData == nil) || isProcessingQR
-        case .file:
-            armoredText.isEmpty && importedKeyData == nil
-        }
-    }
-
-    private func addContact() {
-        do {
-            let data = importedKeyData ?? Data(armoredText.utf8)
-            let inspection = try importLoader.inspect(keyData: data)
-            let request = importWorkflow.makeImportConfirmationRequest(
-                inspection: inspection,
-                allowsUnverifiedImport: configuration.verificationPolicy == .allowUnverified,
-                onSuccess: { contact in
-                    activeImportConfirmationCoordinator.dismiss()
-                    configuration.onImported?(contact)
-                    if configuration.onImported == nil {
-                        dismiss()
-                    }
-                },
-                onReplaceRequested: { request in
-                    activeImportConfirmationCoordinator.dismiss()
-                    pendingKeyUpdateRequest = request
-                    showKeyUpdateAlert = true
-                },
-                onFailure: { importError in
-                    error = importError
-                    activeImportConfirmationCoordinator.dismiss()
-                    showError = true
-                }
-            )
-
-            if let onImportConfirmationRequested = configuration.onImportConfirmationRequested {
-                onImportConfirmationRequested(request)
-            } else {
-                activeImportConfirmationCoordinator.present(request)
-            }
-        } catch {
-            self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-            showError = true
-        }
-    }
-
     private var activeImportConfirmationCoordinator: ImportConfirmationCoordinator {
         importConfirmationCoordinator ?? fallbackImportConfirmationCoordinator
     }
 
-    private func processQRPhoto(_ item: PhotosPickerItem) {
-        isProcessingQR = true
-        Task {
-            defer { isProcessingQR = false }
-            do {
-                let publicKeyData = try await importLoader.loadKeyDataFromQRPhoto(item)
-                if let armoredString = String(data: publicKeyData, encoding: .utf8) {
-                    armoredText = armoredString
-                    importedKeyData = nil
-                    importedFileName = nil
+    private var hostActions: AddContactScreenHostActions {
+        AddContactScreenHostActions(
+            presentImportConfirmation: { request in
+                if let onImportConfirmationRequested = configuration.onImportConfirmationRequested {
+                    onImportConfirmationRequested(request)
                 } else {
-                    importedKeyData = publicKeyData
-                    importedFileName = String(localized: "addcontact.qr.binaryKey", defaultValue: "Binary key from QR")
-                    armoredText = ""
+                    activeImportConfirmationCoordinator.present(request)
                 }
-            } catch {
-                self.error = CypherAirError.from(error) { _ in .invalidQRCode }
-                showError = true
+            },
+            dismissPresentedImportConfirmation: {
+                activeImportConfirmationCoordinator.dismiss()
+            },
+            completeImportedContact: { contact in
+                configuration.onImported?(contact)
+                if configuration.onImported == nil {
+                    dismissAction()
+                }
             }
-        }
+        )
     }
 
-    private func loadFileContents(from url: URL) {
-        do {
-            let loadedFile = try importLoader.loadFromFile(
-                url: url,
-                failure: .invalidKeyData(reason: String(localized: "addcontact.file.readFailed", defaultValue: "Could not read key file"))
-            )
-
-            if let armoredString = loadedFile.text {
-                armoredText = armoredString
-                importedKeyData = nil
-            } else {
-                armoredText = ""
-                importedKeyData = loadedFile.data
-            }
-            importedFileName = loadedFile.fileName
-        } catch let error as CypherAirError {
-            self.error = error
-            showError = true
-        } catch {
-            self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-            showError = true
-        }
+    private var runtimeSyncKey: AddContactView.RuntimeSyncKey {
+        AddContactView.RuntimeSyncKey(configuration: configuration)
     }
 }
