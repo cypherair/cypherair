@@ -14,11 +14,9 @@ struct CypherAirApp: App {
 
     @State private var container: AppContainer
 
-    @State private var importError: CypherAirError?
-    @State private var pendingKeyUpdateRequest: ContactKeyUpdateConfirmationRequest?
     @State private var loadError: String?
-    @State private var tutorialStore = TutorialSessionStore()
-    @State private var importConfirmationCoordinator = ImportConfirmationCoordinator()
+    @State private var tutorialStore: TutorialSessionStore
+    @State private var incomingURLImportCoordinator: IncomingURLImportCoordinator
     @State private var launchConfiguration: AppLaunchConfiguration
     #if os(iOS)
     @State private var iosPresentationState = TutorialOnboardingHandoffState()
@@ -43,18 +41,25 @@ struct CypherAirApp: App {
         if launchConfiguration.shouldSkipOnboarding {
             container.config.hasCompletedOnboarding = true
         }
+        let tutorialStore = TutorialSessionStore()
+        let incomingURLImportCoordinator = IncomingURLImportCoordinator(
+            importLoader: PublicKeyImportLoader(qrService: container.qrService),
+            importWorkflow: ContactImportWorkflow(contactService: container.contactService)
+        )
         let startupResult = AppStartupCoordinator().performStartup(using: container)
 
         _launchConfiguration = State(initialValue: launchConfiguration)
         _container = State(initialValue: container)
         _loadError = State(initialValue: startupResult.loadError)
+        _tutorialStore = State(initialValue: tutorialStore)
+        _incomingURLImportCoordinator = State(initialValue: incomingURLImportCoordinator)
     }
 
     // MARK: - Scene
 
     var body: some Scene {
         WindowGroup {
-            ImportConfirmationSheetHost(coordinator: importConfirmationCoordinator) {
+            ImportConfirmationSheetHost(coordinator: incomingURLImportCoordinator.importConfirmationCoordinator) {
                 mainWindowContent
                     .privacyScreen()
                     .optionalTint(container.config.colorTheme.accentColor)
@@ -94,37 +99,51 @@ struct CypherAirApp: App {
                 .alert(
                     String(localized: "import.error.alertTitle", defaultValue: "Import Failed"),
                     isPresented: Binding(
-                        get: { importError != nil },
-                        set: { if !$0 { importError = nil } }
+                        get: { incomingURLImportCoordinator.importError != nil },
+                        set: { if !$0 { incomingURLImportCoordinator.dismissImportError() } }
                     )
                 ) {
                     Button(String(localized: "import.error.ok", defaultValue: "OK")) {
-                        importError = nil
+                        incomingURLImportCoordinator.dismissImportError()
                     }
                 } message: {
-                    if let importError {
+                    if let importError = incomingURLImportCoordinator.importError {
                         Text(importError.localizedDescription)
                     }
                 }
                 .alert(
                     String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
                     isPresented: Binding(
-                        get: { pendingKeyUpdateRequest != nil },
-                        set: { if !$0 { pendingKeyUpdateRequest = nil } }
+                        get: { incomingURLImportCoordinator.pendingKeyUpdateRequest != nil },
+                        set: { if !$0 { incomingURLImportCoordinator.cancelPendingKeyUpdate() } }
                     ),
-                    presenting: pendingKeyUpdateRequest
+                    presenting: incomingURLImportCoordinator.pendingKeyUpdateRequest
                 ) { request in
                     Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
-                        pendingKeyUpdateRequest = nil
-                        request.onConfirm()
+                        incomingURLImportCoordinator.confirmPendingKeyUpdate()
                     }
                     Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
-                        pendingKeyUpdateRequest = nil
-                        request.onCancel()
+                        incomingURLImportCoordinator.cancelPendingKeyUpdate()
                     }
                 } message: { request in
                     Text(String(localized: "addcontact.keyUpdate.message",
                                 defaultValue: "This contact (\(request.pendingUpdate.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
+                }
+                .alert(
+                    String(localized: "import.tutorialBlocked.title", defaultValue: "Close Tutorial to Import"),
+                    isPresented: Binding(
+                        get: { incomingURLImportCoordinator.isTutorialImportBlocked },
+                        set: { if !$0 { incomingURLImportCoordinator.dismissTutorialImportBlocked() } }
+                    )
+                ) {
+                    Button(String(localized: "import.error.ok", defaultValue: "OK")) {
+                        incomingURLImportCoordinator.dismissTutorialImportBlocked()
+                    }
+                } message: {
+                    Text(String(
+                        localized: "import.tutorialBlocked.message",
+                        defaultValue: "CypherAir does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
+                    ))
                 }
                 .alert(
                     String(localized: "app.loadError.title", defaultValue: "Load Warning"),
@@ -142,7 +161,10 @@ struct CypherAirApp: App {
                     }
                 }
                 .onOpenURL { url in
-                    handleIncomingURL(url)
+                    incomingURLImportCoordinator.handleIncomingURL(
+                        url,
+                        isTutorialPresentationActive: tutorialStore.isTutorialPresentationActive
+                    )
                 }
         }
         #if os(macOS)
@@ -282,39 +304,6 @@ struct CypherAirApp: App {
     }
     #endif
 
-    // MARK: - URL Scheme Handling
-
-    /// Handle cypherair:// URLs for public key import.
-    /// The QRService validates the URL format and parses the OpenPGP key.
-    /// The user must confirm before the key is added as a contact.
-    private func handleIncomingURL(_ url: URL) {
-        guard url.scheme == "cypherair" else { return }
-        guard !tutorialStore.session.hasStartedSession else { return }
-
-        do {
-            let inspection = try PublicKeyImportLoader(qrService: container.qrService).loadFromURL(url)
-            let workflow = ContactImportWorkflow(contactService: container.contactService)
-            importConfirmationCoordinator.present(
-                workflow.makeImportConfirmationRequest(
-                    inspection: inspection,
-                    allowsUnverifiedImport: true,
-                    onSuccess: { _ in
-                        importConfirmationCoordinator.dismiss()
-                    },
-                    onReplaceRequested: { request in
-                        importConfirmationCoordinator.dismiss()
-                        pendingKeyUpdateRequest = request
-                    },
-                    onFailure: { importError in
-                        self.importError = importError
-                        importConfirmationCoordinator.dismiss()
-                    }
-                )
-            )
-        } catch {
-            importError = CypherAirError.from(error) { _ in .invalidQRCode }
-        }
-    }
 }
 
 struct AppLaunchConfiguration {

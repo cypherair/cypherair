@@ -11,6 +11,7 @@ final class TutorialSessionStore {
     private(set) var container: TutorialSandboxContainer?
     private(set) var navigation = TutorialNavigationState()
     private(set) var errorMessage: String?
+    private(set) var isTutorialPresentationActive = false
 
     var selectedTab: AppShellTab { navigation.selectedTab }
     var routePath: [AppRoute] { navigation.path(for: navigation.selectedTab) }
@@ -105,6 +106,10 @@ final class TutorialSessionStore {
 
     func configurePersistence(appConfiguration: AppConfiguration) {
         self.appConfiguration = appConfiguration
+    }
+
+    func setTutorialPresentationActive(_ isActive: Bool) {
+        isTutorialPresentationActive = isActive
     }
 
     func prepareForPresentation(launchOrigin: TutorialLaunchOrigin) {

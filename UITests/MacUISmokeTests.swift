@@ -123,6 +123,7 @@ final class MacUISmokeTests: XCTestCase {
         app.launchEnvironment["UITEST_ROOT"] = "main"
         app.launchEnvironment["UITEST_SKIP_ONBOARDING"] = "1"
         app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
+        prepareLaunchIgnoringSavedState()
         app.launch()
         waitForLaunchReadiness(rootReadyID: "main.ready")
     }
@@ -136,6 +137,7 @@ final class MacUISmokeTests: XCTestCase {
         app.launchEnvironment["UITEST_SKIP_ONBOARDING"] = "1"
         app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
         app.launchEnvironment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] = openAuthModeConfirmation ? "1" : "0"
+        prepareLaunchIgnoringSavedState()
         app.launch()
         waitForLaunchReadiness(rootReadyID: "settings.ready")
     }
@@ -145,8 +147,13 @@ final class MacUISmokeTests: XCTestCase {
         app.launchEnvironment["UITEST_SKIP_ONBOARDING"] = "1"
         app.launchEnvironment["UITEST_TUTORIAL_TASK"] = task
         app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
+        prepareLaunchIgnoringSavedState()
         app.launch()
         waitForLaunchReadiness(rootReadyID: "tutorial.ready")
+    }
+
+    private func prepareLaunchIgnoringSavedState() {
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
     }
 
     // MARK: - Flow Helpers

@@ -1,8 +1,9 @@
 # Service / View Refactor Implementation Specification
 
+> Status: Archived refactor plan. Phases 1-4 plus the scoped URL import coordinator cleanup are treated as the completed practical refactor scope for now. The remainder of Phase 5, especially app-root presentation coordination and tutorial host finalization, is deferred to a future design pass.
 > Purpose: Define the implementation baseline for a future Service and View refactor without changing user-visible behavior or current security semantics.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [SERVICE_VIEW_REFACTOR_ASSESSMENT](SERVICE_VIEW_REFACTOR_ASSESSMENT.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [CONVENTIONS](CONVENTIONS.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
+> Companion documents: [SERVICE_VIEW_REFACTOR_ASSESSMENT](SERVICE_VIEW_REFACTOR_ASSESSMENT.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [CONVENTIONS](../CONVENTIONS.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md)
 > Spec posture: This document is an execution baseline for future refactor work. It is intentionally more specific than the assessment, but it does not authorize implementation before the assessment is reviewed and accepted.
 > Important framing: This specification is intentionally grounded in the repository's real starting point. That grounding does **not** reduce the need for refactor; it prevents the plan from depending on abstractions or ownership seams that the codebase does not yet have.
 
@@ -44,7 +45,7 @@ The document also does **not** imply that every named collaborator must become a
 
 ### 3.2 Required Screen-Model Ownership Pattern
 
-The repository already defines the recommended screen-model ownership pattern in [CONVENTIONS](CONVENTIONS.md), but it does not yet have a mature, repo-validated implementation example in `Sources/App/`. This refactor should therefore adopt one explicit pattern consistently and turn it into the first validated baseline.
+The repository already defines the recommended screen-model ownership pattern in [CONVENTIONS](../CONVENTIONS.md), but it does not yet have a mature, repo-validated implementation example in `Sources/App/`. This refactor should therefore adopt one explicit pattern consistently and turn it into the first validated baseline.
 
 The required pattern is:
 
@@ -411,7 +412,7 @@ Every phase must end with:
 - `cargo test --manifest-path pgp-mobile/Cargo.toml`
 - `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 - `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` whenever launch flow, screen ownership, ready markers, or tutorial/settings routing could be affected
-- targeted review against [CODE_REVIEW](CODE_REVIEW.md)
+- targeted review against [CODE_REVIEW](../CODE_REVIEW.md)
 
 ### 7.3 Phase-Specific Test Expectations
 
