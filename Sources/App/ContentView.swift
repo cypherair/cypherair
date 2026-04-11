@@ -17,6 +17,8 @@ struct ContentView: View {
 struct MacAppShellView: View {
     @Environment(AppConfiguration.self) private var config
 
+    let tutorialLaunchRelay: MacTutorialLaunchRelay
+
     @State private var navigationState = MacShellNavigationState()
 
     var body: some View {
@@ -46,19 +48,12 @@ struct MacAppShellView: View {
             detailContent(for: navigationState.selectedTab)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .environment(
-            \.macPresentationController,
-            MacPresentationController(
-                present: { presentation in
-                    navigationState.activePresentation = presentation
-                },
-                dismiss: {
-                    navigationState.activePresentation = nil
-                }
-            )
-        )
         .screenReady("main.ready")
-        .macPresentationHost($navigationState.activePresentation)
+        .macPresentationHost(
+            $navigationState.activePresentation,
+            hostMode: .mainWindow,
+            tutorialLaunchRelay: tutorialLaunchRelay
+        )
         .task {
             if !config.hasCompletedOnboarding,
                navigationState.activePresentation == nil {

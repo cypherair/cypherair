@@ -18,6 +18,9 @@ struct CypherAirApp: App {
     @State private var tutorialStore: TutorialSessionStore
     @State private var incomingURLImportCoordinator: IncomingURLImportCoordinator
     @State private var launchConfiguration: AppLaunchConfiguration
+    #if os(macOS)
+    @State private var macTutorialLaunchRelay = MacTutorialLaunchRelay()
+    #endif
     #if os(iOS)
     @State private var iosPresentationState = TutorialOnboardingHandoffState()
     #endif
@@ -58,116 +61,13 @@ struct CypherAirApp: App {
     // MARK: - Scene
 
     var body: some Scene {
-        WindowGroup {
-            ImportConfirmationSheetHost(coordinator: incomingURLImportCoordinator.importConfirmationCoordinator) {
-                mainWindowContent
-                    .privacyScreen()
-                    .optionalTint(container.config.colorTheme.accentColor)
-                    .environment(container.config)
-                    .environment(container.keyManagement)
-                    .environment(container.contactService)
-                    .environment(container.encryptionService)
-                    .environment(container.decryptionService)
-                    .environment(container.signingService)
-                    .environment(container.qrService)
-                    .environment(container.selfTestService)
-                    .environment(container.authManager)
-                    .environment(tutorialStore)
-                    #if os(iOS)
-                    .environment(\.iosPresentationController, iosPresentationControllerValue)
-                    #endif
-            }
-                #if os(iOS)
-                .sheet(item: onboardingPresentationBinding, onDismiss: {
-                    iosPresentationState.completePendingTutorialLaunchIfNeeded()
-                }) { presentation in
-                    onboardingPresentationView(for: presentation)
-                }
-                .fullScreenCover(item: tutorialPresentationBinding) { presentation in
-                    tutorialPresentationView(for: presentation)
-                }
-                .task {
-                    presentInitialIOSFlowIfNeeded()
-                }
-                .onChange(of: container.config.hasCompletedOnboarding) { _, hasCompletedOnboarding in
-                    if !hasCompletedOnboarding,
-                       iosPresentationState.activePresentation == nil {
-                        iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
-                    }
-                }
-                #endif
-                .alert(
-                    String(localized: "import.error.alertTitle", defaultValue: "Import Failed"),
-                    isPresented: Binding(
-                        get: { incomingURLImportCoordinator.importError != nil },
-                        set: { if !$0 { incomingURLImportCoordinator.dismissImportError() } }
-                    )
-                ) {
-                    Button(String(localized: "import.error.ok", defaultValue: "OK")) {
-                        incomingURLImportCoordinator.dismissImportError()
-                    }
-                } message: {
-                    if let importError = incomingURLImportCoordinator.importError {
-                        Text(importError.localizedDescription)
-                    }
-                }
-                .alert(
-                    String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
-                    isPresented: Binding(
-                        get: { incomingURLImportCoordinator.pendingKeyUpdateRequest != nil },
-                        set: { if !$0 { incomingURLImportCoordinator.cancelPendingKeyUpdate() } }
-                    ),
-                    presenting: incomingURLImportCoordinator.pendingKeyUpdateRequest
-                ) { request in
-                    Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
-                        incomingURLImportCoordinator.confirmPendingKeyUpdate()
-                    }
-                    Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
-                        incomingURLImportCoordinator.cancelPendingKeyUpdate()
-                    }
-                } message: { request in
-                    Text(String(localized: "addcontact.keyUpdate.message",
-                                defaultValue: "This contact (\(request.pendingUpdate.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
-                }
-                .alert(
-                    String(localized: "import.tutorialBlocked.title", defaultValue: "Close Tutorial to Import"),
-                    isPresented: Binding(
-                        get: { incomingURLImportCoordinator.isTutorialImportBlocked },
-                        set: { if !$0 { incomingURLImportCoordinator.dismissTutorialImportBlocked() } }
-                    )
-                ) {
-                    Button(String(localized: "import.error.ok", defaultValue: "OK")) {
-                        incomingURLImportCoordinator.dismissTutorialImportBlocked()
-                    }
-                } message: {
-                    Text(String(
-                        localized: "import.tutorialBlocked.message",
-                        defaultValue: "CypherAir does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
-                    ))
-                }
-                .alert(
-                    String(localized: "app.loadError.title", defaultValue: "Load Warning"),
-                    isPresented: Binding(
-                        get: { loadError != nil },
-                        set: { if !$0 { loadError = nil } }
-                    )
-                ) {
-                    Button(String(localized: "error.ok", defaultValue: "OK")) {
-                        loadError = nil
-                    }
-                } message: {
-                    if let loadError {
-                        Text(loadError)
-                    }
-                }
-                .onOpenURL { url in
-                    incomingURLImportCoordinator.handleIncomingURL(
-                        url,
-                        isTutorialPresentationActive: tutorialStore.isTutorialPresentationActive
-                    )
-                }
-        }
         #if os(macOS)
+        Window(
+            String(localized: "app.name", defaultValue: "CypherAir"),
+            id: macMainWindowID
+        ) {
+            mainWindowSceneContent
+        }
         .defaultSize(width: 900, height: 650)
         .windowResizability(.contentMinSize)
         .commands {
@@ -176,11 +76,15 @@ struct CypherAirApp: App {
             // independent privacy screen states leading to inconsistent security behavior.
             CommandGroup(replacing: .newItem) { }
         }
+        #else
+        WindowGroup {
+            mainWindowSceneContent
+        }
         #endif
 
         #if os(macOS)
         Settings {
-            MacSettingsRootView()
+            MacSettingsRootView(tutorialLaunchRelay: macTutorialLaunchRelay)
             .optionalTint(container.config.colorTheme.accentColor)
             .environment(container.config)
             .environment(container.authManager)
@@ -196,10 +100,12 @@ struct CypherAirApp: App {
         #if os(macOS)
         switch launchConfiguration.root {
         case .main:
-            MacAppShellView()
+            MacAppShellView(tutorialLaunchRelay: macTutorialLaunchRelay)
         case .settings:
             MacSettingsRootView(
-                launchConfiguration: launchConfiguration
+                launchConfiguration: launchConfiguration,
+                tutorialLaunchRelay: macTutorialLaunchRelay,
+                presentationHostMode: .mainWindow
             )
         case .tutorial:
             TutorialView(
@@ -210,6 +116,117 @@ struct CypherAirApp: App {
         #else
         ContentView()
         #endif
+    }
+
+    @ViewBuilder
+    private var mainWindowSceneContent: some View {
+        ImportConfirmationSheetHost(coordinator: incomingURLImportCoordinator.importConfirmationCoordinator) {
+            mainWindowContent
+                .privacyScreen()
+                .optionalTint(container.config.colorTheme.accentColor)
+                .environment(container.config)
+                .environment(container.keyManagement)
+                .environment(container.contactService)
+                .environment(container.encryptionService)
+                .environment(container.decryptionService)
+                .environment(container.signingService)
+                .environment(container.qrService)
+                .environment(container.selfTestService)
+                .environment(container.authManager)
+                .environment(tutorialStore)
+                #if os(iOS)
+                .environment(\.iosPresentationController, iosPresentationControllerValue)
+                #endif
+        }
+        #if os(iOS)
+        .sheet(item: onboardingPresentationBinding, onDismiss: {
+            iosPresentationState.completePendingTutorialLaunchIfNeeded()
+        }) { presentation in
+            onboardingPresentationView(for: presentation)
+        }
+        .fullScreenCover(item: tutorialPresentationBinding) { presentation in
+            tutorialPresentationView(for: presentation)
+        }
+        .task {
+            presentInitialIOSFlowIfNeeded()
+        }
+        .onChange(of: container.config.hasCompletedOnboarding) { _, hasCompletedOnboarding in
+            if !hasCompletedOnboarding,
+               iosPresentationState.activePresentation == nil {
+                iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
+            }
+        }
+        #endif
+        .alert(
+            String(localized: "import.error.alertTitle", defaultValue: "Import Failed"),
+            isPresented: Binding(
+                get: { incomingURLImportCoordinator.importError != nil },
+                set: { if !$0 { incomingURLImportCoordinator.dismissImportError() } }
+            )
+        ) {
+            Button(String(localized: "import.error.ok", defaultValue: "OK")) {
+                incomingURLImportCoordinator.dismissImportError()
+            }
+        } message: {
+            if let importError = incomingURLImportCoordinator.importError {
+                Text(importError.localizedDescription)
+            }
+        }
+        .alert(
+            String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
+            isPresented: Binding(
+                get: { incomingURLImportCoordinator.pendingKeyUpdateRequest != nil },
+                set: { if !$0 { incomingURLImportCoordinator.cancelPendingKeyUpdate() } }
+            ),
+            presenting: incomingURLImportCoordinator.pendingKeyUpdateRequest
+        ) { request in
+            Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
+                incomingURLImportCoordinator.confirmPendingKeyUpdate()
+            }
+            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
+                incomingURLImportCoordinator.cancelPendingKeyUpdate()
+            }
+        } message: { request in
+            Text(String(localized: "addcontact.keyUpdate.message",
+                        defaultValue: "This contact (\(request.pendingUpdate.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
+        }
+        .alert(
+            String(localized: "import.tutorialBlocked.title", defaultValue: "Close Tutorial to Import"),
+            isPresented: Binding(
+                get: { incomingURLImportCoordinator.isTutorialImportBlocked },
+                set: { if !$0 { incomingURLImportCoordinator.dismissTutorialImportBlocked() } }
+            )
+        ) {
+            Button(String(localized: "import.error.ok", defaultValue: "OK")) {
+                incomingURLImportCoordinator.dismissTutorialImportBlocked()
+            }
+        } message: {
+            Text(String(
+                localized: "import.tutorialBlocked.message",
+                defaultValue: "CypherAir does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
+            ))
+        }
+        .alert(
+            String(localized: "app.loadError.title", defaultValue: "Load Warning"),
+            isPresented: Binding(
+                get: { loadError != nil },
+                set: { if !$0 { loadError = nil } }
+            )
+        ) {
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                loadError = nil
+            }
+        } message: {
+            if let loadError {
+                Text(loadError)
+            }
+        }
+        .onOpenURL { url in
+            incomingURLImportCoordinator.handleIncomingURL(
+                url,
+                isTutorialPresentationActive: tutorialStore.isTutorialPresentationActive
+            )
+        }
     }
 
     #if os(iOS)

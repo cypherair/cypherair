@@ -242,6 +242,49 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_presentTutorial_withIOSPresentationController_routesThroughAppRootTutorialHost() {
+        var capturedPresentation: IOSPresentation?
+        let iosPresentationController = IOSPresentationController(
+            present: { presentation in
+                capturedPresentation = presentation
+            },
+            dismiss: {},
+            handoffToTutorialAfterOnboardingDismiss: { _ in }
+        )
+
+        let model = makeModel(iosPresentationController: iosPresentationController)
+        model.presentTutorial()
+
+        guard case .tutorial(let presentationContext)? = capturedPresentation else {
+            return XCTFail("Expected tutorial presentation through the iOS app-root host")
+        }
+
+        XCTAssertEqual(presentationContext, .inApp)
+        XCTAssertFalse(model.showTutorialOnboarding)
+    }
+
+    @MainActor
+    func test_presentTutorial_withMacPresentationController_routesThroughLocalMacHost() {
+        var capturedPresentation: MacPresentation?
+        let macPresentationController = MacPresentationController(
+            present: { presentation in
+                capturedPresentation = presentation
+            },
+            dismiss: {}
+        )
+
+        let model = makeModel(macPresentationController: macPresentationController)
+        model.presentTutorial()
+
+        guard case .tutorial(let presentationContext)? = capturedPresentation else {
+            return XCTFail("Expected tutorial presentation through the macOS host")
+        }
+
+        XCTAssertEqual(presentationContext, .inApp)
+        XCTAssertFalse(model.showTutorialOnboarding)
+    }
+
+    @MainActor
     func test_launchPreviewRequest_usesSharedHighSecurityWarningWithoutRiskAcknowledgement() {
         let request = SettingsAuthModeRequestBuilder.makeLaunchPreviewRequest()
 

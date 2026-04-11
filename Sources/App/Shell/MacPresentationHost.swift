@@ -2,13 +2,17 @@ import SwiftUI
 
 private struct MacPresentationHostModifier: ViewModifier {
     @Binding var activePresentation: MacPresentation?
+    let hostMode: MacPresentationHostMode
+    let tutorialLaunchRelay: MacTutorialLaunchRelay
 
     @Environment(AppConfiguration.self) private var config
     @Environment(TutorialSessionStore.self) private var tutorialStore
+    @Environment(\.openWindow) private var openWindow
 
     func body(content: Content) -> some View {
         ZStack {
             content
+                .environment(\.macPresentationController, macPresentationControllerValue)
 
             if let workspacePresentation {
                 workspaceOverlay(for: workspacePresentation)
@@ -53,6 +57,15 @@ private struct MacPresentationHostModifier: ViewModifier {
             case .onboarding, .tutorial:
                 EmptyView()
             }
+        }
+        .onAppear {
+            consumePendingTutorialLaunchIfPossible()
+        }
+        .onChange(of: tutorialLaunchRelay.pendingRequestID) { _, _ in
+            consumePendingTutorialLaunchIfPossible()
+        }
+        .onChange(of: activePresentation?.id) { _, _ in
+            consumePendingTutorialLaunchIfPossible()
         }
     }
 
@@ -111,19 +124,46 @@ private struct MacPresentationHostModifier: ViewModifier {
     }
 
     private var macPresentationControllerValue: MacPresentationController {
-        MacPresentationController(
-            present: { presentation in
-                activePresentation = presentation
-            },
-            dismiss: {
-                activePresentation = nil
-            }
-        )
+        switch hostMode {
+        case .mainWindow:
+            MacPresentationController.mainWindow(activePresentation: $activePresentation)
+        case .settingsScene:
+            MacPresentationController.settingsScene(
+                activePresentation: $activePresentation,
+                tutorialLaunchRelay: tutorialLaunchRelay,
+                openMainWindow: {
+                    openWindow(id: macMainWindowID)
+                }
+            )
+        }
+    }
+
+    private func consumePendingTutorialLaunchIfPossible() {
+        guard hostMode == .mainWindow,
+              let pendingRequest = tutorialLaunchRelay.pendingRequest,
+              let pendingPresentation = tutorialLaunchRelay.pendingPresentation(
+                currentPresentation: activePresentation
+              ) else {
+            return
+        }
+
+        activePresentation = pendingPresentation
+        tutorialLaunchRelay.clearIfMatches(pendingRequest.id)
     }
 }
 
 extension View {
-    func macPresentationHost(_ activePresentation: Binding<MacPresentation?>) -> some View {
-        modifier(MacPresentationHostModifier(activePresentation: activePresentation))
+    func macPresentationHost(
+        _ activePresentation: Binding<MacPresentation?>,
+        hostMode: MacPresentationHostMode,
+        tutorialLaunchRelay: MacTutorialLaunchRelay
+    ) -> some View {
+        modifier(
+            MacPresentationHostModifier(
+                activePresentation: activePresentation,
+                hostMode: hostMode,
+                tutorialLaunchRelay: tutorialLaunchRelay
+            )
+        )
     }
 }
