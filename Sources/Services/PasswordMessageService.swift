@@ -3,8 +3,10 @@ import Foundation
 /// Orchestrates password-based OpenPGP message encryption and decryption.
 ///
 /// This service is intentionally separate from recipient-key encryption and
-/// the two-phase `DecryptionService` flow. Password-based message handling does
-/// not use Secure Enclave unwrapping or PKESK recipient matching.
+/// the two-phase `DecryptionService` flow. Its password-decrypt path does not
+/// use Secure Enclave unwrapping or PKESK recipient matching. If optional
+/// signing is requested during password-message encryption, it authenticates
+/// through `KeyManagementService.unwrapPrivateKey(...)` first.
 @Observable
 final class PasswordMessageService {
 

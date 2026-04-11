@@ -363,6 +363,8 @@ Define the password-encrypted message family that is already present in `pgp-mob
 
 - password-based message encryption
 - password-based message decryption
+- optional signing during password-message encryption
+- successful decrypt-side signature grading via caller-provided verification keys
 - explicit handling of `SKESK`
 - mixed `PKESK + SKESK` semantics for password-only decrypt entry points
 
@@ -382,6 +384,7 @@ Define the password-encrypted message family that is already present in `pgp-mob
 - This family requires additive password-message encrypt/decrypt exports.
 - The outward-facing contract must distinguish armored encryption output, binary encryption output, and password decrypt.
 - Password message APIs use a dedicated password-message format concept that is independent from `KeyProfile`.
+- The password-encrypt exports may accept optional signing key material so the outgoing password message can also carry a signature.
 - Outgoing payload symmetric algorithm is fixed to `AES-256`.
 - `seipdv1` output uses non-AEAD symmetric message construction with `AES-256`.
 - `seipdv2` output explicitly pins `AEADAlgorithm::OCB` with `AES-256`.
@@ -395,7 +398,9 @@ Define the password-encrypted message family that is already present in `pgp-mob
   - no `SKESK` present
   - password rejected after attempting the password path
 - The decrypted category requires plaintext to be present.
+- When verification keys are provided and the decrypted payload carries signatures, the decrypted category may also carry the same graded signature status / signer fingerprint information that the current password-message result record already exposes.
 - The two non-success categories require plaintext to be absent.
+- The two non-success categories also require signature-result fields to be absent.
 - `password_rejected` is only returned when:
   - at least one `SKESK` was present
   - the password path was attempted
@@ -414,6 +419,8 @@ Define the password-encrypted message family that is already present in `pgp-mob
 - separate additive password encrypt / decrypt methods
 - a dedicated password-message format type
 - a password-family-specific decrypt result shape that can represent the three semantic categories above
+- optional signing-key input on the password-encrypt methods
+- verification-key input plus signature-result fields on the password-decrypt method/result shape
 - legacy recipient-key APIs remain separate
 
 #### Required Helper / Discovery Support
@@ -442,11 +449,17 @@ Define the password-encrypted message family that is already present in `pgp-mob
 
 - password encrypt / decrypt round-trip
 - coverage for both `seipdv1` and `seipdv2`
+- signed password-message round-trip with signature-result preservation
 - mixed-message smoke test
 - no-`SKESK` smoke test
 - `password_rejected` smoke test
 - tamper/auth-failure smoke tests
 - unsupported-algorithm smoke test
+
+Current repository state:
+
+- The current Swift FFI suite already covers `seipdv1` / `seipdv2` round-trips, signed password-message round-trip semantics, `noSkesk`, `passwordRejected`, and tamper/auth-failure cases.
+- Dedicated Swift FFI smoke tests for mixed `PKESK + SKESK` and unsupported-algorithm password-message behavior are not currently present; those cases are covered in the Rust suite today.
 
 #### Open Questions
 
@@ -662,6 +675,11 @@ Preserve multi-signature information that is currently collapsed into one legacy
 - expired-signature smoke test
 - fixed multi-signer fixture coverage for UniFFI array/record mapping
 - compatibility smoke tests proving legacy APIs still behave as before
+
+Current repository state:
+
+- The current Swift FFI suite already covers detailed cleartext, detached, file verify, decrypt, and file decrypt smoke tests, fixed multi-signer fixture mapping, compatibility with legacy folded fields, and file-cancellation behavior.
+- A dedicated expired-signature detailed Swift FFI smoke test is not currently present and remains a gap relative to the target minimum coverage above.
 
 ## 4. Validation And Review Rules
 
