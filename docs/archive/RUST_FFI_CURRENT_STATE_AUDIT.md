@@ -1,7 +1,7 @@
 # Rust / FFI Current-State Audit
 
-> Date: 2026-04-11
-> Scope: Present-tense current-state claims in `RUST_FFI_IMPLEMENTATION_REFERENCE.md` and `RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`.
+> Status: Archived audit snapshot from 2026-04-11. Kept as historical evidence for the previous Rust/FFI doc-stack review; no longer treated as an active source of truth.
+> Scope: Present-tense current-state claims in the then-active `RUST_FFI_IMPLEMENTATION_REFERENCE.md` and `RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`.
 > Outcome: 34 audited current-state claims; 34 `准确`; 0 `部分准确`; 0 `已过时`; 0 `无法仅凭仓库确认`.
 
 ## 1. Method
@@ -111,10 +111,10 @@
   - `ARCHITECTURE.md`
   - `TESTING.md`
   - `SEQUOIA_CAPABILITY_AUDIT.md`
-- The three-doc split remains internally coherent:
+- The then-active three-doc split remained internally coherent at the time of this audit:
   - `BASELINE` owns current downstream integration state
   - `IMPLEMENTATION_REFERENCE` owns semantic and validation guidance plus a small set of present-tense implementation facts
-  - `SEQUOIA_CAPABILITY_AUDIT` remains the broader current-build inventory
+  - `SEQUOIA_CAPABILITY_AUDIT` remained the broader current-build inventory
 
 ## 4. Minimal Revision Suggestions
 

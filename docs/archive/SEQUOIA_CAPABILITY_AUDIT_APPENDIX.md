@@ -5,7 +5,7 @@
 > Purpose: Record the Sequoia 2.2 surface that is outside CypherAir's current build baseline or current product/security boundary.
 > Audience: Human developers, reviewers, and AI coding tools.
 
-This appendix is intentionally **not** a defect list or backlog by itself. Its job is to capture `out-of-boundary surface` and keep it separate from the current-build inventory in [`SEQUOIA_CAPABILITY_AUDIT.md`](../SEQUOIA_CAPABILITY_AUDIT.md).
+This appendix is intentionally **not** a defect list or backlog by itself. Its job is to capture `out-of-boundary surface` and keep it separate from the archived main audit snapshot in [`SEQUOIA_CAPABILITY_AUDIT.md`](SEQUOIA_CAPABILITY_AUDIT.md).
 
 ## 1. Classification Rule
 
@@ -58,7 +58,7 @@ The Sequoia source and examples expose capability families that CypherAir does n
 
 Read the companion documents as follows:
 
-- [`SEQUOIA_CAPABILITY_AUDIT.md`](../SEQUOIA_CAPABILITY_AUDIT.md): canonical inventory of the current build, including every relevant `current-build omission`
+- [`SEQUOIA_CAPABILITY_AUDIT.md`](SEQUOIA_CAPABILITY_AUDIT.md): archived main audit snapshot, including the `current-build omission` picture as it stood when that audit was active
 - [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md): archived roadmap snapshot from the Sequoia expansion phase
 - this appendix: archived `out-of-boundary surface` snapshot only
 

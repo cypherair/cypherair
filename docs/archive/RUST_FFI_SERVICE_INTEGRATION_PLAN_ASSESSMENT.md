@@ -1,15 +1,15 @@
 # Rust / FFI Service Integration Plan Assessment
 
-> Status: Active feasibility assessment for [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md). Intended as the review gate before downstream Service-layer follow-on work starts.
-> Purpose: Evaluate whether the current Service-layer integration plan is accurate, reasonable, and executable against the real repository state.
+> Status: Archived feasibility assessment snapshot. Its still-relevant conclusions were absorbed into the active [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md); this file remains for historical review context.
+> Purpose: Preserve the earlier assessment of whether the Service-layer integration plan was accurate, reasonable, and executable against the repository state at the time of review.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_SERVICE_INTEGRATION_BASELINE](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
+> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_SERVICE_INTEGRATION_BASELINE](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md)
 > Assessment posture: This document records verified code-and-test facts first, then adds cautious architectural conclusions where the current implementation shape clearly supports them.
 > Important framing: When the plan document and the repository disagree, production code and tests are treated as the source of truth. Any mismatch becomes a documentation finding, not an implementation assumption.
 
 ## 1. Scope And Method
 
-This assessment reviews the five planned workstreams in [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md):
+This assessment reviews the five planned workstreams in [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md):
 
 1. selector discovery and selector-bearing Swift models
 2. selective revocation in `KeyManagementService`
@@ -64,10 +64,10 @@ Workstream summary:
 
 ### 3.1 Claims That Are Accurate
 
-- The plan correctly identifies that [`PasswordMessageService`](../Sources/Services/PasswordMessageService.swift) already exists as a production service and lacks a direct app route or screen-model owner today.
-- The plan correctly identifies that [`SigningService`](../Sources/Services/SigningService.swift) already consumes one detailed FFI path internally and folds back to legacy semantics.
-- The plan correctly identifies that [`DecryptionService`](../Sources/Services/DecryptionService.swift) remains bound to the current Phase 1 / Phase 2 boundary and that any detailed-result adoption there is security-sensitive.
-- The plan correctly identifies that current Swift metadata does not expose selector-bearing subkey/User ID data. [`PGPKeyIdentity`](../Sources/Models/PGPKeyIdentity.swift) only stores primary identity and summary metadata, while [`KeyInfo`](../pgp-mobile/src/keys.rs) exposes no subkey selector list and no raw User ID collection.
+- The plan correctly identifies that [`PasswordMessageService`](../../Sources/Services/PasswordMessageService.swift) already exists as a production service and lacks a direct app route or screen-model owner today.
+- The plan correctly identifies that [`SigningService`](../../Sources/Services/SigningService.swift) already consumes one detailed FFI path internally and folds back to legacy semantics.
+- The plan correctly identifies that [`DecryptionService`](../../Sources/Services/DecryptionService.swift) remains bound to the current Phase 1 / Phase 2 boundary and that any detailed-result adoption there is security-sensitive.
+- The plan correctly identifies that current Swift metadata does not expose selector-bearing subkey/User ID data. [`PGPKeyIdentity`](../../Sources/Models/PGPKeyIdentity.swift) only stores primary identity and summary metadata, while [`KeyInfo`](../../pgp-mobile/src/keys.rs) exposes no subkey selector list and no raw User ID collection.
 
 ### 3.2 Claims That Are Incomplete
 
@@ -83,7 +83,7 @@ Workstream summary:
 ### 3.3 Claims That Are Overstated
 
 - The plan says selective revocation should preserve the "current export and storage expectations around revocation bytes and armored export". That is too broad for the current code shape.
-- Today, key-level revocation is persisted through a single field, `PGPKeyIdentity.revocationCert`, populated during generation/import and lazily backfilled through [`KeyExportService`](../Sources/Services/KeyManagement/KeyExportService.swift).
+- Today, key-level revocation is persisted through a single field, `PGPKeyIdentity.revocationCert`, populated during generation/import and lazily backfilled through [`KeyExportService`](../../Sources/Services/KeyManagement/KeyExportService.swift).
 - That singleton storage path does not naturally extend to:
   - multiple subkey revocations
   - multiple User ID revocations
@@ -92,8 +92,8 @@ Workstream summary:
 ### 3.4 Missing Risks
 
 - The plan does not call out that selective revocation touches a sensitive data-lifecycle boundary even though it lives outside `Sources/Security/`. It requires secret certificate unwrapping and raises a new persistence-policy question.
-- The plan does not call out that `CertificateSignatureResult` and [`SignatureVerification`](../Sources/Models/SignatureVerification.swift) are structurally incompatible. This is more than a naming preference; the current app-level message-verification model cannot represent certification kind or signing-subkey fingerprint.
-- The plan underweights the ambiguity caused by the current partial detailed-result adoption. [`SigningService.verifyDetachedStreaming(...)`](../Sources/Services/SigningService.swift) already depends on `verifyDetachedFileDetailed(...)`, but service tests still protect only legacy folded behavior.
+- The plan does not call out that `CertificateSignatureResult` and [`SignatureVerification`](../../Sources/Models/SignatureVerification.swift) are structurally incompatible. This is more than a naming preference; the current app-level message-verification model cannot represent certification kind or signing-subkey fingerprint.
+- The plan underweights the ambiguity caused by the current partial detailed-result adoption. [`SigningService.verifyDetachedStreaming(...)`](../../Sources/Services/SigningService.swift) already depends on `verifyDetachedFileDetailed(...)`, but service tests still protect only legacy folded behavior.
 
 ### 3.5 Missing Prerequisites
 
@@ -113,16 +113,16 @@ Workstream summary:
 
 **Evidence**
 
-- [`pgp-mobile/src/keys.rs`](../pgp-mobile/src/keys.rs) `KeyInfo` exposes:
+- [`pgp-mobile/src/keys.rs`](../../pgp-mobile/src/keys.rs) `KeyInfo` exposes:
   - primary fingerprint
   - key version
   - one display-oriented `user_id`
   - summary booleans and algorithm names
-- [`PGPKeyIdentity`](../Sources/Models/PGPKeyIdentity.swift) mirrors that summary level and persists only one `userId` string plus high-level metadata.
+- [`PGPKeyIdentity`](../../Sources/Models/PGPKeyIdentity.swift) mirrors that summary level and persists only one `userId` string plus high-level metadata.
 - Existing selective-revocation and certificate-signature FFI exports require:
   - `subkeyFingerprint`
   - raw `userIdData`
-- Current tests confirm those FFI selectors exist, but they are only exercised at FFI level in [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../Tests/FFIIntegrationTests/FFIIntegrationTests.swift).
+- Current tests confirm those FFI selectors exist, but they are only exercised at FFI level in [`Tests/FFIIntegrationTests/FFIIntegrationTests.swift`](../../Tests/FFIIntegrationTests/FFIIntegrationTests.swift).
 
 **Assessment**
 
@@ -160,20 +160,20 @@ Workstream summary:
 **Evidence**
 
 - Current key-level revocation ownership is already coherent:
-  - [`KeyManagementService`](../Sources/Services/KeyManagementService.swift) is now a 238-line facade that delegates to focused internal owners instead of directly implementing every workflow branch in one file
+  - [`KeyManagementService`](../../Sources/Services/KeyManagementService.swift) is now a 238-line facade that delegates to focused internal owners instead of directly implementing every workflow branch in one file
   - the current internal split is:
-    - [`KeyProvisioningService`](../Sources/Services/KeyManagement/KeyProvisioningService.swift)
-    - [`KeyExportService`](../Sources/Services/KeyManagement/KeyExportService.swift)
-    - [`KeyMutationService`](../Sources/Services/KeyManagement/KeyMutationService.swift)
-    - [`PrivateKeyAccessService`](../Sources/Services/KeyManagement/PrivateKeyAccessService.swift)
-    - [`KeyCatalogStore`](../Sources/Services/KeyManagement/KeyCatalogStore.swift)
-  - [`KeyProvisioningService`](../Sources/Services/KeyManagement/KeyProvisioningService.swift) generates or imports one key-level revocation into `PGPKeyIdentity.revocationCert`
-  - [`KeyExportService`](../Sources/Services/KeyManagement/KeyExportService.swift) exports that binary signature or lazily backfills it
-  - [`KeyDetailView`](../Sources/App/Keys/KeyDetailView.swift) exposes only key-level export
+    - [`KeyProvisioningService`](../../Sources/Services/KeyManagement/KeyProvisioningService.swift)
+    - [`KeyExportService`](../../Sources/Services/KeyManagement/KeyExportService.swift)
+    - [`KeyMutationService`](../../Sources/Services/KeyManagement/KeyMutationService.swift)
+    - [`PrivateKeyAccessService`](../../Sources/Services/KeyManagement/PrivateKeyAccessService.swift)
+    - [`KeyCatalogStore`](../../Sources/Services/KeyManagement/KeyCatalogStore.swift)
+  - [`KeyProvisioningService`](../../Sources/Services/KeyManagement/KeyProvisioningService.swift) generates or imports one key-level revocation into `PGPKeyIdentity.revocationCert`
+  - [`KeyExportService`](../../Sources/Services/KeyManagement/KeyExportService.swift) exports that binary signature or lazily backfills it
+  - [`KeyDetailView`](../../Sources/App/Keys/KeyDetailView.swift) exposes only key-level export
 - Current FFI exports already include:
   - `generateSubkeyRevocation(...)`
   - `generateUserIdRevocation(...)`
-- Current Swift tests cover key-level revocation storage/backfill/export in [`Tests/ServiceTests/KeyManagementServiceTests.swift`](../Tests/ServiceTests/KeyManagementServiceTests.swift), but there is no service-owned selective revocation contract yet.
+- Current Swift tests cover key-level revocation storage/backfill/export in [`Tests/ServiceTests/KeyManagementServiceTests.swift`](../../Tests/ServiceTests/KeyManagementServiceTests.swift), but there is no service-owned selective revocation contract yet.
 
 **Assessment**
 
@@ -218,13 +218,13 @@ Workstream summary:
   - `verifyDirectKeySignature(...)`
   - `verifyUserIdBindingSignature(...)`
   - `generateUserIdCertification(...)`
-- [`pgp-mobile/src/cert_signature.rs`](../pgp-mobile/src/cert_signature.rs) defines a family-local result with:
+- [`pgp-mobile/src/cert_signature.rs`](../../pgp-mobile/src/cert_signature.rs) defines a family-local result with:
   - `status`
   - `certificationKind`
   - `signerPrimaryFingerprint`
   - optional `signingKeyFingerprint`
 - No existing production service under `Sources/Services/` owns these operations.
-- [`SignatureVerification`](../Sources/Models/SignatureVerification.swift) is message-centric and cannot represent certification kind or signing-subkey fingerprint.
+- [`SignatureVerification`](../../Sources/Models/SignatureVerification.swift) is message-centric and cannot represent certification kind or signing-subkey fingerprint.
 
 **Assessment**
 
@@ -270,13 +270,13 @@ Workstream summary:
 **Evidence**
 
 - Detailed-result Rust/FFI types already exist in:
-  - [`pgp-mobile/src/signature_details.rs`](../pgp-mobile/src/signature_details.rs)
-  - [`pgp-mobile/src/verify.rs`](../pgp-mobile/src/verify.rs)
-  - [`pgp-mobile/src/decrypt.rs`](../pgp-mobile/src/decrypt.rs)
-- [`SigningService`](../Sources/Services/SigningService.swift) already calls `verifyDetachedFileDetailed(...)` but folds immediately to legacy `SignatureVerification`.
-- [`DecryptionService`](../Sources/Services/DecryptionService.swift) still uses only legacy `decrypt(...)` and `decryptFile(...)`.
+  - [`pgp-mobile/src/signature_details.rs`](../../pgp-mobile/src/signature_details.rs)
+  - [`pgp-mobile/src/verify.rs`](../../pgp-mobile/src/verify.rs)
+  - [`pgp-mobile/src/decrypt.rs`](../../pgp-mobile/src/decrypt.rs)
+- [`SigningService`](../../Sources/Services/SigningService.swift) already calls `verifyDetachedFileDetailed(...)` but folds immediately to legacy `SignatureVerification`.
+- [`DecryptionService`](../../Sources/Services/DecryptionService.swift) still uses only legacy `decrypt(...)` and `decryptFile(...)`.
 - FFI tests cover parser order, repeated signers, unknown signers, and legacy-compat fields.
-- Service tests currently cover only legacy folded behavior on the streaming verify path in [`Tests/ServiceTests/StreamingServiceTests.swift`](../Tests/ServiceTests/StreamingServiceTests.swift).
+- Service tests currently cover only legacy folded behavior on the streaming verify path in [`Tests/ServiceTests/StreamingServiceTests.swift`](../../Tests/ServiceTests/StreamingServiceTests.swift).
 
 **Assessment**
 
@@ -317,9 +317,9 @@ Workstream summary:
 
 **Evidence**
 
-- [`PasswordMessageService`](../Sources/Services/PasswordMessageService.swift) is production-ready and covered by dedicated service tests in [`Tests/ServiceTests/PasswordMessageServiceTests.swift`](../Tests/ServiceTests/PasswordMessageServiceTests.swift).
-- [`AppContainer`](../Sources/App/AppContainer.swift) constructs the service.
-- [`AppRoute`](../Sources/App/AppRoute.swift) has no password-message route today.
+- [`PasswordMessageService`](../../Sources/Services/PasswordMessageService.swift) is production-ready and covered by dedicated service tests in [`Tests/ServiceTests/PasswordMessageServiceTests.swift`](../../Tests/ServiceTests/PasswordMessageServiceTests.swift).
+- [`AppContainer`](../../Sources/App/AppContainer.swift) constructs the service.
+- [`AppRoute`](../../Sources/App/AppRoute.swift) has no password-message route today.
 - Current app review of `Sources/App/` shows no direct screen-model or route consumer.
 
 **Assessment**

@@ -1,6 +1,7 @@
 # Sequoia Capability Audit
 
-> Purpose: Provide the canonical inventory of which Sequoia 2.2 capabilities CypherAir's current build wraps, exports, consumes, disconnects, omits, or intentionally leaves out.
+> Status: Archived current-build audit snapshot. Active Rust/FFI technical guidance now lives in [RUST_FFI_IMPLEMENTATION_REFERENCE](../RUST_FFI_IMPLEMENTATION_REFERENCE.md), while current downstream integration state and rollout live in [RUST_FFI_SERVICE_INTEGRATION_BASELINE](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) and [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
+> Purpose: Preserve the broader Sequoia 2.2 capability inventory that previously served as the active current-build audit.
 > Audience: Human developers, reviewers, and AI coding tools.
 
 ## 1. Scope And Baselines
@@ -11,9 +12,9 @@ This audit uses two baselines:
    - `sequoia-openpgp = 2.2.0`
    - `default-features = false`
    - enabled features: `crypto-openssl`, `compression-deflate`
-   - source of truth: [`pgp-mobile/Cargo.toml`](../pgp-mobile/Cargo.toml)
+   - source of truth: [`pgp-mobile/Cargo.toml`](../../pgp-mobile/Cargo.toml)
 2. **Secondary baseline: broader Sequoia 2.2 surface**
-   - historical background recorded in the archived appendix [`archive/SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](archive/SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md)
+   - historical background recorded in the archived appendix [`SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md)
 
 Layers audited:
 
@@ -24,12 +25,12 @@ Layers audited:
 
 ## 2. How To Read This Audit
 
-This document is the **canonical inventory** for the current build. It is intentionally broader than the archived roadmap snapshot:
+This document previously served as the current-build inventory. It is intentionally broader than the archived roadmap snapshot and is now kept as historical reference:
 
-- [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) is the active current-state document for Swift service ownership, app ownership, and current integration gaps
-- [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) is the active rollout document for service ownership, interface changes, and sequencing
-- [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) is the archived roadmap snapshot from the Sequoia expansion phase
-- [`archive/SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](archive/SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md) records archived `out-of-boundary surface` context
+- [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) is the active current-state document for Swift service ownership, app ownership, and current integration gaps
+- [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md) is the active rollout document for service ownership, interface changes, and sequencing
+- [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) is the archived roadmap snapshot from the Sequoia expansion phase
+- [`SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md) records archived `out-of-boundary surface` context
 
 The companion documents use the following terms consistently:
 
@@ -90,7 +91,7 @@ All current `PgpEngine` exports and the major current-build omission families ar
 | Recipient-based decryption with AEAD/MDC hard-fail | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Rust explicitly zeroizes partial plaintext on error; services enforce two-phase auth flow. |
 | Read incoming compressed messages using deflate/zlib-compatible paths | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Enabled by `compression-deflate`; validated through GnuPG interop tests and service tests. |
 | Streaming file encryption/decryption with progress and cancellation | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Implemented end-to-end | Includes secure temp-file handling and cancellation propagation. |
-| Password/SKESK message encryption | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Service implemented; app entry pending | Exposed through additive password-message methods, optional signing, and dedicated `PasswordMessageService`; no app route or screen model consumes the service yet. See [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) and [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md). |
+| Password/SKESK message encryption | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Service implemented; app entry pending | Exposed through additive password-message methods, optional signing, and dedicated `PasswordMessageService`; no app route or screen model consumes the service yet. See [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) and [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md). |
 | Password/SKESK message decryption | Encrypt/decrypt | Yes | Yes | Yes | Yes | Yes | Yes | Service implemented; app entry pending | Uses password-only `SKESK` handling, dedicated decrypt result statuses, and fatal auth/integrity errors when a candidate session key reaches payload decryption; app ownership is still pending. |
 
 ### 3.3 Signing, Verification, And Parsing Helpers
@@ -156,7 +157,7 @@ This section summarizes the historically roadmapped families referenced above. I
 
 ### 5.1 Families Previously Tracked On The Rust Roadmap
 
-The following families are recorded in the archived roadmap snapshot [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](archive/RUST_SEQUOIA_INTEGRATION_TODO.md):
+The following families are recorded in the archived roadmap snapshot [`RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md):
 
 1. **Certificate merge/update family**
    - Status: implemented in Rust, FFI, tests, and same-fingerprint `ContactService` adoption.
@@ -164,25 +165,25 @@ The following families are recorded in the archived roadmap snapshot [`archive/R
 
 2. **Revocation construction family**
    - Includes generating a key revocation certificate from an existing secret cert, plus selective subkey and User ID revocation builders.
-   - Current status lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
-   - Active planning now lives in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
+   - Current status lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
+   - Active planning now lives in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
 
 3. **Password/SKESK symmetric-message family**
    - Includes password-based encryption/decryption wrappers and the result/error semantics needed to distinguish `passwordRejected`, integrity/authentication, malformed-message, and unsupported-algorithm outcomes.
-   - Current status lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
-   - Active planning lives in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
+   - Current status lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
+   - Active planning lives in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
 
 4. **Certification and binding verification family**
    - Status: implemented in Rust, FFI, and tests; service integration is still pending.
    - Includes direct-key verification, User ID binding verification, and User ID certification generation with typed certificate-signature semantics.
-   - Current status lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
-   - Planned downstream owner and rollout live in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
+   - Current status lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
+   - Planned downstream owner and rollout live in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
 
 5. **Richer signature result family**
    - Status: implemented in Rust, FFI, and tests; partially integrated at the service boundary today.
    - Includes multi-signature-aware verification/decryption result models that preserve Sequoia semantics instead of collapsing them into one status.
-   - Current integration state lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
-   - Active planning now lives in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
+   - Current integration state lives in [`RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md).
+   - Active planning now lives in [`RUST_FFI_SERVICE_INTEGRATION_PLAN.md`](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
 
 ### 5.2 Current-Build Omissions Tracked Here, But Not In The Archived Roadmap Snapshot
 

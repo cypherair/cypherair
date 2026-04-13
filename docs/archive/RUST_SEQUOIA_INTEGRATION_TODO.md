@@ -12,12 +12,12 @@ Primary objective:
 
 This roadmap snapshot is derived from:
 
-- [`SEQUOIA_CAPABILITY_AUDIT.md`](../SEQUOIA_CAPABILITY_AUDIT.md)
+- [`SEQUOIA_CAPABILITY_AUDIT.md`](SEQUOIA_CAPABILITY_AUDIT.md)
 - [`SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md`](SEQUOIA_CAPABILITY_AUDIT_APPENDIX.md)
 
-This document is intentionally narrower than the main audit:
+This document is intentionally narrower than the main audit snapshot:
 
-- the audit is the **canonical inventory**
+- the audit is the archived broader inventory snapshot
 - this file is the archived roadmap snapshot from the Sequoia expansion phase
 - the appendix records the archived `out-of-boundary surface` snapshot
 

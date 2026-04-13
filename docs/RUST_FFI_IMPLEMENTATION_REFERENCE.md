@@ -2,22 +2,26 @@
 
 > Purpose: Provide the implementation reference for future `pgp-mobile` and UniFFI surface expansion.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [SEQUOIA_CAPABILITY_AUDIT](SEQUOIA_CAPABILITY_AUDIT.md) · [archive/RUST_SEQUOIA_INTEGRATION_TODO](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) · [PRD](PRD.md) · [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
+> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [PRD](PRD.md) · [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
 
-This document does not replace the service baseline, rollout plan, audit, or the archived roadmap snapshot:
+This document is the only active Rust / FFI technical reference in the current doc stack.
 
-- [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) is the active current-state document for Swift service ownership, app ownership, and current integration gaps.
-- [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) is the active planning document for Swift service ownership, app ownership, and integration sequencing.
-- [SEQUOIA_CAPABILITY_AUDIT.md](SEQUOIA_CAPABILITY_AUDIT.md) remains the canonical current-build inventory.
-- [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](archive/RUST_SEQUOIA_INTEGRATION_TODO.md) remains the historical roadmap snapshot from the Sequoia expansion phase.
-- This document is the implementation reference for future Rust / FFI expansion work.
+Use the active docs as follows:
+
+- [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) owns current downstream Swift service/app integration state.
+- [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) owns active rollout order, service ownership, and downstream interface decisions.
+- this document owns Rust / FFI rules, family-level semantic contracts, validation minima, and the small set of current-build boundary facts that still matter for implementation work.
+
+Historical context remains in archived docs when needed, especially:
+
+- [archive/SEQUOIA_CAPABILITY_AUDIT.md](archive/SEQUOIA_CAPABILITY_AUDIT.md)
+- [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](archive/RUST_SEQUOIA_INTEGRATION_TODO.md)
 
 This document is intentionally narrower than a full design package:
 
 - it covers the Rust layer, the UniFFI export surface, Rust tests, and Swift FFI tests
-- it does not own current downstream Swift integration state or rollout planning
-- current service ownership, app ownership, and current gaps live in [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md)
-- rollout sequencing and next service-integration work live in [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md)
+- it does not own current downstream Swift service/app inventory as a matrix document
+- it does not own rollout sequencing
 - it is a hybrid reference spec: strong on semantics, boundaries, and validation, but not automatically a frozen public-API contract for every family
 - only current blockers that still affect interface semantics or validation belong in `Open Questions`
 
@@ -33,11 +37,27 @@ Use the companion documents as follows:
 - library choice, platform constraints, and existing FFI architecture live in [TDD.md](TDD.md)
 - current Swift service ownership, app ownership, and current integration gaps live in [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md)
 - rollout sequencing and planned downstream service ownership live in [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md)
-- current implementation coverage lives in [SEQUOIA_CAPABILITY_AUDIT.md](SEQUOIA_CAPABILITY_AUDIT.md)
-- historical workstream priority and recommended execution order from that phase live in [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](archive/RUST_SEQUOIA_INTEGRATION_TODO.md)
-- this document defines implementation-facing rules, semantics, and validation for Rust / FFI work
+- historical workstream context from the Sequoia expansion phase lives in [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](archive/RUST_SEQUOIA_INTEGRATION_TODO.md)
+- this document defines implementation-facing rules, semantics, validation, and the current build-boundary notes that still affect Rust / FFI work
 
-### 1.2 What This Document Must Answer
+### 1.2 Current Build Baseline And Boundary Notes
+
+Current repository baseline:
+
+- `sequoia-openpgp = 2.2.0`
+- `default-features = false`
+- enabled features: `crypto-openssl`, `compression-deflate`
+- source of truth: [`pgp-mobile/Cargo.toml`](../pgp-mobile/Cargo.toml)
+
+Current build-boundary notes that still matter for implementation work:
+
+- generic packet / metadata introspection beyond recipient-header parsing remains unwrapped
+- runtime policy customization beyond `StandardPolicy` remains intentionally excluded
+- caller-facing algorithm/backend selection knobs remain intentionally excluded
+- outgoing compression remains intentionally excluded by current product/security policy
+- QR URL encode/decode helpers are app-specific extensions built on top of Sequoia parsing, not missing Sequoia wrappers
+
+### 1.3 What This Document Must Answer
 
 For every active-roadmap Rust / FFI capability family, this document should answer:
 
@@ -48,7 +68,7 @@ For every active-roadmap Rust / FFI capability family, this document should answ
 - which helper exports are required to make the API usable
 - what the minimum Rust and Swift FFI validation must cover
 
-### 1.3 Decision-Complete Rule
+### 1.4 Decision-Complete Rule
 
 This document is the implementation reference, not a parking lot for unresolved interface decisions or a substitute for a final API contract.
 

@@ -3,7 +3,7 @@
 > Status: Archived assessment snapshot. Superseded by [RUST_FFI_SERVICE_INTEGRATION_BASELINE](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) and [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md). Kept for historical context.
 > Purpose: Preserve the previous assessment of how the five Rust / FFI capability families were wired into the Swift services layer, app entry points, and test stack.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [SEQUOIA_CAPABILITY_AUDIT](../SEQUOIA_CAPABILITY_AUDIT.md) · [RUST_SEQUOIA_INTEGRATION_TODO](RUST_SEQUOIA_INTEGRATION_TODO.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TESTING](../TESTING.md)
+> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [SEQUOIA_CAPABILITY_AUDIT](SEQUOIA_CAPABILITY_AUDIT.md) · [RUST_SEQUOIA_INTEGRATION_TODO](RUST_SEQUOIA_INTEGRATION_TODO.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TESTING](../TESTING.md)
 
 ## 1. Scope And Classification
 
@@ -47,7 +47,7 @@ Classification labels used below:
 **Expected service stance**
 
 - [`RUST_FFI_IMPLEMENTATION_REFERENCE.md`](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) Section 3.1 and [`archive/RUST_SEQUOIA_INTEGRATION_TODO.md`](RUST_SEQUOIA_INTEGRATION_TODO.md) Section 2.1 both expect bounded same-fingerprint public-certificate update absorption in the Swift contacts flow.
-- [`SEQUOIA_CAPABILITY_AUDIT.md`](../SEQUOIA_CAPABILITY_AUDIT.md) records this family as implemented end-to-end.
+- [`SEQUOIA_CAPABILITY_AUDIT.md`](SEQUOIA_CAPABILITY_AUDIT.md) records this family as implemented end-to-end.
 
 **Current implementation evidence**
 
