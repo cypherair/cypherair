@@ -1,3 +1,5 @@
+use std::time::{Duration, SystemTime};
+
 use pgp_mobile::armor;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
@@ -23,6 +25,19 @@ fn generate_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
     .expect("key generation should succeed")
 }
 
+fn generate_backdated_universal_secret_cert(name: &str, creation_time: SystemTime) -> Vec<u8> {
+    let (cert, _) = CertBuilder::general_purpose(Some(format!(
+        "{} <{}@example.com>",
+        name,
+        name.to_lowercase()
+    )))
+    .set_creation_time(creation_time)
+    .generate()
+    .expect("backdated cert should generate");
+
+    serialize_secret_cert(&cert)
+}
+
 fn serialize_public_cert(cert: &openpgp::Cert) -> Vec<u8> {
     let mut bytes = Vec::new();
     cert.serialize(&mut bytes)
@@ -39,9 +54,19 @@ fn serialize_secret_cert(cert: &openpgp::Cert) -> Vec<u8> {
 }
 
 fn duplicate_userid_raw(secret_cert: &[u8], duplicate_user_id: &str) -> Vec<u8> {
+    duplicate_userid_raw_with_signature(secret_cert, duplicate_user_id, false, None, None)
+}
+
+fn duplicate_userid_raw_with_signature(
+    secret_cert: &[u8],
+    duplicate_user_id: &str,
+    is_primary: bool,
+    creation_time: Option<SystemTime>,
+    validity_period: Option<Duration>,
+) -> Vec<u8> {
     let cert = openpgp::Cert::from_bytes(secret_cert).expect("secret cert should parse");
     let policy = StandardPolicy::new();
-    let template: signature::SignatureBuilder = cert
+    let mut template: signature::SignatureBuilder = cert
         .with_policy(&policy, None)
         .expect("cert should validate")
         .primary_userid()
@@ -49,6 +74,19 @@ fn duplicate_userid_raw(secret_cert: &[u8], duplicate_user_id: &str) -> Vec<u8> 
         .binding_signature()
         .clone()
         .into();
+    template = template
+        .set_primary_userid(is_primary)
+        .expect("signature builder primary update should succeed");
+    if let Some(creation_time) = creation_time {
+        template = template
+            .set_signature_creation_time(creation_time)
+            .expect("signature builder creation time update should succeed");
+    }
+    if let Some(validity_period) = validity_period {
+        template = template
+            .set_signature_validity_period(validity_period)
+            .expect("signature builder validity update should succeed");
+    }
 
     let userid: UserID = duplicate_user_id.into();
     let mut signer = cert
@@ -63,9 +101,7 @@ fn duplicate_userid_raw(secret_cert: &[u8], duplicate_user_id: &str) -> Vec<u8> 
         .bind(
             &mut signer,
             &cert,
-            template
-                .set_primary_userid(false)
-                .expect("signature builder update should succeed"),
+            template,
         )
         .expect("userid binding should succeed");
     let mut userid_bytes = Vec::new();
@@ -101,6 +137,15 @@ fn duplicate_userid_raw(secret_cert: &[u8], duplicate_user_id: &str) -> Vec<u8> 
 }
 
 fn revoke_userid_occurrence(secret_cert: &[u8], occurrence_index: usize) -> Vec<u8> {
+    revoke_userid_occurrence_with_signature(secret_cert, occurrence_index, None, None)
+}
+
+fn revoke_userid_occurrence_with_signature(
+    secret_cert: &[u8],
+    occurrence_index: usize,
+    creation_time: Option<SystemTime>,
+    validity_period: Option<Duration>,
+) -> Vec<u8> {
     let cert = openpgp::Cert::from_bytes(secret_cert).expect("secret cert should parse");
     let raw_cert = openpgp::cert::raw::RawCert::from_bytes(secret_cert)
         .expect("raw secret cert should parse");
@@ -122,11 +167,26 @@ fn revoke_userid_occurrence(secret_cert: &[u8], occurrence_index: usize) -> Vec<
         .expect("primary key should have secret parts")
         .into_keypair()
         .expect("keypair conversion should succeed");
-    let revocation = UserIDRevocationBuilder::new()
+    let mut builder = UserIDRevocationBuilder::new()
         .set_reason_for_revocation(ReasonForRevocation::UIDRetired, b"")
-        .expect("revocation reason should configure")
+        .expect("revocation reason should configure");
+    if let Some(creation_time) = creation_time {
+        builder = builder
+            .set_signature_creation_time(creation_time)
+            .expect("revocation creation time update should succeed");
+    }
+    let base_revocation = builder
         .build(&mut signer, &cert, &user_id, None)
         .expect("User ID revocation should build");
+    let revocation = if let Some(validity_period) = validity_period {
+        signature::SignatureBuilder::from(base_revocation)
+            .set_signature_validity_period(validity_period)
+            .expect("revocation validity update should succeed")
+            .sign_userid_binding(&mut signer, Some(cert.primary_key().key()), &user_id)
+            .expect("expired User ID revocation should build")
+    } else {
+        base_revocation
+    };
     let mut revocation_bytes = Vec::new();
     Packet::from(revocation)
         .serialize(&mut revocation_bytes)
@@ -303,6 +363,174 @@ fn test_discover_certificate_selectors_duplicate_user_ids_preserve_per_occurrenc
     assert!(
         discovered.user_ids[1].is_currently_revoked,
         "second occurrence should preserve its revoked state"
+    );
+}
+
+#[test]
+fn test_discover_certificate_selectors_duplicate_user_ids_future_dated_binding_is_not_current() {
+    let now = SystemTime::now();
+    let generated =
+        generate_backdated_universal_secret_cert("Duplicate Future Primary", now - Duration::from_secs(14_400));
+    let original_user_id = first_user_id_text(&generated);
+    let secret_cert = duplicate_userid_raw_with_signature(
+        &generated,
+        &original_user_id,
+        true,
+        Some(now + Duration::from_secs(3600)),
+        None,
+    );
+
+    let discovered = keys::discover_certificate_selectors(&secret_cert)
+        .expect("selector discovery should succeed");
+
+    assert_eq!(discovered.user_ids.len(), 2);
+    assert!(discovered.user_ids[0].is_currently_primary);
+    assert!(
+        !discovered.user_ids[1].is_currently_primary,
+        "future-dated binding must not become current primary state"
+    );
+}
+
+#[test]
+fn test_discover_certificate_selectors_duplicate_user_ids_future_dated_revocation_is_not_current() {
+    let now = SystemTime::now();
+    let generated = generate_backdated_universal_secret_cert(
+        "Duplicate Future Revocation",
+        now - Duration::from_secs(14_400),
+    );
+    let original_user_id = first_user_id_text(&generated);
+    let duplicated = duplicate_userid_raw(&generated, &original_user_id);
+    let future_revoked = revoke_userid_occurrence_with_signature(
+        &duplicated,
+        1,
+        Some(now + Duration::from_secs(3600)),
+        None,
+    );
+
+    let discovered = keys::discover_certificate_selectors(&future_revoked)
+        .expect("selector discovery should succeed");
+
+    assert_eq!(discovered.user_ids.len(), 2);
+    assert!(
+        !discovered.user_ids[1].is_currently_revoked,
+        "future-dated revocation must not become current revoked state"
+    );
+}
+
+#[test]
+fn test_discover_certificate_selectors_duplicate_user_ids_expired_binding_is_not_current() {
+    let now = SystemTime::now();
+    let generated = generate_backdated_universal_secret_cert(
+        "Duplicate Expired Primary",
+        now - Duration::from_secs(14_400),
+    );
+    let original_user_id = first_user_id_text(&generated);
+    let secret_cert = duplicate_userid_raw_with_signature(
+        &generated,
+        &original_user_id,
+        true,
+        Some(now - Duration::from_secs(7200)),
+        Some(Duration::from_secs(60)),
+    );
+
+    let discovered = keys::discover_certificate_selectors(&secret_cert)
+        .expect("selector discovery should succeed");
+
+    assert_eq!(discovered.user_ids.len(), 2);
+    assert!(discovered.user_ids[0].is_currently_primary);
+    assert!(
+        !discovered.user_ids[1].is_currently_primary,
+        "expired binding must not become current primary state"
+    );
+}
+
+#[test]
+fn test_discover_certificate_selectors_duplicate_user_ids_expired_revocation_is_not_current() {
+    let now = SystemTime::now();
+    let generated = generate_backdated_universal_secret_cert(
+        "Duplicate Expired Revocation",
+        now - Duration::from_secs(14_400),
+    );
+    let original_user_id = first_user_id_text(&generated);
+    let duplicated = duplicate_userid_raw(&generated, &original_user_id);
+    let revoked = revoke_userid_occurrence_with_signature(
+        &duplicated,
+        1,
+        Some(now - Duration::from_secs(7200)),
+        Some(Duration::from_secs(60)),
+    );
+
+    let discovered = keys::discover_certificate_selectors(&revoked)
+        .expect("selector discovery should succeed");
+
+    assert_eq!(discovered.user_ids.len(), 2);
+    assert!(
+        !discovered.user_ids[1].is_currently_revoked,
+        "expired revocation must not become current revoked state"
+    );
+}
+
+#[test]
+fn test_discover_certificate_selectors_newer_binding_clears_older_revocation() {
+    let now = SystemTime::now();
+    let generated = generate_backdated_universal_secret_cert(
+        "Duplicate Binding Clears Revocation",
+        now - Duration::from_secs(14_400),
+    );
+    let original_user_id = first_user_id_text(&generated);
+    let duplicated = duplicate_userid_raw_with_signature(
+        &generated,
+        &original_user_id,
+        false,
+        Some(now - Duration::from_secs(3600)),
+        None,
+    );
+    let revoked = revoke_userid_occurrence_with_signature(
+        &duplicated,
+        1,
+        Some(now - Duration::from_secs(7200)),
+        None,
+    );
+
+    let discovered = keys::discover_certificate_selectors(&revoked)
+        .expect("selector discovery should succeed");
+
+    assert_eq!(discovered.user_ids.len(), 2);
+    assert!(
+        !discovered.user_ids[1].is_currently_revoked,
+        "older revocation must not survive a newer current binding"
+    );
+}
+
+#[test]
+fn test_discover_certificate_selectors_newer_revocation_beats_older_binding() {
+    let now = SystemTime::now();
+    let generated = generate_backdated_universal_secret_cert(
+        "Duplicate Revocation Beats Binding",
+        now - Duration::from_secs(14_400),
+    );
+    let original_user_id = first_user_id_text(&generated);
+    let duplicated = duplicate_userid_raw_with_signature(
+        &generated,
+        &original_user_id,
+        false,
+        Some(now - Duration::from_secs(7200)),
+        None,
+    );
+    let revoked = revoke_userid_occurrence_with_signature(
+        &duplicated,
+        1,
+        Some(now - Duration::from_secs(3600)),
+        None,
+    );
+
+    let discovered = keys::discover_certificate_selectors(&revoked)
+        .expect("selector discovery should succeed");
+
+    assert_eq!(discovered.user_ids.len(), 2);
+    assert!(
+        discovered.user_ids[1].is_currently_revoked,
+        "newer current revocation must beat an older binding"
     );
 }
 

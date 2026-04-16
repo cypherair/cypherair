@@ -404,6 +404,11 @@ final class CommonHelpersTests: XCTestCase {
             keyManagement: keyManagement,
             contactService: contactService
         )
+        let certificateSignatureService = CertificateSignatureService(
+            engine: engine,
+            keyManagement: keyManagement,
+            contactService: contactService
+        )
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
         let container = AppContainer(
@@ -418,6 +423,7 @@ final class CommonHelpersTests: XCTestCase {
             decryptionService: decryptionService,
             passwordMessageService: passwordMessageService,
             signingService: signingService,
+            certificateSignatureService: certificateSignatureService,
             qrService: qrService,
             selfTestService: selfTestService,
             contactsDirectory: contactDirectory,

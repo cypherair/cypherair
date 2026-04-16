@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use openpgp::cert::prelude::*;
 use openpgp::packet::{Signature, UserID};
@@ -732,52 +732,65 @@ fn current_user_id_occurrence_state(
     cert: &openpgp::Cert,
     occurrence: &RawUserIdOccurrence,
     policy: &StandardPolicy,
-    _now: SystemTime,
+    now: SystemTime,
 ) -> (bool, bool) {
     let primary_key = cert.primary_key().key();
-    let binding_signature = occurrence
-        .signatures
-        .iter()
-        .filter(|signature| {
-            matches!(
-                signature.typ(),
-                SignatureType::GenericCertification
-                    | SignatureType::PersonaCertification
-                    | SignatureType::CasualCertification
-                    | SignatureType::PositiveCertification
-            )
-        })
-        .filter(|signature| {
-            policy
+    let binding_signature = occurrence.signatures.iter().filter(|signature| {
+        matches!(
+            signature.typ(),
+            SignatureType::GenericCertification
+                | SignatureType::PersonaCertification
+                | SignatureType::CasualCertification
+                | SignatureType::PositiveCertification
+        )
+    })
+    .filter(|signature| {
+        signature
+            .signature_creation_time()
+            .map(|creation_time| creation_time <= now)
+            .unwrap_or(false)
+            && signature.signature_alive(now, Duration::ZERO).is_ok()
+            && policy
                 .signature(signature, HashAlgoSecurity::SecondPreImageResistance)
                 .is_ok()
-                && signature
-                    .verify_userid_binding(primary_key, primary_key, &occurrence.user_id)
-                    .is_ok()
-        })
-        .max_by_key(|signature| signature.signature_creation_time());
+            && signature
+                .verify_userid_binding(primary_key, primary_key, &occurrence.user_id)
+                .is_ok()
+    })
+    .max_by_key(|signature| {
+        signature
+            .signature_creation_time()
+            .expect("active binding signatures always have a creation time")
+    });
 
-    let latest_revocation_time = occurrence
-        .signatures
-        .iter()
-        .filter(|signature| signature.typ() == SignatureType::CertificationRevocation)
-        .filter(|signature| {
-            policy
+    let latest_revocation = occurrence.signatures.iter().filter(|signature| {
+        signature.typ() == SignatureType::CertificationRevocation
+    })
+    .filter(|signature| {
+        signature
+            .signature_creation_time()
+            .map(|creation_time| creation_time <= now)
+            .unwrap_or(false)
+            && signature.signature_alive(now, Duration::ZERO).is_ok()
+            && policy
                 .signature(signature, HashAlgoSecurity::SecondPreImageResistance)
                 .is_ok()
-                && signature
-                    .verify_userid_revocation(primary_key, primary_key, &occurrence.user_id)
-                    .is_ok()
-        })
-        .filter_map(|signature| signature.signature_creation_time())
-        .max();
+            && signature
+                .verify_userid_revocation(primary_key, primary_key, &occurrence.user_id)
+                .is_ok()
+    })
+    .max_by_key(|signature| {
+        signature
+            .signature_creation_time()
+            .expect("active revocation signatures always have a creation time")
+    });
 
     let is_currently_primary = binding_signature
         .and_then(|signature| signature.primary_userid())
         .unwrap_or(false);
     let is_currently_revoked = match (
         binding_signature.and_then(|signature| signature.signature_creation_time()),
-        latest_revocation_time,
+        latest_revocation.and_then(|signature| signature.signature_creation_time()),
     ) {
         (Some(binding_time), Some(revocation_time)) => revocation_time >= binding_time,
         (None, Some(_)) => true,

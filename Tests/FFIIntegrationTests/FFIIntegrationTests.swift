@@ -1648,6 +1648,47 @@ final class FFIIntegrationTests: XCTestCase {
         }
     }
 
+    func test_certificateSignature_userIdBindingBySelector_bytesMismatch_throwsInvalidKeyData()
+        throws
+    {
+        let signer = try engine.generateKey(
+            name: "FFI Selector Mismatch Signer",
+            email: "ffi-selector-mismatch-signer@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let target = try engine.generateKey(
+            name: "FFI Selector Mismatch Target",
+            email: "ffi-selector-mismatch-target@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let discovered = try engine.discoverCertificateSelectors(certData: target.publicKeyData)
+        let signature = try engine.generateUserIdCertification(
+            signerSecretCert: signer.certData,
+            targetCert: target.publicKeyData,
+            userIdData: discovered.userIds[0].userIdData,
+            certificationKind: .positive
+        )
+        let mismatchedData = discovered.userIds[0].userIdData + Data("-mismatch".utf8)
+
+        XCTAssertThrowsError(
+            try engine.verifyUserIdBindingSignatureBySelector(
+                signature: signature,
+                targetCert: target.publicKeyData,
+                userIdSelector: selectorInput(
+                    userIdData: mismatchedData,
+                    occurrenceIndex: discovered.userIds[0].occurrenceIndex
+                ),
+                candidateSigners: [signer.publicKeyData]
+            )
+        ) { error in
+            guard case .InvalidKeyData = error as? PgpError else {
+                return XCTFail("Expected InvalidKeyData, got \(error)")
+            }
+        }
+    }
+
     // MARK: - C5.4B Detailed Signature Results
 
     func test_detailedVerifyCleartext_fixtureMultiSigner_preservesEntriesAndLegacyFields() throws {

@@ -47,6 +47,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_filter(|key| key.fingerprint() != signer_cert.fingerprint())
         .emit_secret_key_stubs(true)
         .serialize(&mut signer_secret_bytes)?;
+    let mut signer_public_bytes = Vec::new();
+    signer_cert.serialize(&mut signer_public_bytes)?;
 
     let certification_subkey = signer_cert
         .keys()
@@ -98,6 +100,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(
         fixtures_dir.join("ffi_cert_binding_subkey_signer.gpg"),
         signer_secret_bytes,
+    )?;
+    fs::write(
+        fixtures_dir.join("ffi_cert_binding_subkey_signer_public.gpg"),
+        signer_public_bytes,
     )?;
     fs::write(
         fixtures_dir.join("ffi_cert_binding_target.gpg"),
