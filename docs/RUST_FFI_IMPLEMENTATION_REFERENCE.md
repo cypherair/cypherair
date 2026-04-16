@@ -109,7 +109,8 @@ Use bytes when the exact OpenPGP packet payload is semantically significant.
 
 - Certificates, revocations, detached signatures, message bytes, session-key related inputs, and User ID packet content use `Vec<u8>` / `Data`.
 - Display-oriented strings may use `String`, but they must not be used as cryptographic identity selectors.
-- User ID selectors for certification, binding verification, or User ID revocation must use raw User ID bytes, not display strings.
+- User ID selectors for certification, binding verification, or User ID revocation must use `userIdData + occurrenceIndex`, not display strings.
+- `occurrenceIndex` validates selector identity against one certificate snapshot; downstream OpenPGP crypto still consumes the raw `UserID` packet content.
 
 If an API requires parameters that the current export surface cannot reliably discover, the capability family must either:
 
@@ -329,7 +330,7 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 - The current Swift production boundary is key-level only through `KeyManagementService`.
 - Public-only certificate input must use one uniform family-wide rule:
   - return `Err(InvalidKeyData)` under a family-wide "secret certificate required" semantic rule
-- User ID revocation uses raw User ID bytes as selector input.
+- User ID revocation uses `userIdData + occurrenceIndex` as selector input.
 - Default reason-code policy is fixed:
   - key revocation: `ReasonForRevocation::KeyRetired`
   - subkey revocation: `ReasonForRevocation::KeyRetired`
@@ -343,7 +344,8 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 - separate additive exports for:
   - key revocation
   - subkey revocation
-  - User ID revocation
+  - legacy User ID revocation by raw `userIdData` for compatibility
+  - selector-based User ID revocation by `userIdData + occurrenceIndex`
 - byte-oriented outputs
 
 #### Required Helper / Discovery Support
@@ -351,7 +353,7 @@ Provide Rust / FFI coverage for revocation material that can be generated from e
 - key-level revocation does not require new discovery helpers and is already integrated through `KeyManagementService`
 - selective subkey/User ID adoption requires bounded selector discovery that exposes:
   - selectable subkey identifiers
-  - selectable raw User ID bytes
+  - selectable raw User ID bytes plus occurrence indexes for duplicate same-bytes entries
 - service integration should introduce selector-bearing Swift models or equivalent bounded discovery helpers before adding selective `KeyManagementService` APIs
 
 #### Minimum Rust Tests
@@ -545,12 +547,14 @@ Expose certificate-signature semantics needed for certification-related Rust com
 #### Expected FFI Surface Shape
 
 - dedicated additive verification methods for certificate-signature semantics
-- dedicated additive certification-generation method for User ID certification
+- dedicated additive certification-generation methods for:
+  - legacy raw-`userIdData` compatibility
+  - selector-based `userIdData + occurrenceIndex` input
 - family-specific result/status types separate from message verification records
 
 #### Required Helper / Discovery Support
 
-- current Swift models do not expose selector-bearing raw User ID data for bounded service ownership
+- current Swift models must expose selector-bearing raw User ID data plus occurrence indexes for bounded service ownership
 - service integration should introduce selector-bearing discovery support for User ID-driven operations before or alongside `CertificateSignatureService`
 - the planned service owner for this family is `CertificateSignatureService`
 

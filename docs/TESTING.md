@@ -212,7 +212,8 @@ When changing revocation-construction behavior, validation must cover:
 - key-level generation for both profiles
 - subkey and User ID revocation construction on the Rust / FFI surface
 - if Swift FFI tests reuse armored secret-key fixtures, dearmor them first so the tests exercise the documented `binary-only` revocation-construction contract
-- case-insensitive subkey fingerprint acceptance plus selector-miss rejection for subkey fingerprint and raw User ID inputs
+- case-insensitive subkey fingerprint acceptance plus selector-miss rejection for subkey fingerprint and `userIdData + occurrenceIndex` selector inputs
+- duplicate same-bytes User ID discovery preserving per-occurrence `primary` / `revoked` state
 - public-only / unusable-secret rejection returning `InvalidKeyData`
 - imported-key availability parity: import immediately stores a key-level revocation signature
 - lazy backfill for legacy imported keys with empty `revocationCert`
@@ -243,6 +244,7 @@ When changing certificate-signature verification or User ID certification behavi
 - parse/type/precondition failure returning `Err(...)` instead of a family-local invalid result
 - third-party certification generation followed by successful crypto verification
 - all four OpenPGP certification kinds: `Generic`, `Persona`, `Casual`, and `Positive`
+- selector-based User ID operations using `userIdData + occurrenceIndex`, including out-of-range and bytes-mismatch rejection
 - verify-result `certificationKind` matching the signature type for User ID certification signatures
 - signer fingerprint contract coverage:
 - `Valid` + primary signer path returns the signer certificate primary fingerprint and no subkey fingerprint

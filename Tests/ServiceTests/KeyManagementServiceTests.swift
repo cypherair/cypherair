@@ -104,6 +104,16 @@ final class KeyManagementServiceTests: XCTestCase {
         )
     }
 
+    private func storeIdentity(_ identity: PGPKeyIdentity) throws {
+        let data = try JSONEncoder().encode(identity)
+        try mockKC.save(
+            data,
+            service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+    }
+
     // MARK: - Key Generation: Profile A
 
     func test_generateKey_profileA_storesKeychainItems() async throws {
@@ -1187,6 +1197,47 @@ final class KeyManagementServiceTests: XCTestCase {
 
         XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore, "Fingerprint mismatch must not unwrap private keys")
         XCTAssertEqual(mockKC.saveCallCount, saveCountBefore, "Fingerprint mismatch must not rewrite metadata")
+    }
+
+    func test_selectionCatalog_duplicateSameBytesFixture_preservesPerOccurrenceState() throws {
+        let fixture = try FixtureLoader.loadData(
+            "selector_duplicate_userid_second_revoked_secret",
+            ext: "gpg"
+        )
+        let info = try engine.parseKeyInfo(keyData: fixture)
+        let identity = PGPKeyIdentity(
+            fingerprint: info.fingerprint,
+            keyVersion: info.keyVersion,
+            profile: info.profile,
+            userId: info.userId,
+            hasEncryptionSubkey: info.hasEncryptionSubkey,
+            isRevoked: info.isRevoked,
+            isExpired: info.isExpired,
+            isDefault: false,
+            isBackedUp: false,
+            publicKeyData: fixture,
+            revocationCert: Data(),
+            primaryAlgo: info.primaryAlgo,
+            subkeyAlgo: info.subkeyAlgo,
+            expiryDate: info.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+        )
+        try storeIdentity(identity)
+
+        let freshService = makeFreshService()
+        try freshService.loadKeys()
+        let unwrapCountBefore = mockSE.unwrapCallCount
+        let saveCountBefore = mockKC.saveCallCount
+
+        let catalog = try freshService.selectionCatalog(fingerprint: info.fingerprint)
+
+        XCTAssertEqual(catalog.userIds.count, 2)
+        XCTAssertEqual(catalog.userIds[0].userIdData, catalog.userIds[1].userIdData)
+        XCTAssertTrue(catalog.userIds[0].isCurrentlyPrimary)
+        XCTAssertFalse(catalog.userIds[1].isCurrentlyPrimary)
+        XCTAssertFalse(catalog.userIds[0].isCurrentlyRevoked)
+        XCTAssertTrue(catalog.userIds[1].isCurrentlyRevoked)
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore, "Duplicate selector discovery must not unwrap private key material")
+        XCTAssertEqual(mockKC.saveCallCount, saveCountBefore, "Duplicate selector discovery must not rewrite metadata")
     }
 
     // MARK: - M4: Revocation Certificate Validity

@@ -48,6 +48,13 @@ final class FFIIntegrationTests: XCTestCase {
         FileManager.default.temporaryDirectory.appendingPathComponent(filename)
     }
 
+    private func selectorInput(userIdData: Data, occurrenceIndex: UInt64) -> UserIdSelectorInput {
+        UserIdSelectorInput(
+            userIdData: userIdData,
+            occurrenceIndex: occurrenceIndex
+        )
+    }
+
     private func findTargetedPasswordTamper(
         ciphertext: Data,
         password: String,
@@ -668,6 +675,23 @@ final class FFIIntegrationTests: XCTestCase {
         }
     }
 
+    func test_discoverCertificateSelectors_duplicateSameBytesFixture_preservesPerOccurrenceStateAcrossFFI()
+        throws
+    {
+        let secretCert = try loadFixture("selector_duplicate_userid_second_revoked_secret")
+
+        let discovered = try engine.discoverCertificateSelectors(certData: secretCert)
+
+        XCTAssertEqual(discovered.userIds.count, 2)
+        XCTAssertEqual(discovered.userIds[0].occurrenceIndex, 0)
+        XCTAssertEqual(discovered.userIds[1].occurrenceIndex, 1)
+        XCTAssertEqual(discovered.userIds[0].userIdData, discovered.userIds[1].userIdData)
+        XCTAssertTrue(discovered.userIds[0].isCurrentlyPrimary)
+        XCTAssertFalse(discovered.userIds[1].isCurrentlyPrimary)
+        XCTAssertFalse(discovered.userIds[0].isCurrentlyRevoked)
+        XCTAssertTrue(discovered.userIds[1].isCurrentlyRevoked)
+    }
+
     func test_validatePublicCertificate_secretBearingInput_throwsInvalidKeyDataWithStableToken() throws {
         let generated = try engine.generateKey(
             name: "Validate Secret",
@@ -1180,6 +1204,77 @@ final class FFIIntegrationTests: XCTestCase {
         }
     }
 
+    func test_generateUserIdRevocationBySelector_generatedKey_returnsSignatureBytes() throws {
+        let generated = try engine.generateKey(
+            name: "Selector Revocation",
+            email: "selector-revocation@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let discovered = try engine.discoverCertificateSelectors(certData: generated.certData)
+
+        let revocation = try engine.generateUserIdRevocationBySelector(
+            secretCert: generated.certData,
+            userIdSelector: selectorInput(
+                userIdData: discovered.userIds[0].userIdData,
+                occurrenceIndex: discovered.userIds[0].occurrenceIndex
+            )
+        )
+
+        XCTAssertFalse(revocation.isEmpty)
+    }
+
+    func test_generateUserIdRevocationBySelector_occurrenceIndexOutOfRange_throwsInvalidKeyData()
+        throws
+    {
+        let generated = try engine.generateKey(
+            name: "Selector Revocation Range",
+            email: "selector-revocation-range@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let discovered = try engine.discoverCertificateSelectors(certData: generated.certData)
+
+        XCTAssertThrowsError(
+            try engine.generateUserIdRevocationBySelector(
+                secretCert: generated.certData,
+                userIdSelector: selectorInput(
+                    userIdData: discovered.userIds[0].userIdData,
+                    occurrenceIndex: 99
+                )
+            )
+        ) { error in
+            guard case .InvalidKeyData = error as? PgpError else {
+                return XCTFail("Expected InvalidKeyData, got \(error)")
+            }
+        }
+    }
+
+    func test_generateUserIdRevocationBySelector_bytesMismatch_throwsInvalidKeyData() throws {
+        let generated = try engine.generateKey(
+            name: "Selector Revocation Mismatch",
+            email: "selector-revocation-mismatch@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let discovered = try engine.discoverCertificateSelectors(certData: generated.certData)
+        let mismatchedData = discovered.userIds[0].userIdData + Data("-mismatch".utf8)
+
+        XCTAssertThrowsError(
+            try engine.generateUserIdRevocationBySelector(
+                secretCert: generated.certData,
+                userIdSelector: selectorInput(
+                    userIdData: mismatchedData,
+                    occurrenceIndex: discovered.userIds[0].occurrenceIndex
+                )
+            )
+        ) { error in
+            guard case .InvalidKeyData = error as? PgpError else {
+                return XCTFail("Expected InvalidKeyData, got \(error)")
+            }
+        }
+    }
+
     /// C5.3: S2kError / WrongPassphrase on Profile B export-import with wrong passphrase.
     func test_errorMapping_s2kError_profileB_wrongPassphrase() throws {
         let key = try engine.generateKey(
@@ -1443,6 +1538,114 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertEqual(result.certificationKind, .positive)
         XCTAssertNil(result.signerPrimaryFingerprint)
         XCTAssertNil(result.signingKeyFingerprint)
+    }
+
+    func test_certificateSignature_userIdCertificationBySelector_roundTripAcrossFFI() throws {
+        let signer = try engine.generateKey(
+            name: "FFI Selector Signer",
+            email: "ffi-selector-signer@example.com",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+        let target = try engine.generateKey(
+            name: "FFI Selector Target",
+            email: "ffi-selector-target@example.com",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+        let discovered = try engine.discoverCertificateSelectors(certData: target.publicKeyData)
+        let selector = selectorInput(
+            userIdData: discovered.userIds[0].userIdData,
+            occurrenceIndex: discovered.userIds[0].occurrenceIndex
+        )
+
+        let signature = try engine.generateUserIdCertificationBySelector(
+            signerSecretCert: signer.certData,
+            targetCert: target.publicKeyData,
+            userIdSelector: selector,
+            certificationKind: .persona
+        )
+        let result = try engine.verifyUserIdBindingSignatureBySelector(
+            signature: signature,
+            targetCert: target.publicKeyData,
+            userIdSelector: selector,
+            candidateSigners: [signer.publicKeyData]
+        )
+
+        XCTAssertEqual(result.status, .valid)
+        XCTAssertEqual(result.certificationKind, .persona)
+        XCTAssertEqual(result.signerPrimaryFingerprint, signer.fingerprint)
+    }
+
+    func test_certificateSignature_userIdBindingBySelector_duplicateFixtureAcceptsSecondOccurrence()
+        throws
+    {
+        let signer = try engine.generateKey(
+            name: "FFI Duplicate Selector Signer",
+            email: "ffi-duplicate-selector-signer@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let target = try loadFixture("selector_duplicate_userid_second_revoked_secret")
+        let discovered = try engine.discoverCertificateSelectors(certData: target)
+        let selector = selectorInput(
+            userIdData: discovered.userIds[1].userIdData,
+            occurrenceIndex: discovered.userIds[1].occurrenceIndex
+        )
+
+        let signature = try engine.generateUserIdCertificationBySelector(
+            signerSecretCert: signer.certData,
+            targetCert: target,
+            userIdSelector: selector,
+            certificationKind: .positive
+        )
+        let result = try engine.verifyUserIdBindingSignatureBySelector(
+            signature: signature,
+            targetCert: target,
+            userIdSelector: selector,
+            candidateSigners: [signer.publicKeyData]
+        )
+
+        XCTAssertEqual(result.status, .valid)
+        XCTAssertEqual(result.certificationKind, .positive)
+    }
+
+    func test_certificateSignature_userIdBindingBySelector_outOfRange_throwsInvalidKeyData() throws {
+        let signer = try engine.generateKey(
+            name: "FFI Selector Range Signer",
+            email: "ffi-selector-range-signer@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let target = try engine.generateKey(
+            name: "FFI Selector Range Target",
+            email: "ffi-selector-range-target@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let discovered = try engine.discoverCertificateSelectors(certData: target.publicKeyData)
+        let signature = try engine.generateUserIdCertification(
+            signerSecretCert: signer.certData,
+            targetCert: target.publicKeyData,
+            userIdData: discovered.userIds[0].userIdData,
+            certificationKind: .positive
+        )
+
+        XCTAssertThrowsError(
+            try engine.verifyUserIdBindingSignatureBySelector(
+                signature: signature,
+                targetCert: target.publicKeyData,
+                userIdSelector: selectorInput(
+                    userIdData: discovered.userIds[0].userIdData,
+                    occurrenceIndex: 99
+                ),
+                candidateSigners: [signer.publicKeyData]
+            )
+        ) { error in
+            guard case .InvalidKeyData = error as? PgpError else {
+                return XCTFail("Expected InvalidKeyData, got \(error)")
+            }
+        }
     }
 
     // MARK: - C5.4B Detailed Signature Results

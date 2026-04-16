@@ -10,6 +10,7 @@ use openpgp::packet::UserID;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Serialize;
+use openpgp::types::ReasonForRevocation;
 use openpgp::Packet;
 
 fn generate_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
@@ -99,12 +100,92 @@ fn duplicate_userid_raw(secret_cert: &[u8], duplicate_user_id: &str) -> Vec<u8> 
     duplicated
 }
 
+fn revoke_userid_occurrence(secret_cert: &[u8], occurrence_index: usize) -> Vec<u8> {
+    let cert = openpgp::Cert::from_bytes(secret_cert).expect("secret cert should parse");
+    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(secret_cert)
+        .expect("raw secret cert should parse");
+    let user_id = raw_cert
+        .packets()
+        .filter(|packet| packet.tag() == Tag::UserID)
+        .nth(occurrence_index)
+        .map(|packet| Packet::from_bytes(packet.as_bytes()).expect("userid packet should parse"))
+        .and_then(|packet| match packet {
+            Packet::UserID(user_id) => Some(user_id),
+            _ => None,
+        })
+        .expect("requested User ID occurrence should exist");
+    let mut signer = cert
+        .primary_key()
+        .key()
+        .clone()
+        .parts_into_secret()
+        .expect("primary key should have secret parts")
+        .into_keypair()
+        .expect("keypair conversion should succeed");
+    let revocation = UserIDRevocationBuilder::new()
+        .set_reason_for_revocation(ReasonForRevocation::UIDRetired, b"")
+        .expect("revocation reason should configure")
+        .build(&mut signer, &cert, &user_id, None)
+        .expect("User ID revocation should build");
+    let mut revocation_bytes = Vec::new();
+    Packet::from(revocation)
+        .serialize(&mut revocation_bytes)
+        .expect("revocation packet should serialize");
+
+    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(secret_cert)
+        .expect("raw secret cert should parse");
+    let mut revoked = Vec::new();
+    let mut seen_user_ids = 0usize;
+    let mut target_open = false;
+    let mut inserted = false;
+
+    for packet in raw_cert.packets() {
+        if target_open && packet.tag() != Tag::Signature && !inserted {
+            revoked.extend_from_slice(&revocation_bytes);
+            inserted = true;
+            target_open = false;
+        }
+
+        if packet.tag() == Tag::UserID {
+            if target_open && !inserted {
+                revoked.extend_from_slice(&revocation_bytes);
+                inserted = true;
+            }
+
+            target_open = seen_user_ids == occurrence_index;
+            seen_user_ids += 1;
+        }
+
+        revoked.extend_from_slice(packet.as_bytes());
+    }
+
+    if target_open && !inserted {
+        revoked.extend_from_slice(&revocation_bytes);
+    }
+
+    revoked
+}
+
 fn assert_invalid_key_data<T>(result: Result<T, PgpError>) {
     match result {
         Err(PgpError::InvalidKeyData { .. }) => {}
         Err(other) => panic!("expected InvalidKeyData, got: {other:?}"),
         Ok(_) => panic!("expected InvalidKeyData, got success"),
     }
+}
+
+fn first_user_id_text(cert_data: &[u8]) -> String {
+    String::from_utf8(
+        openpgp::Cert::from_bytes(cert_data)
+            .expect("certificate should parse")
+            .userids()
+            .next()
+            .expect("certificate should have a User ID")
+            .userid()
+            .value()
+            .to_vec(),
+    )
+    .expect("User ID should be valid UTF-8 in test fixture")
 }
 
 #[test]
@@ -179,6 +260,50 @@ fn test_discover_certificate_selectors_duplicate_user_ids_preserve_order_and_occ
     assert_eq!(discovered.user_ids[1].occurrence_index, 1);
     assert_eq!(discovered.user_ids[0].user_id_data, discovered.user_ids[1].user_id_data);
     assert_eq!(discovered.user_ids[0].display_text, discovered.user_ids[1].display_text);
+}
+
+#[test]
+fn test_discover_certificate_selectors_duplicate_user_ids_preserve_per_occurrence_primary_state() {
+    let generated = generate_key(KeyProfile::Universal, "Duplicate Primary");
+    let original_user_id = first_user_id_text(&generated.cert_data);
+    let secret_cert = duplicate_userid_raw(&generated.cert_data, &original_user_id);
+
+    let discovered = keys::discover_certificate_selectors(&secret_cert)
+        .expect("selector discovery should succeed");
+
+    assert_eq!(discovered.user_ids.len(), 2);
+    assert_eq!(discovered.user_ids[0].user_id_data, discovered.user_ids[1].user_id_data);
+    assert!(
+        discovered.user_ids[0].is_currently_primary,
+        "original occurrence should remain primary"
+    );
+    assert!(
+        !discovered.user_ids[1].is_currently_primary,
+        "duplicate occurrence should preserve its non-primary state"
+    );
+}
+
+#[test]
+fn test_discover_certificate_selectors_duplicate_user_ids_preserve_per_occurrence_revocation_state()
+{
+    let generated = generate_key(KeyProfile::Universal, "Duplicate Revoked");
+    let original_user_id = first_user_id_text(&generated.cert_data);
+    let duplicated = duplicate_userid_raw(&generated.cert_data, &original_user_id);
+    let revoked = revoke_userid_occurrence(&duplicated, 1);
+
+    let discovered =
+        keys::discover_certificate_selectors(&revoked).expect("selector discovery should succeed");
+
+    assert_eq!(discovered.user_ids.len(), 2);
+    assert_eq!(discovered.user_ids[0].user_id_data, discovered.user_ids[1].user_id_data);
+    assert!(
+        !discovered.user_ids[0].is_currently_revoked,
+        "first occurrence should remain valid"
+    );
+    assert!(
+        discovered.user_ids[1].is_currently_revoked,
+        "second occurrence should preserve its revoked state"
+    );
 }
 
 #[test]

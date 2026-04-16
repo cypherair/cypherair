@@ -5,6 +5,7 @@ use openpgp::types::SignatureType;
 use sequoia_openpgp as openpgp;
 
 use crate::error::PgpError;
+use crate::keys::{find_user_id_by_selector, UserIdSelectorInput};
 
 /// OpenPGP certification signature kinds preserved across the FFI boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -67,7 +68,7 @@ pub fn verify_user_id_binding_signature(
 ) -> Result<CertificateSignatureResult, PgpError> {
     let (signature, certification_kind) = parse_user_id_binding_signature(signature)?;
     let target_cert = parse_cert(target_cert, "Invalid target certificate")?;
-    let user_id = find_user_id(&target_cert, user_id_data)?;
+    let user_id = find_user_id_first_match(&target_cert, user_id_data)?;
     let candidate_signers = parse_candidate_signers(candidate_signers)?;
 
     if let Some(result) = verify_user_id_issuer_guided(
@@ -89,6 +90,37 @@ pub fn verify_user_id_binding_signature(
     )
 }
 
+pub fn verify_user_id_binding_signature_by_selector(
+    signature: &[u8],
+    target_cert: &[u8],
+    user_id_selector: &UserIdSelectorInput,
+    candidate_signers: &[Vec<u8>],
+) -> Result<CertificateSignatureResult, PgpError> {
+    let (signature, certification_kind) = parse_user_id_binding_signature(signature)?;
+    let target_cert_data = target_cert;
+    let target_cert = parse_cert(target_cert_data, "Invalid target certificate")?;
+    let user_id = find_user_id_by_selector(target_cert_data, user_id_selector)?;
+    let candidate_signers = parse_candidate_signers(candidate_signers)?;
+
+    if let Some(result) = verify_user_id_issuer_guided(
+        &signature,
+        &target_cert,
+        &user_id,
+        &candidate_signers,
+        certification_kind,
+    ) {
+        return Ok(result);
+    }
+
+    verify_user_id_fallback(
+        &signature,
+        &target_cert,
+        &user_id,
+        &candidate_signers,
+        certification_kind,
+    )
+}
+
 pub fn generate_user_id_certification(
     signer_secret_cert: &[u8],
     target_cert: &[u8],
@@ -103,7 +135,45 @@ pub fn generate_user_id_certification(
     }
 
     let target_cert = parse_cert(target_cert, "Invalid target certificate")?;
-    let user_id = find_user_id(&target_cert, user_id_data)?;
+    let user_id = find_user_id_first_match(&target_cert, user_id_data)?;
+    let mut signer = select_certification_signer(&signer_cert)?;
+    let certification = user_id
+        .certify(
+            &mut signer,
+            &target_cert,
+            certification_kind.signature_type(),
+            None,
+            None,
+        )
+        .map_err(|e| PgpError::SigningFailed {
+            reason: format!("Failed to generate User ID certification: {e}"),
+        })?;
+
+    let mut output = Vec::new();
+    openpgp::Packet::from(certification)
+        .serialize(&mut output)
+        .map_err(|e| PgpError::SigningFailed {
+            reason: format!("Failed to serialize User ID certification: {e}"),
+        })?;
+    Ok(output)
+}
+
+pub fn generate_user_id_certification_by_selector(
+    signer_secret_cert: &[u8],
+    target_cert: &[u8],
+    user_id_selector: &UserIdSelectorInput,
+    certification_kind: CertificationKind,
+) -> Result<Vec<u8>, PgpError> {
+    let signer_cert = parse_cert(signer_secret_cert, "Invalid signer certificate")?;
+    if !signer_cert.is_tsk() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "Certification generation requires secret key material".to_string(),
+        });
+    }
+
+    let target_cert_data = target_cert;
+    let target_cert = parse_cert(target_cert_data, "Invalid target certificate")?;
+    let user_id = find_user_id_by_selector(target_cert_data, user_id_selector)?;
     let mut signer = select_certification_signer(&signer_cert)?;
     let certification = user_id
         .certify(
@@ -188,7 +258,10 @@ fn parse_cert(cert_data: &[u8], reason_prefix: &str) -> Result<openpgp::Cert, Pg
     })
 }
 
-fn find_user_id<'a>(cert: &'a openpgp::Cert, user_id_data: &[u8]) -> Result<&'a UserID, PgpError> {
+fn find_user_id_first_match<'a>(
+    cert: &'a openpgp::Cert,
+    user_id_data: &[u8],
+) -> Result<&'a UserID, PgpError> {
     cert.userids()
         .find(|user_id| user_id.userid().value() == user_id_data)
         .map(|user_id| user_id.userid())

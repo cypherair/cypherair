@@ -28,7 +28,7 @@ use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
 use crate::keys::{
     CertificateMergeResult, DiscoveredCertificateSelectors, GeneratedKey, KeyInfo, KeyProfile,
-    ModifyExpiryResult, PublicCertificateValidationResult, S2kInfo,
+    ModifyExpiryResult, PublicCertificateValidationResult, S2kInfo, UserIdSelectorInput,
 };
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::signature_details::{
@@ -343,6 +343,9 @@ impl PgpEngine {
     }
 
     /// Verify a User ID binding signature against a target certificate using crypto-only semantics.
+    ///
+    /// Legacy compatibility path: if the certificate contains duplicate User ID bytes,
+    /// this selects the first matching occurrence.
     pub fn verify_user_id_binding_signature(
         &self,
         signature: Vec<u8>,
@@ -358,7 +361,26 @@ impl PgpEngine {
         )
     }
 
+    /// Verify a User ID binding signature against an explicitly selected User ID occurrence.
+    pub fn verify_user_id_binding_signature_by_selector(
+        &self,
+        signature: Vec<u8>,
+        target_cert: Vec<u8>,
+        user_id_selector: UserIdSelectorInput,
+        candidate_signers: Vec<Vec<u8>>,
+    ) -> Result<CertificateSignatureResult, PgpError> {
+        cert_signature::verify_user_id_binding_signature_by_selector(
+            &signature,
+            &target_cert,
+            &user_id_selector,
+            &candidate_signers,
+        )
+    }
+
     /// Generate raw certification-signature bytes for a specific User ID on the target certificate.
+    ///
+    /// Legacy compatibility path: if the certificate contains duplicate User ID bytes,
+    /// this selects the first matching occurrence.
     pub fn generate_user_id_certification(
         &self,
         signer_secret_cert: Vec<u8>,
@@ -371,6 +393,23 @@ impl PgpEngine {
             &signer_secret_cert,
             &target_cert,
             &user_id_data,
+            certification_kind,
+        )
+    }
+
+    /// Generate raw certification-signature bytes for an explicitly selected User ID occurrence.
+    pub fn generate_user_id_certification_by_selector(
+        &self,
+        signer_secret_cert: Vec<u8>,
+        target_cert: Vec<u8>,
+        user_id_selector: UserIdSelectorInput,
+        certification_kind: CertificationKind,
+    ) -> Result<Vec<u8>, PgpError> {
+        let signer_secret_cert = Zeroizing::new(signer_secret_cert);
+        cert_signature::generate_user_id_certification_by_selector(
+            &signer_secret_cert,
+            &target_cert,
+            &user_id_selector,
             certification_kind,
         )
     }
@@ -435,6 +474,9 @@ impl PgpEngine {
     }
 
     /// Generate a User ID-specific revocation signature from an existing secret certificate.
+    ///
+    /// Legacy compatibility path: if the certificate contains duplicate User ID bytes,
+    /// this selects the first matching occurrence.
     pub fn generate_user_id_revocation(
         &self,
         secret_cert: Vec<u8>,
@@ -442,6 +484,16 @@ impl PgpEngine {
     ) -> Result<Vec<u8>, PgpError> {
         let secret_cert = Zeroizing::new(secret_cert);
         keys::generate_user_id_revocation(&secret_cert, &user_id_data)
+    }
+
+    /// Generate a User ID-specific revocation signature using an explicit selector.
+    pub fn generate_user_id_revocation_by_selector(
+        &self,
+        secret_cert: Vec<u8>,
+        user_id_selector: UserIdSelectorInput,
+    ) -> Result<Vec<u8>, PgpError> {
+        let secret_cert = Zeroizing::new(secret_cert);
+        keys::generate_user_id_revocation_by_selector(&secret_cert, &user_id_selector)
     }
 
     // ── Armor ───────────────────────────────────────────────────────

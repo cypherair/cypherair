@@ -82,8 +82,9 @@ The selector-discovery surface must be specific enough for:
 Selectors must remain cryptographic selectors:
 
 - subkey selection uses `subkeyFingerprint`
-- User ID selection uses raw `userIdData`
+- User ID selection uses `userIdData + occurrenceIndex`
 - display strings must not become selector inputs
+- duplicate same-bytes User ID occurrences are supported and must remain distinct in selector-bearing metadata
 
 Exact helper shape, exact exported record shape, and exact field naming remain stage-plan work.
 

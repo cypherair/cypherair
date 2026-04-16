@@ -690,13 +690,29 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     
     /**
      * Generate raw certification-signature bytes for a specific User ID on the target certificate.
+     *
+     * Legacy compatibility path: if the certificate contains duplicate User ID bytes,
+     * this selects the first matching occurrence.
      */
     func generateUserIdCertification(signerSecretCert: Data, targetCert: Data, userIdData: Data, certificationKind: CertificationKind) throws  -> Data
     
     /**
+     * Generate raw certification-signature bytes for an explicitly selected User ID occurrence.
+     */
+    func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind) throws  -> Data
+    
+    /**
      * Generate a User ID-specific revocation signature from an existing secret certificate.
+     *
+     * Legacy compatibility path: if the certificate contains duplicate User ID bytes,
+     * this selects the first matching occurrence.
      */
     func generateUserIdRevocation(secretCert: Data, userIdData: Data) throws  -> Data
+    
+    /**
+     * Generate a User ID-specific revocation signature using an explicit selector.
+     */
+    func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: UserIdSelectorInput) throws  -> Data
     
     /**
      * Get the key version from binary certificate data.
@@ -830,8 +846,16 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     
     /**
      * Verify a User ID binding signature against a target certificate using crypto-only semantics.
+     *
+     * Legacy compatibility path: if the certificate contains duplicate User ID bytes,
+     * this selects the first matching occurrence.
      */
     func verifyUserIdBindingSignature(signature: Data, targetCert: Data, userIdData: Data, candidateSigners: [Data]) throws  -> CertificateSignatureResult
+    
+    /**
+     * Verify a User ID binding signature against an explicitly selected User ID occurrence.
+     */
+    func verifyUserIdBindingSignatureBySelector(signature: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, candidateSigners: [Data]) throws  -> CertificateSignatureResult
     
 }
 /**
@@ -1213,6 +1237,9 @@ open func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String)t
     
     /**
      * Generate raw certification-signature bytes for a specific User ID on the target certificate.
+     *
+     * Legacy compatibility path: if the certificate contains duplicate User ID bytes,
+     * this selects the first matching occurrence.
      */
 open func generateUserIdCertification(signerSecretCert: Data, targetCert: Data, userIdData: Data, certificationKind: CertificationKind)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
@@ -1227,7 +1254,25 @@ open func generateUserIdCertification(signerSecretCert: Data, targetCert: Data, 
 }
     
     /**
+     * Generate raw certification-signature bytes for an explicitly selected User ID occurrence.
+     */
+open func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_certification_by_selector(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(signerSecretCert),
+        FfiConverterData.lower(targetCert),
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),
+        FfiConverterTypeCertificationKind_lower(certificationKind),$0
+    )
+})
+}
+    
+    /**
      * Generate a User ID-specific revocation signature from an existing secret certificate.
+     *
+     * Legacy compatibility path: if the certificate contains duplicate User ID bytes,
+     * this selects the first matching occurrence.
      */
 open func generateUserIdRevocation(secretCert: Data, userIdData: Data)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
@@ -1235,6 +1280,19 @@ open func generateUserIdRevocation(secretCert: Data, userIdData: Data)throws  ->
             self.uniffiCloneHandle(),
         FfiConverterData.lower(secretCert),
         FfiConverterData.lower(userIdData),$0
+    )
+})
+}
+    
+    /**
+     * Generate a User ID-specific revocation signature using an explicit selector.
+     */
+open func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: UserIdSelectorInput)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_revocation_by_selector(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(secretCert),
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),$0
     )
 })
 }
@@ -1542,6 +1600,9 @@ open func verifyDirectKeySignature(signature: Data, targetCert: Data, candidateS
     
     /**
      * Verify a User ID binding signature against a target certificate using crypto-only semantics.
+     *
+     * Legacy compatibility path: if the certificate contains duplicate User ID bytes,
+     * this selects the first matching occurrence.
      */
 open func verifyUserIdBindingSignature(signature: Data, targetCert: Data, userIdData: Data, candidateSigners: [Data])throws  -> CertificateSignatureResult  {
     return try  FfiConverterTypeCertificateSignatureResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
@@ -1550,6 +1611,21 @@ open func verifyUserIdBindingSignature(signature: Data, targetCert: Data, userId
         FfiConverterData.lower(signature),
         FfiConverterData.lower(targetCert),
         FfiConverterData.lower(userIdData),
+        FfiConverterSequenceData.lower(candidateSigners),$0
+    )
+})
+}
+    
+    /**
+     * Verify a User ID binding signature against an explicitly selected User ID occurrence.
+     */
+open func verifyUserIdBindingSignatureBySelector(signature: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, candidateSigners: [Data])throws  -> CertificateSignatureResult  {
+    return try  FfiConverterTypeCertificateSignatureResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_verify_user_id_binding_signature_by_selector(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(signature),
+        FfiConverterData.lower(targetCert),
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),
         FfiConverterSequenceData.lower(candidateSigners),$0
     )
 })
@@ -3256,6 +3332,75 @@ public func FfiConverterTypeS2kInfo_lower(_ value: S2kInfo) -> RustBuffer {
 
 
 /**
+ * Selector identity for a specific User ID occurrence in a certificate snapshot.
+ */
+public struct UserIdSelectorInput: Equatable, Hashable {
+    /**
+     * Raw User ID packet bytes for the selected occurrence.
+     */
+    public var userIdData: Data
+    /**
+     * 0-based occurrence index in the certificate's native User ID order.
+     */
+    public var occurrenceIndex: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Raw User ID packet bytes for the selected occurrence.
+         */userIdData: Data, 
+        /**
+         * 0-based occurrence index in the certificate's native User ID order.
+         */occurrenceIndex: UInt64) {
+        self.userIdData = userIdData
+        self.occurrenceIndex = occurrenceIndex
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension UserIdSelectorInput: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUserIdSelectorInput: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UserIdSelectorInput {
+        return
+            try UserIdSelectorInput(
+                userIdData: FfiConverterData.read(from: &buf), 
+                occurrenceIndex: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UserIdSelectorInput, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.userIdData, into: &buf)
+        FfiConverterUInt64.write(value.occurrenceIndex, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUserIdSelectorInput_lift(_ buf: RustBuffer) throws -> UserIdSelectorInput {
+    return try FfiConverterTypeUserIdSelectorInput.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUserIdSelectorInput_lower(_ value: UserIdSelectorInput) -> RustBuffer {
+    return FfiConverterTypeUserIdSelectorInput.lower(value)
+}
+
+
+/**
  * Detailed result for in-memory verification APIs.
  */
 public struct VerifyDetailedResult: Equatable, Hashable {
@@ -4817,10 +4962,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation() != 46816) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification() != 13160) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification() != 47653) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation() != 41268) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector() != 9110) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation() != 39300) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector() != 3390) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_get_key_version() != 2783) {
@@ -4886,7 +5037,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_direct_key_signature() != 31324) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_user_id_binding_signature() != 57491) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_user_id_binding_signature() != 11947) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_user_id_binding_signature_by_selector() != 18125) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_progressreporter_on_progress() != 45018) {

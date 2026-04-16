@@ -639,4 +639,17 @@ final class ModelTests: XCTestCase {
             XCTAssertEqual(restored, theme, "Round-trip failed for \(theme)")
         }
     }
+
+    func test_userIdSelectionOption_selectorInput_preservesBytesAndOccurrence() {
+        let option = UserIdSelectionOption(
+            occurrenceIndex: 1,
+            userIdData: Data("duplicate@example.com".utf8),
+            displayText: "duplicate@example.com",
+            isCurrentlyPrimary: false,
+            isCurrentlyRevoked: true
+        )
+
+        XCTAssertEqual(option.selectorInput.userIdData, option.userIdData)
+        XCTAssertEqual(option.selectorInput.occurrenceIndex, 1)
+    }
 }
