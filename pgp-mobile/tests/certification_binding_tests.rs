@@ -7,7 +7,7 @@ use openpgp::serialize::Marshal;
 use openpgp::types::{KeyFlags, SignatureType};
 use pgp_mobile::cert_signature::{self, CertificateSignatureStatus, CertificationKind};
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeyProfile, UserIdSelectorInput};
 use sequoia_openpgp as openpgp;
 
 fn generated_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
@@ -45,6 +45,81 @@ fn first_user_id_bytes(cert_data: &[u8]) -> Vec<u8> {
         .userid()
         .value()
         .to_vec()
+}
+
+fn duplicate_userid(secret_cert: &[u8], duplicate_user_id: &str) -> Vec<u8> {
+    let cert = parse_cert(secret_cert);
+    let policy = StandardPolicy::new();
+    let template: signature::SignatureBuilder = cert
+        .with_policy(&policy, None)
+        .expect("cert should validate")
+        .primary_userid()
+        .expect("primary user id should exist")
+        .binding_signature()
+        .clone()
+        .into();
+
+    let userid: openpgp::packet::UserID = duplicate_user_id.into();
+    let mut signer = cert
+        .primary_key()
+        .key()
+        .clone()
+        .parts_into_secret()
+        .expect("primary key should have secret parts")
+        .into_keypair()
+        .expect("keypair conversion should succeed");
+    let binding = userid
+        .bind(
+            &mut signer,
+            &cert,
+            template
+                .set_primary_userid(false)
+                .expect("signature builder update should succeed"),
+        )
+        .expect("userid binding should succeed");
+
+    let mut userid_bytes = Vec::new();
+    openpgp::Packet::from(userid)
+        .serialize(&mut userid_bytes)
+        .expect("userid packet should serialize");
+    let mut binding_bytes = Vec::new();
+    openpgp::Packet::from(binding)
+        .serialize(&mut binding_bytes)
+        .expect("binding packet should serialize");
+
+    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(secret_cert)
+        .expect("raw secret cert should parse");
+    let mut duplicated = Vec::new();
+    let mut inserted = false;
+
+    for packet in raw_cert.packets() {
+        if !inserted
+            && matches!(
+                packet.tag(),
+                openpgp::packet::Tag::PublicSubkey | openpgp::packet::Tag::SecretSubkey
+            )
+        {
+            duplicated.extend_from_slice(&userid_bytes);
+            duplicated.extend_from_slice(&binding_bytes);
+            inserted = true;
+        }
+
+        duplicated.extend_from_slice(packet.as_bytes());
+    }
+
+    if !inserted {
+        duplicated.extend_from_slice(&userid_bytes);
+        duplicated.extend_from_slice(&binding_bytes);
+    }
+
+    duplicated
+}
+
+fn user_id_selector(user_id_data: &[u8], occurrence_index: u64) -> UserIdSelectorInput {
+    UserIdSelectorInput {
+        user_id_data: user_id_data.to_vec(),
+        occurrence_index,
+    }
 }
 
 fn direct_key_signature_bytes(cert_data: &[u8]) -> Vec<u8> {
@@ -374,6 +449,44 @@ fn test_verify_user_id_binding_signature_invalid_matching_user_id_returns_invali
 }
 
 #[test]
+fn test_generate_user_id_certification_legacy_duplicate_userid_remains_valid_for_duplicate_occurrences()
+{
+    let signer = generated_key(KeyProfile::Universal, "LegacyDuplicateSigner");
+    let target = generated_key(KeyProfile::Universal, "LegacyDuplicateTarget");
+    let duplicated = duplicate_userid(
+        &target.cert_data,
+        "LegacyDuplicateTarget <legacyduplicatetarget@example.com>",
+    );
+    let user_id_data = first_user_id_bytes(&duplicated);
+
+    let signature = cert_signature::generate_user_id_certification(
+        &signer.cert_data,
+        &duplicated,
+        &user_id_data,
+        CertificationKind::Positive,
+    )
+    .expect("legacy certification generation should succeed");
+
+    let first_result = cert_signature::verify_user_id_binding_signature_by_selector(
+        &signature,
+        &duplicated,
+        &user_id_selector(&user_id_data, 0),
+        &[signer.public_key_data.clone()],
+    )
+    .expect("first occurrence verification should succeed");
+    let second_result = cert_signature::verify_user_id_binding_signature_by_selector(
+        &signature,
+        &duplicated,
+        &user_id_selector(&user_id_data, 1),
+        &[signer.public_key_data.clone()],
+    )
+    .expect("second occurrence verification should return a result");
+
+    assert_eq!(first_result.status, CertificateSignatureStatus::Valid);
+    assert_eq!(second_result.status, CertificateSignatureStatus::Valid);
+}
+
+#[test]
 fn test_generate_and_verify_user_id_certification_preserves_kind_for_all_profiles() {
     for profile in [KeyProfile::Universal, KeyProfile::Advanced] {
         for kind in [
@@ -418,6 +531,45 @@ fn test_generate_and_verify_user_id_certification_preserves_kind_for_all_profile
             assert_eq!(result.signing_key_fingerprint, None);
         }
     }
+}
+
+#[test]
+fn test_generate_and_verify_user_id_certification_by_selector_accepts_duplicate_occurrence_selector()
+{
+    let signer = generated_key(KeyProfile::Advanced, "SelectorKindSigner");
+    let target = generated_key(KeyProfile::Advanced, "SelectorKindTarget");
+    let duplicated = duplicate_userid(
+        &target.cert_data,
+        "SelectorKindTarget <selectorkindtarget@example.com>",
+    );
+    let user_id_data = first_user_id_bytes(&duplicated);
+
+    let signature = cert_signature::generate_user_id_certification_by_selector(
+        &signer.cert_data,
+        &duplicated,
+        &user_id_selector(&user_id_data, 1),
+        CertificationKind::Persona,
+    )
+    .expect("selector-based certification generation should succeed");
+
+    let second_result = cert_signature::verify_user_id_binding_signature_by_selector(
+        &signature,
+        &duplicated,
+        &user_id_selector(&user_id_data, 1),
+        &[signer.public_key_data.clone()],
+    )
+    .expect("selected occurrence verification should succeed");
+    let first_result = cert_signature::verify_user_id_binding_signature_by_selector(
+        &signature,
+        &duplicated,
+        &user_id_selector(&user_id_data, 0),
+        &[signer.public_key_data.clone()],
+    )
+    .expect("non-selected occurrence verification should return a result");
+
+    assert_eq!(second_result.status, CertificateSignatureStatus::Valid);
+    assert_eq!(second_result.certification_kind, Some(CertificationKind::Persona));
+    assert_eq!(first_result.status, CertificateSignatureStatus::Valid);
 }
 
 #[test]
@@ -595,6 +747,23 @@ fn test_generate_user_id_certification_public_only_input_rejected() {
 }
 
 #[test]
+fn test_generate_user_id_certification_by_selector_mismatch_returns_invalid_key_data() {
+    let signer = generated_key(KeyProfile::Universal, "SelectorMismatchSigner");
+    let target = generated_key(KeyProfile::Universal, "SelectorMismatchTarget");
+    let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let mismatched = [user_id_data.clone(), b"-mismatch".to_vec()].concat();
+
+    let result = cert_signature::generate_user_id_certification_by_selector(
+        &signer.cert_data,
+        &target.public_key_data,
+        &user_id_selector(&mismatched, 0),
+        CertificationKind::Positive,
+    );
+
+    assert!(matches!(result, Err(PgpError::InvalidKeyData { .. })));
+}
+
+#[test]
 fn test_generate_user_id_certification_without_usable_certifier_returns_signing_failed() {
     let signer = unusable_certification_signer();
     let target = generated_key(KeyProfile::Universal, "UnusableTarget");
@@ -661,4 +830,27 @@ fn test_verify_user_id_binding_signature_malformed_signature_returns_err() {
     );
 
     assert!(matches!(result, Err(PgpError::CorruptData { .. })));
+}
+
+#[test]
+fn test_verify_user_id_binding_signature_by_selector_out_of_range_returns_invalid_key_data() {
+    let signer = generated_key(KeyProfile::Universal, "SelectorRangeSigner");
+    let target = generated_key(KeyProfile::Universal, "SelectorRangeTarget");
+    let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let signature = cert_signature::generate_user_id_certification(
+        &signer.cert_data,
+        &target.public_key_data,
+        &user_id_data,
+        CertificationKind::Positive,
+    )
+    .expect("certification generation should succeed");
+
+    let result = cert_signature::verify_user_id_binding_signature_by_selector(
+        &signature,
+        &target.public_key_data,
+        &user_id_selector(&user_id_data, 99),
+        &[signer.public_key_data],
+    );
+
+    assert!(matches!(result, Err(PgpError::InvalidKeyData { .. })));
 }

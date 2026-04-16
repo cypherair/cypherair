@@ -1,12 +1,13 @@
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use openpgp::cert::prelude::*;
+use openpgp::packet::{Signature, UserID};
 use openpgp::parse::Parse;
 use openpgp::policy::{HashAlgoSecurity, Policy, StandardPolicy};
 use openpgp::serialize::Serialize;
-use openpgp::types::{ReasonForRevocation, RevocationStatus};
+use openpgp::types::{ReasonForRevocation, RevocationStatus, SignatureType};
 use sequoia_openpgp as openpgp;
 use zeroize::Zeroizing;
 
@@ -115,6 +116,15 @@ pub struct DiscoveredUserId {
     pub is_currently_revoked: bool,
 }
 
+/// Selector identity for a specific User ID occurrence in a certificate snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct UserIdSelectorInput {
+    /// Raw User ID packet bytes for the selected occurrence.
+    pub user_id_data: Vec<u8>,
+    /// 0-based occurrence index in the certificate's native User ID order.
+    pub occurrence_index: u64,
+}
+
 /// Public-certificate validation result for contact import.
 #[derive(Debug, uniffi::Record)]
 pub struct PublicCertificateValidationResult {
@@ -155,10 +165,9 @@ struct UserIdCandidate {
     signature_creation_time: SystemTime,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct UserIdDiscoveryState {
-    is_currently_primary: bool,
-    is_currently_revoked: bool,
+struct RawUserIdOccurrence {
+    user_id: UserID,
+    signatures: Vec<Signature>,
 }
 
 /// Generate a new key pair with the specified profile.
@@ -395,12 +404,7 @@ pub fn discover_certificate_selectors(
     let currently_valid_subkeys = current_valid_subkey_fingerprints(&cert, &policy, now);
     let transport_encryption_capable_subkeys =
         current_transport_encryption_capable_subkey_fingerprints(&cert, &policy, now);
-    let user_id_states = current_user_id_discovery_states(&cert, &policy, now);
-    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(cert_data).map_err(|e| {
-        PgpError::InvalidKeyData {
-            reason: e.to_string(),
-        }
-    })?;
+    let raw_user_ids = raw_user_id_occurrences(cert_data)?;
 
     let subkeys = cert
         .keys()
@@ -417,14 +421,13 @@ pub fn discover_certificate_selectors(
         })
         .collect();
 
-    let user_ids = raw_cert
-        .packets()
-        .filter(|packet| packet.tag() == openpgp::packet::Tag::UserID)
+    let user_ids = raw_user_ids
+        .iter()
         .enumerate()
-        .map(|(occurrence_index, packet)| {
-            discover_user_id(packet, occurrence_index as u64, &user_id_states)
+        .map(|(occurrence_index, user_id)| {
+            discover_user_id(&cert, user_id, occurrence_index as u64, &policy, now)
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect();
 
     Ok(DiscoveredCertificateSelectors {
         certificate_fingerprint: cert.fingerprint().to_hex().to_lowercase(),
@@ -559,39 +562,23 @@ fn discover_subkey(
 }
 
 fn discover_user_id(
-    packet: openpgp::cert::raw::RawPacket<'_>,
+    cert: &openpgp::Cert,
+    occurrence: &RawUserIdOccurrence,
     occurrence_index: u64,
-    user_id_states: &HashMap<Vec<u8>, UserIdDiscoveryState>,
-) -> Result<DiscoveredUserId, PgpError> {
-    let packet = openpgp::Packet::from_bytes(packet.as_bytes()).map_err(|e| {
-        PgpError::InvalidKeyData {
-            reason: format!("Failed to parse raw User ID packet: {e}"),
-        }
-    })?;
-    let user_id = match packet {
-        openpgp::Packet::UserID(user_id) => user_id,
-        _ => {
-            return Err(PgpError::InvalidKeyData {
-                reason: "Expected raw User ID packet during selector discovery".to_string(),
-            });
-        }
-    };
-    let user_id_data = user_id.value().to_vec();
-    let state = user_id_states
-        .get(&user_id_data)
-        .copied()
-        .unwrap_or(UserIdDiscoveryState {
-            is_currently_primary: false,
-            is_currently_revoked: false,
-        });
+    policy: &StandardPolicy,
+    now: SystemTime,
+) -> DiscoveredUserId {
+    let user_id_data = occurrence.user_id.value().to_vec();
+    let (is_currently_primary, is_currently_revoked) =
+        current_user_id_occurrence_state(cert, occurrence, policy, now);
 
-    Ok(DiscoveredUserId {
+    DiscoveredUserId {
         occurrence_index,
         display_text: user_id_bytes_to_string(&user_id_data),
         user_id_data,
-        is_currently_primary: state.is_currently_primary,
-        is_currently_revoked: state.is_currently_revoked,
-    })
+        is_currently_primary,
+        is_currently_revoked,
+    }
 }
 
 fn current_valid_subkey_fingerprints(
@@ -617,38 +604,6 @@ fn current_transport_encryption_capable_subkey_fingerprints(
         .supported()
         .for_transport_encryption()
         .map(|subkey| subkey.key().fingerprint().to_hex().to_lowercase())
-        .collect()
-}
-
-fn current_user_id_discovery_states(
-    cert: &openpgp::Cert,
-    policy: &StandardPolicy,
-    now: SystemTime,
-) -> HashMap<Vec<u8>, UserIdDiscoveryState> {
-    cert.userids()
-        .map(|user_id| {
-            let candidate = make_user_id_candidate(&user_id, policy, Some(now));
-            let is_currently_revoked = candidate
-                .as_ref()
-                .map(|candidate| candidate.revoked)
-                .unwrap_or_else(|| {
-                    matches!(
-                        user_id.revocation_status(policy, Some(now)),
-                        RevocationStatus::Revoked(_)
-                    )
-                });
-
-            (
-                user_id.userid().value().to_vec(),
-                UserIdDiscoveryState {
-                    is_currently_primary: candidate
-                        .as_ref()
-                        .map(|candidate| candidate.primary)
-                        .unwrap_or(false),
-                    is_currently_revoked,
-                },
-            )
-        })
         .collect()
 }
 
@@ -702,6 +657,134 @@ fn serialize_public_cert(cert: &openpgp::Cert) -> Result<Vec<u8>, PgpError> {
             reason: format!("Failed to serialize public certificate: {e}"),
         })?;
     Ok(public_key_data)
+}
+
+pub(crate) fn find_user_id_by_selector<'a>(
+    cert_data: &[u8],
+    selector: &UserIdSelectorInput,
+) -> Result<UserID, PgpError> {
+    let Some(user_id) = raw_user_id_occurrences(cert_data)?
+        .into_iter()
+        .nth(selector.occurrence_index as usize)
+        .map(|occurrence| occurrence.user_id)
+    else {
+        return Err(PgpError::InvalidKeyData {
+            reason: "User ID selector occurrence index out of range".to_string(),
+        });
+    };
+
+    if user_id.value() != selector.user_id_data.as_slice() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "User ID selector bytes do not match the selected occurrence".to_string(),
+        });
+    }
+
+    Ok(user_id)
+}
+
+fn raw_user_id_occurrences(cert_data: &[u8]) -> Result<Vec<RawUserIdOccurrence>, PgpError> {
+    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(cert_data).map_err(|e| {
+        PgpError::InvalidKeyData {
+            reason: e.to_string(),
+        }
+    })?;
+    let mut occurrences = Vec::new();
+    let mut current: Option<RawUserIdOccurrence> = None;
+
+    for packet in raw_cert.packets() {
+        let packet = openpgp::Packet::from_bytes(packet.as_bytes()).map_err(|e| {
+            PgpError::InvalidKeyData {
+                reason: format!("Failed to parse raw certificate packet: {e}"),
+            }
+        })?;
+
+        match packet {
+            openpgp::Packet::UserID(user_id) => {
+                if let Some(current_occurrence) = current.take() {
+                    occurrences.push(current_occurrence);
+                }
+                current = Some(RawUserIdOccurrence {
+                    user_id,
+                    signatures: Vec::new(),
+                });
+            }
+            openpgp::Packet::Signature(signature) => {
+                if let Some(current_occurrence) = current.as_mut() {
+                    current_occurrence.signatures.push(signature);
+                }
+            }
+            _ => {
+                if let Some(current_occurrence) = current.take() {
+                    occurrences.push(current_occurrence);
+                }
+            }
+        }
+    }
+
+    if let Some(current_occurrence) = current.take() {
+        occurrences.push(current_occurrence);
+    }
+
+    Ok(occurrences)
+}
+
+fn current_user_id_occurrence_state(
+    cert: &openpgp::Cert,
+    occurrence: &RawUserIdOccurrence,
+    policy: &StandardPolicy,
+    _now: SystemTime,
+) -> (bool, bool) {
+    let primary_key = cert.primary_key().key();
+    let binding_signature = occurrence
+        .signatures
+        .iter()
+        .filter(|signature| {
+            matches!(
+                signature.typ(),
+                SignatureType::GenericCertification
+                    | SignatureType::PersonaCertification
+                    | SignatureType::CasualCertification
+                    | SignatureType::PositiveCertification
+            )
+        })
+        .filter(|signature| {
+            policy
+                .signature(signature, HashAlgoSecurity::SecondPreImageResistance)
+                .is_ok()
+                && signature
+                    .verify_userid_binding(primary_key, primary_key, &occurrence.user_id)
+                    .is_ok()
+        })
+        .max_by_key(|signature| signature.signature_creation_time());
+
+    let latest_revocation_time = occurrence
+        .signatures
+        .iter()
+        .filter(|signature| signature.typ() == SignatureType::CertificationRevocation)
+        .filter(|signature| {
+            policy
+                .signature(signature, HashAlgoSecurity::SecondPreImageResistance)
+                .is_ok()
+                && signature
+                    .verify_userid_revocation(primary_key, primary_key, &occurrence.user_id)
+                    .is_ok()
+        })
+        .filter_map(|signature| signature.signature_creation_time())
+        .max();
+
+    let is_currently_primary = binding_signature
+        .and_then(|signature| signature.primary_userid())
+        .unwrap_or(false);
+    let is_currently_revoked = match (
+        binding_signature.and_then(|signature| signature.signature_creation_time()),
+        latest_revocation_time,
+    ) {
+        (Some(binding_time), Some(revocation_time)) => revocation_time >= binding_time,
+        (None, Some(_)) => true,
+        _ => false,
+    };
+
+    (is_currently_primary, is_currently_revoked)
 }
 
 /// Merge same-fingerprint public certificate update material into an existing public certificate.
@@ -1090,6 +1173,9 @@ pub fn generate_subkey_revocation(
 }
 
 /// Generate a User ID-specific revocation signature from an existing secret certificate.
+///
+/// Legacy compatibility path: if the certificate contains duplicate User ID bytes,
+/// this selects the first matching occurrence.
 pub fn generate_user_id_revocation(
     secret_cert: &[u8],
     user_id_data: &[u8],
@@ -1109,6 +1195,28 @@ pub fn generate_user_id_revocation(
             reason: format!("Failed to configure User ID revocation: {e}"),
         })?
         .build(&mut signer, &cert, user_id.userid(), None)
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Failed to generate User ID revocation: {e}"),
+        })?;
+
+    serialize_revocation_signature(sig)
+}
+
+/// Generate a User ID-specific revocation signature using an explicit selector.
+pub fn generate_user_id_revocation_by_selector(
+    secret_cert: &[u8],
+    user_id_selector: &UserIdSelectorInput,
+) -> Result<Vec<u8>, PgpError> {
+    let cert = parse_cert_for_revocation(secret_cert)?;
+    let mut signer = primary_signer_for_revocation(&cert)?;
+    let user_id = find_user_id_by_selector(secret_cert, user_id_selector)?;
+
+    let sig = UserIDRevocationBuilder::new()
+        .set_reason_for_revocation(ReasonForRevocation::UIDRetired, b"")
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Failed to configure User ID revocation: {e}"),
+        })?
+        .build(&mut signer, &cert, &user_id, None)
         .map_err(|e| PgpError::RevocationError {
             reason: format!("Failed to generate User ID revocation: {e}"),
         })?;

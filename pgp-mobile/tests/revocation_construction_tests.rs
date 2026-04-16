@@ -1,5 +1,5 @@
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeyProfile, UserIdSelectorInput};
 use sequoia_openpgp as openpgp;
 
 use openpgp::packet::signature;
@@ -63,6 +63,91 @@ fn add_userid(secret_cert: &[u8], new_user_id: &str) -> Vec<u8> {
         .insert_packets(vec![Packet::from(userid), binding.into()])
         .expect("userid packets should insert");
     serialize_secret_cert(&updated_cert)
+}
+
+fn duplicate_userid(secret_cert: &[u8], duplicate_user_id: &str) -> Vec<u8> {
+    let cert = openpgp::Cert::from_bytes(secret_cert).expect("secret cert should parse");
+    let policy = StandardPolicy::new();
+    let template: signature::SignatureBuilder = cert
+        .with_policy(&policy, None)
+        .expect("cert should validate")
+        .primary_userid()
+        .expect("primary user id should exist")
+        .binding_signature()
+        .clone()
+        .into();
+
+    let userid: UserID = duplicate_user_id.into();
+    let mut signer = cert
+        .primary_key()
+        .key()
+        .clone()
+        .parts_into_secret()
+        .expect("primary key should have secret parts")
+        .into_keypair()
+        .expect("keypair conversion should succeed");
+    let binding = userid
+        .bind(
+            &mut signer,
+            &cert,
+            template
+                .set_primary_userid(false)
+                .expect("signature builder update should succeed"),
+        )
+        .expect("userid binding should succeed");
+    let mut userid_bytes = Vec::new();
+    Packet::from(userid)
+        .serialize(&mut userid_bytes)
+        .expect("userid packet should serialize");
+    let mut binding_bytes = Vec::new();
+    Packet::from(binding)
+        .serialize(&mut binding_bytes)
+        .expect("binding packet should serialize");
+
+    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(secret_cert)
+        .expect("raw secret cert should parse");
+    let mut duplicated = Vec::new();
+    let mut inserted = false;
+
+    for packet in raw_cert.packets() {
+        if !inserted
+            && matches!(
+                packet.tag(),
+                openpgp::packet::Tag::PublicSubkey | openpgp::packet::Tag::SecretSubkey
+            )
+        {
+            duplicated.extend_from_slice(&userid_bytes);
+            duplicated.extend_from_slice(&binding_bytes);
+            inserted = true;
+        }
+
+        duplicated.extend_from_slice(packet.as_bytes());
+    }
+
+    if !inserted {
+        duplicated.extend_from_slice(&userid_bytes);
+        duplicated.extend_from_slice(&binding_bytes);
+    }
+
+    duplicated
+}
+
+fn user_id_selector(user_id_data: &[u8], occurrence_index: u64) -> UserIdSelectorInput {
+    UserIdSelectorInput {
+        user_id_data: user_id_data.to_vec(),
+        occurrence_index,
+    }
+}
+
+fn first_user_id_bytes(cert_data: &[u8]) -> Vec<u8> {
+    openpgp::Cert::from_bytes(cert_data)
+        .expect("certificate should parse")
+        .userids()
+        .next()
+        .expect("certificate should have a user id")
+        .userid()
+        .value()
+        .to_vec()
 }
 
 fn assert_invalid_key_data(result: Result<Vec<u8>, PgpError>) {
@@ -285,6 +370,67 @@ fn test_generate_user_id_revocation_selector_miss_returns_invalid_key_data() {
     assert_invalid_key_data(keys::generate_user_id_revocation(
         &generated.cert_data,
         b"missing@example.com",
+    ));
+}
+
+#[test]
+fn test_generate_user_id_revocation_legacy_duplicate_userid_generates_signature() {
+    let generated = generate_key(KeyProfile::Universal, "LegacyDuplicateUserid");
+    let duplicated = duplicate_userid(
+        &generated.cert_data,
+        "LegacyDuplicateUserid <legacyduplicateuserid@example.com>",
+    );
+    let discovered = keys::discover_certificate_selectors(&duplicated)
+        .expect("selector discovery should succeed");
+    let user_id_data = discovered.user_ids[0].user_id_data.clone();
+
+    let revocation = keys::generate_user_id_revocation(&duplicated, &user_id_data)
+        .expect("legacy user id revocation should generate");
+
+    assert!(!revocation.is_empty());
+}
+
+#[test]
+fn test_generate_user_id_revocation_by_selector_accepts_duplicate_occurrence_selector() {
+    let generated = generate_key(KeyProfile::Universal, "SelectorDuplicateUserid");
+    let duplicated = duplicate_userid(
+        &generated.cert_data,
+        "SelectorDuplicateUserid <selectorduplicateuserid@example.com>",
+    );
+    let discovered = keys::discover_certificate_selectors(&duplicated)
+        .expect("selector discovery should succeed");
+    let selector = &discovered.user_ids[1];
+
+    let revocation = keys::generate_user_id_revocation_by_selector(
+        &duplicated,
+        &user_id_selector(&selector.user_id_data, selector.occurrence_index),
+    )
+    .expect("selector-based user id revocation should generate");
+
+    assert!(!revocation.is_empty());
+}
+
+#[test]
+fn test_generate_user_id_revocation_by_selector_occurrence_index_out_of_range_returns_invalid_key_data()
+{
+    let generated = generate_key(KeyProfile::Universal, "OutOfRangeUserid");
+    let user_id_data = first_user_id_bytes(&generated.cert_data);
+
+    assert_invalid_key_data(keys::generate_user_id_revocation_by_selector(
+        &generated.cert_data,
+        &user_id_selector(&user_id_data, 99),
+    ));
+}
+
+#[test]
+fn test_generate_user_id_revocation_by_selector_bytes_mismatch_returns_invalid_key_data() {
+    let generated = generate_key(KeyProfile::Universal, "MismatchUserid");
+    let first_user_id = first_user_id_bytes(&generated.cert_data);
+    let mismatched = [first_user_id.clone(), b"-mismatch".to_vec()].concat();
+
+    assert_invalid_key_data(keys::generate_user_id_revocation_by_selector(
+        &generated.cert_data,
+        &user_id_selector(&mismatched, 0),
     ));
 }
 
