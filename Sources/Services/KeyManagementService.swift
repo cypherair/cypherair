@@ -226,7 +226,8 @@ final class KeyManagementService {
         mutationService.checkAndRecoverFromInterruptedModifyExpiry()
     }
 
-    /// Triggers device authentication (Face ID / Touch ID) and returns raw private-key bytes.
+    /// Triggers device authentication (Face ID / Touch ID) and returns the unwrapped
+    /// secret certificate material for the selected key.
     /// The caller MUST zeroize the returned data after use.
     func unwrapPrivateKey(fingerprint: String) throws -> Data {
         try privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
