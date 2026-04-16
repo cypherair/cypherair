@@ -141,6 +141,7 @@
 				Models/ColorTheme.swift,
 				Models/Contact.swift,
 				Models/CypherAirError.swift,
+				Models/DetailedSignatureVerification.swift,
 				Models/ExportableFile.swift,
 				Models/IdentityPresentation.swift,
 				"Models/KeyProfile+App.swift",
