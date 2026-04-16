@@ -2,7 +2,6 @@ import Foundation
 import XCTest
 @testable import CypherAir
 
-@MainActor
 final class IncomingURLImportCoordinatorTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
 
@@ -17,6 +16,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         super.tearDown()
     }
 
+    @MainActor
     func test_handleIncomingURL_nonCypherAirURL_ignoresWithoutAlert() {
         let coordinator = makeCoordinator()
         let url = URL(string: "https://example.com/import/v1/AAAA")!
@@ -29,6 +29,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.isTutorialImportBlocked)
     }
 
+    @MainActor
     func test_handleIncomingURL_invalidCypherAirURL_setsImportError() {
         let coordinator = makeCoordinator()
         let url = URL(string: "cypherair://import/v1/not-a-valid-key")!
@@ -40,6 +41,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.isTutorialImportBlocked)
     }
 
+    @MainActor
     func test_handleIncomingURL_validURL_presentsConfirmationAndConfirmedImportStoresContact() throws {
         let coordinator = makeCoordinator()
         let generated = try stack.engine.generateKey(
@@ -61,6 +63,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         XCTAssertNotNil(stack.contactService.contact(forFingerprint: generated.fingerprint))
     }
 
+    @MainActor
     func test_handleIncomingURL_replacementFlow_confirmStoresReplacementAndClearsPendingRequest() throws {
         let coordinator = makeCoordinator()
         let firstKey = try stack.engine.generateKey(
@@ -93,6 +96,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         XCTAssertNotNil(stack.contactService.contact(forFingerprint: secondKey.fingerprint))
     }
 
+    @MainActor
     func test_handleIncomingURL_replacementFlow_cancelClearsPendingRequestWithoutReplacing() throws {
         let coordinator = makeCoordinator()
         let firstKey = try stack.engine.generateKey(
@@ -124,6 +128,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         XCTAssertNil(stack.contactService.contact(forFingerprint: secondKey.fingerprint))
     }
 
+    @MainActor
     func test_handleIncomingURL_whileTutorialPresentationIsActive_showsBlockedAlertAndDoesNotImport() throws {
         let coordinator = makeCoordinator()
         let generated = try stack.engine.generateKey(
@@ -142,6 +147,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         XCTAssertTrue(stack.contactService.contacts.isEmpty)
     }
 
+    @MainActor
     func test_handleIncomingURL_afterTutorialDismissal_allowsImportEvenWhenSessionHadStarted() async throws {
         let tutorialStore = TutorialSessionStore()
         await tutorialStore.openModule(.sandbox)
@@ -168,6 +174,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         XCTAssertNotNil(coordinator.importConfirmationCoordinator.request)
     }
 
+    @MainActor
     private func makeCoordinator() -> IncomingURLImportCoordinator {
         IncomingURLImportCoordinator(
             importLoader: PublicKeyImportLoader(qrService: QRService(engine: stack.engine)),
