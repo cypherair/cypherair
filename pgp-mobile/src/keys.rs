@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use openpgp::cert::prelude::*;
@@ -73,6 +74,47 @@ pub struct KeyInfo {
     pub expiry_timestamp: Option<u64>,
 }
 
+/// Selector-bearing discovery result for a certificate.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct DiscoveredCertificateSelectors {
+    /// Primary certificate fingerprint in canonical lowercase hex.
+    pub certificate_fingerprint: String,
+    /// All subkeys in the certificate's native iteration order.
+    pub subkeys: Vec<DiscoveredSubkey>,
+    /// All User IDs in the certificate's native iteration order.
+    pub user_ids: Vec<DiscoveredUserId>,
+}
+
+/// Selector-bearing metadata for one discovered subkey.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct DiscoveredSubkey {
+    /// Subkey fingerprint in canonical lowercase hex.
+    pub fingerprint: String,
+    /// Display-oriented algorithm name.
+    pub algorithm_display: String,
+    /// Whether this subkey is currently transport-encryption capable under StandardPolicy + now.
+    pub is_currently_transport_encryption_capable: bool,
+    /// Whether this subkey is currently revoked under StandardPolicy + now.
+    pub is_currently_revoked: bool,
+    /// Whether this subkey is currently expired under StandardPolicy + now.
+    pub is_currently_expired: bool,
+}
+
+/// Selector-bearing metadata for one discovered User ID packet.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct DiscoveredUserId {
+    /// 0-based occurrence index in the certificate's native User ID iteration order.
+    pub occurrence_index: u64,
+    /// Raw User ID packet bytes.
+    pub user_id_data: Vec<u8>,
+    /// Display-oriented lossy UTF-8 rendering of `user_id_data`.
+    pub display_text: String,
+    /// Whether this User ID is currently marked primary under StandardPolicy + now.
+    pub is_currently_primary: bool,
+    /// Whether this User ID is currently revoked under StandardPolicy + now.
+    pub is_currently_revoked: bool,
+}
+
 /// Public-certificate validation result for contact import.
 #[derive(Debug, uniffi::Record)]
 pub struct PublicCertificateValidationResult {
@@ -111,6 +153,12 @@ struct UserIdCandidate {
     revoked: bool,
     primary: bool,
     signature_creation_time: SystemTime,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct UserIdDiscoveryState {
+    is_currently_primary: bool,
+    is_currently_revoked: bool,
 }
 
 /// Generate a new key pair with the specified profile.
@@ -330,6 +378,61 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
     })
 }
 
+/// Discover selector-bearing subkey and User ID metadata from binary certificate bytes.
+///
+/// This API is binary-only by contract. ASCII-armored certificate input is rejected.
+pub fn discover_certificate_selectors(
+    cert_data: &[u8],
+) -> Result<DiscoveredCertificateSelectors, PgpError> {
+    reject_armored_certificate_input(cert_data)?;
+
+    let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
+        reason: e.to_string(),
+    })?;
+    let policy = StandardPolicy::new();
+    let now = SystemTime::now();
+
+    let currently_valid_subkeys = current_valid_subkey_fingerprints(&cert, &policy, now);
+    let transport_encryption_capable_subkeys =
+        current_transport_encryption_capable_subkey_fingerprints(&cert, &policy, now);
+    let user_id_states = current_user_id_discovery_states(&cert, &policy, now);
+    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(cert_data).map_err(|e| {
+        PgpError::InvalidKeyData {
+            reason: e.to_string(),
+        }
+    })?;
+
+    let subkeys = cert
+        .keys()
+        .subkeys()
+        .map(|subkey| {
+            discover_subkey(
+                &cert,
+                &subkey,
+                &policy,
+                now,
+                &currently_valid_subkeys,
+                &transport_encryption_capable_subkeys,
+            )
+        })
+        .collect();
+
+    let user_ids = raw_cert
+        .packets()
+        .filter(|packet| packet.tag() == openpgp::packet::Tag::UserID)
+        .enumerate()
+        .map(|(occurrence_index, packet)| {
+            discover_user_id(packet, occurrence_index as u64, &user_id_states)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(DiscoveredCertificateSelectors {
+        certificate_fingerprint: cert.fingerprint().to_hex().to_lowercase(),
+        subkeys,
+        user_ids,
+    })
+}
+
 /// Validate that contact-import data is a public certificate and return normalized metadata.
 pub fn validate_public_certificate(
     cert_data: &[u8],
@@ -381,13 +484,13 @@ fn select_ranked_user_id(
     now: Option<SystemTime>,
 ) -> Option<String> {
     cert.userids()
-        .filter_map(|user_id| make_user_id_candidate(user_id, policy, now))
+        .filter_map(|user_id| make_user_id_candidate(&user_id, policy, now))
         .max_by(compare_user_id_candidates)
         .map(|candidate| user_id_bytes_to_string(&candidate.user_id_bytes))
 }
 
 fn make_user_id_candidate(
-    user_id: UserIDAmalgamation<'_>,
+    user_id: &UserIDAmalgamation<'_>,
     policy: &StandardPolicy,
     now: Option<SystemTime>,
 ) -> Option<UserIdCandidate> {
@@ -420,6 +523,135 @@ fn make_user_id_candidate(
     })
 }
 
+fn discover_subkey(
+    cert: &openpgp::Cert,
+    subkey: &SubordinateKeyAmalgamation<'_, openpgp::packet::key::PublicParts>,
+    policy: &StandardPolicy,
+    now: SystemTime,
+    currently_valid_subkeys: &HashSet<String>,
+    transport_encryption_capable_subkeys: &HashSet<String>,
+) -> DiscoveredSubkey {
+    let fingerprint = subkey.key().fingerprint().to_hex().to_lowercase();
+    let is_currently_revoked = matches!(
+        subkey.revocation_status(policy, Some(now)),
+        RevocationStatus::Revoked(_)
+    );
+    let is_currently_expired = if is_currently_revoked {
+        false
+    } else if currently_valid_subkeys.contains(&fingerprint) {
+        false
+    } else {
+        let creation_time = subkey.key().creation_time();
+        cert.keys()
+            .subkeys()
+            .with_policy(policy, Some(creation_time))
+            .any(|candidate| candidate.key().fingerprint().to_hex().to_lowercase() == fingerprint)
+    };
+
+    DiscoveredSubkey {
+        fingerprint: fingerprint.clone(),
+        algorithm_display: subkey.key().pk_algo().to_string(),
+        is_currently_transport_encryption_capable: transport_encryption_capable_subkeys
+            .contains(&fingerprint),
+        is_currently_revoked,
+        is_currently_expired,
+    }
+}
+
+fn discover_user_id(
+    packet: openpgp::cert::raw::RawPacket<'_>,
+    occurrence_index: u64,
+    user_id_states: &HashMap<Vec<u8>, UserIdDiscoveryState>,
+) -> Result<DiscoveredUserId, PgpError> {
+    let packet = openpgp::Packet::from_bytes(packet.as_bytes()).map_err(|e| {
+        PgpError::InvalidKeyData {
+            reason: format!("Failed to parse raw User ID packet: {e}"),
+        }
+    })?;
+    let user_id = match packet {
+        openpgp::Packet::UserID(user_id) => user_id,
+        _ => {
+            return Err(PgpError::InvalidKeyData {
+                reason: "Expected raw User ID packet during selector discovery".to_string(),
+            });
+        }
+    };
+    let user_id_data = user_id.value().to_vec();
+    let state = user_id_states
+        .get(&user_id_data)
+        .copied()
+        .unwrap_or(UserIdDiscoveryState {
+            is_currently_primary: false,
+            is_currently_revoked: false,
+        });
+
+    Ok(DiscoveredUserId {
+        occurrence_index,
+        display_text: user_id_bytes_to_string(&user_id_data),
+        user_id_data,
+        is_currently_primary: state.is_currently_primary,
+        is_currently_revoked: state.is_currently_revoked,
+    })
+}
+
+fn current_valid_subkey_fingerprints(
+    cert: &openpgp::Cert,
+    policy: &StandardPolicy,
+    now: SystemTime,
+) -> HashSet<String> {
+    cert.keys()
+        .subkeys()
+        .with_policy(policy, Some(now))
+        .map(|subkey| subkey.key().fingerprint().to_hex().to_lowercase())
+        .collect()
+}
+
+fn current_transport_encryption_capable_subkey_fingerprints(
+    cert: &openpgp::Cert,
+    policy: &StandardPolicy,
+    now: SystemTime,
+) -> HashSet<String> {
+    cert.keys()
+        .subkeys()
+        .with_policy(policy, Some(now))
+        .supported()
+        .for_transport_encryption()
+        .map(|subkey| subkey.key().fingerprint().to_hex().to_lowercase())
+        .collect()
+}
+
+fn current_user_id_discovery_states(
+    cert: &openpgp::Cert,
+    policy: &StandardPolicy,
+    now: SystemTime,
+) -> HashMap<Vec<u8>, UserIdDiscoveryState> {
+    cert.userids()
+        .map(|user_id| {
+            let candidate = make_user_id_candidate(&user_id, policy, Some(now));
+            let is_currently_revoked = candidate
+                .as_ref()
+                .map(|candidate| candidate.revoked)
+                .unwrap_or_else(|| {
+                    matches!(
+                        user_id.revocation_status(policy, Some(now)),
+                        RevocationStatus::Revoked(_)
+                    )
+                });
+
+            (
+                user_id.userid().value().to_vec(),
+                UserIdDiscoveryState {
+                    is_currently_primary: candidate
+                        .as_ref()
+                        .map(|candidate| candidate.primary)
+                        .unwrap_or(false),
+                    is_currently_revoked,
+                },
+            )
+        })
+        .collect()
+}
+
 fn compare_user_id_candidates(left: &UserIdCandidate, right: &UserIdCandidate) -> Ordering {
     match (left.revoked, right.revoked) {
         (false, true) => return Ordering::Greater,
@@ -445,6 +677,22 @@ fn compare_user_id_candidates(left: &UserIdCandidate, right: &UserIdCandidate) -
 
 fn user_id_bytes_to_string(user_id: &[u8]) -> String {
     String::from_utf8_lossy(user_id).to_string()
+}
+
+fn reject_armored_certificate_input(cert_data: &[u8]) -> Result<(), PgpError> {
+    let trimmed = cert_data
+        .iter()
+        .skip_while(|byte| byte.is_ascii_whitespace())
+        .copied()
+        .collect::<Vec<_>>();
+
+    if trimmed.starts_with(b"-----BEGIN PGP") {
+        return Err(PgpError::InvalidKeyData {
+            reason: "Certificate selector discovery requires binary certificate bytes".to_string(),
+        });
+    }
+
+    Ok(())
 }
 
 fn serialize_public_cert(cert: &openpgp::Cert) -> Result<Vec<u8>, PgpError> {
