@@ -1,7 +1,7 @@
 # Rust / FFI Service Integration Plan
 
-> Status: Active rollout document for the remaining Swift service and app-layer adoption work on the current Rust / FFI capability families.
-> Purpose: Define the next implementation work needed to complete or deepen downstream Swift adoption of the Rust / FFI capability families that are already in scope for CypherAir.
+> Status: Active rollout document for the remaining Swift service-layer adoption work on the current Rust / FFI capability families.
+> Purpose: Define the next implementation work needed to complete or deepen downstream Swift service adoption of the Rust / FFI capability families that are already in scope for CypherAir.
 > Audience: Human developers, reviewers, and AI coding tools.
 > Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
 
@@ -18,191 +18,242 @@ Use the baseline document for:
 
 Use this document for:
 
-- what to build next
+- what to build next at the service boundary
 - which service should own each remaining family
+- which rollout-level prerequisites must be completed first
 - which interface and ownership decisions are fixed before implementation starts
 - what order the work should land in
 - what validation must accompany it
 
-This document intentionally absorbs the still-relevant conclusions from the earlier feasibility assessment. It should now stand on its own as the active rollout guide.
+This document intentionally freezes rollout-level decisions only.
+
+- it fixes prerequisites, service ownership, sequencing, persistence policy, and security review posture where those decisions affect implementation order or safety
+- it does not freeze implementation-level method names, record names, exact parameter wrappers, or wire shapes unless a later stage plan needs to do so explicitly
+
+Current rollout posture is `service-first` compatibility mode.
+
+- current work in this document deepens Rust / FFI, Swift service, and Swift model boundaries first
+- existing UI continues to use the current legacy / folded behavior during this rollout
+- new service-visible information may exist before it is shown in the app
+- app-surface adoption is not part of this rollout unless a later product-scoped plan explicitly adds it
+
+This document intentionally absorbs the still-relevant conclusions from the earlier feasibility assessment while keeping the total plan at the service-boundary level.
 
 ## 2. Rollout Summary
 
 The current rollout work is:
 
-1. Add selector discovery support at the Rust / FFI boundary and introduce selector-bearing Swift metadata.
-2. Introduce `CertificateSignatureService`.
-3. Add detailed-result service APIs in `SigningService`.
+1. Add detailed-result service APIs in `SigningService`.
+2. Add selector discovery support at the Rust / FFI boundary and introduce selector-bearing Swift metadata.
+3. Introduce `CertificateSignatureService`.
 4. Extend the `KeyManagementService` facade for selective revocation.
-5. Add an optional dedicated app consumer for `PasswordMessageService`.
-6. Add detailed-result service APIs in `DecryptionService` as a separately reviewed security-sensitive phase.
+5. Add detailed-result service APIs in `DecryptionService` as a separately reviewed security-sensitive phase.
 
 Certificate Merge / Update stays out of the rollout queue because it already serves as the completed reference baseline.
 
+`PasswordMessageService` app ownership is out of scope for the current rollout.
+
+- the service-layer capability remains supported
+- no new app route, view, or screen-model ownership is planned in this document
+- any future app exposure for password-message flows requires a separate product-scoped plan
+
 ## 3. Planned Workstreams
 
-### 3.1 Add Selector Discovery Support And Selector-Bearing Swift Metadata
+### 3.1 Add Detailed Result APIs In `SigningService`
+
+This is the first active rollout workstream.
+
+- It is a bounded service-contract extension built on top of already-shipped detailed Rust / FFI APIs.
+- It does not depend on selector discovery.
+- It does not depend on `CertificateSignatureService`.
+- It does not touch the `DecryptionService` Phase 1 / Phase 2 authentication boundary.
+
+Workstream decisions fixed here:
+
+- keep current legacy service methods and result types unchanged for existing consumers
+- add additive detailed-result methods in `SigningService`
+- expose Swift detailed verify result types that preserve:
+  - per-signature arrays
+  - parser order
+  - repeated signers
+  - unknown signer entries
+  - legacy compatibility fields
+- treat the current internal use of `verifyDetachedFileDetailed(...)` as the seed of an explicit service contract instead of an internal fold-only detail
+
+Exact detailed method names and exact Swift result-type shapes remain stage-plan work.
+
+### 3.2 Add Selector Discovery Support And Selector-Bearing Swift Metadata
 
 This is the shared prerequisite workstream for selective revocation and User ID-driven certificate-signature service adoption.
 
-- Add a bounded Rust / FFI discovery helper or equivalent exported bounded metadata surface for:
-  - selectable subkey identifiers
-  - selectable raw User ID bytes
-- Introduce a selector-bearing Swift metadata type that is built from that exported discovery surface.
-- Keep `PGPKeyIdentity` as summary metadata for persisted identity state; do not expand it into the long-term selector catalog.
-- The selector-bearing surface must be specific enough for:
-  - subkey revocation selection
-  - User ID revocation selection
-  - User ID binding verification
-  - User ID certification generation
-- Selectors must remain cryptographic selectors:
-  - subkey selection uses `subkeyFingerprint`
-  - User ID selection uses raw `userIdData`
-  - display strings must not become selector inputs
+Workstream decisions fixed here:
 
-### 3.2 Introduce `CertificateSignatureService`
+- selector discovery is an independent prerequisite and must land before later selector-driven workstreams begin
+- selector discovery must be provided through an independent Rust / FFI selector-discovery surface
+- selector discovery must not be reconstructed from UI inference or display-string parsing
+- `PGPKeyIdentity` stays summary metadata for persisted identity state and must not become the selector catalog
+
+The selector-discovery surface must be specific enough for:
+
+- subkey revocation selection
+- User ID revocation selection
+- User ID binding verification
+- User ID certification generation
+
+Selectors must remain cryptographic selectors:
+
+- subkey selection uses `subkeyFingerprint`
+- User ID selection uses raw `userIdData`
+- display strings must not become selector inputs
+
+Exact helper shape, exact exported record shape, and exact field naming remain stage-plan work.
+
+### 3.3 Introduce `CertificateSignatureService`
 
 This family should land as a dedicated service rather than piggybacking on message services.
 
-- Proposed service name: `CertificateSignatureService`
-- Proposed owned operations:
+Workstream decisions fixed here:
+
+- introduce a dedicated `CertificateSignatureService`
+- keep the whole service rollout after selector discovery, even though direct-key verification is selector-independent
+- own the following operations inside this service:
   - `verifyDirectKeySignature(...)`
   - `verifyUserIdBindingSignature(...)`
   - `generateUserIdCertification(...)`
-- Proposed input ownership:
+- keep signer-candidate ownership explicit:
   - candidate signer certificates come from contact public certificates plus own public certificates
-  - target certificate input remains certificate bytes or a bounded Swift type that preserves `publicKeyData`
-  - User ID-driven operations consume selector-bearing metadata from Workstream 3.1
-  - certification generation accesses local secret key material through `KeyManagementService.unwrapPrivateKey(...)`
-- Proposed result ownership:
-  - certificate-signature-specific Swift result types
-  - no reuse of message `SignatureVerification`
+- keep target-certificate ownership explicit:
+  - the service accepts certificate bytes or a bounded Swift type that preserves `publicKeyData`
+- require selector-bearing metadata from Workstream 3.2 for User ID-driven operations
+- access local secret key material for certification generation through `KeyManagementService.unwrapPrivateKey(...)`
+- use certificate-signature-specific Swift result types
+- do not reuse message `SignatureVerification`
 
-Direct-key verification is selector-independent, but this service rollout stays grouped after selector discovery because two of the three owned operations are User ID-driven.
-
-### 3.3 Add Detailed Result APIs In `SigningService`
-
-This workstream deepens service adoption without breaking current app behavior.
-
-- Keep current legacy service methods and result types unchanged for existing consumers.
-- Add additive detailed-result methods in `SigningService`.
-- Expose Swift detailed verify result types that preserve:
-  - per-signature arrays
-  - parser order
-  - repeated signers
-  - unknown signer entries
-  - legacy compatibility fields
-- The current internal use of `verifyDetachedFileDetailed(...)` should become an explicit service contract instead of an internal fold-only implementation detail.
+Exact input wrapper choice and exact Swift result-type details remain stage-plan work.
 
 ### 3.4 Extend The `KeyManagementService` Facade For Selective Revocation
 
-After selector discovery exists, selective revocation should become a bounded `KeyManagementService` responsibility.
+After selector discovery exists, selective revocation becomes a bounded `KeyManagementService` responsibility.
 
-- Keep current key-level revocation behavior unchanged.
-- Keep `KeyManagementService` as the app-facing facade and observable state owner.
-- Land new key-lifecycle implementation in focused internal owners under `Sources/Services/KeyManagement/`; do not grow `KeyManagementService.swift` back into a monolithic implementation file.
-- Add additive facade APIs for:
+Workstream decisions fixed here:
+
+- keep current key-level revocation behavior unchanged
+- keep `KeyManagementService` as the app-facing facade and observable state owner
+- keep new implementation logic in focused internal owners under `Sources/Services/KeyManagement/`; do not grow `KeyManagementService.swift` back into a monolithic implementation file
+- add additive facade APIs for:
   - subkey revocation generation
   - User ID revocation generation
-- Accept validated selectors from the selector-bearing metadata surface instead of raw UI strings or bytes.
+- accept validated selectors from the selector-bearing metadata surface instead of raw UI strings or bytes
 
-Selective revocation v1 persistence/export policy is fixed as follows:
+Selective revocation v1 persistence and export policy is fixed as follows:
 
 - key-level revocation storage remains unchanged
-- selective revocations are generated and exported on demand
+- selective revocations are generated on demand
 - selective revocations do not introduce a new persisted multi-artifact store in v1
-- armored export remains supported for the generated revocation bytes
+- generation and armored export are separate concerns
+- armored export remains supported for generated revocation bytes
 
-Connect the service APIs to `KeyDetail` or a later key-management UI only after the service contract is stable.
+Connect the service APIs to `KeyDetail` or a later key-management UI only after the service contract is stable and after a separate app-surface plan explicitly asks for that work.
 
-### 3.5 Add A Dedicated App Consumer For `PasswordMessageService`
+Exact facade return shapes and exact export surface details remain stage-plan work.
 
-This workstream is an independent app-ownership track, not a service rewrite and not a prerequisite for the other workstreams.
-
-- Add a dedicated route, view, and screen-model ownership for password-message encrypt/decrypt only if product scope wants the workflow exposed now.
-- Keep this workflow separate from the existing recipient-key two-phase decrypt flow.
-- Document and implement UI-boundary ownership for plaintext lifetime and zeroization.
-- Define explicit UI handling for:
-  - `noSkesk`
-  - `passwordRejected`
-  - fatal auth/integrity failure
-  - optional signature reporting on successful decrypt
-
-### 3.6 Add Detailed Result APIs In `DecryptionService`
+### 3.5 Add Detailed Result APIs In `DecryptionService`
 
 This is a separate final-phase workstream because it touches a security-sensitive boundary.
 
-- Keep current legacy service methods and result types unchanged for existing consumers.
-- Add additive detailed-result methods in `DecryptionService`.
-- Expose Swift detailed decrypt result types that preserve:
+Workstream decisions fixed here:
+
+- keep current legacy service methods and result types unchanged for existing consumers
+- add additive detailed-result methods in `DecryptionService`
+- expose Swift detailed decrypt result types that preserve:
   - per-signature arrays
   - parser order
   - repeated signers
   - unknown signer entries
   - legacy compatibility fields
-- Keep the current Phase 1 / Phase 2 boundary intact.
-- Keep current auth-failure and integrity-failure hard-stop behavior intact.
-- Treat this work as security-sensitive and require dedicated human review rather than bundling it with `SigningService` detailed-result adoption.
+- keep the current Phase 1 / Phase 2 boundary intact
+- keep current auth-failure and integrity-failure hard-stop behavior intact
+- treat this work as security-sensitive and require dedicated human review rather than bundling it with `SigningService` detailed-result adoption
+
+Exact detailed method sets across the current `DecryptionService` API surface remain stage-plan work, but no detailed contract may bypass the existing authentication boundary.
 
 ## 4. Target Service / Interface Decisions
 
-### 4.1 Selector Discovery Surface
+### 4.1 Compatibility Mode
 
-- Add a new selector-bearing metadata type or equivalent bounded discovery surface.
-- Build it from Rust / FFI discovery support, not from UI inference or display-string parsing.
-- Do not overload `PGPKeyIdentity` with selector-bearing UI data.
-- Make the new surface reusable across selective revocation and certificate-signature workflows.
+- current rollout completion is defined at the service boundary, not at the UI boundary
+- existing UI-visible behavior remains unchanged for current consumers during this rollout
+- new service contracts may land before app presentation changes exist
+- this is an intentional compatibility-mode rollout, not an ambiguous partial-implementation state
 
-### 4.2 `KeyManagementService`
+### 4.2 `SigningService`
 
-- Add selective revocation service boundaries after selector discovery exists.
-- Require validated selectors from the selector-bearing Swift model instead of raw caller-provided selector bytes.
-- Keep current key-level revocation behavior unchanged.
-- Keep new implementation logic in `Sources/Services/KeyManagement/` internal owners when it belongs to the key lifecycle domain.
+- add detailed verify variants parallel to the current legacy methods
+- return new detailed signature result types
+- preserve legacy folded fields only as a compatibility bridge inside the new detailed result model
+- treat this as the first active rollout phase because it is the lowest-risk remaining service-boundary extension
 
-### 4.3 Selective Revocation Persistence
+### 4.3 Selector Discovery Surface
 
-- Key-level `PGPKeyIdentity.revocationCert` remains the only persisted revocation artifact in v1.
-- Selective subkey/User ID revocations are export-on-demand only in v1.
-- Any future persisted selective-revocation store is out of scope for this rollout and must be specified separately.
+- add an independent selector-bearing metadata surface at the Rust / FFI boundary
+- build it from Rust / FFI discovery support, not from UI inference or display-string parsing
+- do not overload `PGPKeyIdentity` with selector-bearing UI data
+- make the new surface reusable across selective revocation and certificate-signature workflows
 
 ### 4.4 `CertificateSignatureService`
 
-- Introduce a dedicated service for:
+- introduce a dedicated service for:
   - direct-key signature verification
   - User ID binding verification
   - User ID certification generation
-- Use certificate-signature-specific result types instead of message verification types.
-- Keep signer-candidate ownership and target-certificate ownership explicit at the service boundary.
+- use certificate-signature-specific result types instead of message verification types
+- keep signer-candidate ownership and target-certificate ownership explicit at the service boundary
+- keep the service rollout after selector discovery for a cleaner total service boundary
 
-### 4.5 `SigningService`
+### 4.5 `KeyManagementService`
 
-- Add detailed verify variants parallel to the current legacy methods.
-- Return new detailed signature result types.
-- Preserve legacy folded fields only as a compatibility bridge inside the new detailed result model.
+- add selective revocation service boundaries after selector discovery exists
+- require validated selectors from the selector-bearing Swift model instead of raw caller-provided selector bytes
+- keep current key-level revocation behavior unchanged
+- keep new implementation logic in `Sources/Services/KeyManagement/` internal owners when it belongs to the key lifecycle domain
+- keep `KeyManagementService` as the facade boundary for any later app adoption
 
-### 4.6 `DecryptionService`
+### 4.6 Selective Revocation Persistence And Export Layering
 
-- Add detailed decrypt variants parallel to the current legacy methods.
-- Keep the current Phase 1 / Phase 2 boundary intact.
-- Return new detailed decrypt result types without weakening existing auth/failure guarantees.
-- Treat this as a separate rollout phase from `SigningService`.
+- key-level `PGPKeyIdentity.revocationCert` remains the only persisted revocation artifact in v1
+- selective subkey/User ID revocations are export-on-demand only in v1
+- selective revocation generation and armored export remain separate layers
+- any future persisted selective-revocation store is out of scope for this rollout and must be specified separately
 
-### 4.7 `PasswordMessageService`
+### 4.7 `DecryptionService`
 
-- Keep the current service API unless implementation work reveals a concrete gap.
-- Focus this track on app entry ownership, screen-model ownership, and UI-boundary plaintext handling rather than service refactoring.
+- add detailed decrypt variants parallel to the current legacy methods
+- keep the current Phase 1 / Phase 2 boundary intact
+- return new detailed decrypt result types without weakening existing auth/failure guarantees
+- treat this as a separate rollout phase from `SigningService`
 
 ## 5. Validation Expectations
 
-### 5.1 Selector Discovery
+### 5.1 Compatibility Mode
+
+- existing UI-visible behavior remains unchanged for current consumers during this rollout
+- new service contracts are additive only
+- current Rust, FFI, and service-family tests that protect legacy behavior remain valid
+
+### 5.2 `SigningService` Detailed Results
+
+- detailed verify service results preserve signature arrays, parser order, repeated signers, and unknown signers
+- legacy compatibility fields still match current UI-visible behavior
+- service-level tests protect the detailed result contract instead of only folded legacy semantics
+
+### 5.3 Selector Discovery
 
 - selector discovery covers selectable subkey identifiers and raw User ID bytes
 - selectors remain stable across generated and imported certificates
 - no caller-facing API uses display strings as cryptographic selectors
 - both Profile A and Profile B are covered where the capability applies
 
-### 5.2 Certificate Signature Service
+### 5.4 Certificate Signature Service
 
 - direct-key verification covers `Valid`, `Invalid`, and `SignerMissing`
 - User ID binding verification covers `Valid`, `Invalid`, and `SignerMissing`
@@ -210,26 +261,14 @@ This is a separate final-phase workstream because it touches a security-sensitiv
 - successful subkey-signer verification preserves both primary signer fingerprint and signing-subkey fingerprint
 - certificate-signature result typing remains distinct from message verification typing
 
-### 5.3 `SigningService` Detailed Results
-
-- detailed verify service results preserve signature arrays, parser order, repeated signers, and unknown signers
-- legacy compatibility fields still match current UI-visible behavior
-- service-level tests protect the detailed result contract instead of only folded legacy semantics
-
-### 5.4 Selective Revocation
+### 5.5 Selective Revocation
 
 - existing key-level behavior remains unchanged
 - selector discovery is used for subkey and User ID selection
 - negative coverage exists for selector miss, public-only input, and unusable-secret input
 - selective revocations support export-on-demand and armored export
 - v1 does not silently introduce persisted multi-artifact selective-revocation storage
-
-### 5.5 Password / SKESK App Consumer
-
-- app entry points do not blur password decrypt with recipient-key decrypt
-- plaintext zeroization ownership is documented and tested at the UI boundary
-- `noSkesk`, `passwordRejected`, and auth/integrity failure UX mapping is covered
-- current Rust, FFI, and service-family tests remain valid
+- tests cover the generation/export layering without introducing a new persisted selective-revocation store
 
 ### 5.6 `DecryptionService` Detailed Results
 
@@ -242,15 +281,15 @@ This is a separate final-phase workstream because it touches a security-sensitiv
 
 Recommended sequencing:
 
-1. Complete selector discovery support and selector-bearing Swift metadata.
-2. Introduce `CertificateSignatureService`.
-3. Add detailed-result service APIs to `SigningService`.
+1. Add detailed-result service APIs to `SigningService`.
+2. Complete selector discovery support and selector-bearing Swift metadata.
+3. Introduce `CertificateSignatureService`.
 4. Extend the `KeyManagementService` facade for selective revocation.
-5. Add the app consumer for `PasswordMessageService` only if product scope wants it now.
-6. Add detailed-result service APIs to `DecryptionService` as a separately reviewed security-sensitive phase.
+5. Add detailed-result service APIs to `DecryptionService` as a separately reviewed security-sensitive phase.
 
 Additional review notes:
 
 - Any Rust / UniFFI public-surface changes still require regeneration and cross-layer validation under [TESTING.md](TESTING.md) and [CODE_REVIEW.md](CODE_REVIEW.md).
 - Any `DecryptionService` detailed-result adoption remains security-sensitive and requires human review under [SECURITY.md](SECURITY.md).
-- This plan intentionally treats the remaining integration gaps as active downstream work, while keeping independent app-surface work separate from the core service-boundary sequence.
+- This plan intentionally treats the remaining integration gaps as active downstream service-boundary work while keeping app-surface adoption out of the current rollout.
+- Any later app exposure for `PasswordMessageService`, selective revocation, or certificate-signature workflows requires a separate product-scoped plan.
