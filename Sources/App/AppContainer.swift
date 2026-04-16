@@ -13,6 +13,7 @@ final class AppContainer {
     let decryptionService: DecryptionService
     let passwordMessageService: PasswordMessageService
     let signingService: SigningService
+    let certificateSignatureService: CertificateSignatureService
     let qrService: QRService
     let selfTestService: SelfTestService
     let contactsDirectory: URL?
@@ -30,6 +31,7 @@ final class AppContainer {
         decryptionService: DecryptionService,
         passwordMessageService: PasswordMessageService,
         signingService: SigningService,
+        certificateSignatureService: CertificateSignatureService,
         qrService: QRService,
         selfTestService: SelfTestService,
         contactsDirectory: URL? = nil,
@@ -46,6 +48,7 @@ final class AppContainer {
         self.decryptionService = decryptionService
         self.passwordMessageService = passwordMessageService
         self.signingService = signingService
+        self.certificateSignatureService = certificateSignatureService
         self.qrService = qrService
         self.selfTestService = selfTestService
         self.contactsDirectory = contactsDirectory
@@ -90,6 +93,11 @@ final class AppContainer {
             keyManagement: keyManagement,
             contactService: contactService
         )
+        let certificateSignatureService = CertificateSignatureService(
+            engine: engine,
+            keyManagement: keyManagement,
+            contactService: contactService
+        )
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
 
@@ -105,6 +113,7 @@ final class AppContainer {
             decryptionService: decryptionService,
             passwordMessageService: passwordMessageService,
             signingService: signingService,
+            certificateSignatureService: certificateSignatureService,
             qrService: qrService,
             selfTestService: selfTestService
         )
@@ -165,6 +174,11 @@ final class AppContainer {
             keyManagement: keyManagement,
             contactService: contactService
         )
+        let certificateSignatureService = CertificateSignatureService(
+            engine: engine,
+            keyManagement: keyManagement,
+            contactService: contactService
+        )
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
 
@@ -180,6 +194,7 @@ final class AppContainer {
             decryptionService: decryptionService,
             passwordMessageService: passwordMessageService,
             signingService: signingService,
+            certificateSignatureService: certificateSignatureService,
             qrService: qrService,
             selfTestService: selfTestService,
             contactsDirectory: contactsDirectory,

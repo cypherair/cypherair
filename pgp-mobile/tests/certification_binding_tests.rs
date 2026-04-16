@@ -854,3 +854,27 @@ fn test_verify_user_id_binding_signature_by_selector_out_of_range_returns_invali
 
     assert!(matches!(result, Err(PgpError::InvalidKeyData { .. })));
 }
+
+#[test]
+fn test_verify_user_id_binding_signature_by_selector_mismatch_returns_invalid_key_data() {
+    let signer = generated_key(KeyProfile::Universal, "SelectorVerifyMismatchSigner");
+    let target = generated_key(KeyProfile::Universal, "SelectorVerifyMismatchTarget");
+    let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let mismatched = [user_id_data.clone(), b"-mismatch".to_vec()].concat();
+    let signature = cert_signature::generate_user_id_certification(
+        &signer.cert_data,
+        &target.public_key_data,
+        &user_id_data,
+        CertificationKind::Positive,
+    )
+    .expect("certification generation should succeed");
+
+    let result = cert_signature::verify_user_id_binding_signature_by_selector(
+        &signature,
+        &target.public_key_data,
+        &user_id_selector(&mismatched, 0),
+        &[signer.public_key_data],
+    );
+
+    assert!(matches!(result, Err(PgpError::InvalidKeyData { .. })));
+}

@@ -222,20 +222,18 @@ final class KeyManagementService {
             throw CypherAirError.noMatchingKey
         }
 
-        let discovered: DiscoveredCertificateSelectors
-        do {
-            discovered = try engine.discoverCertificateSelectors(certData: identity.publicKeyData)
-        } catch {
-            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-        }
+        let discovery = try CertificateSelectionCatalogDiscovery.discover(
+            engine: engine,
+            certData: identity.publicKeyData
+        )
 
-        guard discovered.certificateFingerprint == identity.fingerprint else {
+        guard discovery.raw.certificateFingerprint == identity.fingerprint else {
             throw CypherAirError.invalidKeyData(
                 reason: "Stored key metadata fingerprint does not match certificate data"
             )
         }
 
-        return CertificateSelectionCatalogMapper.map(discovered)
+        return discovery.catalog
     }
 
     // MARK: - Crash Recovery

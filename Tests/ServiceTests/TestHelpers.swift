@@ -112,6 +112,11 @@ enum TestHelpers {
             contactService: contactSvc
         )
         let signingSvc = SigningService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)
+        let certificateSignatureSvc = CertificateSignatureService(
+            engine: engine,
+            keyManagement: keyMgmt,
+            contactService: contactSvc
+        )
 
         return ServiceStack(
             engine: engine,
@@ -121,6 +126,7 @@ enum TestHelpers {
             decryptionService: decryptionSvc,
             passwordMessageService: passwordMessageSvc,
             signingService: signingSvc,
+            certificateSignatureService: certificateSignatureSvc,
             mockSE: mockSE,
             mockKC: mockKC,
             mockAuth: mockAuth,
@@ -137,6 +143,7 @@ enum TestHelpers {
         let decryptionService: DecryptionService
         let passwordMessageService: PasswordMessageService
         let signingService: SigningService
+        let certificateSignatureService: CertificateSignatureService
         let mockSE: MockSecureEnclave
         let mockKC: MockKeychain
         let mockAuth: MockAuthenticator
