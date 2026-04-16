@@ -10,6 +10,7 @@ final class KeyManagementService {
     /// All key identities stored on this device.
     private(set) var keys: [PGPKeyIdentity] = []
 
+    private let engine: PgpEngine
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
     private let provisioningService: KeyProvisioningService
@@ -33,6 +34,7 @@ final class KeyManagementService {
             bundleStore: bundleStore
         )
 
+        self.engine = engine
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
         self.provisioningService = KeyProvisioningService(
@@ -211,6 +213,29 @@ final class KeyManagementService {
     /// Does NOT require authentication (public key only).
     func exportPublicKey(fingerprint: String) throws -> Data {
         try exportService.exportPublicKey(fingerprint: fingerprint)
+    }
+
+    /// Discover selector-bearing subkey and User ID metadata for an existing key.
+    /// This is a read-only operation that uses stored public key bytes only.
+    func selectionCatalog(fingerprint: String) throws -> CertificateSelectionCatalog {
+        guard let identity = catalogStore.identity(for: fingerprint) else {
+            throw CypherAirError.noMatchingKey
+        }
+
+        let discovered: DiscoveredCertificateSelectors
+        do {
+            discovered = try engine.discoverCertificateSelectors(certData: identity.publicKeyData)
+        } catch {
+            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+        }
+
+        guard discovered.certificateFingerprint == identity.fingerprint else {
+            throw CypherAirError.invalidKeyData(
+                reason: "Stored key metadata fingerprint does not match certificate data"
+            )
+        }
+
+        return CertificateSelectionCatalogMapper.map(discovered)
     }
 
     // MARK: - Crash Recovery

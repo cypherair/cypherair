@@ -134,6 +134,7 @@
 				"Extensions/Data+Zeroing.swift",
 				"Extensions/KeyProfile+Codable.swift",
 				Models/AppConfiguration.swift,
+				Models/CertificateSelectionCatalog.swift,
 				Models/ColorTheme.swift,
 				Models/Contact.swift,
 				Models/CypherAirError.swift,
@@ -142,6 +143,8 @@
 				"Models/KeyProfile+App.swift",
 				Models/PGPKeyIdentity.swift,
 				Models/SignatureVerification.swift,
+				Models/SubkeySelectionOption.swift,
+				Models/UserIdSelectionOption.swift,
 				PgpMobile/pgp_mobile.swift,
 				Resources/AppIconAPreview.png,
 				Resources/AppIconBPreview.png,
@@ -167,6 +170,7 @@
 				Security/Mocks/MockSecureEnclave.swift,
 				Security/SecureEnclaveManageable.swift,
 				Security/SecureEnclaveManager.swift,
+				Services/CertificateSelectionCatalogMapper.swift,
 				Services/ContactImportPublicCertificateValidator.swift,
 				Services/ContactRepository.swift,
 				Services/ContactService.swift,
@@ -515,7 +519,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -750,7 +754,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;

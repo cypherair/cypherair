@@ -618,6 +618,13 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func detectProfile(certData: Data) throws  -> KeyProfile
     
     /**
+     * Discover selector-bearing subkey and User ID metadata from binary certificate bytes.
+     *
+     * This API is binary-only by contract. ASCII-armored certificate input is rejected.
+     */
+    func discoverCertificateSelectors(certData: Data) throws  -> DiscoveredCertificateSelectors
+    
+    /**
      * Encode a public key for QR code URL scheme.
      * Format: cypherair://import/v1/<base64url, no padding>
      *
@@ -1028,6 +1035,20 @@ open func decryptWithPassword(ciphertext: Data, password: String, verificationKe
 open func detectProfile(certData: Data)throws  -> KeyProfile  {
     return try  FfiConverterTypeKeyProfile_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_detect_profile(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(certData),$0
+    )
+})
+}
+    
+    /**
+     * Discover selector-bearing subkey and User ID metadata from binary certificate bytes.
+     *
+     * This API is binary-only by contract. ASCII-armored certificate input is rejected.
+     */
+open func discoverCertificateSelectors(certData: Data)throws  -> DiscoveredCertificateSelectors  {
+    return try  FfiConverterTypeDiscoveredCertificateSelectors_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_discover_certificate_selectors(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),$0
     )
@@ -2172,6 +2193,283 @@ public func FfiConverterTypeDetailedSignatureEntry_lift(_ buf: RustBuffer) throw
 #endif
 public func FfiConverterTypeDetailedSignatureEntry_lower(_ value: DetailedSignatureEntry) -> RustBuffer {
     return FfiConverterTypeDetailedSignatureEntry.lower(value)
+}
+
+
+/**
+ * Selector-bearing discovery result for a certificate.
+ */
+public struct DiscoveredCertificateSelectors: Equatable, Hashable {
+    /**
+     * Primary certificate fingerprint in canonical lowercase hex.
+     */
+    public var certificateFingerprint: String
+    /**
+     * All subkeys in the certificate's native iteration order.
+     */
+    public var subkeys: [DiscoveredSubkey]
+    /**
+     * All User IDs in the certificate's native iteration order.
+     */
+    public var userIds: [DiscoveredUserId]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Primary certificate fingerprint in canonical lowercase hex.
+         */certificateFingerprint: String, 
+        /**
+         * All subkeys in the certificate's native iteration order.
+         */subkeys: [DiscoveredSubkey], 
+        /**
+         * All User IDs in the certificate's native iteration order.
+         */userIds: [DiscoveredUserId]) {
+        self.certificateFingerprint = certificateFingerprint
+        self.subkeys = subkeys
+        self.userIds = userIds
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DiscoveredCertificateSelectors: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDiscoveredCertificateSelectors: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiscoveredCertificateSelectors {
+        return
+            try DiscoveredCertificateSelectors(
+                certificateFingerprint: FfiConverterString.read(from: &buf), 
+                subkeys: FfiConverterSequenceTypeDiscoveredSubkey.read(from: &buf), 
+                userIds: FfiConverterSequenceTypeDiscoveredUserId.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DiscoveredCertificateSelectors, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.certificateFingerprint, into: &buf)
+        FfiConverterSequenceTypeDiscoveredSubkey.write(value.subkeys, into: &buf)
+        FfiConverterSequenceTypeDiscoveredUserId.write(value.userIds, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDiscoveredCertificateSelectors_lift(_ buf: RustBuffer) throws -> DiscoveredCertificateSelectors {
+    return try FfiConverterTypeDiscoveredCertificateSelectors.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDiscoveredCertificateSelectors_lower(_ value: DiscoveredCertificateSelectors) -> RustBuffer {
+    return FfiConverterTypeDiscoveredCertificateSelectors.lower(value)
+}
+
+
+/**
+ * Selector-bearing metadata for one discovered subkey.
+ */
+public struct DiscoveredSubkey: Equatable, Hashable {
+    /**
+     * Subkey fingerprint in canonical lowercase hex.
+     */
+    public var fingerprint: String
+    /**
+     * Display-oriented algorithm name.
+     */
+    public var algorithmDisplay: String
+    /**
+     * Whether this subkey is currently transport-encryption capable under StandardPolicy + now.
+     */
+    public var isCurrentlyTransportEncryptionCapable: Bool
+    /**
+     * Whether this subkey is currently revoked under StandardPolicy + now.
+     */
+    public var isCurrentlyRevoked: Bool
+    /**
+     * Whether this subkey is currently expired under StandardPolicy + now.
+     */
+    public var isCurrentlyExpired: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Subkey fingerprint in canonical lowercase hex.
+         */fingerprint: String, 
+        /**
+         * Display-oriented algorithm name.
+         */algorithmDisplay: String, 
+        /**
+         * Whether this subkey is currently transport-encryption capable under StandardPolicy + now.
+         */isCurrentlyTransportEncryptionCapable: Bool, 
+        /**
+         * Whether this subkey is currently revoked under StandardPolicy + now.
+         */isCurrentlyRevoked: Bool, 
+        /**
+         * Whether this subkey is currently expired under StandardPolicy + now.
+         */isCurrentlyExpired: Bool) {
+        self.fingerprint = fingerprint
+        self.algorithmDisplay = algorithmDisplay
+        self.isCurrentlyTransportEncryptionCapable = isCurrentlyTransportEncryptionCapable
+        self.isCurrentlyRevoked = isCurrentlyRevoked
+        self.isCurrentlyExpired = isCurrentlyExpired
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DiscoveredSubkey: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDiscoveredSubkey: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiscoveredSubkey {
+        return
+            try DiscoveredSubkey(
+                fingerprint: FfiConverterString.read(from: &buf), 
+                algorithmDisplay: FfiConverterString.read(from: &buf), 
+                isCurrentlyTransportEncryptionCapable: FfiConverterBool.read(from: &buf), 
+                isCurrentlyRevoked: FfiConverterBool.read(from: &buf), 
+                isCurrentlyExpired: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DiscoveredSubkey, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.fingerprint, into: &buf)
+        FfiConverterString.write(value.algorithmDisplay, into: &buf)
+        FfiConverterBool.write(value.isCurrentlyTransportEncryptionCapable, into: &buf)
+        FfiConverterBool.write(value.isCurrentlyRevoked, into: &buf)
+        FfiConverterBool.write(value.isCurrentlyExpired, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDiscoveredSubkey_lift(_ buf: RustBuffer) throws -> DiscoveredSubkey {
+    return try FfiConverterTypeDiscoveredSubkey.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDiscoveredSubkey_lower(_ value: DiscoveredSubkey) -> RustBuffer {
+    return FfiConverterTypeDiscoveredSubkey.lower(value)
+}
+
+
+/**
+ * Selector-bearing metadata for one discovered User ID packet.
+ */
+public struct DiscoveredUserId: Equatable, Hashable {
+    /**
+     * 0-based occurrence index in the certificate's native User ID iteration order.
+     */
+    public var occurrenceIndex: UInt64
+    /**
+     * Raw User ID packet bytes.
+     */
+    public var userIdData: Data
+    /**
+     * Display-oriented lossy UTF-8 rendering of `user_id_data`.
+     */
+    public var displayText: String
+    /**
+     * Whether this User ID is currently marked primary under StandardPolicy + now.
+     */
+    public var isCurrentlyPrimary: Bool
+    /**
+     * Whether this User ID is currently revoked under StandardPolicy + now.
+     */
+    public var isCurrentlyRevoked: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * 0-based occurrence index in the certificate's native User ID iteration order.
+         */occurrenceIndex: UInt64, 
+        /**
+         * Raw User ID packet bytes.
+         */userIdData: Data, 
+        /**
+         * Display-oriented lossy UTF-8 rendering of `user_id_data`.
+         */displayText: String, 
+        /**
+         * Whether this User ID is currently marked primary under StandardPolicy + now.
+         */isCurrentlyPrimary: Bool, 
+        /**
+         * Whether this User ID is currently revoked under StandardPolicy + now.
+         */isCurrentlyRevoked: Bool) {
+        self.occurrenceIndex = occurrenceIndex
+        self.userIdData = userIdData
+        self.displayText = displayText
+        self.isCurrentlyPrimary = isCurrentlyPrimary
+        self.isCurrentlyRevoked = isCurrentlyRevoked
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DiscoveredUserId: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDiscoveredUserId: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiscoveredUserId {
+        return
+            try DiscoveredUserId(
+                occurrenceIndex: FfiConverterUInt64.read(from: &buf), 
+                userIdData: FfiConverterData.read(from: &buf), 
+                displayText: FfiConverterString.read(from: &buf), 
+                isCurrentlyPrimary: FfiConverterBool.read(from: &buf), 
+                isCurrentlyRevoked: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DiscoveredUserId, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.occurrenceIndex, into: &buf)
+        FfiConverterData.write(value.userIdData, into: &buf)
+        FfiConverterString.write(value.displayText, into: &buf)
+        FfiConverterBool.write(value.isCurrentlyPrimary, into: &buf)
+        FfiConverterBool.write(value.isCurrentlyRevoked, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDiscoveredUserId_lift(_ buf: RustBuffer) throws -> DiscoveredUserId {
+    return try FfiConverterTypeDiscoveredUserId.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDiscoveredUserId_lower(_ value: DiscoveredUserId) -> RustBuffer {
+    return FfiConverterTypeDiscoveredUserId.lower(value)
 }
 
 
@@ -4391,6 +4689,56 @@ fileprivate struct FfiConverterSequenceTypeDetailedSignatureEntry: FfiConverterR
     }
 }
 
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeDiscoveredSubkey: FfiConverterRustBuffer {
+    typealias SwiftType = [DiscoveredSubkey]
+
+    public static func write(_ value: [DiscoveredSubkey], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeDiscoveredSubkey.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [DiscoveredSubkey] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [DiscoveredSubkey]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeDiscoveredSubkey.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeDiscoveredUserId: FfiConverterRustBuffer {
+    typealias SwiftType = [DiscoveredUserId]
+
+    public static func write(_ value: [DiscoveredUserId], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeDiscoveredUserId.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [DiscoveredUserId] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [DiscoveredUserId]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeDiscoveredUserId.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -4434,6 +4782,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_detect_profile() != 25919) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_discover_certificate_selectors() != 2777) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encode_qr_url() != 4268) {

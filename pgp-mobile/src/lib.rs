@@ -27,8 +27,8 @@ use crate::cert_signature::{CertificateSignatureResult, CertificationKind};
 use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
 use crate::keys::{
-    CertificateMergeResult, GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult,
-    PublicCertificateValidationResult, S2kInfo,
+    CertificateMergeResult, DiscoveredCertificateSelectors, GeneratedKey, KeyInfo, KeyProfile,
+    ModifyExpiryResult, PublicCertificateValidationResult, S2kInfo,
 };
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::signature_details::{
@@ -75,6 +75,16 @@ impl PgpEngine {
     /// Parse a key and extract information (fingerprint, version, User ID, etc.).
     pub fn parse_key_info(&self, key_data: Vec<u8>) -> Result<KeyInfo, PgpError> {
         keys::parse_key_info(&key_data)
+    }
+
+    /// Discover selector-bearing subkey and User ID metadata from binary certificate bytes.
+    ///
+    /// This API is binary-only by contract. ASCII-armored certificate input is rejected.
+    pub fn discover_certificate_selectors(
+        &self,
+        cert_data: Vec<u8>,
+    ) -> Result<DiscoveredCertificateSelectors, PgpError> {
+        keys::discover_certificate_selectors(&cert_data)
     }
 
     /// Get the key version from binary certificate data.

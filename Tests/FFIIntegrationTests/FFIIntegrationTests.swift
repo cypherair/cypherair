@@ -584,6 +584,90 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertEqual(result.profile, .universal)
     }
 
+    // MARK: - C5.2C Selector Discovery
+
+    func test_discoverCertificateSelectors_gpgPublicAndSecretFixtures_matchAcrossFFI() throws {
+        let publicCert = try loadArmoredFixtureAsBinary("gpg_pubkey")
+        let secretCert = try loadArmoredFixtureAsBinary("gpg_secretkey")
+
+        let fromPublic = try engine.discoverCertificateSelectors(certData: publicCert)
+        let fromSecret = try engine.discoverCertificateSelectors(certData: secretCert)
+
+        XCTAssertEqual(fromPublic, fromSecret)
+        XCTAssertFalse(fromPublic.subkeys.isEmpty)
+        XCTAssertFalse(fromPublic.userIds.isEmpty)
+    }
+
+    func test_discoverCertificateSelectors_generatedProfiles_driveSelectiveRevocationAcrossFFI() throws {
+        for profile in [KeyProfile.universal, .advanced] {
+            let generated = try engine.generateKey(
+                name: "Selector \(profile)",
+                email: "selector-\(profile)-ffi@example.com",
+                expirySeconds: nil,
+                profile: profile
+            )
+
+            let discovered = try engine.discoverCertificateSelectors(certData: generated.publicKeyData)
+
+            XCTAssertEqual(discovered.certificateFingerprint, generated.fingerprint)
+            XCTAssertFalse(discovered.subkeys.isEmpty)
+            XCTAssertEqual(discovered.userIds.count, 1)
+            XCTAssertEqual(
+                discovered.subkeys[0].fingerprint,
+                discovered.subkeys[0].fingerprint.lowercased(),
+                "FFI-discovered subkey selector must be lowercase hex"
+            )
+            XCTAssertTrue(
+                discovered.subkeys.contains(where: \.isCurrentlyTransportEncryptionCapable),
+                "Generated key should expose at least one currently transport-capable discovered subkey"
+            )
+
+            let subkeyRevocation = try engine.generateSubkeyRevocation(
+                secretCert: generated.certData,
+                subkeyFingerprint: discovered.subkeys[0].fingerprint
+            )
+            let userIdRevocation = try engine.generateUserIdRevocation(
+                secretCert: generated.certData,
+                userIdData: discovered.userIds[0].userIdData
+            )
+
+            XCTAssertFalse(subkeyRevocation.isEmpty)
+            XCTAssertFalse(userIdRevocation.isEmpty)
+        }
+    }
+
+    func test_discoverCertificateSelectors_primaryUserIdMergeFixture_preservesListOrderAndOccurrenceIndexAcrossFFI() throws {
+        let base = try loadFixture("merge_primary_uid_base")
+        let update = try loadFixture("merge_primary_uid_update")
+        let merged = try engine.mergePublicCertificateUpdate(
+            existingCert: base,
+            incomingCertOrUpdate: update
+        )
+
+        let discovered = try engine.discoverCertificateSelectors(certData: merged.mergedCertData)
+
+        XCTAssertEqual(discovered.userIds.count, 2)
+        XCTAssertEqual(discovered.userIds[0].occurrenceIndex, 0)
+        XCTAssertEqual(discovered.userIds[1].occurrenceIndex, 1)
+        XCTAssertEqual(discovered.userIds.map(\.displayText), ["aaaaa", "bbbbb"])
+        XCTAssertEqual(
+            discovered.userIds.map(\.userIdData),
+            [Data("aaaaa".utf8), Data("bbbbb".utf8)]
+        )
+    }
+
+    func test_discoverCertificateSelectors_binaryOnlyArmoredInput_throwsInvalidKeyDataAcrossFFI() throws {
+        let armoredPublicCert = try loadArmoredFixture("gpg_pubkey")
+
+        XCTAssertThrowsError(
+            try engine.discoverCertificateSelectors(certData: armoredPublicCert)
+        ) { error in
+            guard case .InvalidKeyData = error as? PgpError else {
+                return XCTFail("Expected InvalidKeyData, got \(error)")
+            }
+        }
+    }
+
     func test_validatePublicCertificate_secretBearingInput_throwsInvalidKeyDataWithStableToken() throws {
         let generated = try engine.generateKey(
             name: "Validate Secret",
