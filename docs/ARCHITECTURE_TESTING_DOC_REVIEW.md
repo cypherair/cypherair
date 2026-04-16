@@ -1,417 +1,197 @@
-# Architecture and Testing Documentation Review
+# Code-Baseline Verification of `ARCHITECTURE_TESTING_DOC_REVIEW.md`
 
 ## Executive Summary
 
-This audit reviews `docs/ARCHITECTURE.md` and `docs/TESTING.md` against the current repository state.
+This document verifies the findings previously listed in `docs/ARCHITECTURE_TESTING_DOC_REVIEW.md`
+against the current repository state.
 
-Overall, the two documents still describe the project's direction correctly, but several concrete statements are now stale. The most important mismatches are:
+Verification rules for this pass:
 
-- the two-phase decrypt flow still describes the older `parseRecipients -> local fingerprint match` model instead of the current `matchRecipients` certificate-matching flow
-- the Architecture Guide overstates the scope of `DiskSpaceChecker` and has an outdated Rust crate inventory and storage layout
-- the Testing Guide is internally inconsistent about where FFI integration tests run
-- several Testing Guide code examples and mock interfaces no longer match the current Swift and UniFFI APIs
+- Primary facts come from code, tests, test plans, workflows, and on-disk layout.
+- `docs/ARCHITECTURE.md`, `docs/TESTING.md`, and `CLAUDE.md` are comparison targets, not
+  facts in their own right.
+- The earlier review content was treated as a claim list only, never as evidence.
 
-Severity summary:
+Verdict summary:
 
-| ID | Severity | Area | Summary |
+| ID | Verdict | Severity assessment | Short note |
 |---|---|---|---|
-| A-1 | High | Architecture | Phase-1 decrypt flow documents the wrong Rust API and matching model |
-| A-2 | Medium | Architecture | Rust crate file inventory is stale and still references missing `pgp-mobile/uniffi.toml` |
-| A-3 | High | Architecture | `DiskSpaceChecker` is documented as replacing the fixed 100 MB limit, but the limit still exists for in-memory file encryption |
-| A-4 | Medium | Architecture | Storage layout is incomplete and partially outdated |
-| A-5 | Medium | Architecture | QR import flow omits the current loader/coordinator workflow and import gating behavior |
-| A-6 | Medium | Architecture | Memory-zeroing component description no longer matches current file ownership |
-| T-1 | High | Testing | Test-layer platform descriptions are internally inconsistent and do not match the active test plan layout |
-| T-2 | High | Testing | Multiple code examples no longer compile against the current APIs |
-| T-3 | Medium | Testing | Mock interface examples no longer match the current protocols |
-| T-4 | Medium | Testing | Explicit `PgpError -> CypherAirError` mapping coverage is narrower than the guide implies |
-| T-5 | Low | Testing | The GitHub Actions runner note over-generalizes which jobs use `macos-26` |
-| T-6 | Low | Testing | Section numbering is duplicated in the GnuPG section |
-| C-1 | Medium | Cross-document | `docs/TESTING.md` and `CLAUDE.md` disagree about the complete test-plan set and when `CypherAir-MacUITests` matters |
+| A-1 | Partially confirmed | Keep `High` | The doc flow is stale, but the Swift service still uses `parseRecipients(...)` as its own phase-1 entrypoint name. |
+| A-2 | Confirmed | Keep `Medium` | The crate tree is stale and still references a missing `uniffi.toml`. |
+| A-3 | Confirmed | Lower to `Medium` | The mismatch is real, but it documents a behavior limit rather than a security boundary. |
+| A-4 | Confirmed | Keep `Medium` | The storage section misses real files, temp paths, and defaults. |
+| A-5 | Confirmed | Keep `Medium` | The URL import flow now has more coordinator and gating stages than the doc shows. |
+| A-6 | Confirmed | Keep `Medium` | The documented ownership of zeroing helpers no longer matches the code split. |
+| T-1 | Confirmed | Keep `High` | The FFI layer description conflicts with the active Xcode test-plan layout. |
+| T-2 | Confirmed | Keep `High` | Several snippets no longer match the shipping APIs. |
+| T-3 | Confirmed | Keep `Medium` | The mock seams in the guide lag the real protocols. |
+| T-4 | Partially confirmed | Keep `Medium` | Direct mapping coverage is incomplete for some newer variants, but broader behavior coverage exists elsewhere. |
+| T-5 | Confirmed | Keep `Low` | The workflow note over-generalizes `macos-26`. |
+| T-6 | Confirmed | Keep `Low` | The duplicated section number is real. |
+| C-1 | Partially confirmed | Lower to `Low` | There is a real omission in `CLAUDE.md`, but it is more incomplete than contradictory. |
 
-The issues found here are documentation-fidelity problems, not code changes. This audit did not find a code-level contradiction with the project's core zero-network, Secure Enclave, or AEAD hard-fail rules during the inspected paths.
+Totals:
 
-## Methodology
+- Confirmed: 10
+- Partially confirmed: 3
+- Not supported: 0
 
-This was a static, repository-local audit.
+## Source Priority
 
-- Target documents reviewed:
-  - `docs/ARCHITECTURE.md`
-  - `docs/TESTING.md`
-- Primary evidence sources:
-  - `Sources/App/`
-  - `Sources/Services/`
-  - `Sources/Security/`
-  - `Sources/Models/`
-  - `pgp-mobile/src/`
-  - `Tests/`
-  - `UITests/`
-  - `CypherAir-UnitTests.xctestplan`
-  - `CypherAir-DeviceTests.xctestplan`
-  - `CypherAir-MacUITests.xctestplan`
-  - `CypherAir.xcodeproj/xcshareddata/xcschemes/CypherAir.xcscheme`
-  - `.github/workflows/pr-checks.yml`
-  - `.github/workflows/nightly-full.yml`
-  - `CLAUDE.md`
-- Read-only commands used:
-  - `rg --files`
-  - `rg -n`
-  - `sed -n`
-  - `nl -ba`
-  - `plutil -p`
-- Runtime validation commands were not required for the findings below. The mismatches are directly observable from source layout, test plans, workflows, and code signatures.
+Primary evidence used for every verdict:
 
-## Architecture Findings
+- `Sources/`
+- `pgp-mobile/src/`
+- `Tests/`
+- `UITests/`
+- `CypherAir-UnitTests.xctestplan`
+- `CypherAir-DeviceTests.xctestplan`
+- `CypherAir-MacUITests.xctestplan`
+- `CypherAir.xcodeproj/xcshareddata/xcschemes/CypherAir.xcscheme`
+- `.github/workflows/`
+- actual file-tree layout under the repo root
 
-### A-1. Phase-1 decrypt flow documents the wrong recipient-matching API
+Secondary comparison targets:
 
-- Source document and section:
-  - `docs/ARCHITECTURE.md`, Section 3, "Two-Phase Decrypt"
-- Documented claim:
-  - Phase 1 calls `parseRecipients(ciphertext)` and then "Match against local key fingerprints."
-- Actual repository state:
-  - `DecryptionService` does not use `parseRecipients` for local matching.
-  - It uses `engine.matchRecipients(...)` for in-memory decrypt and `engine.matchRecipientsFromFile(...)` for streaming decrypt.
-  - The Rust surface explicitly documents `parse_recipients` as returning encryption subkey identifiers and says callers should use `match_recipients` for correct certificate matching.
-- Evidence:
-  - `Sources/Services/DecryptionService.swift`
-  - `pgp-mobile/src/lib.rs`
-  - Example command: `rg -n "parse_recipients|match_recipients|matchRecipients" pgp-mobile/src/lib.rs Sources/Services/DecryptionService.swift`
-- Severity:
-  - High
-- Recommended correction:
-  - Update the decryption sequence diagram and surrounding text so Phase 1 is described as "match PKESK recipients against local certificates using `matchRecipients` / `matchRecipientsFromFile`, returning matched primary fingerprints."
-  - Keep `parseRecipients` documented only as a lower-level packet-inspection API, not as the app's matching step.
+- `docs/ARCHITECTURE.md`
+- `docs/TESTING.md`
+- `CLAUDE.md`
 
-### A-2. Rust crate inventory is stale and still references a missing `uniffi.toml`
+## Detailed Verification
 
-- Source document and section:
-  - `docs/ARCHITECTURE.md`, Section 2, "Rust Engine (`pgp-mobile/`)"
-- Documented claim:
-  - The crate tree ends with `uniffi.toml`, and the listed source files are limited to the older subset.
-- Actual repository state:
-  - `pgp-mobile/uniffi.toml` does not exist.
-  - UniFFI scaffolding is proc-macro based (`uniffi::setup_scaffolding!()` in `pgp-mobile/src/lib.rs`), and `pgp-mobile/build.rs` is intentionally empty aside from that explanation.
-  - The current crate also contains `cert_signature.rs` and `signature_details.rs`, which are absent from the documented tree.
-- Evidence:
-  - `pgp-mobile/src/lib.rs`
-  - `pgp-mobile/build.rs`
-  - `find pgp-mobile -maxdepth 2 -type f | sort`
-- Severity:
-  - Medium
-- Recommended correction:
-  - Refresh the crate tree to match the real file set.
-  - Remove the `uniffi.toml` entry unless such a file is reintroduced.
-  - Mention the proc-macro-based UniFFI setup and the generated binding outputs that the Xcode project consumes.
+### Architecture Findings
 
-### A-3. `DiskSpaceChecker` is documented as replacing the fixed 100 MB limit, but it only covers streaming file encryption
+#### A-1. Phase-1 decrypt flow documents the wrong matching model
 
-- Source document and section:
-  - `docs/ARCHITECTURE.md`, Services table, `DiskSpaceChecker`
-- Documented claim:
-  - `DiskSpaceChecker` "replaces the fixed 100 MB limit."
-- Actual repository state:
-  - `EncryptionService.encryptFile(...)` still enforces a fixed `100 * 1024 * 1024` size limit for in-memory file encryption.
-  - `DiskSpaceChecker.validateForEncryption(...)` is only used in `encryptFileStreaming(...)`.
-  - Existing tests still assert the 100 MB limit.
-- Evidence:
-  - `Sources/Services/EncryptionService.swift`
-  - `Sources/Services/DiskSpaceChecker.swift`
-  - `Tests/ServiceTests/EncryptionServiceTests.swift`
-  - Example command: `rg -n "100 MB|fileTooLarge|validateForEncryption" Sources/Services Tests docs/ARCHITECTURE.md`
-- Severity:
-  - High
-- Recommended correction:
-  - Narrow the `DiskSpaceChecker` description to "streaming file encryption preflight disk-space validation."
-  - Explicitly state that non-streaming file encryption still has the 100 MB in-memory limit.
+- Verdict: Partially confirmed.
+- Code evidence: `Sources/Services/DecryptionService.swift:57-106` dearmors and calls `engine.matchRecipients(...)`; `Sources/Services/DecryptionService.swift:120-156` calls `engine.matchRecipientsFromFile(...)`; `pgp-mobile/src/lib.rs:209-230` explicitly says `parse_recipients` returns PKESK subkey identifiers and that callers should use `match_recipients` for local matching.
+- Why the review is correct: The Architecture doc's sequence still shows the Rust side returning recipient key IDs and Swift then matching them locally, which is no longer how the app performs Phase 1.
+- Why the review overstates the change: The Swift service still exposes `parseRecipients(...)` and `parseRecipientsFromFile(...)` as its own Phase-1 entrypoints. What changed is the Rust API used underneath, not the service method name.
+- Severity assessment: Keep `High`. This is a security-critical flow, and the doc currently attributes matching to the wrong layer.
+- Recommendation assessment: Keep, but make it more precise: update the flow to show `DecryptionService.parseRecipients(...)` delegating to Rust `matchRecipients(...)` / `matchRecipientsFromFile(...)`.
 
-### A-4. Storage layout is incomplete and partially outdated
+#### A-2. Rust crate inventory is stale
 
-- Source document and section:
-  - `docs/ARCHITECTURE.md`, Section 5, "Storage Layout"
-- Documented claim:
-  - `Documents/contacts/` contains only `.gpg` files.
-  - `Documents/revocation/` exists as a managed output directory.
-  - `tmp/` includes only `decrypted/`.
-  - `com.cypherair.preference.colorTheme` defaults to `"defaultBlue"`.
-  - The listed UserDefaults keys are the complete relevant set.
-- Actual repository state:
-  - Contact storage also includes `contact-metadata.json` for verification state persistence.
-  - The codebase includes temp `streaming/` cleanup in startup, not only `decrypted/`.
-  - `AppConfiguration.colorTheme` defaults to `.systemDefault`, not `.defaultBlue`.
-  - `AppConfiguration` persists `com.cypherair.preference.guidedTutorialCompletedVersion`, which is not documented.
-  - UI-test container setup writes `com.cypherair.preference.uiTestBypassAuthentication`.
-  - No app-managed `Documents/revocation/` directory was found in the current implementation; revocation export is surfaced through the export controller instead of writing to a persistent app directory.
-- Evidence:
-  - `Sources/Services/ContactRepository.swift`
-  - `Sources/App/AppStartupCoordinator.swift`
-  - `Sources/Models/AppConfiguration.swift`
-  - `Sources/App/AppContainer.swift`
-  - Example command: `rg -n "contact-metadata|guidedTutorialCompletedVersion|uiTestBypassAuthentication|temporaryDirectory|revocation/" Sources Tests docs/ARCHITECTURE.md`
-- Severity:
-  - Medium
-- Recommended correction:
-  - Update the storage section to include `contact-metadata.json`, `tmp/streaming/`, and `guidedTutorialCompletedVersion`.
-  - Correct the color-theme default to `.systemDefault`.
-  - Either document the revocation export as share/export-controller driven or provide the real persistence path if one is later introduced.
+- Verdict: Confirmed.
+- Code evidence: the live tree includes `pgp-mobile/src/cert_signature.rs`, `pgp-mobile/src/signature_details.rs`, `pgp-mobile/uniffi-bindgen.rs`, and `pgp-mobile/bindings/`; there is no `pgp-mobile/uniffi.toml`; `pgp-mobile/src/lib.rs` uses UniFFI proc-macro scaffolding.
+- Why the review is correct: The Architecture doc's crate tree omits real files and still lists a `uniffi.toml` that does not exist.
+- Severity assessment: Keep `Medium`.
+- Recommendation assessment: Keep. Refresh the tree and mention the proc-macro-based UniFFI setup plus generated binding outputs.
 
-### A-5. The URL-import flow omits the current loader/coordinator workflow
+#### A-3. `DiskSpaceChecker` is documented as replacing the fixed 100 MB limit
 
-- Source document and section:
-  - `docs/ARCHITECTURE.md`, Section 3, "URL Scheme Public Key Import"
-- Documented claim:
-  - `CypherAirApp` calls `QRService.parseImportURL`, `QRService` parses the key details directly, and the app then stores the contact.
-- Actual repository state:
-  - `QRService.parseImportURL(...)` returns validated public-key bytes only.
-  - `PublicKeyImportLoader` performs certificate inspection using `inspectImportablePublicCertificate(...)`.
-  - `IncomingURLImportCoordinator` mediates URL handling and can block import while the guided tutorial presentation is active.
-  - `ContactImportWorkflow` then manages verified/unverified import and replacement confirmation.
-- Evidence:
-  - `Sources/App/Contacts/Import/IncomingURLImportCoordinator.swift`
-  - `Sources/App/Contacts/Import/PublicKeyImportLoader.swift`
-  - `Sources/App/Contacts/Import/ContactImportWorkflow.swift`
-  - `Sources/Services/QRService.swift`
-- Severity:
-  - Medium
-- Recommended correction:
-  - Expand the import flow diagram to show:
-    1. URL decode/validation
-    2. public-certificate inspection
-    3. confirmation workflow
-    4. optional key-replacement confirmation
-    5. tutorial-time import blocking
+- Verdict: Confirmed.
+- Code evidence: `Sources/Services/EncryptionService.swift:72-93` still enforces a fixed `100 * 1024 * 1024` limit in `encryptFile(...)`; `Sources/Services/EncryptionService.swift:108-127` uses `diskSpaceChecker.validateForEncryption(...)` only in `encryptFileStreaming(...)`.
+- Why the review is correct: The Architecture table says `DiskSpaceChecker` replaced the fixed 100 MB limit, but non-streaming file encryption still keeps that hard cap.
+- Severity assessment: Lower to `Medium`. The mismatch is real and user-visible, but it is not a security-boundary error.
+- Recommendation assessment: Keep. The doc should narrow `DiskSpaceChecker` to streaming preflight validation and separately mention the non-streaming in-memory limit.
 
-### A-6. The memory-zeroing component description no longer matches current file ownership
+#### A-4. Storage layout is incomplete and partially outdated
 
-- Source document and section:
-  - `docs/ARCHITECTURE.md`, Security table, `MemoryZeroingUtility`
-- Documented claim:
-  - `MemoryZeroingUtility` is the component that provides "Extensions on `Data` and `Array<UInt8>` for secure clearing."
-- Actual repository state:
-  - `Sources/Security/MemoryZeroingUtility.swift` defines `SensitiveData`, an auto-zeroing wrapper object.
-  - The `Data.zeroize()` and `Array<UInt8>.zeroize()` extensions live in `Sources/Extensions/Data+Zeroing.swift`.
-- Evidence:
-  - `Sources/Security/MemoryZeroingUtility.swift`
-  - `Sources/Extensions/Data+Zeroing.swift`
-- Severity:
-  - Medium
-- Recommended correction:
-  - Either rename the documented component to match the actual file split or document both pieces explicitly:
-    - `SensitiveData` in `Sources/Security/MemoryZeroingUtility.swift`
-    - `Data` / `Array<UInt8>` zeroing extensions in `Sources/Extensions/Data+Zeroing.swift`
+- Verdict: Confirmed.
+- Code evidence: `Sources/Services/ContactRepository.swift:82-87` stores `contact-metadata.json`; `Sources/App/AppStartupCoordinator.swift:45-57` cleans both `tmp/decrypted/` and `tmp/streaming/`; `Sources/Models/AppConfiguration.swift:65-97` persists `guidedTutorialCompletedVersion` and `colorTheme`; `Sources/Models/AppConfiguration.swift:139-145` defaults `colorTheme` to `.systemDefault`; `Sources/App/AppContainer.swift:113-122` writes `com.cypherair.preference.uiTestBypassAuthentication` for the UI-test container; `Sources/App/Keys/KeyDetailScreenModel.swift:135-157` routes revocation export through the export controller instead of a persistent `Documents/revocation/` folder.
+- Why the review is correct: The Architecture storage section omits real contact metadata, startup cleanup for `tmp/streaming/`, the guided-tutorial completion key, and the current color-theme default.
+- Why the review is also correct about revocation export: the current flow prepares exported revocation data for `fileExporter` presentation, not for storage in an app-managed revocation directory.
+- Important nuance: `com.cypherair.preference.uiTestBypassAuthentication` is real, but it is test-container state rather than ordinary runtime preference storage. It belongs in a verification note, not in the main app-storage inventory.
+- Additional check: `Sources/Services/SelfTestService.swift:3-5` still supports `Documents/self-test/`, so the review was right to leave that part alone.
+- Severity assessment: Keep `Medium`.
+- Recommendation assessment: Keep, with the test-only nuance above.
 
-## Testing Findings
+#### A-5. URL import flow omits the current coordinator and loader workflow
 
-### T-1. The test-layer platform description is internally inconsistent
+- Verdict: Confirmed.
+- Code evidence: `Sources/Services/QRService.swift:43-87` parses and validates the URL and returns public-key bytes only; `Sources/Services/QRService.swift:92-105` performs public-certificate inspection; `Sources/App/Contacts/Import/PublicKeyImportLoader.swift:22-33` turns URL bytes into `PublicKeyImportInspection`; `Sources/App/Contacts/Import/IncomingURLImportCoordinator.swift:25-57` blocks import while the guided tutorial is active and routes the inspection into UI flow; `Sources/App/Contacts/Import/ContactImportWorkflow.swift:23-123` owns verified/unverified import and replacement confirmation.
+- Why the review is correct: The current import path is more layered than the Architecture doc shows. Parsing, inspection, tutorial gating, confirmation, and replacement handling are now distinct steps.
+- Severity assessment: Keep `Medium`.
+- Recommendation assessment: Keep.
 
-- Source document and section:
-  - `docs/TESTING.md`, Section 1, "Test Layers"
-- Documented claim:
-  - Layer 2 runs on macOS local validation, iOS Simulator, and CI.
-  - Layer 3 FFI integration tests run on iOS Simulator plus physical device.
-- Actual repository state:
-  - `FFIIntegrationTests.swift` is part of the `CypherAirTests` target.
-  - `CypherAir-UnitTests.xctestplan` selects only the `CypherAirTests` target and skips device-only test classes.
-  - The documented CI and local commands run `CypherAir-UnitTests` on `platform=macOS`.
-  - There is no separate physical-device-only FFI integration target or test plan in the current project.
-  - Section 2 of the same document already says `CypherAir-UnitTests.xctestplan` covers Layers 2-3, which conflicts with the Layer 3 platform text in Section 1.
-- Evidence:
-  - `docs/TESTING.md`
-  - `CypherAir-UnitTests.xctestplan`
-  - `Tests/FFIIntegrationTests/FFIIntegrationTests.swift`
-  - `.github/workflows/pr-checks.yml`
-  - `.github/workflows/nightly-full.yml`
-- Severity:
-  - High
-- Recommended correction:
-  - Reword Layer 3 to say that FFI integration tests live inside the `CypherAirTests` target and therefore run wherever `CypherAir-UnitTests` runs:
-    - macOS local validation
-    - macOS CI
-    - optionally simulator where supported
-  - Reserve "physical device only" for Section 4 device-security coverage.
+#### A-6. Memory-zeroing component description no longer matches file ownership
 
-### T-2. Several Testing Guide code examples no longer compile against the current APIs
+- Verdict: Confirmed.
+- Code evidence: `Sources/Security/MemoryZeroingUtility.swift:3-52` defines `SensitiveData`; `Sources/Extensions/Data+Zeroing.swift:3-40` owns the `Data.zeroize()` and `Array<UInt8>.zeroize()` extensions.
+- Why the review is correct: The Architecture security table attributes the extension-based zeroing helpers to `MemoryZeroingUtility`, but the code split is now `SensitiveData` in one file and zeroing extensions in another.
+- Severity assessment: Keep `Medium`. This is contributor-facing architectural drift even though it does not change runtime behavior.
+- Recommendation assessment: Keep.
 
-- Source document and section:
-  - `docs/TESTING.md`, Sections 6 and 7
-- Documented claim:
-  - The provided sample code reflects the current testing surface.
-- Actual repository state:
-  - The examples use older or nonexistent APIs, including:
-    - `pgpMobile.generateKeyPair(...)`
-    - `pgpMobile.encrypt(... signingKey:)`
-    - `pgpMobile.decrypt(... privateKey:)`
-    - `DecryptionService(authenticator: ...)`
-    - `decryptionService.decryptAndZeroize(...)`
-    - `authManager.checkAndRecoverFromInterruptedRewrap()` with no fingerprint input
-  - The current surface uses `PgpEngine.generateKey(...)`, `encrypt(... recipients: signingKey: encryptToSelf:)`, `decrypt(... secretKeys: verificationKeys:)`, and `AuthenticationManager.checkAndRecoverFromInterruptedRewrap(fingerprints:)`.
-- Evidence:
-  - `docs/TESTING.md`
-  - `Tests/FFIIntegrationTests/FFIIntegrationTests.swift`
-  - `Sources/Services/DecryptionService.swift`
-  - `Sources/Security/AuthenticationManager.swift`
-- Severity:
-  - High
-- Recommended correction:
-  - Update or remove the stale snippets.
-  - If the goal is pseudocode rather than compilable examples, label them clearly as pseudocode. Otherwise, rewrite them to use the real `PgpEngine`, `DecryptionService`, and `AuthenticationManager` APIs.
+### Testing Findings
 
-### T-3. Mock interface examples no longer match the current protocols
+#### T-1. Test-layer platform description is internally inconsistent
 
-- Source document and section:
-  - `docs/TESTING.md`, Section 4, "Mock Patterns"
-- Documented claim:
-  - The sample protocols represent the current test seams.
-- Actual repository state:
-  - `KeychainManageable` now includes `exists(...)` and `listItems(...)`.
-  - `SecureEnclaveManageable` includes `authenticationContext` parameters and a static `isAvailable`.
-  - `AuthenticationEvaluable` is mode-based, not LAPolicy-based, and exposes `isBiometricsAvailable` and `lastEvaluatedContext`.
-- Evidence:
-  - `Sources/Security/KeychainManageable.swift`
-  - `Sources/Security/SecureEnclaveManageable.swift`
-  - `Sources/Security/AuthenticationEvaluable.swift`
-- Severity:
-  - Medium
-- Recommended correction:
-  - Refresh the protocol examples so they match the current interfaces.
-  - This is especially important for AI-assisted contributors who may copy the sample seams directly.
+- Verdict: Confirmed.
+- Code evidence: `Tests/FFIIntegrationTests/FFIIntegrationTests.swift:1-6` shows FFI tests are ordinary `XCTestCase`s in the Swift test bundle; `CypherAir-UnitTests.xctestplan:18-33` runs the `CypherAirTests` target and skips only device-only test classes; `CypherAir-DeviceTests.xctestplan:18-36` selects the device-specific classes; `.github/workflows/pr-checks.yml:22-32` and `.github/workflows/nightly-full.yml:20-26` run `CypherAir-UnitTests` on macOS.
+- Why the review is correct: The active test-plan layout says FFI integration tests run wherever `CypherAir-UnitTests` runs, which includes the macOS-local and macOS-CI path documented elsewhere in the repo.
+- Severity assessment: Keep `High`.
+- Recommendation assessment: Keep.
 
-### T-4. Explicit `PgpError -> CypherAirError` mapping coverage is narrower than the guide implies
+#### T-2. Several Testing Guide code examples no longer compile against current APIs
 
-- Source document and section:
-  - `docs/TESTING.md`, Layer 3 description and Section 9, "Every PR Must Include"
-- Documented claim:
-  - The guide implies that `PgpError` variant mapping is covered comprehensively.
-- Actual repository state:
-  - `CypherAirError.init(pgpError:)` handles current variants including `OperationCancelled`, `FileIoError`, and `KeyTooLargeForQr`.
-  - `ModelTests.swift` includes explicit mapping tests for the older set of variants but does not include dedicated `CypherAirError(pgpError:)` tests for all of those newer cases.
-  - There are runtime-level tests for cancellation and streaming failures elsewhere, but the direct mapping coverage is not as explicit as the guide suggests.
-- Evidence:
-  - `Sources/Models/CypherAirError.swift`
-  - `Tests/ServiceTests/ModelTests.swift`
-  - Example command: `rg -n "OperationCancelled|FileIoError|KeyTooLargeForQr" Tests Sources/Models/CypherAirError.swift`
-- Severity:
-  - Medium
-- Recommended correction:
-  - Either add explicit mapping tests for the missing variants or narrow the wording so the guide does not overstate the current direct mapping coverage.
+- Verdict: Confirmed.
+- Code evidence: `Sources/PgpMobile/pgp_mobile.swift:637-714` exposes `generateKey(...)`, `encrypt(...)`, `encryptFile(...)`, `matchRecipients(...)`, and `matchRecipientsFromFile(...)`; `Sources/Services/DecryptionService.swift:35-46` takes `engine`, `keyManagement`, and `contactService` in its initializer; `Sources/Security/AuthenticationManager.swift:355-392` requires `checkAndRecoverFromInterruptedRewrap(fingerprints:)`; no shipping API matches `pgpMobile.generateKeyPair(...)`, `decrypt(... privateKey:)`, `DecryptionService(authenticator: ...)`, or `decryptAndZeroize(...)`.
+- Why the review is correct: The Testing guide still contains multiple stale names and signatures that do not match the current code.
+- Severity assessment: Keep `High`.
+- Recommendation assessment: Keep.
 
-### T-5. The GitHub Actions runner note over-generalizes which jobs use `macos-26`
+#### T-3. Mock interface examples no longer match current protocols
 
-- Source document and section:
-  - `docs/TESTING.md`, Section 2.1, "GitHub Actions Hosted macOS Limitation"
-- Documented claim:
-  - "The repository workflows target `macos-26`."
-- Actual repository state:
-  - The Swift validation jobs use `macos-26`.
-  - The `rust-full-tests` job in `.github/workflows/pr-checks.yml` runs on `macos-latest`.
-- Evidence:
-  - `.github/workflows/pr-checks.yml`
-  - `.github/workflows/nightly-full.yml`
-- Severity:
-  - Low
-- Recommended correction:
-  - Rephrase this section to say that the Swift/Xcode validation jobs target `macos-26`, while the Rust-only job in `pr-checks.yml` currently uses `macos-latest`.
+- Verdict: Confirmed.
+- Code evidence: `Sources/Security/KeychainManageable.swift:10-46` adds `exists(...)` and `listItems(...)`; `Sources/Security/SecureEnclaveManageable.swift:30-75` adds `authenticationContext` parameters plus static `isAvailable`; `Sources/Security/AuthenticationEvaluable.swift:59-82` is mode-based and exposes `isBiometricsAvailable` and `lastEvaluatedContext`.
+- Why the review is correct: The guide's mock protocols no longer match the actual seams that tests and production code use.
+- Severity assessment: Keep `Medium`.
+- Recommendation assessment: Keep.
 
-### T-6. Section numbering is duplicated in the GnuPG section
+#### T-4. Direct `PgpError -> CypherAirError` mapping coverage is narrower than implied
 
-- Source document and section:
-  - `docs/TESTING.md`, headings around Sections 7 and 8
-- Documented claim:
-  - The numbering is sequential.
-- Actual repository state:
-  - The document uses `## 7. Recovery-Specific Tests` and later `## 7. GnuPG Interoperability Tests (Profile A Only)`.
-- Evidence:
-  - `docs/TESTING.md`
-- Severity:
-  - Low
-- Recommended correction:
-  - Renumber the later sections so the heading hierarchy is monotonic and easier to reference.
+- Verdict: Partially confirmed.
+- Code evidence: `Sources/Models/CypherAirError.swift:135-178` maps `.OperationCancelled`, `.FileIoError`, and `.KeyTooLargeForQr`; `Tests/ServiceTests/ModelTests.swift:11-170` has direct constructor-mapping tests for older variants but not dedicated mapping tests for those newer three cases; `Tests/FFIIntegrationTests/FFIIntegrationTests.swift:1564-1610` and `Tests/ServiceTests/StreamingServiceTests.swift:185-257` exercise cancellation behavior at runtime.
+- Why the review is correct: Direct, one-assert-per-variant coverage of `CypherAirError.init(pgpError:)` is incomplete for some newer variants.
+- Why the review overstates the gap: Cancellation and streaming I/O paths are still exercised elsewhere, so the problem is narrower than "mapping coverage is missing" in general.
+- Severity assessment: Keep `Medium`.
+- Recommendation assessment: Keep. Either add explicit constructor-mapping tests for the missing variants or narrow the wording in the guide.
 
-## Cross-Document Consistency Findings
+#### T-5. The GitHub Actions runner note over-generalizes which jobs use `macos-26`
 
-### C-1. `docs/TESTING.md` and `CLAUDE.md` disagree on the complete test-plan picture
+- Verdict: Confirmed.
+- Code evidence: `.github/workflows/pr-checks.yml:10-23` runs the Rust job on `macos-latest` and the Swift job on `macos-26`; `.github/workflows/nightly-full.yml:8-10` runs the nightly full-validation job on `macos-26`.
+- Why the review is correct: Only the Swift/Xcode jobs consistently target `macos-26`; the Rust-only PR job does not.
+- Severity assessment: Keep `Low`.
+- Recommendation assessment: Keep.
 
-- Source document and section:
-  - `docs/TESTING.md`, Section 2 and Section 9
-  - `CLAUDE.md`, "Testing Requirements"
-- Documented claim:
-  - `docs/TESTING.md` treats the workspace as having three important test plans and explicitly calls out `CypherAir-MacUITests` for launch/routing/tutorial-host refactors.
-  - `CLAUDE.md` lists only `CypherAir-UnitTests.xctestplan` and `CypherAir-DeviceTests.xctestplan`.
-- Actual repository state:
-  - The scheme includes all three plans, with `CypherAir-UnitTests` as default and `CypherAir-MacUITests` present as a first-class plan.
-  - `UITests/MacUISmokeTests.swift` contains real launch, settings, and tutorial smoke coverage.
-- Evidence:
-  - `CypherAir.xcodeproj/xcshareddata/xcschemes/CypherAir.xcscheme`
-  - `CypherAir-MacUITests.xctestplan`
-  - `UITests/MacUISmokeTests.swift`
-  - `CLAUDE.md`
-- Severity:
-  - Medium
-- Recommended correction:
-  - Update `CLAUDE.md` so its test-plan overview mentions `CypherAir-MacUITests` and the specific cases where it should be run.
-  - Alternatively, soften the Testing Guide wording if the intention is to keep `MacUITests` as a context-specific plan rather than a generally listed one.
+#### T-6. Section numbering is duplicated in the GnuPG section
 
-## Recommended Corrections
+- Verdict: Confirmed.
+- Code evidence: `docs/TESTING.md:466` is `## 7. Recovery-Specific Tests`; `docs/TESTING.md:513` is also `## 7. GnuPG Interoperability Tests (Profile A Only)`.
+- Why the review is correct: This is a direct document-structure error.
+- Severity assessment: Keep `Low`.
+- Recommendation assessment: Keep.
 
-The cleanest update path is:
+### Cross-Document Finding
 
-1. Fix the high-severity inaccuracies first.
-   - Replace the old decrypt Phase-1 description with the current `matchRecipients` flow.
-   - Correct the Testing Guide's Layer 2/3 platform language.
-   - Rewrite stale API examples so they match the current `PgpEngine`, `DecryptionService`, and `AuthenticationManager` surfaces.
-   - Narrow the `DiskSpaceChecker` scope to streaming encryption and keep the fixed 100 MB limit documented for in-memory file encryption.
+#### C-1. `docs/TESTING.md` and `CLAUDE.md` disagree on the complete test-plan picture
 
-2. Refresh structural inventories and storage details.
-   - Update the Rust crate file tree.
-   - Remove the missing `uniffi.toml` reference.
-   - Add `contact-metadata.json`, `tmp/streaming/`, and `guidedTutorialCompletedVersion` to the storage section.
-   - Correct the default color theme.
+- Verdict: Partially confirmed.
+- Code evidence: `CypherAir.xcodeproj/xcshareddata/xcschemes/CypherAir.xcscheme:25-40` includes `CypherAir-UnitTests`, `CypherAir-MacUITests`, and `CypherAir-DeviceTests`; `CypherAir-MacUITests.xctestplan:18-25` is a real first-class plan; `CLAUDE.md:122` lists only the first two non-UI plans; `docs/TESTING.md:88` and `docs/TESTING.md:553` explicitly call out `CypherAir-MacUITests`.
+- Why the review is correct: `CLAUDE.md` omits a real test plan that the scheme exposes and that the Testing guide explicitly names for UI/routing/tutorial refactors.
+- Why the review overstates the conflict: This is more an omission in `CLAUDE.md` than a hard contradiction about the default required validation commands.
+- Severity assessment: Lower to `Low`.
+- Recommendation assessment: Keep, but the fix should be to mention `CypherAir-MacUITests` as a conditional plan rather than to imply it is part of every default validation run.
 
-3. Align the testing guidance with the actual interfaces and coverage.
-   - Refresh the mock-interface examples.
-   - Either add explicit mapping tests for the newer `PgpError` variants or tone down the current claim.
-   - Fix the duplicated section numbering and the over-generalized runner wording.
+## Missed by Review
 
-4. Reconcile duplicated guidance across docs.
-   - Bring `CLAUDE.md` into line with the three-plan reality of the scheme, especially around `CypherAir-MacUITests`.
+This verification pass did not add new findings outside the review's existing claim set.
 
-## Verification Appendix
+Intentional non-expansions:
 
-### Static inspection commands used
+- No new full-document audit was started.
+- No runtime pass/fail claims were added.
+- No code or documentation changes outside this verification file were made.
 
-Representative commands used during this audit:
+## Verification Status
 
-```bash
-rg --files docs Sources Tests UITests pgp-mobile
-rg -n "CypherAir-UnitTests|CypherAir-MacUITests|FFIIntegrationTests|matchRecipients|parse_recipients" \
-  docs Sources Tests UITests pgp-mobile .github CLAUDE.md
-nl -ba docs/ARCHITECTURE.md
-nl -ba docs/TESTING.md
-nl -ba CypherAir-UnitTests.xctestplan
-nl -ba CypherAir-DeviceTests.xctestplan
-nl -ba CypherAir-MacUITests.xctestplan
-nl -ba CypherAir.xcodeproj/xcshareddata/xcschemes/CypherAir.xcscheme
-plutil -p CypherAir.entitlements
-```
+Static verification commands were sufficient for this pass. No runtime validation was required to
+decide the verdicts above.
 
-### Runtime validation status
+Representative evidence sources used during verification:
 
-- `cargo test --manifest-path pgp-mobile/Cargo.toml`: not run for this audit
-- `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`: not run for this audit
-- `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'`: not run for this audit
-
-Reason:
-
-- The findings above are documentation-to-repository mismatches that were directly verifiable through static inspection.
-- No runtime pass/fail claim is made in this report.
-
-### Workspace mutation scope
-
-- Added:
-  - `docs/ARCHITECTURE_TESTING_DOC_REVIEW.md`
-- Intentionally not modified:
-  - `docs/ARCHITECTURE.md`
-  - `docs/TESTING.md`
-  - generated UniFFI files
-  - Xcode project files
-  - security and cryptography implementation files
+- `rg -n` across `Sources/`, `Tests/`, `UITests/`, `pgp-mobile/src/`, `.github/workflows/`
+- `nl -ba` on key implementation files, test plans, and the shared Xcode scheme
+- direct file-tree inspection under `pgp-mobile/`, `bindings/`, and the repo root
