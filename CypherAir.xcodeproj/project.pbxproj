@@ -549,37 +549,34 @@
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4.1;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				LIBRARY_SEARCH_PATHS = "$(inherited)";
-				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios/release",
-				);
-				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release",
-				);
-				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 26.4.1;
-				MARKETING_VERSION = 1.2.6;
-				OTHER_CFLAGS = (
-					"$(inherited)",
-					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
-				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-lpgp_mobile",
-				);
-				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
-				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.cypherair;
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = iphoneos;
+					LD_RUNPATH_SEARCH_PATHS = (
+						"$(inherited)",
+						"@executable_path/Frameworks",
+					);
+					LIBRARY_SEARCH_PATHS = "$(inherited)";
+					MACOSX_DEPLOYMENT_TARGET = 26.4.1;
+					MARKETING_VERSION = 1.2.6;
+					OTHER_CFLAGS = (
+						"$(inherited)",
+						"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+					);
+					OTHER_LDFLAGS = "$(inherited)";
+					"OTHER_LDFLAGS[sdk=iphoneos*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios/release/libpgp_mobile.a",
+					);
+					"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release/libpgp_mobile.a",
+					);
+					"OTHER_LDFLAGS[sdk=macosx*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release/libpgp_mobile.a",
+					);
+					OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
+					PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.cypherair;
+					REGISTER_APP_GROUPS = YES;
+					SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
@@ -784,37 +781,34 @@
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4.1;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				LIBRARY_SEARCH_PATHS = "$(inherited)";
-				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios/release",
-				);
-				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release",
-				);
-				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 26.4.1;
-				MARKETING_VERSION = 1.2.6;
-				OTHER_CFLAGS = (
-					"$(inherited)",
-					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
-				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-lpgp_mobile",
-				);
-				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
-				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.cypherair;
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = iphoneos;
+					LD_RUNPATH_SEARCH_PATHS = (
+						"$(inherited)",
+						"@executable_path/Frameworks",
+					);
+					LIBRARY_SEARCH_PATHS = "$(inherited)";
+					MACOSX_DEPLOYMENT_TARGET = 26.4.1;
+					MARKETING_VERSION = 1.2.6;
+					OTHER_CFLAGS = (
+						"$(inherited)",
+						"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+					);
+					OTHER_LDFLAGS = "$(inherited)";
+					"OTHER_LDFLAGS[sdk=iphoneos*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios/release/libpgp_mobile.a",
+					);
+					"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release/libpgp_mobile.a",
+					);
+					"OTHER_LDFLAGS[sdk=macosx*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release/libpgp_mobile.a",
+					);
+					OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
+					PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.cypherair;
+					REGISTER_APP_GROUPS = YES;
+					SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
