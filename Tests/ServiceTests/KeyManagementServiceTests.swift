@@ -114,6 +114,40 @@ final class KeyManagementServiceTests: XCTestCase {
         )
     }
 
+    private func provisionFixtureBackedIdentity(secretCertData: Data) throws -> PGPKeyIdentity {
+        let info = try engine.parseKeyInfo(keyData: secretCertData)
+        let handle = try mockSE.generateWrappingKey(accessControl: nil)
+        let bundle = try mockSE.wrap(
+            privateKey: secretCertData,
+            using: handle,
+            fingerprint: info.fingerprint
+        )
+        let bundleStore = KeyBundleStore(keychain: mockKC)
+        try bundleStore.saveBundle(bundle, fingerprint: info.fingerprint)
+
+        // Test-only fixture path: retain the exact fixture bytes on the identity so
+        // selector discovery sees the same duplicate-occurrence structure already
+        // exercised by `test_selectionCatalog_duplicateSameBytesFixture_preservesPerOccurrenceState`.
+        let identity = PGPKeyIdentity(
+            fingerprint: info.fingerprint,
+            keyVersion: info.keyVersion,
+            profile: info.profile,
+            userId: info.userId,
+            hasEncryptionSubkey: info.hasEncryptionSubkey,
+            isRevoked: info.isRevoked,
+            isExpired: info.isExpired,
+            isDefault: false,
+            isBackedUp: false,
+            publicKeyData: secretCertData,
+            revocationCert: Data(),
+            primaryAlgo: info.primaryAlgo,
+            subkeyAlgo: info.subkeyAlgo,
+            expiryDate: info.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+        )
+        try storeIdentity(identity)
+        return identity
+    }
+
     // MARK: - Key Generation: Profile A
 
     func test_generateKey_profileA_storesKeychainItems() async throws {
@@ -1405,4 +1439,312 @@ final class KeyManagementServiceTests: XCTestCase {
                       "Validation result should contain the key's fingerprint")
     }
 
+    // MARK: - Selective Revocation: Subkey
+
+    /// Armor header used to verify the service returns ASCII-armored signature bytes.
+    private static let armoredSignatureHeader = "-----BEGIN PGP SIGNATURE-----"
+
+    private func assertArmoredSignature(_ armored: Data, file: StaticString = #filePath, line: UInt = #line) throws {
+        let prefix = String(data: armored.prefix(Self.armoredSignatureHeader.utf8.count), encoding: .utf8)
+        XCTAssertEqual(prefix, Self.armoredSignatureHeader,
+                       "Selective revocation output must be ASCII-armored as a PGP SIGNATURE",
+                       file: file, line: line)
+
+        let binary = try engine.dearmor(armored: armored)
+        XCTAssertFalse(binary.isEmpty,
+                       "Dearmored selective revocation must be non-empty binary bytes",
+                       file: file, line: line)
+    }
+
+    private func snapshotCatalogAndKeychain(
+        for targetService: KeyManagementService? = nil
+    ) -> (keys: [PGPKeyIdentity], saveCount: Int, deleteCount: Int) {
+        let targetService = targetService ?? service!
+        return (targetService.keys, mockKC.saveCallCount, mockKC.deleteCallCount)
+    }
+
+    private func assertNoCatalogOrKeychainMutation(
+        for targetService: KeyManagementService? = nil,
+        before: (keys: [PGPKeyIdentity], saveCount: Int, deleteCount: Int),
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let targetService = targetService ?? service!
+        XCTAssertEqual(targetService.keys.count, before.keys.count, "Catalog key count must not change",
+                       file: file, line: line)
+        for (beforeKey, afterKey) in zip(before.keys, targetService.keys) {
+            XCTAssertEqual(beforeKey.fingerprint, afterKey.fingerprint, file: file, line: line)
+            XCTAssertEqual(beforeKey.revocationCert, afterKey.revocationCert,
+                           "PGPKeyIdentity.revocationCert must not be mutated by selective revocation",
+                           file: file, line: line)
+            XCTAssertEqual(beforeKey.isBackedUp, afterKey.isBackedUp, file: file, line: line)
+        }
+        XCTAssertEqual(mockKC.saveCallCount, before.saveCount,
+                       "Selective revocation must not write to Keychain", file: file, line: line)
+        XCTAssertEqual(mockKC.deleteCallCount, before.deleteCount,
+                       "Selective revocation must not delete Keychain items", file: file, line: line)
+    }
+
+    func test_exportSubkeyRevocationCertificate_profileA_returnsArmoredSignatureAndUnwrapsOnce() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Subkey Rev A")
+        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let subkey = try XCTUnwrap(catalog.subkeys.first,
+                                   "Profile A key should expose at least one subkey selector")
+
+        let unwrapBefore = mockSE.unwrapCallCount
+        let snapshot = snapshotCatalogAndKeychain()
+
+        let armored = try await service.exportSubkeyRevocationCertificate(
+            fingerprint: identity.fingerprint,
+            subkeySelection: subkey
+        )
+
+        try assertArmoredSignature(armored)
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore + 1,
+                       "Subkey revocation export must unwrap exactly once on the happy path")
+        assertNoCatalogOrKeychainMutation(before: snapshot)
+    }
+
+    func test_exportSubkeyRevocationCertificate_profileB_returnsArmoredSignatureAndUnwrapsOnce() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service, name: "Subkey Rev B")
+        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let subkey = try XCTUnwrap(catalog.subkeys.first,
+                                   "Profile B key should expose at least one subkey selector")
+
+        let unwrapBefore = mockSE.unwrapCallCount
+        let snapshot = snapshotCatalogAndKeychain()
+
+        let armored = try await service.exportSubkeyRevocationCertificate(
+            fingerprint: identity.fingerprint,
+            subkeySelection: subkey
+        )
+
+        try assertArmoredSignature(armored)
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore + 1)
+        assertNoCatalogOrKeychainMutation(before: snapshot)
+    }
+
+    func test_exportSubkeyRevocationCertificate_unknownFingerprint_throwsNoMatchingKeyBeforeUnwrap() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Subkey Rev Missing")
+        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let subkey = try XCTUnwrap(catalog.subkeys.first)
+
+        let unwrapBefore = mockSE.unwrapCallCount
+
+        do {
+            _ = try await service.exportSubkeyRevocationCertificate(
+                fingerprint: "0000000000000000000000000000000000000000",
+                subkeySelection: subkey
+            )
+            XCTFail("Expected noMatchingKey")
+        } catch CypherAirError.noMatchingKey {
+            // Expected.
+        } catch {
+            XCTFail("Expected noMatchingKey, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore,
+                       "Unknown fingerprint must never reach SE unwrap")
+    }
+
+    func test_exportSubkeyRevocationCertificate_selectorMissInCert_throwsInvalidKeyDataBeforeUnwrap() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Subkey Rev Bogus")
+
+        let bogusSelection = SubkeySelectionOption(
+            fingerprint: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+            algorithmDisplay: "x25519",
+            isCurrentlyTransportEncryptionCapable: true,
+            isCurrentlyRevoked: false,
+            isCurrentlyExpired: false
+        )
+
+        let unwrapBefore = mockSE.unwrapCallCount
+
+        do {
+            _ = try await service.exportSubkeyRevocationCertificate(
+                fingerprint: identity.fingerprint,
+                subkeySelection: bogusSelection
+            )
+            XCTFail("Expected invalidKeyData")
+        } catch CypherAirError.invalidKeyData {
+            // Expected.
+        } catch {
+            XCTFail("Expected invalidKeyData, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore,
+                       "Selector-miss must fail before any SE unwrap")
+    }
+
+    // MARK: - Selective Revocation: User ID
+
+    func test_exportUserIdRevocationCertificate_profileA_returnsArmoredSignatureAndUnwrapsOnce() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "UserId Rev A")
+        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let userIdOption = try XCTUnwrap(catalog.userIds.first,
+                                         "Profile A key should expose its User ID selector")
+
+        let unwrapBefore = mockSE.unwrapCallCount
+        let snapshot = snapshotCatalogAndKeychain()
+
+        let armored = try await service.exportUserIdRevocationCertificate(
+            fingerprint: identity.fingerprint,
+            userIdSelection: userIdOption
+        )
+
+        try assertArmoredSignature(armored)
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore + 1)
+        assertNoCatalogOrKeychainMutation(before: snapshot)
+    }
+
+    func test_exportUserIdRevocationCertificate_profileB_returnsArmoredSignatureAndUnwrapsOnce() async throws {
+        let identity = try await TestHelpers.generateProfileBKey(service: service, name: "UserId Rev B")
+        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let userIdOption = try XCTUnwrap(catalog.userIds.first)
+
+        let unwrapBefore = mockSE.unwrapCallCount
+        let snapshot = snapshotCatalogAndKeychain()
+
+        let armored = try await service.exportUserIdRevocationCertificate(
+            fingerprint: identity.fingerprint,
+            userIdSelection: userIdOption
+        )
+
+        try assertArmoredSignature(armored)
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore + 1)
+        assertNoCatalogOrKeychainMutation(before: snapshot)
+    }
+
+    func test_exportUserIdRevocationCertificate_outOfRangeOccurrenceIndex_throwsInvalidKeyDataBeforeUnwrap() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "UserId Rev OOB")
+        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let baseOption = try XCTUnwrap(catalog.userIds.first)
+
+        let outOfRange = UserIdSelectionOption(
+            occurrenceIndex: baseOption.occurrenceIndex + 1,
+            userIdData: baseOption.userIdData,
+            displayText: baseOption.displayText,
+            isCurrentlyPrimary: baseOption.isCurrentlyPrimary,
+            isCurrentlyRevoked: baseOption.isCurrentlyRevoked
+        )
+
+        let unwrapBefore = mockSE.unwrapCallCount
+
+        do {
+            _ = try await service.exportUserIdRevocationCertificate(
+                fingerprint: identity.fingerprint,
+                userIdSelection: outOfRange
+            )
+            XCTFail("Expected invalidKeyData")
+        } catch CypherAirError.invalidKeyData {
+            // Expected.
+        } catch {
+            XCTFail("Expected invalidKeyData, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore,
+                       "Out-of-range occurrence index must fail before any SE unwrap")
+    }
+
+    func test_exportUserIdRevocationCertificate_userIdDataBytesMismatch_throwsInvalidKeyDataBeforeUnwrap() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "UserId Rev Bytes")
+        let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let baseOption = try XCTUnwrap(catalog.userIds.first)
+
+        let tamperedBytes = Data("Mallory <mallory@example.com>".utf8)
+        XCTAssertNotEqual(tamperedBytes, baseOption.userIdData,
+                          "Tampered bytes must differ from the genuine selector bytes")
+
+        let mismatched = UserIdSelectionOption(
+            occurrenceIndex: baseOption.occurrenceIndex,
+            userIdData: tamperedBytes,
+            displayText: baseOption.displayText,
+            isCurrentlyPrimary: baseOption.isCurrentlyPrimary,
+            isCurrentlyRevoked: baseOption.isCurrentlyRevoked
+        )
+
+        let unwrapBefore = mockSE.unwrapCallCount
+
+        do {
+            _ = try await service.exportUserIdRevocationCertificate(
+                fingerprint: identity.fingerprint,
+                userIdSelection: mismatched
+            )
+            XCTFail("Expected invalidKeyData")
+        } catch CypherAirError.invalidKeyData {
+            // Expected.
+        } catch {
+            XCTFail("Expected invalidKeyData, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore,
+                       "User ID bytes mismatch must fail before any SE unwrap")
+    }
+
+    func test_exportUserIdRevocationCertificate_selectorBuiltFromDifferentCertificate_throwsInvalidKeyDataBeforeUnwrap() async throws {
+        let victimIdentity = try await TestHelpers.generateProfileAKey(service: service, name: "Victim Cert")
+        let foreignIdentity = try await TestHelpers.generateProfileAKey(
+            service: service,
+            name: "Foreign Cert",
+            email: "foreign@example.com"
+        )
+
+        let foreignCatalog = try service.selectionCatalog(fingerprint: foreignIdentity.fingerprint)
+        let foreignOption = try XCTUnwrap(foreignCatalog.userIds.first)
+
+        let victimCatalog = try service.selectionCatalog(fingerprint: victimIdentity.fingerprint)
+        let victimOption = try XCTUnwrap(victimCatalog.userIds.first)
+        XCTAssertNotEqual(foreignOption.userIdData, victimOption.userIdData)
+
+        let unwrapBefore = mockSE.unwrapCallCount
+
+        do {
+            _ = try await service.exportUserIdRevocationCertificate(
+                fingerprint: victimIdentity.fingerprint,
+                userIdSelection: foreignOption
+            )
+            XCTFail("Expected invalidKeyData")
+        } catch CypherAirError.invalidKeyData {
+            // Expected.
+        } catch {
+            XCTFail("Expected invalidKeyData, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore,
+                       "Cross-certificate selector must fail before any SE unwrap")
+    }
+
+    /// Exercises the service's end-to-end dispatch for the duplicate-occurrence path.
+    ///
+    /// This uses a fixture-backed identity path instead of the normal import flow so the
+    /// stored metadata preserves the duplicate-occurrence structure exactly as encoded in the
+    /// source fixture. The duplicate-occurrence cryptographic semantics themselves remain
+    /// covered at the Rust/FFI layer by `FFIIntegrationTests.test_generateUserIdRevocation_*`
+    /// and by `pgp-mobile/tests/revocation_construction_tests.rs`.
+    func test_exportUserIdRevocationCertificate_duplicateOccurrence_secondIndexRoutesThroughService() async throws {
+        let fixture = try FixtureLoader.loadData(
+            "selector_duplicate_userid_second_revoked_secret",
+            ext: "gpg"
+        )
+        let identity = try provisionFixtureBackedIdentity(secretCertData: fixture)
+        let freshService = makeFreshService()
+        try freshService.loadKeys()
+
+        let catalog = try freshService.selectionCatalog(fingerprint: identity.fingerprint)
+        XCTAssertEqual(catalog.userIds.count, 2, "Fixture is expected to expose two User ID occurrences")
+        let secondOccurrence = catalog.userIds[1]
+        XCTAssertEqual(secondOccurrence.occurrenceIndex, 1)
+
+        let unwrapBefore = mockSE.unwrapCallCount
+        let snapshot = snapshotCatalogAndKeychain(for: freshService)
+
+        let armored = try await freshService.exportUserIdRevocationCertificate(
+            fingerprint: identity.fingerprint,
+            userIdSelection: secondOccurrence
+        )
+
+        try assertArmoredSignature(armored)
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore + 1)
+        assertNoCatalogOrKeychainMutation(for: freshService, before: snapshot)
+    }
 }

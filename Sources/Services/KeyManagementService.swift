@@ -15,6 +15,7 @@ final class KeyManagementService {
     private let privateKeyAccessService: PrivateKeyAccessService
     private let provisioningService: KeyProvisioningService
     private let exportService: KeyExportService
+    private let selectiveRevocationService: SelectiveRevocationService
     private let mutationService: KeyMutationService
 
     init(
@@ -45,6 +46,11 @@ final class KeyManagementService {
             catalogStore: catalogStore
         )
         self.exportService = KeyExportService(
+            engine: engine,
+            catalogStore: catalogStore,
+            privateKeyAccessService: privateKeyAccessService
+        )
+        self.selectiveRevocationService = SelectiveRevocationService(
             engine: engine,
             catalogStore: catalogStore,
             privateKeyAccessService: privateKeyAccessService
@@ -151,6 +157,56 @@ final class KeyManagementService {
         )
         syncKeys()
         return armoredRevocation
+    }
+
+    // MARK: - Selective Revocation Export (Subkey / User ID)
+
+    /// Generate and armor a subkey-scoped revocation signature for an existing key.
+    ///
+    /// Selector validation happens against the stored public certificate *before* SE unwrap —
+    /// an invalid `subkeySelection` throws `CypherAirError.invalidKeyData(...)` without
+    /// triggering device authentication. Requires device authentication only when the
+    /// selector matches the stored certificate.
+    ///
+    /// v1 policy: this operation is export-on-demand. It does not persist a new revocation
+    /// artifact on `PGPKeyIdentity` or in the Keychain, and it does not mutate catalog state.
+    ///
+    /// - Parameters:
+    ///   - fingerprint: Fingerprint of the key whose subkey is being revoked.
+    ///   - subkeySelection: Selector-bearing option obtained from `selectionCatalog(fingerprint:)`.
+    /// - Returns: ASCII-armored subkey revocation signature bytes.
+    func exportSubkeyRevocationCertificate(
+        fingerprint: String,
+        subkeySelection: SubkeySelectionOption
+    ) async throws -> Data {
+        try await selectiveRevocationService.exportSubkeyRevocationCertificate(
+            fingerprint: fingerprint,
+            subkeySelection: subkeySelection
+        )
+    }
+
+    /// Generate and armor a User ID-scoped revocation signature for an existing key.
+    ///
+    /// Selector validation happens against the stored public certificate *before* SE unwrap —
+    /// an invalid `userIdSelection` throws `CypherAirError.invalidKeyData(...)` without
+    /// triggering device authentication. Requires device authentication only when the
+    /// selector matches the stored certificate.
+    ///
+    /// v1 policy: this operation is export-on-demand. It does not persist a new revocation
+    /// artifact on `PGPKeyIdentity` or in the Keychain, and it does not mutate catalog state.
+    ///
+    /// - Parameters:
+    ///   - fingerprint: Fingerprint of the key whose User ID is being revoked.
+    ///   - userIdSelection: Selector-bearing option obtained from `selectionCatalog(fingerprint:)`.
+    /// - Returns: ASCII-armored User ID revocation signature bytes.
+    func exportUserIdRevocationCertificate(
+        fingerprint: String,
+        userIdSelection: UserIdSelectionOption
+    ) async throws -> Data {
+        try await selectiveRevocationService.exportUserIdRevocationCertificate(
+            fingerprint: fingerprint,
+            userIdSelection: userIdSelection
+        )
     }
 
     // MARK: - Key Expiry Modification
