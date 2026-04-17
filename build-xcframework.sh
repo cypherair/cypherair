@@ -38,6 +38,43 @@ echo "=== CypherAir: pgp-mobile XCFramework Build ==="
 echo "Build mode: $BUILD_DIR"
 echo ""
 
+# Xcode links CypherAir against target-specific static archives. Any leftover
+# target-specific `libpgp_mobile.dylib` in those same directories is dangerous:
+# a previous `-lpgp_mobile` style link can pick the dylib first and shadow the
+# fresh `.a`, breaking new UniFFI symbols at link time. Only the host dylib
+# built for UniFFI bindgen is allowed, and it is treated as a temporary file.
+target_dylib_candidates=(
+    "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-ios/$BUILD_DIR/libpgp_mobile.dylib"
+    "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-ios-sim/$BUILD_DIR/libpgp_mobile.dylib"
+    "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
+    "$SCRIPT_DIR/target/aarch64-apple-ios/$BUILD_DIR/libpgp_mobile.dylib"
+    "$SCRIPT_DIR/target/aarch64-apple-ios-sim/$BUILD_DIR/libpgp_mobile.dylib"
+    "$SCRIPT_DIR/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
+)
+
+cleanup_target_specific_dylibs() {
+    for dylib in "${target_dylib_candidates[@]}"; do
+        rm -f "$dylib"
+    done
+}
+
+assert_no_target_specific_dylibs() {
+    local dylib
+    local stale_found=0
+
+    for dylib in "${target_dylib_candidates[@]}"; do
+        if [ -f "$dylib" ]; then
+            echo "  ✗ ERROR: Stale target-specific dylib would shadow the static archive:"
+            echo "    $dylib"
+            stale_found=1
+        fi
+    done
+
+    if [ "$stale_found" -ne 0 ]; then
+        exit 1
+    fi
+}
+
 # ── Step 1: Verify Rust targets ──────────────────────────────────
 echo "[1/9] Verifying Rust targets..."
 if ! rustup target list --installed | grep -q "aarch64-apple-ios$"; then
@@ -89,12 +126,8 @@ fi
 echo "  ✓ macOS library: $MACOS_LIB"
 ls -lh "$MACOS_LIB"
 
-# Xcode links CypherAir against `-lpgp_mobile`, which prefers a `.dylib`
-# over a static archive when both exist in the same search path.  A stale
-# target-specific dylib from an earlier bindgen build would shadow the freshly
-# built static archive and break new UniFFI symbols at link time.
-rm -f "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
-rm -f "$SCRIPT_DIR/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
+# Clean every Xcode-visible target directory before bindgen creates any host dylib.
+cleanup_target_specific_dylibs
 
 # ── Step 5: Build host dylib for UniFFI bindgen ──────────────────
 echo ""
@@ -142,6 +175,7 @@ rm -rf "$BINDINGS_DIR"
 mkdir -p "$BINDINGS_DIR"
 (cd "$SCRIPT_DIR/pgp-mobile" && cargo run $CARGO_FLAGS --bin uniffi-bindgen \
     generate --library "$HOST_DYLIB" --language swift --out-dir "$BINDINGS_DIR")
+rm -f "$HOST_DYLIB"
 
 # Create module.modulemap alias expected by Xcode project build settings
 # (UniFFI generates pgp_mobileFFI.modulemap, but project.pbxproj references module.modulemap)
@@ -156,6 +190,7 @@ ls -la "$BINDINGS_DIR"
 echo ""
 echo "[7/9] Creating XCFramework..."
 rm -rf "$XCFRAMEWORK_OUTPUT"
+assert_no_target_specific_dylibs
 
 # Move the modulemap and header to a headers directory
 HEADERS_DIR="$BINDINGS_DIR/headers"
@@ -201,7 +236,8 @@ echo ""
 echo "=== Build Complete ==="
 echo ""
 echo "Next steps:"
-echo "  1. Add $XCFRAMEWORK_OUTPUT to your Xcode project (if not already added)"
+echo "  1. Xcode continues to link the Rust static archives directly"
+echo "     from pgp-mobile/target/...; $XCFRAMEWORK_OUTPUT is a synced artifact."
 echo "  2. If Swift 6.2 concurrency warnings occur:"
 echo "     - Use @preconcurrency import PgpMobile"
 echo "     - Or add @unchecked Sendable conformances in an extension file"

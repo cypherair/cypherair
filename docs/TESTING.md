@@ -108,15 +108,17 @@ Impact:
 
 Rust changes under `pgp-mobile/src` do **not** automatically refresh the build products that Xcode uses for Swift and FFI validation.
 
-Today, the Xcode project is wired directly to:
+Today, the Xcode project explicitly links these static archives:
 
-- `pgp-mobile/target/aarch64-apple-ios/release`
-- `pgp-mobile/target/aarch64-apple-ios-sim/release`
-- `pgp-mobile/target/aarch64-apple-darwin/release`
+- `pgp-mobile/target/aarch64-apple-ios/release/libpgp_mobile.a`
+- `pgp-mobile/target/aarch64-apple-ios-sim/release/libpgp_mobile.a`
+- `pgp-mobile/target/aarch64-apple-darwin/release/libpgp_mobile.a`
 - `bindings/module.modulemap`
 - `Sources/PgpMobile/pgp_mobile.swift`
 
 The local `PgpMobile.xcframework` output may still be produced by the build script and can exist in the working tree, but it is ignored by git, not tracked in source control, and not used directly for the current Xcode link step.
+
+Target-specific `libpgp_mobile.dylib` files must **not** exist in those Xcode-linked target directories. They can shadow the intended static archive and cause missing UniFFI symbols at link time. The build script treats the host dylib used for UniFFI bindgen as a temporary artifact and removes it before exiting.
 
 This means there are three distinct workflows:
 
@@ -150,6 +152,8 @@ Recommended path:
 ```bash
 ./build-xcframework.sh --release
 ```
+
+Prefer this path after Rust or UniFFI changes because it refreshes the static archives, regenerates bindings, and enforces the dylib cleanup/validation that keeps Xcode linking deterministic.
 
 If you must run the underlying bindgen step manually, run it from `pgp-mobile/`, not from the repo root:
 
@@ -194,7 +198,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 Typical stale-artifact symptoms:
 
 - Rust tests reflect the new behavior, but Swift unit tests or FFI integration tests still show the old behavior.
-- The app links successfully against `-lpgp_mobile`, but new UniFFI symbols or generated Swift types are missing.
+- The app links against the refreshed static archive path, but new UniFFI symbols or generated Swift types are missing.
 
 If that happens, first suspect stale Rust release archives or generated UniFFI outputs rather than stale Swift source.
 
