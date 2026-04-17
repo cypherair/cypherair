@@ -1576,6 +1576,39 @@ final class KeyManagementServiceTests: XCTestCase {
                        "Selector-miss must fail before any SE unwrap")
     }
 
+    func test_exportSubkeyRevocationCertificate_metadataFingerprintMismatch_throwsInvalidKeyDataBeforeUnwrap() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Subkey Rev Metadata A")
+        let otherIdentity = try await TestHelpers.generateProfileBKey(service: service, name: "Subkey Rev Metadata B")
+        let otherCatalog = try service.selectionCatalog(fingerprint: otherIdentity.fingerprint)
+        let otherSubkey = try XCTUnwrap(otherCatalog.subkeys.first)
+
+        var corruptedIdentity = try loadStoredIdentity(fingerprint: identity.fingerprint)
+        corruptedIdentity.publicKeyData = otherIdentity.publicKeyData
+        try overwriteStoredIdentity(corruptedIdentity)
+
+        let freshService = makeFreshService()
+        try freshService.loadKeys()
+
+        let unwrapBefore = mockSE.unwrapCallCount
+        let snapshot = snapshotCatalogAndKeychain(for: freshService)
+
+        do {
+            _ = try await freshService.exportSubkeyRevocationCertificate(
+                fingerprint: identity.fingerprint,
+                subkeySelection: otherSubkey
+            )
+            XCTFail("Expected invalidKeyData")
+        } catch CypherAirError.invalidKeyData {
+            // Expected.
+        } catch {
+            XCTFail("Expected invalidKeyData, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore,
+                       "Metadata fingerprint mismatch must fail before any SE unwrap")
+        assertNoCatalogOrKeychainMutation(for: freshService, before: snapshot)
+    }
+
     // MARK: - Selective Revocation: User ID
 
     func test_exportUserIdRevocationCertificate_profileA_returnsArmoredSignatureAndUnwrapsOnce() async throws {
@@ -1712,6 +1745,43 @@ final class KeyManagementServiceTests: XCTestCase {
 
         XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore,
                        "Cross-certificate selector must fail before any SE unwrap")
+    }
+
+    func test_exportUserIdRevocationCertificate_metadataFingerprintMismatch_throwsInvalidKeyDataBeforeUnwrap() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "UserId Rev Metadata A")
+        let otherIdentity = try await TestHelpers.generateProfileBKey(
+            service: service,
+            name: "UserId Rev Metadata B",
+            email: "metadata-b@example.com"
+        )
+        let otherCatalog = try service.selectionCatalog(fingerprint: otherIdentity.fingerprint)
+        let otherUserId = try XCTUnwrap(otherCatalog.userIds.first)
+
+        var corruptedIdentity = try loadStoredIdentity(fingerprint: identity.fingerprint)
+        corruptedIdentity.publicKeyData = otherIdentity.publicKeyData
+        try overwriteStoredIdentity(corruptedIdentity)
+
+        let freshService = makeFreshService()
+        try freshService.loadKeys()
+
+        let unwrapBefore = mockSE.unwrapCallCount
+        let snapshot = snapshotCatalogAndKeychain(for: freshService)
+
+        do {
+            _ = try await freshService.exportUserIdRevocationCertificate(
+                fingerprint: identity.fingerprint,
+                userIdSelection: otherUserId
+            )
+            XCTFail("Expected invalidKeyData")
+        } catch CypherAirError.invalidKeyData {
+            // Expected.
+        } catch {
+            XCTFail("Expected invalidKeyData, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore,
+                       "Metadata fingerprint mismatch must fail before any SE unwrap")
+        assertNoCatalogOrKeychainMutation(for: freshService, before: snapshot)
     }
 
     /// Exercises the service's end-to-end dispatch for the duplicate-occurrence path.

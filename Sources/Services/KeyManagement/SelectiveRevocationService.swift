@@ -4,9 +4,10 @@ import Foundation
 ///
 /// Consumes selector-bearing carrier options (`SubkeySelectionOption`, `UserIdSelectionOption`)
 /// produced by the Workstream 3.1 discovery surface and re-validates them against the stored
-/// public certificate *before* any Secure Enclave unwrap. This guarantees that a bogus, stale,
-/// or cross-certificate selector fails fast with `CypherAirError.invalidKeyData(...)` without
-/// triggering a Face ID / passcode prompt.
+/// public certificate *before* any Secure Enclave unwrap. This validation includes both
+/// selector membership and metadata/public-certificate fingerprint consistency, guaranteeing
+/// that a bogus, stale, cross-certificate, or metadata-corrupted selector path fails fast with
+/// `CypherAirError.invalidKeyData(...)` without triggering a Face ID / passcode prompt.
 ///
 /// v1 policy (plan §3.4): selective revocations are generated on demand and returned armored.
 /// They are not persisted; `KeyCatalogStore` state is not mutated by this service.
@@ -27,8 +28,9 @@ final class SelectiveRevocationService {
 
     /// Generate and armor a subkey-scoped revocation signature for the given subkey selection.
     ///
-    /// Selector validation precedes SE unwrap: if `subkeySelection.fingerprint` does not
-    /// belong to the stored certificate's discovered subkey set, this throws
+    /// Selector validation precedes SE unwrap: if the stored metadata fingerprint does not
+    /// match the discovered certificate fingerprint, or if `subkeySelection.fingerprint`
+    /// does not belong to the stored certificate's discovered subkey set, this throws
     /// `CypherAirError.invalidKeyData(...)` without unwrapping any secret material.
     func exportSubkeyRevocationCertificate(
         fingerprint: String,
@@ -40,6 +42,7 @@ final class SelectiveRevocationService {
 
         let validatedSubkeyFingerprint = try validatedSubkeyFingerprint(
             certData: identity.publicKeyData,
+            expectedFingerprint: identity.fingerprint,
             subkeySelection: subkeySelection
         )
 
@@ -62,7 +65,8 @@ final class SelectiveRevocationService {
 
     /// Generate and armor a User ID-scoped revocation signature for the given User ID selection.
     ///
-    /// Selector validation precedes SE unwrap: if `userIdSelection.occurrenceIndex` /
+    /// Selector validation precedes SE unwrap: if the stored metadata fingerprint does not
+    /// match the discovered certificate fingerprint, or if `userIdSelection.occurrenceIndex` /
     /// `userIdSelection.userIdData` does not match an entry on the stored certificate's
     /// discovered User ID set, this throws `CypherAirError.invalidKeyData(...)` without
     /// unwrapping any secret material.
@@ -76,6 +80,7 @@ final class SelectiveRevocationService {
 
         let validatedSelectorInput = try validatedUserIdSelectorInput(
             certData: identity.publicKeyData,
+            expectedFingerprint: identity.fingerprint,
             userIdSelection: userIdSelection
         )
 
@@ -98,14 +103,33 @@ final class SelectiveRevocationService {
 
     // MARK: - Selector Validation (public-only, no unwrap)
 
-    private func validatedSubkeyFingerprint(
+    private func validatedCatalog(
         certData: Data,
-        subkeySelection: SubkeySelectionOption
-    ) throws -> String {
-        let catalog = try CertificateSelectionCatalogDiscovery.discover(
+        expectedFingerprint: String
+    ) throws -> CertificateSelectionCatalog {
+        let discovery = try CertificateSelectionCatalogDiscovery.discover(
             engine: engine,
             certData: certData
-        ).catalog
+        )
+
+        guard discovery.raw.certificateFingerprint == expectedFingerprint else {
+            throw CypherAirError.invalidKeyData(
+                reason: "Stored key metadata fingerprint does not match certificate data"
+            )
+        }
+
+        return discovery.catalog
+    }
+
+    private func validatedSubkeyFingerprint(
+        certData: Data,
+        expectedFingerprint: String,
+        subkeySelection: SubkeySelectionOption
+    ) throws -> String {
+        let catalog = try validatedCatalog(
+            certData: certData,
+            expectedFingerprint: expectedFingerprint
+        )
 
         guard catalog.subkeys.contains(where: { $0.fingerprint == subkeySelection.fingerprint }) else {
             throw CypherAirError.invalidKeyData(
@@ -118,12 +142,13 @@ final class SelectiveRevocationService {
 
     private func validatedUserIdSelectorInput(
         certData: Data,
+        expectedFingerprint: String,
         userIdSelection: UserIdSelectionOption
     ) throws -> UserIdSelectorInput {
-        let catalog = try CertificateSelectionCatalogDiscovery.discover(
-            engine: engine,
-            certData: certData
-        ).catalog
+        let catalog = try validatedCatalog(
+            certData: certData,
+            expectedFingerprint: expectedFingerprint
+        )
 
         guard catalog.userIds.contains(where: {
             $0.occurrenceIndex == userIdSelection.occurrenceIndex
