@@ -168,10 +168,12 @@ final class SigningService {
 
         return (
             text: result.content,
-            verification: makeDetailedVerification(
+            verification: DetailedSignatureVerification.from(
                 legacyStatus: result.legacyStatus,
                 legacySignerFingerprint: result.legacySignerFingerprint,
-                signatures: result.signatures
+                signatures: result.signatures,
+                contacts: contactService.contacts,
+                ownKeys: keyManagement.keys
             )
         )
     }
@@ -231,10 +233,12 @@ final class SigningService {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
-        return makeDetailedVerification(
+        return DetailedSignatureVerification.from(
             legacyStatus: result.legacyStatus,
             legacySignerFingerprint: result.legacySignerFingerprint,
-            signatures: result.signatures
+            signatures: result.signatures,
+            contacts: contactService.contacts,
+            ownKeys: keyManagement.keys
         )
     }
 
@@ -303,10 +307,12 @@ final class SigningService {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
-        return makeDetailedVerification(
+        return DetailedSignatureVerification.from(
             legacyStatus: result.legacyStatus,
             legacySignerFingerprint: result.legacySignerFingerprint,
-            signatures: result.signatures
+            signatures: result.signatures,
+            contacts: contactService.contacts,
+            ownKeys: keyManagement.keys
         )
     }
 
@@ -317,60 +323,6 @@ final class SigningService {
     private func allVerificationKeys() -> [Data] {
         contactService.contacts.map { $0.publicKeyData }
             + keyManagement.keys.map { $0.publicKeyData }
-    }
-
-    private func makeDetailedVerification(
-        legacyStatus: SignatureStatus,
-        legacySignerFingerprint: String?,
-        signatures: [DetailedSignatureEntry]
-    ) -> DetailedSignatureVerification {
-        let legacySignerContact = legacySignerFingerprint.flatMap {
-            contactService.contact(forFingerprint: $0)
-        }
-        let legacySignerIdentity = SignatureVerification.SignerIdentity.resolve(
-            fingerprint: legacySignerFingerprint,
-            contacts: contactService.contacts,
-            ownKeys: keyManagement.keys
-        )
-
-        return DetailedSignatureVerification(
-            legacyStatus: legacyStatus,
-            legacySignerFingerprint: legacySignerFingerprint,
-            legacySignerContact: legacySignerContact,
-            legacySignerIdentity: legacySignerIdentity,
-            signatures: signatures.map(makeDetailedEntry(from:))
-        )
-    }
-
-    private func makeDetailedEntry(
-        from entry: DetailedSignatureEntry
-    ) -> DetailedSignatureVerification.Entry {
-        let signerIdentity = SignatureVerification.SignerIdentity.resolve(
-            fingerprint: entry.signerPrimaryFingerprint,
-            contacts: contactService.contacts,
-            ownKeys: keyManagement.keys
-        )
-
-        return DetailedSignatureVerification.Entry(
-            status: makeDetailedStatus(from: entry.status),
-            signerPrimaryFingerprint: entry.signerPrimaryFingerprint,
-            signerIdentity: signerIdentity
-        )
-    }
-
-    private func makeDetailedStatus(
-        from status: DetailedSignatureStatus
-    ) -> DetailedSignatureVerification.Entry.Status {
-        switch status {
-        case .valid:
-            .valid
-        case .unknownSigner:
-            .unknownSigner
-        case .bad:
-            .bad
-        case .expired:
-            .expired
-        }
     }
 
     // MARK: - Off-Main-Actor Engine Helpers

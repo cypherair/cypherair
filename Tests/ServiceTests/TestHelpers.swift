@@ -92,6 +92,58 @@ enum TestHelpers {
         try await generateAndStoreKey(service: service, profile: .advanced, name: name, email: email)
     }
 
+    /// Provision an unencrypted secret-cert fixture into the mock-backed key management stack
+    /// by SE-wrapping it, persisting the wrapped bundle and metadata, then reloading the service.
+    ///
+    /// This intentionally does not go through `KeyManagementService.importKey(...)`, because
+    /// test fixtures such as `ffi_detailed_recipient_secret.gpg` are not passphrase-protected.
+    @discardableResult
+    static func provisionFixtureBackedIdentity(
+        secretCertData: Data,
+        engine: PgpEngine,
+        service: KeyManagementService,
+        mockSE: MockSecureEnclave,
+        mockKC: MockKeychain,
+        isDefault: Bool = false
+    ) throws -> PGPKeyIdentity {
+        let info = try engine.parseKeyInfo(keyData: secretCertData)
+        let armoredPublicKey = try engine.armorPublicKey(certData: secretCertData)
+        let publicKeyData = try engine.dearmor(armored: armoredPublicKey)
+
+        let handle = try mockSE.generateWrappingKey(accessControl: nil)
+        let bundle = try mockSE.wrap(
+            privateKey: secretCertData,
+            using: handle,
+            fingerprint: info.fingerprint
+        )
+
+        let bundleStore = KeyBundleStore(keychain: mockKC)
+        try bundleStore.saveBundle(bundle, fingerprint: info.fingerprint)
+
+        let identity = PGPKeyIdentity(
+            fingerprint: info.fingerprint,
+            keyVersion: info.keyVersion,
+            profile: info.profile,
+            userId: info.userId,
+            hasEncryptionSubkey: info.hasEncryptionSubkey,
+            isRevoked: info.isRevoked,
+            isExpired: info.isExpired,
+            isDefault: isDefault,
+            isBackedUp: false,
+            publicKeyData: publicKeyData,
+            revocationCert: Data(),
+            primaryAlgo: info.primaryAlgo,
+            subkeyAlgo: info.subkeyAlgo,
+            expiryDate: info.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+        )
+
+        let metadataStore = KeyMetadataStore(keychain: mockKC)
+        try metadataStore.save(identity)
+        try service.loadKeys()
+
+        return identity
+    }
+
     // MARK: - Full Service Stack Factory
 
     /// Create a complete service stack (KeyManagement + Contact + Encryption + Decryption
