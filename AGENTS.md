@@ -186,6 +186,7 @@ After editing:
 - Before string replacement, verify match counts.
 - After revert operations, verify with `git diff`.
 - Build success is not enough; run tests.
+- When merging pull requests for this repository, prefer a regular merge commit by default. Do not squash-merge or rebase-merge unless the user explicitly asks for it.
 - Conventional commit prefixes are preferred:
   `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 
