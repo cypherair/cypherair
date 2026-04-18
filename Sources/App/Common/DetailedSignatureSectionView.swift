@@ -1,61 +1,70 @@
 import SwiftUI
 
 struct DetailedSignatureSectionView: View {
-    struct ResetToken: Hashable {
-        enum ScreenContext: String, Hashable {
-            case verify
-            case decrypt
-        }
-
-        let screenContext: ScreenContext
-        let modeIdentifier: String
-        let presentationEpoch: Int
-    }
-
     let verification: DetailedSignatureVerification
-    let resetToken: ResetToken
-
-    @State private var isExpanded = false
+    let resultTitle: LocalizedStringKey
+    let signerTitle: LocalizedStringKey
 
     var body: some View {
         Section {
-            DisclosureGroup(
-                String(
-                    localized: "signature.detailed.section",
-                    defaultValue: "Detailed Signatures"
-                ),
-                isExpanded: $isExpanded
-            ) {
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(Array(verification.signatures.enumerated()), id: \.offset) { index, entry in
-                        let entryVerification = SignatureVerification(entry: entry)
+            VStack(alignment: .leading, spacing: 16) {
+                if signatureEntries.isEmpty {
+                    statusRow(for: verification.legacyVerification)
+                } else {
+                    ForEach(Array(signatureEntries.enumerated()), id: \.offset) { index, entryVerification in
+                        statusRow(for: entryVerification)
 
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .top, spacing: 10) {
-                                Image(systemName: entryVerification.symbolName)
-                                    .foregroundStyle(entryVerification.statusColor)
-
-                                Text(entryVerification.statusDescription)
-                                    .font(.subheadline)
-                            }
-                            .accessibilityElement(children: .combine)
-
-                            if entryVerification.shouldShowSignerIdentity {
-                                SignatureIdentityCardView(verification: entryVerification)
-                            }
-                        }
-
-                        if index < verification.signatures.count - 1 {
+                        if index < signatureEntries.count - 1 {
                             Divider()
                         }
                     }
                 }
-                .padding(.top, 12)
+            }
+        } header: {
+            Text(resultTitle)
+        }
+
+        if !signerEntries.isEmpty {
+            Section {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(Array(signerEntries.enumerated()), id: \.offset) { index, signerVerification in
+                        SignatureIdentityCardView(verification: signerVerification)
+
+                        if index < signerEntries.count - 1 {
+                            Divider()
+                        }
+                    }
+                }
+            } header: {
+                Text(signerTitle)
             }
         }
-        .onChange(of: resetToken) { _, _ in
-            isExpanded = false
+    }
+
+    private var signatureEntries: [SignatureVerification] {
+        verification.signatures.map(SignatureVerification.init(entry:))
+    }
+
+    private var signerEntries: [SignatureVerification] {
+        if signatureEntries.isEmpty {
+            return verification.legacyVerification.shouldShowSignerIdentity
+                ? [verification.legacyVerification]
+                : []
         }
+
+        return signatureEntries.filter(\.shouldShowSignerIdentity)
+    }
+
+    @ViewBuilder
+    private func statusRow(for verification: SignatureVerification) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: verification.symbolName)
+                .foregroundStyle(verification.statusColor)
+
+            Text(verification.statusDescription)
+                .font(.subheadline)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

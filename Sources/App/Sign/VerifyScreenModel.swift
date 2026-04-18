@@ -44,8 +44,6 @@ final class VerifyScreenModel {
     var signatureFileURL: URL?
     var signatureFileName: String?
     var textInputSectionEpoch = 0
-    private var cleartextDetailedPresentationEpoch = 0
-    private var detachedDetailedPresentationEpoch = 0
 
     init(
         signingService: SigningService,
@@ -137,23 +135,6 @@ final class VerifyScreenModel {
 
     var detachedVerification: SignatureVerification? {
         detachedDetailedVerification?.legacyVerification
-    }
-
-    var activeDetailedResetToken: DetailedSignatureSectionView.ResetToken {
-        switch verifyMode {
-        case .cleartext:
-            DetailedSignatureSectionView.ResetToken(
-                screenContext: .verify,
-                modeIdentifier: verifyMode.rawValue,
-                presentationEpoch: cleartextDetailedPresentationEpoch
-            )
-        case .detached:
-            DetailedSignatureSectionView.ResetToken(
-                screenContext: .verify,
-                modeIdentifier: verifyMode.rawValue,
-                presentationEpoch: detachedDetailedPresentationEpoch
-            )
-        }
     }
 
     var verifyButtonDisabled: Bool {
@@ -331,22 +312,18 @@ final class VerifyScreenModel {
 
     private func replaceCleartextDetailedVerification(with verification: DetailedSignatureVerification) {
         cleartextDetailedVerification = verification
-        cleartextDetailedPresentationEpoch &+= 1
     }
 
     private func replaceDetachedDetailedVerification(with verification: DetailedSignatureVerification) {
         detachedDetailedVerification = verification
-        detachedDetailedPresentationEpoch &+= 1
     }
 
     private func clearCleartextVerificationState() {
         cleartextDetailedVerification = nil
-        cleartextDetailedPresentationEpoch &+= 1
     }
 
     private func clearDetachedVerificationState() {
         detachedDetailedVerification = nil
-        detachedDetailedPresentationEpoch &+= 1
     }
 
     private func mapVerificationError(_ error: Error) -> CypherAirError {

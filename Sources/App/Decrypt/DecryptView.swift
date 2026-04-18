@@ -262,33 +262,11 @@ private struct DecryptScreenHostView: View {
                 }
             }
 
-            if let sigVerification = model.signatureVerification {
-                Section {
-                    HStack {
-                        Image(systemName: sigVerification.symbolName)
-                            .foregroundStyle(sigVerification.statusColor)
-                        Text(sigVerification.statusDescription)
-                            .font(.subheadline)
-                    }
-                    .accessibilityElement(children: .combine)
-                } header: {
-                    Text(String(localized: "decrypt.signature", defaultValue: "Signature"))
-                }
-
-                if sigVerification.shouldShowSignerIdentity {
-                    Section {
-                        SignatureIdentityCardView(verification: sigVerification)
-                    } header: {
-                        Text(String(localized: "decrypt.signer", defaultValue: "Signer"))
-                    }
-                }
-            }
-
-            if let detailedVerification = model.detailedSignatureVerification,
-               !detailedVerification.signatures.isEmpty {
+            if let detailedVerification = model.detailedSignatureVerification {
                 DetailedSignatureSectionView(
                     verification: detailedVerification,
-                    resetToken: model.detailedSignatureResetToken
+                    resultTitle: "decrypt.signature",
+                    signerTitle: "decrypt.signer"
                 )
             }
         }
