@@ -433,6 +433,9 @@ pub(crate) fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
     // All comparisons are case-insensitive to guard against rewording across versions.
     for cause in e.chain() {
         let cause_str = cause.to_string().to_lowercase();
+        if cause_str.contains("operation cancelled by user") {
+            return PgpError::OperationCancelled;
+        }
         if cause_str.contains("authentication")
             || cause_str.contains("aead")
             || cause_str.contains("tag mismatch")

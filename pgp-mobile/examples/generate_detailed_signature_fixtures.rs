@@ -229,6 +229,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &recipient.public_key_data,
         &[&signer_a.cert_data, &signer_b.cert_data],
     );
+    let encrypted_repeated = encrypt_multi_signed(
+        b"FFI detailed repeated encrypted payload",
+        &recipient.public_key_data,
+        &[&signer_a.cert_data, &signer_a.cert_data],
+    );
     let mixedfold_data = b"FFI detailed verify mixed fold".to_vec();
     let expired_unknown_binary = sign_detached_multi_binary(
         &mixedfold_data,
@@ -310,6 +315,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(
         fixtures_dir.join("ffi_detailed_multisig_encrypted.gpg"),
         encrypted,
+    )?;
+    fs::write(
+        fixtures_dir.join("ffi_detailed_repeated_encrypted.gpg"),
+        encrypted_repeated,
     )?;
     fs::write(
         fixtures_dir.join("ffi_detailed_mixedfold_data.txt"),

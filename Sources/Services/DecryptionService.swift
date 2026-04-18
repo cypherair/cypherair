@@ -187,8 +187,7 @@ final class DecryptionService {
         }
 
         // Gather verification keys (all contacts + own public keys)
-        let verificationKeys = contactService.contacts.map { $0.publicKeyData }
-            + keyManagement.keys.map { $0.publicKeyData }
+        let verificationKeys = allVerificationKeys()
 
         // Decrypt via Rust engine — off main thread
         let result: DecryptResult
@@ -220,6 +219,54 @@ final class DecryptionService {
         )
 
         return (plaintext: result.plaintext, signature: sigVerification)
+    }
+
+    /// Decrypt a message using the matched key from Phase 1 while preserving
+    /// per-signature detailed verification results.
+    ///
+    /// SECURITY: This method must only be called after Phase 1 has identified the key.
+    /// The private key exists in memory only during the decrypt call and is zeroized immediately after.
+    func decryptDetailed(
+        phase1: Phase1Result
+    ) async throws -> (plaintext: Data, verification: DetailedSignatureVerification) {
+        guard let matchedKey = phase1.matchedKey else {
+            throw CypherAirError.noMatchingKey
+        }
+
+        var secretKey: Data
+        do {
+            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
+        } catch {
+            throw CypherAirError.from(error) { _ in .authenticationFailed }
+        }
+        defer {
+            secretKey.resetBytes(in: 0..<secretKey.count)
+        }
+
+        let verificationKeys = allVerificationKeys()
+
+        let result: DecryptDetailedResult
+        do {
+            result = try await Self.performDecryptDetailed(
+                engine: engine,
+                ciphertext: phase1.ciphertext,
+                secretKeys: [secretKey],
+                verificationKeys: verificationKeys
+            )
+        } catch {
+            throw CypherAirError.from(error) { .corruptData(reason: $0) }
+        }
+
+        return (
+            plaintext: result.plaintext,
+            verification: DetailedSignatureVerification.from(
+                legacyStatus: result.legacyStatus,
+                legacySignerFingerprint: result.legacySignerFingerprint,
+                signatures: result.signatures,
+                contacts: contactService.contacts,
+                ownKeys: keyManagement.keys
+            )
+        )
     }
 
     // MARK: - Phase 2: Streaming File Decrypt (Authentication Required)
@@ -254,8 +301,7 @@ final class DecryptionService {
         }
 
         // Gather verification keys (all contacts + own public keys)
-        let verificationKeys = contactService.contacts.map { $0.publicKeyData }
-            + keyManagement.keys.map { $0.publicKeyData }
+        let verificationKeys = allVerificationKeys()
 
         // Prepare output path in tmp/decrypted/
         let decryptedDir = FileManager.default.temporaryDirectory
@@ -309,6 +355,72 @@ final class DecryptionService {
         return (outputURL: outputURL, signature: sigVerification)
     }
 
+    /// Decrypt a file using streaming I/O while preserving per-signature detailed
+    /// verification results.
+    ///
+    /// SECURITY: This method must only be called after Phase 1 has identified the key.
+    /// The private key exists in memory only during the decrypt call and is zeroized immediately after.
+    func decryptFileStreamingDetailed(
+        phase1: FilePhase1Result,
+        progress: FileProgressReporter?
+    ) async throws -> (outputURL: URL, verification: DetailedSignatureVerification) {
+        guard let matchedKey = phase1.matchedKey else {
+            throw CypherAirError.noMatchingKey
+        }
+
+        var secretKey: Data
+        do {
+            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
+        } catch {
+            throw CypherAirError.from(error) { _ in .authenticationFailed }
+        }
+        defer {
+            secretKey.resetBytes(in: 0..<secretKey.count)
+        }
+
+        let verificationKeys = allVerificationKeys()
+
+        let decryptedDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("decrypted", isDirectory: true)
+        try FileManager.default.createDirectory(at: decryptedDir, withIntermediateDirectories: true)
+
+        let inputFilename = (phase1.inputPath as NSString).lastPathComponent
+        let outputFilename: String
+        let ext = (inputFilename as NSString).pathExtension.lowercased()
+        if ["gpg", "pgp", "asc"].contains(ext) {
+            outputFilename = (inputFilename as NSString).deletingPathExtension
+        } else {
+            outputFilename = inputFilename + ".decrypted"
+        }
+        let outputURL = decryptedDir.appendingPathComponent(outputFilename)
+
+        let fileResult: FileDecryptDetailedResult
+        do {
+            fileResult = try await Self.performDecryptFileDetailed(
+                engine: engine,
+                inputPath: phase1.inputPath,
+                outputPath: outputURL.path,
+                secretKeys: [secretKey],
+                verificationKeys: verificationKeys,
+                progress: progress
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: outputURL)
+            throw CypherAirError.from(error) { .corruptData(reason: $0) }
+        }
+
+        return (
+            outputURL: outputURL,
+            verification: DetailedSignatureVerification.from(
+                legacyStatus: fileResult.legacyStatus,
+                legacySignerFingerprint: fileResult.legacySignerFingerprint,
+                signatures: fileResult.signatures,
+                contacts: contactService.contacts,
+                ownKeys: keyManagement.keys
+            )
+        )
+    }
+
     // MARK: - Convenience: Full Decrypt
 
     /// Perform both Phase 1 and Phase 2 in sequence.
@@ -316,6 +428,24 @@ final class DecryptionService {
     func decryptMessage(ciphertext: Data) async throws -> (plaintext: Data, signature: SignatureVerification) {
         let phase1 = try await parseRecipients(ciphertext: ciphertext)
         return try await decrypt(phase1: phase1)
+    }
+
+    /// Perform both Phase 1 and Phase 2 in sequence while preserving
+    /// per-signature detailed verification results.
+    func decryptMessageDetailed(
+        ciphertext: Data
+    ) async throws -> (plaintext: Data, verification: DetailedSignatureVerification) {
+        let phase1 = try await parseRecipients(ciphertext: ciphertext)
+        return try await decryptDetailed(phase1: phase1)
+    }
+
+    // MARK: - Private
+
+    /// Collect all public keys for signature verification
+    /// (contacts + own keys).
+    private func allVerificationKeys() -> [Data] {
+        contactService.contacts.map { $0.publicKeyData }
+            + keyManagement.keys.map { $0.publicKeyData }
     }
 
     // MARK: - Off-Main-Actor Engine Helpers
@@ -335,6 +465,21 @@ final class DecryptionService {
         )
     }
 
+    /// Run detailed decryption off the main actor.
+    @concurrent
+    private static func performDecryptDetailed(
+        engine: PgpEngine,
+        ciphertext: Data,
+        secretKeys: [Data],
+        verificationKeys: [Data]
+    ) async throws -> DecryptDetailedResult {
+        try engine.decryptDetailed(
+            ciphertext: ciphertext,
+            secretKeys: secretKeys,
+            verificationKeys: verificationKeys
+        )
+    }
+
     /// Run streaming file decryption off the main actor.
     @concurrent
     private static func performDecryptFile(
@@ -346,6 +491,25 @@ final class DecryptionService {
         progress: FileProgressReporter?
     ) async throws -> FileDecryptResult {
         try engine.decryptFile(
+            inputPath: inputPath,
+            outputPath: outputPath,
+            secretKeys: secretKeys,
+            verificationKeys: verificationKeys,
+            progress: progress
+        )
+    }
+
+    /// Run streaming file detailed decryption off the main actor.
+    @concurrent
+    private static func performDecryptFileDetailed(
+        engine: PgpEngine,
+        inputPath: String,
+        outputPath: String,
+        secretKeys: [Data],
+        verificationKeys: [Data],
+        progress: FileProgressReporter?
+    ) async throws -> FileDecryptDetailedResult {
+        try engine.decryptFileDetailed(
             inputPath: inputPath,
             outputPath: outputPath,
             secretKeys: secretKeys,

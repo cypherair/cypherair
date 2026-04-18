@@ -81,8 +81,8 @@ impl<R: Read> Read for ProgressReader<R> {
             let should_continue = reporter.on_progress(self.bytes_read, self.total_bytes);
             if !should_continue {
                 return Err(std::io::Error::new(
-                    std::io::ErrorKind::Interrupted,
-                    "Operation cancelled by user",
+                    std::io::ErrorKind::Other,
+                    StreamingCancelled,
                 ));
             }
         }
@@ -91,20 +91,20 @@ impl<R: Read> Read for ProgressReader<R> {
     }
 }
 
-/// Marker error for detached verify cancellation.
+/// Marker error for streaming-operation cancellation.
 ///
-/// `buffered-reader` automatically retries `io::ErrorKind::Interrupted`, so detached
-/// file verification needs a distinct non-retryable error to propagate cancellation.
+/// Some downstream readers transparently retry `io::ErrorKind::Interrupted`, so
+/// cancellation must use a distinct non-retryable error type.
 #[derive(Debug)]
-struct DetachedVerifyCancelled;
+struct StreamingCancelled;
 
-impl fmt::Display for DetachedVerifyCancelled {
+impl fmt::Display for StreamingCancelled {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Operation cancelled by user")
     }
 }
 
-impl std::error::Error for DetachedVerifyCancelled {}
+impl std::error::Error for StreamingCancelled {}
 
 /// Reader used only for detached file verification.
 ///
@@ -138,7 +138,7 @@ impl<R: Read> Read for DetachedVerifyProgressReader<R> {
             if !should_continue {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
-                    DetachedVerifyCancelled,
+                    StreamingCancelled,
                 ));
             }
         }
@@ -180,7 +180,12 @@ fn zeroing_copy<R: Read, W: Write>(
 
     loop {
         let n = reader.read(&mut buf).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::Interrupted {
+            if e.kind() == std::io::ErrorKind::Interrupted
+                || e
+                    .get_ref()
+                    .and_then(|inner| inner.downcast_ref::<StreamingCancelled>())
+                    .is_some()
+            {
                 CopyError::Cancelled
             } else {
                 CopyError::Read(e)
@@ -202,13 +207,13 @@ fn zeroing_copy<R: Read, W: Write>(
 /// cancellation must still surface as hard errors instead of collapsing to `Bad`.
 fn classify_detached_verify_reader_error(error: &openpgp::anyhow::Error) -> Option<PgpError> {
     for cause in error.chain() {
-        if cause.downcast_ref::<DetachedVerifyCancelled>().is_some() {
+        if cause.downcast_ref::<StreamingCancelled>().is_some() {
             return Some(PgpError::OperationCancelled);
         }
         if let Some(io_error) = cause.downcast_ref::<std::io::Error>() {
             if io_error
                 .get_ref()
-                .and_then(|inner| inner.downcast_ref::<DetachedVerifyCancelled>())
+                .and_then(|inner| inner.downcast_ref::<StreamingCancelled>())
                 .is_some()
             {
                 return Some(PgpError::OperationCancelled);

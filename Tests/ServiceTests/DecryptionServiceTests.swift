@@ -521,6 +521,577 @@ final class DecryptionServiceTests: XCTestCase {
                        "Should match the correct Profile B key")
     }
 
+    // MARK: - Detailed Results
+
+    func test_decryptDetailed_validOwnKeySigner_matchesLegacyAndResolvesOwnKey() async throws {
+        let sender = try await TestHelpers.generateAndStoreKey(
+            service: stack.keyManagement,
+            profile: .universal,
+            name: "Detailed Sender",
+            email: "detailed-sender@example.com"
+        )
+        let recipient = try await TestHelpers.generateAndStoreKey(
+            service: stack.keyManagement,
+            profile: .universal,
+            name: "Detailed Recipient",
+            email: "detailed-recipient@example.com"
+        )
+
+        let plaintext = Data("Detailed decrypt own-key signer".utf8)
+        var senderSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
+        defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
+
+        let ciphertext = try stack.engine.encryptBinary(
+            plaintext: plaintext,
+            recipients: [recipient.publicKeyData],
+            signingKey: senderSecret,
+            encryptToSelf: nil
+        )
+        let phase1 = try makePhase1(matchedKey: recipient, ciphertext: ciphertext)
+
+        let unwrapBefore = stack.mockSE.unwrapCallCount
+        let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
+        XCTAssertEqual(
+            stack.mockSE.unwrapCallCount,
+            unwrapBefore + 1,
+            "Detailed decrypt should unwrap exactly once"
+        )
+
+        let legacy = try await stack.decryptionService.decrypt(phase1: phase1)
+
+        XCTAssertEqual(detailed.plaintext, plaintext)
+        XCTAssertEqual(detailed.verification.signatures.count, 1)
+        XCTAssertEqual(detailed.verification.signatures[0].status, .valid)
+        XCTAssertEqual(
+            detailed.verification.signatures[0].signerPrimaryFingerprint,
+            sender.fingerprint
+        )
+        XCTAssertEqual(
+            detailed.verification.signatures[0].signerIdentity?.source,
+            .ownKey
+        )
+        XCTAssertEqual(
+            detailed.verification.signatures[0].signerIdentity?.fingerprint,
+            sender.fingerprint
+        )
+        assertLegacyVerificationEquivalent(
+            detailed.verification.legacyVerification,
+            legacy.signature
+        )
+    }
+
+    func test_decryptDetailed_unsigned_returnsEmptySignaturesAndNotSigned() async throws {
+        let recipient = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Unsigned Detailed Recipient"
+        )
+        let plaintext = Data("Unsigned detailed decrypt".utf8)
+        let ciphertext = try stack.engine.encryptBinary(
+            plaintext: plaintext,
+            recipients: [recipient.publicKeyData],
+            signingKey: nil,
+            encryptToSelf: nil
+        )
+        let phase1 = try makePhase1(matchedKey: recipient, ciphertext: ciphertext)
+
+        let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
+        let legacy = try await stack.decryptionService.decrypt(phase1: phase1)
+
+        XCTAssertEqual(detailed.plaintext, plaintext)
+        XCTAssertEqual(detailed.verification.legacyStatus, .notSigned)
+        XCTAssertTrue(detailed.verification.signatures.isEmpty)
+        assertLegacyVerificationEquivalent(
+            detailed.verification.legacyVerification,
+            legacy.signature
+        )
+    }
+
+    func test_decryptDetailed_fixtureMultiSigner_preservesEntriesAndContactResolution()
+        async throws
+    {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let signerB = try loadFixture("ffi_detailed_signer_b")
+        let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let ciphertext = try loadFixture("ffi_detailed_multisig_encrypted")
+
+        let signerAInfo = try stack.engine.parseKeyInfo(keyData: signerA)
+        let signerBInfo = try stack.engine.parseKeyInfo(keyData: signerB)
+        try stack.contactService.addContact(publicKeyData: signerA)
+        try stack.contactService.addContact(publicKeyData: signerB)
+
+        let identity = try TestHelpers.provisionFixtureBackedIdentity(
+            secretCertData: recipientSecret,
+            engine: stack.engine,
+            service: stack.keyManagement,
+            mockSE: stack.mockSE,
+            mockKC: stack.mockKC,
+            isDefault: true
+        )
+        let phase1 = try makePhase1(matchedKey: identity, ciphertext: ciphertext)
+
+        let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
+        let expected = try stack.engine.decryptDetailed(
+            ciphertext: ciphertext,
+            secretKeys: [recipientSecret],
+            verificationKeys: [signerA, signerB]
+        )
+
+        XCTAssertEqual(detailed.plaintext, expected.plaintext)
+        XCTAssertEqual(detailed.verification.legacyStatus, expected.legacyStatus)
+        XCTAssertEqual(
+            detailed.verification.legacySignerFingerprint,
+            expected.legacySignerFingerprint
+        )
+        assertDetailedEntriesMatchFFI(
+            detailed.verification.signatures,
+            expected.signatures
+        )
+        XCTAssertEqual(
+            detailed.verification.signatures.map(\.signerPrimaryFingerprint),
+            [signerBInfo.fingerprint, signerAInfo.fingerprint]
+        )
+        XCTAssertTrue(detailed.verification.signatures.allSatisfy {
+            $0.signerIdentity?.source == .contact
+        })
+    }
+
+    func test_decryptDetailed_runtimeUnknownSigner_returnsUnknownEntryWithoutFingerprint()
+        async throws
+    {
+        let recipient = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Unknown Detailed Recipient"
+        )
+        let externalSigner = try stack.engine.generateKey(
+            name: "Unknown Detailed Signer",
+            email: "unknown-detailed@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let plaintext = Data("Unknown signer detailed decrypt".utf8)
+
+        let ciphertext = try stack.engine.encryptBinary(
+            plaintext: plaintext,
+            recipients: [recipient.publicKeyData],
+            signingKey: externalSigner.certData,
+            encryptToSelf: nil
+        )
+        let phase1 = try makePhase1(matchedKey: recipient, ciphertext: ciphertext)
+
+        let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
+
+        XCTAssertEqual(detailed.plaintext, plaintext)
+        XCTAssertEqual(detailed.verification.legacyStatus, .unknownSigner)
+        XCTAssertNil(detailed.verification.legacySignerFingerprint)
+        XCTAssertEqual(detailed.verification.signatures.count, 1)
+        XCTAssertEqual(detailed.verification.signatures[0].status, .unknownSigner)
+        XCTAssertNil(detailed.verification.signatures[0].signerPrimaryFingerprint)
+        XCTAssertNil(detailed.verification.signatures[0].signerIdentity)
+    }
+
+    func test_decryptDetailed_noMatchedKey_throwsNoMatchingKeyWithoutUnwrap() async throws {
+        let phase1 = DecryptionService.Phase1Result(
+            recipientKeyIds: ["unknown"],
+            matchedKey: nil,
+            ciphertext: Data()
+        )
+        let unwrapBefore = stack.mockSE.unwrapCallCount
+
+        do {
+            _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
+            XCTFail("Expected noMatchingKey")
+        } catch {
+            assertCypherAirError(error) { if case .noMatchingKey = $0 { return true } else { return false } }
+        }
+
+        XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapBefore)
+    }
+
+    func test_decryptDetailed_profileA_tamperedCiphertext_throwsMappedIntegrityError()
+        async throws
+    {
+        let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
+            profile: .universal
+        )
+        var tampered = binaryCiphertext
+        tampered[tampered.count / 2] ^= 0x01
+        let phase1 = DecryptionService.Phase1Result(
+            recipientKeyIds: try stack.engine.parseRecipients(ciphertext: binaryCiphertext),
+            matchedKey: identity,
+            ciphertext: tampered
+        )
+
+        do {
+            _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
+            XCTFail("Expected mapped integrity failure")
+        } catch {
+            assertCypherAirError(error) {
+                switch $0 {
+                case .integrityCheckFailed, .corruptData, .noMatchingKey:
+                    return true
+                default:
+                    return false
+                }
+            }
+        }
+    }
+
+    func test_decryptDetailed_profileB_tamperedCiphertext_throwsMappedAEADError()
+        async throws
+    {
+        let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
+            profile: .advanced
+        )
+        var tampered = binaryCiphertext
+        tampered[tampered.count / 2] ^= 0x01
+        let phase1 = DecryptionService.Phase1Result(
+            recipientKeyIds: try stack.engine.parseRecipients(ciphertext: binaryCiphertext),
+            matchedKey: identity,
+            ciphertext: tampered
+        )
+
+        do {
+            _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
+            XCTFail("Expected mapped AEAD failure")
+        } catch {
+            assertCypherAirError(error) {
+                switch $0 {
+                case .aeadAuthenticationFailed, .integrityCheckFailed, .corruptData, .noMatchingKey:
+                    return true
+                default:
+                    return false
+                }
+            }
+        }
+    }
+
+    func test_decryptMessageDetailed_endToEnd_matchesChainedPhases() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Detailed Message Recipient"
+        )
+        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "Detailed message end-to-end",
+            recipientFingerprints: [identity.fingerprint],
+            signWithFingerprint: identity.fingerprint,
+            encryptToSelf: false
+        )
+
+        let endToEnd = try await stack.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
+        let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
+        let chained = try await stack.decryptionService.decryptDetailed(phase1: phase1)
+
+        XCTAssertEqual(endToEnd.plaintext, chained.plaintext)
+        XCTAssertEqual(endToEnd.verification, chained.verification)
+    }
+
+    func test_decryptFileStreamingDetailed_fixtureMultiSigner_matchesInMemoryDetailed()
+        async throws
+    {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let signerB = try loadFixture("ffi_detailed_signer_b")
+        let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let ciphertext = try loadFixture("ffi_detailed_multisig_encrypted")
+
+        try stack.contactService.addContact(publicKeyData: signerA)
+        try stack.contactService.addContact(publicKeyData: signerB)
+        let identity = try TestHelpers.provisionFixtureBackedIdentity(
+            secretCertData: recipientSecret,
+            engine: stack.engine,
+            service: stack.keyManagement,
+            mockSE: stack.mockSE,
+            mockKC: stack.mockKC,
+            isDefault: true
+        )
+
+        let inputURL = try makeTemporaryFile(
+            named: "ffi-detailed-multisig-encrypted.gpg",
+            contents: ciphertext
+        )
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+
+        let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: inputURL)
+        let detailed = try await stack.decryptionService.decryptFileStreamingDetailed(
+            phase1: phase1,
+            progress: nil
+        )
+        defer { try? FileManager.default.removeItem(at: detailed.outputURL) }
+
+        let inMemory = try await stack.decryptionService.decryptDetailed(
+            phase1: makePhase1(matchedKey: identity, ciphertext: ciphertext)
+        )
+        let expectedOutputURL = makeTemporaryOutputURL(
+            named: "ffi-detailed-multisig-expected.bin"
+        )
+        let expected = try stack.engine.decryptFileDetailed(
+            inputPath: inputURL.path,
+            outputPath: expectedOutputURL.path,
+            secretKeys: [recipientSecret],
+            verificationKeys: [signerA, signerB],
+            progress: nil
+        )
+        defer { try? FileManager.default.removeItem(at: expectedOutputURL) }
+
+        XCTAssertEqual(try Data(contentsOf: detailed.outputURL), inMemory.plaintext)
+        XCTAssertEqual(detailed.verification.legacyStatus, inMemory.verification.legacyStatus)
+        assertDetailedEntriesMatchFFI(
+            detailed.verification.signatures,
+            expected.signatures
+        )
+        XCTAssertEqual(detailed.verification.signatures, inMemory.verification.signatures)
+        XCTAssertTrue(detailed.verification.signatures.allSatisfy {
+            $0.signerIdentity?.source == .contact
+        })
+    }
+
+    func test_decryptFileStreamingDetailed_runtimeUnknownSigner_matchesInMemoryDetailed()
+        async throws
+    {
+        let recipient = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Unknown File Detailed Recipient"
+        )
+        let externalSigner = try stack.engine.generateKey(
+            name: "Unknown File Detailed Signer",
+            email: "unknown-file-detailed@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let plaintext = Data("Unknown signer detailed file decrypt".utf8)
+        let ciphertext = try stack.engine.encryptBinary(
+            plaintext: plaintext,
+            recipients: [recipient.publicKeyData],
+            signingKey: externalSigner.certData,
+            encryptToSelf: nil
+        )
+
+        let inputURL = try makeTemporaryFile(
+            named: "unknown-signer-detailed.gpg",
+            contents: ciphertext
+        )
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+
+        let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: inputURL)
+        let detailed = try await stack.decryptionService.decryptFileStreamingDetailed(
+            phase1: phase1,
+            progress: nil
+        )
+        defer { try? FileManager.default.removeItem(at: detailed.outputURL) }
+
+        let inMemory = try await stack.decryptionService.decryptDetailed(
+            phase1: makePhase1(matchedKey: recipient, ciphertext: ciphertext)
+        )
+
+        XCTAssertEqual(try Data(contentsOf: detailed.outputURL), plaintext)
+        XCTAssertEqual(detailed.verification, inMemory.verification)
+        XCTAssertEqual(detailed.verification.signatures.count, 1)
+        XCTAssertEqual(detailed.verification.signatures[0].status, .unknownSigner)
+        XCTAssertNil(detailed.verification.signatures[0].signerPrimaryFingerprint)
+        XCTAssertNil(detailed.verification.signatures[0].signerIdentity)
+    }
+
+    func test_decryptFileStreamingDetailed_fixtureRepeatedSigner_preservesRepeatedEntries()
+        async throws
+    {
+        let signerA = try loadFixture("ffi_detailed_signer_a")
+        let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
+        let ciphertext = try loadFixture("ffi_detailed_repeated_encrypted")
+        let signerAInfo = try stack.engine.parseKeyInfo(keyData: signerA)
+
+        try stack.contactService.addContact(publicKeyData: signerA)
+        _ = try TestHelpers.provisionFixtureBackedIdentity(
+            secretCertData: recipientSecret,
+            engine: stack.engine,
+            service: stack.keyManagement,
+            mockSE: stack.mockSE,
+            mockKC: stack.mockKC,
+            isDefault: true
+        )
+
+        let inputURL = try makeTemporaryFile(
+            named: "ffi-detailed-repeated-encrypted.gpg",
+            contents: ciphertext
+        )
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+
+        let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: inputURL)
+        let detailed = try await stack.decryptionService.decryptFileStreamingDetailed(
+            phase1: phase1,
+            progress: nil
+        )
+        defer { try? FileManager.default.removeItem(at: detailed.outputURL) }
+
+        XCTAssertEqual(detailed.verification.signatures.count, 2)
+        XCTAssertEqual(
+            detailed.verification.signatures.map(\.signerPrimaryFingerprint),
+            [signerAInfo.fingerprint, signerAInfo.fingerprint]
+        )
+        XCTAssertTrue(detailed.verification.signatures.allSatisfy {
+            $0.status == .valid && $0.signerIdentity?.source == .contact
+        })
+    }
+
+    func test_decryptFileStreamingDetailed_cancellation_throwsMappedOperationCancelledAndCleansUp()
+        async throws
+    {
+        let recipient = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Detailed Cancel Recipient"
+        )
+        try stack.contactService.addContact(publicKeyData: recipient.publicKeyData)
+
+        let plaintextURL = try makeTemporaryFile(
+            named: "detailed-cancel.txt",
+            contents: Data(repeating: 0x42, count: 256 * 1024)
+        )
+        defer { try? FileManager.default.removeItem(at: plaintextURL) }
+
+        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+            inputURL: plaintextURL,
+            recipientFingerprints: [recipient.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+
+        let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedURL)
+        let expectedOutputURL = expectedDecryptedOutputURL(for: encryptedURL)
+        try? FileManager.default.removeItem(at: expectedOutputURL)
+
+        let progress = FileProgressReporter()
+        progress.cancel()
+
+        do {
+            _ = try await stack.decryptionService.decryptFileStreamingDetailed(
+                phase1: phase1,
+                progress: progress
+            )
+            XCTFail("Expected operationCancelled")
+        } catch {
+            assertCypherAirError(error) {
+                if case .operationCancelled = $0 { return true }
+                return false
+            }
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: expectedOutputURL.path))
+    }
+
+    func test_decryptFileStreamingDetailed_profileA_tamperedFile_throwsMappedIntegrityErrorAndCleansUp()
+        async throws
+    {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Detailed Tampered File A"
+        )
+        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+
+        let plaintextURL = try makeTemporaryFile(
+            named: "detailed-tampered-a.txt",
+            contents: Data("Detailed tampered file A".utf8)
+        )
+        defer { try? FileManager.default.removeItem(at: plaintextURL) }
+
+        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+            inputURL: plaintextURL,
+            recipientFingerprints: [identity.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+
+        var encryptedData = try Data(contentsOf: encryptedURL)
+        encryptedData[encryptedData.count / 2] ^= 0x01
+        try encryptedData.write(to: encryptedURL, options: .atomic)
+
+        let phase1 = DecryptionService.FilePhase1Result(
+            recipientKeyIds: [identity.fingerprint],
+            matchedKey: identity,
+            inputPath: encryptedURL.path
+        )
+        let expectedOutputURL = expectedDecryptedOutputURL(for: encryptedURL)
+        try? FileManager.default.removeItem(at: expectedOutputURL)
+
+        do {
+            _ = try await stack.decryptionService.decryptFileStreamingDetailed(
+                phase1: phase1,
+                progress: nil
+            )
+            XCTFail("Expected mapped integrity failure")
+        } catch {
+            assertCypherAirError(error) {
+                switch $0 {
+                case .integrityCheckFailed, .corruptData, .noMatchingKey:
+                    return true
+                default:
+                    return false
+                }
+            }
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: expectedOutputURL.path))
+    }
+
+    func test_decryptFileStreamingDetailed_profileB_tamperedFile_throwsMappedAEADErrorAndCleansUp()
+        async throws
+    {
+        let identity = try await TestHelpers.generateProfileBKey(
+            service: stack.keyManagement,
+            name: "Detailed Tampered File B"
+        )
+        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+
+        let plaintextURL = try makeTemporaryFile(
+            named: "detailed-tampered-b.txt",
+            contents: Data("Detailed tampered file B".utf8)
+        )
+        defer { try? FileManager.default.removeItem(at: plaintextURL) }
+
+        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+            inputURL: plaintextURL,
+            recipientFingerprints: [identity.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+
+        var encryptedData = try Data(contentsOf: encryptedURL)
+        encryptedData[encryptedData.count / 2] ^= 0x01
+        try encryptedData.write(to: encryptedURL, options: .atomic)
+
+        let phase1 = DecryptionService.FilePhase1Result(
+            recipientKeyIds: [identity.fingerprint],
+            matchedKey: identity,
+            inputPath: encryptedURL.path
+        )
+        let expectedOutputURL = expectedDecryptedOutputURL(for: encryptedURL)
+        try? FileManager.default.removeItem(at: expectedOutputURL)
+
+        do {
+            _ = try await stack.decryptionService.decryptFileStreamingDetailed(
+                phase1: phase1,
+                progress: nil
+            )
+            XCTFail("Expected mapped AEAD failure")
+        } catch {
+            assertCypherAirError(error) {
+                switch $0 {
+                case .aeadAuthenticationFailed, .integrityCheckFailed, .corruptData, .noMatchingKey:
+                    return true
+                default:
+                    return false
+                }
+            }
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: expectedOutputURL.path))
+    }
+
     // MARK: - H1: High Security Biometrics Blocking
 
     func test_decrypt_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
@@ -538,5 +1109,119 @@ final class DecryptionServiceTests: XCTestCase {
             // KeyManagementService.unwrapPrivateKey → CypherAirError
             // Accept any error here — the key invariant is that decryption does NOT succeed
         }
+    }
+
+    // MARK: - Detailed Test Helpers
+
+    private func loadFixture(_ name: String, ext: String = "gpg") throws -> Data {
+        try FixtureLoader.loadData(name, ext: ext)
+    }
+
+    private func makeTemporaryFile(named name: String, contents: Data) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirDetailedDecryptTests-\(UUID().uuidString)-\(name)")
+        try contents.write(to: url, options: .atomic)
+        return url
+    }
+
+    private func makeTemporaryOutputURL(named name: String) -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirDetailedDecryptTests-\(UUID().uuidString)-\(name)")
+    }
+
+    private func makePhase1(
+        matchedKey: PGPKeyIdentity,
+        ciphertext: Data
+    ) throws -> DecryptionService.Phase1Result {
+        DecryptionService.Phase1Result(
+            recipientKeyIds: try stack.engine.parseRecipients(ciphertext: ciphertext),
+            matchedKey: matchedKey,
+            ciphertext: ciphertext
+        )
+    }
+
+    private func expectedDecryptedOutputURL(for inputURL: URL) -> URL {
+        let decryptedDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("decrypted", isDirectory: true)
+        let inputFilename = inputURL.lastPathComponent
+        let ext = inputURL.pathExtension.lowercased()
+        let outputFilename: String
+        if ["gpg", "pgp", "asc"].contains(ext) {
+            outputFilename = inputURL.deletingPathExtension().lastPathComponent
+        } else {
+            outputFilename = inputFilename + ".decrypted"
+        }
+        return decryptedDir.appendingPathComponent(outputFilename)
+    }
+
+    private func assertLegacyVerificationEquivalent(
+        _ actual: SignatureVerification,
+        _ expected: SignatureVerification,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(actual.status, expected.status, file: file, line: line)
+        XCTAssertEqual(actual.signerFingerprint, expected.signerFingerprint, file: file, line: line)
+        XCTAssertEqual(actual.signerContact, expected.signerContact, file: file, line: line)
+        XCTAssertEqual(actual.signerIdentity, expected.signerIdentity, file: file, line: line)
+    }
+
+    private func assertDetailedEntriesMatchFFI(
+        _ actual: [DetailedSignatureVerification.Entry],
+        _ expected: [DetailedSignatureEntry],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(actual.count, expected.count, file: file, line: line)
+        for (actualEntry, expectedEntry) in zip(actual, expected) {
+            XCTAssertEqual(
+                actualEntry.status,
+                detailedStatus(from: expectedEntry.status),
+                file: file,
+                line: line
+            )
+            XCTAssertEqual(
+                actualEntry.signerPrimaryFingerprint,
+                expectedEntry.signerPrimaryFingerprint,
+                file: file,
+                line: line
+            )
+        }
+    }
+
+    private func detailedStatus(
+        from status: DetailedSignatureStatus
+    ) -> DetailedSignatureVerification.Entry.Status {
+        switch status {
+        case .valid:
+            return .valid
+        case .unknownSigner:
+            return .unknownSigner
+        case .bad:
+            return .bad
+        case .expired:
+            return .expired
+        }
+    }
+
+    private func assertCypherAirError(
+        _ error: Error,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        matches matcher: (CypherAirError) -> Bool
+    ) {
+        guard let cypherAirError = error as? CypherAirError else {
+            return XCTFail(
+                "Expected CypherAirError, got \(type(of: error)): \(error)",
+                file: file,
+                line: line
+            )
+        }
+        XCTAssertTrue(
+            matcher(cypherAirError),
+            "Unexpected CypherAirError: \(cypherAirError)",
+            file: file,
+            line: line
+        )
     }
 }
