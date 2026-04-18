@@ -130,6 +130,12 @@ Mode switching requires re-wrapping all Secure Enclave protected keys.
 - Maintain existing user-visible behavior unless the task explicitly changes it.
 - Treat `pgp_mobile.swift` as generated code. Do not hand-edit it.
 
+## Release Metadata / Build Numbers
+
+Treat Xcode release metadata as user-owned state. Do not modify, normalize, revert, or lower `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION` unless the user explicitly asks for a version or build-number change.
+
+If the user asks to increment the build number, first read the current `CURRENT_PROJECT_VERSION`, then increment it by 1 unless the user specifies an exact value. Never decrease `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION`. If these fields already have uncommitted changes, treat them as user edits; do not revert, overwrite, or reinterpret them unless the user explicitly asks.
+
 ## Coding Conventions
 
 - Swift API Design Guidelines. `guard` early exits over force unwraps. `async/await` over Combine.
