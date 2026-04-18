@@ -93,9 +93,9 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         XCTAssertEqual(rEfi.licenseSourceKind, .spdxFallback)
         XCTAssertTrue(rEfi.licenseSourceItems.contains { $0.contains("LGPL-2.1") })
 
-        let uniffi = try XCTUnwrap(notices.first { $0.id == "uniffi@0.31.0" })
+        let uniffi = try XCTUnwrap(notices.first { $0.id == "uniffi@0.31.1" })
         XCTAssertEqual(uniffi.licenseSourceKind, .repositoryArchive)
-        XCTAssertTrue(uniffi.licenseSourceItems.contains("v0.31.0:LICENSE"))
+        XCTAssertTrue(uniffi.licenseSourceItems.contains("v0.31.1:LICENSE"))
 
         let sequoia = try XCTUnwrap(notices.first { $0.id == "sequoia-openpgp@2.2.0" })
         XCTAssertEqual(sequoia.licenseSourceKind, .cratePackage)

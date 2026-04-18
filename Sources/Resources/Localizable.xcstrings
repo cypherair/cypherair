@@ -3158,6 +3158,22 @@
         }
       }
     },
+    "error.contactImportRequiresPublicCertificate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacts only accept public certificates. Remove any private key material and try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人只接受公钥证书。请移除任何私钥材料后再试。"
+          }
+        }
+      }
+    },
     "error.corruptData" : {
       "localizations" : {
         "en" : {
@@ -3314,22 +3330,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不是有效的 CypherAir 公钥。"
-          }
-        }
-      }
-    },
-    "error.contactImportRequiresPublicCertificate" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contacts only accept public certificates. Remove any private key material and try again."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "联系人只接受公钥证书。请移除任何私钥材料后再试。"
           }
         }
       }
@@ -3942,6 +3942,38 @@
         }
       }
     },
+    "guidedTutorial.alreadyOpen.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Guided Tutorial is already open in the main window. Return to that window to continue."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引导教程已经在主窗口中打开。请返回该窗口继续操作。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.alreadyOpen.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutorial Already Open"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "教程已打开"
+          }
+        }
+      }
+    },
     "guidedTutorial.backup.entry" : {
       "localizations" : {
         "en" : {
@@ -4540,70 +4572,6 @@
         }
       }
     },
-    "guidedTutorial.alreadyOpen.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The Guided Tutorial is already open in the main window. Return to that window to continue."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "引导教程已经在主窗口中打开。请返回该窗口继续操作。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.alreadyOpen.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tutorial Already Open"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "教程已打开"
-          }
-        }
-      }
-    },
-    "guidedTutorial.launchBlocked.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The main window is busy with another dialog. Finish or dismiss it, then start the Guided Tutorial again."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "主窗口当前正被另一个对话框占用。请先完成或关闭它，然后再次启动引导教程。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.launchBlocked.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finish Current Dialog First"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请先完成当前对话框"
-          }
-        }
-      }
-    },
     "guidedTutorial.keys.alice" : {
       "localizations" : {
         "en" : {
@@ -4648,6 +4616,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "检查预填的 Alice 身份信息并生成密钥。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.launchBlocked.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The main window is busy with another dialog. Finish or dismiss it, then start the Guided Tutorial again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主窗口当前正被另一个对话框占用。请先完成或关闭它，然后再次启动引导教程。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.launchBlocked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finish Current Dialog First"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先完成当前对话框"
           }
         }
       }
@@ -6031,38 +6031,6 @@
         }
       }
     },
-    "import.tutorialBlocked.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "引导教程打开时，CypherAir 不会导入真实联系人。请关闭教程，然后重新打开二维码链接。"
-          }
-        }
-      }
-    },
-    "import.tutorialBlocked.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Close Tutorial to Import"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭教程后再导入"
-          }
-        }
-      }
-    },
     "import.expired" : {
       "localizations" : {
         "en" : {
@@ -6267,6 +6235,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "导入密钥"
+          }
+        }
+      }
+    },
+    "import.tutorialBlocked.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引导教程打开时，CypherAir 不会导入真实联系人。请关闭教程，然后重新打开二维码链接。"
+          }
+        }
+      }
+    },
+    "import.tutorialBlocked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close Tutorial to Import"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭教程后再导入"
           }
         }
       }
@@ -9303,6 +9303,7 @@
       }
     },
     "signature.detailed.section" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
