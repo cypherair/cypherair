@@ -49,7 +49,6 @@ final class DecryptScreenModel {
     private var pendingTextModeImport: PendingTextModeImport?
     var showTextModeSuggestion = false
     var textInputSectionEpoch = 0
-    private var detailedSignaturePresentationEpoch = 0
 
     init(
         decryptionService: DecryptionService,
@@ -199,14 +198,6 @@ final class DecryptScreenModel {
 
     var signatureVerification: SignatureVerification? {
         detailedSignatureVerification?.legacyVerification
-    }
-
-    var detailedSignatureResetToken: DetailedSignatureSectionView.ResetToken {
-        DetailedSignatureSectionView.ResetToken(
-            screenContext: .decrypt,
-            modeIdentifier: decryptMode.rawValue,
-            presentationEpoch: detailedSignaturePresentationEpoch
-        )
     }
 
     func handleAppear() {
@@ -498,12 +489,10 @@ final class DecryptScreenModel {
 
     private func replaceDetailedSignatureVerification(with verification: DetailedSignatureVerification) {
         detailedSignatureVerification = verification
-        detailedSignaturePresentationEpoch &+= 1
     }
 
     private func clearDetailedSignatureVerification() {
         detailedSignatureVerification = nil
-        detailedSignaturePresentationEpoch &+= 1
     }
 
     private func clearDisplayedText() {

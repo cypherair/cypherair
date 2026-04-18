@@ -134,33 +134,11 @@ private struct VerifyScreenHostView: View {
                 }
             }
 
-            if let activeVerification = model.activeVerification {
-                Section {
-                    HStack {
-                        Image(systemName: activeVerification.symbolName)
-                            .foregroundStyle(activeVerification.statusColor)
-                        Text(activeVerification.statusDescription)
-                            .font(.subheadline)
-                    }
-                    .accessibilityElement(children: .combine)
-                } header: {
-                    Text(String(localized: "verify.result", defaultValue: "Verification Result"))
-                }
-
-                if activeVerification.shouldShowSignerIdentity {
-                    Section {
-                        SignatureIdentityCardView(verification: activeVerification)
-                    } header: {
-                        Text(String(localized: "verify.signer", defaultValue: "Signer"))
-                    }
-                }
-            }
-
-            if let activeDetailedVerification = model.activeDetailedVerification,
-               !activeDetailedVerification.signatures.isEmpty {
+            if let activeDetailedVerification = model.activeDetailedVerification {
                 DetailedSignatureSectionView(
                     verification: activeDetailedVerification,
-                    resetToken: model.activeDetailedResetToken
+                    resultTitle: "verify.result",
+                    signerTitle: "verify.signer"
                 )
             }
         }
