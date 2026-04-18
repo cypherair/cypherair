@@ -61,12 +61,12 @@
     ]
   },
   {
-    "id": "anstyle@1.0.13",
+    "id": "anstyle@1.0.14",
     "displayName": "anstyle",
-    "version": "1.0.13",
+    "version": "1.0.14",
     "repositoryURL": "https://github.com/rust-cli/anstyle",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "anstyle-1.0.13.txt",
+    "licenseFileResourceName": "anstyle-1.0.14.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -151,12 +151,12 @@
     ]
   },
   {
-    "id": "bitflags@2.11.0",
+    "id": "bitflags@2.11.1",
     "displayName": "bitflags",
-    "version": "2.11.0",
+    "version": "2.11.1",
     "repositoryURL": "https://github.com/bitflags/bitflags",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "bitflags-2.11.0.txt",
+    "licenseFileResourceName": "bitflags-2.11.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -297,12 +297,12 @@
     ]
   },
   {
-    "id": "clap@4.5.60",
+    "id": "clap@4.6.1",
     "displayName": "clap",
-    "version": "4.5.60",
+    "version": "4.6.1",
     "repositoryURL": "https://github.com/clap-rs/clap",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "clap-4.5.60.txt",
+    "licenseFileResourceName": "clap-4.6.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -312,12 +312,12 @@
     ]
   },
   {
-    "id": "clap_builder@4.5.60",
+    "id": "clap_builder@4.6.0",
     "displayName": "clap_builder",
-    "version": "4.5.60",
+    "version": "4.6.0",
     "repositoryURL": "https://github.com/clap-rs/clap",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "clap_builder-4.5.60.txt",
+    "licenseFileResourceName": "clap_builder-4.6.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -327,12 +327,12 @@
     ]
   },
   {
-    "id": "clap_lex@1.0.0",
+    "id": "clap_lex@1.1.0",
     "displayName": "clap_lex",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "repositoryURL": "https://github.com/clap-rs/clap",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "clap_lex-1.0.0.txt",
+    "licenseFileResourceName": "clap_lex-1.1.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -462,12 +462,12 @@
     ]
   },
   {
-    "id": "fastrand@2.3.0",
+    "id": "fastrand@2.4.1",
     "displayName": "fastrand",
-    "version": "2.3.0",
+    "version": "2.4.1",
     "repositoryURL": "https://github.com/smol-rs/fastrand",
     "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "fastrand-2.3.0.txt",
+    "licenseFileResourceName": "fastrand-2.4.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -624,12 +624,12 @@
     ]
   },
   {
-    "id": "hashbrown@0.16.1",
+    "id": "hashbrown@0.17.0",
     "displayName": "hashbrown",
-    "version": "0.16.1",
+    "version": "0.17.0",
     "repositoryURL": "https://github.com/rust-lang/hashbrown",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "hashbrown-0.16.1.txt",
+    "licenseFileResourceName": "hashbrown-0.17.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -684,12 +684,12 @@
     ]
   },
   {
-    "id": "icu_collections@2.1.1",
+    "id": "icu_collections@2.2.0",
     "displayName": "icu_collections",
-    "version": "2.1.1",
+    "version": "2.2.0",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "icu_collections-2.1.1.txt",
+    "licenseFileResourceName": "icu_collections-2.2.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -698,12 +698,12 @@
     ]
   },
   {
-    "id": "icu_locale_core@2.1.1",
+    "id": "icu_locale_core@2.2.0",
     "displayName": "icu_locale_core",
-    "version": "2.1.1",
+    "version": "2.2.0",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "icu_locale_core-2.1.1.txt",
+    "licenseFileResourceName": "icu_locale_core-2.2.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -712,12 +712,12 @@
     ]
   },
   {
-    "id": "icu_normalizer@2.1.1",
+    "id": "icu_normalizer@2.2.0",
     "displayName": "icu_normalizer",
-    "version": "2.1.1",
+    "version": "2.2.0",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "icu_normalizer-2.1.1.txt",
+    "licenseFileResourceName": "icu_normalizer-2.2.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -726,12 +726,12 @@
     ]
   },
   {
-    "id": "icu_normalizer_data@2.1.1",
+    "id": "icu_normalizer_data@2.2.0",
     "displayName": "icu_normalizer_data",
-    "version": "2.1.1",
+    "version": "2.2.0",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "icu_normalizer_data-2.1.1.txt",
+    "licenseFileResourceName": "icu_normalizer_data-2.2.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -740,12 +740,12 @@
     ]
   },
   {
-    "id": "icu_properties@2.1.2",
+    "id": "icu_properties@2.2.0",
     "displayName": "icu_properties",
-    "version": "2.1.2",
+    "version": "2.2.0",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "icu_properties-2.1.2.txt",
+    "licenseFileResourceName": "icu_properties-2.2.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -754,12 +754,12 @@
     ]
   },
   {
-    "id": "icu_properties_data@2.1.2",
+    "id": "icu_properties_data@2.2.0",
     "displayName": "icu_properties_data",
-    "version": "2.1.2",
+    "version": "2.2.0",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "icu_properties_data-2.1.2.txt",
+    "licenseFileResourceName": "icu_properties_data-2.2.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -768,12 +768,12 @@
     ]
   },
   {
-    "id": "icu_provider@2.1.1",
+    "id": "icu_provider@2.2.0",
     "displayName": "icu_provider",
-    "version": "2.1.1",
+    "version": "2.2.0",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "icu_provider-2.1.1.txt",
+    "licenseFileResourceName": "icu_provider-2.2.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -812,12 +812,12 @@
     ]
   },
   {
-    "id": "indexmap@2.13.0",
+    "id": "indexmap@2.14.0",
     "displayName": "indexmap",
-    "version": "2.13.0",
+    "version": "2.14.0",
     "repositoryURL": "https://github.com/indexmap-rs/indexmap",
     "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "indexmap-2.13.0.txt",
+    "licenseFileResourceName": "indexmap-2.14.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -827,12 +827,12 @@
     ]
   },
   {
-    "id": "itoa@1.0.17",
+    "id": "itoa@1.0.18",
     "displayName": "itoa",
-    "version": "1.0.17",
+    "version": "1.0.18",
     "repositoryURL": "https://github.com/dtolnay/itoa",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "itoa-1.0.17.txt",
+    "licenseFileResourceName": "itoa-1.0.18.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -842,12 +842,12 @@
     ]
   },
   {
-    "id": "js-sys@0.3.91",
+    "id": "js-sys@0.3.95",
     "displayName": "js-sys",
-    "version": "0.3.91",
+    "version": "0.3.95",
     "repositoryURL": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/js-sys",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "js-sys-0.3.91.txt",
+    "licenseFileResourceName": "js-sys-0.3.95.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -872,12 +872,12 @@
     ]
   },
   {
-    "id": "libc@0.2.183",
+    "id": "libc@0.2.185",
     "displayName": "libc",
-    "version": "0.2.183",
+    "version": "0.2.185",
     "repositoryURL": "https://github.com/rust-lang/libc",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "libc-0.2.183.txt",
+    "licenseFileResourceName": "libc-0.2.185.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -902,12 +902,12 @@
     ]
   },
   {
-    "id": "litemap@0.8.1",
+    "id": "litemap@0.8.2",
     "displayName": "litemap",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "litemap-0.8.1.txt",
+    "licenseFileResourceName": "litemap-0.8.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1019,12 +1019,12 @@
     ]
   },
   {
-    "id": "once_cell@1.21.3",
+    "id": "once_cell@1.21.4",
     "displayName": "once_cell",
-    "version": "1.21.3",
+    "version": "1.21.4",
     "repositoryURL": "https://github.com/matklad/once_cell",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "once_cell-1.21.3.txt",
+    "licenseFileResourceName": "once_cell-1.21.4.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1034,12 +1034,12 @@
     ]
   },
   {
-    "id": "openssl@0.10.76",
+    "id": "openssl@0.10.77",
     "displayName": "openssl",
-    "version": "0.10.76",
+    "version": "0.10.77",
     "repositoryURL": "https://github.com/rust-openssl/rust-openssl",
     "licenseName": "Apache-2.0",
-    "licenseFileResourceName": "openssl-0.10.76.txt",
+    "licenseFileResourceName": "openssl-0.10.77.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",
@@ -1048,12 +1048,12 @@
     ]
   },
   {
-    "id": "openssl-src@300.5.5+3.5.5",
+    "id": "openssl-src@300.6.0+3.6.2",
     "displayName": "openssl-src",
-    "version": "300.5.5+3.5.5",
+    "version": "300.6.0+3.6.2",
     "repositoryURL": "https://github.com/alexcrichton/openssl-src-rs",
     "licenseName": "MIT/Apache-2.0",
-    "licenseFileResourceName": "openssl-src-300.5.5-3.5.5.txt",
+    "licenseFileResourceName": "openssl-src-300.6.0-3.6.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1063,12 +1063,12 @@
     ]
   },
   {
-    "id": "openssl-sys@0.9.112",
+    "id": "openssl-sys@0.9.113",
     "displayName": "openssl-sys",
-    "version": "0.9.112",
+    "version": "0.9.113",
     "repositoryURL": "https://github.com/rust-openssl/rust-openssl",
     "licenseName": "MIT",
-    "licenseFileResourceName": "openssl-sys-0.9.112.txt",
+    "licenseFileResourceName": "openssl-sys-0.9.113.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1122,12 +1122,12 @@
     ]
   },
   {
-    "id": "potential_utf@0.1.4",
+    "id": "potential_utf@0.1.5",
     "displayName": "potential_utf",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "potential_utf-0.1.4.txt",
+    "licenseFileResourceName": "potential_utf-0.1.5.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1241,12 +1241,12 @@
     ]
   },
   {
-    "id": "semver@1.0.27",
+    "id": "semver@1.0.28",
     "displayName": "semver",
-    "version": "1.0.27",
+    "version": "1.0.28",
     "repositoryURL": "https://github.com/dtolnay/semver",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "semver-1.0.27.txt",
+    "licenseFileResourceName": "semver-1.0.28.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1315,12 +1315,12 @@
     ]
   },
   {
-    "id": "serde_spanned@1.0.4",
+    "id": "serde_spanned@1.1.1",
     "displayName": "serde_spanned",
-    "version": "1.0.4",
+    "version": "1.1.1",
     "repositoryURL": "https://github.com/toml-rs/toml",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "serde_spanned-1.0.4.txt",
+    "licenseFileResourceName": "serde_spanned-1.1.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1344,12 +1344,12 @@
     ]
   },
   {
-    "id": "simd-adler32@0.3.8",
+    "id": "simd-adler32@0.3.9",
     "displayName": "simd-adler32",
-    "version": "0.3.8",
+    "version": "0.3.9",
     "repositoryURL": "https://github.com/mcountryman/simd-adler32",
     "licenseName": "MIT",
-    "licenseFileResourceName": "simd-adler32-0.3.8.txt",
+    "licenseFileResourceName": "simd-adler32-0.3.9.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1503,12 +1503,12 @@
     ]
   },
   {
-    "id": "tinystr@0.8.2",
+    "id": "tinystr@0.8.3",
     "displayName": "tinystr",
-    "version": "0.8.2",
+    "version": "0.8.3",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "tinystr-0.8.2.txt",
+    "licenseFileResourceName": "tinystr-0.8.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1547,12 +1547,12 @@
     ]
   },
   {
-    "id": "toml_parser@1.0.9+spec-1.1.0",
+    "id": "toml_parser@1.1.2+spec-1.1.0",
     "displayName": "toml_parser",
-    "version": "1.0.9+spec-1.1.0",
+    "version": "1.1.2+spec-1.1.0",
     "repositoryURL": "https://github.com/toml-rs/toml",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "toml_parser-1.0.9-spec-1.1.0.txt",
+    "licenseFileResourceName": "toml_parser-1.1.2-spec-1.1.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1562,12 +1562,12 @@
     ]
   },
   {
-    "id": "toml_writer@1.0.6+spec-1.1.0",
+    "id": "toml_writer@1.1.1+spec-1.1.0",
     "displayName": "toml_writer",
-    "version": "1.0.6+spec-1.1.0",
+    "version": "1.1.1+spec-1.1.0",
     "repositoryURL": "https://github.com/toml-rs/toml",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "toml_writer-1.0.6-spec-1.1.0.txt",
+    "licenseFileResourceName": "toml_writer-1.1.1-spec-1.1.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1609,101 +1609,101 @@
     ]
   },
   {
-    "id": "uniffi@0.31.0",
+    "id": "uniffi@0.31.1",
     "displayName": "uniffi",
-    "version": "0.31.0",
+    "version": "0.31.1",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi-0.31.0.txt",
+    "licenseFileResourceName": "uniffi-0.31.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.0:LICENSE"
+      "v0.31.1:LICENSE"
     ]
   },
   {
-    "id": "uniffi_bindgen@0.31.0",
+    "id": "uniffi_bindgen@0.31.1",
     "displayName": "uniffi_bindgen",
-    "version": "0.31.0",
+    "version": "0.31.1",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_bindgen-0.31.0.txt",
+    "licenseFileResourceName": "uniffi_bindgen-0.31.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.0:LICENSE"
+      "v0.31.1:LICENSE"
     ]
   },
   {
-    "id": "uniffi_build@0.31.0",
+    "id": "uniffi_build@0.31.1",
     "displayName": "uniffi_build",
-    "version": "0.31.0",
+    "version": "0.31.1",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_build-0.31.0.txt",
+    "licenseFileResourceName": "uniffi_build-0.31.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.0:LICENSE"
+      "v0.31.1:LICENSE"
     ]
   },
   {
-    "id": "uniffi_core@0.31.0",
+    "id": "uniffi_core@0.31.1",
     "displayName": "uniffi_core",
-    "version": "0.31.0",
+    "version": "0.31.1",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_core-0.31.0.txt",
+    "licenseFileResourceName": "uniffi_core-0.31.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.0:LICENSE"
+      "v0.31.1:LICENSE"
     ]
   },
   {
-    "id": "uniffi_meta@0.31.0",
+    "id": "uniffi_meta@0.31.1",
     "displayName": "uniffi_meta",
-    "version": "0.31.0",
+    "version": "0.31.1",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_meta-0.31.0.txt",
+    "licenseFileResourceName": "uniffi_meta-0.31.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.0:LICENSE"
+      "v0.31.1:LICENSE"
     ]
   },
   {
-    "id": "uniffi_pipeline@0.31.0",
+    "id": "uniffi_pipeline@0.31.1",
     "displayName": "uniffi_pipeline",
-    "version": "0.31.0",
+    "version": "0.31.1",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_pipeline-0.31.0.txt",
+    "licenseFileResourceName": "uniffi_pipeline-0.31.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.0:LICENSE"
+      "v0.31.1:LICENSE"
     ]
   },
   {
-    "id": "uniffi_udl@0.31.0",
+    "id": "uniffi_udl@0.31.1",
     "displayName": "uniffi_udl",
-    "version": "0.31.0",
+    "version": "0.31.1",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_udl-0.31.0.txt",
+    "licenseFileResourceName": "uniffi_udl-0.31.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.0:LICENSE"
+      "v0.31.1:LICENSE"
     ]
   },
   {
@@ -1737,18 +1737,18 @@
     ]
   },
   {
-    "id": "wasip2@1.0.2+wasi-0.2.9",
+    "id": "wasip2@1.0.3+wasi-0.2.9",
     "displayName": "wasip2",
-    "version": "1.0.2+wasi-0.2.9",
+    "version": "1.0.3+wasi-0.2.9",
     "repositoryURL": "https://github.com/bytecodealliance/wasi-rs",
     "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
-    "licenseFileResourceName": "wasip2-1.0.2-wasi-0.2.9.txt",
+    "licenseFileResourceName": "wasip2-1.0.3-wasi-0.2.9.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
-    "licenseSourceKind": "repositoryArchive",
+    "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
-      "wasip2-1.0.2:LICENSE-APACHE",
-      "wasip2-1.0.2:LICENSE-MIT"
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
     ]
   },
   {
@@ -1767,12 +1767,12 @@
     ]
   },
   {
-    "id": "wasm-bindgen@0.2.114",
+    "id": "wasm-bindgen@0.2.118",
     "displayName": "wasm-bindgen",
-    "version": "0.2.114",
+    "version": "0.2.118",
     "repositoryURL": "https://github.com/wasm-bindgen/wasm-bindgen",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "wasm-bindgen-0.2.114.txt",
+    "licenseFileResourceName": "wasm-bindgen-0.2.118.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1782,12 +1782,12 @@
     ]
   },
   {
-    "id": "wasm-bindgen-shared@0.2.114",
+    "id": "wasm-bindgen-shared@0.2.118",
     "displayName": "wasm-bindgen-shared",
-    "version": "0.2.114",
+    "version": "0.2.118",
     "repositoryURL": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/shared",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "wasm-bindgen-shared-0.2.114.txt",
+    "licenseFileResourceName": "wasm-bindgen-shared-0.2.118.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1900,6 +1900,20 @@
     ]
   },
   {
+    "id": "winnow@1.0.1",
+    "displayName": "winnow",
+    "version": "1.0.1",
+    "repositoryURL": "https://github.com/winnow-rs/winnow",
+    "licenseName": "MIT",
+    "licenseFileResourceName": "winnow-1.0.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-MIT"
+    ]
+  },
+  {
     "id": "wit-bindgen@0.51.0",
     "displayName": "wit-bindgen",
     "version": "0.51.0",
@@ -1915,12 +1929,27 @@
     ]
   },
   {
-    "id": "writeable@0.6.2",
+    "id": "wit-bindgen@0.57.1",
+    "displayName": "wit-bindgen",
+    "version": "0.57.1",
+    "repositoryURL": "https://github.com/bytecodealliance/wit-bindgen",
+    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+    "licenseFileResourceName": "wit-bindgen-0.57.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "writeable@0.6.3",
     "displayName": "writeable",
-    "version": "0.6.2",
+    "version": "0.6.3",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "writeable-0.6.2.txt",
+    "licenseFileResourceName": "writeable-0.6.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1943,12 +1972,12 @@
     ]
   },
   {
-    "id": "yoke@0.8.1",
+    "id": "yoke@0.8.2",
     "displayName": "yoke",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "yoke-0.8.1.txt",
+    "licenseFileResourceName": "yoke-0.8.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1957,12 +1986,12 @@
     ]
   },
   {
-    "id": "zerofrom@0.1.6",
+    "id": "zerofrom@0.1.7",
     "displayName": "zerofrom",
-    "version": "0.1.6",
+    "version": "0.1.7",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "zerofrom-0.1.6.txt",
+    "licenseFileResourceName": "zerofrom-0.1.7.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1986,12 +2015,12 @@
     ]
   },
   {
-    "id": "zerotrie@0.2.3",
+    "id": "zerotrie@0.2.4",
     "displayName": "zerotrie",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "zerotrie-0.2.3.txt",
+    "licenseFileResourceName": "zerotrie-0.2.4.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -2000,12 +2029,12 @@
     ]
   },
   {
-    "id": "zerovec@0.11.5",
+    "id": "zerovec@0.11.6",
     "displayName": "zerovec",
-    "version": "0.11.5",
+    "version": "0.11.6",
     "repositoryURL": "https://github.com/unicode-org/icu4x",
     "licenseName": "Unicode-3.0",
-    "licenseFileResourceName": "zerovec-0.11.5.txt",
+    "licenseFileResourceName": "zerovec-0.11.6.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",

@@ -58,6 +58,20 @@ cleanup_target_specific_dylibs() {
     done
 }
 
+patch_generated_swift_bindings() {
+    local swift_file="$1"
+
+    if [ ! -f "$swift_file" ]; then
+        return
+    fi
+
+    # Swift 6.2 treats shared raw pointers as non-Sendable. UniFFI 0.31.1
+    # generates callback vtable pointers as plain static lets, so mark them
+    # explicitly unsafe/nonisolated after generation instead of hand-editing
+    # the checked-in generated file.
+    perl -0pi -e 's/\n    static let vtablePtr: UnsafePointer<(UniffiVTableCallbackInterface[A-Za-z0-9_]+)> = \{/\n    nonisolated(unsafe) static let vtablePtr: UnsafePointer<$1> = {/g' "$swift_file"
+}
+
 assert_no_target_specific_dylibs() {
     local dylib
     local stale_found=0
@@ -176,6 +190,7 @@ mkdir -p "$BINDINGS_DIR"
 (cd "$SCRIPT_DIR/pgp-mobile" && cargo run $CARGO_FLAGS --bin uniffi-bindgen \
     generate --library "$HOST_DYLIB" --language swift --out-dir "$BINDINGS_DIR")
 rm -f "$HOST_DYLIB"
+patch_generated_swift_bindings "$BINDINGS_DIR/pgp_mobile.swift"
 
 # Create module.modulemap alias expected by Xcode project build settings
 # (UniFFI generates pgp_mobileFFI.modulemap, but project.pbxproj references module.modulemap)

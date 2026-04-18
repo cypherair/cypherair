@@ -1787,9 +1787,8 @@ fileprivate struct UniffiCallbackInterfaceProgressReporter {
     // Create the VTable using a series of closures.
     // Swift automatically converts these into C callback functions.
     //
-    // This creates 1-element array, since this seems to be the only way to construct a const
-    // pointer that we can pass to the Rust code.
-    static let vtable: [UniffiVTableCallbackInterfaceProgressReporter] = [UniffiVTableCallbackInterfaceProgressReporter(
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceProgressReporter = UniffiVTableCallbackInterfaceProgressReporter(
         uniffiFree: { (uniffiHandle: UInt64) -> () in
             do {
                 try FfiConverterTypeProgressReporter.handleMap.remove(handle: uniffiHandle)
@@ -1830,11 +1829,19 @@ fileprivate struct UniffiCallbackInterfaceProgressReporter {
                 writeReturn: writeReturn
             )
         }
-    )]
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceProgressReporter> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceProgressReporter>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
 }
 
 private func uniffiCallbackInitProgressReporter() {
-    uniffi_pgp_mobile_fn_init_callback_vtable_progressreporter(UniffiCallbackInterfaceProgressReporter.vtable)
+    uniffi_pgp_mobile_fn_init_callback_vtable_progressreporter(UniffiCallbackInterfaceProgressReporter.vtablePtr)
 }
 
 #if swift(>=5.8)
