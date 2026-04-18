@@ -707,7 +707,7 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapBefore)
     }
 
-    func test_decryptDetailed_profileA_tamperedCiphertext_throwsMappedIntegrityError()
+    func test_decryptDetailed_profileA_midpointBitFlip_rejectsTamperedCiphertext()
         async throws
     {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
@@ -723,7 +723,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         do {
             _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
-            XCTFail("Expected mapped integrity failure")
+            XCTFail("Expected midpoint corruption to hard-fail")
         } catch {
             assertCypherAirError(error) {
                 switch $0 {
@@ -736,7 +736,38 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_decryptDetailed_profileB_tamperedCiphertext_throwsMappedAEADError()
+    func test_decryptDetailed_profileA_targetedTamper_throwsIntegrityCheckFailed()
+        async throws
+    {
+        let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
+            profile: .universal
+        )
+        var secretKey = try stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        defer { secretKey.resetBytes(in: 0..<secretKey.count) }
+        let tampered = try findTargetedDecryptTamper(
+            ciphertext: binaryCiphertext,
+            secretKeys: [secretKey],
+            verificationKeys: [identity.publicKeyData],
+            acceptedErrors: [.IntegrityCheckFailed]
+        )
+        let phase1 = DecryptionService.Phase1Result(
+            recipientKeyIds: try stack.engine.parseRecipients(ciphertext: binaryCiphertext),
+            matchedKey: identity,
+            ciphertext: tampered
+        )
+
+        do {
+            _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
+            XCTFail("Expected targeted Profile A tamper to surface integrityCheckFailed")
+        } catch {
+            assertCypherAirError(error) {
+                if case .integrityCheckFailed = $0 { return true }
+                return false
+            }
+        }
+    }
+
+    func test_decryptDetailed_profileB_midpointBitFlip_hardFailsWithMappedSecurityError()
         async throws
     {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
@@ -752,8 +783,10 @@ final class DecryptionServiceTests: XCTestCase {
 
         do {
             _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
-            XCTFail("Expected mapped AEAD failure")
+            XCTFail("Expected self-generated Profile B midpoint corruption to hard-fail")
         } catch {
+            // Self-generated v6 PKESK + SEIPDv2 messages may fail session-key recovery
+            // before payload AEAD validation, so NoMatchingKey remains acceptable here.
             assertCypherAirError(error) {
                 switch $0 {
                 case .aeadAuthenticationFailed, .integrityCheckFailed, .corruptData, .noMatchingKey:
@@ -980,7 +1013,7 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: expectedOutputURL.path))
     }
 
-    func test_decryptFileStreamingDetailed_profileA_tamperedFile_throwsMappedIntegrityErrorAndCleansUp()
+    func test_decryptFileStreamingDetailed_profileA_midpointBitFlip_rejectsTamperedFileAndCleansUp()
         async throws
     {
         let identity = try await TestHelpers.generateProfileAKey(
@@ -1021,7 +1054,7 @@ final class DecryptionServiceTests: XCTestCase {
                 phase1: phase1,
                 progress: nil
             )
-            XCTFail("Expected mapped integrity failure")
+            XCTFail("Expected midpoint file corruption to hard-fail")
         } catch {
             assertCypherAirError(error) {
                 switch $0 {
@@ -1036,7 +1069,62 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: expectedOutputURL.path))
     }
 
-    func test_decryptFileStreamingDetailed_profileB_tamperedFile_throwsMappedAEADErrorAndCleansUp()
+    func test_decryptFileStreamingDetailed_profileA_targetedTamper_throwsIntegrityCheckFailedAndCleansUp()
+        async throws
+    {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Detailed Targeted File A"
+        )
+        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+
+        let plaintextURL = try makeTemporaryFile(
+            named: "detailed-targeted-a.txt",
+            contents: Data("Detailed targeted file A".utf8)
+        )
+        defer { try? FileManager.default.removeItem(at: plaintextURL) }
+
+        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+            inputURL: plaintextURL,
+            recipientFingerprints: [identity.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+
+        let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedURL)
+        let originalCiphertext = try Data(contentsOf: encryptedURL)
+        var secretKey = try stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        defer { secretKey.resetBytes(in: 0..<secretKey.count) }
+        let targetedCiphertext = try findTargetedDecryptTamper(
+            ciphertext: originalCiphertext,
+            secretKeys: [secretKey],
+            verificationKeys: [],
+            acceptedErrors: [.IntegrityCheckFailed]
+        )
+        try targetedCiphertext.write(to: encryptedURL, options: .atomic)
+
+        let expectedOutputURL = expectedDecryptedOutputURL(for: encryptedURL)
+        try? FileManager.default.removeItem(at: expectedOutputURL)
+
+        do {
+            _ = try await stack.decryptionService.decryptFileStreamingDetailed(
+                phase1: phase1,
+                progress: nil
+            )
+            XCTFail("Expected targeted Profile A file tamper to surface integrityCheckFailed")
+        } catch {
+            assertCypherAirError(error) {
+                if case .integrityCheckFailed = $0 { return true }
+                return false
+            }
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: expectedOutputURL.path))
+    }
+
+    func test_decryptFileStreamingDetailed_profileB_midpointBitFlip_hardFailsAndCleansUp()
         async throws
     {
         let identity = try await TestHelpers.generateProfileBKey(
@@ -1077,8 +1165,10 @@ final class DecryptionServiceTests: XCTestCase {
                 phase1: phase1,
                 progress: nil
             )
-            XCTFail("Expected mapped AEAD failure")
+            XCTFail("Expected self-generated Profile B file corruption to hard-fail")
         } catch {
+            // Self-generated v6 PKESK + SEIPDv2 messages may fail session-key recovery
+            // before payload AEAD validation, so NoMatchingKey remains acceptable here.
             assertCypherAirError(error) {
                 switch $0 {
                 case .aeadAuthenticationFailed, .integrityCheckFailed, .corruptData, .noMatchingKey:
@@ -1127,6 +1217,43 @@ final class DecryptionServiceTests: XCTestCase {
     private func makeTemporaryOutputURL(named name: String) -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirDetailedDecryptTests-\(UUID().uuidString)-\(name)")
+    }
+
+    private func findTargetedDecryptTamper(
+        ciphertext: Data,
+        secretKeys: [Data],
+        verificationKeys: [Data],
+        acceptedErrors: [PgpError]
+    ) throws -> Data {
+        let positions = [
+            max(ciphertext.count - 8, 0),
+            max(ciphertext.count - 16, 0),
+            max(ciphertext.count - 24, 0),
+            max(ciphertext.count - 32, 0),
+            max(ciphertext.count - 48, 0),
+            max(ciphertext.count - 64, 0),
+            ciphertext.count * 3 / 4,
+        ]
+
+        for position in positions where position < ciphertext.count {
+            var tampered = ciphertext
+            tampered[position] ^= 0x01
+
+            do {
+                _ = try stack.engine.decrypt(
+                    ciphertext: tampered,
+                    secretKeys: secretKeys,
+                    verificationKeys: verificationKeys
+                )
+            } catch let error as PgpError where acceptedErrors.contains(error) {
+                return tampered
+            } catch {
+                continue
+            }
+        }
+
+        XCTFail("Could not locate a deterministic decrypt auth/integrity tamper position")
+        return ciphertext
     }
 
     private func makePhase1(

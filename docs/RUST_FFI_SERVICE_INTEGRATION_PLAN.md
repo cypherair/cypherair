@@ -3,7 +3,7 @@
 > Status: Active rollout document for the remaining Swift service-layer adoption work on the current Rust / FFI capability families.
 > Purpose: Define the next implementation work needed to complete or deepen downstream Swift service adoption of the Rust / FFI capability families that are already in scope for CypherAir.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
+> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [RUST_FFI_APP_SURFACE_ADOPTION_PLAN](RUST_FFI_APP_SURFACE_ADOPTION_PLAN.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
 
 ## 1. Role And Scope
 
