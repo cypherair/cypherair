@@ -53,12 +53,14 @@ xcodebuild -scheme CypherAir \
 
 As of April 18, 2026, the probe confirms that the project is **not yet natively visionOS-complete**.
 
-### 2.3 Confirmed current blockers
+### 2.3 Observed current blockers
 
-The current build failure is not a top-level architecture failure. It is a set of concrete API-availability issues that must be resolved before the app can compile cleanly for visionOS.
+The current visionOS readiness gap is not a top-level architecture failure. As of **April 18, 2026**, the generic visionOS build probe and targeted visionOS SDK availability checks show a set of concrete platform-compatibility blockers that must be resolved before the app can compile cleanly for native visionOS.
 
-Confirmed blockers:
+Observed blockers:
 
+- [`Sources/App/HomeView.swift`](../Sources/App/HomeView.swift)
+  - `.buttonStyle(.glass)` is unavailable on visionOS.
 - [`Sources/App/Common/CypherMultilineTextInput.swift`](../Sources/App/Common/CypherMultilineTextInput.swift)
   - `conversationContext` is unavailable on visionOS.
   - `inputAssistantItem.leadingBarButtonGroups` is unavailable on visionOS.
@@ -76,9 +78,9 @@ The `scrollDismissesKeyboard` issue is a **class of issue**, not a single-file i
 - [`Sources/App/Keys/ImportKeyView.swift`](../Sources/App/Keys/ImportKeyView.swift)
 - [`Sources/App/Keys/KeyGenerationView.swift`](../Sources/App/Keys/KeyGenerationView.swift)
 
-There is also a launch-readiness warning at the asset level:
+The current first compile-stopping failure in the generic `visionOS` build probe is the `.glass` button style usage in [`HomeView.swift`](../Sources/App/HomeView.swift). The text-input and keyboard-assistant issues above remain in scope because targeted `visionOS` SDK availability checks confirm that those symbols are explicitly unavailable on native visionOS.
 
-- The visionOS build currently emits asset catalog warnings indicating that alternate app icon resources are not fully applicable to visionOS.
+The plan intentionally does **not** treat alternate app icon asset warnings as a current blocker. That warning had been observed earlier in planning, but it was **not reproduced** in the latest local build probe and therefore should not be treated as a current gating issue without a fresh reproducible log.
 
 ## 3. Platform Strategy
 
@@ -92,17 +94,21 @@ The current codebase largely branches between iOS and macOS. That is a good star
 
 ### 3.1 Platform branching rule
 
-visionOS should not remain hidden behind `canImport(UIKit)` checks alone.
+visionOS should not remain hidden behind `canImport(UIKit)` checks alone, but native adaptation work also should not default to platform forking when Apple’s standard adaptive mechanisms are sufficient.
 
 The implementation strategy for future work should explicitly prefer:
 
+- adaptive layout and environment-driven behavior;
+- availability and capability checks;
+- compile-time platform branching only when a symbol is unavailable on visionOS or the interaction model is meaningfully different.
+
+For example, future code should prefer environment and availability patterns first, and reserve explicit platform branches for cases like:
+
 ```swift
 #if os(visionOS)
-// visionOS-specific path
+// Native visionOS-only path for unavailable or materially different APIs.
 #elseif os(iOS)
-// iOS-specific path
-#elseif os(macOS)
-// macOS-specific path
+// iOS-specific path when the same symbol or interaction is not shared.
 #endif
 ```
 
@@ -110,9 +116,17 @@ Use `canImport(UIKit)` only where a UIKit-wide abstraction is genuinely shared a
 
 ### 3.2 Scene model for v1
 
-CypherAir v1 on visionOS should preserve the current **single-window mental model**.
+CypherAir v1 on visionOS should target a **single-instance main window** rather than a multi-instance window group.
 
-For the initial release, the app should not introduce new scene types beyond what is needed for standard application windows. In particular, v1 should not depend on:
+The intended v1 target is a standard application window with `Window` semantics, not a `WindowGroup` that permits multiple independently instantiated primary windows. This is a product and security decision, not only a presentation preference: CypherAir’s privacy screen, reauthentication state, and sensitive in-memory workflow assumptions are simpler and safer when the native visionOS product exposes one primary window.
+
+Current repository state and target state are different here:
+
+- today, the non-macOS app path still uses `WindowGroup`;
+- native visionOS v1 should treat that as an implementation gap to close, not as the desired end state;
+- multi-window support is out of scope for v1 because it would require explicit design for privacy-screen coordination, authentication-state consistency, and window restoration semantics before it could be considered safe and coherent.
+
+For the initial release, the app should not introduce new scene types beyond what is needed for a single standard application window. In particular, v1 should not depend on:
 
 - `ImmersiveSpace`
 - `Volume`
@@ -154,9 +168,13 @@ All privacy and security settings should remain part of the visionOS product sur
 Specific guidance for v1:
 
 - keep the existing privacy, authentication, and key-management settings model;
-- validate alternate app icon support on visionOS before exposing the setting there;
-- if alternate icons are unsupported or incomplete on visionOS, hide the setting rather than presenting a degraded UI;
-- review visionOS app icon and alternate icon resources as part of launch readiness because the current asset catalog already emits visionOS-specific warnings.
+- treat alternate app icon selection as a **native visionOS v1 non-goal**;
+- explicitly distinguish between two runtime models:
+  - compatible iPhone/iPad apps running on visionOS can still use `setAlternateIconName`;
+  - apps built natively with the visionOS SDK do **not** support alternate icons, and calling `setAlternateIconName` has no effect;
+- do not expose the alternate app icon setting in the native visionOS UI;
+- treat static app icon asset configuration as a separate launch-readiness concern, not as a runtime substitute for alternate icon switching;
+- document that native visionOS has **no runtime substitute** for alternate app icon switching in v1.
 
 ## 5. Security and Authentication Position
 
@@ -341,9 +359,12 @@ Apple platform and design guidance:
 - [Bringing your existing apps to visionOS](https://developer.apple.com/documentation/visionos/bringing-your-app-to-visionos)
 - [Determining whether to bring your app to visionOS](https://developer.apple.com/documentation/visionos/determining-whether-to-bring-your-app-to-visionos)
 - [Windows](https://developer.apple.com/design/human-interface-guidelines/windows)
+- [WindowGroup](https://developer.apple.com/documentation/swiftui/windowgroup)
+- [Window](https://developer.apple.com/documentation/swiftui/window)
 - [Ornaments](https://developer.apple.com/design/human-interface-guidelines/ornaments)
 - [TabViewStyle.sidebarAdaptable](https://developer.apple.com/documentation/swiftui/tabviewstyle/sidebaradaptable)
 - [TabView](https://developer.apple.com/documentation/swiftui/tabview)
+- [setAlternateIconName(_:completionHandler:)](https://developer.apple.com/documentation/uikit/uiapplication/setalternateiconname%28_%3Acompletionhandler%3A%29)
 - [Local Authentication](https://developer.apple.com/documentation/localauthentication/)
 - [LAContext](https://developer.apple.com/documentation/localauthentication/lacontext)
 - [SecureEnclave](https://developer.apple.com/documentation/cryptokit/secureenclave)
