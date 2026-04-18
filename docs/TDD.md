@@ -117,6 +117,8 @@ The App decrypts all supported formats regardless of the user's own key profile:
 
 Targets: `aarch64-apple-ios` (device) + `aarch64-apple-ios-sim` (Apple Silicon sim) + `aarch64-apple-darwin` (macOS Apple Silicon). Tier 2 in Rust. `getrandom` uses SecRandomCopyBytes on iOS/macOS. LTO and strip are **disabled** in the release profile (`lto = false`, `strip = "none"`) — enabling them causes linker failures with vendored OpenSSL. Binary size is managed via `codegen-units = 1` and Xcode dead code elimination. Estimated app binary contribution: ~6–8 MB.
 
+As of April 18, 2026, local experiments have also validated Rust-only compilation for `aarch64-apple-visionos` and `aarch64-apple-visionos-sim` using a patched `openssl-src-rs` fork. This is not yet part of the project's supported release pipeline: `build-xcframework.sh`, direct Xcode archive linkage, and the native app compile path still need separate visionOS integration work.
+
 The current deployment baseline for the app targets is `iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+`.
 
 ---
@@ -184,6 +186,8 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 2. `./build-xcframework.sh --release` refreshes the release archives, generates UniFFI Swift bindings and headers, validates host-dylib cleanup, and produces the packaged `PgpMobile.xcframework` output
 3. The current Xcode project links `pgp-mobile/target/.../release/libpgp_mobile.a` directly per SDK and imports the generated headers through `bindings/module.modulemap`
 4. Local Swift / FFI validation runs through `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
+
+Pending native visionOS implementation, any temporary `openssl-src` override for visionOS work should use a reproducible `git` + exact `rev` pin to the CypherAir fork, not a machine-local `path` dependency and not an unstable fork branch reference.
 
 See also [CLAUDE.md](../CLAUDE.md) Build Commands for the full pipeline with exact commands.
 
