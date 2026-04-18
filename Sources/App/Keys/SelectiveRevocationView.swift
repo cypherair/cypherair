@@ -88,6 +88,9 @@ private struct SelectiveRevocationScreenHostView: View {
                 model.handleExportError(exportError)
             }
         }
+        .onDisappear {
+            model.handleDisappear()
+        }
         .onAppear {
             model.loadIfNeeded()
         }

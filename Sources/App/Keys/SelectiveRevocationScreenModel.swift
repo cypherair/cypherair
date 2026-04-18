@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 @Observable
 final class SelectiveRevocationScreenModel {
-    typealias SelectionCatalogAction = @MainActor (String) throws -> CertificateSelectionCatalog
+    typealias SelectionCatalogAction = @MainActor (String) async throws -> CertificateSelectionCatalog
     typealias SubkeyRevocationExportAction = @MainActor (String, SubkeySelectionOption) async throws -> Data
     typealias UserIdRevocationExportAction = @MainActor (String, UserIdSelectionOption) async throws -> Data
 
@@ -27,6 +27,11 @@ final class SelectiveRevocationScreenModel {
     private let selectionCatalogAction: SelectionCatalogAction
     private let subkeyRevocationExportAction: SubkeyRevocationExportAction
     private let userIdRevocationExportAction: UserIdRevocationExportAction
+
+    private var catalogLoadTask: Task<Void, Never>?
+    private var catalogLoadGeneration: UInt64 = 0
+    private var exportTask: Task<Void, Never>?
+    private var exportGeneration: UInt64 = 0
 
     private(set) var loadState: LoadState = .idle
     private(set) var catalog: CertificateSelectionCatalog?
@@ -52,7 +57,7 @@ final class SelectiveRevocationScreenModel {
         self.configuration = configuration
         self.exportController = exportController
         self.selectionCatalogAction = selectionCatalogAction ?? { fingerprint in
-            try keyManagement.selectionCatalog(fingerprint: fingerprint)
+            try await keyManagement.loadSelectionCatalog(fingerprint: fingerprint)
         }
         self.subkeyRevocationExportAction = subkeyRevocationExportAction ?? { fingerprint, selection in
             try await keyManagement.exportSubkeyRevocationCertificate(
@@ -140,19 +145,11 @@ final class SelectiveRevocationScreenModel {
             return
         }
 
-        activeExportOperation = .subkey
-
-        Task {
-            defer {
-                activeExportOperation = nil
-            }
-
-            do {
-                let exported = try await subkeyRevocationExportAction(fingerprint, selectedSubkey)
-                try prepareExport(exported, filename: subkeyExportFilename(for: selectedSubkey))
-            } catch {
-                presentMappedError(error)
-            }
+        startExport(
+            operation: .subkey,
+            filename: subkeyExportFilename(for: selectedSubkey)
+        ) {
+            try await self.subkeyRevocationExportAction(self.fingerprint, selectedSubkey)
         }
     }
 
@@ -161,19 +158,11 @@ final class SelectiveRevocationScreenModel {
             return
         }
 
-        activeExportOperation = .userId
-
-        Task {
-            defer {
-                activeExportOperation = nil
-            }
-
-            do {
-                let exported = try await userIdRevocationExportAction(fingerprint, selectedUserId)
-                try prepareExport(exported, filename: userIdExportFilename(for: selectedUserId))
-            } catch {
-                presentMappedError(error)
-            }
+        startExport(
+            operation: .userId,
+            filename: userIdExportFilename(for: selectedUserId)
+        ) {
+            try await self.userIdRevocationExportAction(self.fingerprint, selectedUserId)
         }
     }
 
@@ -190,17 +179,101 @@ final class SelectiveRevocationScreenModel {
         showError = false
     }
 
-    private func loadCatalog() {
-        loadState = .loading
+    func handleDisappear() {
+        catalogLoadGeneration &+= 1
+        catalogLoadTask?.cancel()
+        catalogLoadTask = nil
 
-        do {
-            catalog = try selectionCatalogAction(fingerprint)
-            loadError = nil
-            loadState = .loaded
-        } catch {
-            catalog = nil
-            loadError = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-            loadState = .failed
+        if isLoading {
+            loadState = .idle
+        }
+
+        exportGeneration &+= 1
+        exportTask?.cancel()
+        exportTask = nil
+        activeExportOperation = nil
+        exportController.finish()
+    }
+
+    private func loadCatalog() {
+        catalogLoadTask?.cancel()
+        catalogLoadGeneration &+= 1
+        let generation = catalogLoadGeneration
+        loadState = .loading
+        let fingerprint = self.fingerprint
+        let selectionCatalogAction = self.selectionCatalogAction
+
+        catalogLoadTask = Task { [weak self, generation] in
+            defer {
+                if let self, generation == self.catalogLoadGeneration {
+                    self.catalogLoadTask = nil
+                }
+            }
+
+            do {
+                await Task.yield()
+                let catalog = try await selectionCatalogAction(fingerprint)
+                try Task.checkCancellation()
+
+                guard let self, generation == self.catalogLoadGeneration else {
+                    return
+                }
+
+                self.catalog = catalog
+                self.loadError = nil
+                self.loadState = .loaded
+            } catch {
+                guard let self else {
+                    return
+                }
+                guard !Self.shouldIgnore(error), generation == self.catalogLoadGeneration else {
+                    return
+                }
+
+                self.catalog = nil
+                self.loadError = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+                self.loadState = .failed
+            }
+        }
+    }
+
+    private func startExport(
+        operation: ExportOperation,
+        filename: String,
+        action: @escaping @MainActor () async throws -> Data
+    ) {
+        exportTask?.cancel()
+        exportGeneration &+= 1
+        let generation = exportGeneration
+        activeExportOperation = operation
+
+        exportTask = Task { [weak self, generation] in
+            defer {
+                if let self, generation == self.exportGeneration {
+                    self.activeExportOperation = nil
+                    self.exportTask = nil
+                }
+            }
+
+            do {
+                let exported = try await action()
+                try Task.checkCancellation()
+
+                guard let self, generation == self.exportGeneration else {
+                    return
+                }
+
+                try self.prepareExport(exported, filename: filename)
+            } catch {
+                guard let self else {
+                    return
+                }
+                guard !Self.shouldIgnore(error), generation == self.exportGeneration else {
+                    return
+                }
+
+                self.presentMappedError(error)
+            }
         }
     }
 
@@ -217,6 +290,21 @@ final class SelectiveRevocationScreenModel {
     private func presentMappedError(_ error: Error) {
         self.error = CypherAirError.from(error) { .fileIoError(reason: $0) }
         showError = true
+    }
+
+    private static func shouldIgnore(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        if let cypherAirError = error as? CypherAirError,
+           case .operationCancelled = cypherAirError {
+            return true
+        }
+        if let pgpError = error as? PgpError,
+           case .OperationCancelled = pgpError {
+            return true
+        }
+        return false
     }
 
     private func subkeyExportFilename(for subkey: SubkeySelectionOption) -> String {
