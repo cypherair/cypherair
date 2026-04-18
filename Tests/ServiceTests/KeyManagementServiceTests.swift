@@ -1274,6 +1274,59 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(mockKC.saveCallCount, saveCountBefore, "Duplicate selector discovery must not rewrite metadata")
     }
 
+    func test_loadSelectionCatalog_existingStoredKey_matchesSynchronousSelectorsWithoutUnwrapOrMetadataRewrite() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Async Selector Catalog")
+        let unwrapCountBefore = mockSE.unwrapCallCount
+        let saveCountBefore = mockKC.saveCallCount
+
+        let synchronousCatalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
+        let asyncCatalog = try await service.loadSelectionCatalog(fingerprint: identity.fingerprint)
+
+        XCTAssertEqual(asyncCatalog, synchronousCatalog)
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore, "Async selector discovery must not unwrap private key material")
+        XCTAssertEqual(mockKC.saveCallCount, saveCountBefore, "Async selector discovery must not rewrite metadata")
+    }
+
+    func test_loadSelectionCatalog_missingFingerprint_throwsNoMatchingKey() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: service, name: "Async Selector Missing")
+
+        do {
+            _ = try await service.loadSelectionCatalog(fingerprint: "missing-fingerprint")
+            XCTFail("Expected noMatchingKey")
+        } catch CypherAirError.noMatchingKey {
+            // Expected.
+        } catch {
+            XCTFail("Expected noMatchingKey, got \(error)")
+        }
+    }
+
+    func test_loadSelectionCatalog_metadataFingerprintMismatch_throwsInvalidKeyDataWithoutUnwrap() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Async Selector Mismatch A")
+        let otherIdentity = try await TestHelpers.generateProfileBKey(service: service, name: "Async Selector Mismatch B")
+
+        var corruptedIdentity = try loadStoredIdentity(fingerprint: identity.fingerprint)
+        corruptedIdentity.publicKeyData = otherIdentity.publicKeyData
+        try overwriteStoredIdentity(corruptedIdentity)
+
+        let freshService = makeFreshService()
+        try freshService.loadKeys()
+
+        let unwrapCountBefore = mockSE.unwrapCallCount
+        let saveCountBefore = mockKC.saveCallCount
+
+        do {
+            _ = try await freshService.loadSelectionCatalog(fingerprint: identity.fingerprint)
+            XCTFail("Expected invalidKeyData")
+        } catch CypherAirError.invalidKeyData {
+            // Expected.
+        } catch {
+            XCTFail("Expected invalidKeyData, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore, "Async fingerprint mismatch must not unwrap private keys")
+        XCTAssertEqual(mockKC.saveCallCount, saveCountBefore, "Async fingerprint mismatch must not rewrite metadata")
+    }
+
     // MARK: - M4: Revocation Certificate Validity
 
     func test_exportRevocationCertificate_existingGeneratedKey_doesNotUnwrapAndReturnsArmoredSignature() async throws {

@@ -292,6 +292,27 @@ final class KeyManagementService {
         return discovery.catalog
     }
 
+    /// Discover selector-bearing subkey and User ID metadata off the main actor.
+    /// This is a read-only operation that uses stored public key bytes only.
+    func loadSelectionCatalog(fingerprint: String) async throws -> CertificateSelectionCatalog {
+        guard let identity = catalogStore.identity(for: fingerprint) else {
+            throw CypherAirError.noMatchingKey
+        }
+
+        let discovery = try await Self.discoverSelectionCatalogOffMainActor(
+            engine: engine,
+            certData: identity.publicKeyData
+        )
+
+        guard discovery.raw.certificateFingerprint == identity.fingerprint else {
+            throw CypherAirError.invalidKeyData(
+                reason: "Stored key metadata fingerprint does not match certificate data"
+            )
+        }
+
+        return discovery.catalog
+    }
+
     // MARK: - Crash Recovery
 
     /// Check for an interrupted modifyExpiry operation and recover.
@@ -310,6 +331,17 @@ final class KeyManagementService {
     /// The caller MUST zeroize the returned data after use.
     func unwrapPrivateKey(fingerprint: String) throws -> Data {
         try privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
+    }
+
+    @concurrent
+    private static func discoverSelectionCatalogOffMainActor(
+        engine: PgpEngine,
+        certData: Data
+    ) async throws -> (raw: DiscoveredCertificateSelectors, catalog: CertificateSelectionCatalog) {
+        try CertificateSelectionCatalogDiscovery.discover(
+            engine: engine,
+            certData: certData
+        )
     }
 
     private func syncKeys() {
