@@ -51,6 +51,18 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("modifyexpiry.ready")
     }
 
+    func test_mainFlow_keyDetail_opensSelectiveRevocation() throws {
+        launchMain()
+        generateKey()
+
+        element("postgen.keyDetail").tap()
+        waitForScreenReady("keydetail.ready")
+
+        element("keydetail.selectiveRevocation").tap()
+
+        waitForScreenReady("selectiverevocation.ready")
+    }
+
     func test_settingsRoot_opensThemePicker() throws {
         launchSettings()
 

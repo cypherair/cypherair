@@ -13,6 +13,8 @@ struct AppRouteDestinationView: View {
             KeyDetailView(fingerprint: fingerprint)
         case .backupKey(let fingerprint):
             BackupKeyView(fingerprint: fingerprint)
+        case .selectiveRevocation(let fingerprint):
+            SelectiveRevocationView(fingerprint: fingerprint)
         case .importKey:
             ImportKeyView()
         case .contactDetail(let fingerprint):

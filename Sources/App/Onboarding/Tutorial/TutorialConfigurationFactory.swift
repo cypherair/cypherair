@@ -137,6 +137,7 @@ struct TutorialConfigurationFactory {
             allowsPublicKeySave: false,
             allowsPublicKeyCopy: false,
             allowsRevocationExport: false,
+            allowsSelectiveRevocationLaunch: false,
             outputInterceptionPolicy: outputInterceptionPolicy
         )
     }
