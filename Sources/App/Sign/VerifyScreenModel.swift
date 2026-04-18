@@ -12,13 +12,13 @@ final class VerifyScreenModel {
 
     typealias CleartextVerificationAction = @MainActor (Data) async throws -> (
         text: Data?,
-        verification: SignatureVerification
+        verification: DetailedSignatureVerification
     )
     typealias DetachedVerificationAction = @MainActor (
         URL,
         URL,
         FileProgressReporter
-    ) async throws -> SignatureVerification
+    ) async throws -> DetailedSignatureVerification
     typealias CleartextFileImportAction = @MainActor (URL) throws -> (
         data: Data,
         text: String
@@ -34,8 +34,8 @@ final class VerifyScreenModel {
     var verifyMode: VerifyView.VerifyMode = .cleartext
     var signedInput = ""
     var cleartextOriginalText: String?
-    var cleartextVerification: SignatureVerification?
-    var detachedVerification: SignatureVerification?
+    var cleartextDetailedVerification: DetailedSignatureVerification?
+    var detachedDetailedVerification: DetailedSignatureVerification?
     var filePickerTarget: FilePickerTarget?
     var showFileImporter = false
     var importedCleartext = ImportedTextInputState()
@@ -44,6 +44,8 @@ final class VerifyScreenModel {
     var signatureFileURL: URL?
     var signatureFileName: String?
     var textInputSectionEpoch = 0
+    private var cleartextDetailedPresentationEpoch = 0
+    private var detachedDetailedPresentationEpoch = 0
 
     init(
         signingService: SigningService,
@@ -56,7 +58,7 @@ final class VerifyScreenModel {
         self.configuration = configuration
         self.operation = operation
         self.cleartextVerificationAction = cleartextVerificationAction ?? { signedMessage in
-            try await signingService.verifyCleartext(signedMessage)
+            try await signingService.verifyCleartextDetailed(signedMessage)
         }
         self.detachedVerificationAction = detachedVerificationAction ?? { originalURL, signatureURL, progress in
             try await SecurityScopedFileAccess.withAccess(
@@ -83,7 +85,7 @@ final class VerifyScreenModel {
             ) {
                 let signature = try Data(contentsOf: signatureURL)
                 try Task.checkCancellation()
-                return try await signingService.verifyDetachedStreaming(
+                return try await signingService.verifyDetachedStreamingDetailed(
                     fileURL: originalURL,
                     signature: signature,
                     progress: progress
@@ -117,11 +119,40 @@ final class VerifyScreenModel {
     }
 
     var activeVerification: SignatureVerification? {
+        activeDetailedVerification?.legacyVerification
+    }
+
+    var activeDetailedVerification: DetailedSignatureVerification? {
         switch verifyMode {
         case .cleartext:
-            cleartextVerification
+            cleartextDetailedVerification
         case .detached:
-            detachedVerification
+            detachedDetailedVerification
+        }
+    }
+
+    var cleartextVerification: SignatureVerification? {
+        cleartextDetailedVerification?.legacyVerification
+    }
+
+    var detachedVerification: SignatureVerification? {
+        detachedDetailedVerification?.legacyVerification
+    }
+
+    var activeDetailedResetToken: DetailedSignatureSectionView.ResetToken {
+        switch verifyMode {
+        case .cleartext:
+            DetailedSignatureSectionView.ResetToken(
+                screenContext: .verify,
+                modeIdentifier: verifyMode.rawValue,
+                presentationEpoch: cleartextDetailedPresentationEpoch
+            )
+        case .detached:
+            DetailedSignatureSectionView.ResetToken(
+                screenContext: .verify,
+                modeIdentifier: verifyMode.rawValue,
+                presentationEpoch: detachedDetailedPresentationEpoch
+            )
         }
     }
 
@@ -204,9 +235,11 @@ final class VerifyScreenModel {
         case .original:
             originalFileURL = url
             originalFileName = url.lastPathComponent
+            invalidateDetachedVerificationState()
         case .signature:
             signatureFileURL = url
             signatureFileName = url.lastPathComponent
+            invalidateDetachedVerificationState()
         case .none:
             break
         }
@@ -235,7 +268,7 @@ final class VerifyScreenModel {
             if let content = result.text {
                 self.cleartextOriginalText = String(data: content, encoding: .utf8)
             }
-            self.cleartextVerification = result.verification
+            self.replaceCleartextDetailedVerification(with: result.verification)
             self.textInputSectionEpoch &+= 1
         }
     }
@@ -246,7 +279,7 @@ final class VerifyScreenModel {
             return
         }
 
-        detachedVerification = nil
+        clearDetachedVerificationState()
 
         operation.runFileOperation(mapError: mapVerificationError) { [self] progress in
             let result = try await self.detachedVerificationAction(
@@ -255,7 +288,7 @@ final class VerifyScreenModel {
                 progress
             )
             try Task.checkCancellation()
-            self.detachedVerification = result
+            self.replaceDetachedDetailedVerification(with: result)
         }
     }
 
@@ -288,8 +321,32 @@ final class VerifyScreenModel {
 
     private func invalidateCleartextVerificationState() {
         cleartextOriginalText = nil
-        cleartextVerification = nil
+        clearCleartextVerificationState()
         textInputSectionEpoch &+= 1
+    }
+
+    private func invalidateDetachedVerificationState() {
+        clearDetachedVerificationState()
+    }
+
+    private func replaceCleartextDetailedVerification(with verification: DetailedSignatureVerification) {
+        cleartextDetailedVerification = verification
+        cleartextDetailedPresentationEpoch &+= 1
+    }
+
+    private func replaceDetachedDetailedVerification(with verification: DetailedSignatureVerification) {
+        detachedDetailedVerification = verification
+        detachedDetailedPresentationEpoch &+= 1
+    }
+
+    private func clearCleartextVerificationState() {
+        cleartextDetailedVerification = nil
+        cleartextDetailedPresentationEpoch &+= 1
+    }
+
+    private func clearDetachedVerificationState() {
+        detachedDetailedVerification = nil
+        detachedDetailedPresentationEpoch &+= 1
     }
 
     private func mapVerificationError(_ error: Error) -> CypherAirError {

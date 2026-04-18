@@ -9,12 +9,12 @@ final class DecryptScreenModel {
     typealias CiphertextFileInspectionAction = @MainActor (URL) throws -> (data: Data, text: String)?
     typealias TextDecryptionAction = @MainActor (
         DecryptionService.Phase1Result
-    ) async throws -> (plaintext: Data, signature: SignatureVerification)
+    ) async throws -> (plaintext: Data, verification: DetailedSignatureVerification)
     typealias FileDecryptionAction = @MainActor (
         URL,
         DecryptionService.FilePhase1Result,
         FileProgressReporter
-    ) async throws -> (outputURL: URL, signature: SignatureVerification)
+    ) async throws -> (outputURL: URL, verification: DetailedSignatureVerification)
 
     private(set) var configuration: DecryptView.Configuration
     let operation: OperationController
@@ -37,7 +37,7 @@ final class DecryptScreenModel {
     var decryptMode: DecryptView.DecryptMode = .text
     var ciphertextInput = ""
     var decryptedText: String?
-    var signatureVerification: SignatureVerification?
+    var detailedSignatureVerification: DetailedSignatureVerification?
     var phase1Result: DecryptionService.Phase1Result?
     var showFileImporter = false
     var fileImportTarget: DecryptView.FileImportTarget?
@@ -49,6 +49,7 @@ final class DecryptScreenModel {
     private var pendingTextModeImport: PendingTextModeImport?
     var showTextModeSuggestion = false
     var textInputSectionEpoch = 0
+    private var detailedSignaturePresentationEpoch = 0
 
     init(
         decryptionService: DecryptionService,
@@ -137,7 +138,7 @@ final class DecryptScreenModel {
             }
         }
         self.textDecryptionAction = textDecryptionAction ?? { phase1 in
-            try await decryptionService.decrypt(phase1: phase1)
+            try await decryptionService.decryptDetailed(phase1: phase1)
         }
         self.fileDecryptionAction = fileDecryptionAction ?? { fileURL, phase1, progress in
             try await SecurityScopedFileAccess.withAccess(
@@ -153,7 +154,7 @@ final class DecryptScreenModel {
                     )
                 ]
             ) {
-                try await decryptionService.decryptFileStreaming(
+                try await decryptionService.decryptFileStreamingDetailed(
                     phase1: phase1,
                     progress: progress
                 )
@@ -196,6 +197,18 @@ final class DecryptScreenModel {
         decryptMode == .file && operation.isRunning && operation.progress != nil
     }
 
+    var signatureVerification: SignatureVerification? {
+        detailedSignatureVerification?.legacyVerification
+    }
+
+    var detailedSignatureResetToken: DetailedSignatureSectionView.ResetToken {
+        DetailedSignatureSectionView.ResetToken(
+            screenContext: .decrypt,
+            modeIdentifier: decryptMode.rawValue,
+            presentationEpoch: detailedSignaturePresentationEpoch
+        )
+    }
+
     func handleAppear() {
         applyPrefilledCiphertextIfNeeded(from: configuration)
         applyInitialPhase1ResultIfPresent(from: configuration)
@@ -218,7 +231,7 @@ final class DecryptScreenModel {
     func handleDisappear() {
         clearDisplayedText()
         deleteTemporaryDecryptedFile()
-        signatureVerification = nil
+        clearDetailedSignatureVerification()
         phase1Result = nil
         filePhase1Result = nil
         importedCiphertext.clear()
@@ -229,7 +242,7 @@ final class DecryptScreenModel {
     func handleContentClearGenerationChange() {
         clearDisplayedText()
         deleteTemporaryDecryptedFile()
-        signatureVerification = nil
+        clearDetailedSignatureVerification()
         phase1Result = nil
         filePhase1Result = nil
     }
@@ -271,7 +284,7 @@ final class DecryptScreenModel {
     func parseRecipientsText() {
         let inputData = importedCiphertext.rawData ?? Data(ciphertextInput.utf8)
         decryptedText = nil
-        signatureVerification = nil
+        clearDetailedSignatureVerification()
         let onParsed = configuration.onParsed
 
         operation.run(mapError: mapDecryptError) { [self] in
@@ -303,8 +316,8 @@ final class DecryptScreenModel {
             if let text = String(data: result.plaintext, encoding: .utf8) {
                 self.decryptedText = text
             }
-            self.signatureVerification = result.signature
-            onDecrypted?(result.plaintext, result.signature)
+            self.replaceDetailedSignatureVerification(with: result.verification)
+            onDecrypted?(result.plaintext, result.verification.legacyVerification)
 
             var mutablePlaintext = result.plaintext
             mutablePlaintext.resetBytes(in: 0..<mutablePlaintext.count)
@@ -325,7 +338,7 @@ final class DecryptScreenModel {
             )
             try Task.checkCancellation()
             self.decryptedFileURL = result.outputURL
-            self.signatureVerification = result.signature
+            self.replaceDetailedSignatureVerification(with: result.verification)
         }
     }
 
@@ -470,7 +483,7 @@ final class DecryptScreenModel {
 
     private func invalidateTextInputState() {
         clearDisplayedText()
-        signatureVerification = nil
+        clearDetailedSignatureVerification()
         phase1Result = nil
         textInputSectionEpoch &+= 1
     }
@@ -479,8 +492,18 @@ final class DecryptScreenModel {
         if deleteTemporaryOutput {
             deleteTemporaryDecryptedFile()
         }
-        signatureVerification = nil
+        clearDetailedSignatureVerification()
         filePhase1Result = nil
+    }
+
+    private func replaceDetailedSignatureVerification(with verification: DetailedSignatureVerification) {
+        detailedSignatureVerification = verification
+        detailedSignaturePresentationEpoch &+= 1
+    }
+
+    private func clearDetailedSignatureVerification() {
+        detailedSignatureVerification = nil
+        detailedSignaturePresentationEpoch &+= 1
     }
 
     private func clearDisplayedText() {

@@ -283,6 +283,14 @@ private struct DecryptScreenHostView: View {
                     }
                 }
             }
+
+            if let detailedVerification = model.detailedSignatureVerification,
+               !detailedVerification.signatures.isEmpty {
+                DetailedSignatureSectionView(
+                    verification: detailedVerification,
+                    resetToken: model.detailedSignatureResetToken
+                )
+            }
         }
         #if canImport(UIKit)
         .scrollDismissesKeyboard(.interactively)

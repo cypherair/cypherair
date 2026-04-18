@@ -155,6 +155,14 @@ private struct VerifyScreenHostView: View {
                     }
                 }
             }
+
+            if let activeDetailedVerification = model.activeDetailedVerification,
+               !activeDetailedVerification.signatures.isEmpty {
+                DetailedSignatureSectionView(
+                    verification: activeDetailedVerification,
+                    resetToken: model.activeDetailedResetToken
+                )
+            }
         }
         #if canImport(UIKit)
         .scrollDismissesKeyboard(.interactively)
