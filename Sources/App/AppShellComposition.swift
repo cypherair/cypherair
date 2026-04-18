@@ -38,8 +38,10 @@ struct AppRouteDestinationView: View {
         case .license:
             LicenseListView()
         case .appIcon:
-            #if canImport(UIKit)
+            #if os(iOS)
             AppIconPickerView()
+            #elseif os(visionOS)
+            VisionOSAppIconUnavailableView()
             #else
             Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
             #endif

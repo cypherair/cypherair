@@ -100,16 +100,20 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
             textView.mathExpressionCompletionType = .no
         }
 
+        #if os(iOS)
         if #available(iOS 18.4, *) {
             textView.conversationContext = nil
         }
+        #endif
 
         if #available(iOS 16.0, *) {
             textView.isFindInteractionEnabled = false
         }
 
+        #if os(iOS)
         textView.inputAssistantItem.leadingBarButtonGroups = []
         textView.inputAssistantItem.trailingBarButtonGroups = []
+        #endif
         textView.textDragDelegate = nil
         textView.textDropDelegate = nil
         textView.textDragInteraction?.isEnabled = false
@@ -175,8 +179,10 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         }
 
         private func applyInteractionRestrictions() {
+            #if os(iOS)
             inputAssistantItem.leadingBarButtonGroups = []
             inputAssistantItem.trailingBarButtonGroups = []
+            #endif
             textDragDelegate = nil
             textDropDelegate = nil
             textDragInteraction?.isEnabled = false

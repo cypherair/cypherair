@@ -1,6 +1,6 @@
 import SwiftUI
 
-let macMainWindowID = "cypherair-main-window"
+let mainWindowID = "cypherair-main-window"
 
 @MainActor
 enum MacPresentation: Identifiable {

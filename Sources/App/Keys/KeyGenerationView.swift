@@ -135,9 +135,7 @@ struct KeyGenerationView: View {
                 .accessibilityIdentifier("keygen.generate")
             }
         }
-        #if canImport(UIKit)
-        .scrollDismissesKeyboard(.interactively)
-        #endif
+        .scrollDismissesKeyboardInteractivelyIfAvailable()
         #if os(macOS)
         .formStyle(.grouped)
         #endif

@@ -96,9 +96,7 @@ struct ImportKeyView: View {
                 .disabled((armoredText.isEmpty && importedKeyData == nil) || passphrase.isEmpty || isImporting)
             }
         }
-        #if canImport(UIKit)
-        .scrollDismissesKeyboard(.interactively)
-        #endif
+        .scrollDismissesKeyboardInteractivelyIfAvailable()
         #if os(macOS)
         .formStyle(.grouped)
         #endif

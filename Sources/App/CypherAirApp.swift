@@ -22,7 +22,7 @@ struct CypherAirApp: App {
     @State private var macTutorialLaunchRelay = MacTutorialLaunchRelay()
     @State private var macTutorialHostAvailability = MacTutorialHostAvailability()
     #endif
-    #if os(iOS)
+    #if os(iOS) || os(visionOS)
     @State private var iosPresentationState = TutorialOnboardingHandoffState()
     #endif
 
@@ -65,7 +65,7 @@ struct CypherAirApp: App {
         #if os(macOS)
         Window(
             String(localized: "app.name", defaultValue: "CypherAir"),
-            id: macMainWindowID
+            id: mainWindowID
         ) {
             mainWindowSceneContent
         }
@@ -76,6 +76,13 @@ struct CypherAirApp: App {
             // CypherAir uses a single-window design; multiple windows would create
             // independent privacy screen states leading to inconsistent security behavior.
             CommandGroup(replacing: .newItem) { }
+        }
+        #elseif os(visionOS)
+        Window(
+            String(localized: "app.name", defaultValue: "CypherAir"),
+            id: mainWindowID
+        ) {
+            mainWindowSceneContent
         }
         #else
         WindowGroup {
@@ -142,11 +149,11 @@ struct CypherAirApp: App {
                 .environment(container.selfTestService)
                 .environment(container.authManager)
                 .environment(tutorialStore)
-                #if os(iOS)
+                #if os(iOS) || os(visionOS)
                 .environment(\.iosPresentationController, iosPresentationControllerValue)
                 #endif
         }
-        #if os(iOS)
+        #if os(iOS) || os(visionOS)
         .sheet(item: onboardingPresentationBinding, onDismiss: {
             iosPresentationState.completePendingTutorialLaunchIfNeeded()
         }) { presentation in
@@ -257,7 +264,7 @@ struct CypherAirApp: App {
         #endif
     }
 
-    #if os(iOS)
+    #if os(iOS) || os(visionOS)
     private var onboardingPresentationBinding: Binding<IOSPresentation?> {
         Binding(
             get: {

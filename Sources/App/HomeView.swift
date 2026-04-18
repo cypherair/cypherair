@@ -129,7 +129,11 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 80)
         }
+        #if os(visionOS)
+        .buttonStyle(.borderedProminent)
+        #else
         .buttonStyle(.glass)
+        #endif
         .tint(tint)
         .accessibilityLabel(title)
         .tutorialAnchor(anchor)

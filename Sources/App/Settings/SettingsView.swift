@@ -121,7 +121,7 @@ private struct SettingsScreenHostView: View {
                 .accessibilityIdentifier("settings.theme")
                 .disabled(!model.configuration.isThemePickerEnabled)
 
-                #if canImport(UIKit)
+                #if os(iOS)
                 NavigationLink(value: AppRoute.appIcon) {
                     Label(
                         String(localized: "settings.appIcon", defaultValue: "App Icon"),
@@ -359,7 +359,7 @@ struct MacSettingsRootView: View {
                     tutorialLaunchBlockedNotice = TutorialLaunchBlockedNotice(reason: reason)
                 },
                 openMainWindow: {
-                    openWindow(id: macMainWindowID)
+                    openWindow(id: mainWindowID)
                 }
             )
         }

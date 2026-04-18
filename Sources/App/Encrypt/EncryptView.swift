@@ -351,9 +351,7 @@ private struct EncryptScreenHostView: View {
                 }
             }
         }
-        #if canImport(UIKit)
-        .scrollDismissesKeyboard(.interactively)
-        #endif
+        .scrollDismissesKeyboardInteractivelyIfAvailable()
         #if os(macOS)
         .formStyle(.grouped)
         #endif

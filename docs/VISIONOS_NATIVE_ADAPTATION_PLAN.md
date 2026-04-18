@@ -224,6 +224,7 @@ The current Rust/UniFFI pipeline is not yet visionOS-native:
 - The patched `openssl-src-rs` work has been upstreamed as:
   - [`alexcrichton/openssl-src-rs#283`](https://github.com/alexcrichton/openssl-src-rs/pull/283)
   - branch source: `cypherair/openssl-src-rs:visionos-openssl-src-upstream-prep`
+  - exact tested revision: `0c7e9b5e0c4c4644de34dd3ee86f2a2ef87daa61`
 - That upstream PR also fixes the existing architecture-specific iOS simulator OpenSSL configure target mappings for:
   - `x86_64-apple-ios`
   - `aarch64-apple-ios-sim`
@@ -248,7 +249,22 @@ The v1 planning conclusion is:
 - **no UniFFI surface redesign is required** for visionOS v1;
 - the build pipeline must be extended to produce and link visionOS Rust artifacts before CypherAir can be considered a native visionOS target;
 - this is an engineering enablement task, not a product-level redesign.
-- CypherAir main should not commit a machine-local `path` patch for `openssl-src`; if upstream support is still pending when implementation starts, a temporary implementation branch may pin `openssl-src` to the CypherAir fork with `git` + exact `rev` for reproducibility.
+- CypherAir main should not commit a machine-local `path` patch for `openssl-src`.
+- If upstream support is still pending when implementation starts, a temporary implementation branch may pin `openssl-src` to the CypherAir fork with `git` + exact `rev` for reproducibility.
+
+The current recommended temporary source for that implementation-branch-only override is:
+
+- fork: [`cypherair/openssl-src-rs`](https://github.com/cypherair/openssl-src-rs)
+- branch: `visionos-openssl-src-upstream-prep`
+- exact tested revision: `0c7e9b5e0c4c4644de34dd3ee86f2a2ef87daa61`
+- upstream PR: [`alexcrichton/openssl-src-rs#283`](https://github.com/alexcrichton/openssl-src-rs/pull/283)
+
+A recommended temporary Cargo override for a future implementation branch is:
+
+```toml
+[patch.crates-io]
+openssl-src = { git = "https://github.com/cypherair/openssl-src-rs", rev = "0c7e9b5e0c4c4644de34dd3ee86f2a2ef87daa61" }
+```
 
 In practical terms, a clean native visionOS adaptation requires both:
 

@@ -573,11 +573,19 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release/libpgp_mobile.a",
 				);
-				"OTHER_LDFLAGS[sdk=macosx*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release/libpgp_mobile.a",
-				);
-				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
+					"OTHER_LDFLAGS[sdk=macosx*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release/libpgp_mobile.a",
+					);
+					"OTHER_LDFLAGS[sdk=xros*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-visionos/release/libpgp_mobile.a",
+					);
+					"OTHER_LDFLAGS[sdk=xrsimulator*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-visionos-sim/release/libpgp_mobile.a",
+					);
+					OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.cypherair;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = iphoneos;
@@ -805,11 +813,19 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-ios-sim/release/libpgp_mobile.a",
 				);
-				"OTHER_LDFLAGS[sdk=macosx*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release/libpgp_mobile.a",
-				);
-				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
+					"OTHER_LDFLAGS[sdk=macosx*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-darwin/release/libpgp_mobile.a",
+					);
+					"OTHER_LDFLAGS[sdk=xros*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-visionos/release/libpgp_mobile.a",
+					);
+					"OTHER_LDFLAGS[sdk=xrsimulator*]" = (
+						"$(inherited)",
+						"$(PROJECT_DIR)/pgp-mobile/target/aarch64-apple-visionos-sim/release/libpgp_mobile.a",
+					);
+					OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = com.cypherair.cypherair;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = iphoneos;
