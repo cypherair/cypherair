@@ -101,6 +101,7 @@ Out of scope:
 - integrating certificate-signature tools into `AddContactView` or the contact-import confirmation flow
 - automatic application of generated certification signatures back into target certificates
 - automatic changes to `Contact.isVerified` based on certificate-signature verification results
+- adding a second contact-verification-state mutation entry inside certificate-signature workflows
 - any persisted selective-revocation artifact store beyond the already-existing key-level revocation field
 - any trust or web-of-trust policy semantics
 
@@ -123,6 +124,16 @@ The UI adoption work must preserve the current architectural boundary.
 - Selector-bearing choices shown in UI must come from `selectionCatalog(...)` discovery support. They must not be reconstructed from display strings, lossy labels, or inferred ordering.
 - Any selector validation that can happen before authentication must still happen before authentication.
 - `DecryptionService` UI adoption must not alter the current Phase 1 / Phase 2 boundary.
+- certificate-signature workflows must freeze a public-only pre-auth boundary:
+  - target-contact resolution
+  - selector discovery
+  - signature import
+  - armored / binary normalization
+  - direct-key verification
+  - User ID binding verification
+  - own-key signer-list presentation from existing key metadata
+- only the final User ID certification export action may unwrap a private key and trigger device authentication.
+- certificate-signature verification is crypto-only inspection. It does not replace contact fingerprint verification and must not mutate `Contact.isVerified`.
 
 ## 4. UI Ownership And Routes
 
@@ -172,6 +183,12 @@ Ownership decisions fixed here:
 - introduce `SelectiveRevocationView`
 - introduce `SelectiveRevocationScreenModel`
 
+Automation-facing interface decisions fixed here:
+
+- `KeyDetailView` exposes a stable launcher accessibility id: `keydetail.selectiveRevocation`
+- `SelectiveRevocationView` exposes a stable page root accessibility id: `selectiverevocation.root`
+- `SelectiveRevocationView` exposes a stable `screenReady` marker: `selectiverevocation.ready`
+
 The new page is key-scoped:
 
 - it is entered with one key fingerprint
@@ -194,6 +211,12 @@ Ownership decisions fixed here:
 - keep `ContactDetailView` as the launcher only
 - introduce `CertificateSignaturesView`
 - introduce `CertificateSignaturesScreenModel`
+
+Automation-facing interface decisions fixed here:
+
+- `ContactDetailView` exposes a stable launcher accessibility id: `contactdetail.certificateSignatures`
+- `CertificateSignaturesView` exposes a stable page root accessibility id: `certsignatures.root`
+- `CertificateSignaturesView` exposes a stable `screenReady` marker: `certsignatures.ready`
 
 The new page is contact-scoped:
 
@@ -292,18 +315,25 @@ The page supports exactly three modes:
 Workflow decisions fixed here:
 
 - the page resolves its target certificate from the selected contact
-- direct-key verification accepts pasted or file-imported signature input
-- User ID binding verification accepts pasted or file-imported signature input
-- User ID-driven modes load `CertificateSignatureService.selectionCatalog(targetCert:)`
+- the page remains reachable even when the contact is still unverified
+- the page shows an unverified-contact warning consistent with `ContactDetailView`'s current "confirm the fingerprint before relying on it" semantics
+- direct-key verification accepts pasted or file-imported signature input and remains public-only with no device authentication
+- User ID binding verification accepts pasted or file-imported signature input and remains public-only with no device authentication
+- User ID-driven modes load `CertificateSignatureService.selectionCatalog(targetCert:)` without device authentication
 - User ID-driven modes require the user to choose from the discovered `userIds` list
+- certification generation presents the user's available signer choices from existing key metadata only and must not trigger authentication while populating that list
 - certification generation requires the user to choose one of the user's own keys as signer
 - certification generation requires the user to choose one `CertificationKind`
+- certification export is the only action in this page that may trigger authentication and unwrap private key material
 - certification export produces an ASCII-armored signature export through an additive service helper layered on top of the existing raw-byte API
+- certification export is disabled while the contact remains unverified
+- the disabled certification-export state must explain that the user must verify the contact fingerprint in `ContactDetailView` before exporting a certification
 
 The page does not do any of the following:
 
 - it does not mutate the contact's stored certificate
 - it does not mutate the contact's verification state
+- it does not add a second "Mark Verified" or equivalent contact-verification action
 - it does not claim policy validity or trust semantics beyond the crypto-only result returned by the service
 - it does not generalize into a global certificate browser
 
@@ -314,7 +344,9 @@ The current service surface is almost sufficient for UI adoption, but one additi
 Service-helper decisions fixed here:
 
 - certificate-signature verification paths should accept armored or binary signature input through a service-owned normalization helper instead of pushing dearmor logic into the UI
+- the normalization helper must remain public-only and must not trigger device authentication
 - certification export should use a service-owned armored-export helper layered on top of `generateUserIdCertification(...)`
+- the armored certification-export helper must preserve the frozen auth boundary: helper layering does not authorize authentication before the final export action
 - the existing raw-byte certificate-signature methods remain valid and unchanged
 - these helpers may be implemented as new public methods or as public workflow wrappers backed by internal helpers, but they must remain additive
 
@@ -333,6 +365,23 @@ Minimum required validation:
 - new screen-model tests cover selector loading, signer selection, and export gating for certificate-signature workflows
 - `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 - at minimum one macOS UI smoke pass that exercises the new routes and their page launch path through `CypherAir-MacUITests`
+
+Automation contract for any new flow covered by `MacUISmokeTests` is fixed here:
+
+- each smoke-covered flow must provide a stable launcher accessibility id
+- each smoke-covered destination page must provide a stable page root accessibility id
+- each smoke-covered destination page must provide a stable `screenReady` marker
+- this round's minimum fixed identifiers are:
+  - `keydetail.selectiveRevocation`
+  - `selectiverevocation.root`
+  - `selectiverevocation.ready`
+  - `contactdetail.certificateSignatures`
+  - `certsignatures.root`
+  - `certsignatures.ready`
+- if a later smoke expansion needs stable mode-switch or action control identifiers inside those pages, they may be added later, but launcher / root / ready is the minimum contract frozen by this document
+- new smoke coverage in this round should explicitly include:
+  - `KeyDetail -> Selective Revocation`
+  - `ContactDetail -> Certificate Signatures`
 
 ### 6.2 Human Review Requirements
 
