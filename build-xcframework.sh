@@ -2,13 +2,14 @@
 # build-xcframework.sh — Automated build pipeline for pgp-mobile XCFramework.
 #
 # This script:
-# 1. Cross-compiles pgp-mobile for iOS device, simulator, and macOS targets
+# 1. Cross-compiles pgp-mobile for iOS, visionOS, and macOS targets
 # 2. Generates UniFFI Swift bindings
 # 3. Creates the XCFramework
 #
 # Prerequisites:
 # - Xcode (latest stable) with command-line tools
-# - Rust stable with targets: aarch64-apple-ios, aarch64-apple-ios-sim, aarch64-apple-darwin
+# - Rust stable with targets: aarch64-apple-ios, aarch64-apple-ios-sim,
+#   aarch64-apple-darwin, aarch64-apple-visionos, aarch64-apple-visionos-sim
 # - perl + make (for vendored OpenSSL compilation)
 #
 # Usage:
@@ -47,9 +48,13 @@ target_dylib_candidates=(
     "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-ios/$BUILD_DIR/libpgp_mobile.dylib"
     "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-ios-sim/$BUILD_DIR/libpgp_mobile.dylib"
     "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
+    "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-visionos/$BUILD_DIR/libpgp_mobile.dylib"
+    "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-visionos-sim/$BUILD_DIR/libpgp_mobile.dylib"
     "$SCRIPT_DIR/target/aarch64-apple-ios/$BUILD_DIR/libpgp_mobile.dylib"
     "$SCRIPT_DIR/target/aarch64-apple-ios-sim/$BUILD_DIR/libpgp_mobile.dylib"
     "$SCRIPT_DIR/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
+    "$SCRIPT_DIR/target/aarch64-apple-visionos/$BUILD_DIR/libpgp_mobile.dylib"
+    "$SCRIPT_DIR/target/aarch64-apple-visionos-sim/$BUILD_DIR/libpgp_mobile.dylib"
 )
 
 cleanup_target_specific_dylibs() {
@@ -90,7 +95,7 @@ assert_no_target_specific_dylibs() {
 }
 
 # ── Step 1: Verify Rust targets ──────────────────────────────────
-echo "[1/9] Verifying Rust targets..."
+echo "[1/11] Verifying Rust targets..."
 if ! rustup target list --installed | grep -q "aarch64-apple-ios$"; then
     echo "  Installing aarch64-apple-ios target..."
     rustup target add aarch64-apple-ios
@@ -103,11 +108,19 @@ if ! rustup target list --installed | grep -q "aarch64-apple-darwin"; then
     echo "  Installing aarch64-apple-darwin target..."
     rustup target add aarch64-apple-darwin
 fi
+if ! rustup target list --installed | grep -q "aarch64-apple-visionos$"; then
+    echo "  Installing aarch64-apple-visionos target..."
+    rustup target add aarch64-apple-visionos
+fi
+if ! rustup target list --installed | grep -q "aarch64-apple-visionos-sim$"; then
+    echo "  Installing aarch64-apple-visionos-sim target..."
+    rustup target add aarch64-apple-visionos-sim
+fi
 echo "  ✓ Targets ready"
 
 # ── Step 2: Build for iOS device ─────────────────────────────────
 echo ""
-echo "[2/9] Building for aarch64-apple-ios (device)..."
+echo "[2/11] Building for aarch64-apple-ios (device)..."
 echo "  Note: First build compiles vendored OpenSSL (~3-5 min)"
 cargo build $CARGO_FLAGS --target aarch64-apple-ios --manifest-path "$MANIFEST"
 DEVICE_LIB="$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-ios/$BUILD_DIR/libpgp_mobile.a"
@@ -120,7 +133,7 @@ ls -lh "$DEVICE_LIB"
 
 # ── Step 3: Build for iOS simulator ──────────────────────────────
 echo ""
-echo "[3/9] Building for aarch64-apple-ios-sim (simulator)..."
+echo "[3/11] Building for aarch64-apple-ios-sim (simulator)..."
 cargo build $CARGO_FLAGS --target aarch64-apple-ios-sim --manifest-path "$MANIFEST"
 SIM_LIB="$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-ios-sim/$BUILD_DIR/libpgp_mobile.a"
 if [ ! -f "$SIM_LIB" ]; then
@@ -131,7 +144,7 @@ ls -lh "$SIM_LIB"
 
 # ── Step 4: Build for macOS (Apple Silicon) ──────────────────────
 echo ""
-echo "[4/9] Building for aarch64-apple-darwin (macOS)..."
+echo "[4/11] Building for aarch64-apple-darwin (macOS)..."
 cargo build $CARGO_FLAGS --target aarch64-apple-darwin --manifest-path "$MANIFEST"
 MACOS_LIB="$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-darwin/$BUILD_DIR/libpgp_mobile.a"
 if [ ! -f "$MACOS_LIB" ]; then
@@ -140,12 +153,34 @@ fi
 echo "  ✓ macOS library: $MACOS_LIB"
 ls -lh "$MACOS_LIB"
 
+# ── Step 5: Build for visionOS device ────────────────────────────
+echo ""
+echo "[5/11] Building for aarch64-apple-visionos (device)..."
+cargo build $CARGO_FLAGS --target aarch64-apple-visionos --manifest-path "$MANIFEST"
+VISIONOS_LIB="$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-visionos/$BUILD_DIR/libpgp_mobile.a"
+if [ ! -f "$VISIONOS_LIB" ]; then
+    VISIONOS_LIB="$SCRIPT_DIR/target/aarch64-apple-visionos/$BUILD_DIR/libpgp_mobile.a"
+fi
+echo "  ✓ visionOS device library: $VISIONOS_LIB"
+ls -lh "$VISIONOS_LIB"
+
+# ── Step 6: Build for visionOS simulator ─────────────────────────
+echo ""
+echo "[6/11] Building for aarch64-apple-visionos-sim (simulator)..."
+cargo build $CARGO_FLAGS --target aarch64-apple-visionos-sim --manifest-path "$MANIFEST"
+VISIONOS_SIM_LIB="$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-visionos-sim/$BUILD_DIR/libpgp_mobile.a"
+if [ ! -f "$VISIONOS_SIM_LIB" ]; then
+    VISIONOS_SIM_LIB="$SCRIPT_DIR/target/aarch64-apple-visionos-sim/$BUILD_DIR/libpgp_mobile.a"
+fi
+echo "  ✓ visionOS simulator library: $VISIONOS_SIM_LIB"
+ls -lh "$VISIONOS_SIM_LIB"
+
 # Clean every Xcode-visible target directory before bindgen creates any host dylib.
 cleanup_target_specific_dylibs
 
-# ── Step 5: Build host dylib for UniFFI bindgen ──────────────────
+# ── Step 7: Build host dylib for UniFFI bindgen ──────────────────
 echo ""
-echo "[5/9] Building host dylib for UniFFI bindgen..."
+echo "[7/11] Building host dylib for UniFFI bindgen..."
 # Temporarily add cdylib to crate-type so cargo produces a .dylib for bindgen.
 # The dylib is only needed on the macOS host for uniffi-bindgen — it is never
 # shipped to iOS.  We restore the original Cargo.toml afterwards.
@@ -182,9 +217,9 @@ if [ ! -f "$HOST_DYLIB" ]; then
 fi
 echo "  ✓ Host dylib: $HOST_DYLIB"
 
-# ── Step 6: Generate Swift bindings ──────────────────────────────
+# ── Step 8: Generate Swift bindings ──────────────────────────────
 echo ""
-echo "[6/9] Generating UniFFI Swift bindings..."
+echo "[8/11] Generating UniFFI Swift bindings..."
 rm -rf "$BINDINGS_DIR"
 mkdir -p "$BINDINGS_DIR"
 (cd "$SCRIPT_DIR/pgp-mobile" && cargo run $CARGO_FLAGS --bin uniffi-bindgen \
@@ -201,9 +236,9 @@ fi
 echo "  ✓ Bindings generated in $BINDINGS_DIR"
 ls -la "$BINDINGS_DIR"
 
-# ── Step 7: Create XCFramework ───────────────────────────────────
+# ── Step 9: Create XCFramework ───────────────────────────────────
 echo ""
-echo "[7/9] Creating XCFramework..."
+echo "[9/11] Creating XCFramework..."
 rm -rf "$XCFRAMEWORK_OUTPUT"
 assert_no_target_specific_dylibs
 
@@ -221,23 +256,29 @@ xcodebuild -create-xcframework \
     -library "$DEVICE_LIB" -headers "$HEADERS_DIR" \
     -library "$SIM_LIB" -headers "$HEADERS_DIR" \
     -library "$MACOS_LIB" -headers "$HEADERS_DIR" \
+    -library "$VISIONOS_LIB" -headers "$HEADERS_DIR" \
+    -library "$VISIONOS_SIM_LIB" -headers "$HEADERS_DIR" \
     -output "$XCFRAMEWORK_OUTPUT"
 
 echo "  ✓ XCFramework created: $XCFRAMEWORK_OUTPUT"
 
-# ── Step 8: Report binary size ───────────────────────────────────
+# ── Step 10: Report binary size ──────────────────────────────────
 echo ""
-echo "[8/9] Binary size report..."
+echo "[10/11] Binary size report..."
 DEVICE_SIZE=$(stat -f%z "$DEVICE_LIB" 2>/dev/null || stat --printf="%s" "$DEVICE_LIB" 2>/dev/null || echo "unknown")
 SIM_SIZE=$(stat -f%z "$SIM_LIB" 2>/dev/null || stat --printf="%s" "$SIM_LIB" 2>/dev/null || echo "unknown")
 MACOS_SIZE=$(stat -f%z "$MACOS_LIB" 2>/dev/null || stat --printf="%s" "$MACOS_LIB" 2>/dev/null || echo "unknown")
+VISIONOS_SIZE=$(stat -f%z "$VISIONOS_LIB" 2>/dev/null || stat --printf="%s" "$VISIONOS_LIB" 2>/dev/null || echo "unknown")
+VISIONOS_SIM_SIZE=$(stat -f%z "$VISIONOS_SIM_LIB" 2>/dev/null || stat --printf="%s" "$VISIONOS_SIM_LIB" 2>/dev/null || echo "unknown")
 echo "  Device library: $DEVICE_SIZE bytes"
 echo "  Simulator library: $SIM_SIZE bytes"
 echo "  macOS library: $MACOS_SIZE bytes"
+echo "  visionOS device library: $VISIONOS_SIZE bytes"
+echo "  visionOS simulator library: $VISIONOS_SIM_SIZE bytes"
 
-# ── Step 9: Sync Swift bindings to Xcode source tree ─────────────
+# ── Step 11: Sync Swift bindings to Xcode source tree ────────────
 echo ""
-echo "[9/9] Syncing generated bindings to Sources/PgpMobile/..."
+echo "[11/11] Syncing generated bindings to Sources/PgpMobile/..."
 SWIFT_BINDING_SRC="$BINDINGS_DIR/pgp_mobile.swift"
 SWIFT_BINDING_DST="$SCRIPT_DIR/Sources/PgpMobile/pgp_mobile.swift"
 if [ -f "$SWIFT_BINDING_SRC" ]; then

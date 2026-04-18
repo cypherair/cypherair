@@ -143,7 +143,7 @@ private struct MacPresentationHostModifier: ViewModifier {
                 tutorialHostAvailability: tutorialHostAvailability,
                 onTutorialLaunchBlocked: onTutorialLaunchBlocked,
                 openMainWindow: {
-                    openWindow(id: macMainWindowID)
+                    openWindow(id: mainWindowID)
                 }
             )
         }

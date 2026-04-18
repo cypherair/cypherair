@@ -178,9 +178,7 @@ private struct AddContactScreenHostView: View {
                 .accessibilityIdentifier("addcontact.add")
             }
         }
-        #if canImport(UIKit)
-        .scrollDismissesKeyboard(.interactively)
-        #endif
+        .scrollDismissesKeyboardInteractivelyIfAvailable()
         #if os(macOS)
         .formStyle(.grouped)
         #endif
