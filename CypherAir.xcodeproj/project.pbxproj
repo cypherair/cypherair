@@ -89,6 +89,8 @@
 				App/Keys/ModifyExpiry/ModifyExpirySheetView.swift,
 				App/Keys/MyKeysView.swift,
 				App/Keys/PostGenerationPromptView.swift,
+				App/Keys/SelectiveRevocationScreenModel.swift,
+				App/Keys/SelectiveRevocationView.swift,
 				App/Onboarding/OnboardingView.swift,
 				App/Onboarding/Tutorial/TutorialConfigurationFactory.swift,
 				App/Onboarding/Tutorial/TutorialGuidanceResolver.swift,

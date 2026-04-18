@@ -167,6 +167,12 @@ struct TutorialUnsafeRouteBlocklist {
                 message: String(localized: "guidedTutorial.blocked.appIcon.body", defaultValue: "App icon changes affect the real app and are unavailable inside the tutorial sandbox."),
                 systemImage: "app.badge"
             )
+        case .selectiveRevocation:
+            TutorialBlockedSurface(
+                title: String(localized: "guidedTutorial.blocked.selectiveRevocation.title", defaultValue: "Selective Revocation Unavailable"),
+                message: String(localized: "guidedTutorial.blocked.selectiveRevocation.body", defaultValue: "Selective revocation exports are unavailable inside the tutorial sandbox."),
+                systemImage: "xmark.seal"
+            )
         default:
             nil
         }

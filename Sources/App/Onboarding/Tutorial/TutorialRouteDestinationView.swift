@@ -81,6 +81,12 @@ struct TutorialRouteDestinationView: View {
                     )
                 }
             )
+        case .selectiveRevocation(let fingerprint):
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    SelectiveRevocationView(fingerprint: fingerprint)
+                }
+            )
         case .keyDetail(let fingerprint):
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {

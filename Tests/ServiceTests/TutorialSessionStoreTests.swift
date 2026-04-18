@@ -360,6 +360,7 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNotNil(blocklist.blockedRoute(for: .importKey))
         XCTAssertNotNil(blocklist.blockedRoute(for: .selfTest))
         XCTAssertNotNil(blocklist.blockedRoute(for: .appIcon))
+        XCTAssertNotNil(blocklist.blockedRoute(for: .selectiveRevocation(fingerprint: "test-fingerprint")))
         XCTAssertNil(blocklist.blockedRoot(for: .sign))
         XCTAssertNil(blocklist.blockedRoot(for: .verify))
         XCTAssertNil(blocklist.blockedRoute(for: .encrypt))
@@ -438,6 +439,7 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertFalse(configuration.allowsPublicKeySave)
         XCTAssertFalse(configuration.allowsPublicKeyCopy)
         XCTAssertFalse(configuration.allowsRevocationExport)
+        XCTAssertFalse(configuration.allowsSelectiveRevocationLaunch)
         XCTAssertTrue(configuration.outputInterceptionPolicy.interceptClipboardCopy?("public-key", config, .publicKey) == true)
     }
 
