@@ -293,7 +293,7 @@ The following files and functions are security-critical. Claude Code must **stop
 | `pgp-mobile/src/error.rs` | PgpError enum. Must stay 1:1 with Swift. |
 | `Sources/Services/DiskSpaceChecker.swift` | Disk space validation threshold. Wrong threshold = Jetsam termination during file operations. |
 | `CypherAir.entitlements` | MIE, Enhanced Security entitlements. |
-| `Info.plist` | Only `NSFaceIDUsageDescription` permitted. No other usage descriptions. |
+| `CypherAir-Info.plist` | Only `NSFaceIDUsageDescription` permitted. No other usage descriptions. |
 
 ### Functions Requiring Human Review
 

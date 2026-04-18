@@ -14,17 +14,17 @@
 
 ## Security-Related PRs
 
-Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`, `Sources/Services/QRService.swift`, `pgp-mobile/src/`, `CypherAir.entitlements`, or `Info.plist`.
+Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`, `Sources/Services/QRService.swift`, `pgp-mobile/src/`, `CypherAir.entitlements`, or `CypherAir-Info.plist`.
 
 - [ ] Both positive and negative tests included
 - [ ] Memory zeroing verified: `resetBytes(in:)` (Swift) / `zeroize` (Rust) on all sensitive buffers
 - [ ] No `print()` / `os_log()` / `NSLog()` of key material, passphrases, or decrypted content
 - [ ] Access control flags correct for both Standard and High Security modes
 - [ ] AEAD hard-fail enforced (no partial plaintext on auth failure)
-- [ ] Only `NSFaceIDUsageDescription` in Info.plist
+- [ ] Only `NSFaceIDUsageDescription` in `CypherAir-Info.plist`
 - [ ] No network APIs introduced (URLSession, NWConnection, HTTP)
 - [ ] Secure random only (`SecRandomCopyBytes` / `getrandom`)
-- [ ] Human review obtained for files listed in [SECURITY.md](SECURITY.md) §7
+- [ ] Human review obtained for files listed in [SECURITY.md](SECURITY.md) §8
 - [ ] Crash recovery distinguishes safe cleanup, retryable failure, and unrecoverable failure correctly
 - [ ] Retryable recovery failures keep retry flags set; unrecoverable states clear flags and surface a generic warning
 - [ ] Startup diagnostics remain generic and do not leak fingerprints or key identifiers

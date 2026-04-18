@@ -1,5 +1,10 @@
 # Documentation Audit
 
+> Status: Archived review snapshot from 2026-04-17. Kept as historical evidence for the repository-wide documentation audit that drove the April 18, 2026 governance and sync pass.
+> Archival reason: The corrective work identified by this audit has been absorbed into the active documentation set and governance rules.
+> Successor docs: [DOCUMENTATION_GOVERNANCE](../DOCUMENTATION_GOVERNANCE.md), [CHANGELOG](../CHANGELOG.md), and the active canonical docs updated by this pass.
+> Current code and active canonical docs outrank this archived file whenever they disagree.
+
 > Date: 2026-04-17
 > Scope: `README.md`, `CLAUDE.md`, `AGENTS.md`, all `docs/*.md`, and all `docs/archive/*.md`
 > Excludes: `.claude/` tooling docs

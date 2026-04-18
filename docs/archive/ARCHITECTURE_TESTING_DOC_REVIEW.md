@@ -1,8 +1,13 @@
-# Code-Baseline Verification of `ARCHITECTURE_TESTING_DOC_REVIEW.md`
+# Architecture / Testing Documentation Review Snapshot
+
+> Status: Archived review snapshot from 2026-04-16. Kept as historical evidence for one point-in-time verification pass against architecture and testing documentation.
+> Archival reason: The affected canonical docs have since been updated, so this file is no longer an active guidance document.
+> Successor docs: [ARCHITECTURE](../ARCHITECTURE.md), [TESTING](../TESTING.md), [DOCUMENTATION_GOVERNANCE](../DOCUMENTATION_GOVERNANCE.md), and [CHANGELOG](../CHANGELOG.md).
+> Current code and active canonical docs outrank this archived file whenever they disagree.
 
 ## Executive Summary
 
-This document verifies the findings previously listed in `docs/ARCHITECTURE_TESTING_DOC_REVIEW.md`
+This document preserves one historical verification pass against the earlier architecture/testing documentation review
 against the current repository state.
 
 Verification rules for this pass:

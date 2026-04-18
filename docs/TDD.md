@@ -1,7 +1,7 @@
 # Technical Design Document (TDD)
 
-> **Version:** v4.0
-> **Companion to:** [PRD](PRD.md) v4.0
+> **Version:** v4.2
+> **Companion to:** [PRD](PRD.md) v4.2
 > **Audience:** Developers, Security Auditors
 
 ## 1. OpenPGP Library: Sequoia PGP
@@ -181,11 +181,9 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 ### 2.5 Build Pipeline
 
 1. `cargo build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim` / `aarch64-apple-darwin`
-2. `uniffi-bindgen generate` → `.swift` + `.h` + `.modulemap`
-3. `lipo` (fat sim binary) → `xcodebuild -create-xcframework`
-4. Import XCFramework into Xcode + copy generated `.swift`
-
-*Alternative:* `cargo-swift` automates all into `cargo swift package`.
+2. `./build-xcframework.sh --release` refreshes the release archives, generates UniFFI Swift bindings and headers, validates host-dylib cleanup, and produces the packaged `PgpMobile.xcframework` output
+3. The current Xcode project links `pgp-mobile/target/.../release/libpgp_mobile.a` directly per SDK and imports the generated headers through `bindings/module.modulemap`
+4. Local Swift / FFI validation runs through `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 
 See also [CLAUDE.md](../CLAUDE.md) Build Commands for the full pipeline with exact commands.
 
@@ -307,7 +305,7 @@ Generate: `CIQRCodeGenerator`. Decode from photo: PHPicker + CoreImage `CIDetect
 
 ```
 Keychain: SE key + salt + sealed-key + metadata per identity (both profiles)
-/Documents/: contacts/ (public keys), revocation/, self-test/
+/Documents/: contacts/ (public keys + `contact-metadata.json`), self-test/
 /Library/Preferences/ (UserDefaults):
   com.cypherair.preference.authMode              → "standard" | "highSecurity"
   com.cypherair.preference.gracePeriod           → Int (0/60/180/300)
@@ -315,12 +313,14 @@ Keychain: SE key + salt + sealed-key + metadata per identity (both profiles)
   com.cypherair.preference.clipboardNotice       → Bool (default true)
   com.cypherair.preference.requireAuthOnLaunch   → Bool (default true)
   com.cypherair.preference.onboardingComplete    → Bool (default false)
-  com.cypherair.preference.colorTheme            → String (ColorTheme rawValue, default "defaultBlue")
+  com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
+  com.cypherair.preference.colorTheme            → String (ColorTheme rawValue, default "systemDefault")
   com.cypherair.internal.rewrapInProgress        → Bool (crash recovery)
   com.cypherair.internal.rewrapTargetMode        → String (target auth mode during re-wrap)
   com.cypherair.internal.modifyExpiryInProgress  → Bool (crash recovery flag)
   com.cypherair.internal.modifyExpiryFingerprint → String (key fingerprint during expiry modification)
 /tmp/decrypted/: ephemeral file previews
+/tmp/streaming/: temporary streaming encrypt/decrypt outputs
 ```
 
 ---
