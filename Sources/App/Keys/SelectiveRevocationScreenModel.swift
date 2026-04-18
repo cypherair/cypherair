@@ -256,6 +256,10 @@ final class SelectiveRevocationScreenModel {
             }
 
             do {
+                // Cancellation is best-effort here. The default export path may already
+                // have entered Secure Enclave authentication and synchronous revocation
+                // generation before the first suspension point, so dismissal guarantees
+                // stale-result suppression rather than aborting all underlying work.
                 let exported = try await action()
                 try Task.checkCancellation()
 

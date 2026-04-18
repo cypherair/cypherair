@@ -46,6 +46,9 @@ final class SelectiveRevocationService {
             subkeySelection: subkeySelection
         )
 
+        // Once selector validation succeeds, SE unwrap may trigger a system auth prompt
+        // before the caller can observe task cancellation. Callers should treat dismissal
+        // as suppressing late results, not as a guarantee that auth never begins.
         var secretKey = try privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
@@ -84,6 +87,9 @@ final class SelectiveRevocationService {
             userIdSelection: userIdSelection
         )
 
+        // Once selector validation succeeds, SE unwrap may trigger a system auth prompt
+        // before the caller can observe task cancellation. Callers should treat dismissal
+        // as suppressing late results, not as a guarantee that auth never begins.
         var secretKey = try privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
