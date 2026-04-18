@@ -9302,6 +9302,22 @@
         }
       }
     },
+    "signature.detailed.section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detailed Signatures"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "详细签名"
+          }
+        }
+      }
+    },
     "signature.expired" : {
       "localizations" : {
         "en" : {
