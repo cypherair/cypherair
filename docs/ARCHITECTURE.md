@@ -68,13 +68,14 @@ Orchestrates user-facing operations by coordinating the Security layer and the R
 | `EncryptionService` | Text/file encryption with recipient selection, encrypt-to-self, signature toggle, **auto format selection** (SEIPDv1/v2 by recipient key version) |
 | `DecryptionService` | Two-phase decryption: header parse (Phase 1, no auth) → decrypt (Phase 2, auth required). Handles both SEIPDv1 and SEIPDv2. **Security-critical: Phase 1/Phase 2 boundary must never be bypassed.** |
 | `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing. Separate from the recipient-key/two-phase decrypt flow; password-based decrypt does not use PKESK matching, while optional signing during password-message encryption may trigger Secure Enclave unwrap. |
-| `SigningService` | Cleartext text signatures, detached file signatures, verification with graded results |
-| `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, and revocation export (including imported-key availability parity with lazy backfill for legacy imports) |
+| `SigningService` | Cleartext text signatures, detached file signatures, legacy verification summaries, and detailed signature-result service APIs used by the current verify workflows |
+| `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, and selective revocation export through focused internal key-management helpers |
+| `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
 | `ContactService` | Public key storage, same-fingerprint public update absorption, different-fingerprint replacement detection, flat list management |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing. **Security-critical: parses untrusted external input.** |
 | `SelfTestService` | One-tap diagnostic covering **both profiles**: key gen → encrypt/decrypt → sign/verify → tamper test → QR round-trip |
 | `FileProgressReporter` | Bridges Rust streaming progress callbacks to SwiftUI `@Observable` state. Implements UniFFI `ProgressReporter` protocol. Thread-safe via `OSAllocatedUnfairLock`. |
-| `DiskSpaceChecker` | Runtime disk space validation before file operations. Uses `volumeAvailableCapacityForImportantUsageKey` to prevent Jetsam termination during large file operations. Replaces the fixed 100 MB limit. |
+| `DiskSpaceChecker` | Runtime disk space validation before streaming file encryption. Uses `volumeAvailableCapacityForImportantUsageKey` to prevent Jetsam termination during large file operations. The legacy in-memory `encryptFile(...)` helper still retains its fixed 100 MB guard. |
 
 ### Security Layer (`Sources/Security/`)
 
@@ -118,7 +119,11 @@ pgp-mobile/
 │   ├── armor.rs      # ASCII armor encode/decode
 │   └── error.rs      # PgpError enum (maps 1:1 to Swift throwing functions)
 ├── tests/            # Rust-side unit + integration tests
-└── uniffi.toml       # UniFFI configuration
+└── uniffi-bindgen.rs # UniFFI CLI entrypoint used by the build script
+bindings/
+├── module.modulemap  # Xcode-imported module map alias
+├── pgp_mobileFFI.h   # Generated C header
+└── pgp_mobile.swift  # Generated Swift bindings synced into Sources/PgpMobile/
 ```
 
 ## 3. Data Flows
@@ -165,9 +170,9 @@ sequenceDiagram
     V->>DS: beginDecrypt(ciphertext)
 
     Note over DS,PGP: Phase 1 — No authentication
-    DS->>PGP: parseRecipients(ciphertext)
-    PGP-->>DS: List of recipient Key IDs
-    DS->>DS: Match against local key fingerprints
+    DS->>PGP: matchRecipients(ciphertext, localCerts)
+    PGP-->>DS: Matched primary certificate fingerprints
+    DS->>DS: Resolve matched local key identity
     alt No match
         DS-->>V: Error: "Not addressed to your identities"
     end
@@ -305,7 +310,7 @@ iOS Keychain (kSecClassGenericPassword, WhenUnlockedThisDeviceOnly):
 App Sandbox:
 ├── Documents/
 │   ├── contacts/                → Public key files (.gpg binary)
-│   ├── revocation/              → Revocation certificates
+│   │   └── contact-metadata.json → Verification-state manifest for stored contacts
 │   └── self-test/               → Self-test reports
 ├── Library/Preferences/
 │   └── (UserDefaults)
@@ -315,13 +320,15 @@ App Sandbox:
 │       ├── com.cypherair.preference.clipboardNotice        → Bool (default true)
 │       ├── com.cypherair.preference.requireAuthOnLaunch    → Bool (default true)
 │       ├── com.cypherair.preference.onboardingComplete     → Bool (default false)
-│       ├── com.cypherair.preference.colorTheme             → String (ColorTheme rawValue, default "defaultBlue")
+│       ├── com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
+│       ├── com.cypherair.preference.colorTheme             → String (ColorTheme rawValue, default "systemDefault")
 │       ├── com.cypherair.internal.rewrapInProgress         → Bool (crash recovery flag)
 │       ├── com.cypherair.internal.rewrapTargetMode         → String (target auth mode during re-wrap)
 │       ├── com.cypherair.internal.modifyExpiryInProgress   → Bool (crash recovery flag)
 │       └── com.cypherair.internal.modifyExpiryFingerprint  → String (key fingerprint during expiry modification)
 └── tmp/
-    └── decrypted/               → Decrypted file previews (deleted on view exit + app launch)
+    ├── decrypted/               → Decrypted file previews (deleted on view exit + app launch)
+    └── streaming/               → Temporary streaming encrypt/decrypt outputs (deleted on app launch)
 ```
 
 **Keychain key naming conventions:**

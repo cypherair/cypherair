@@ -1,6 +1,7 @@
 # Contacts Product Requirements Document (PRD)
 
 > **Version:** Draft v1.0  
+> **Status:** Draft future product spec. This document does not describe current shipped Contacts behavior.
 > **Purpose:** Product requirements for the Contacts enhancement initiative.  
 > **Audience:** Product, design, engineering, QA, and AI coding tools.  
 > **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific product direction.  

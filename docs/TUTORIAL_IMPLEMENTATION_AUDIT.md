@@ -1,6 +1,9 @@
 # Tutorial Implementation Audit
 
-Date: 2026-04-10
+> Status: Active review snapshot. This document is evidence about the current tutorial implementation, not a statement of shipped canonical behavior for the rest of the app.
+> Purpose: Verify the current tutorial implementation against the active rebuild specification and capture snapshot-scoped findings.
+> Audience: Human developers, designers, product owners, and AI coding tools.
+> Date: 2026-04-10
 
 Source spec: `docs/TUTORIAL_REBUILD_SPEC.md`
 

@@ -2,6 +2,7 @@
 
 > Purpose: Define the target guided tutorial product for CypherAir across iPhone, iPad, and macOS.
 > Audience: Human developers, designers, product owners, and AI coding tools.
+> Status: Active roadmap spec. This document defines the intended tutorial end-state and is not a statement of current shipped behavior.
 > Companion documents: [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [LIQUID_GLASS](LIQUID_GLASS.md) · [TESTING](TESTING.md)
 > Spec posture: This document defines the target tutorial product, not a patch plan for the current implementation. It is written from the ideal end-state backward. The final tutorial may diverge materially from the current code wherever needed to satisfy CypherAir's privacy, offline, security, accessibility, and cross-platform product goals.
 

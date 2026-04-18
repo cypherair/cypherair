@@ -1,32 +1,23 @@
 # Rust / FFI Service Integration Baseline
 
-> Status: Active current-state document for Swift service and app-layer ownership of the current Rust / FFI capability families.
-> Purpose: Record the current downstream integration baseline for the Rust / FFI capability families that matter to CypherAir's production services and app workflows.
+> Status: Active current-state document for Swift service and app-layer ownership of the tracked Rust / FFI capability families.
+> Purpose: Record what exists today at the Rust / FFI boundary, which production Swift service owns each family, which shipped app workflow consumes it, and what downstream gaps still remain.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
+> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [RUST_FFI_APP_SURFACE_ADOPTION_PLAN](RUST_FFI_APP_SURFACE_ADOPTION_PLAN.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
 
 ## 1. Role And Scope
 
-This document is the current-state companion to [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
-
 Use this document for:
 
-- what Rust / FFI surface exists today for the tracked families
-- which production Swift service currently owns each family
-- which production app workflow currently consumes it
-- what coverage exists today
-- what the current downstream integration gap is
+- the current Rust / FFI surface for the tracked families
+- the current production Swift service owner
+- the current shipped app consumer, if one exists
+- the current coverage shape
+- the remaining downstream gap, if any
 
-Do not use this document for:
+Do not use this document for rollout sequencing, Rust semantic rules, or historical capability inventory. Those belong in the companion plan, implementation reference, and archived review stack.
 
-- rollout order
-- future implementation sequencing
-- Rust / UniFFI semantic rules
-- broader current-build inventory outside the tracked families
-
-Those belong in [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) and [RUST_FFI_IMPLEMENTATION_REFERENCE.md](RUST_FFI_IMPLEMENTATION_REFERENCE.md).
-
-The five tracked families are:
+The tracked families remain:
 
 1. Certificate Merge / Update
 2. Revocation Construction
@@ -36,82 +27,46 @@ The five tracked families are:
 
 ## 2. Current-State Matrix
 
-| Family | Current Rust/FFI Surface | Current Swift Service Owner | Current App Consumer | Current Coverage | Current Integration Gap | Current State |
-|---|---|---|---|---|---|---|
-| Certificate Merge / Update | `mergePublicCertificateUpdate(...)`, public-certificate validation helpers | `ContactService` | `ContactImportWorkflow`, `AddContactView`, `IncomingURLImportCoordinator`, URL import flow in `CypherAirApp` | Rust merge/validation tests, FFI integration tests, `ContactServiceTests` | None on the current same-fingerprint public-update path | Completed service baseline |
-| Revocation Construction | `generateKeyRevocation(...)`, `generateSubkeyRevocation(...)`, `generateUserIdRevocation(...)`, `parseRevocationCert(...)` | `KeyManagementService` facade for key-level generation/export only | `KeyDetailView` revocation export | Rust revocation tests, FFI integration tests, `KeyManagementServiceTests` | Swift models do not expose selector-bearing subkey/User ID data; no bounded service API yet for selective builders | Key-level integrated; selective builders not yet service-owned |
-| Password / SKESK Symmetric Messages | Additive password encrypt/decrypt methods, optional signing inputs, and password-family result types | `PasswordMessageService` | No direct app route or screen-model consumer; constructed in `AppContainer` only | Rust password tests, FFI integration tests, `PasswordMessageServiceTests` | Service exists, but there is no app entry, screen-model ownership, or UI-boundary plaintext handling contract | Service implemented; app consumer missing |
-| Certification And Binding Verification | `verifyDirectKeySignature(...)`, `verifyUserIdBindingSignature(...)`, `generateUserIdCertification(...)` | None | None | Rust certification/binding tests and FFI integration tests | No production service owner, no selector-bearing Swift surface for User ID-driven flows, no app owner | FFI-complete; no Swift service owner |
-| Richer Signature Results | `verify*Detailed(...)`, `decryptDetailed(...)`, `decryptFileDetailed(...)`, `verifyDetachedFileDetailed(...)` | Partial use in `SigningService`; no detailed owner in `DecryptionService` | `VerifyScreenModel` reaches `SigningService.verifyDetachedStreaming(...)`, which folds detailed fields back to legacy semantics | Rust detailed-result tests, FFI integration tests, streaming service tests for legacy folded behavior | Detailed semantics do not cross the service boundary and are not protected by service-level detailed-result tests | Partially integrated at the service boundary |
+| Family | Current Swift Service Owner | Current App Consumer | Current Coverage | Current Integration Gap | Current State |
+|---|---|---|---|---|---|
+| Certificate Merge / Update | `ContactService` | `ContactImportWorkflow`, `AddContactView`, `IncomingURLImportCoordinator`, URL import flow in `CypherAirApp` | Rust merge/validation tests, FFI integration tests, `ContactServiceTests` | None on the current same-fingerprint update path | Completed service and app baseline |
+| Revocation Construction | `KeyManagementService` facade with focused internal key-management owners, including selective revocation support | `KeyDetailView` key-level export, `SelectiveRevocationView` for subkey/User ID export | Rust revocation tests, FFI integration tests, `KeyManagementServiceTests`, `SelectiveRevocationScreenModelTests`, `MacUISmokeTests` | None on the current shipped revocation-export workflows | Completed service and app baseline |
+| Password / SKESK Symmetric Messages | `PasswordMessageService` | None | Rust password tests, FFI integration tests, `PasswordMessageServiceTests` | No app route, no screen-model owner, and no user-facing plaintext/export workflow | Service implemented; app consumer missing |
+| Certification And Binding Verification | `CertificateSignatureService` | None | Rust certification/binding tests, FFI integration tests, `CertificateSignatureServiceTests` | No contact-scoped app route or workflow owner | Service implemented; app consumer missing |
+| Richer Signature Results | `SigningService` and `DecryptionService` | `VerifyView` / `VerifyScreenModel`, `DecryptView` / `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Rust detailed-result tests, FFI integration tests, `SigningServiceDetailedResultTests`, `DecryptionServiceTests` | No current service-boundary gap. The UI intentionally preserves a summary-first presentation through the legacy bridge while also showing detailed entries. | Completed service and app baseline |
 
-## 3. Family-By-Family Integration Baseline
+## 3. Family Notes
 
 ### 3.1 Certificate Merge / Update
 
-This family is the completed baseline.
-
-- Rust / FFI already exports same-fingerprint public-certificate merge/update behavior and the public-only validation helpers used by contact import.
-- `ContactService.addContact(...)` owns duplicate/no-op detection, same-fingerprint update absorption, different-fingerprint replacement detection, and persistence through `ContactRepository`.
-- `ContactImportWorkflow`, `AddContactView`, and incoming URL import all already consume the service boundary instead of calling FFI directly.
-- The current service and FFI tests already protect the key invariants that matter for this family, including secret-bearing input rejection and authoritative `Contact` rebuilding in `confirmKeyUpdate(...)`.
+- Same-fingerprint public-certificate update absorption is complete at Rust / FFI, service, and app levels.
+- `ContactService` remains the authoritative downstream owner for duplicate/no-op detection, same-fingerprint merge/update handling, and different-fingerprint replacement detection.
 
 ### 3.2 Revocation Construction
 
-This family has a split baseline.
-
-- Key-level revocation generation/export is already integrated behind the `KeyManagementService` service boundary.
-- Selective revocation builders for subkeys and User IDs are exported at Rust / FFI level, but are not yet service-owned.
-
-Current Swift model and service-shape boundaries matter here:
-
-- `KeyManagementService` is the app-facing facade for key management, but the actual implementation is already split into focused internal owners under `Sources/Services/KeyManagement/`.
-- Current key-level revocation behavior uses one persisted binary signature field, `PGPKeyIdentity.revocationCert`, together with armored export and lazy backfill for legacy imported keys.
-- Current Swift-facing model surfaces such as `PGPKeyIdentity` and Rust `KeyInfo` expose only primary identity and summary metadata.
-- They do not expose selector-bearing subkey fingerprints or raw User ID bytes for selectable User IDs.
-
-Selective revocation is therefore not just missing service wiring. It is blocked on selector discovery and a bounded service contract.
+- Key-level revocation export remains available from `KeyDetailView`.
+- Selector-bearing subkey and User ID revocation export is now available through `KeyManagementService.selectionCatalog(...)`, `exportSubkeyRevocationCertificate(...)`, `exportUserIdRevocationCertificate(...)`, and the shipped `SelectiveRevocationView` flow.
+- Tutorial surfaces explicitly block the selective-revocation launch path rather than silently hiding it through missing route support.
 
 ### 3.3 Password / SKESK Symmetric Messages
 
-This family already has a real Swift service owner.
-
-- `PasswordMessageService` wraps additive Rust / FFI password-message encrypt/decrypt methods, optional signing inputs, and successful-decrypt signature-result mapping.
-- It preserves the family-local decrypt outcomes that differ from recipient-key decryption:
-  - `decrypted`
-  - `noSkesk`
-  - `passwordRejected`
-- Its password-decrypt path stays separate from the two-phase `DecryptionService` flow and does not use Secure Enclave unwrap or PKESK recipient matching.
-- Its optional-signing encrypt path does authenticate through `KeyManagementService.unwrapPrivateKey(...)` before handing the signing key to the password-message FFI surface.
-- Rust, FFI, and service tests already cover the family semantics.
-
-The remaining gap is app ownership, not service existence.
+- `PasswordMessageService` is the real service boundary for password-message encrypt/decrypt semantics.
+- It remains intentionally separate from the recipient-key two-phase decrypt flow.
+- The remaining gap is product and app ownership, not Rust / FFI or service completeness.
 
 ### 3.4 Certification And Binding Verification
 
-This family is complete at Rust / FFI level but still has no production service owner.
-
-- Rust / FFI already supports direct-key signature verification, User ID binding verification, and User ID certification generation.
-- FFI tests already exercise the family-local result semantics, including signer selection and certification kind preservation.
-- No current service under `Sources/Services/` owns certificate-signature-specific workflows.
-- Current Swift-facing model surfaces still do not expose the selector-bearing raw User ID data needed for bounded User ID-driven service ownership.
-
-This family is currently FFI-complete but service-unowned.
+- `CertificateSignatureService` owns direct-key verification, User ID binding verification, selector discovery for target certificates, and User ID certification generation.
+- The remaining gap is a contact-scoped app workflow; no current `ContactDetailView` route or screen-model owns these operations.
 
 ### 3.5 Richer Signature Results
 
-This family is partially integrated at the service boundary today.
+- Detailed result types already cross the service boundary in both verify and decrypt flows.
+- The app currently keeps the existing summary-first presentation by rendering the legacy bridge together with detailed per-signature entries.
+- The remaining adoption question is certificate-signature UI, not detailed verify/decrypt semantics.
 
-- Rust / FFI already preserves parser-order signature entries, repeated signers, unknown signer entries, and legacy compatibility fields.
-- `SigningService.verifyDetachedStreaming(...)` already calls `verifyDetachedFileDetailed(...)`, but immediately folds the result back down to legacy semantics.
-- `DecryptionService` still consumes only the legacy decrypt result types.
-- Current app flows therefore still expose only the legacy single-status signature semantics.
+## 4. Current Downstream Gaps
 
-This family has crossed into production services internally, but not yet as a first-class service contract.
-
-## 4. Current Ownership Summary
-
-- Certificate Merge / Update: owned by `ContactService`; no active gap on the current production path.
-- Revocation Construction: owned by the `KeyManagementService` facade for key-level flows only; selective builders still need selector-bearing Swift support and a bounded service contract.
-- Password / SKESK Symmetric Messages: owned by `PasswordMessageService`; missing app route and screen-model ownership.
-- Certification And Binding Verification: no current service owner.
-- Richer Signature Results: partially owned by `SigningService`; no detailed-result contract yet in `DecryptionService`.
+- `PasswordMessageService` still has no shipped app workflow.
+- `CertificateSignatureService` still has no shipped contact-scoped UI workflow.
+- The other tracked families no longer have current service-boundary or app-boundary gaps on their shipped paths.

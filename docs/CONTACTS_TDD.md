@@ -1,6 +1,7 @@
 # Contacts Technical Design Document (TDD)
 
 > **Version:** Draft v1.0  
+> **Status:** Draft future technical spec. This document does not describe current shipped Contacts implementation.
 > **Purpose:** Technical design for implementing the Contacts enhancement initiative.  
 > **Audience:** Engineering, QA, and AI coding tools.  
 > **Companion document:** [CONTACTS_PRD](CONTACTS_PRD.md)  

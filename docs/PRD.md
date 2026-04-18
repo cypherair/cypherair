@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD)
 
-> **Version:** v4.0
+> **Version:** v4.2
 > **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+
 > **License:** GPLv3  
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
@@ -49,7 +49,7 @@ No HTTP(S). No networked SDKs. No update checks. Code audit confirms zero networ
 
 ### 2.2 Minimal Permissions (Hard Requirement)
 
-The only Info.plist usage description is `NSFaceIDUsageDescription`, which is required by iOS when the App uses `LAContext` for Face ID / Touch ID authentication. This is not a runtime permission prompt — iOS mandates the key's presence and crashes the process if it is absent. No camera (QR via system Camera + URL scheme). No photo library (PHPickerViewController). No other permission descriptions in Info.plist. Permitted I/O: App sandbox, Share Sheet, file picker, photo picker, URL scheme, system "Open With."
+The only `CypherAir-Info.plist` usage description is `NSFaceIDUsageDescription`, which is required by iOS when the App uses `LAContext` for Face ID / Touch ID authentication. This is not a runtime permission prompt — iOS mandates the key's presence and crashes the process if it is absent. No camera (QR via system Camera + URL scheme). No photo library (PHPickerViewController). No other permission descriptions in `CypherAir-Info.plist`. Permitted I/O: App sandbox, Share Sheet, file picker, photo picker, URL scheme, system "Open With."
 
 ---
 
@@ -289,7 +289,7 @@ Key gen, encrypt/decrypt, sign/verify, tamper (1-bit flip), QR encode/decode. Ru
 
 ### 8.5 Offline & Permission
 
-- [ ] Airplane Mode works. No prompts. Only `NSFaceIDUsageDescription` in Info.plist (no other usage descriptions). No network/camera/photo APIs.
+- [ ] Airplane Mode works. No prompts. Only `NSFaceIDUsageDescription` in `CypherAir-Info.plist` (no other usage descriptions). No network/camera/photo APIs.
 
 ### 8.6 Accessibility
 
@@ -311,7 +311,7 @@ Full details in [TDD](TDD.md). Key decisions:
 
 - **OpenPGP:** Sequoia PGP 2.2.0 (Rust) + crypto-openssl vendored.
 - **Profiles:** Profile A = `CipherSuite::Cv25519` + `Profile::RFC4880`. Profile B = `CipherSuite::Cv448` + `Profile::RFC9580`.
-- **FFI:** Mozilla UniFFI. Wrapper crate → Swift bindings → XCFramework.
+- **FFI:** Mozilla UniFFI. The `pgp-mobile` wrapper crate generates Swift bindings and packaged outputs; the current Xcode project links the three target-specific `libpgp_mobile.a` release archives plus `bindings/module.modulemap` directly.
 - **Key storage:** Keychain + SE P-256 wrapping (CryptoKit ECDH + AES-GCM). Two access control configurations for Standard/High Security modes.
 - **UI:** SwiftUI. UIKit where needed (UIActivityViewController, UIDocumentPickerViewController, PHPickerViewController, beginBackgroundTask).
 - **Storage:** Keychain + sandbox. No database.
@@ -341,7 +341,7 @@ Full details in [TDD](TDD.md). Key decisions:
 
 ### 10.3 v1.2 — Completed
 
-- [x] macOS 26.4+ support (same codebase). Separate entitlements for macOS sandbox and file access. Conditional compilation for platform-specific APIs (clipboard, background tasks, biometric icons). XCFramework extended with `aarch64-apple-darwin` slice.
+- [x] macOS 26.4+ support (same codebase). Separate entitlements for macOS sandbox and file access. Conditional compilation for platform-specific APIs (clipboard, background tasks, biometric icons). The Rust build/packaging workflow includes the `aarch64-apple-darwin` release archive and packaged output slice.
 
 ### 10.4 v2.0
 

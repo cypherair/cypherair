@@ -516,7 +516,7 @@ Expose certificate-signature semantics needed for certification-related Rust com
 #### Required Semantics
 
 - Results in this family are `crypto-only`.
-- The current Swift production boundary is none; planned service ownership belongs to a dedicated `CertificateSignatureService`.
+- The current Swift production boundary is `CertificateSignatureService`; there is still no shipped app consumer for this family.
 - They must not imply signer validity under policy.
 - This family requires additive exports for:
   - direct-key verification
@@ -554,9 +554,9 @@ Expose certificate-signature semantics needed for certification-related Rust com
 
 #### Required Helper / Discovery Support
 
-- current Swift models must expose selector-bearing raw User ID data plus occurrence indexes for bounded service ownership
-- service integration should introduce selector-bearing discovery support for User ID-driven operations before or alongside `CertificateSignatureService`
-- the planned service owner for this family is `CertificateSignatureService`
+- current Swift selector-bearing discovery support already exists for bounded User ID-driven service ownership
+- selector-driven operations should continue to use shared selector-bearing discovery rather than display-string inference
+- the current service owner for this family is `CertificateSignatureService`
 
 #### Minimum Rust Tests
 
@@ -674,7 +674,7 @@ Preserve multi-signature information that is currently collapsed into one legacy
 #### Required Helper / Discovery Support
 
 - none beyond the detailed result records themselves
-- service adoption requires dedicated Swift detailed result types instead of reusing the current legacy folded `SignatureVerification` surface
+- current service adoption already uses dedicated Swift detailed result types while preserving legacy summary bridges for shipped UI workflows
 
 #### Minimum Rust Tests
 

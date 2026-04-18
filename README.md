@@ -47,7 +47,7 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 | Platform | iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+, minimum 8 GB RAM |
 | Language | Swift 6.2, SwiftUI (Liquid Glass), UIKit for system pickers |
 | OpenPGP Engine | Sequoia PGP 2.2.0 (Rust), `crypto-openssl` backend (vendored) |
-| FFI Bridge | Mozilla UniFFI 0.31.x |
+| FFI Bridge | Mozilla UniFFI 0.31.x; Xcode links target-specific release archives plus `bindings/module.modulemap` directly |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |
 | Build | Xcode 26, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` |
 | Localization | English + Simplified Chinese (.xcstrings) |
@@ -121,7 +121,14 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
     -destination 'platform=iOS,name=<DEVICE_NAME>'
 ```
 
-For the full Rust / UniFFI / Xcode workflow, including artifact refresh details and stale-output troubleshooting, see [docs/TESTING.md](docs/TESTING.md) and [CLAUDE.md](CLAUDE.md).
+For route, tutorial, and other macOS UI changes, also run:
+
+```bash
+xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
+    -destination 'platform=macOS'
+```
+
+For the full Rust / UniFFI / Xcode workflow, including artifact refresh details, direct-archive linkage, and stale-output troubleshooting, see [docs/TESTING.md](docs/TESTING.md) and [CLAUDE.md](CLAUDE.md).
 
 ### CI Note
 
@@ -162,6 +169,7 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Module breakdown, data flows, storage layout |
 | [SECURITY](docs/SECURITY.md) | Encryption scheme, key lifecycle, threat model |
 | [TESTING](docs/TESTING.md) | Test strategy and coverage |
+| [DOCUMENTATION_GOVERNANCE](docs/DOCUMENTATION_GOVERNANCE.md) | Documentation classes, metadata rules, archive rules, and update triggers |
 | [POC](docs/archive/POC.md) | Proof-of-concept test plan (archived) |
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards and SwiftUI patterns |
 | [LIQUID_GLASS](docs/LIQUID_GLASS.md) | iOS 26 Liquid Glass design adoption guide |

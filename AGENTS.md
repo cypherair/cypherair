@@ -47,7 +47,7 @@ cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Carg
 cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
 cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
 
-# Full Rust + UniFFI + XCFramework sync
+# Full Rust + UniFFI + packaged-artifact sync
 ./build-xcframework.sh --release
 
 # Rust tests
@@ -60,9 +60,13 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 # Device-only tests
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
     -destination 'platform=iOS,name=<DEVICE_NAME>'
+
+# Targeted macOS UI smoke coverage for routes, settings, and tutorial flows
+xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
+    -destination 'platform=macOS'
 ```
 
-For the full Rust artifact refresh, UniFFI/bindings sync, and Xcode validation workflow, see `docs/TESTING.md`.
+For the full Rust artifact refresh, UniFFI/bindings sync, direct-archive linkage details, and Xcode validation workflow, see `docs/TESTING.md`.
 
 ## Non-Negotiable Constraints
 
@@ -153,6 +157,7 @@ If the user asks to increment the build number, first read the current `CURRENT_
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the Rust `release` static libraries that Xcode links for Swift/FFI tests.
 - If a Rust change can affect Swift-visible behavior, rebuild the Rust `release` artifacts (or run `./build-xcframework.sh --release`) before running `xcodebuild test`.
 - See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
+- For route ownership, launch, tutorial-host, or macOS UI workflow changes, also run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted smoke subset.
 
 At minimum after meaningful code changes:
 
