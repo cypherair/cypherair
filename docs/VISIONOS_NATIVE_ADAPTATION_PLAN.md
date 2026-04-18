@@ -217,6 +217,16 @@ This is a first-class gap, not an appendix item.
 
 The current Rust/UniFFI pipeline is not yet visionOS-native:
 
+- Local Rust builds have now validated that `pgp-mobile` can compile for both:
+  - `aarch64-apple-visionos`
+  - `aarch64-apple-visionos-sim`
+  when `openssl-src` is patched with visionOS support.
+- The patched `openssl-src-rs` work has been upstreamed as:
+  - [`alexcrichton/openssl-src-rs#283`](https://github.com/alexcrichton/openssl-src-rs/pull/283)
+  - branch source: `cypherair/openssl-src-rs:visionos-openssl-src-upstream-prep`
+- That upstream PR also fixes the existing architecture-specific iOS simulator OpenSSL configure target mappings for:
+  - `x86_64-apple-ios`
+  - `aarch64-apple-ios-sim`
 - [`build-xcframework.sh`](../build-xcframework.sh) builds only:
   - `aarch64-apple-ios`
   - `aarch64-apple-ios-sim`
@@ -229,6 +239,8 @@ The current Rust/UniFFI pipeline is not yet visionOS-native:
   - `aarch64-apple-visionos`
   - `aarch64-apple-visionos-sim`
 
+This changes the planning posture: the unresolved gap is no longer "whether vendored OpenSSL can be made to build for visionOS at all", but rather "how to formalize that support in CypherAir's own build, linking, and Swift app layers".
+
 ### 6.2 Planning conclusion
 
 The v1 planning conclusion is:
@@ -236,6 +248,7 @@ The v1 planning conclusion is:
 - **no UniFFI surface redesign is required** for visionOS v1;
 - the build pipeline must be extended to produce and link visionOS Rust artifacts before CypherAir can be considered a native visionOS target;
 - this is an engineering enablement task, not a product-level redesign.
+- CypherAir main should not commit a machine-local `path` patch for `openssl-src`; if upstream support is still pending when implementation starts, a temporary implementation branch may pin `openssl-src` to the CypherAir fork with `git` + exact `rev` for reproducibility.
 
 In practical terms, a clean native visionOS adaptation requires both:
 
