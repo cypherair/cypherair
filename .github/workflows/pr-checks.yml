@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+env:
+  XCFRAMEWORK_ARTIFACT_NAME: pgpmobile-xcframework
+  XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
+
 jobs:
   rust-full-tests:
     runs-on: macos-latest
@@ -19,12 +23,58 @@ jobs:
           cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
           cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
 
-  swift-unit-tests:
+  xcframework-package:
+    needs: rust-full-tests
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-      - name: Run CypherAir unit tests
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build XCFramework and generated bindings
+        run: ./build-xcframework.sh --release
+      - name: Package XCFramework artifact
         run: |
+          ditto -c -k --sequesterRsrc --keepParent PgpMobile.xcframework "$XCFRAMEWORK_ZIP"
+      - name: Upload XCFramework artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.XCFRAMEWORK_ARTIFACT_NAME }}
+          path: ${{ env.XCFRAMEWORK_ZIP }}
+          retention-days: 5
+          if-no-files-found: error
+      - name: Probe iOS build
+        run: |
+          xcodebuild build \
+            -scheme CypherAir \
+            -project CypherAir.xcodeproj \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Probe visionOS build
+        run: |
+          xcodebuild build \
+            -scheme CypherAir \
+            -project CypherAir.xcodeproj \
+            -destination 'generic/platform=visionOS' \
+            CODE_SIGNING_ALLOWED=NO
+
+  swift-unit-tests-hosted-preview:
+    continue-on-error: true
+    needs: xcframework-package
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download XCFramework artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ env.XCFRAMEWORK_ARTIFACT_NAME }}
+      - name: Restore XCFramework from artifact
+        run: |
+          rm -rf PgpMobile.xcframework
+          ditto -x -k "$XCFRAMEWORK_ZIP" .
+      - name: Run hosted macOS unit-test preview
+        run: |
+          # Observational only until GitHub-hosted macOS reaches 26.4
+          # or the repository adopts a self-hosted macOS runner.
           xcodebuild test \
             -scheme CypherAir \
             -project CypherAir.xcodeproj \

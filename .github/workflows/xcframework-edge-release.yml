@@ -1,0 +1,161 @@
+name: XCFramework Edge Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Prerelease tag to publish. Use a temporary tag for release drills.
+        required: true
+        default: pgpmobile-edge
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: xcframework-edge-release
+  cancel-in-progress: true
+
+env:
+  DEFAULT_EDGE_TAG: pgpmobile-edge
+  XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
+  XCFRAMEWORK_CHECKSUM: PgpMobile.xcframework.sha256
+  EDGE_METADATA: pgpmobile-edge.json
+
+jobs:
+  publish-edge-release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Resolve release settings
+        run: |
+          RELEASE_TAG="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || 'pgpmobile-edge' }}"
+          if [ "$RELEASE_TAG" = "$DEFAULT_EDGE_TAG" ]; then
+            RELEASE_TITLE="PgpMobile Edge XCFramework"
+          else
+            RELEASE_TITLE="PgpMobile Edge XCFramework ($RELEASE_TAG)"
+          fi
+
+          {
+            echo "RELEASE_TAG=$RELEASE_TAG"
+            echo "RELEASE_TITLE=$RELEASE_TITLE"
+            echo "WORKFLOW_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "WORKFLOW_REF_NAME=${GITHUB_REF_NAME}"
+          } >> "$GITHUB_ENV"
+      - name: Run full Rust suite
+        run: |
+          cargo test --manifest-path pgp-mobile/Cargo.toml
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
+      - name: Build XCFramework and generated bindings
+        run: ./build-xcframework.sh --release
+      - name: Probe iOS build
+        run: |
+          xcodebuild build \
+            -scheme CypherAir \
+            -project CypherAir.xcodeproj \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Probe visionOS build
+        run: |
+          xcodebuild build \
+            -scheme CypherAir \
+            -project CypherAir.xcodeproj \
+            -destination 'generic/platform=visionOS' \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Package release assets
+        run: |
+          BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          XCODE_VERSION="$(xcodebuild -version | tr '\n' ' ' | sed 's/  */ /g; s/ $//')"
+          RUSTC_VERSION="$(rustc --version)"
+
+          ditto -c -k --sequesterRsrc --keepParent PgpMobile.xcframework "$XCFRAMEWORK_ZIP"
+          shasum -a 256 "$XCFRAMEWORK_ZIP" > "$XCFRAMEWORK_CHECKSUM"
+
+          {
+            echo "BUILT_AT=$BUILT_AT"
+            echo "XCODE_VERSION=$XCODE_VERSION"
+            echo "RUSTC_VERSION=$RUSTC_VERSION"
+          } >> "$GITHUB_ENV"
+
+          cat > "$EDGE_METADATA" <<EOF
+          {
+            "commit_sha": "$GITHUB_SHA",
+            "built_at": "$BUILT_AT",
+            "xcode_version": "$XCODE_VERSION",
+            "rustc_version": "$RUSTC_VERSION",
+            "workflow_url": "$WORKFLOW_URL"
+          }
+          EOF
+
+          cat > release-notes.md <<EOF
+          Rolling prerelease XCFramework built from workflow ref \`$WORKFLOW_REF_NAME\`.
+
+          - Commit: \`$GITHUB_SHA\`
+          - Built at (UTC): \`$BUILT_AT\`
+          - Xcode: \`$XCODE_VERSION\`
+          - Rust: \`$RUSTC_VERSION\`
+          - Workflow: [$WORKFLOW_URL]($WORKFLOW_URL)
+
+          Assets:
+
+          - \`$XCFRAMEWORK_ZIP\`
+          - \`$XCFRAMEWORK_CHECKSUM\`
+          - \`$EDGE_METADATA\`
+
+          Verification:
+
+          \`\`\`bash
+          shasum -a 256 -c $XCFRAMEWORK_CHECKSUM
+          gh attestation verify $XCFRAMEWORK_ZIP -R $GITHUB_REPOSITORY
+          \`\`\`
+          EOF
+      - name: Generate artifact attestation
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ env.XCFRAMEWORK_ZIP }}
+      - name: Update rolling edge tag
+        run: |
+          git fetch --tags --force origin
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$RELEASE_TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$RELEASE_TAG" --force
+      - name: Create or update edge prerelease
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --verify-tag \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_TITLE" \
+              --notes-file release-notes.md \
+              --prerelease
+          else
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_TITLE" \
+              --notes-file release-notes.md \
+              --prerelease \
+              --latest=false
+          fi
+      - name: Upload release assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            "$XCFRAMEWORK_ZIP" \
+            "$XCFRAMEWORK_CHECKSUM" \
+            "$EDGE_METADATA" \
+            --clobber

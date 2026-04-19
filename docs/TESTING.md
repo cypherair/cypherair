@@ -21,7 +21,7 @@ cargo test --manifest-path pgp-mobile/Cargo.toml
 The local default command above skips tests marked `#[ignore = "slow"]`, including
 `profile_b_slow_tests` and `large_payload_tests`.
 
-GitHub Actions runs the default suite plus the slow Rust targets explicitly:
+The blocking automation lanes and the XCFramework edge-release workflow run the default suite plus the slow Rust targets explicitly:
 
 ```bash
 cargo test --manifest-path pgp-mobile/Cargo.toml
@@ -91,7 +91,24 @@ There is currently no dedicated visionOS XCTest plan. Native visionOS validation
 
 **All test commands in CLAUDE.md and CI configuration must use `-testPlan` to ensure consistent scope.**
 
-## 2.1 GitHub Actions Hosted macOS Limitation
+## 2.1 Current GitHub Actions Lanes
+
+The repository currently uses two validation tiers in GitHub Actions.
+
+**Blocking jobs** — must pass on pull requests and nightly validation:
+
+- `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
+- `xcframework-package` runs `./build-xcframework.sh --release`, uploads the `pgpmobile-xcframework` artifact for 5 days, and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes
+
+**Observational jobs** — useful signal, but non-blocking while GitHub-hosted macOS remains below the project deployment target:
+
+- `swift-unit-tests-hosted-preview` downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests`
+
+The repository also publishes a rolling XCFramework prerelease:
+
+- `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, rebuilds and validates the XCFramework, then updates the public `pgpmobile-edge` prerelease assets
+
+## 2.2 GitHub Actions Hosted macOS Limitation
 
 The repository workflows target `macos-26`, but GitHub's hosted runner image may still lag the app's minimum deployment target.
 
@@ -103,10 +120,11 @@ At the time of writing:
 Impact:
 
 - Rust CI remains valid.
-- The hosted Swift unit-test job can fail before test execution because the runner OS is older than the app/test deployment target.
+- The hosted Swift unit-test preview job can fail before test execution because the runner OS is older than the app/test deployment target.
+- The hosted Swift unit-test preview remains observational / non-blocking until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 - Local macOS validation remains the source of truth until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 
-## 2.2 Rust Artifacts, UniFFI Outputs, and Xcode Validation
+## 2.3 Rust Artifacts, UniFFI Outputs, and Xcode Validation
 
 Rust changes under `pgp-mobile/src` do **not** automatically refresh the build products that Xcode uses for Swift and FFI validation.
 
@@ -117,6 +135,8 @@ Today, the Xcode project links:
 - `Sources/PgpMobile/pgp_mobile.swift`
 
 `PgpMobile.xcframework` is a local generated artifact. It is ignored by git and must be refreshed with `./build-xcframework.sh --release` after Rust or UniFFI changes that can affect Swift-visible behavior. The shared scheme and app target both check for the artifact and fail with a clear error if the XCFramework is missing.
+
+GitHub Actions package jobs archive the generated `PgpMobile.xcframework` as the `pgpmobile-xcframework` artifact so downstream jobs can restore the exact build product on a clean runner.
 
 The Rust static archives under `pgp-mobile/target/.../release` are intermediate inputs used to create the XCFramework, not Xcode link inputs. After a successful `./build-xcframework.sh --release`, you may reclaim Cargo target space with:
 
@@ -231,7 +251,7 @@ stable public-only contract end to end:
 - the Rust surface returns `InvalidKeyData` with the stable contact-import reason token
 - Swift maps that stable token to the explicit contact-import public-certificate error
 
-## 2.3 Revocation Construction Coverage
+## 2.4 Revocation Construction Coverage
 
 When changing revocation-construction behavior, validation must cover:
 
@@ -247,7 +267,7 @@ When changing revocation-construction behavior, validation must cover:
 - export of existing revocation without Secure Enclave unwrap
 - ASCII-armored revocation export matching the stored binary signature after `dearmor`
 
-## 2.4 Password / SKESK Coverage
+## 2.5 Password / SKESK Coverage
 
 When changing password-message behavior, validation must cover:
 
