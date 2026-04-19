@@ -28,7 +28,7 @@ graph TB
     SVC --> SEC
     SVC --> BIND
     SEC --> |CryptoKit| SE["Secure Enclave<br/>P-256 Hardware"]
-    SEC --> |Security.framework| KC["iOS Keychain"]
+    SEC --> |Security.framework| KC["Keychain"]
     BIND --> PGP
     SVC --> MOD
     SEC --> MOD
@@ -38,7 +38,7 @@ graph TB
 
 ### App Layer (`Sources/App/`)
 
-SwiftUI views, navigation routing, onboarding, and application composition. Views remain thin and call into the Services layer for all operations. Uses iOS 26 Liquid Glass design language — standard components auto-adopt; custom floating controls apply `.glassEffect()`.
+SwiftUI views, navigation routing, onboarding, and application composition. Views remain thin and call into the Services layer for all operations. Uses iOS 26 Liquid Glass conventions where applicable and native platform SwiftUI chrome elsewhere. Standard components auto-adopt; custom floating controls apply `.glassEffect()` only where the API is available and platform-appropriate.
 
 Key files:
 
@@ -295,7 +295,7 @@ These pairs must be updated together. A change to one without the other will cau
 ## 5. Storage Layout
 
 ```
-iOS Keychain (kSecClassGenericPassword, WhenUnlockedThisDeviceOnly):
+Keychain (kSecClassGenericPassword, WhenUnlockedThisDeviceOnly):
 ├── Per identity (fingerprint = lowercase hex, no spaces/separators):
 │   ├── com.cypherair.v1.se-key.<fingerprint>        → SE key dataRepresentation
 │   ├── com.cypherair.v1.salt.<fingerprint>           → Random HKDF salt

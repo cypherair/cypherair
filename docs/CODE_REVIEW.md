@@ -5,7 +5,7 @@
 
 ## All PRs
 
-- [ ] All targets compile: `aarch64-apple-ios`, `aarch64-apple-ios-sim`, and `aarch64-apple-darwin`
+- [ ] All targets compile: `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, `aarch64-apple-visionos`, and `aarch64-apple-visionos-sim`
 - [ ] `cargo test` and `xcodebuild test -testPlan CypherAir-UnitTests` pass
 - [ ] No new compiler warnings
 - [ ] No hardcoded user-visible strings (all in String Catalog)

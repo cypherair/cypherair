@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD)
 
-> **Version:** v4.2
-> **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+
+> **Version:** v4.3
+> **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+
 > **License:** GPLv3  
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
 
@@ -14,13 +14,13 @@ A fully offline OpenPGP encryption tool that enables everyday users to communica
 ### 1.2 Core Value Proposition
 
 - **Truly Offline:** Zero network access; data leakage eliminated at the architectural level.
-- **Minimal Permissions:** The only permission is Face ID usage description (`NSFaceIDUsageDescription`), required by iOS for biometric authentication. No camera, photo library, contacts, or network permissions. All I/O via system-provided pickers and Share Sheet.
+- **Minimal Permissions:** The only usage-description key is `NSFaceIDUsageDescription`, used for biometric authentication. No camera, photo library, contacts, or network permissions. All I/O via system-provided pickers and Share Sheet.
 - **Standards-Compliant:** Compatible with GnuPG (Profile A) and the latest RFC 9580 standard (Profile B).
 - **Usable by Anyone:** No cryptographic knowledge required.
 
 ### 1.3 Supported Platforms
 
-iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ (same codebase). Minimum device: 8 GB RAM.
+iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+ (same codebase). Minimum device: 8 GB RAM.
 
 ### 1.4 Explicit Exclusions
 
@@ -49,7 +49,7 @@ No HTTP(S). No networked SDKs. No update checks. Code audit confirms zero networ
 
 ### 2.2 Minimal Permissions (Hard Requirement)
 
-The only `CypherAir-Info.plist` usage description is `NSFaceIDUsageDescription`, which is required by iOS when the App uses `LAContext` for Face ID / Touch ID authentication. This is not a runtime permission prompt — iOS mandates the key's presence and crashes the process if it is absent. No camera (QR via system Camera + URL scheme). No photo library (PHPickerViewController). No other permission descriptions in `CypherAir-Info.plist`. Permitted I/O: App sandbox, Share Sheet, file picker, photo picker, URL scheme, system "Open With."
+The only `CypherAir-Info.plist` usage description is `NSFaceIDUsageDescription`, which CypherAir uses for LocalAuthentication-backed biometric flows. This is not a runtime permission prompt. No camera (QR via system Camera + URL scheme). No photo library (PHPickerViewController). No other permission descriptions in `CypherAir-Info.plist`. Permitted I/O: App sandbox, Share Sheet, file picker, photo picker, URL scheme, system "Open With."
 
 ---
 
@@ -191,7 +191,7 @@ Blur overlay when App enters background. Prevents multitasking switcher leakage.
 
 The App offers two authentication modes, selectable in Settings:
 
-- **Standard Mode (default):** Face ID / Touch ID with device passcode fallback. Suitable for most users. Equivalent to iOS `deviceOwnerAuthentication`.
+- **Standard Mode (default):** Face ID / Touch ID with device passcode fallback. Suitable for most users. Equivalent to Apple `deviceOwnerAuthentication`.
 - **High Security Mode:** Face ID / Touch ID only, with no passcode fallback. Inspired by Apple's Stolen Device Protection, which removes passcode fallback for sensitive operations to prevent a thief who has obtained both the device and the passcode from accessing critical data. In this mode, if biometric authentication is unavailable (sensor damaged, face obscured), the user cannot perform any private-key operations (decrypt, sign, export) until biometric authentication is restored.
 
 **Activation safeguards:** When the user enables High Security Mode, the App:
@@ -343,7 +343,11 @@ Full details in [TDD](TDD.md). Key decisions:
 
 - [x] macOS 26.4+ support (same codebase). Separate entitlements for macOS sandbox and file access. Conditional compilation for platform-specific APIs (clipboard, background tasks, biometric icons). The Rust build/packaging workflow includes the `aarch64-apple-darwin` release archive and packaged output slice.
 
-### 10.4 v2.0
+### 10.4 v1.3 — Completed
+
+- [x] Native visionOS 26.4+ support (same codebase). The project ships native `visionOS` and `visionOS Simulator` Rust release archives, links them directly in Xcode, and validates the native app path with `xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS' CODE_SIGNING_ALLOWED=NO`.
+
+### 10.5 v2.0
 
 Share Extension. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack.
 
