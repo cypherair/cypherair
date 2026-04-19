@@ -176,6 +176,7 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 
 | Document | Description |
 |----------|-------------|
+| [COMPLIANCE_REMEDIATION_PLAN](docs/COMPLIANCE_REMEDIATION_PLAN.md) | Active roadmap for licensing and distribution-compliance migration research |
 | [PRD](docs/PRD.md) | Product requirements, workflows, and acceptance criteria |
 | [TDD](docs/TDD.md) | Technical design — library selection, FFI, SE wrapping |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Module breakdown, data flows, storage layout |
@@ -193,4 +194,6 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 
 This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.
 
-The OpenPGP engine uses [Sequoia PGP](https://sequoia-pgp.org/) (LGPL-2.0-or-later), which is compatible with GPLv3.
+The OpenPGP engine uses [Sequoia PGP](https://sequoia-pgp.org/) (`LGPL-2.0-or-later`).
+
+Current licensing and distribution-compliance migration questions, including the App Store / first-party `GPLv3` posture and `LGPL-2.0-or-later` obligations for Sequoia-linked binaries, are tracked in [docs/COMPLIANCE_REMEDIATION_PLAN.md](docs/COMPLIANCE_REMEDIATION_PLAN.md).
