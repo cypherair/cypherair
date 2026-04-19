@@ -142,8 +142,13 @@ For the full Rust / UniFFI / Xcode workflow, including XCFramework artifact refr
 The GitHub Actions workflows in this repository currently target `macos-26`, but GitHub's hosted runner image may still lag the project's minimum deployment target. At the time of writing, the hosted image reports **macOS 26.3**, while the project and test targets require **macOS 26.4**. In that situation:
 
 - Rust CI can still pass normally.
-- The hosted Swift unit-test job may fail before tests start because the runner OS is older than the app's deployment target.
+- The hosted Swift unit-test preview job may fail before tests start because the runner OS is older than the app's deployment target.
+- That preview remains observational / non-blocking until GitHub's hosted macOS image catches up or the repository adopts a self-hosted macOS runner.
 - Local validation using `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'` should be treated as the source of truth until GitHub's hosted macOS image catches up.
+
+### XCFramework Prerelease
+
+CypherAir publishes a rolling prerelease XCFramework for the current `main` branch as `pgpmobile-edge`. For asset names, download commands, verification steps, and future stable-release conventions, see [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md).
 
 ## Security Model
 
@@ -181,6 +186,7 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards and SwiftUI patterns |
 | [LIQUID_GLASS](docs/LIQUID_GLASS.md) | iOS 26 Liquid Glass and platform-native SwiftUI chrome guidance |
 | [CODE_REVIEW](docs/CODE_REVIEW.md) | Code review checklist by change type |
+| [XCFRAMEWORK_RELEASES](docs/XCFRAMEWORK_RELEASES.md) | Rolling XCFramework prerelease channel, verification, and future stable release policy |
 | [CHANGELOG](docs/CHANGELOG.md) | PRD revision history |
 
 ## License
