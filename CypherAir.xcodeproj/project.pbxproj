@@ -11,6 +11,7 @@
 		CE0065252F676EBC008604AB /* AppIconB.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065232F676EBC008604AB /* AppIconB.icon */; };
 		CE0065262F676EBC008604AB /* AppIconC.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065242F676EBC008604AB /* AppIconC.icon */; };
 		CE0065272F676EBC008604AB /* AppIconA.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065222F676EBC008604AB /* AppIconA.icon */; };
+		CEB560272F944C05004A1CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CEB560262F944C05004A1CA7 /* Assets.xcassets */; };
 		CEF297622F7612DF00DB6BF6 /* AppIconD.icon in Resources */ = {isa = PBXBuildFile; fileRef = CEF297612F7612DF00DB6BF6 /* AppIconD.icon */; };
 /* End PBXBuildFile section */
 
@@ -41,6 +42,7 @@
 		CE0065242F676EBC008604AB /* AppIconC.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconC.icon; sourceTree = "<group>"; };
 		CE5F0F372F75EF3E007C896C /* CypherAir.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAir.entitlements; sourceTree = "<group>"; };
 		CE5F0F382F75EF45007C896C /* CypherAirMacOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAirMacOS.entitlements; sourceTree = "<group>"; };
+		CEB560262F944C05004A1CA7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CEF297612F7612DF00DB6BF6 /* AppIconD.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconD.icon; sourceTree = "<group>"; };
 		E10000012F90000100000001 /* CypherAirMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CypherAirMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -228,6 +230,7 @@
 		7C9F769E62E925ECA46373E6 = {
 			isa = PBXGroup;
 			children = (
+				CEB560262F944C05004A1CA7 /* Assets.xcassets */,
 				CE5F0F372F75EF3E007C896C /* CypherAir.entitlements */,
 				CE5F0F382F75EF45007C896C /* CypherAirMacOS.entitlements */,
 				CE0065122F651C44008604AB /* AppIcon.icon */,
@@ -367,6 +370,7 @@
 			files = (
 				CE0065252F676EBC008604AB /* AppIconB.icon in Resources */,
 				CEF297622F7612DF00DB6BF6 /* AppIconD.icon in Resources */,
+				CEB560272F944C05004A1CA7 /* Assets.xcassets in Resources */,
 				CE0065262F676EBC008604AB /* AppIconC.icon in Resources */,
 				CE0065272F676EBC008604AB /* AppIconA.icon in Resources */,
 				CE0065172F652334008604AB /* AppIcon.icon in Resources */,
@@ -524,14 +528,18 @@
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
 				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconC AppIconB AppIcon";
+				"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=*]" = "AppIconC AppIconB AppIcon AppIconD";
+				"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=xr*]" = "";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconA;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=*]" = AppIconA;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=xr*]" = VisionAppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_WARN_COMPLETION_HANDLER_MISUSE = YES;
 				CLANG_WARN_OBJC_MISSING_PROPERTY_SYNTHESIS = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -764,14 +772,18 @@
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
 				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconC AppIconB AppIcon";
+				"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=*]" = "AppIconC AppIconB AppIcon AppIconD";
+				"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=xr*]" = "";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconA;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=*]" = AppIconA;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=xr*]" = VisionAppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_WARN_COMPLETION_HANDLER_MISUSE = YES;
 				CLANG_WARN_OBJC_MISSING_PROPERTY_SYNTHESIS = YES;
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
