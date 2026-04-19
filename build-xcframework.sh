@@ -39,11 +39,12 @@ echo "=== CypherAir: pgp-mobile XCFramework Build ==="
 echo "Build mode: $BUILD_DIR"
 echo ""
 
-# Xcode links CypherAir against target-specific static archives. Any leftover
-# target-specific `libpgp_mobile.dylib` in those same directories is dangerous:
-# a previous `-lpgp_mobile` style link can pick the dylib first and shadow the
-# fresh `.a`, breaking new UniFFI symbols at link time. Only the host dylib
-# built for UniFFI bindgen is allowed, and it is treated as a temporary file.
+# Xcode consumes the packaged PgpMobile.xcframework. The target-specific
+# archives below are intermediate inputs for that package. Any leftover
+# target-specific `libpgp_mobile.dylib` is still treated as stale state because
+# older direct-link settings or manual linker flags can pick it instead of the
+# intended static archive. Only the host dylib used for UniFFI bindgen is
+# allowed, and it is treated as a temporary file.
 target_dylib_candidates=(
     "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-ios/$BUILD_DIR/libpgp_mobile.dylib"
     "$SCRIPT_DIR/pgp-mobile/target/aarch64-apple-ios-sim/$BUILD_DIR/libpgp_mobile.dylib"
@@ -83,7 +84,7 @@ assert_no_target_specific_dylibs() {
 
     for dylib in "${target_dylib_candidates[@]}"; do
         if [ -f "$dylib" ]; then
-            echo "  ✗ ERROR: Stale target-specific dylib would shadow the static archive:"
+            echo "  ✗ ERROR: Stale target-specific dylib found next to a Rust static archive:"
             echo "    $dylib"
             stale_found=1
         fi
@@ -175,7 +176,7 @@ fi
 echo "  ✓ visionOS simulator library: $VISIONOS_SIM_LIB"
 ls -lh "$VISIONOS_SIM_LIB"
 
-# Clean every Xcode-visible target directory before bindgen creates any host dylib.
+# Clean target-specific output directories before bindgen creates any host dylib.
 cleanup_target_specific_dylibs
 
 # ── Step 7: Build host dylib for UniFFI bindgen ──────────────────
@@ -292,8 +293,11 @@ echo ""
 echo "=== Build Complete ==="
 echo ""
 echo "Next steps:"
-echo "  1. Xcode continues to link the Rust static archives directly"
-echo "     from pgp-mobile/target/...; $XCFRAMEWORK_OUTPUT is a synced artifact."
-echo "  2. If Swift 6.2 concurrency warnings occur:"
+echo "  1. Xcode links $XCFRAMEWORK_OUTPUT."
+echo "  2. pgp-mobile/target/... contains Cargo build intermediates only."
+echo "  3. After a successful build, you may run:"
+echo "     cargo clean --manifest-path pgp-mobile/Cargo.toml"
+echo "     to reclaim Cargo target space without breaking Xcode linkage."
+echo "  4. If Swift 6.2 concurrency warnings occur:"
 echo "     - Use @preconcurrency import PgpMobile"
 echo "     - Or add @unchecked Sendable conformances in an extension file"
