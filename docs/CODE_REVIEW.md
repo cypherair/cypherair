@@ -5,8 +5,8 @@
 
 ## All PRs
 
-- [ ] All targets compile: `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, `aarch64-apple-visionos`, and `aarch64-apple-visionos-sim`
-- [ ] `cargo test` and `xcodebuild test -testPlan CypherAir-UnitTests` pass
+- [ ] Rust targets compile: `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, `aarch64-apple-visionos`, and `aarch64-apple-visionos-sim`
+- [ ] `cargo test`, `xcodebuild test -testPlan CypherAir-UnitTests`, and the native visionOS build probe pass
 - [ ] No new compiler warnings
 - [ ] No hardcoded user-visible strings (all in String Catalog)
 - [ ] No force-unwrap (`!`) in production code

@@ -180,7 +180,9 @@ Button("Encrypt") { ... }
 
 ### Where to Apply Glass
 
-| UI Element | Glass Treatment |
+The table below is iOS/iPadOS-first guidance. On macOS and visionOS, prefer platform-native SwiftUI chrome and use these glass APIs only when they are available, guarded where needed, and visually match platform conventions.
+
+| UI Element | iOS/iPadOS Treatment |
 |-----------|----------------|
 | Tab bar | Automatic (standard TabView) |
 | Navigation bars + toolbars | Automatic (standard NavigationStack) |
