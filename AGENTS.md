@@ -4,18 +4,18 @@ This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding ag
 
 ## Project Overview
 
-CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, and macOS.
+CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and visionOS.
 
 - License: GPLv3
 - Privacy model: zero network access
 - Permissions model: minimal permissions, only biometric usage description
 - Cryptography: Sequoia PGP via Rust + UniFFI + Swift
-- Platforms: iOS 26.4+, iPadOS 26.4+, macOS 26.4+
+- Platforms: iOS 26.4+, iPadOS 26.4+, macOS 26.4+, visionOS 26.4+
 
 ## Tech Stack
 
 - Swift 6.2
-- SwiftUI with iOS 26 Liquid Glass conventions
+- SwiftUI with iOS 26 Liquid Glass conventions where applicable and native platform chrome elsewhere
 - Rust stable
 - `sequoia-openpgp` 2.2.0 with `crypto-openssl`
 - UniFFI 0.31.x
@@ -46,6 +46,8 @@ Start with `docs/ARCHITECTURE.md` and `docs/SECURITY.md` when working in unfamil
 cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
 cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
 cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
 
 # Full Rust + UniFFI + packaged-artifact sync
 ./build-xcframework.sh --release
@@ -64,7 +66,14 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
 # Targeted macOS UI smoke coverage for routes, settings, and tutorial flows
 xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
     -destination 'platform=macOS'
+
+# Native visionOS build probe
+xcodebuild build -scheme CypherAir \
+    -destination 'generic/platform=visionOS' \
+    CODE_SIGNING_ALLOWED=NO
 ```
+
+There is currently no dedicated visionOS XCTest test plan. Native visionOS validation uses the build probe above together with the existing Rust, macOS-local, and iOS-device validation paths.
 
 For the full Rust artifact refresh, UniFFI/bindings sync, direct-archive linkage details, and Xcode validation workflow, see `docs/TESTING.md`.
 
@@ -144,7 +153,7 @@ If the user asks to increment the build number, first read the current `CURRENT_
 
 - Swift API Design Guidelines. `guard` early exits over force unwraps. `async/await` over Combine.
 - `@Observable` for state. `NavigationStack` with typed paths. No `NavigationView`.
-- iOS 26 Liquid Glass: standard components auto-adopt. Custom controls use `.glassEffect()`.
+- Use iOS 26 Liquid Glass conventions where applicable, and prefer platform-native SwiftUI chrome on macOS and visionOS. Custom controls use `.glassEffect()` only when the API is available and matches platform conventions.
 - One type per file. Group by feature. All user strings in the String Catalog.
 - Full conventions: `docs/CONVENTIONS.md`.
 

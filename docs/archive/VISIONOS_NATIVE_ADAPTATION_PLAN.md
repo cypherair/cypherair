@@ -1,3 +1,9 @@
+> Status: Archived planning snapshot.
+> Snapshot date: 2026-04-18.
+> Archival reason: Native visionOS support is now shipped, so this plan no longer describes the current product or build state.
+> Successor current-state docs: [README](../../README.md) · [PRD](../PRD.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md)
+> Current code and active documentation outrank this archived planning snapshot.
+
 # CypherAir Native visionOS Adaptation Plan
 
 > Purpose: Define the engineering plan for a native visionOS adaptation of CypherAir.
@@ -23,7 +29,7 @@ For v1, CypherAir should target **native parity and platform correctness**, not 
 
 The repository is partially prepared for visionOS at the project level:
 
-- [`CypherAir.xcodeproj/project.pbxproj`](../CypherAir.xcodeproj/project.pbxproj) already declares:
+- [`CypherAir.xcodeproj/project.pbxproj`](../../CypherAir.xcodeproj/project.pbxproj) already declares:
   - `SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator"`
   - `TARGETED_DEVICE_FAMILY = "1,2,7"`
   - `XROS_DEPLOYMENT_TARGET = 26.4`
@@ -33,9 +39,9 @@ The repository is partially prepared for visionOS at the project level:
 
 The app is also structurally well-positioned for a window-based adaptation:
 
-- [`Sources/App/CypherAirApp.swift`](../Sources/App/CypherAirApp.swift) already uses the SwiftUI app lifecycle and platform branching between iOS and macOS.
-- [`Sources/App/ContentView.swift`](../Sources/App/ContentView.swift) and related shell files already separate iOS-style and macOS-style presentation logic.
-- [`Sources/App/Shell/SharedIOSTabShellView.swift`](../Sources/App/Shell/SharedIOSTabShellView.swift) uses `.tabViewStyle(.sidebarAdaptable)`, which Apple documents as:
+- [`Sources/App/CypherAirApp.swift`](../../Sources/App/CypherAirApp.swift) already uses the SwiftUI app lifecycle and platform branching between iOS and macOS.
+- [`Sources/App/ContentView.swift`](../../Sources/App/ContentView.swift) and related shell files already separate iOS-style and macOS-style presentation logic.
+- [`Sources/App/Shell/SharedIOSTabShellView.swift`](../../Sources/App/Shell/SharedIOSTabShellView.swift) uses `.tabViewStyle(.sidebarAdaptable)`, which Apple documents as:
   - showing an **ornament** on visionOS; and
   - showing a **sidebar** for secondary tabs inside a `TabSection`.
 
@@ -59,26 +65,26 @@ The current visionOS readiness gap is not a top-level architecture failure. As o
 
 Observed blockers:
 
-- [`Sources/App/HomeView.swift`](../Sources/App/HomeView.swift)
+- [`Sources/App/HomeView.swift`](../../Sources/App/HomeView.swift)
   - `.buttonStyle(.glass)` is unavailable on visionOS.
-- [`Sources/App/Common/CypherMultilineTextInput.swift`](../Sources/App/Common/CypherMultilineTextInput.swift)
+- [`Sources/App/Common/CypherMultilineTextInput.swift`](../../Sources/App/Common/CypherMultilineTextInput.swift)
   - `conversationContext` is unavailable on visionOS.
   - `inputAssistantItem.leadingBarButtonGroups` is unavailable on visionOS.
   - `inputAssistantItem.trailingBarButtonGroups` is unavailable on visionOS.
-- [`Sources/App/Contacts/AddContactView.swift`](../Sources/App/Contacts/AddContactView.swift)
+- [`Sources/App/Contacts/AddContactView.swift`](../../Sources/App/Contacts/AddContactView.swift)
   - `.scrollDismissesKeyboard(.interactively)` is unavailable on visionOS.
 
 The `scrollDismissesKeyboard` issue is a **class of issue**, not a single-file issue. The same modifier currently appears in multiple input-heavy screens, including:
 
-- [`Sources/App/Decrypt/DecryptView.swift`](../Sources/App/Decrypt/DecryptView.swift)
-- [`Sources/App/Encrypt/EncryptView.swift`](../Sources/App/Encrypt/EncryptView.swift)
-- [`Sources/App/Sign/SignView.swift`](../Sources/App/Sign/SignView.swift)
-- [`Sources/App/Sign/VerifyView.swift`](../Sources/App/Sign/VerifyView.swift)
-- [`Sources/App/Keys/BackupKeyView.swift`](../Sources/App/Keys/BackupKeyView.swift)
-- [`Sources/App/Keys/ImportKeyView.swift`](../Sources/App/Keys/ImportKeyView.swift)
-- [`Sources/App/Keys/KeyGenerationView.swift`](../Sources/App/Keys/KeyGenerationView.swift)
+- [`Sources/App/Decrypt/DecryptView.swift`](../../Sources/App/Decrypt/DecryptView.swift)
+- [`Sources/App/Encrypt/EncryptView.swift`](../../Sources/App/Encrypt/EncryptView.swift)
+- [`Sources/App/Sign/SignView.swift`](../../Sources/App/Sign/SignView.swift)
+- [`Sources/App/Sign/VerifyView.swift`](../../Sources/App/Sign/VerifyView.swift)
+- [`Sources/App/Keys/BackupKeyView.swift`](../../Sources/App/Keys/BackupKeyView.swift)
+- [`Sources/App/Keys/ImportKeyView.swift`](../../Sources/App/Keys/ImportKeyView.swift)
+- [`Sources/App/Keys/KeyGenerationView.swift`](../../Sources/App/Keys/KeyGenerationView.swift)
 
-The current first compile-stopping failure in the generic `visionOS` build probe is the `.glass` button style usage in [`HomeView.swift`](../Sources/App/HomeView.swift). The text-input and keyboard-assistant issues above remain in scope because targeted `visionOS` SDK availability checks confirm that those symbols are explicitly unavailable on native visionOS.
+The current first compile-stopping failure in the generic `visionOS` build probe is the `.glass` button style usage in [`HomeView.swift`](../../Sources/App/HomeView.swift). The text-input and keyboard-assistant issues above remain in scope because targeted `visionOS` SDK availability checks confirm that those symbols are explicitly unavailable on native visionOS.
 
 The plan intentionally does **not** treat alternate app icon asset warnings as a current blocker. That warning had been observed earlier in planning, but it was **not reproduced** in the latest local build probe and therefore should not be treated as a current gating issue without a fresh reproducible log.
 
@@ -155,7 +161,7 @@ Text input is the first known UI adaptation area.
 
 The implementation work implied by this document should include:
 
-- replacing or guarding iOS-only text assistant APIs in [`CypherMultilineTextInput.swift`](../Sources/App/Common/CypherMultilineTextInput.swift);
+- replacing or guarding iOS-only text assistant APIs in [`CypherMultilineTextInput.swift`](../../Sources/App/Common/CypherMultilineTextInput.swift);
 - removing or conditionally disabling `.scrollDismissesKeyboard(.interactively)` on visionOS;
 - validating secure long-form text entry, paste, import, export, and machine-text workflows under visionOS interaction patterns.
 
@@ -203,9 +209,9 @@ For CypherAir, this supports a compatibility-driven visionOS adaptation rather t
 
 Any future implementation work touching the following paths remains a sensitive-boundary change and should be explicitly reviewed:
 
-- [`Sources/Security/`](../Sources/Security)
-- [`Sources/Services/DecryptionService.swift`](../Sources/Services/DecryptionService.swift)
-- [`pgp-mobile/src/`](../pgp-mobile/src)
+- [`Sources/Security/`](../../Sources/Security)
+- [`Sources/Services/DecryptionService.swift`](../../Sources/Services/DecryptionService.swift)
+- [`pgp-mobile/src/`](../../pgp-mobile/src)
 
 The expectation for visionOS adaptation work is that changes in these areas, if needed at all, should be compatibility-driven rather than behavior-changing.
 
@@ -228,11 +234,11 @@ The current Rust/UniFFI pipeline is not yet visionOS-native:
 - That upstream PR also fixes the existing architecture-specific iOS simulator OpenSSL configure target mappings for:
   - `x86_64-apple-ios`
   - `aarch64-apple-ios-sim`
-- [`build-xcframework.sh`](../build-xcframework.sh) builds only:
+- [`build-xcframework.sh`](../../build-xcframework.sh) builds only:
   - `aarch64-apple-ios`
   - `aarch64-apple-ios-sim`
   - `aarch64-apple-darwin`
-- [`CypherAir.xcodeproj/project.pbxproj`](../CypherAir.xcodeproj/project.pbxproj) links Rust static archives only for:
+- [`CypherAir.xcodeproj/project.pbxproj`](../../CypherAir.xcodeproj/project.pbxproj) links Rust static archives only for:
   - `iphoneos`
   - `iphonesimulator`
   - `macosx`
@@ -354,7 +360,7 @@ visionOS v1 is primarily a **platform adaptation** of:
 - the build and linking pipeline; and
 - the validation matrix.
 
-If any implementation work later touches [`Sources/Security`](../Sources/Security) or [`pgp-mobile/src`](../pgp-mobile/src), it should be treated as compatibility work unless a separate design decision explicitly approves a behavior change.
+If any implementation work later touches [`Sources/Security`](../../Sources/Security) or [`pgp-mobile/src`](../../pgp-mobile/src), it should be treated as compatibility work unless a separate design decision explicitly approves a behavior change.
 
 ## 9. Non-Goals
 

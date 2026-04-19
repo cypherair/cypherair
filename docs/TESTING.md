@@ -87,6 +87,8 @@ The workspace currently includes three Xcode Test Plans:
 
 **CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for macOS UI automation, including `UITests/MacUISmokeTests.swift` coverage for main, settings, and tutorial launch/smoke flows.
 
+There is currently no dedicated visionOS XCTest plan. Native visionOS validation uses a generic build probe together with the existing Rust, macOS-local, and iOS-device validation paths.
+
 **All test commands in CLAUDE.md and CI configuration must use `-testPlan` to ensure consistent scope.**
 
 ## 2.1 GitHub Actions Hosted macOS Limitation
@@ -113,6 +115,8 @@ Today, the Xcode project explicitly links these static archives:
 - `pgp-mobile/target/aarch64-apple-ios/release/libpgp_mobile.a`
 - `pgp-mobile/target/aarch64-apple-ios-sim/release/libpgp_mobile.a`
 - `pgp-mobile/target/aarch64-apple-darwin/release/libpgp_mobile.a`
+- `pgp-mobile/target/aarch64-apple-visionos/release/libpgp_mobile.a`
+- `pgp-mobile/target/aarch64-apple-visionos-sim/release/libpgp_mobile.a`
 - `bindings/module.modulemap`
 - `Sources/PgpMobile/pgp_mobile.swift`
 
@@ -141,6 +145,8 @@ Use this when Rust implementation changed but the UniFFI surface and generated b
 cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
 cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
 cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
 ```
 
 ### C. Full UniFFI / bindings / XCFramework sync
@@ -177,6 +183,16 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 
 Treat this macOS-local path as the source of truth for Swift validation until GitHub's hosted macOS image catches up to the project's deployment target.
 
+For native visionOS validation, use a build probe rather than a dedicated XCTest plan:
+
+```bash
+xcodebuild build -scheme CypherAir \
+    -destination 'generic/platform=visionOS' \
+    CODE_SIGNING_ALLOWED=NO
+```
+
+Treat this as build/linkage and platform-availability validation, not as a substitute for the existing Rust, macOS-local, and iOS-device test matrix.
+
 Recommended flows:
 
 ```bash
@@ -185,14 +201,22 @@ cargo test --manifest-path pgp-mobile/Cargo.toml
 cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
 cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
 cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
+cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
+xcodebuild build -scheme CypherAir \
+    -destination 'generic/platform=visionOS' \
+    CODE_SIGNING_ALLOWED=NO
 
 # UniFFI surface / bindings / packaged artifact change
 cargo test --manifest-path pgp-mobile/Cargo.toml
 ./build-xcframework.sh --release
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
+xcodebuild build -scheme CypherAir \
+    -destination 'generic/platform=visionOS' \
+    CODE_SIGNING_ALLOWED=NO
 ```
 
 Typical stale-artifact symptoms:

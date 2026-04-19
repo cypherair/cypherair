@@ -1,7 +1,7 @@
 # Technical Design Document (TDD)
 
-> **Version:** v4.2
-> **Companion to:** [PRD](PRD.md) v4.2
+> **Version:** v4.3
+> **Companion to:** [PRD](PRD.md) v4.3
 > **Audience:** Developers, Security Auditors
 
 ## 1. OpenPGP Library: Sequoia PGP
@@ -115,11 +115,13 @@ The App decrypts all supported formats regardless of the user's own key profile:
 
 ### 1.7 Cross-Compilation
 
-Targets: `aarch64-apple-ios` (device) + `aarch64-apple-ios-sim` (Apple Silicon sim) + `aarch64-apple-darwin` (macOS Apple Silicon). Tier 2 in Rust. `getrandom` uses SecRandomCopyBytes on iOS/macOS. LTO and strip are **disabled** in the release profile (`lto = false`, `strip = "none"`) — enabling them causes linker failures with vendored OpenSSL. Binary size is managed via `codegen-units = 1` and Xcode dead code elimination. Estimated app binary contribution: ~6–8 MB.
+Targets: `aarch64-apple-ios` (device) + `aarch64-apple-ios-sim` (Apple Silicon sim) + `aarch64-apple-darwin` (macOS Apple Silicon) + `aarch64-apple-visionos` (visionOS device) + `aarch64-apple-visionos-sim` (visionOS simulator). Tier 2 in Rust. `getrandom` uses `SecRandomCopyBytes` on Apple platforms. LTO and strip are **disabled** in the release profile (`lto = false`, `strip = "none"`) — enabling them causes linker failures with vendored OpenSSL. Binary size is managed via `codegen-units = 1` and Xcode dead code elimination. Estimated app binary contribution: ~6–8 MB.
 
-As of April 18, 2026, local experiments have also validated Rust-only compilation for `aarch64-apple-visionos` and `aarch64-apple-visionos-sim` using a patched `openssl-src-rs` fork. This is not yet part of the project's supported release pipeline: `build-xcframework.sh`, direct Xcode archive linkage, and the native app compile path still need separate visionOS integration work.
+The current release pipeline includes native visionOS support. `build-xcframework.sh` builds and validates the visionOS device and simulator archives, the Xcode project links the target-specific `libpgp_mobile.a` archives directly per SDK, and the native app path is probed with `xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS' CODE_SIGNING_ALLOWED=NO`.
 
-The current deployment baseline for the app targets is `iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+`.
+To keep vendored OpenSSL reproducible across the current Apple target matrix, `pgp-mobile/Cargo.toml` pins `openssl-src` through `[patch.crates-io]` to `https://github.com/cypherair/openssl-src-rs` at rev `0c7e9b5e0c4c4644de34dd3ee86f2a2ef87daa61`.
+
+The current deployment baseline for the app targets is `iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+`.
 
 ---
 
@@ -182,12 +184,12 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 
 ### 2.5 Build Pipeline
 
-1. `cargo build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim` / `aarch64-apple-darwin`
+1. `cargo build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim` / `aarch64-apple-darwin` / `aarch64-apple-visionos` / `aarch64-apple-visionos-sim`
 2. `./build-xcframework.sh --release` refreshes the release archives, generates UniFFI Swift bindings and headers, validates host-dylib cleanup, and produces the packaged `PgpMobile.xcframework` output
 3. The current Xcode project links `pgp-mobile/target/.../release/libpgp_mobile.a` directly per SDK and imports the generated headers through `bindings/module.modulemap`
 4. Local Swift / FFI validation runs through `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 
-Pending native visionOS implementation, any temporary `openssl-src` override for visionOS work should use a reproducible `git` + exact `rev` pin to the CypherAir fork, not a machine-local `path` dependency and not an unstable fork branch reference.
+The current `openssl-src` override for visionOS support must remain reproducible: use the checked-in `git` + exact `rev` pin to the CypherAir fork, not a machine-local `path` dependency and not an unstable branch reference.
 
 See also [CLAUDE.md](../CLAUDE.md) Build Commands for the full pipeline with exact commands.
 

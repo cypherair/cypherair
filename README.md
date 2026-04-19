@@ -1,8 +1,8 @@
 # CypherAir
 
-**Fully offline OpenPGP encryption for iOS — zero network, zero permissions.**
+**Fully offline OpenPGP encryption for Apple platforms — zero network, zero permissions.**
 
-CypherAir is an open-source OpenPGP encryption tool for iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+. It enables everyday users to communicate securely with friends, preventing message content from being monitored by third parties. The app operates with absolutely zero network access and requests no system permissions — data leakage is eliminated at the architectural level.
+CypherAir is an open-source OpenPGP encryption tool for iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+. It enables everyday users to communicate securely with friends, preventing message content from being monitored by third parties. The app operates with absolutely zero network access and requests no system permissions — data leakage is eliminated at the architectural level.
 
 ## Key Features
 
@@ -10,7 +10,7 @@ CypherAir is an open-source OpenPGP encryption tool for iOS 26.4+ / iPadOS 26.4+
 - **Zero Permissions** — No camera, photo library, or any other system permission requested. All I/O goes through system-provided pickers and the Share Sheet.
 - **Dual Encryption Profiles** — Profile A (Universal Compatible) for GnuPG interoperability; Profile B (Advanced Security) using the latest RFC 9580 standard with stronger algorithms.
 - **Secure Enclave Protection** — Private keys are hardware-bound via P-256 key wrapping (CryptoKit ECDH + AES-GCM) with biometric authentication.
-- **Usable by Anyone** — No cryptographic knowledge required. Clean, accessible UI built with iOS 26 Liquid Glass design language.
+- **Usable by Anyone** — No cryptographic knowledge required. Clean, accessible UI built with SwiftUI, using iOS 26 Liquid Glass conventions where applicable and native platform chrome elsewhere.
 
 ## Encryption Profiles
 
@@ -44,12 +44,12 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 
 | Layer | Technology |
 |-------|------------|
-| Platform | iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+, minimum 8 GB RAM |
-| Language | Swift 6.2, SwiftUI (Liquid Glass), UIKit for system pickers |
+| Platform | iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+, minimum 8 GB RAM |
+| Language | Swift 6.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere), UIKit for system pickers |
 | OpenPGP Engine | Sequoia PGP 2.2.0 (Rust), `crypto-openssl` backend (vendored) |
 | FFI Bridge | Mozilla UniFFI 0.31.x; Xcode links target-specific release archives plus `bindings/module.modulemap` directly |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |
-| Build | Xcode 26, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` |
+| Build | Xcode 26, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim` |
 | Localization | English + Simplified Chinese (.xcstrings) |
 
 ## Architecture
@@ -98,7 +98,7 @@ Recent refactors focused on maintainability and safety without changing the app'
 ### Prerequisites
 
 - macOS (Apple Silicon) with Xcode 26
-- Rust stable (latest) with targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin`
+- Rust stable (latest) with targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin aarch64-apple-visionos aarch64-apple-visionos-sim`
 
 ### Commands
 
@@ -112,6 +112,11 @@ cargo test --manifest-path pgp-mobile/Cargo.toml
 # 3. Validate Swift unit + FFI behavior locally
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
+
+# 4. Probe the native visionOS app build
+xcodebuild build -scheme CypherAir \
+    -destination 'generic/platform=visionOS' \
+    CODE_SIGNING_ALLOWED=NO
 ```
 
 For Secure Enclave, biometrics, and MIE coverage on hardware:
@@ -128,6 +133,8 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
     -destination 'platform=macOS'
 ```
 
+There is currently no dedicated visionOS XCTest test plan. Native visionOS validation uses the build probe above together with the existing Rust, macOS-local, and iOS-device validation paths.
+
 For the full Rust / UniFFI / Xcode workflow, including artifact refresh details, direct-archive linkage, and stale-output troubleshooting, see [docs/TESTING.md](docs/TESTING.md) and [CLAUDE.md](CLAUDE.md).
 
 ### CI Note
@@ -142,7 +149,7 @@ The GitHub Actions workflows in this repository currently target `macos-26`, but
 
 CypherAir's security design centers around several layers of protection:
 
-- **Private Key Storage** — Keys are wrapped by a Secure Enclave P-256 key via self-ECDH + HKDF + AES-GCM, then stored in the iOS Keychain. Keys are device-bound and never leave the hardware.
+- **Private Key Storage** — Keys are wrapped by a Secure Enclave P-256 key via self-ECDH + HKDF + AES-GCM, then stored in Keychain. Keys are device-bound and never leave the hardware.
 - **Two-Phase Decryption** — Phase 1 parses the message header and matches recipient keys without authentication. Phase 2 requires biometric/passcode auth before decryption proceeds.
 - **Authentication Modes** — Standard Mode (Face ID / Touch ID with passcode fallback) or High Security Mode (biometric only, inspired by Apple's Stolen Device Protection).
 - **Memory Safety** — Sensitive data is zeroed from memory after use. MIE (Memory Integrity Enforcement) is enabled via Xcode's Enhanced Security capability, providing hardware memory tagging on A19+ devices.
@@ -172,7 +179,7 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [DOCUMENTATION_GOVERNANCE](docs/DOCUMENTATION_GOVERNANCE.md) | Documentation classes, metadata rules, archive rules, and update triggers |
 | [POC](docs/archive/POC.md) | Proof-of-concept test plan (archived) |
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards and SwiftUI patterns |
-| [LIQUID_GLASS](docs/LIQUID_GLASS.md) | iOS 26 Liquid Glass design adoption guide |
+| [LIQUID_GLASS](docs/LIQUID_GLASS.md) | iOS 26 Liquid Glass and platform-native SwiftUI chrome guidance |
 | [CODE_REVIEW](docs/CODE_REVIEW.md) | Code review checklist by change type |
 | [CHANGELOG](docs/CHANGELOG.md) | PRD revision history |
 

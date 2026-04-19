@@ -40,7 +40,7 @@ Follow the [Swift API Design Guidelines](https://www.swift.org/documentation/api
 
 ### State Management
 
-Use the iOS 26 / Swift 6.2 state management model:
+Use the Xcode 26 / Swift 6.2 state management model:
 
 | Old Pattern | New Pattern | Usage |
 |------------|------------|-------|
@@ -93,10 +93,11 @@ struct ContentView: View {
 
 ### Liquid Glass
 
-CypherAir targets iOS 26 exclusively and fully adopts Liquid Glass. See `docs/LIQUID_GLASS.md` for the full guide. Key rules:
+CypherAir targets iOS 26.4+, iPadOS 26.4+, macOS 26.4+, and visionOS 26.4+. Fully embrace modern SwiftUI chrome across those platforms. See `docs/LIQUID_GLASS.md` for the full guide. Key rules:
 
-- Standard components (TabView, NavigationStack, toolbars, sheets) get Liquid Glass automatically. Do not override their backgrounds.
-- Custom floating controls: apply `.glassEffect()` as the last modifier. Remove any `.background()` modifiers first.
+- On iOS and iPadOS, standard components (TabView, NavigationStack, toolbars, sheets) get Liquid Glass automatically. Do not override their backgrounds.
+- On macOS and visionOS, prefer platform-native SwiftUI chrome instead of forcing iOS-styled glass.
+- Custom floating controls: apply `.glassEffect()` as the last modifier only when the API is available and the result matches platform conventions. Remove any `.background()` modifiers first.
 - Never apply glass to content views (lists, key details, message display).
 - Use `.tint()` on glass only for semantic meaning (blue = primary action, red = destructive). Never decorative tinting.
 

@@ -1,16 +1,16 @@
 # CypherAir
 
-Offline OpenPGP encryption tool for iOS, iPadOS, and macOS. GPLv3. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
+Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. GPLv3. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
 
 ## Tech Stack
 
-- **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+. Minimum device: 8 GB RAM.
-- **Language:** Swift 6.2, SwiftUI (iOS 26 Liquid Glass design). UIKit only for system pickers.
+- **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+. Minimum device: 8 GB RAM.
+- **Language:** Swift 6.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). UIKit only for system pickers.
 - **OpenPGP:** Sequoia PGP 2.2.0 (Rust, LGPL-2.0-or-later, compatible with App's GPLv3) with `crypto-openssl` backend (vendored static linking).
 - **Profiles:** Profile A (Universal): v4 keys, Ed25519+X25519, SEIPDv1. Profile B (Advanced): v6 keys, Ed448+X448, SEIPDv2 AEAD. See @docs/PRD.md Section 3.
 - **FFI:** Mozilla UniFFI 0.31.x. Rust wrapper crate `pgp-mobile` generates Swift bindings and packaged outputs, while Xcode currently links the target-specific `libpgp_mobile.a` release archives plus `bindings/module.modulemap` directly.
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain).
-- **Build:** Xcode 26, Rust stable (latest, MSRV follows sequoia-openpgp requirements), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin`.
+- **Build:** Xcode 26, Rust stable (latest, MSRV follows sequoia-openpgp requirements), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`.
 - **Localization:** English + Simplified Chinese via `.xcstrings` String Catalog.
 
 ## Architecture
@@ -45,6 +45,12 @@ cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/
 # Rust: cross-compile for macOS Apple Silicon
 cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
 
+# Rust: cross-compile for visionOS device
+cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
+
+# Rust: cross-compile for visionOS simulator
+cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
+
 # Full Rust + UniFFI + packaged-artifact sync
 ./build-xcframework.sh --release
 
@@ -62,14 +68,21 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
 # Run targeted macOS UI smoke coverage for routes, settings, and tutorial flows
 xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
     -destination 'platform=macOS'
+
+# Run the native visionOS build probe
+xcodebuild build -scheme CypherAir \
+    -destination 'generic/platform=visionOS' \
+    CODE_SIGNING_ALLOWED=NO
 ```
+
+There is currently no dedicated visionOS XCTest test plan. Native visionOS validation uses the build probe above together with the existing Rust, macOS-local, and iOS-device validation paths.
 
 For the full Rust artifact refresh, UniFFI/bindings sync, and Xcode validation workflow, see @docs/TESTING.md.
 
 ## Hard Constraints — NEVER Violate
 
 1. **Zero network access.** No HTTP(S), no networked SDKs, no telemetry. Code audit must confirm zero network code paths. No network URL loading (http/https). No NWConnection. No URLSession. Custom app URL scheme handling (`cypherair://`) is permitted — it is local IPC, not network access.
-2. **Minimal permissions.** The app configures only `NSFaceIDUsageDescription` as a usage description (required by iOS for Face ID / Touch ID authentication via `LAContext`). No camera, photo library, contacts, or network entitlements. All I/O through system pickers, Share Sheet, URL scheme.
+2. **Minimal permissions.** The app configures only `NSFaceIDUsageDescription` as a usage description for LocalAuthentication-backed biometric flows. No camera, photo library, contacts, or network entitlements. All I/O through system pickers, Share Sheet, URL scheme.
 3. **AEAD hard-fail.** Authentication failure during decryption must abort immediately. Never show partial plaintext.
 4. **No plaintext or private keys in logs.** Never `print()`, `os_log()`, or `NSLog()` any key material, passphrase, or decrypted content. Not even in DEBUG builds.
 5. **Memory zeroing.** All sensitive data (`Data` buffers containing keys, passphrases, plaintext) must be overwritten with zeros when no longer needed. Rust side: `zeroize` crate. Swift side: `resetBytes(in:)` on `Data`.
@@ -113,7 +126,7 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 
 - Swift API Design Guidelines. `guard let` over force-unwrap. `async/await` over Combine.
 - `@Observable` for state. `NavigationStack` with typed paths. No `NavigationView`.
-- iOS 26 Liquid Glass: standard components auto-adopt. Custom controls use `.glassEffect()`. See @docs/LIQUID_GLASS.md.
+- Use iOS 26 Liquid Glass conventions where applicable, and prefer platform-native SwiftUI chrome on macOS and visionOS. Custom controls use `.glassEffect()` only when the API is available and matches platform conventions. See @docs/LIQUID_GLASS.md.
 - One type per file. Group by feature. All user strings in String Catalog.
 - Full conventions: @docs/CONVENTIONS.md
 

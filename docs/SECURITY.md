@@ -19,7 +19,7 @@ All cryptographic operations use Sequoia PGP 2.2.0. Two profiles with different 
 | Hash | SHA-512 | Accepts SHA-256 for legacy verification |
 | S2K (key export) | Iterated+Salted (mode 3) | GnuPG compatible |
 | Compression | DEFLATE (read-only) | Enabled for reading compatibility; outgoing messages must not use compression |
-| Random | SecRandomCopyBytes | Via `getrandom` crate on iOS |
+| Random | SecRandomCopyBytes | Via `getrandom` crate on Apple platforms |
 
 ### Profile B (Advanced Security)
 
@@ -32,7 +32,7 @@ All cryptographic operations use Sequoia PGP 2.2.0. Two profiles with different 
 | Hash | SHA-512 | |
 | S2K (key export) | Argon2id (512 MB / p=4 / ~3s) | Memory-hard |
 | Compression | DEFLATE (read-only) | Enabled for reading compatibility; outgoing messages must not use compression |
-| Random | SecRandomCopyBytes | Via `getrandom` crate on iOS |
+| Random | SecRandomCopyBytes | Via `getrandom` crate on Apple platforms |
 
 **Interoperability:** Profile A output compatible with GnuPG 2.1+ and all PGP tools. Profile B output compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+. The App reads v4 keys, v6 keys, SEIPDv1, SEIPDv2 (OCB/GCM), Iterated+Salted S2K, and Argon2id S2K. Compression (`deflate`) read-only for compatibility; outgoing messages never compressed. Bzip2 excluded (extra C dependency).
 

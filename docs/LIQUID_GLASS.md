@@ -1,17 +1,19 @@
 # Liquid Glass Adoption Guide
 
-> Purpose: iOS 26 Liquid Glass design language reference and CypherAir-specific guidance.
+> Purpose: iOS 26 Liquid Glass design language reference and CypherAir-specific cross-platform guidance.
 > Audience: Human developers and AI coding tools.
 
 ## 1. Overview
 
 Liquid Glass is Apple's iOS 26 design language. It is a translucent, refracting material that replaces the blur-based materials used since iOS 7. Glass belongs exclusively on the **navigation and controls layer** — floating above content, never applied to content itself.
 
-**CypherAir targets iOS 26.4+ exclusively.** There is no need for backward compatibility with older design languages. Do not use `UIDesignRequiresCompatibility`. Fully embrace Liquid Glass.
+**CypherAir targets iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+.** There is no need for backward compatibility with older design languages. Do not use `UIDesignRequiresCompatibility`.
+
+This guide is still primarily about the iOS and iPadOS Liquid Glass material model. On macOS and visionOS, prefer the platform's native SwiftUI chrome and use explicit glass APIs only when the API is available and the result matches platform conventions.
 
 ## 2. Automatic Adoption
 
-Standard SwiftUI components receive Liquid Glass automatically when compiled with Xcode 26. No code changes required for:
+On iOS and iPadOS, standard SwiftUI components receive Liquid Glass automatically when compiled with Xcode 26. On macOS and visionOS, prefer the platform's native SwiftUI chrome instead of forcing iOS-styled glass. No code changes are required for the following iOS/iPadOS examples:
 
 - **TabView:** Becomes a floating glass capsule. Content scrolls behind it.
 - **NavigationStack:** Navigation bar becomes transparent. Toolbar items appear as individual glass buttons.
@@ -161,6 +163,8 @@ TabView {
 ```
 
 ### Button Styles
+
+These button-style examples are iOS/iPadOS-first. On visionOS and macOS, use the shared APIs only when they are actually available and visually match platform conventions.
 
 ```swift
 // Translucent glass button (secondary actions)

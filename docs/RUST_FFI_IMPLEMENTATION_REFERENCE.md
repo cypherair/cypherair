@@ -195,6 +195,8 @@ At minimum:
 - `cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml`
 - `cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml`
 - `cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml`
+- `cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml`
+- `cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml`
 - UniFFI regeneration when the public surface changes
 - `cargo test --manifest-path pgp-mobile/Cargo.toml`
 - `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
