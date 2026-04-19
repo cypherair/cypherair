@@ -104,9 +104,9 @@ The repository currently uses two validation tiers in GitHub Actions.
 
 - `swift-unit-tests-hosted-preview` downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests`
 
-The repository also publishes a rolling XCFramework prerelease:
+The repository also publishes unique edge XCFramework prereleases:
 
-- `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, rebuilds and validates the XCFramework, then updates the public `pgpmobile-edge` prerelease assets
+- `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, rebuilds and validates the XCFramework, then publishes a unique `pgpmobile-edge-` prerelease with immutable-safe draft upload flow
 
 ## 2.2 GitHub Actions Hosted macOS Limitation
 

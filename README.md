@@ -148,7 +148,7 @@ The GitHub Actions workflows in this repository currently target `macos-26`, but
 
 ### XCFramework Prerelease
 
-CypherAir publishes a rolling prerelease XCFramework for the current `main` branch as `pgpmobile-edge`. For asset names, download commands, verification steps, and future stable-release conventions, see [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md).
+CypherAir publishes unique edge prerelease XCFrameworks for the current `main` branch using `pgpmobile-edge-` release tags. For discovery, asset names, download commands, verification steps, and future stable-release conventions, see [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md).
 
 ## Security Model
 
