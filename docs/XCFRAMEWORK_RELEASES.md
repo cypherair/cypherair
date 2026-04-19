@@ -9,11 +9,18 @@ CypherAir publishes a unique edge prerelease XCFramework from the current `main`
 
 - Edge prerelease tags use the `pgpmobile-edge-` prefix.
 - Tag format: `pgpmobile-edge-YYYYMMDDTHHMMSSZ-shortsha-rRUN_ID-aRUN_ATTEMPT`.
-- This channel is updated automatically on every successful push to `main` and can be run manually with a custom `release_tag_prefix`.
-- It is intended for CI, integration, and manual validation against a specific branch tip.
+- This channel is updated automatically on every successful push to `main` and may be manually re-run from `main` only with the exact `pgpmobile-edge` prefix.
+- It is intended for CI, integration, and manual validation of the current `main` tip.
 - It is not treated as a stable SDK release.
 
 The legacy rolling `pgpmobile-edge` tag/release is deprecated and removed during the migration to unique edge prereleases. Consumers must not use the fixed `pgpmobile-edge` tag.
+
+Non-`main` manual validation must use a `pgpmobile-drill-*` prefix.
+
+- Drill prerelease tags use the `pgpmobile-drill-*` prefix supplied to `workflow_dispatch`.
+- Drill releases are branch- or ref-specific validation artifacts, not part of the canonical edge discovery channel.
+- Drill releases publish `PgpMobile.xcframework.zip`, `PgpMobile.xcframework.sha256`, and `pgpmobile-drill.json`.
+- Consumers must not discover or consume drill artifacts by scanning for the latest edge prerelease.
 
 Each edge prerelease publishes exactly these assets:
 
@@ -25,6 +32,8 @@ Each edge prerelease publishes exactly these assets:
 
 - `release_tag`
 - `release_url`
+- `release_channel`
+- `source_ref`
 - `commit_sha`
 - `built_at`
 - `run_id`
@@ -84,7 +93,27 @@ gh release verify-asset "$TAG" PgpMobile.xcframework.zip -R cypherair/cypherair
 Finally, verify the GitHub artifact attestation for the zip:
 
 ```bash
-gh attestation verify PgpMobile.xcframework.zip -R cypherair/cypherair
+gh attestation verify PgpMobile.xcframework.zip \
+    -R cypherair/cypherair \
+    --signer-workflow cypherair/cypherair/.github/workflows/xcframework-edge-release.yml \
+    --source-ref refs/heads/main
+```
+
+Drill releases are verified using the exact ref-pinned command rendered in that release's notes. Do not reuse the canonical edge command for drill artifacts.
+
+## Failed Run Cleanup
+
+The workflow performs best-effort cleanup if a run fails after creating a draft release or tag.
+
+- If the release still exists as a draft, the workflow deletes the draft and its tag automatically.
+- If the release was never created but the tag exists, the workflow deletes the orphan tag automatically.
+- If cleanup itself fails, manual cleanup may still be required.
+
+Manual cleanup commands:
+
+```bash
+gh release delete <tag> -R cypherair/cypherair --cleanup-tag --yes
+git push origin ":refs/tags/<tag>"
 ```
 
 ## Future Stable Releases

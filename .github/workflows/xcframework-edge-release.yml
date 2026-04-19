@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag_prefix:
-        description: Prefix for the unique prerelease tag.
+        description: Use `pgpmobile-edge` on `main` or `pgpmobile-drill-*` for non-main manual drills.
         required: true
         default: pgpmobile-edge
         type: string
@@ -20,7 +20,6 @@ permissions:
 env:
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
   XCFRAMEWORK_CHECKSUM: PgpMobile.xcframework.sha256
-  EDGE_METADATA: pgpmobile-edge.json
 
 jobs:
   publish-edge-release:
@@ -43,7 +42,27 @@ jobs:
         run: |
           set -euo pipefail
 
-          RELEASE_TAG_PREFIX="${INPUT_RELEASE_TAG_PREFIX:-pgpmobile-edge}"
+          EVENT_NAME="${GITHUB_EVENT_NAME}"
+          RELEASE_SOURCE_REF="${GITHUB_REF}"
+          RELEASE_SIGNER_WORKFLOW="cypherair/cypherair/.github/workflows/xcframework-edge-release.yml"
+
+          case "$EVENT_NAME" in
+            push)
+              RELEASE_TAG_PREFIX="pgpmobile-edge"
+              if [ "$RELEASE_SOURCE_REF" != "refs/heads/main" ]; then
+                echo "::error::Push-triggered edge releases are only allowed from refs/heads/main."
+                exit 1
+              fi
+              ;;
+            workflow_dispatch)
+              RELEASE_TAG_PREFIX="${INPUT_RELEASE_TAG_PREFIX:-pgpmobile-edge}"
+              ;;
+            *)
+              echo "::error::Unsupported event for edge release workflow: $EVENT_NAME"
+              exit 1
+              ;;
+          esac
+
           if [ -z "$RELEASE_TAG_PREFIX" ]; then
             echo "::error::release_tag_prefix must not be empty."
             exit 1
@@ -52,6 +71,37 @@ jobs:
           case "$RELEASE_TAG_PREFIX" in
             *[!A-Za-z0-9._-]*)
               echo "::error::release_tag_prefix may only contain letters, numbers, dots, underscores, and hyphens."
+              exit 1
+              ;;
+          esac
+
+          case "$RELEASE_TAG_PREFIX" in
+            pgpmobile-edge)
+              if [ "$RELEASE_SOURCE_REF" != "refs/heads/main" ]; then
+                echo "::error::Canonical pgpmobile-edge releases are only allowed from refs/heads/main. Use a pgpmobile-drill-* prefix for non-main manual runs."
+                exit 1
+              fi
+              RELEASE_CHANNEL="edge"
+              RELEASE_CHANNEL_LABEL="Edge"
+              RELEASE_METADATA="pgpmobile-edge.json"
+              ;;
+            pgpmobile-drill-?*)
+              if [ "$EVENT_NAME" != "workflow_dispatch" ]; then
+                echo "::error::pgpmobile-drill-* prefixes are only allowed for workflow_dispatch runs."
+                exit 1
+              fi
+
+              if [ "$RELEASE_SOURCE_REF" = "refs/heads/main" ]; then
+                echo "::error::refs/heads/main must use the canonical pgpmobile-edge prefix."
+                exit 1
+              fi
+
+              RELEASE_CHANNEL="drill"
+              RELEASE_CHANNEL_LABEL="Drill"
+              RELEASE_METADATA="pgpmobile-drill.json"
+              ;;
+            *)
+              echo "::error::release_tag_prefix must be exactly pgpmobile-edge or match pgpmobile-drill-*."
               exit 1
               ;;
           esac
@@ -71,14 +121,18 @@ jobs:
             exit 1
           fi
 
-          RELEASE_TITLE="PgpMobile Edge XCFramework ($RELEASE_TAG)"
+          RELEASE_TITLE="PgpMobile ${RELEASE_CHANNEL_LABEL} XCFramework ($RELEASE_TAG)"
           RELEASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
 
           {
+            echo "RELEASE_CHANNEL=$RELEASE_CHANNEL"
             echo "RELEASE_TAG_PREFIX=$RELEASE_TAG_PREFIX"
             echo "RELEASE_TAG=$RELEASE_TAG"
             echo "RELEASE_TITLE=$RELEASE_TITLE"
             echo "RELEASE_URL=$RELEASE_URL"
+            echo "RELEASE_SOURCE_REF=$RELEASE_SOURCE_REF"
+            echo "RELEASE_SIGNER_WORKFLOW=$RELEASE_SIGNER_WORKFLOW"
+            echo "RELEASE_METADATA=$RELEASE_METADATA"
             echo "RUN_ATTEMPT=$RUN_ATTEMPT"
             echo "WORKFLOW_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "WORKFLOW_REF_NAME=${GITHUB_REF_NAME}"
@@ -125,8 +179,9 @@ jobs:
             echo "PROJECT_BUILD_NUMBER=$PROJECT_BUILD_NUMBER"
           } >> "$GITHUB_ENV"
 
-          cat > "$EDGE_METADATA" <<EOF
+          cat > "$RELEASE_METADATA" <<EOF
           {
+            "release_channel": "$RELEASE_CHANNEL",
             "release_tag": "$RELEASE_TAG",
             "release_url": "$RELEASE_URL",
             "commit_sha": "$GITHUB_SHA",
@@ -137,14 +192,17 @@ jobs:
             "project_build_number": "$PROJECT_BUILD_NUMBER",
             "xcode_version": "$XCODE_VERSION",
             "rustc_version": "$RUSTC_VERSION",
-            "workflow_url": "$WORKFLOW_URL"
+            "workflow_url": "$WORKFLOW_URL",
+            "source_ref": "$RELEASE_SOURCE_REF"
           }
           EOF
 
           cat > release-notes.md <<EOF
-          Unique edge prerelease XCFramework built from workflow ref \`$WORKFLOW_REF_NAME\`.
+          Unique $RELEASE_CHANNEL prerelease XCFramework built from workflow ref \`$WORKFLOW_REF_NAME\`.
 
           - Release tag: \`$RELEASE_TAG\`
+          - Release channel: \`$RELEASE_CHANNEL\`
+          - Source ref: \`$RELEASE_SOURCE_REF\`
           - Commit: \`$GITHUB_SHA\`
           - Built at (UTC): \`$BUILT_AT\`
           - App marketing version: \`$MARKETING_VERSION\`
@@ -157,15 +215,15 @@ jobs:
 
           - \`$XCFRAMEWORK_ZIP\`
           - \`$XCFRAMEWORK_CHECKSUM\`
-          - \`$EDGE_METADATA\`
+          - \`$RELEASE_METADATA\`
 
           Verification:
 
           \`\`\`bash
-          shasum -a 256 -c $XCFRAMEWORK_CHECKSUM
-          gh release verify $RELEASE_TAG -R $GITHUB_REPOSITORY
-          gh release verify-asset $RELEASE_TAG $XCFRAMEWORK_ZIP -R $GITHUB_REPOSITORY
-          gh attestation verify $XCFRAMEWORK_ZIP -R $GITHUB_REPOSITORY
+          shasum -a 256 -c "$XCFRAMEWORK_CHECKSUM"
+          gh release verify "$RELEASE_TAG" -R "$GITHUB_REPOSITORY"
+          gh release verify-asset "$RELEASE_TAG" "$XCFRAMEWORK_ZIP" -R "$GITHUB_REPOSITORY"
+          gh attestation verify "$XCFRAMEWORK_ZIP" -R "$GITHUB_REPOSITORY" --signer-workflow "$RELEASE_SIGNER_WORKFLOW" --source-ref "$RELEASE_SOURCE_REF"
           \`\`\`
           EOF
       - name: Generate artifact attestation
@@ -209,7 +267,7 @@ jobs:
           gh release upload "$RELEASE_TAG" \
             "$XCFRAMEWORK_ZIP" \
             "$XCFRAMEWORK_CHECKSUM" \
-            "$EDGE_METADATA"
+            "$RELEASE_METADATA"
       - name: Publish draft edge prerelease
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -220,3 +278,42 @@ jobs:
             --draft=false \
             --prerelease \
             --latest=false
+      - name: Cleanup failed draft release/tag
+        if: ${{ failure() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+
+          warn() {
+            echo "::warning::$1"
+          }
+
+          if [ -z "${RELEASE_TAG:-}" ]; then
+            echo "No release tag resolved; skipping cleanup."
+            exit 0
+          fi
+
+          release_is_draft="$(gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null)"
+          release_status=$?
+
+          if [ $release_status -eq 0 ]; then
+            if [ "$release_is_draft" = "true" ]; then
+              if ! gh release delete "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" --cleanup-tag --yes; then
+                warn "Failed to delete draft release and tag for $RELEASE_TAG; manual cleanup may be required."
+              fi
+              exit 0
+            fi
+
+            warn "Release $RELEASE_TAG is no longer a draft; leaving release and tag in place."
+            exit 0
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            if ! git push origin ":refs/tags/$RELEASE_TAG"; then
+              warn "Failed to delete orphan tag $RELEASE_TAG; manual cleanup may be required."
+            fi
+            exit 0
+          fi
+
+          echo "No draft release or orphan tag found for $RELEASE_TAG."

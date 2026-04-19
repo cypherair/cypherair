@@ -106,7 +106,7 @@ The repository currently uses two validation tiers in GitHub Actions.
 
 The repository also publishes unique edge XCFramework prereleases:
 
-- `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, rebuilds and validates the XCFramework, then publishes a unique `pgpmobile-edge-` prerelease with immutable-safe draft upload flow
+- `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, rebuilds and validates the XCFramework, then publishes a unique `pgpmobile-edge-` prerelease for canonical `main` builds; non-main manual runs must use `pgpmobile-drill-*` prefixes
 
 ## 2.2 GitHub Actions Hosted macOS Limitation
 
