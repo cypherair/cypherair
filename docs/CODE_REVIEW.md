@@ -8,7 +8,7 @@
 - [ ] Rust targets compile: `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, `aarch64-apple-visionos`, and `aarch64-apple-visionos-sim`
 - [ ] For Rust / UniFFI-visible behavior changes, `./build-xcframework.sh --release` has been run before any Xcode validation
 - [ ] `cargo test`, local `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`, and the native visionOS build probe pass
-- [ ] If `Hosted macOS Unit Tests` failed in GitHub Actions, the result was reviewed with the hosted macOS 26.4 runner limitation in mind; local macOS validation remains the source of truth until hosted macOS catches up or a self-hosted runner is used
+- [ ] If `swift-unit-tests-hosted-preview` ran in GitHub Actions, its result was reviewed as observational only while hosted macOS remains below 26.4
 - [ ] No new compiler warnings
 - [ ] No hardcoded user-visible strings (all in String Catalog)
 - [ ] No force-unwrap (`!`) in production code
