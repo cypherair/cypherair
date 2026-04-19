@@ -47,7 +47,7 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 | Platform | iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+, minimum 8 GB RAM |
 | Language | Swift 6.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere), UIKit for system pickers |
 | OpenPGP Engine | Sequoia PGP 2.2.0 (Rust), `crypto-openssl` backend (vendored) |
-| FFI Bridge | Mozilla UniFFI 0.31.x; Xcode links target-specific release archives plus `bindings/module.modulemap` directly |
+| FFI Bridge | Mozilla UniFFI 0.31.x; Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap` |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |
 | Build | Xcode 26, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim` |
 | Localization | English + Simplified Chinese (.xcstrings) |
@@ -106,7 +106,7 @@ Recent refactors focused on maintainability and safety without changing the app'
 # 1. Validate Rust behavior
 cargo test --manifest-path pgp-mobile/Cargo.toml
 
-# 2. Refresh Rust artifacts, bindings, and packaged outputs used by Xcode
+# 2. Refresh the XCFramework artifact and generated bindings used by Xcode
 ./build-xcframework.sh --release
 
 # 3. Validate Swift unit + FFI behavior locally
@@ -135,7 +135,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
 
 There is currently no dedicated visionOS XCTest test plan. Native visionOS validation uses the build probe above together with the existing Rust, macOS-local, and iOS-device validation paths.
 
-For the full Rust / UniFFI / Xcode workflow, including artifact refresh details, direct-archive linkage, and stale-output troubleshooting, see [docs/TESTING.md](docs/TESTING.md) and [CLAUDE.md](CLAUDE.md).
+For the full Rust / UniFFI / Xcode workflow, including XCFramework artifact refresh details and stale-output troubleshooting, see [docs/TESTING.md](docs/TESTING.md) and [CLAUDE.md](CLAUDE.md).
 
 ### CI Note
 

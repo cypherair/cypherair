@@ -110,19 +110,21 @@ Impact:
 
 Rust changes under `pgp-mobile/src` do **not** automatically refresh the build products that Xcode uses for Swift and FFI validation.
 
-Today, the Xcode project explicitly links these static archives:
+Today, the Xcode project links:
 
-- `pgp-mobile/target/aarch64-apple-ios/release/libpgp_mobile.a`
-- `pgp-mobile/target/aarch64-apple-ios-sim/release/libpgp_mobile.a`
-- `pgp-mobile/target/aarch64-apple-darwin/release/libpgp_mobile.a`
-- `pgp-mobile/target/aarch64-apple-visionos/release/libpgp_mobile.a`
-- `pgp-mobile/target/aarch64-apple-visionos-sim/release/libpgp_mobile.a`
+- `PgpMobile.xcframework`
 - `bindings/module.modulemap`
 - `Sources/PgpMobile/pgp_mobile.swift`
 
-The local `PgpMobile.xcframework` output may still be produced by the build script and can exist in the working tree, but it is ignored by git, not tracked in source control, and not used directly for the current Xcode link step.
+`PgpMobile.xcframework` is a local generated artifact. It is ignored by git and must be refreshed with `./build-xcframework.sh --release` after Rust or UniFFI changes that can affect Swift-visible behavior. The shared scheme and app target both check for the artifact and fail with a clear error if the XCFramework is missing.
 
-Target-specific `libpgp_mobile.dylib` files must **not** exist in those Xcode-linked target directories. They can shadow the intended static archive and cause missing UniFFI symbols at link time. The build script treats the host dylib used for UniFFI bindgen as a temporary artifact and removes it before exiting.
+The Rust static archives under `pgp-mobile/target/.../release` are intermediate inputs used to create the XCFramework, not Xcode link inputs. After a successful `./build-xcframework.sh --release`, you may reclaim Cargo target space with:
+
+```bash
+cargo clean --manifest-path pgp-mobile/Cargo.toml
+```
+
+Target-specific `libpgp_mobile.dylib` files must **not** exist next to those intermediate static archives. They are stale build state from older direct-link flows and can shadow the intended static archive if stale project settings or manual linker flags are used. The build script treats the host dylib used for UniFFI bindgen as a temporary artifact and removes it before exiting.
 
 This means there are three distinct workflows:
 
@@ -137,9 +139,9 @@ cargo test --manifest-path pgp-mobile/Cargo.toml
 This is the default local path and skips `#[ignore = "slow"]` Rust tests.
 It does **not** refresh the release archives or generated UniFFI outputs that Xcode consumes.
 
-### B. Refresh the Rust release archives that Xcode links
+### B. Build Rust release archives only
 
-Use this when Rust implementation changed but the UniFFI surface and generated bindings did not.
+Use this only when you want to refresh or inspect the platform-specific Rust release archives directly. This does **not** refresh the XCFramework artifact that Xcode consumes.
 
 ```bash
 cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
@@ -151,7 +153,7 @@ cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mo
 
 ### C. Full UniFFI / bindings / XCFramework sync
 
-Use this when the UniFFI surface, generated bindings, headers, or packaged XCFramework artifacts changed, or whenever you want the safest full refresh.
+Use this when Rust implementation, the UniFFI surface, generated bindings, headers, or packaged XCFramework artifacts changed, or whenever you want the safest full refresh before Swift / FFI validation.
 
 Recommended path:
 
@@ -159,7 +161,7 @@ Recommended path:
 ./build-xcframework.sh --release
 ```
 
-Prefer this path after Rust or UniFFI changes because it refreshes the static archives, regenerates bindings, and enforces the dylib cleanup/validation that keeps Xcode linking deterministic.
+Prefer this path after Rust or UniFFI changes because it refreshes the intermediate static archives, regenerates bindings, recreates `PgpMobile.xcframework`, and enforces the dylib cleanup/validation that keeps Xcode linking deterministic.
 
 If you must run the underlying bindgen step manually, run it from `pgp-mobile/`, not from the repo root:
 
@@ -196,13 +198,9 @@ Treat this as build/linkage and platform-availability validation, not as a subst
 Recommended flows:
 
 ```bash
-# Rust-only behavior change
+# Rust-backed behavior change
 cargo test --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
+./build-xcframework.sh --release
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
 xcodebuild build -scheme CypherAir \
@@ -222,9 +220,9 @@ xcodebuild build -scheme CypherAir \
 Typical stale-artifact symptoms:
 
 - Rust tests reflect the new behavior, but Swift unit tests or FFI integration tests still show the old behavior.
-- The app links against the refreshed static archive path, but new UniFFI symbols or generated Swift types are missing.
+- The app links against an older `PgpMobile.xcframework`, but new UniFFI symbols or generated Swift types are missing.
 
-If that happens, first suspect stale Rust release archives or generated UniFFI outputs rather than stale Swift source.
+If that happens, first suspect a stale `PgpMobile.xcframework` or generated UniFFI output rather than stale Swift source.
 
 If a Rust / UniFFI change affects contact import validation, validation must also prove the
 stable public-only contract end to end:

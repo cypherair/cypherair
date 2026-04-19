@@ -75,7 +75,7 @@ xcodebuild build -scheme CypherAir \
 
 There is currently no dedicated visionOS XCTest test plan. Native visionOS validation uses the build probe above together with the existing Rust, macOS-local, and iOS-device validation paths.
 
-For the full Rust artifact refresh, UniFFI/bindings sync, direct-archive linkage details, and Xcode validation workflow, see `docs/TESTING.md`.
+For the full Rust artifact refresh, UniFFI/bindings sync, XCFramework linkage details, and Xcode validation workflow, see `docs/TESTING.md`.
 
 ## Non-Negotiable Constraints
 
@@ -139,6 +139,7 @@ Mode switching requires re-wrapping all Secure Enclave protected keys.
 - Keep changes scoped to the user request.
   This means only make changes that are directly required to complete the requested task; it is not permission to normalize, revert, or clean up unrelated local changes that are already in the worktree.
 - Do not add “nice to have” refactors unless they directly support the requested work.
+- In Plan mode only, for build-system, Xcode-project, packaging, or other high-coupling changes where toolchain behavior is a material risk, prefer validating the approach first in an isolated temporary copy or other disposable prototype environment before editing the real workspace.
 - Prefer small, reviewable diffs.
 - Maintain existing user-visible behavior unless the task explicitly changes it.
 - Treat `pgp_mobile.swift` as generated code. Do not hand-edit it.
@@ -163,8 +164,8 @@ If the user asks to increment the build number, first read the current `CURRENT_
 - Crypto behavior changes must be tested for both profiles.
 - Add negative tests for failure paths, not only happy paths.
 - Secure Enclave / biometric tests must be guarded for real hardware availability.
-- Rust changes under `pgp-mobile/src` do **not** automatically refresh the Rust `release` static libraries that Xcode links for Swift/FFI tests.
-- If a Rust change can affect Swift-visible behavior, rebuild the Rust `release` artifacts (or run `./build-xcframework.sh --release`) before running `xcodebuild test`.
+- Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode uses for Swift/FFI tests.
+- If a Rust change can affect Swift-visible behavior, run `./build-xcframework.sh --release` before running `xcodebuild test`.
 - See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
 - For route ownership, launch, tutorial-host, or macOS UI workflow changes, also run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted smoke subset.
 
@@ -187,6 +188,7 @@ Before editing:
 - Read the relevant implementation files
 - Check `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, and `docs/TESTING.md` when touching core flows
 - Confirm whether the change crosses a sensitive boundary
+- In Plan mode, if the task changes build/link/package topology or Xcode wiring, consider a disposable prototype run first to prove feasibility before touching the real project files
 
 After editing:
 
