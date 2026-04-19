@@ -93,16 +93,17 @@ There is currently no dedicated visionOS XCTest plan. Native visionOS validation
 
 ## 2.1 Current GitHub Actions Lanes
 
-The repository currently uses two validation tiers in GitHub Actions.
+The repository currently uses separate GitHub Actions workflows for blocking validation, hosted macOS unit-test visibility, and XCFramework edge releases.
 
-**Blocking jobs** — must pass on pull requests and nightly validation:
+**PR and nightly validation** — must pass on pull requests and nightly validation:
 
 - `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
 - `xcframework-package` runs `./build-xcframework.sh --release`, uploads the `pgpmobile-xcframework` artifact for 5 days, and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes
 
-**Observational jobs** — useful signal, but non-blocking while GitHub-hosted macOS remains below the project deployment target:
+**Hosted macOS Unit Tests** — runs on pull requests, `main` pushes, `workflow_dispatch`, and a daily `10:30 UTC` schedule:
 
-- `swift-unit-tests-hosted-preview` downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests`
+- `macos-unit-tests` rebuilds `PgpMobile.xcframework` with `./build-xcframework.sh --release` and runs hosted macOS `CypherAir-UnitTests`
+- The workflow is intentionally separate and does not use `continue-on-error`, so hosted Swift test failures appear as a failed check. GitHub branch protection determines whether that check blocks merges.
 
 The repository also publishes unique edge XCFramework prereleases:
 
@@ -120,8 +121,8 @@ At the time of writing:
 Impact:
 
 - Rust CI remains valid.
-- The hosted Swift unit-test preview job can fail before test execution because the runner OS is older than the app/test deployment target.
-- The hosted Swift unit-test preview remains observational / non-blocking until GitHub's hosted image catches up or a self-hosted macOS runner is used.
+- The independent hosted macOS unit-test workflow can fail before test execution because the runner OS is older than the app/test deployment target.
+- Hosted macOS unit-test failures should be reviewed as explicit CI signal, but branch protection determines whether the independent workflow blocks merges.
 - Local macOS validation remains the source of truth until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 
 ## 2.3 Rust Artifacts, UniFFI Outputs, and Xcode Validation

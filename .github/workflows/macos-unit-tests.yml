@@ -1,0 +1,36 @@
+name: Hosted macOS Unit Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "30 10 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-unit-tests:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Rust stable toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install stable
+          rustup default stable
+          rustc --version
+          cargo --version
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - name: Build XCFramework and generated bindings
+        run: ./build-xcframework.sh --release
+      - name: Run hosted macOS unit tests
+        run: |
+          xcodebuild test \
+            -scheme CypherAir \
+            -project CypherAir.xcodeproj \
+            -testPlan CypherAir-UnitTests \
+            -destination 'platform=macOS,arch=arm64'
