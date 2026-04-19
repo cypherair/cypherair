@@ -8,7 +8,9 @@
 
 ### 1.1 Selection
 
-sequoia-openpgp 2.2.0. Rust. RFC 9580 + RFC 4880 complete. LGPL-2.0-or-later (App Store compatible; compatible with App's GPLv3).
+sequoia-openpgp 2.2.0. Rust. RFC 9580 + RFC 4880 complete. Licensed under LGPL-2.0-or-later.
+
+Licensing and distribution-compliance migration questions for the current App Store / first-party `GPLv3` posture and Sequoia-linked binary distribution are tracked in [COMPLIANCE_REMEDIATION_PLAN.md](COMPLIANCE_REMEDIATION_PLAN.md). This section records the current technical library selection, not a final legal conclusion about distribution compatibility.
 
 | Library | Lang | RFC 9580 | Argon2id | iOS | Decision |
 |---------|------|----------|----------|-----|----------|

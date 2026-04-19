@@ -6,7 +6,7 @@ Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. GPLv3. Zer
 
 - **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+. Minimum device: 8 GB RAM.
 - **Language:** Swift 6.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). UIKit only for system pickers.
-- **OpenPGP:** Sequoia PGP 2.2.0 (Rust, LGPL-2.0-or-later, compatible with App's GPLv3) with `crypto-openssl` backend (vendored static linking).
+- **OpenPGP:** Sequoia PGP 2.2.0 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Active licensing and distribution-compliance migration questions are tracked in @docs/COMPLIANCE_REMEDIATION_PLAN.md.
 - **Profiles:** Profile A (Universal): v4 keys, Ed25519+X25519, SEIPDv1. Profile B (Advanced): v6 keys, Ed448+X448, SEIPDv2 AEAD. See @docs/PRD.md Section 3.
 - **FFI:** Mozilla UniFFI 0.31.x. Rust wrapper crate `pgp-mobile` generates Swift bindings and packaged outputs, while Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap`.
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain).
