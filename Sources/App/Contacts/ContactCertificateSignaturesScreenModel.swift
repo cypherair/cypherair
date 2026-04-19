@@ -241,15 +241,13 @@ final class ContactCertificateSignaturesScreenModel {
     func handleImportedFile(_ url: URL) {
         do {
             let loadedFile = try signatureFileImportAction(url)
-            let visibleText = loadedFile.text ?? signatureInput
+            let visibleText = loadedFile.text ?? ""
             importedSignature.setImportedFile(
                 data: loadedFile.data,
                 fileName: url.lastPathComponent,
                 text: visibleText
             )
-            if let text = loadedFile.text {
-                signatureInput = text
-            }
+            signatureInput = visibleText
             invalidateVerification()
         } catch {
             presentMappedError(error)
