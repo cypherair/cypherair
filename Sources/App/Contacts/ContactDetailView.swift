@@ -2,10 +2,27 @@ import SwiftUI
 
 /// Shows details of a contact's public key.
 struct ContactDetailView: View {
+    struct Configuration {
+        var showsCertificateSignatureEntry = true
+        var allowsCertificateSignatureLaunch = true
+        var certificateSignatureRestrictionMessage: String?
+
+        static let `default` = Configuration()
+    }
+
     let fingerprint: String
+    let configuration: Configuration
 
     @Environment(ContactService.self) private var contactService
     @Environment(\.dismiss) private var dismiss
+
+    init(
+        fingerprint: String,
+        configuration: Configuration = .default
+    ) {
+        self.fingerprint = fingerprint
+        self.configuration = configuration
+    }
 
     @State private var showDeleteConfirmation = false
     @State private var deleteError: String?
@@ -91,6 +108,30 @@ struct ContactDetailView: View {
                     }
 
                     Section {
+                        if configuration.showsCertificateSignatureEntry {
+                            NavigationLink(
+                                value: AppRoute.contactCertificateSignatures(fingerprint: fingerprint)
+                            ) {
+                                Label(
+                                    String(
+                                        localized: "contactdetail.certificateSignatures",
+                                        defaultValue: "Certificate Signatures"
+                                    ),
+                                    systemImage: "checkmark.seal"
+                                )
+                            }
+                            .disabled(!configuration.allowsCertificateSignatureLaunch)
+                            .accessibilityIdentifier("contactdetail.certificateSignatures")
+                        }
+                    } header: {
+                        Text(String(localized: "contactdetail.actions", defaultValue: "Actions"))
+                    } footer: {
+                        if let restrictionMessage = configuration.certificateSignatureRestrictionMessage {
+                            Text(restrictionMessage)
+                        }
+                    }
+
+                    Section {
                         Button(role: .destructive) {
                             showDeleteConfirmation = true
                         } label: {
@@ -111,6 +152,8 @@ struct ContactDetailView: View {
         #if os(macOS)
         .listStyle(.inset)
         #endif
+        .accessibilityIdentifier("contactdetail.root")
+        .screenReady("contactdetail.ready")
         .navigationTitle(String(localized: "contactdetail.title", defaultValue: "Contact"))
         .confirmationDialog(
             String(localized: "contactdetail.delete.title", defaultValue: "Remove Contact"),

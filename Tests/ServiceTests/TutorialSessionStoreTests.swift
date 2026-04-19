@@ -361,6 +361,7 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNotNil(blocklist.blockedRoute(for: .selfTest))
         XCTAssertNotNil(blocklist.blockedRoute(for: .appIcon))
         XCTAssertNotNil(blocklist.blockedRoute(for: .selectiveRevocation(fingerprint: "test-fingerprint")))
+        XCTAssertNotNil(blocklist.blockedRoute(for: .contactCertificateSignatures(fingerprint: "test-fingerprint")))
         XCTAssertNil(blocklist.blockedRoot(for: .sign))
         XCTAssertNil(blocklist.blockedRoot(for: .verify))
         XCTAssertNil(blocklist.blockedRoute(for: .encrypt))
@@ -439,8 +440,19 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertFalse(configuration.allowsPublicKeySave)
         XCTAssertFalse(configuration.allowsPublicKeyCopy)
         XCTAssertFalse(configuration.allowsRevocationExport)
+        XCTAssertTrue(configuration.showsSelectiveRevocationEntry)
         XCTAssertFalse(configuration.allowsSelectiveRevocationLaunch)
+        XCTAssertNotNil(configuration.selectiveRevocationRestrictionMessage)
         XCTAssertTrue(configuration.outputInterceptionPolicy.interceptClipboardCopy?("public-key", config, .publicKey) == true)
+    }
+
+    func test_tutorialConfigurationFactory_contactDetailConfiguration_showsDisabledCertificateSignatureEntry() {
+        let store = TutorialSessionStore()
+        let configuration = store.configurationFactory.contactDetailConfiguration()
+
+        XCTAssertTrue(configuration.showsCertificateSignatureEntry)
+        XCTAssertFalse(configuration.allowsCertificateSignatureLaunch)
+        XCTAssertNotNil(configuration.certificateSignatureRestrictionMessage)
     }
 
     func test_tutorialConfigurationFactory_backupConfiguration_usesInlinePreviewAndActiveExportCallback() {

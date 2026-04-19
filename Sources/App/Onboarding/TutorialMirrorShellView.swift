@@ -18,6 +18,7 @@ struct TutorialMirrorShellView: View {
             .environment(container.encryptionService)
             .environment(container.decryptionService)
             .environment(container.signingService)
+            .environment(container.certificateSignatureService)
             .environment(container.qrService)
             .environment(container.selfTestService)
             .environment(container.authManager)

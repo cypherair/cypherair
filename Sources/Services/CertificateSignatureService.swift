@@ -105,6 +105,26 @@ final class CertificateSignatureService {
         }
     }
 
+    func generateArmoredUserIdCertification(
+        signerFingerprint: String,
+        targetCert: Data,
+        selectedUserId: UserIdSelectionOption,
+        certificationKind: CertificationKind
+    ) async throws -> Data {
+        let rawSignature = try await generateUserIdCertification(
+            signerFingerprint: signerFingerprint,
+            targetCert: targetCert,
+            selectedUserId: selectedUserId,
+            certificationKind: certificationKind
+        )
+
+        do {
+            return try engine.armor(data: rawSignature, kind: .signature)
+        } catch {
+            throw CypherAirError.from(error) { .armorError(reason: $0) }
+        }
+    }
+
     func candidateSignerCertificates() -> [Data] {
         contactService.contacts.map(\.publicKeyData)
             + keyManagement.keys.map(\.publicKeyData)

@@ -40,6 +40,11 @@ struct TutorialView: View {
                 hasPreparedPresentation = true
                 tutorialStore.configurePersistence(appConfiguration: config)
                 tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
+                #if DEBUG
+                if await tutorialStore.prepareUITestContactDetailSurfaceIfRequested() {
+                    return
+                }
+                #endif
                 if let initialModule {
                     await tutorialStore.openModule(initialModule)
                 }

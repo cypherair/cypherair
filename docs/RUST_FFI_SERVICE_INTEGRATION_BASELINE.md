@@ -32,7 +32,7 @@ The tracked families remain:
 | Certificate Merge / Update | `ContactService` | `ContactImportWorkflow`, `AddContactView`, `IncomingURLImportCoordinator`, URL import flow in `CypherAirApp` | Rust merge/validation tests, FFI integration tests, `ContactServiceTests` | None on the current same-fingerprint update path | Completed service and app baseline |
 | Revocation Construction | `KeyManagementService` facade with focused internal key-management owners, including selective revocation support | `KeyDetailView` key-level export, `SelectiveRevocationView` for subkey/User ID export | Rust revocation tests, FFI integration tests, `KeyManagementServiceTests`, `SelectiveRevocationScreenModelTests`, `MacUISmokeTests` | None on the current shipped revocation-export workflows | Completed service and app baseline |
 | Password / SKESK Symmetric Messages | `PasswordMessageService` | None | Rust password tests, FFI integration tests, `PasswordMessageServiceTests` | No app route, no screen-model owner, and no user-facing plaintext/export workflow | Service implemented; app consumer missing |
-| Certification And Binding Verification | `CertificateSignatureService` | None | Rust certification/binding tests, FFI integration tests, `CertificateSignatureServiceTests` | No contact-scoped app route or workflow owner | Service implemented; app consumer missing |
+| Certification And Binding Verification | `CertificateSignatureService` | `ContactDetailView` launcher + `ContactCertificateSignaturesView` / `ContactCertificateSignaturesScreenModel` | Rust certification/binding tests, FFI integration tests, `CertificateSignatureServiceTests`, `ContactCertificateSignaturesScreenModelTests`, `MacUISmokeTests` | None on the shipped contact-scoped certificate-signature workflow | Completed service and app baseline |
 | Richer Signature Results | `SigningService` and `DecryptionService` | `VerifyView` / `VerifyScreenModel`, `DecryptView` / `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Rust detailed-result tests, FFI integration tests, `SigningServiceDetailedResultTests`, `DecryptionServiceTests` | No current service-boundary gap. The UI intentionally preserves a summary-first presentation through the legacy bridge while also showing detailed entries. | Completed service and app baseline |
 
 ## 3. Family Notes
@@ -57,7 +57,8 @@ The tracked families remain:
 ### 3.4 Certification And Binding Verification
 
 - `CertificateSignatureService` owns direct-key verification, User ID binding verification, selector discovery for target certificates, and User ID certification generation.
-- The remaining gap is a contact-scoped app workflow; no current `ContactDetailView` route or screen-model owns these operations.
+- `ContactDetailView` now owns the launcher surface and `ContactCertificateSignaturesView` / `ContactCertificateSignaturesScreenModel` own the contact-scoped app workflow.
+- Tutorial surfaces keep the launcher visible-but-disabled and continue to block direct route access.
 
 ### 3.5 Richer Signature Results
 
@@ -68,5 +69,4 @@ The tracked families remain:
 ## 4. Current Downstream Gaps
 
 - `PasswordMessageService` still has no shipped app workflow.
-- `CertificateSignatureService` still has no shipped contact-scoped UI workflow.
 - The other tracked families no longer have current service-boundary or app-boundary gaps on their shipped paths.

@@ -347,6 +347,49 @@ final class TutorialSessionStore {
     func markCompletedForTesting(_ module: TutorialModuleID) {
         complete(module)
     }
+
+    func prepareUITestContactDetailSurfaceIfRequested(
+        processInfo: ProcessInfo = .processInfo
+    ) async -> Bool {
+        guard processInfo.environment["UITEST_TUTORIAL_CONTACT_DETAIL"] == "1" else {
+            return false
+        }
+
+        ensureSession()
+        markCompletedForTesting(.sandbox)
+        markCompletedForTesting(.createDemoIdentity)
+        await openModule(.addDemoContact)
+
+        do {
+            guard let container else {
+                return false
+            }
+
+            await ensureBobPrepared()
+            guard let bobArmoredPublicKey = session.artifacts.bobArmoredPublicKey else {
+                return false
+            }
+
+            let result = try container.contactService.addContact(
+                publicKeyData: Data(bobArmoredPublicKey.utf8)
+            )
+            let contact: Contact
+            switch result {
+            case .added(let added), .duplicate(let added), .updated(let added):
+                contact = added
+            case .keyUpdateDetected(let newContact, _, _):
+                contact = newContact
+            }
+
+            noteBobImported(contact)
+            selectTab(.contacts)
+            setRoutePath([.contactDetail(fingerprint: contact.fingerprint)], for: .contacts)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
     #endif
 
     func navigateToPostGenerationPrompt(_ identity: PGPKeyIdentity) {

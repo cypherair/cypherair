@@ -85,7 +85,7 @@ The workspace currently includes three Xcode Test Plans:
 
 **CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, biometric auth modes, mode switching, crash recovery, MIE validation.
 
-**CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for macOS UI automation, including `UITests/MacUISmokeTests.swift` coverage for main, settings, and tutorial launch/smoke flows.
+**CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for macOS UI automation, including `UITests/MacUISmokeTests.swift` coverage for main, settings, tutorial launch/smoke flows, and the contact-scoped certificate-signature route.
 
 There is currently no dedicated visionOS XCTest plan. Native visionOS validation uses a generic build probe together with the existing Rust, macOS-local, and iOS-device validation paths.
 
@@ -289,6 +289,8 @@ When changing certificate-signature verification or User ID certification behavi
 - issuer-guided success plus a missing-issuer fallback success path
 - parse/type/precondition failure returning `Err(...)` instead of a family-local invalid result
 - third-party certification generation followed by successful crypto verification
+- contact-scoped screen-model coverage for selector loading, retry/cancel behavior, export orchestration, and result presentation
+- app-level coverage that the contact-scoped workflow accepts both `.asc` and `.sig` signature files and that generated armored certification output can be verified through the same workflow
 - all four OpenPGP certification kinds: `Generic`, `Persona`, `Casual`, and `Positive`
 - selector-based User ID operations using `userIdData + occurrenceIndex`, including out-of-range and bytes-mismatch rejection
 - verify-result `certificationKind` matching the signature type for User ID certification signatures

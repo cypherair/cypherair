@@ -4151,6 +4151,38 @@
         }
       }
     },
+    "guidedTutorial.blocked.certificateSignatures.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate signature workflows are unavailable inside the tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书签名工作流在教程沙箱中不可用。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.certificateSignatures.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate Signatures Unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法使用证书签名"
+          }
+        }
+      }
+    },
     "guidedTutorial.blocked.sign.body" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5336,6 +5368,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在教程沙箱中无法导入真实文件。请直接粘贴文本以继续安全探索这个页面。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.restricted.certificateSignatures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate signature workflows are unavailable inside the tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书签名工作流在教程沙箱中不可用。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.restricted.selectiveRevocation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selective revocation exports are unavailable inside the tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择性吊销导出在教程沙箱中不可用。"
           }
         }
       }

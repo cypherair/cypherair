@@ -120,7 +120,8 @@ final class AppContainer {
     }
 
     static func makeUITest(
-        requiresManualAuthentication: Bool = false
+        requiresManualAuthentication: Bool = false,
+        preloadContact: Bool = false
     ) -> AppContainer {
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
@@ -182,6 +183,10 @@ final class AppContainer {
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
 
+        if preloadContact {
+            try? preloadUITestContact(engine: engine, contactService: contactService)
+        }
+
         return AppContainer(
             secureEnclave: secureEnclave,
             keychain: keychain,
@@ -200,5 +205,18 @@ final class AppContainer {
             contactsDirectory: contactsDirectory,
             defaultsSuiteName: suiteName
         )
+    }
+
+    private static func preloadUITestContact(
+        engine: PgpEngine,
+        contactService: ContactService
+    ) throws {
+        let generated = try engine.generateKey(
+            name: "UITest Contact",
+            email: "uitest-contact@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
     }
 }

@@ -29,6 +29,7 @@ final class TutorialSandboxContainer {
     let encryptionService: EncryptionService
     let decryptionService: DecryptionService
     let signingService: SigningService
+    let certificateSignatureService: CertificateSignatureService
     let qrService: QRService
     let selfTestService: SelfTestService
     let contactsDirectory: URL
@@ -91,6 +92,11 @@ final class TutorialSandboxContainer {
             contactService: contactService
         )
         self.signingService = SigningService(
+            engine: engine,
+            keyManagement: keyManagement,
+            contactService: contactService
+        )
+        self.certificateSignatureService = CertificateSignatureService(
             engine: engine,
             keyManagement: keyManagement,
             contactService: contactService

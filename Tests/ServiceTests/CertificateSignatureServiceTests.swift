@@ -272,6 +272,81 @@ final class CertificateSignatureServiceTests: XCTestCase {
         }
     }
 
+    func test_generateArmoredUserIdCertification_returnsArmoredSignature() async throws {
+        let signer = try await generateSigner(
+            profile: .advanced,
+            name: "Armored Signer",
+            email: "armored-signer@example.com"
+        )
+        let target = try generatedTarget(
+            profile: .advanced,
+            name: "Armored Target",
+            email: "armored-target@example.com"
+        )
+        let selectedUserId = try selectedUserId(for: target.publicKeyData)
+
+        let armored = try await stack.certificateSignatureService.generateArmoredUserIdCertification(
+            signerFingerprint: signer.fingerprint,
+            targetCert: target.publicKeyData,
+            selectedUserId: selectedUserId,
+            certificationKind: .positive
+        )
+
+        XCTAssertTrue(
+            String(data: armored, encoding: .utf8)?.contains("BEGIN PGP SIGNATURE") == true
+        )
+    }
+
+    func test_generateArmoredUserIdCertification_dearmoredRoundTrip_verifiesSuccessfully() async throws {
+        let signer = try await generateSigner(
+            profile: .universal,
+            name: "Armored Roundtrip Signer",
+            email: "armored-roundtrip-signer@example.com"
+        )
+        let target = try generatedTarget(
+            profile: .universal,
+            name: "Armored Roundtrip Target",
+            email: "armored-roundtrip-target@example.com"
+        )
+        let selectedUserId = try selectedUserId(for: target.publicKeyData)
+
+        let armored = try await stack.certificateSignatureService.generateArmoredUserIdCertification(
+            signerFingerprint: signer.fingerprint,
+            targetCert: target.publicKeyData,
+            selectedUserId: selectedUserId,
+            certificationKind: .casual
+        )
+        let binary = try stack.engine.dearmor(armored: armored)
+
+        let verification = try await stack.certificateSignatureService.verifyUserIdBindingSignature(
+            signature: binary,
+            targetCert: target.publicKeyData,
+            selectedUserId: selectedUserId
+        )
+
+        XCTAssertEqual(verification.status, .valid)
+        XCTAssertEqual(verification.certificationKind, .casual)
+    }
+
+    func test_verifyDirectKeySignature_acceptsBinaryAndArmoredSignatureBytes() async throws {
+        let target = try loadFixture("ffi_direct_key_target")
+        let binary = try loadFixture("ffi_direct_key_signature", ext: "sig")
+        let armored = try stack.engine.armor(data: binary, kind: .signature)
+        _ = try stack.contactService.addContact(publicKeyData: target)
+
+        let armoredVerification = try await stack.certificateSignatureService.verifyDirectKeySignature(
+            signature: armored,
+            targetCert: target
+        )
+        let binaryVerification = try await stack.certificateSignatureService.verifyDirectKeySignature(
+            signature: binary,
+            targetCert: target
+        )
+
+        XCTAssertEqual(armoredVerification.status, .valid)
+        XCTAssertEqual(binaryVerification.status, .valid)
+    }
+
     func test_generateUserIdCertification_mismatchedSelector_throwsInvalidKeyDataWithoutUnwrap()
         async throws
     {

@@ -9,7 +9,9 @@ final class MacUISmokeTests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication()
+        app = MainActor.assumeIsolated {
+            XCUIApplication()
+        }
     }
 
     func test_mainFlow_keyReady_opensKeyDetail() throws {
@@ -61,6 +63,20 @@ final class MacUISmokeTests: XCTestCase {
         element("keydetail.selectiveRevocation").tap()
 
         waitForScreenReady("selectiverevocation.ready")
+    }
+
+    func test_mainFlow_contacts_opensCertificateSignatures() throws {
+        launchMain(preloadContact: true)
+
+        element("sidebar.contacts").tap()
+        XCTAssertTrue(element("contacts.row").waitForExistence(timeout: 10))
+        element("contacts.row").tap()
+
+        waitForScreenReady("contactdetail.ready")
+
+        element("contactdetail.certificateSignatures").tap()
+
+        waitForScreenReady("contactcertsig.ready")
     }
 
     func test_settingsRoot_opensThemePicker() throws {
@@ -129,12 +145,32 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("backup.ready")
     }
 
+    func test_tutorial_keyDetail_showsDisabledSelectiveRevocationEntry() throws {
+        launchTutorial(task: "generateAliceKey")
+        generateTutorialKey()
+
+        element("postgen.keyDetail").tap()
+
+        waitForScreenReady("keydetail.ready")
+        XCTAssertTrue(element("keydetail.selectiveRevocation").exists)
+        XCTAssertFalse(element("keydetail.selectiveRevocation").isEnabled)
+    }
+
+    func test_tutorial_contactDetail_showsDisabledCertificateSignatureEntry() throws {
+        launchTutorial(task: "addDemoContact", preloadedContactDetail: true)
+
+        waitForScreenReady("contactdetail.ready")
+        XCTAssertTrue(element("contactdetail.certificateSignatures").exists)
+        XCTAssertFalse(element("contactdetail.certificateSignatures").isEnabled)
+    }
+
     // MARK: - Launch Helpers
 
-    private func launchMain() {
+    private func launchMain(preloadContact: Bool = false) {
         app.launchEnvironment["UITEST_ROOT"] = "main"
         app.launchEnvironment["UITEST_SKIP_ONBOARDING"] = "1"
         app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
+        app.launchEnvironment["UITEST_PRELOAD_CONTACT"] = preloadContact ? "1" : "0"
         prepareLaunchIgnoringSavedState()
         app.launch()
         waitForLaunchReadiness(rootReadyID: "main.ready")
@@ -154,11 +190,12 @@ final class MacUISmokeTests: XCTestCase {
         waitForLaunchReadiness(rootReadyID: "settings.ready")
     }
 
-    private func launchTutorial(task: String) {
+    private func launchTutorial(task: String, preloadedContactDetail: Bool = false) {
         app.launchEnvironment["UITEST_ROOT"] = "tutorial"
         app.launchEnvironment["UITEST_SKIP_ONBOARDING"] = "1"
         app.launchEnvironment["UITEST_TUTORIAL_TASK"] = task
         app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
+        app.launchEnvironment["UITEST_TUTORIAL_CONTACT_DETAIL"] = preloadedContactDetail ? "1" : "0"
         prepareLaunchIgnoringSavedState()
         app.launch()
         waitForLaunchReadiness(rootReadyID: "tutorial.ready")
@@ -230,6 +267,24 @@ final class MacUISmokeTests: XCTestCase {
         XCTAssertTrue(
             element(identifier).waitForExistence(timeout: timeout),
             "Expected ready marker \(identifier) to appear."
+        )
+    }
+
+    private func waitForElementEnabled(
+        _ element: XCUIElement,
+        timeout: TimeInterval = 10
+    ) {
+        XCTAssertTrue(
+            element.waitForExistence(timeout: timeout),
+            "Expected element \(element) to appear."
+        )
+
+        let predicate = NSPredicate(format: "isEnabled == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [expectation], timeout: timeout),
+            .completed,
+            "Expected element to become enabled."
         )
     }
 }
