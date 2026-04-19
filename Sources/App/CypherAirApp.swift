@@ -33,7 +33,8 @@ struct CypherAirApp: App {
         let container: AppContainer
         if launchConfiguration.isUITestMode {
             container = AppContainer.makeUITest(
-                requiresManualAuthentication: launchConfiguration.requiresManualAuthentication
+                requiresManualAuthentication: launchConfiguration.requiresManualAuthentication,
+                preloadContact: launchConfiguration.preloadsUITestContact
             )
         } else {
             container = AppContainer.makeDefault()
@@ -145,6 +146,7 @@ struct CypherAirApp: App {
                 .environment(container.encryptionService)
                 .environment(container.decryptionService)
                 .environment(container.signingService)
+                .environment(container.certificateSignatureService)
                 .environment(container.qrService)
                 .environment(container.selfTestService)
                 .environment(container.authManager)
@@ -396,6 +398,7 @@ struct AppLaunchConfiguration {
     let isUITestMode: Bool
     let requiresManualAuthentication: Bool
     let opensAuthModeConfirmation: Bool
+    let preloadsUITestContact: Bool
 
     init(processInfo: ProcessInfo = .processInfo) {
         let environment = processInfo.environment
@@ -403,6 +406,7 @@ struct AppLaunchConfiguration {
         self.isUITestMode = environment["UITEST_ROOT"] != nil || environment["UITEST_SKIP_ONBOARDING"] != nil
         self.requiresManualAuthentication = environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
         self.opensAuthModeConfirmation = environment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] == "1"
+        self.preloadsUITestContact = environment["UITEST_PRELOAD_CONTACT"] == "1"
         self.shouldSkipOnboarding = environment["UITEST_SKIP_ONBOARDING"] == "1" || root != .main
         self.tutorialModule = environment["UITEST_TUTORIAL_TASK"].flatMap { value in
             switch value {

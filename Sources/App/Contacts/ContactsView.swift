@@ -13,6 +13,7 @@ struct ContactsView: View {
                 NavigationLink(value: AppRoute.contactDetail(fingerprint: contact.fingerprint)) {
                     ContactRowView(contact: contact)
                 }
+                .accessibilityIdentifier("contacts.row")
             }
             .onDelete { indexSet in
                 for index in indexSet {
@@ -107,5 +108,6 @@ private struct ContactRowView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .accessibilityIdentifier("contacts.row")
     }
 }

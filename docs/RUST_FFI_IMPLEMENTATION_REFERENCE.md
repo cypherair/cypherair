@@ -509,7 +509,7 @@ Expose certificate-signature semantics needed for certification-related Rust com
 
 #### Input Format Classification
 
-- `signature`: `binary-only`
+- `signature`: raw signature bytes, either a binary OpenPGP signature packet or an ASCII-armored signature block
 - `target_cert`: `binary-only`
 - `candidate_signers`: `binary-only`
 - `signer_secret_cert` for certification generation: `binary-only`

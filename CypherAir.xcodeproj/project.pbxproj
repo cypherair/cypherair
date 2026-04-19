@@ -7,11 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE58C0002F96000000000001 /* PgpMobile.xcframework */; };
 		CE0065172F652334008604AB /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065122F651C44008604AB /* AppIcon.icon */; };
 		CE0065252F676EBC008604AB /* AppIconB.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065232F676EBC008604AB /* AppIconB.icon */; };
 		CE0065262F676EBC008604AB /* AppIconC.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065242F676EBC008604AB /* AppIconC.icon */; };
 		CE0065272F676EBC008604AB /* AppIconA.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065222F676EBC008604AB /* AppIconA.icon */; };
+		CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE58C0002F96000000000001 /* PgpMobile.xcframework */; };
 		CEB560272F944C05004A1CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CEB560262F944C05004A1CA7 /* Assets.xcassets */; };
 		CEF297622F7612DF00DB6BF6 /* AppIconD.icon in Resources */ = {isa = PBXBuildFile; fileRef = CEF297612F7612DF00DB6BF6 /* AppIconD.icon */; };
 /* End PBXBuildFile section */
@@ -41,9 +41,9 @@
 		CE0065222F676EBC008604AB /* AppIconA.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconA.icon; sourceTree = "<group>"; };
 		CE0065232F676EBC008604AB /* AppIconB.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconB.icon; sourceTree = "<group>"; };
 		CE0065242F676EBC008604AB /* AppIconC.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconC.icon; sourceTree = "<group>"; };
+		CE58C0002F96000000000001 /* PgpMobile.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = PgpMobile.xcframework; sourceTree = "<group>"; };
 		CE5F0F372F75EF3E007C896C /* CypherAir.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAir.entitlements; sourceTree = "<group>"; };
 		CE5F0F382F75EF45007C896C /* CypherAirMacOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAirMacOS.entitlements; sourceTree = "<group>"; };
-		CE58C0002F96000000000001 /* PgpMobile.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = PgpMobile.xcframework; sourceTree = "<group>"; };
 		CEB560262F944C05004A1CA7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CEF297612F7612DF00DB6BF6 /* AppIconD.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconD.icon; sourceTree = "<group>"; };
 		E10000012F90000100000001 /* CypherAirMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CypherAirMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -69,6 +69,8 @@
 				App/Common/TextImport/ImportedTextInputState.swift,
 				App/Contacts/AddContactScreenModel.swift,
 				App/Contacts/AddContactView.swift,
+				App/Contacts/ContactCertificateSignaturesScreenModel.swift,
+				App/Contacts/ContactCertificateSignaturesView.swift,
 				App/Contacts/ContactDetailView.swift,
 				App/Contacts/ContactsView.swift,
 				App/Contacts/Import/ContactImportWorkflow.swift,
@@ -228,6 +230,17 @@
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		CE58C0022F96000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
 		7C9F769E62E925ECA46373E6 = {
 			isa = PBXGroup;
@@ -260,17 +273,6 @@
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
-
-/* Begin PBXFrameworksBuildPhase section */
-		CE58C0022F96000000000001 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXNativeTarget section */
 		8054D4FD1FA30AED22F9BF1B /* CypherAir */ = {
@@ -410,25 +412,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		CE58C0032F96000000000001 /* Check PgpMobile XCFramework */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Check PgpMobile XCFramework";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "if [ ! -f \"${SRCROOT}/PgpMobile.xcframework/Info.plist\" ]; then\n    echo \"error: PgpMobile.xcframework is missing. Run ./build-xcframework.sh --release\"\n    exit 1\nfi\n";
-		};
 		CE2F97D52F746A9E00232BC9 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -447,6 +430,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "FIXTURE_SRC=\"${SRCROOT}/Tests/Fixtures\"\nFIXTURE_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Fixtures\"\nmkdir -p \"$FIXTURE_DST\"\nfor ext in asc gpg sig txt; do\n    for f in \"$FIXTURE_SRC\"/*.\"$ext\"; do\n        [ -f \"$f\" ] && cp \"$f\" \"$FIXTURE_DST/\"\n    done\ndone\n";
+		};
+		CE58C0032F96000000000001 /* Check PgpMobile XCFramework */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Check PgpMobile XCFramework";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ ! -f \"${SRCROOT}/PgpMobile.xcframework/Info.plist\" ]; then\n    echo \"error: PgpMobile.xcframework is missing. Run ./build-xcframework.sh --release\"\n    exit 1\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -574,7 +576,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -604,7 +606,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.2.7;
+				MARKETING_VERSION = 1.2.8;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -798,7 +800,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -828,7 +830,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.2.7;
+				MARKETING_VERSION = 1.2.8;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",

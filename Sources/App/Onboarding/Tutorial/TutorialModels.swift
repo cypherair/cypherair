@@ -173,6 +173,18 @@ struct TutorialUnsafeRouteBlocklist {
                 message: String(localized: "guidedTutorial.blocked.selectiveRevocation.body", defaultValue: "Selective revocation exports are unavailable inside the tutorial sandbox."),
                 systemImage: "xmark.seal"
             )
+        case .contactCertificateSignatures:
+            TutorialBlockedSurface(
+                title: String(
+                    localized: "guidedTutorial.blocked.certificateSignatures.title",
+                    defaultValue: "Certificate Signatures Unavailable"
+                ),
+                message: String(
+                    localized: "guidedTutorial.blocked.certificateSignatures.body",
+                    defaultValue: "Certificate signature workflows are unavailable inside the tutorial sandbox."
+                ),
+                systemImage: "checkmark.seal"
+            )
         default:
             nil
         }

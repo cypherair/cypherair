@@ -12,6 +12,7 @@ enum AppRoute: Hashable {
 
     // Contacts
     case contactDetail(fingerprint: String)
+    case contactCertificateSignatures(fingerprint: String)
     case addContact
     case qrDisplay(publicKeyData: Data, displayName: String)
 

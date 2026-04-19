@@ -37,7 +37,12 @@ struct TutorialRouteDestinationView: View {
         case .postGenerationPrompt(let identity):
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {
-                    PostGenerationPromptView(identity: identity)
+                    PostGenerationPromptView(
+                        identity: identity,
+                        onDone: {
+                            tutorialStore.returnToOverview()
+                        }
+                    )
                 }
             )
         case .addContact:
@@ -87,6 +92,12 @@ struct TutorialRouteDestinationView: View {
                     SelectiveRevocationView(fingerprint: fingerprint)
                 }
             )
+        case .contactCertificateSignatures(let fingerprint):
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    ContactCertificateSignaturesView(fingerprint: fingerprint)
+                }
+            )
         case .keyDetail(let fingerprint):
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {
@@ -97,7 +108,14 @@ struct TutorialRouteDestinationView: View {
                 }
             )
         case .contactDetail(let fingerprint):
-            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ContactDetailView(fingerprint: fingerprint) })
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    ContactDetailView(
+                        fingerprint: fingerprint,
+                        configuration: factory.contactDetailConfiguration()
+                    )
+                }
+            )
         case .qrDisplay(let publicKeyData, let displayName):
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { QRDisplayView(publicKeyData: publicKeyData, displayName: displayName) })
         case .importKey:

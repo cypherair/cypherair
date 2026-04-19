@@ -38,6 +38,14 @@ struct TutorialConfigurationFactory {
             configuration.prefilledArmoredText = store.session.artifacts.bobArmoredPublicKey
             configuration.onImported = { [weak store] contact in
                 store?.noteBobImported(contact)
+                store?.selectTab(.contacts)
+                store?.setRoutePath(
+                    [
+                        .addContact,
+                        .contactDetail(fingerprint: contact.fingerprint),
+                    ],
+                    for: .contacts
+                )
             }
             configuration.onImportConfirmationRequested = { [weak store] request in
                 store?.presentImportConfirmation(request)
@@ -137,8 +145,24 @@ struct TutorialConfigurationFactory {
             allowsPublicKeySave: false,
             allowsPublicKeyCopy: false,
             allowsRevocationExport: false,
+            showsSelectiveRevocationEntry: true,
             allowsSelectiveRevocationLaunch: false,
+            selectiveRevocationRestrictionMessage: String(
+                localized: "guidedTutorial.restricted.selectiveRevocation",
+                defaultValue: "Selective revocation exports are unavailable inside the tutorial sandbox."
+            ),
             outputInterceptionPolicy: outputInterceptionPolicy
+        )
+    }
+
+    func contactDetailConfiguration() -> ContactDetailView.Configuration {
+        ContactDetailView.Configuration(
+            showsCertificateSignatureEntry: true,
+            allowsCertificateSignatureLaunch: false,
+            certificateSignatureRestrictionMessage: String(
+                localized: "guidedTutorial.restricted.certificateSignatures",
+                defaultValue: "Certificate signature workflows are unavailable inside the tutorial sandbox."
+            )
         )
     }
 

@@ -13,7 +13,9 @@ struct KeyDetailView: View {
         var allowsPublicKeySave = true
         var allowsPublicKeyCopy = true
         var allowsRevocationExport = true
+        var showsSelectiveRevocationEntry = true
         var allowsSelectiveRevocationLaunch = true
+        var selectiveRevocationRestrictionMessage: String?
         var outputInterceptionPolicy: OutputInterceptionPolicy = .passthrough
 
         static let `default` = Configuration()
@@ -219,17 +221,22 @@ private struct KeyDetailScreenHostView: View {
                         }
                         .disabled(!model.configuration.allowsRevocationExport || model.isPreparingRevocationExport)
 
-                        if model.configuration.allowsSelectiveRevocationLaunch {
+                        if model.configuration.showsSelectiveRevocationEntry {
                             NavigationLink(value: AppRoute.selectiveRevocation(fingerprint: model.fingerprint)) {
                                 Label(
                                     String(localized: "keydetail.selectiveRevocation", defaultValue: "Selective Revocation"),
                                     systemImage: "xmark.seal"
                                 )
                             }
+                            .disabled(!model.configuration.allowsSelectiveRevocationLaunch)
                             .accessibilityIdentifier("keydetail.selectiveRevocation")
                         }
                     } header: {
                         Text(String(localized: "keydetail.actions", defaultValue: "Actions"))
+                    } footer: {
+                        if let restrictionMessage = model.configuration.selectiveRevocationRestrictionMessage {
+                            Text(restrictionMessage)
+                        }
                     }
 
                     if !key.isDefault {

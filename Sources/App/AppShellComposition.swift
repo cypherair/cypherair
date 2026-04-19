@@ -19,6 +19,8 @@ struct AppRouteDestinationView: View {
             ImportKeyView()
         case .contactDetail(let fingerprint):
             ContactDetailView(fingerprint: fingerprint)
+        case .contactCertificateSignatures(let fingerprint):
+            ContactCertificateSignaturesView(fingerprint: fingerprint)
         case .addContact:
             AddContactView()
         case .qrDisplay(let publicKeyData, let displayName):

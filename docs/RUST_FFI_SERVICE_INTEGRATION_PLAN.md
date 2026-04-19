@@ -30,21 +30,9 @@ There is no remaining service-boundary rollout item in this document's tracked f
 
 ## 3. Remaining Downstream Queue
 
-### 3.1 Contact-Scoped Certificate-Signature Workflow
+There is no active downstream adoption item left in this document's tracked family set.
 
-The only active downstream adoption item still tied to this family set is a contact-scoped app workflow for `CertificateSignatureService`.
-
-That follow-on work should:
-
-- start from an existing contact-management surface such as `ContactDetailView`
-- call `CertificateSignatureService` rather than `PgpEngine`
-- keep selector discovery and validation at the service boundary
-- preserve the existing rule that certificate-signature verification/certification does not automatically mutate contact verification state
-- keep trust / web-of-trust semantics out of scope
-
-The product-scoped design for that work belongs in [RUST_FFI_APP_SURFACE_ADOPTION_PLAN](RUST_FFI_APP_SURFACE_ADOPTION_PLAN.md).
-
-### 3.2 Password-Message App Ownership
+### 3.1 Password-Message App Ownership
 
 `PasswordMessageService` remains intentionally out of scope for this document's active downstream queue.
 
@@ -62,7 +50,6 @@ The product-scoped design for that work belongs in [RUST_FFI_APP_SURFACE_ADOPTIO
 Update this document when one of the following becomes true:
 
 - a new tracked Rust / FFI family requires real downstream adoption planning again
-- the remaining `CertificateSignatureService` app workflow ships
 - `PasswordMessageService` app exposure becomes approved product scope
 
 Until one of those triggers fires, this document should stay short and should not be expanded back into a historical rollout log.
