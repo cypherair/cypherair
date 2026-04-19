@@ -136,6 +136,104 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_handleImportedFile_binaryImport_clearsVisibleText_andPreservesRawData() throws {
+        let contact = try makeContact(name: "Binary Import Contact", email: "binary-import@example.com")
+        let importedBinary = Data([0x89, 0x50, 0x47, 0x50])
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            signatureFileImportAction: { _ in
+                (data: importedBinary, text: nil)
+            }
+        )
+
+        model.setSignatureInput("old text")
+        model.handleImportedFile(URL(fileURLWithPath: "/tmp/signature.sig"))
+
+        XCTAssertEqual(model.signatureInput, "")
+        XCTAssertTrue(model.importedSignature.hasImportedFile)
+        XCTAssertEqual(model.importedSignature.rawData, importedBinary)
+        XCTAssertEqual(model.importedSignature.fileName, "signature.sig")
+        XCTAssertEqual(model.importedSignature.textSnapshot, "")
+    }
+
+    @MainActor
+    func test_handleImportedFile_binaryImport_verifyUsesImportedRawData_notPreviousText() async throws {
+        let contact = try makeContact(name: "Binary Verify Contact", email: "binary-verify@example.com")
+        let importedBinary = Data([0xde, 0xad, 0xbe, 0xef])
+        var capturedSignature: Data?
+        let verification = CertificateSignatureVerification(
+            status: .valid,
+            certificationKind: nil,
+            signerPrimaryFingerprint: nil,
+            signingKeyFingerprint: nil,
+            signerIdentity: nil
+        )
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            verifyDirectKeyAction: { signature, _ in
+                capturedSignature = signature
+                return verification
+            },
+            signatureFileImportAction: { _ in
+                (data: importedBinary, text: nil)
+            }
+        )
+
+        model.setSignatureInput("old text")
+        model.handleImportedFile(URL(fileURLWithPath: "/tmp/imported.sig"))
+        model.verifyDirectKey()
+
+        await waitUntil("binary direct-key verification capture") {
+            capturedSignature == importedBinary
+        }
+
+        XCTAssertEqual(model.signatureInput, "")
+        XCTAssertEqual(capturedSignature, importedBinary)
+    }
+
+    @MainActor
+    func test_setSignatureInput_afterBinaryImport_invalidatesImportedAuthority() async throws {
+        let contact = try makeContact(name: "Binary Edit Contact", email: "binary-edit@example.com")
+        let importedBinary = Data([0xaa, 0xbb, 0xcc])
+        var capturedSignature: Data?
+        let verification = CertificateSignatureVerification(
+            status: .valid,
+            certificationKind: nil,
+            signerPrimaryFingerprint: nil,
+            signingKeyFingerprint: nil,
+            signerIdentity: nil
+        )
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            verifyDirectKeyAction: { signature, _ in
+                capturedSignature = signature
+                return verification
+            },
+            signatureFileImportAction: { _ in
+                (data: importedBinary, text: nil)
+            }
+        )
+
+        model.handleImportedFile(URL(fileURLWithPath: "/tmp/imported.sig"))
+        XCTAssertTrue(model.importedSignature.hasImportedFile)
+
+        model.setSignatureInput("replacement text")
+
+        XCTAssertFalse(model.importedSignature.hasImportedFile)
+        XCTAssertNil(model.importedSignature.rawData)
+        XCTAssertNil(model.importedSignature.fileName)
+        XCTAssertNil(model.importedSignature.textSnapshot)
+
+        model.verifyDirectKey()
+
+        await waitUntil("edited direct-key verification capture") {
+            capturedSignature == Data("replacement text".utf8)
+        }
+
+        XCTAssertEqual(capturedSignature, Data("replacement text".utf8))
+    }
+
+    @MainActor
     func test_verifyAndCertify_results_areStored() async throws {
         let contact = try makeContact(name: "Result Contact", email: "result@example.com")
         let catalog = try stack.certificateSignatureService.selectionCatalog(
@@ -316,7 +414,8 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
         selectionCatalogAction: ContactCertificateSignaturesScreenModel.SelectionCatalogAction? = nil,
         verifyDirectKeyAction: ContactCertificateSignaturesScreenModel.VerifyDirectKeyAction? = nil,
         verifyUserIdBindingAction: ContactCertificateSignaturesScreenModel.VerifyUserIdBindingAction? = nil,
-        generateArmoredCertificationAction: ContactCertificateSignaturesScreenModel.GenerateArmoredCertificationAction? = nil
+        generateArmoredCertificationAction: ContactCertificateSignaturesScreenModel.GenerateArmoredCertificationAction? = nil,
+        signatureFileImportAction: ContactCertificateSignaturesScreenModel.SignatureFileImportAction? = nil
     ) -> ContactCertificateSignaturesScreenModel {
         ContactCertificateSignaturesScreenModel(
             fingerprint: fingerprint,
@@ -327,7 +426,8 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
             selectionCatalogAction: selectionCatalogAction,
             verifyDirectKeyAction: verifyDirectKeyAction,
             verifyUserIdBindingAction: verifyUserIdBindingAction,
-            generateArmoredCertificationAction: generateArmoredCertificationAction
+            generateArmoredCertificationAction: generateArmoredCertificationAction,
+            signatureFileImportAction: signatureFileImportAction
         )
     }
 
