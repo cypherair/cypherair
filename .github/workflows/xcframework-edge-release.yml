@@ -77,6 +77,8 @@ jobs:
           BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           XCODE_VERSION="$(xcodebuild -version | tr '\n' ' ' | sed 's/  */ /g; s/ $//')"
           RUSTC_VERSION="$(rustc --version)"
+          MARKETING_VERSION="$(xcodebuild -showBuildSettings -scheme CypherAir -project CypherAir.xcodeproj | sed -n 's/^[[:space:]]*MARKETING_VERSION = //p' | head -n1)"
+          PROJECT_BUILD_NUMBER="$(xcodebuild -showBuildSettings -scheme CypherAir -project CypherAir.xcodeproj | sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION = //p' | head -n1)"
 
           ditto -c -k --sequesterRsrc --keepParent PgpMobile.xcframework "$XCFRAMEWORK_ZIP"
           shasum -a 256 "$XCFRAMEWORK_ZIP" > "$XCFRAMEWORK_CHECKSUM"
@@ -85,12 +87,16 @@ jobs:
             echo "BUILT_AT=$BUILT_AT"
             echo "XCODE_VERSION=$XCODE_VERSION"
             echo "RUSTC_VERSION=$RUSTC_VERSION"
+            echo "MARKETING_VERSION=$MARKETING_VERSION"
+            echo "PROJECT_BUILD_NUMBER=$PROJECT_BUILD_NUMBER"
           } >> "$GITHUB_ENV"
 
           cat > "$EDGE_METADATA" <<EOF
           {
             "commit_sha": "$GITHUB_SHA",
             "built_at": "$BUILT_AT",
+            "marketing_version": "$MARKETING_VERSION",
+            "project_build_number": "$PROJECT_BUILD_NUMBER",
             "xcode_version": "$XCODE_VERSION",
             "rustc_version": "$RUSTC_VERSION",
             "workflow_url": "$WORKFLOW_URL"
@@ -102,6 +108,8 @@ jobs:
 
           - Commit: \`$GITHUB_SHA\`
           - Built at (UTC): \`$BUILT_AT\`
+          - App marketing version: \`$MARKETING_VERSION\`
+          - App build number: \`$PROJECT_BUILD_NUMBER\`
           - Xcode: \`$XCODE_VERSION\`
           - Rust: \`$RUSTC_VERSION\`
           - Workflow: [$WORKFLOW_URL]($WORKFLOW_URL)
