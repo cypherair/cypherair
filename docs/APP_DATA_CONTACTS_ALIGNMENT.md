@@ -46,6 +46,7 @@ Current Contacts docs still say:
 Current app-data docs now say:
 
 - app-data domains use `LAPersistedRight` as the primary authorization gate in v1
+- the `Domain Master Key` is the right-protected secret itself in the canonical v1 model
 - custom Secure Enclave wrapping is no longer promised as the primary v1 app-data design
 
 ### 3.2 Unlock Lifecycle Authority
@@ -57,6 +58,7 @@ Current Contacts docs still say:
 Current app-data docs now say:
 
 - `ProtectedDataSessionCoordinator` owns right authorization timing
+- `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary
 - the domain unlock secret is not released before `LAPersistedRight` authorization succeeds
 - startup is split into pre-auth bootstrap and post-auth unlock phases
 

@@ -115,6 +115,10 @@ The canonical v1 model is:
 
 This means the first gate for app-data unlock is no longer "application code remembered to check session state first." The first gate is the system-managed authorization boundary for the persisted right.
 
+For future protected domains, `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary.
+
+Existing `AuthenticationManager` / `AuthenticationMode` launch-resume authentication may remain as separate privacy UX in shipped code, but it must not be described as the required gate for future app-data unlock semantics.
+
 ### 4.5 Minimal Bootstrap Metadata
 
 The system may keep a minimal layer of plaintext bootstrap metadata outside encrypted domain payloads when required for cold start, recovery, or migration routing.
@@ -307,6 +311,8 @@ The inventory must prevent three failure modes:
 - state that is moved into a protected domain even though startup still needs it before authorization
 - state that remains plaintext indefinitely without an explicit documented reason
 
+The reviewed inventory must include not only `UserDefaults`, but also currently persisted app-owned files and directories that remain outside the protected-domain migration in this round.
+
 ### 5.3 Startup Architecture Impact
 
 The protected app-data proposal is no longer just a narrow service-layer addition.
@@ -342,6 +348,8 @@ The preferred implementation posture is:
 - reuse existing lower-level primitives by composition only where they support, rather than replace, that system gate
 - never attach the new layer to the private-key access-control source of truth
 - no "cleanup refactor" of the private-key domain just to make the new layer look symmetrical
+
+This proposal also does not require future protected domains to depend on the current `AuthenticationMode` gate in order to reach app-data authorization.
 
 ## 7. Code / Interface Direction
 
@@ -397,6 +405,7 @@ Any implementation derived from this roadmap should be reviewable against these 
 - does it preserve the existing private-key domain without semantic drift?
 - does it introduce a reusable protected app-data substrate rather than a one-off vault?
 - does it treat `LAPersistedRight` as the first gate for app-data unlock secret access?
+- does it avoid making `AuthenticationMode` the normative gate for future app-data authorization?
 - does it fully specify the `Domain Master Key` persistence and recovery model?
 - does it keep app-data domains recoverable rather than private-key-style invalidating?
 - does it keep bootstrap metadata minimal and non-sensitive?
