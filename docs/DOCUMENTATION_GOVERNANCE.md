@@ -108,11 +108,12 @@ Update the relevant docs in the same change when one of these surfaces changes:
 - **Test-plan or workflow changes**
   - Update `README.md`, `CLAUDE.md`, `AGENTS.md`, and `docs/TESTING.md`
 
-- **Rust / FFI service ownership or downstream adoption changes**
-  - Update `docs/RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`
-  - Update `docs/RUST_FFI_SERVICE_INTEGRATION_PLAN.md` if the remaining queue changed
-  - Update `docs/RUST_FFI_IMPLEMENTATION_REFERENCE.md` if the semantic or boundary rules changed
-  - Update `docs/RUST_FFI_APP_SURFACE_ADOPTION_PLAN.md` if app ownership changed
+- **Rust / FFI service ownership, downstream adoption, or durable contract changes**
+  - Update `docs/ARCHITECTURE.md` for current Swift service ownership, app ownership, and shipped vs deferred status
+  - Update `docs/PRD.md` for user-visible product-surface changes
+  - Update `docs/TDD.md` for durable Rust / FFI semantic rules, boundary contracts, and family summaries
+  - Update `docs/TESTING.md` for validation minima, coverage expectations, or workflow-specific testing changes
+  - Update `docs/SECURITY.md` when the change affects secret-data lifecycle, authentication boundaries, revocation persistence policy, or certificate-signature trust boundaries
 
 - **Storage keys, defaults, temp paths, or startup cleanup changes**
   - Update `docs/ARCHITECTURE.md` and `docs/TDD.md`

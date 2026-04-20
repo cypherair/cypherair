@@ -76,6 +76,10 @@ Deletion:
 
 **Revocation storage/export note:** CypherAir stores revocation signatures internally as binary OpenPGP signature packets. Export converts those bytes to ASCII armor on demand. Imported keys now receive key-level revocation export capability as part of import. Older imported keys that predate this support lazily backfill the binary revocation at export time, then immediately zeroize the temporarily unwrapped secret certificate bytes after use.
 
+**Selective revocation note:** Subkey and User ID selective revocations are generated and exported on demand. They do not write back into `PGPKeyIdentity.revocationCert`, and they do not introduce an implicit persisted selective-revocation history alongside the key-level revocation slot.
+
+**Certificate-signature workflow note:** Generated User ID certification signatures are exported artifacts. The workflow does not automatically insert them into a stored contact certificate, change `Contact.isVerified`, or introduce trust / web-of-trust policy semantics.
+
 **Profile-specific behavior:**
 - **Generation:** Profile A → `CipherSuite::Cv25519` + `Profile::RFC4880`. Profile B → `CipherSuite::Cv448` + `Profile::RFC9580`.
 - **Export:** Profile A → Iterated+Salted S2K. Profile B → Argon2id S2K.
