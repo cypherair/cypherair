@@ -75,6 +75,7 @@ Properties:
 - never stored in plaintext
 - used to encrypt domain payload generations on disk
 - re-established independently on import or recovery flows when needed
+- persisted in a v1 domain-specific protected form that is stable across startup, relock, and crash recovery
 
 ### 3.4 Bootstrap Metadata
 
@@ -185,13 +186,21 @@ Protected app-data domains unlock for the authenticated app session rather than 
 
 Canonical behavior:
 
-- the app-data right is authorized after successful app launch or resume authentication
+- the app-data right is authorized by `ProtectedDataSessionCoordinator` after successful app launch or resume authentication
 - the domain unlock secret is fetched only after authorization succeeds
 - ordinary in-session reads and writes reuse the authorized session
 - relock occurs on app lock, grace-period expiry, session loss, or app exit
 - relock must also deauthorize the right and clear any cached unlock secret from memory
 
 This model intentionally differs from the private-key domain.
+
+The authoritative v1 orchestration model is:
+
+- existing app launch/resume authentication remains the outer app-auth boundary
+- `ProtectedDataSessionCoordinator` then authorizes the app-data right as the authoritative gate for app-data unlock
+- app-data domains do not bypass the right by treating prior app-auth alone as sufficient to release the unlock secret
+
+Repeated-prompt avoidance is a required design goal. The implementation must minimize duplicate authorization prompts within one launch/resume flow by making `ProtectedDataSessionCoordinator` the sole owner of app-data right authorization timing.
 
 ### 5.5 Recoverable App-Data Semantics
 
@@ -267,6 +276,8 @@ After app-data authorization succeeds, the app may:
 
 This is a required implementation boundary, not a best-effort guideline.
 
+The current app startup path already performs cold-start loading and recovery work. Future real protected domains must therefore treat this two-phase model as an explicit startup-architecture migration, not as a mere local refactor inside one new service.
+
 ## 6. Storage Model
 
 ### 6.1 Domain Location
@@ -334,7 +345,28 @@ The framework must never silently create a new empty domain because the prior lo
 
 The generation model in v1 provides crash consistency only. It does **not** provide freshness or anti-rollback guarantees.
 
-### 6.4 Bootstrap Metadata
+### 6.4 Domain Master Key Persistence Model
+
+The v1 persistence model for each protected app-data domain is:
+
+- the domain payload generations are stored as encrypted envelopes on disk
+- the `Domain Master Key` is not stored in plaintext on disk
+- a domain unlock secret is persisted behind `LAPersistedRight`
+- the `Domain Master Key` is persisted in a protected form that can only be reopened after the unlock secret is released by the system gate
+
+The protected form of the `Domain Master Key` must satisfy these lifecycle rules:
+
+- creation is atomic with first successful protected-domain initialization
+- updates must not leave a window where both the old readable form and the new readable form are lost
+- deletion must remove both the protected key material and the persisted right / secret association for that domain
+- recovery must distinguish between:
+  - unreadable payload generations
+  - unreadable protected master-key state
+  - unreadable or missing persisted-right-protected unlock secret
+
+The v1 docs do not permit multiple equally valid persistence shapes for the master key. Any implementation must use one documented protected-form model and apply the same model consistently across startup, relock, deletion, migration, and recovery.
+
+### 6.5 Bootstrap Metadata
 
 Bootstrap metadata may exist beside encrypted generations, but it must remain minimal.
 
@@ -353,7 +385,7 @@ Bootstrap metadata is a cold-start and recovery routing hint, not a secret-beari
 
 Bootstrap metadata should still receive explicit platform-appropriate local static protection even though it is not part of the encrypted payload.
 
-### 6.5 File-Protection Policy
+### 6.6 File-Protection Policy
 
 Protected domain files must use explicit platform-appropriate local static protection instead of relying on defaults.
 
@@ -377,6 +409,15 @@ Required policy:
 
 The macOS guarantee is stated in terms of container confinement plus platform-supported local static protection, not as a claim of identical iOS-style data-protection classes.
 
+For v1 review purposes, the concrete macOS contract is:
+
+- protected-domain files live only in app-owned container storage
+- bootstrap metadata lives only in the same app-owned container boundary
+- no protected-domain payloads are stored in user-managed document locations by default
+- review and testing verify containment, ownership, and absence of fallback to broader storage locations
+
+This is the v1 acceptance floor. Stronger macOS protection claims require later explicit design and validation.
+
 ## 7. Key And Session Lifecycle
 
 ### 7.1 Domain Master Key Lifecycle
@@ -390,6 +431,13 @@ For each protected app-data domain:
 5. zeroize plaintext secret and master-key buffers after persistence or relock as appropriate
 
 The primary v1 contract is that the system must not release the unlock secret before authorization succeeds.
+
+The v1 `Domain Master Key` lifecycle must also define:
+
+- creation-time persistence of the protected master-key form
+- stable re-open behavior across relock/relaunch
+- explicit deletion semantics for both the protected master-key material and its right-protected unlock secret
+- recovery behavior when either the persisted right or the protected master-key form becomes unreadable
 
 ### 7.2 Keychain Namespace Rule
 
@@ -517,6 +565,8 @@ Expected initial integration points:
 - app lock / resume flow for relock and session reuse
 - future Contacts domain owner
 
+This still implies explicit startup-ordering work when a real protected domain is introduced. It is a narrow code ownership boundary, not a promise of zero initialization-flow changes.
+
 ### 9.3 Contacts Relationship
 
 Contacts must later plug into this framework as a domain-specific consumer.
@@ -544,6 +594,35 @@ For any domain migration:
 3. write protected destination using the new domain model
 4. verify readability of the destination
 5. only then retire or quarantine the old source state
+
+### 10.1 Persisted-State Classification Inventory
+
+Before any real protected domain migration, implementation planning must maintain one reviewed inventory of currently persisted app-owned state.
+
+Each item must be classified as:
+
+- `early-readable`
+- `protected-after-unlock`
+- `remain plaintext with rationale`
+
+At minimum this inventory must include the currently persisted `AppConfiguration` keys and auth/recovery flags already stored in `UserDefaults`.
+
+Initial classification baseline:
+
+| Item | Current location | v1 class | Notes |
+|------|------------------|----------|-------|
+| `authMode` | `UserDefaults` | `early-readable` | Read before app-data authorization |
+| `gracePeriod` | `UserDefaults` | `early-readable` | Read before app-data authorization |
+| `requireAuthOnLaunch` | `UserDefaults` | `early-readable` | Read before app-data authorization |
+| `hasCompletedOnboarding` | `UserDefaults` | `early-readable` | Affects startup routing |
+| `colorTheme` | `UserDefaults` | `early-readable` | Affects early scene presentation |
+| `encryptToSelf` | `UserDefaults` | `protected-after-unlock` candidate | Not required for pre-auth bootstrap |
+| `clipboardNotice` | `UserDefaults` | `protected-after-unlock` candidate | Not required for pre-auth bootstrap |
+| `guidedTutorialCompletedVersion` | `UserDefaults` | `protected-after-unlock` candidate | Keep early-readable only if future startup flow proves it necessary |
+| `rewrapInProgress` | `UserDefaults` | `remain plaintext with rationale` | Private-key recovery flag; stays outside app-data domain in v1 |
+| `rewrapTargetMode` | `UserDefaults` | `remain plaintext with rationale` | Private-key recovery flag; stays outside app-data domain in v1 |
+| `modifyExpiryInProgress` | `UserDefaults` | `remain plaintext with rationale` | Private-key recovery flag; stays outside app-data domain in v1 |
+| `modifyExpiryFingerprint` | `UserDefaults` | `remain plaintext with rationale` | Private-key recovery flag; stays outside app-data domain in v1 |
 
 ## 11. Domain Recovery Contracts
 

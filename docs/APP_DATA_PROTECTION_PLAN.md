@@ -183,6 +183,8 @@ Goals:
 - define a system-gated app-data authorization model that is separate from the private-key access-control source of truth
 - define a strict startup authentication boundary
 - define common relock, deauthorize, and session-unlock semantics
+- define the v1 `Domain Master Key` persistence and recovery model
+- define the initial persistent-state classification inventory
 
 This phase should land before Contacts migration so Contacts can depend on the shared framework instead of creating its own parallel architecture.
 
@@ -249,7 +251,6 @@ Migrate remaining app-owned persistent domains in order of security value and im
 
 Candidate areas include:
 
-- additional settings or recovery state not yet moved in Phase 2
 - additional settings or recovery state not yet moved in Phase 3
 - future local drafts or protected caches
 - future user-managed local data that should not remain plaintext at rest
@@ -283,6 +284,42 @@ After app-data authorization succeeds, the app may:
 - determine final `locked / unlocked / recoveryNeeded` state
 
 This startup boundary is a required implementation constraint, not a best-effort guideline.
+
+### 5.2 Persistent-State Classification Inventory
+
+Before any real protected domain lands, implementation planning must maintain a complete inventory of currently persisted app-owned state.
+
+Each persisted item must be classified as exactly one of:
+
+- `early-readable`
+- `protected-after-unlock`
+- `remain plaintext with rationale`
+
+At minimum this inventory must include:
+
+- current `AppConfiguration` keys
+- auth and recovery flags currently stored in `UserDefaults`
+- any future app-owned bootstrap metadata
+
+The inventory must prevent three failure modes:
+
+- omitted state that never gets reviewed for migration
+- state that is moved into a protected domain even though startup still needs it before authorization
+- state that remains plaintext indefinitely without an explicit documented reason
+
+### 5.3 Startup Architecture Impact
+
+The protected app-data proposal is no longer just a narrow service-layer addition.
+
+For any future real protected domain, the implementation plan must treat the following as explicit architecture migration areas:
+
+- startup ordering
+- service initialization timing
+- locked-state UI routing
+- post-auth unlock orchestration
+- final `locked / unlocked / recoveryNeeded` classification timing
+
+This is especially important for future Contacts adoption, where cold-start loading and locked-state presentation already exist in the app surface.
 
 ## 6. Explicit Do-Not-Change List
 
@@ -334,6 +371,8 @@ Expected narrow integration seams:
 - app lock / resume flow for authorize, relock, deauthorize, and authenticated session reuse
 - future Contacts integration
 
+The phrase "narrow integration seams" must not be interpreted as "no startup architecture impact." Future real protected domains are still expected to require explicit startup-flow changes.
+
 ## 8. Canonicalization Plan
 
 These two new documents are planning and design inputs first. They are not yet canonical replacements for current-state docs.
@@ -358,8 +397,10 @@ Any implementation derived from this roadmap should be reviewable against these 
 - does it preserve the existing private-key domain without semantic drift?
 - does it introduce a reusable protected app-data substrate rather than a one-off vault?
 - does it treat `LAPersistedRight` as the first gate for app-data unlock secret access?
+- does it fully specify the `Domain Master Key` persistence and recovery model?
 - does it keep app-data domains recoverable rather than private-key-style invalidating?
 - does it keep bootstrap metadata minimal and non-sensitive?
 - does it harden file protection explicitly instead of relying on platform defaults?
+- does it classify all existing persisted app-owned state into a reviewed storage class?
 - does it make Contacts a consumer of the framework rather than the owner of a separate architecture?
 - does it keep anti-rollback explicitly out of scope in v1 rather than implying freshness guarantees?
