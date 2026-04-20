@@ -28,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repository-url", default=DEFAULT_REPOSITORY_URL)
     parser.add_argument("--stable-release-tag", default="")
     parser.add_argument("--stable-release-url", default="")
+    parser.add_argument("--require-stable-release", default="NO")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -63,10 +64,24 @@ def resolved_release_url(repository_url: str, release_tag: str, explicit_release
     return ""
 
 
+def requires_stable_release(raw_value: str) -> bool:
+    return raw_value.strip().upper() in {"YES", "TRUE", "1"}
+
+
+def derived_release_tag(marketing_version: str, build_number: str) -> str:
+    return f"cypherair-v{marketing_version}-build{build_number}"
+
+
 def generate() -> None:
     args = parse_args()
 
     stable_release_tag = args.stable_release_tag.strip()
+    if requires_stable_release(args.require_stable_release) and not stable_release_tag:
+        stable_release_tag = derived_release_tag(
+            args.marketing_version.strip(),
+            args.build_number.strip(),
+        )
+
     stable_release_url = resolved_release_url(
         args.repository_url.strip(),
         stable_release_tag,

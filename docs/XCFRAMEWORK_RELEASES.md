@@ -130,3 +130,5 @@ Stable unified releases should:
 - publish exact source and compliance materials together with the stable `XCFramework` assets
 - keep immutable release assets and immutable tag-to-build binding
 - publish release notes that describe compatibility, verification, and compliance-material expectations
+
+For the App-side release ordering, including when a stable GitHub release must exist before an Xcode archive is allowed, see [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md).

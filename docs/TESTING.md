@@ -124,7 +124,19 @@ Impact:
 - The hosted Swift unit-test preview remains observational / non-blocking until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 - Local macOS validation remains the source of truth until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 
-## 2.3 Rust Artifacts, UniFFI Outputs, and Xcode Validation
+## 2.3 Release Flows
+
+CypherAir distinguishes between:
+
+- internal / experimental TestFlight builds
+- formal App Store candidate builds
+
+The release steps and candidate gating rules live in [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md).
+
+- Use the standard `CypherAir` scheme for internal or experimental TestFlight uploads.
+- Use `CypherAir AppStore Candidate` only for the formal App Store candidate path.
+
+## 2.4 Rust Artifacts, UniFFI Outputs, and Xcode Validation
 
 Rust changes under `pgp-mobile/src` do **not** automatically refresh the build products that Xcode uses for Swift and FFI validation.
 
@@ -251,7 +263,7 @@ stable public-only contract end to end:
 - the Rust surface returns `InvalidKeyData` with the stable contact-import reason token
 - Swift maps that stable token to the explicit contact-import public-certificate error
 
-## 2.4 Revocation Construction Coverage
+## 2.5 Revocation Construction Coverage
 
 When changing revocation-construction behavior, validation must cover:
 
@@ -267,7 +279,7 @@ When changing revocation-construction behavior, validation must cover:
 - export of existing revocation without Secure Enclave unwrap
 - ASCII-armored revocation export matching the stored binary signature after `dearmor`
 
-## 2.5 Password / SKESK Coverage
+## 2.6 Password / SKESK Coverage
 
 When changing password-message behavior, validation must cover:
 
@@ -280,7 +292,7 @@ When changing password-message behavior, validation must cover:
 - targeted auth/integrity tamper coverage that flips bytes in the encrypted payload/tag area
 - generic bit-flip coverage may still return `CorruptData` / `NoMatchingKey`; keep those expectations separate from the targeted auth/integrity tests
 
-## 2.5 Certification / Binding Verification Coverage
+## 2.7 Certification / Binding Verification Coverage
 
 When changing certificate-signature verification or User ID certification behavior, validation must cover:
 
@@ -301,7 +313,7 @@ When changing certificate-signature verification or User ID certification behavi
 - `SignerMissing` clears both fingerprint fields
 - public-only certification input rejection and secret-cert-with-no-usable-certifier rejection
 
-## 2.6 Richer Signature Result Coverage
+## 2.8 Richer Signature Result Coverage
 
 When changing the richer-signature-result family, validation must cover:
 

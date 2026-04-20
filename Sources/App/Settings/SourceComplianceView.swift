@@ -166,7 +166,7 @@ struct SourceComplianceView: View {
         if info.stableReleaseURL.isEmpty {
             return String(
                 localized: "sourceCompliance.localBuild",
-                defaultValue: "Unavailable for local builds"
+                defaultValue: "Unavailable for local or internal builds"
             )
         }
         return info.stableReleaseURL
