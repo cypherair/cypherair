@@ -33,6 +33,7 @@ This document does not authorize or require:
 - merging app-data recovery and private-key recovery into one shared state machine
 - a literal global single-key design that conflicts with current Contacts direction
 - notification, extension, or network-driven assumptions
+- anti-rollback or freshness guarantees in v1
 
 ## 3. Terminology
 
@@ -72,7 +73,7 @@ Properties:
 
 - unique per domain
 - never stored in plaintext
-- wrapped using device-bound local protection
+- used to encrypt domain payload generations on disk
 - re-established independently on import or recovery flows when needed
 
 ### 3.4 Bootstrap Metadata
@@ -113,6 +114,7 @@ The framework must satisfy these principles:
 - deterministic crash recovery
 - no silent reset to empty state
 - explicit session unlock and relock behavior
+- system-enforced authorization before the app receives the domain unlock secret
 - explicit zeroization expectations for sensitive in-memory buffers
 - explicit file-protection policy instead of relying on platform defaults
 
@@ -133,37 +135,47 @@ Rationale:
 
 ### 5.2 Device-Bound Wrapping
 
-Domain master keys use device-bound local protection built from the existing Secure Enclave and Keychain primitives.
+The current private-key design uses Secure Enclave indirect wrapping because OpenPGP private keys aren't directly managed by the Secure Enclave.
+
+Protected app-data domains use a different primary model in v1:
+
+- encrypted domain payloads remain app-managed on disk
+- the domain unlock secret is gated by `LAPersistedRight`
+- Apple documents `LAPersistedRight` as being backed by a unique key in the Secure Enclave
+
+This means the v1 app-data proposal still relies on Secure Enclave-backed system authorization, but it does so through Apple's higher-level LocalAuthentication right model rather than through custom Secure Enclave wrapping as the primary gate.
 
 Implementation rule:
 
-- reuse `SecureEnclaveManageable` and `KeychainManageable` by composition
-- define app-data-domain-specific wrapping namespaces and HKDF info strings
-- do not reuse private-key HKDF prefixes or Keychain naming directly
+- treat `LAPersistedRight` / `LASecret` as the primary authorization gate for app-data unlock secrets
+- do not promise custom SE self-ECDH wrapping as the primary app-data design in v1
+- reuse lower-level primitives only where they support the domain model without replacing the primary system gate
 
 Expected properties:
 
 - local-only
-- `ThisDeviceOnly`
-- wrapped master key never stored in plaintext
-- source-device wrapping material never exported as part of portable recovery
+- system-gated access to the domain unlock secret
+- app code must not receive that secret before authorization succeeds
+- source-device authorization state must not be exported as part of portable recovery
 
 ### 5.3 App-Data Wrapping Access-Control Contract
 
-`ProtectedDomainKeyManager` owns a dedicated app-data wrapping policy.
+`ProtectedDomainKeyManager` owns the lifecycle of the app-data domain unlock secret, but the primary authorization gate is the system-managed persisted right.
 
 This policy is a normative requirement, not an implementation detail left for later.
 
 Required rules:
 
-- app-data wrapping keys must **not** call `AuthenticationMode.createAccessControl()`
-- app-data wrapping keys must **not** call `AuthenticationManager.createAccessControl(for:)`
-- app-data wrapping keys must **not** derive `SecAccessControl` from the private-key authentication mode
-- app-data wrapping keys must **not** inherit current `Standard` / `High Security` semantics
-- app-data wrapping keys must **not** inherit future `Special Security Mode` or `biometryCurrentSet` semantics
-- app-data wrapping in v1 provides device binding only
-- runtime authorization for ordinary app-data access is handled solely by `ProtectedDataSessionCoordinator`
+- app-data domains use `LAPersistedRight` as the primary app-data authorization gate in v1
+- all v1 app-data domains use `LAAuthenticationRequirement.default`
+- app-data authorization must **not** call `AuthenticationMode.createAccessControl()`
+- app-data authorization must **not** call `AuthenticationManager.createAccessControl(for:)`
+- app-data authorization must **not** derive from the private-key authentication mode
+- app-data domains must **not** inherit current `Standard` / `High Security` semantics
+- app-data domains must **not** inherit future `Special Security Mode` or `biometryCurrentSet` semantics
+- per-domain authorization-policy variation is out of scope in v1
 - protected app-data domains must never rewrap merely because private-key auth mode changes
+- the system must not return the domain unlock secret before right authorization succeeds
 
 The purpose of this contract is to prevent the new layer from attaching itself to the private-key access-control source of truth.
 
@@ -173,9 +185,11 @@ Protected app-data domains unlock for the authenticated app session rather than 
 
 Canonical behavior:
 
-- domain unlock occurs after successful app launch or resume authentication
-- ordinary in-session reads and writes reuse the unlocked session
+- the app-data right is authorized after successful app launch or resume authentication
+- the domain unlock secret is fetched only after authorization succeeds
+- ordinary in-session reads and writes reuse the authorized session
 - relock occurs on app lock, grace-period expiry, session loss, or app exit
+- relock must also deauthorize the right and clear any cached unlock secret from memory
 
 This model intentionally differs from the private-key domain.
 
@@ -197,13 +211,14 @@ Stated differently:
 
 The framework separates:
 
-- **device-bound static protection** of the domain master key
-- **runtime session authorization** for ordinary access
+- **system authorization** of the app-data unlock secret
+- **runtime session reuse** for ordinary access after that authorization
 
 This separation is required so:
 
 - protected app-data domains do not need rewrapping when private-key auth modes change
-- the app can enforce the user's selected runtime lock policy without coupling domain storage semantics to private-key rewrap cycles
+- the system, not only application code, prevents pre-auth access to the unlock secret
+- the app can still enforce session reuse and relock behavior without coupling app-data semantics to private-key rewrap cycles
 
 ### 5.7 Bootstrap-Critical Settings Whitelist
 
@@ -221,6 +236,36 @@ Rules:
 - Phase 2 must not migrate them into `ProtectedSettingsStore`
 - protected settings must not rely on a shadow copy to recreate early boot behavior
 - any future migration of a bootstrap-critical setting requires a separately documented two-phase startup design
+
+### 5.8 Startup Authentication Boundary
+
+Protected app-data domains must follow a two-phase startup model.
+
+#### Pre-Auth Bootstrap Phase
+
+Before app-data authorization succeeds, the app may:
+
+- read bootstrap-critical settings
+- read file-side bootstrap metadata
+- determine whether protected domains exist and require later unlock
+
+Before app-data authorization succeeds, the app must **not**:
+
+- fetch `LASecret`
+- authorize a right implicitly from a repository/service initializer or getter
+- attempt to open protected-domain generations
+- classify final `locked / unlocked / recoveryNeeded` state from protected-domain contents
+
+#### Post-Auth Unlock Phase
+
+After app-data authorization succeeds, the app may:
+
+- authorize the right through `ProtectedDataSessionCoordinator`
+- fetch the domain unlock secret
+- open `current / previous / pending`
+- classify final `locked / unlocked / recoveryNeeded`
+
+This is a required implementation boundary, not a best-effort guideline.
 
 ## 6. Storage Model
 
@@ -279,13 +324,15 @@ Write sequence:
 Startup recovery sequence:
 
 1. inspect available generations
-2. attempt to open candidates using the local domain master key
+2. after authorization, attempt to open candidates using the local domain master key
 3. keep only structurally valid, decryptable generations
 4. select the highest valid generation as authoritative
 5. retain the next-highest valid generation as `previous` when present
 6. enter `recoveryNeeded` if no readable authoritative generation exists
 
 The framework must never silently create a new empty domain because the prior local state is unreadable.
+
+The generation model in v1 provides crash consistency only. It does **not** provide freshness or anti-rollback guarantees.
 
 ### 6.4 Bootstrap Metadata
 
@@ -337,26 +384,18 @@ The macOS guarantee is stated in terms of container confinement plus platform-su
 For each protected app-data domain:
 
 1. generate random 256-bit `Domain Master Key`
-2. generate or reuse a domain-specific device-bound wrapping key using the dedicated app-data wrapping policy
-3. wrap the master key into a domain-specific wrapped bundle
-4. store wrapped bundle in a domain-specific Keychain namespace
-5. zeroize plaintext master-key creation buffers after successful persistence
+2. generate a domain unlock secret and persist it behind `LAPersistedRight`
+3. authorize the right before retrieving the unlock secret
+4. use the authorized secret to unwrap or derive access to the domain master key
+5. zeroize plaintext secret and master-key buffers after persistence or relock as appropriate
 
-Domain-specific namespaces and HKDF info strings must not collide with private-key wrapping identifiers.
-
-The app-data wrapping policy must remain independent from private-key auth-mode access-control generation.
+The primary v1 contract is that the system must not release the unlock secret before authorization succeeds.
 
 ### 7.2 Keychain Namespace Rule
 
-Each protected app-data domain must define its own namespace, for example:
+If any domain-specific auxiliary Keychain material is used in support of the app-data domain, it must remain separate from current private-key storage names.
 
-- `com.cypherair.protected-data.v1.<domain>.se-key`
-- `com.cypherair.protected-data.v1.<domain>.salt`
-- `com.cypherair.protected-data.v1.<domain>.sealed-master-key`
-
-This namespace is separate from current private-key storage names.
-
-In v1, bootstrap metadata is not stored in Keychain. Keychain stores only the wrapped domain master-key bundle and related key material.
+In v1, bootstrap metadata is not stored in Keychain. The primary authorization state for app-data unlock is the persisted right and its associated protected secret.
 
 ### 7.3 Session Unlock
 
@@ -364,7 +403,9 @@ In v1, bootstrap metadata is not stored in Keychain. Keychain stores only the wr
 
 Required behavior:
 
-- reuse the authenticated app launch/resume session
+- authorize the right after authenticated app launch/resume
+- fetch the domain unlock secret only after authorization succeeds
+- reuse the authorized app-data session
 - avoid domain-specific redundant prompts during ordinary in-session use
 - expose domain availability as locked/unlocked/recoveryNeeded
 
@@ -372,12 +413,15 @@ Required behavior:
 
 Relock must invalidate:
 
+- in-memory domain unlock secret
 - in-memory domain master keys
 - decrypted domain payloads in memory
 - plaintext serialization scratch buffers
 - plaintext in-memory search or lookup indexes derived from protected domains
 
 Sensitive buffers must be zeroized rather than only dereferenced.
+
+Relock must also deauthorize the right for the current session.
 
 ## 8. New Framework Interfaces And Types
 
@@ -419,16 +463,16 @@ Owns:
 
 Owns:
 
-- domain master key creation
-- domain master key wrapping and unwrapping
-- domain-specific Keychain namespace handling
+- domain unlock secret creation and lifecycle
+- domain master key lifecycle after secret retrieval
+- system-gated unlock-secret retrieval backed by `LAPersistedRight`
 - zeroization of transient key material
 
 ### `ProtectedDataSessionCoordinator.swift`
 
 Owns:
 
-- session unlock and relock state
+- right authorization, session unlock, relock, and deauthorize state
 - reuse of authenticated app-session context
 - domain runtime visibility as locked / unlocked / recoveryNeeded
 
@@ -501,42 +545,81 @@ For any domain migration:
 4. verify readability of the destination
 5. only then retire or quarantine the old source state
 
-## 11. Validation Matrix
+## 11. Domain Recovery Contracts
 
-### 11.1 Unlock / Relock
+Each protected domain must declare a recovery contract explicitly.
 
-- domain unlock occurs only after authenticated app session unlock
+Allowed v1 categories:
+
+- `import-recoverable`
+- `resettable-with-confirmation`
+- `blocking`
+
+No protected domain may silently reset on corruption or unreadable local state.
+
+### 11.1 First-Domain Rule
+
+`ProtectedSettingsStore`-style non-bootstrap settings/control state are `resettable-with-confirmation`.
+
+Required behavior:
+
+- entering `recoveryNeeded` must surface a destructive reset path
+- reset must require explicit user confirmation
+- reset must rebuild only that domain, not wipe unrelated protected domains
+
+### 11.2 Contacts Rule
+
+Contacts remains `import-recoverable`.
+
+Required behavior:
+
+- `recoveryNeeded` offers import-based recovery guidance
+- Contacts must not become silently resettable merely because it reuses the shared framework
+
+## 12. Validation Matrix
+
+### 12.1 Unlock / Relock
+
+- the right is authorized only after authenticated app session unlock
+- the domain unlock secret is fetched only after authorization
 - ordinary in-session access triggers no redundant prompts
+- relock deauthorizes the right
+- relock clears cached unlock secrets
 - relock clears in-memory domain master keys
 - relock clears decrypted payloads and derived indexes
 
-### 11.2 Crash Recovery
+### 12.2 Crash Recovery
 
 - interrupted `pending` writes recover deterministically
 - valid `current` and `previous` generations are selected consistently
 - no unreadable local state silently resets to empty domain content
 - `recoveryNeeded` is explicit and stable
 
-### 11.3 File Protection
+### 12.3 File Protection
 
 - iOS / iPadOS / visionOS protected-domain files are created with explicit `complete` file protection
 - macOS protected-domain files live inside the app sandbox/container and use the strongest platform-supported local static protection defined by the implementation
 - bootstrap metadata and temporary scratch files follow the same platform-specific protection policy as their host platform
 
-### 11.4 Zeroization
+### 12.4 Zeroization
 
 - plaintext serialization buffers are zeroized after use
+- cached unlock secrets are zeroized on relock
 - unlocked master-key buffers are zeroized on relock
 - decrypted domain snapshots or derived sensitive indexes are zeroized on relock
 
-### 11.5 Failure Paths
+### 12.5 Failure Paths
 
 - wrong auth does not unlock the domain
-- unreadable wrapped master key enters `recoveryNeeded`
+- pre-auth attempts must not fetch `LASecret`
+- unreadable authorized domain state enters `recoveryNeeded`
 - corrupted envelope hard-fails on authentication or structural validation
 - interrupted migration does not destroy readable source state
+- `ProtectedSettingsStore` reset requires explicit destructive confirmation
+- Contacts recovery remains import-based
+- anti-rollback is not implied by `current / previous / pending`
 
-## 12. Implementation Readiness Expectations
+## 13. Implementation Readiness Expectations
 
 This TDD is only acceptable if an implementer can proceed without making hidden architectural decisions.
 
@@ -544,6 +627,9 @@ At minimum, an implementer must be able to tell:
 
 - that the current private-key domain should remain semantically unchanged
 - that protected app data uses per-domain master keys
+- that `LAPersistedRight` is the primary app-data authorization gate in v1
 - that app-data domains are recoverable rather than private-key-style invalidating
 - that file protection must be explicit
+- that startup is split into pre-auth bootstrap and post-auth unlock phases
+- that the generation model does not promise anti-rollback semantics
 - that Contacts later depends on the framework rather than inventing its own vault base layer

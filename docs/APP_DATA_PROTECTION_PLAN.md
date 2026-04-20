@@ -39,6 +39,8 @@ The missing capability is not "stronger private-key protection." The missing cap
 - recovering deterministically from interrupted writes or unreadable state
 - supporting later feature domains without forcing each one to invent a new vault architecture
 
+The current proposal direction is also too dependent on app-managed authorization timing. For app-data domains, the revised v1 goal is to make the **first release of the domain unlock secret itself** a system-enforced boundary rather than a convention owned only by application code.
+
 ## 3. Hard Constraints
 
 This roadmap is bounded by the following non-negotiable constraints:
@@ -99,7 +101,21 @@ This means:
 
 The design goal is to keep private-key risk surfaces and app-data risk surfaces deliberately separate.
 
-### 4.4 Minimal Bootstrap Metadata
+### 4.4 System-Gated App-Data Authorization
+
+Protected app-data domains use a **system-gated persisted right** as the primary authorization boundary in v1.
+
+The canonical v1 model is:
+
+- each domain persists encrypted payload generations on disk
+- the domain unlock secret is protected by `LAPersistedRight`
+- the right uses `LAAuthenticationRequirement.default`
+- the system must not return the unlock secret before the right is authorized
+- once authorized, the secret may be cached for the authenticated app session and must be cleared on relock
+
+This means the first gate for app-data unlock is no longer "application code remembered to check session state first." The first gate is the system-managed authorization boundary for the persisted right.
+
+### 4.5 Minimal Bootstrap Metadata
 
 The system may keep a minimal layer of plaintext bootstrap metadata outside encrypted domain payloads when required for cold start, recovery, or migration routing.
 
@@ -122,20 +138,33 @@ Typical acceptable bootstrap information includes:
 
 This allowance exists to keep startup recovery deterministic. It is not permission to leave broad app state outside protected domains.
 
-### 4.5 Dedicated App-Data Wrapping Policy
+### 4.6 Private-Key And App-Data Secure Enclave Boundary
 
-Protected app-data domains must use a dedicated app-data wrapping policy.
+The current private-key design uses indirect Secure Enclave wrapping because the app's OpenPGP private keys are not directly managed by the Secure Enclave.
+
+Protected app-data domains are different:
+
+- their domain unlock secret is app-generated
+- Apple provides a higher-level LocalAuthentication right model for gating access to a key and a secret
+- Apple documents `LAPersistedRight` as being backed by a unique key in the Secure Enclave
+
+Choosing `LAPersistedRight` as the primary app-data gate in v1 therefore does **not** mean dropping Secure Enclave involvement. It means preferring the system's higher-level right/secret model over a custom app-managed unlock-secret gate.
+
+### 4.7 Dedicated App-Data Authorization Policy
+
+Protected app-data domains must use a dedicated app-data authorization policy.
 
 This policy is separate from the private-key access-control source of truth.
 
 In v1, this means:
 
-- app-data wrapping must not derive `SecAccessControl` from `AuthenticationMode`
-- app-data wrapping must not call `AuthenticationMode.createAccessControl()`
-- app-data wrapping must not call `AuthenticationManager.createAccessControl(for:)`
-- app-data wrapping must not inherit current `Standard` / `High Security` semantics
-- app-data wrapping must not inherit future `Special Security Mode` or `biometryCurrentSet` semantics
-- app-data wrapping provides device binding only; runtime authorization is handled by the protected app-data session layer
+- app-data authorization must not derive from `AuthenticationMode`
+- app-data authorization must not call `AuthenticationMode.createAccessControl()`
+- app-data authorization must not call `AuthenticationManager.createAccessControl(for:)`
+- all v1 app-data domains use `LAAuthenticationRequirement.default`
+- app-data domains must not inherit current `Standard` / `High Security` semantics
+- app-data domains must not inherit future `Special Security Mode` or `biometryCurrentSet` semantics
+- per-domain authorization-policy variation is out of scope in v1 unless a later domain-specific proposal explicitly reopens it
 
 This rule exists to preserve the intended boundary: private-key security semantics remain private-key-specific.
 
@@ -151,22 +180,33 @@ Goals:
 
 - establish shared terminology and lifecycle
 - define common envelope and recovery rules
-- define a dedicated app-data key-wrapping approach that is separate from the private-key access-control source of truth
-- define common relock and session-unlock semantics
+- define a system-gated app-data authorization model that is separate from the private-key access-control source of truth
+- define a strict startup authentication boundary
+- define common relock, deauthorize, and session-unlock semantics
 
 This phase should land before Contacts migration so Contacts can depend on the shared framework instead of creating its own parallel architecture.
 
-### Phase 2: First Low-Risk Real Domain
+### Phase 2: File-Protection Baseline
+
+Establish the file/static-protection baseline required by protected-domain storage before any real protected domain lands in code.
+
+Goals:
+
+- define the minimum platform-specific local static protection contract for protected-domain files
+- define the required protection for bootstrap metadata and temporary scratch files
+- ensure no real protected domain ships without its file/static-protection baseline
+
+### Phase 3: First Low-Risk Real Domain
 
 Use a low-risk domain such as protected-after-unlock settings or recovery/control state as the first adopter.
 
 Goals:
 
 - exercise the new framework without touching the private-key domain
-- validate session unlock, relock, and recovery behavior on real app-owned data
+- validate authorize / unlock / relock / deauthorize behavior on real app-owned data
 - reduce plaintext or lightly protected security-sensitive preferences over time
 
-Phase 2 uses a split-settings model.
+Phase 3 uses a split-settings model.
 
 #### Bootstrap-Critical Settings
 
@@ -178,28 +218,19 @@ The following settings remain in the early-readable layer in v1 because they are
 - `hasCompletedOnboarding`
 - `colorTheme`
 
-These settings are not eligible for `ProtectedSettingsStore` in Phase 2.
+These settings are not eligible for `ProtectedSettingsStore` in Phase 3.
 
 #### Protected-After-Unlock Settings / Control State
 
-Phase 2 may migrate only settings or control state that do not participate in early boot routing, launch-time authentication decisions, or pre-unlock presentation decisions.
+Phase 3 may migrate only settings or control state that do not participate in early boot routing, launch-time authentication decisions, or pre-unlock presentation decisions.
 
-Phase 2 must not rely on a shadow copy of protected settings to recreate early boot behavior.
+Phase 3 must not rely on a shadow copy of protected settings to recreate early boot behavior.
 
-### Phase 3: Explicit File-Protection Hardening
+This first real domain must also declare its recovery contract up front:
 
-After the basic framework exists, harden app-owned file persistence with explicit Apple file-protection policy rather than relying on defaults.
-
-Goals:
-
-- define a repository-wide file-protection posture for protected app-data files
-- define protected handling for temporary files generated by exports, imports, or other local app-owned flows
-- make file-protection behavior part of the documented security contract
-
-This hardening must be documented as a platform matrix rather than as a single identical rule across all Apple platforms.
-
-- iOS / iPadOS / visionOS: use explicit file-protection classes for protected-domain files and scratch files
-- macOS: define the guarantee in terms of sandbox/container confinement plus the strongest platform-supported local static protection used by the implementation
+- `ProtectedSettingsStore`-style non-bootstrap settings/control state are **resettable with explicit destructive confirmation**
+- they are not import-recoverable in v1
+- they must never silently reset on unreadable local state
 
 ### Phase 4: Contacts Vault On Shared Framework
 
@@ -210,6 +241,7 @@ Goals:
 - preserve the Contacts product and TDD direction
 - ensure Contacts remains a domain-specific consumer of the shared substrate
 - avoid duplicating domain key lifecycle, envelope handling, recovery logic, and relock rules
+- keep Contacts explicitly **import-recoverable**
 
 ### Phase 5: Remaining Persistent Domains
 
@@ -218,8 +250,39 @@ Migrate remaining app-owned persistent domains in order of security value and im
 Candidate areas include:
 
 - additional settings or recovery state not yet moved in Phase 2
+- additional settings or recovery state not yet moved in Phase 3
 - future local drafts or protected caches
 - future user-managed local data that should not remain plaintext at rest
+
+### 5.1 Startup Authentication Boundary
+
+All future implementations derived from this roadmap must follow a two-phase startup model.
+
+#### Pre-Auth Bootstrap Phase
+
+Before app-data authorization succeeds, the app may:
+
+- read bootstrap-critical settings
+- read file-side bootstrap metadata
+- route cold start and determine whether protected domains exist
+
+Before app-data authorization succeeds, the app must **not**:
+
+- fetch `LASecret`
+- authorize a domain right implicitly in an initializer or getter
+- attempt to open protected-domain generations
+- finalize `locked / unlocked / recoveryNeeded` from protected-domain contents
+
+#### Post-Auth Unlock Phase
+
+After app-data authorization succeeds, the app may:
+
+- authorize the domain right through the protected-data session layer
+- fetch the domain unlock secret
+- open `current / previous / pending`
+- determine final `locked / unlocked / recoveryNeeded` state
+
+This startup boundary is a required implementation constraint, not a best-effort guideline.
 
 ## 6. Explicit Do-Not-Change List
 
@@ -238,7 +301,8 @@ The preferred implementation posture is:
 
 - new files for the new layer
 - narrow dependency wiring
-- reuse of existing lower-level primitives by composition through a dedicated app-data policy
+- use `LAPersistedRight` as the primary app-data authorization gate in v1
+- reuse existing lower-level primitives by composition only where they support, rather than replace, that system gate
 - never attach the new layer to the private-key access-control source of truth
 - no "cleanup refactor" of the private-key domain just to make the new layer look symmetrical
 
@@ -267,7 +331,7 @@ Expected narrow integration seams:
 
 - `AppContainer` for dependency construction
 - `AppStartupCoordinator` for protected-domain startup recovery
-- app lock / resume flow for relock and authenticated session reuse
+- app lock / resume flow for authorize, relock, deauthorize, and authenticated session reuse
 - future Contacts integration
 
 ## 8. Canonicalization Plan
@@ -293,7 +357,9 @@ Any implementation derived from this roadmap should be reviewable against these 
 
 - does it preserve the existing private-key domain without semantic drift?
 - does it introduce a reusable protected app-data substrate rather than a one-off vault?
+- does it treat `LAPersistedRight` as the first gate for app-data unlock secret access?
 - does it keep app-data domains recoverable rather than private-key-style invalidating?
 - does it keep bootstrap metadata minimal and non-sensitive?
 - does it harden file protection explicitly instead of relying on platform defaults?
 - does it make Contacts a consumer of the framework rather than the owner of a separate architecture?
+- does it keep anti-rollback explicitly out of scope in v1 rather than implying freshness guarantees?
