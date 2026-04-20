@@ -148,7 +148,26 @@ Expected properties:
 - wrapped master key never stored in plaintext
 - source-device wrapping material never exported as part of portable recovery
 
-### 5.3 Session-Unlocked Access Model
+### 5.3 App-Data Wrapping Access-Control Contract
+
+`ProtectedDomainKeyManager` owns a dedicated app-data wrapping policy.
+
+This policy is a normative requirement, not an implementation detail left for later.
+
+Required rules:
+
+- app-data wrapping keys must **not** call `AuthenticationMode.createAccessControl()`
+- app-data wrapping keys must **not** call `AuthenticationManager.createAccessControl(for:)`
+- app-data wrapping keys must **not** derive `SecAccessControl` from the private-key authentication mode
+- app-data wrapping keys must **not** inherit current `Standard` / `High Security` semantics
+- app-data wrapping keys must **not** inherit future `Special Security Mode` or `biometryCurrentSet` semantics
+- app-data wrapping in v1 provides device binding only
+- runtime authorization for ordinary app-data access is handled solely by `ProtectedDataSessionCoordinator`
+- protected app-data domains must never rewrap merely because private-key auth mode changes
+
+The purpose of this contract is to prevent the new layer from attaching itself to the private-key access-control source of truth.
+
+### 5.4 Session-Unlocked Access Model
 
 Protected app-data domains unlock for the authenticated app session rather than per operation.
 
@@ -160,7 +179,7 @@ Canonical behavior:
 
 This model intentionally differs from the private-key domain.
 
-### 5.4 Recoverable App-Data Semantics
+### 5.5 Recoverable App-Data Semantics
 
 Protected app-data domains are recoverable domains even if future private-key behavior becomes stricter under `Special Security Mode`.
 
@@ -174,7 +193,7 @@ Stated differently:
 - protected app-data domains must continue to use recoverable semantics
 - app-data access is governed by the authenticated session and local recoverability rules, not by private-key loss semantics
 
-### 5.5 Runtime Policy Separation
+### 5.6 Runtime Policy Separation
 
 The framework separates:
 
@@ -185,6 +204,23 @@ This separation is required so:
 
 - protected app-data domains do not need rewrapping when private-key auth modes change
 - the app can enforce the user's selected runtime lock policy without coupling domain storage semantics to private-key rewrap cycles
+
+### 5.7 Bootstrap-Critical Settings Whitelist
+
+The following settings are bootstrap-critical in v1 because current startup or pre-unlock behavior depends on them before protected domains unlock:
+
+- `authMode`
+- `gracePeriod`
+- `requireAuthOnLaunch`
+- `hasCompletedOnboarding`
+- `colorTheme`
+
+Rules:
+
+- these keys remain in the early-readable layer in v1
+- Phase 2 must not migrate them into `ProtectedSettingsStore`
+- protected settings must not rely on a shadow copy to recreate early boot behavior
+- any future migration of a bootstrap-critical setting requires a separately documented two-phase startup design
 
 ## 6. Storage Model
 
@@ -255,6 +291,8 @@ The framework must never silently create a new empty domain because the prior lo
 
 Bootstrap metadata may exist beside encrypted generations, but it must remain minimal.
 
+In v1, bootstrap metadata is file-side metadata stored beside encrypted generations. It is not stored in Keychain.
+
 Bootstrap metadata must not become a plaintext shadow database.
 
 Recommended bootstrap contents:
@@ -264,11 +302,15 @@ Recommended bootstrap contents:
 - expected current generation identifier
 - coarse recovery flag or reason code
 
-Bootstrap metadata should still receive explicit Apple file protection even though it is not part of the encrypted payload.
+Bootstrap metadata is a cold-start and recovery routing hint, not a secret-bearing store.
+
+Bootstrap metadata should still receive explicit platform-appropriate local static protection even though it is not part of the encrypted payload.
 
 ### 6.5 File-Protection Policy
 
-Protected domain files must use explicit Apple file protection instead of platform defaults.
+Protected domain files must use explicit platform-appropriate local static protection instead of relying on defaults.
+
+#### iOS / iPadOS / visionOS
 
 Required policy:
 
@@ -278,6 +320,16 @@ Required policy:
 
 The implementation must not rely on default `completeUntilFirstUserAuthentication` behavior for protected app-data files.
 
+#### macOS
+
+Required policy:
+
+- protected-domain files must live inside the app's sandbox/container `Application Support` area
+- the implementation must use the strongest platform-supported local static protection it can enforce for app-owned files
+- the documentation must not claim identical iOS-style data-protection semantics on macOS unless a later implementation and platform review explicitly prove them
+
+The macOS guarantee is stated in terms of container confinement plus platform-supported local static protection, not as a claim of identical iOS-style data-protection classes.
+
 ## 7. Key And Session Lifecycle
 
 ### 7.1 Domain Master Key Lifecycle
@@ -285,12 +337,14 @@ The implementation must not rely on default `completeUntilFirstUserAuthenticatio
 For each protected app-data domain:
 
 1. generate random 256-bit `Domain Master Key`
-2. generate or reuse a domain-specific device-bound wrapping key
+2. generate or reuse a domain-specific device-bound wrapping key using the dedicated app-data wrapping policy
 3. wrap the master key into a domain-specific wrapped bundle
 4. store wrapped bundle in a domain-specific Keychain namespace
 5. zeroize plaintext master-key creation buffers after successful persistence
 
 Domain-specific namespaces and HKDF info strings must not collide with private-key wrapping identifiers.
+
+The app-data wrapping policy must remain independent from private-key auth-mode access-control generation.
 
 ### 7.2 Keychain Namespace Rule
 
@@ -299,9 +353,10 @@ Each protected app-data domain must define its own namespace, for example:
 - `com.cypherair.protected-data.v1.<domain>.se-key`
 - `com.cypherair.protected-data.v1.<domain>.salt`
 - `com.cypherair.protected-data.v1.<domain>.sealed-master-key`
-- `com.cypherair.protected-data.v1.<domain>.bootstrap`
 
 This namespace is separate from current private-key storage names.
+
+In v1, bootstrap metadata is not stored in Keychain. Keychain stores only the wrapped domain master-key bundle and related key material.
 
 ### 7.3 Session Unlock
 
@@ -492,4 +547,3 @@ At minimum, an implementer must be able to tell:
 - that app-data domains are recoverable rather than private-key-style invalidating
 - that file protection must be explicit
 - that Contacts later depends on the framework rather than inventing its own vault base layer
-
