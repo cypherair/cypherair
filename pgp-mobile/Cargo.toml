@@ -36,4 +36,4 @@ strip = "none"
 codegen-units = 1
 
 [patch.crates-io]
-openssl-src = { git = "https://github.com/cypherair/openssl-src-rs", rev = "0c7e9b5e0c4c4644de34dd3ee86f2a2ef87daa61" }
+openssl-src = { git = "https://github.com/alexcrichton/openssl-src-rs", rev = "767b8bffff4d690189d72d171feb224a41ea2e74" }

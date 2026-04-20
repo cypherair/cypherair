@@ -121,7 +121,7 @@ Targets: `aarch64-apple-ios` (device) + `aarch64-apple-ios-sim` (Apple Silicon s
 
 The current release pipeline includes native visionOS support. `build-xcframework.sh` builds and validates the visionOS device and simulator archives, packages all Apple slices into `PgpMobile.xcframework`, and the Xcode project links that XCFramework. The native app path is probed with `xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS' CODE_SIGNING_ALLOWED=NO`.
 
-To keep vendored OpenSSL reproducible across the current Apple target matrix, `pgp-mobile/Cargo.toml` pins `openssl-src` through `[patch.crates-io]` to `https://github.com/cypherair/openssl-src-rs` at rev `0c7e9b5e0c4c4644de34dd3ee86f2a2ef87daa61`.
+To keep vendored OpenSSL reproducible across the current Apple target matrix, `pgp-mobile/Cargo.toml` pins `openssl-src` through `[patch.crates-io]` to the upstream `https://github.com/alexcrichton/openssl-src-rs` repository at rev `767b8bffff4d690189d72d171feb224a41ea2e74`. The latest published crates.io release (`300.6.0+3.6.2`, published 2026-04-07) predates the upstream merge of visionOS support in PR `#283`, so a checked-in `git` + exact `rev` pin remains necessary for now.
 
 The current deployment baseline for the app targets is `iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+`.
 
@@ -191,7 +191,7 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 3. The current Xcode project links `PgpMobile.xcframework` and imports the generated headers through `bindings/module.modulemap`
 4. Local Swift / FFI validation runs through `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 
-The current `openssl-src` override for visionOS support must remain reproducible: use the checked-in `git` + exact `rev` pin to the CypherAir fork, not a machine-local `path` dependency and not an unstable branch reference.
+The current `openssl-src` override for visionOS support must remain reproducible: use the checked-in `git` + exact `rev` pin to the upstream repository, not a machine-local `path` dependency, not an unstable branch reference, and not the old CypherAir fork override.
 
 See also [CLAUDE.md](../CLAUDE.md) Build Commands for the full pipeline with exact commands.
 
