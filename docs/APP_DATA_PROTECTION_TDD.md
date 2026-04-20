@@ -74,8 +74,10 @@ Properties:
 - unique per domain
 - never stored in plaintext
 - used to encrypt domain payload generations on disk
+- in v1, persisted directly as the `secret` behind one domain-specific `LAPersistedRight`
+- the authorized `LASecret.rawData` is the only plaintext source of the `Domain Master Key`
 - re-established independently on import or recovery flows when needed
-- persisted in a v1 domain-specific protected form that is stable across startup, relock, and crash recovery
+- stable across startup, relock, and crash recovery through that single persisted-right-backed form
 
 ### 3.4 Bootstrap Metadata
 
@@ -186,21 +188,24 @@ Protected app-data domains unlock for the authenticated app session rather than 
 
 Canonical behavior:
 
-- the app-data right is authorized by `ProtectedDataSessionCoordinator` after successful app launch or resume authentication
+- `ProtectedDataSessionCoordinator` owns the authoritative app-data unlock boundary
+- that boundary is `LAPersistedRight.authorize(...)`
 - the domain unlock secret is fetched only after authorization succeeds
 - ordinary in-session reads and writes reuse the authorized session
-- relock occurs on app lock, grace-period expiry, session loss, or app exit
+- authorization survives background / inactive transitions while the app remains inside the current grace window
+- relock occurs on explicit app lock, grace-period expiry, session loss, or app exit
 - relock must also deauthorize the right and clear any cached unlock secret from memory
 
 This model intentionally differs from the private-key domain.
 
 The authoritative v1 orchestration model is:
 
-- existing app launch/resume authentication remains the outer app-auth boundary
-- `ProtectedDataSessionCoordinator` then authorizes the app-data right as the authoritative gate for app-data unlock
+- `ProtectedDataSessionCoordinator` authorizes the app-data right and owns app-data session reuse
+- existing `AuthenticationManager` / `AuthenticationMode` launch-resume auth is not the normative app-data authorization source
+- if current shipped app-shell privacy auth remains in place, it is treated as separate UX and not as the required gate for future app-data unlock semantics
 - app-data domains do not bypass the right by treating prior app-auth alone as sufficient to release the unlock secret
 
-Repeated-prompt avoidance is a required design goal. The implementation must minimize duplicate authorization prompts within one launch/resume flow by making `ProtectedDataSessionCoordinator` the sole owner of app-data right authorization timing.
+Repeated-prompt avoidance is a required design goal. The v1 proposal must not rely on undocumented prompt coalescing between different authorization systems. Instead, the proposal treats `ProtectedDataSessionCoordinator` and its right authorization as the only normative app-data unlock contract.
 
 ### 5.5 Recoverable App-Data Semantics
 
@@ -269,7 +274,6 @@ Before app-data authorization succeeds, the app must **not**:
 
 After app-data authorization succeeds, the app may:
 
-- authorize the right through `ProtectedDataSessionCoordinator`
 - fetch the domain unlock secret
 - open `current / previous / pending`
 - classify final `locked / unlocked / recoveryNeeded`
@@ -351,20 +355,21 @@ The v1 persistence model for each protected app-data domain is:
 
 - the domain payload generations are stored as encrypted envelopes on disk
 - the `Domain Master Key` is not stored in plaintext on disk
-- a domain unlock secret is persisted behind `LAPersistedRight`
-- the `Domain Master Key` is persisted in a protected form that can only be reopened after the unlock secret is released by the system gate
+- the `Domain Master Key` itself is the `secret` persisted behind one domain-specific `LAPersistedRight`
+- there is no second app-managed wrapped master-key blob in v1
+- the authorized `LASecret.rawData` is the only plaintext source of the `Domain Master Key`
 
-The protected form of the `Domain Master Key` must satisfy these lifecycle rules:
+The canonical v1 lifecycle is:
 
-- creation is atomic with first successful protected-domain initialization
-- updates must not leave a window where both the old readable form and the new readable form are lost
-- deletion must remove both the protected key material and the persisted right / secret association for that domain
-- recovery must distinguish between:
+- create: generate the `Domain Master Key`, persist it behind the domain-specific right, then write initial domain state; if initialization fails, remove the right and any partial domain files
+- steady-state updates: rewrite generations only; do not rotate the `Domain Master Key` unless a later domain-specific design explicitly introduces rekey
+- delete: remove domain generations and bootstrap metadata, then remove the persisted right
+- recovery: distinguish between:
   - unreadable payload generations
-  - unreadable protected master-key state
-  - unreadable or missing persisted-right-protected unlock secret
+  - missing persisted right
+  - unreadable or missing right-protected secret data
 
-The v1 docs do not permit multiple equally valid persistence shapes for the master key. Any implementation must use one documented protected-form model and apply the same model consistently across startup, relock, deletion, migration, and recovery.
+The v1 docs do not permit multiple equally valid persistence shapes for the master key. The direct-secret model above is the single canonical v1 model and must be applied consistently across startup, relock, deletion, migration, and recovery.
 
 ### 6.5 Bootstrap Metadata
 
@@ -425,25 +430,25 @@ This is the v1 acceptance floor. Stronger macOS protection claims require later 
 For each protected app-data domain:
 
 1. generate random 256-bit `Domain Master Key`
-2. generate a domain unlock secret and persist it behind `LAPersistedRight`
-3. authorize the right before retrieving the unlock secret
-4. use the authorized secret to unwrap or derive access to the domain master key
-5. zeroize plaintext secret and master-key buffers after persistence or relock as appropriate
+2. persist that `Domain Master Key` as the `secret` behind the domain-specific `LAPersistedRight`
+3. authorize the right before retrieving `LASecret.rawData`
+4. use the authorized `LASecret.rawData` directly as the plaintext `Domain Master Key`
+5. zeroize plaintext secret/master-key buffers after initialization, use, or relock as appropriate
 
-The primary v1 contract is that the system must not release the unlock secret before authorization succeeds.
+The primary v1 contract is that the system must not release the `Domain Master Key` before authorization succeeds.
 
 The v1 `Domain Master Key` lifecycle must also define:
 
-- creation-time persistence of the protected master-key form
+- creation-time persistence of the right-protected `Domain Master Key`
 - stable re-open behavior across relock/relaunch
-- explicit deletion semantics for both the protected master-key material and its right-protected unlock secret
-- recovery behavior when either the persisted right or the protected master-key form becomes unreadable
+- explicit deletion semantics for both domain files and the persisted right
+- recovery behavior when either the persisted right or the right-protected `Domain Master Key` becomes unreadable
 
 ### 7.2 Keychain Namespace Rule
 
 If any domain-specific auxiliary Keychain material is used in support of the app-data domain, it must remain separate from current private-key storage names.
 
-In v1, bootstrap metadata is not stored in Keychain. The primary authorization state for app-data unlock is the persisted right and its associated protected secret.
+In v1, bootstrap metadata is not stored in Keychain. The primary authorization state for app-data unlock is the persisted right, and the primary persisted key material for app-data unlock is the right-protected `Domain Master Key` secret itself.
 
 ### 7.3 Session Unlock
 
@@ -451,7 +456,7 @@ In v1, bootstrap metadata is not stored in Keychain. The primary authorization s
 
 Required behavior:
 
-- authorize the right after authenticated app launch/resume
+- authorize the right as the authoritative app-data unlock boundary
 - fetch the domain unlock secret only after authorization succeeds
 - reuse the authorized app-data session
 - avoid domain-specific redundant prompts during ordinary in-session use
@@ -470,6 +475,8 @@ Relock must invalidate:
 Sensitive buffers must be zeroized rather than only dereferenced.
 
 Relock must also deauthorize the right for the current session.
+
+App-data relock does **not** occur merely because the app entered background or inactive state while the current grace window remains valid.
 
 ## 8. New Framework Interfaces And Types
 
@@ -616,13 +623,17 @@ Initial classification baseline:
 | `requireAuthOnLaunch` | `UserDefaults` | `early-readable` | Read before app-data authorization |
 | `hasCompletedOnboarding` | `UserDefaults` | `early-readable` | Affects startup routing |
 | `colorTheme` | `UserDefaults` | `early-readable` | Affects early scene presentation |
-| `encryptToSelf` | `UserDefaults` | `protected-after-unlock` candidate | Not required for pre-auth bootstrap |
-| `clipboardNotice` | `UserDefaults` | `protected-after-unlock` candidate | Not required for pre-auth bootstrap |
-| `guidedTutorialCompletedVersion` | `UserDefaults` | `protected-after-unlock` candidate | Keep early-readable only if future startup flow proves it necessary |
+| `encryptToSelf` | `UserDefaults` | `protected-after-unlock` | Not required for pre-auth bootstrap |
+| `clipboardNotice` | `UserDefaults` | `protected-after-unlock` | Not required for pre-auth bootstrap |
+| `guidedTutorialCompletedVersion` | `UserDefaults` | `protected-after-unlock` | Not required for pre-auth bootstrap in the current proposal |
 | `rewrapInProgress` | `UserDefaults` | `remain plaintext with rationale` | Private-key recovery flag; stays outside app-data domain in v1 |
 | `rewrapTargetMode` | `UserDefaults` | `remain plaintext with rationale` | Private-key recovery flag; stays outside app-data domain in v1 |
 | `modifyExpiryInProgress` | `UserDefaults` | `remain plaintext with rationale` | Private-key recovery flag; stays outside app-data domain in v1 |
 | `modifyExpiryFingerprint` | `UserDefaults` | `remain plaintext with rationale` | Private-key recovery flag; stays outside app-data domain in v1 |
+| `Documents/contacts/*.gpg` | App sandbox documents | `remain plaintext with rationale` | Existing Contacts storage stays outside this round until Contacts docs are revised |
+| `Documents/contacts/contact-metadata.json` | App sandbox documents | `remain plaintext with rationale` | Existing Contacts metadata stays outside this round until Contacts docs are revised |
+| `Documents/self-test/` | App sandbox documents | `remain plaintext with rationale` | Diagnostic output remains outside protected-domain scope in v1 |
+| future protected-domain bootstrap metadata | App-owned bootstrap files | `early-readable` | Read before app-data authorization by design |
 
 ## 11. Domain Recovery Contracts
 
@@ -659,13 +670,14 @@ Required behavior:
 
 ### 12.1 Unlock / Relock
 
-- the right is authorized only after authenticated app session unlock
+- `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary
 - the domain unlock secret is fetched only after authorization
 - ordinary in-session access triggers no redundant prompts
 - relock deauthorizes the right
 - relock clears cached unlock secrets
 - relock clears in-memory domain master keys
 - relock clears decrypted payloads and derived indexes
+- backgrounding within the active grace window does not deauthorize app-data access
 
 ### 12.2 Crash Recovery
 
