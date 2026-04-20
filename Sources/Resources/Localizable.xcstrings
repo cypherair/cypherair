@@ -1425,6 +1425,22 @@
         }
       }
     },
+    "decrypt.signer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名者"
+          }
+        }
+      }
+    },
     "decrypt.title" : {
       "localizations" : {
         "en" : {
@@ -9165,6 +9181,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "验证结果"
+          }
+        }
+      }
+    },
+    "verify.signer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名者"
           }
         }
       }

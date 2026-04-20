@@ -16,6 +16,16 @@ final class LocalizationCatalogTests: XCTestCase {
         }
     }
 
+    func test_localizedKeysIncludeLocalizedStringKeyArguments() throws {
+        let sourceURL = repositoryRootURL().appending(path: "Sources", directoryHint: .isDirectory)
+        let keys = try localizedKeys(in: sourceURL)
+
+        XCTAssertTrue(keys.contains("decrypt.signature"))
+        XCTAssertTrue(keys.contains("decrypt.signer"))
+        XCTAssertTrue(keys.contains("verify.result"))
+        XCTAssertTrue(keys.contains("verify.signer"))
+    }
+
     func test_localizableCatalogEntriesAreFullyTranslatedAndNotStale() throws {
         let catalog = try loadCatalog(at: "Sources/Resources/Localizable.xcstrings")
 
@@ -78,9 +88,44 @@ final class LocalizationCatalogTests: XCTestCase {
     }
 
     private func localizedKeys(in directoryURL: URL) throws -> Set<String> {
-        let expression = try NSRegularExpression(pattern: #"localized:\s*"([^"]+)""#)
+        let localizedExpression = try NSRegularExpression(pattern: #"localized:\s*"([^"]+)""#)
+        let localizedStringKeyLabelExpression = try NSRegularExpression(
+            pattern: #"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*LocalizedStringKey\b"#
+        )
+        let catalogStyleKeyExpression = try NSRegularExpression(
+            pattern: #"^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+$"#
+        )
+        let sourceContents = try swiftSourceContents(in: directoryURL)
         var keys = Set<String>()
 
+        for contents in sourceContents {
+            let localizedMatches = capturedStrings(matching: localizedExpression, in: contents)
+            for key in localizedMatches where matchesCatalogStyle(key, using: catalogStyleKeyExpression) {
+                keys.insert(key)
+            }
+        }
+
+        let localizedStringKeyLabels = Set(
+            sourceContents.flatMap {
+                capturedStrings(matching: localizedStringKeyLabelExpression, in: $0)
+            }
+        )
+
+        if let localizedStringKeyLiteralExpression = try localizedStringKeyLiteralExpression(
+            for: localizedStringKeyLabels
+        ) {
+            for contents in sourceContents {
+                keys.formUnion(
+                    capturedStrings(matching: localizedStringKeyLiteralExpression, in: contents)
+                )
+            }
+        }
+
+        return keys
+    }
+
+    private func swiftSourceContents(in directoryURL: URL) throws -> [String] {
+        var contents = [String]()
         let enumerator = FileManager.default.enumerator(
             at: directoryURL,
             includingPropertiesForKeys: nil
@@ -89,23 +134,52 @@ final class LocalizationCatalogTests: XCTestCase {
         while let fileURL = enumerator?.nextObject() as? URL {
             guard fileURL.pathExtension == "swift" else { continue }
             guard !fileURL.path.contains("/Sources/PgpMobile/") else { continue }
-
-            let contents = try String(contentsOf: fileURL, encoding: .utf8)
-            let range = NSRange(contents.startIndex..<contents.endIndex, in: contents)
-            let matches = expression.matches(in: contents, range: range)
-
-            for match in matches {
-                guard
-                    let keyRange = Range(match.range(at: 1), in: contents)
-                else {
-                    continue
-                }
-
-                keys.insert(String(contents[keyRange]))
-            }
+            contents.append(try String(contentsOf: fileURL, encoding: .utf8))
         }
 
-        return keys
+        return contents
+    }
+
+    private func localizedStringKeyLiteralExpression(
+        for labels: Set<String>
+    ) throws -> NSRegularExpression? {
+        guard !labels.isEmpty else {
+            return nil
+        }
+
+        let alternation = labels
+            .sorted { lhs, rhs in
+                if lhs.count != rhs.count {
+                    return lhs.count > rhs.count
+                }
+                return lhs < rhs
+            }
+            .map(NSRegularExpression.escapedPattern(for:))
+            .joined(separator: "|")
+
+        let pattern = "\\b(?:\(alternation))\\s*:\\s*\"([A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)+)\""
+        return try NSRegularExpression(pattern: pattern)
+    }
+
+    private func capturedStrings(
+        matching expression: NSRegularExpression,
+        in contents: String
+    ) -> [String] {
+        let range = NSRange(contents.startIndex..<contents.endIndex, in: contents)
+        return expression.matches(in: contents, range: range).compactMap { match in
+            guard let captureRange = Range(match.range(at: 1), in: contents) else {
+                return nil
+            }
+            return String(contents[captureRange])
+        }
+    }
+
+    private func matchesCatalogStyle(
+        _ candidate: String,
+        using expression: NSRegularExpression
+    ) -> Bool {
+        let range = NSRange(candidate.startIndex..<candidate.endIndex, in: candidate)
+        return expression.firstMatch(in: candidate, range: range) != nil
     }
 }
 

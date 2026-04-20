@@ -70,14 +70,21 @@ def head_commit_sha(repo_root: Path) -> str:
 
 
 def remote_tag_commit_sha(repo_root: Path, release_tag: str, remote_name: str = "origin") -> str:
-    completed = run_git(
-        repo_root,
-        "ls-remote",
-        "--tags",
-        remote_name,
-        f"refs/tags/{release_tag}",
-        f"refs/tags/{release_tag}^{{}}",
-    )
+    try:
+        completed = run_git(
+            repo_root,
+            "ls-remote",
+            "--tags",
+            remote_name,
+            f"refs/tags/{release_tag}",
+            f"refs/tags/{release_tag}^{{}}",
+        )
+    except subprocess.CalledProcessError as error:
+        detail = error.stderr.strip()
+        detail_suffix = f" Git reported: {detail}" if detail else ""
+        raise CandidateValidationError(
+            f"Unable to resolve stable tag {release_tag} from remote {remote_name}.{detail_suffix}"
+        ) from error
 
     direct_sha = ""
     peeled_sha = ""
