@@ -5,7 +5,7 @@
 > Audience: Human developers, reviewers, release owners, and AI coding tools.
 > This document records the chosen remediation path. It is not, by itself, a statement that all downstream docs, release workflows, product metadata, or shipped binaries have already been updated.
 > Current code and active canonical docs still describe shipped behavior unless and until they are updated in the implementation phases below.
-> Companion documents: [README.md](../README.md) · [CLAUDE.md](../CLAUDE.md) · [AGENTS.md](../AGENTS.md) · [TDD.md](TDD.md) · [TESTING.md](TESTING.md) · [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md) · [DOCUMENTATION_GOVERNANCE.md](DOCUMENTATION_GOVERNANCE.md)
+> Companion documents: [README.md](../README.md) · [CLAUDE.md](../CLAUDE.md) · [AGENTS.md](../AGENTS.md) · [TDD.md](TDD.md) · [TESTING.md](TESTING.md) · [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md) · [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md) · [DOCUMENTATION_GOVERNANCE.md](DOCUMENTATION_GOVERNANCE.md)
 
 ## 1. Role And Scope
 
@@ -75,6 +75,7 @@ The selected App path is:
 - for release builds, display the marketing version, build number, commit SHA, dependency summary, and the exact GitHub release URL for the corresponding stable build release
 - do not place a long-form written-offer text inside the App UI
 - rely on exact version-bound release materials, durable release-page linkage, and immutable release assets as the primary operational fulfillment path
+- distinguish lightweight internal / experimental uploads from formal App Store candidate uploads, with the App Store candidate path documented in [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md)
 
 The selected App path is intentionally lighter than an embedded full-source package or in-App long-form offer. That choice leaves residual legal-risk questions, which are recorded below rather than hidden.
 

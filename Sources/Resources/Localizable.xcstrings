@@ -9110,13 +9110,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unavailable for local builds"
+            "value" : "Unavailable for local or internal builds"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本地构建不可用"
+            "value" : "本地或内部构建不可用"
           }
         }
       }

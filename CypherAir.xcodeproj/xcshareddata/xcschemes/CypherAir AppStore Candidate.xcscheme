@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "2640"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES"
+      buildArchitectures = "Automatic">
+      <PreActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Check PgpMobile XCFramework"
+               scriptText = "if [ ! -f &quot;${SRCROOT}/PgpMobile.xcframework/Info.plist&quot; ]; then&#10;    echo &quot;error: PgpMobile.xcframework is missing. Run ./build-xcframework.sh --release&quot;&#10;    exit 1&#10;fi&#10;">
+               <EnvironmentBuildable>
+                  <BuildableReference
+                     BuildableIdentifier = "primary"
+                     BlueprintIdentifier = "8054D4FD1FA30AED22F9BF1B"
+                     BuildableName = "CypherAir.app"
+                     BlueprintName = "CypherAir"
+                     ReferencedContainer = "container:CypherAir.xcodeproj">
+                  </BuildableReference>
+               </EnvironmentBuildable>
+            </ActionContent>
+         </ExecutionAction>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Validate App Store Candidate Release"
+               scriptText = "set -euo pipefail&#10;&#10;if [ &quot;${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}&quot; != &quot;YES&quot; ]; then&#10;    exit 0&#10;fi&#10;&#10;BRANCH=&quot;$(git -C &quot;${SRCROOT}&quot; branch --show-current 2&gt;/dev/null || true)&quot;&#10;if [ &quot;${BRANCH}&quot; != &quot;main&quot; ]; then&#10;    echo &quot;error: App Store candidate archives are only allowed from the main branch. Current branch: ${BRANCH:-unknown}&quot;&#10;    exit 1&#10;fi&#10;&#10;if [ -z &quot;${MARKETING_VERSION:-}&quot; ] || [ -z &quot;${CURRENT_PROJECT_VERSION:-}&quot; ]; then&#10;    echo &quot;error: MARKETING_VERSION and CURRENT_PROJECT_VERSION are required for App Store candidate archives.&quot;&#10;    exit 1&#10;fi&#10;&#10;RELEASE_TAG=&quot;cypherair-v${MARKETING_VERSION}-build${CURRENT_PROJECT_VERSION}&quot;&#10;if command -v gh &gt;/dev/null 2&gt;&amp;1 &amp;&amp; gh auth status &gt;/dev/null 2&gt;&amp;1; then&#10;    if ! gh release view &quot;${RELEASE_TAG}&quot; -R cypherair/cypherair &gt;/dev/null 2&gt;&amp;1; then&#10;        echo &quot;error: Missing GitHub stable release ${RELEASE_TAG}. Publish the stable release before archiving an App Store candidate.&quot;&#10;        exit 1&#10;    fi&#10;else&#10;    API_URL=&quot;https://api.github.com/repos/cypherair/cypherair/releases/tags/${RELEASE_TAG}&quot;&#10;    HTTP_CODE=&quot;$(curl -fsS -o /dev/null -w '%{http_code}' &quot;${API_URL}&quot; || true)&quot;&#10;    if [ &quot;${HTTP_CODE}&quot; != &quot;200&quot; ]; then&#10;        echo &quot;error: Missing GitHub stable release ${RELEASE_TAG}. Publish the stable release before archiving an App Store candidate.&quot;&#10;        exit 1&#10;    fi&#10;fi&#10;">
+               <EnvironmentBuildable>
+                  <BuildableReference
+                     BuildableIdentifier = "primary"
+                     BlueprintIdentifier = "8054D4FD1FA30AED22F9BF1B"
+                     BuildableName = "CypherAir.app"
+                     BlueprintName = "CypherAir"
+                     ReferencedContainer = "container:CypherAir.xcodeproj">
+                  </BuildableReference>
+               </EnvironmentBuildable>
+            </ActionContent>
+         </ExecutionAction>
+      </PreActions>
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8054D4FD1FA30AED22F9BF1B"
+               BuildableName = "CypherAir.app"
+               BlueprintName = "CypherAir"
+               ReferencedContainer = "container:CypherAir.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      shouldAutocreateTestPlan = "YES">
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES"
+      queueDebuggingEnableBacktraceRecording = "Yes">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "8054D4FD1FA30AED22F9BF1B"
+            BuildableName = "CypherAir.app"
+            BlueprintName = "CypherAir"
+            ReferencedContainer = "container:CypherAir.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "8054D4FD1FA30AED22F9BF1B"
+            BuildableName = "CypherAir.app"
+            BlueprintName = "CypherAir"
+            ReferencedContainer = "container:CypherAir.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "AppStore Candidate Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>
