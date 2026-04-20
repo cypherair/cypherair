@@ -4,13 +4,15 @@
     "displayName": "CypherAir",
     "version": "Unspecified",
     "repositoryURL": "https://github.com/cypherair/cypherair",
-    "licenseName": "GPL-3.0-or-later",
-    "licenseFileResourceName": "CypherAir-LICENSE.txt",
+    "licenseName": "GPL-3.0-or-later OR MPL-2.0",
+    "licenseFileResourceName": "CypherAir-DUAL-LICENSE.txt",
     "kind": "app",
     "isDirectDependency": false,
     "licenseSourceKind": "projectFile",
     "licenseSourceItems": [
-      "LICENSE"
+      "LICENSE",
+      "LICENSES/GPL-3.0-or-later.txt",
+      "LICENSES/MPL-2.0.txt"
     ]
   },
   {

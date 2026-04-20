@@ -15,8 +15,18 @@ struct AboutView: View {
                 )
                 LabeledContent(
                     String(localized: "about.license", defaultValue: "License"),
-                    value: "GPLv3"
+                    value: "GPL-3.0-or-later OR MPL-2.0"
                 )
+                NavigationLink(value: AppRoute.sourceCompliance) {
+                    Label(
+                        String(
+                            localized: "about.sourceCompliance",
+                            defaultValue: "Source & Compliance"
+                        ),
+                        systemImage: "doc.badge.gearshape"
+                    )
+                }
+                .accessibilityIdentifier("about.sourceCompliance")
             }
 
             Section {

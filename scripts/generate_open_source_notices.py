@@ -22,7 +22,11 @@ ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = ROOT / "pgp-mobile" / "Cargo.toml"
 RESOURCE_DIR = ROOT / "Sources" / "Resources" / "OpenSourceNotices"
 NOTICE_FILE = RESOURCE_DIR / "open_source_notices.json"
-APP_LICENSE_PATH = ROOT / "LICENSE"
+APP_LICENSE_NOTICE_PATH = ROOT / "LICENSE"
+APP_LICENSE_TEXT_PATHS = [
+    ROOT / "LICENSES" / "GPL-3.0-or-later.txt",
+    ROOT / "LICENSES" / "MPL-2.0.txt",
+]
 APP_REPOSITORY_URL = "https://github.com/cypherair/cypherair"
 REGISTRY_LICENSE_PATTERN = re.compile(r"(?i)^(license|copying|unlicense|copyright)([.-].+)?$")
 LICENSE_FETCH_HEADERS = {"User-Agent": "CypherAir Open Source Notices"}
@@ -326,12 +330,16 @@ def build_notice_manifest(packages: list[PackageRecord], license_sources: dict[s
             "displayName": "CypherAir",
             "version": app_version_string(),
             "repositoryURL": APP_REPOSITORY_URL,
-            "licenseName": "GPL-3.0-or-later",
-            "licenseFileResourceName": "CypherAir-LICENSE.txt",
+            "licenseName": "GPL-3.0-or-later OR MPL-2.0",
+            "licenseFileResourceName": "CypherAir-DUAL-LICENSE.txt",
             "kind": "app",
             "isDirectDependency": False,
             "licenseSourceKind": "projectFile",
-            "licenseSourceItems": ["LICENSE"],
+            "licenseSourceItems": [
+                "LICENSE",
+                "LICENSES/GPL-3.0-or-later.txt",
+                "LICENSES/MPL-2.0.txt",
+            ],
         }
     ]
 
@@ -387,7 +395,10 @@ def generate() -> None:
     else:
         RESOURCE_DIR.mkdir(parents=True)
 
-    (RESOURCE_DIR / "CypherAir-LICENSE.txt").write_text(APP_LICENSE_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    app_license_text = combine_license_texts(
+        [(path.name, path.read_text(encoding="utf-8")) for path in APP_LICENSE_TEXT_PATHS]
+    )
+    (RESOURCE_DIR / "CypherAir-DUAL-LICENSE.txt").write_text(app_license_text, encoding="utf-8")
 
     for package in packages:
         license_text, license_source = render_license_text(package)

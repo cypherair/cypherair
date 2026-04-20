@@ -1,0 +1,257 @@
+name: Stable Build Release
+
+on:
+  push:
+    tags:
+      - "cypherair-v*-build*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Stable release tag to validate or publish, e.g. cypherair-v1.2.8-build7
+        required: true
+        type: string
+      source_ref:
+        description: Git ref to checkout for a dry run or manual publish
+        required: true
+        default: main
+        type: string
+      create_release:
+        description: Create the immutable GitHub release instead of a dry run
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+env:
+  XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
+  XCFRAMEWORK_CHECKSUM: PgpMobile.xcframework.sha256
+  SOURCE_BUNDLE: CypherAir-source-bundle.tar.zst
+  COMPLIANCE_MANIFEST: CypherAir-compliance-manifest.json
+  RELINK_KIT: PgpMobile-relink-kit.tar.zst
+
+jobs:
+  publish-stable-release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.source_ref || github.ref }}
+
+      - name: Install Rust stable toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install stable
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: "pgp-mobile -> target"
+
+      - name: Resolve stable release settings
+        env:
+          INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          INPUT_CREATE_RELEASE: ${{ github.event.inputs.create_release }}
+          INPUT_SOURCE_REF: ${{ github.event.inputs.source_ref }}
+        run: |
+          set -euo pipefail
+
+          EVENT_NAME="${GITHUB_EVENT_NAME}"
+          case "$EVENT_NAME" in
+            push)
+              RELEASE_TAG="${GITHUB_REF_NAME}"
+              RELEASE_SOURCE_REF="${GITHUB_REF}"
+              CREATE_RELEASE="true"
+              ;;
+            workflow_dispatch)
+              RELEASE_TAG="${INPUT_RELEASE_TAG}"
+              RELEASE_SOURCE_REF="${INPUT_SOURCE_REF}"
+              CREATE_RELEASE="${INPUT_CREATE_RELEASE}"
+              ;;
+            *)
+              echo "::error::Unsupported event: $EVENT_NAME"
+              exit 1
+              ;;
+          esac
+
+          if ! printf '%s' "$RELEASE_TAG" | grep -Eq '^cypherair-v[0-9]+\.[0-9]+\.[0-9]+-build[0-9]+$'; then
+            echo "::error::Stable release tag must match cypherair-vX.Y.Z-buildN."
+            exit 1
+          fi
+
+          RELEASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
+          COMMIT_SHA="$(git rev-parse HEAD)"
+
+          {
+            echo "RELEASE_TAG=$RELEASE_TAG"
+            echo "RELEASE_SOURCE_REF=$RELEASE_SOURCE_REF"
+            echo "RELEASE_URL=$RELEASE_URL"
+            echo "CREATE_RELEASE=$CREATE_RELEASE"
+            echo "COMMIT_SHA=$COMMIT_SHA"
+          } >> "$GITHUB_ENV"
+
+      - name: Validate tag against project version
+        run: |
+          set -euo pipefail
+
+          TAG_VERSION="$(printf '%s' "$RELEASE_TAG" | sed -E 's/^cypherair-v([0-9]+\.[0-9]+\.[0-9]+)-build([0-9]+)$/\1/')"
+          TAG_BUILD="$(printf '%s' "$RELEASE_TAG" | sed -E 's/^cypherair-v([0-9]+\.[0-9]+\.[0-9]+)-build([0-9]+)$/\2/')"
+          MARKETING_VERSION="$(xcodebuild -showBuildSettings -scheme CypherAir -project CypherAir.xcodeproj | sed -n 's/^[[:space:]]*MARKETING_VERSION = //p' | head -n1)"
+          PROJECT_BUILD_NUMBER="$(xcodebuild -showBuildSettings -scheme CypherAir -project CypherAir.xcodeproj | sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION = //p' | head -n1)"
+
+          if [ "$TAG_VERSION" != "$MARKETING_VERSION" ]; then
+            echo "::error::Release tag marketing version $TAG_VERSION does not match project MARKETING_VERSION $MARKETING_VERSION."
+            exit 1
+          fi
+          if [ "$TAG_BUILD" != "$PROJECT_BUILD_NUMBER" ]; then
+            echo "::error::Release tag build $TAG_BUILD does not match CURRENT_PROJECT_VERSION $PROJECT_BUILD_NUMBER."
+            exit 1
+          fi
+
+          {
+            echo "MARKETING_VERSION=$MARKETING_VERSION"
+            echo "PROJECT_BUILD_NUMBER=$PROJECT_BUILD_NUMBER"
+          } >> "$GITHUB_ENV"
+
+      - name: Run full Rust suite
+        run: |
+          cargo test --manifest-path pgp-mobile/Cargo.toml
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
+          cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
+
+      - name: Build XCFramework and generated bindings
+        run: ./build-xcframework.sh --release
+
+      - name: Probe iOS build with stable compliance metadata
+        run: |
+          SOURCE_COMPLIANCE_COMMIT_SHA="$COMMIT_SHA" \
+          SOURCE_COMPLIANCE_STABLE_RELEASE_TAG="$RELEASE_TAG" \
+          SOURCE_COMPLIANCE_STABLE_RELEASE_URL="$RELEASE_URL" \
+          xcodebuild build \
+            -scheme CypherAir \
+            -project CypherAir.xcodeproj \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Probe visionOS build with stable compliance metadata
+        run: |
+          SOURCE_COMPLIANCE_COMMIT_SHA="$COMMIT_SHA" \
+          SOURCE_COMPLIANCE_STABLE_RELEASE_TAG="$RELEASE_TAG" \
+          SOURCE_COMPLIANCE_STABLE_RELEASE_URL="$RELEASE_URL" \
+          xcodebuild build \
+            -scheme CypherAir \
+            -project CypherAir.xcodeproj \
+            -destination 'generic/platform=visionOS' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package stable binary and compliance assets
+        run: |
+          set -euo pipefail
+
+          BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          XCODE_VERSION="$(xcodebuild -version | tr '\n' ' ' | sed 's/  */ /g; s/ $//')"
+          RUSTC_VERSION="$(rustc --version)"
+
+          ditto -c -k --sequesterRsrc --keepParent PgpMobile.xcframework "$XCFRAMEWORK_ZIP"
+          shasum -a 256 "$XCFRAMEWORK_ZIP" > "$XCFRAMEWORK_CHECKSUM"
+
+          python3 scripts/build_xcframework_relink_kit.py \
+            --release-tag "$RELEASE_TAG" \
+            --marketing-version "$MARKETING_VERSION" \
+            --build-number "$PROJECT_BUILD_NUMBER" \
+            --commit-sha "$COMMIT_SHA" \
+            --xcframework-zip "$XCFRAMEWORK_ZIP" \
+            --output "$RELINK_KIT"
+
+          python3 scripts/build_compliance_release_assets.py \
+            --release-tag "$RELEASE_TAG" \
+            --channel stable \
+            --marketing-version "$MARKETING_VERSION" \
+            --build-number "$PROJECT_BUILD_NUMBER" \
+            --commit-sha "$COMMIT_SHA" \
+            --source-bundle-output "$SOURCE_BUNDLE" \
+            --manifest-output "$COMPLIANCE_MANIFEST" \
+            --binary-asset "$XCFRAMEWORK_ZIP" \
+            --binary-asset "$XCFRAMEWORK_CHECKSUM" \
+            --binary-asset "$RELINK_KIT"
+
+          {
+            echo "BUILT_AT=$BUILT_AT"
+            echo "XCODE_VERSION=$XCODE_VERSION"
+            echo "RUSTC_VERSION=$RUSTC_VERSION"
+          } >> "$GITHUB_ENV"
+
+      - name: Generate release notes
+        run: |
+          cat > release-notes.md <<EOF
+          Exact source and compliance materials for stable build \`$RELEASE_TAG\`.
+
+          - Release tag: \`$RELEASE_TAG\`
+          - Source ref: \`$RELEASE_SOURCE_REF\`
+          - Commit: \`$COMMIT_SHA\`
+          - Built at (UTC): \`$BUILT_AT\`
+          - App marketing version: \`$MARKETING_VERSION\`
+          - App build number: \`$PROJECT_BUILD_NUMBER\`
+          - Xcode: \`$XCODE_VERSION\`
+          - Rust: \`$RUSTC_VERSION\`
+
+          This stable build page is the exact source and compliance landing page for the tagged App build and the stable \`PgpMobile.xcframework\` assets.
+
+          Assets:
+
+          - \`$SOURCE_BUNDLE\`
+          - \`$COMPLIANCE_MANIFEST\`
+          - \`$XCFRAMEWORK_ZIP\`
+          - \`$XCFRAMEWORK_CHECKSUM\`
+          - \`$RELINK_KIT\`
+          EOF
+
+      - name: Upload dry-run assets
+        if: env.CREATE_RELEASE != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: stable-build-release-assets-${{ env.RELEASE_TAG }}
+          path: |
+            ${{ env.SOURCE_BUNDLE }}
+            ${{ env.COMPLIANCE_MANIFEST }}
+            ${{ env.XCFRAMEWORK_ZIP }}
+            ${{ env.XCFRAMEWORK_CHECKSUM }}
+            ${{ env.RELINK_KIT }}
+            release-notes.md
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Generate artifact attestation
+        if: env.CREATE_RELEASE == 'true'
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ env.XCFRAMEWORK_ZIP }}
+
+      - name: Create immutable stable release
+        if: env.CREATE_RELEASE == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release already exists for $RELEASE_TAG. Stable assets are immutable."
+            exit 1
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            --verify-tag \
+            --target "$COMMIT_SHA" \
+            --title "CypherAir Stable Build ($RELEASE_TAG)" \
+            --notes-file release-notes.md \
+            "$SOURCE_BUNDLE" \
+            "$COMPLIANCE_MANIFEST" \
+            "$XCFRAMEWORK_ZIP" \
+            "$XCFRAMEWORK_CHECKSUM" \
+            "$RELINK_KIT"

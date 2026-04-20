@@ -37,6 +37,8 @@ struct AppRouteDestinationView: View {
             SelfTestView()
         case .about:
             AboutView()
+        case .sourceCompliance:
+            SourceComplianceView()
         case .license:
             LicenseListView()
         case .appIcon:

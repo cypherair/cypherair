@@ -27,6 +27,7 @@ enum AppRoute: Hashable {
     // Settings
     case selfTest
     case about
+    case sourceCompliance
     case license
     case appIcon
     case themePicker

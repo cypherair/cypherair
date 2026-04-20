@@ -10,7 +10,7 @@
 
 sequoia-openpgp 2.2.0. Rust. RFC 9580 + RFC 4880 complete. Licensed under LGPL-2.0-or-later.
 
-Licensing and distribution-compliance migration questions for the current App Store / first-party `GPLv3` posture and Sequoia-linked binary distribution are tracked in [COMPLIANCE_REMEDIATION_PLAN.md](COMPLIANCE_REMEDIATION_PLAN.md). This section records the current technical library selection, not a final legal conclusion about distribution compatibility.
+Licensing and distribution-compliance implementation work for the first-party `GPL-3.0-or-later OR MPL-2.0` path and Sequoia-linked binary distribution is tracked in [COMPLIANCE_REMEDIATION_PLAN.md](COMPLIANCE_REMEDIATION_PLAN.md). This section records the current technical library selection, not a final legal conclusion about distribution compatibility.
 
 | Library | Lang | RFC 9580 | Argon2id | iOS | Decision |
 |---------|------|----------|----------|-----|----------|

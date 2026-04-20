@@ -280,6 +280,7 @@
 			buildConfigurationList = 04FFA0AC2AEDE901A06224E1 /* Build configuration list for PBXNativeTarget "CypherAir" */;
 			buildPhases = (
 				CE58C0032F96000000000001 /* Check PgpMobile XCFramework */,
+				CE58C0042F96000000000001 /* Generate Source Compliance Info */,
 				C1FB1E6897EF4454B406EDAF /* Sources */,
 				CE58C0022F96000000000001 /* Frameworks */,
 				CE0065162F65232F008604AB /* Resources */,
@@ -449,6 +450,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "if [ ! -f \"${SRCROOT}/PgpMobile.xcframework/Info.plist\" ]; then\n    echo \"error: PgpMobile.xcframework is missing. Run ./build-xcframework.sh --release\"\n    exit 1\nfi\n";
+		};
+		CE58C0042F96000000000001 /* Generate Source Compliance Info */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/generate_source_compliance_info.py",
+				"$(SRCROOT)/pgp-mobile/Cargo.lock",
+			);
+			name = "Generate Source Compliance Info";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/SourceComplianceInfo.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\nOUTPUT_PATH=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SourceComplianceInfo.json\"\nmkdir -p \"$(dirname \"$OUTPUT_PATH\")\"\nCOMMIT_SHA=\"${SOURCE_COMPLIANCE_COMMIT_SHA:-unknown}\"\n\npython3 \"${SRCROOT}/scripts/generate_source_compliance_info.py\" \\\n    --cargo-lock \"${SRCROOT}/pgp-mobile/Cargo.lock\" \\\n    --marketing-version \"${MARKETING_VERSION}\" \\\n    --build-number \"${CURRENT_PROJECT_VERSION}\" \\\n    --commit-sha \"${COMMIT_SHA}\" \\\n    --repository-url \"https://github.com/cypherair/cypherair\" \\\n    --stable-release-tag \"${SOURCE_COMPLIANCE_STABLE_RELEASE_TAG:-}\" \\\n    --stable-release-url \"${SOURCE_COMPLIANCE_STABLE_RELEASE_URL:-}\" \\\n    --output \"$OUTPUT_PATH\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

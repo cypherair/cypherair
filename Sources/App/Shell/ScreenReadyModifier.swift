@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension View {
+public extension View {
     func screenReady(_ identifier: String) -> some View {
         overlay(alignment: .topLeading) {
             Text(identifier)

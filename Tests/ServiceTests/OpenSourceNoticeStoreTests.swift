@@ -41,13 +41,16 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         }
 
         let bundledLicense = try store.loadLicenseText(for: appNotice)
-        if let repositoryLicense = try repositoryLicenseTextIfAvailable() {
-            XCTAssertEqual(bundledLicense, repositoryLicense)
-        } else {
-            XCTAssertEqual(appNotice.licenseFileResourceName, "CypherAir-LICENSE.txt")
-            XCTAssertTrue(appNotice.licenseSourceItems.contains("LICENSE"))
-            XCTAssertFalse(bundledLicense.isEmpty)
-        }
+        XCTAssertEqual(appNotice.licenseFileResourceName, "CypherAir-DUAL-LICENSE.txt")
+        XCTAssertTrue(appNotice.licenseSourceItems.contains("LICENSE"))
+        XCTAssertTrue(appNotice.licenseSourceItems.contains("LICENSES/GPL-3.0-or-later.txt"))
+        XCTAssertTrue(appNotice.licenseSourceItems.contains("LICENSES/MPL-2.0.txt"))
+        XCTAssertTrue(
+            bundledLicense.contains("GNU GENERAL PUBLIC LICENSE")
+                || bundledLicense.contains("GNU General Public License")
+        )
+        XCTAssertTrue(bundledLicense.contains("Mozilla Public License Version 2.0"))
+        XCTAssertFalse(bundledLicense.isEmpty)
     }
 
     func test_sections_searchAndSorting_filtersThirdPartyBySearchText() throws {
@@ -122,19 +125,4 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         XCTAssertTrue(clipboard.copiedURLs.isEmpty)
     }
 
-    private func repositoryRoot() -> URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-    }
-
-    private func repositoryLicenseTextIfAvailable() throws -> String? {
-        let licenseURL = repositoryRoot().appendingPathComponent("LICENSE")
-        guard FileManager.default.isReadableFile(atPath: licenseURL.path) else {
-            return nil
-        }
-
-        return try String(contentsOf: licenseURL, encoding: .utf8)
-    }
 }

@@ -6,7 +6,7 @@ This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding ag
 
 CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and visionOS.
 
-- License: GPLv3
+- License: `GPL-3.0-or-later OR MPL-2.0` for first-party code
 - Privacy model: zero network access
 - Permissions model: minimal permissions, only biometric usage description
 - Cryptography: Sequoia PGP via Rust + UniFFI + Swift

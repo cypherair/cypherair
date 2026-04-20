@@ -1,0 +1,20 @@
+{
+  "marketingVersion": "1.2.8",
+  "buildNumber": "27",
+  "commitSHA": "1234567890abcdef1234567890abcdef12345678",
+  "stableReleaseTag": "cypherair-v1.2.8-build27",
+  "stableReleaseURL": "https://github.com/cypherair/cypherair/releases/tag/cypherair-v1.2.8-build27",
+  "dependencies": [
+    {
+      "name": "sequoia-openpgp",
+      "version": "2.2.0"
+    },
+    {
+      "name": "buffered-reader",
+      "version": "1.4.0"
+    }
+  ],
+  "firstPartyLicense": "GPL-3.0-or-later OR MPL-2.0",
+  "fulfillmentBasis": "LGPL 2.1",
+  "isStableReleaseBuild": true
+}
