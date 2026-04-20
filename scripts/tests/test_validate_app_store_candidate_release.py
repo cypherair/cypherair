@@ -102,6 +102,36 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         require_stable_release=True,
                     )
 
+    def test_missing_origin_remote_is_reported_as_candidate_validation_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_root = Path(temp_dir_name)
+            repo_root = temp_root / "repo"
+            upstream_root = temp_root / "upstream.git"
+
+            run(["git", "init", "--bare", str(upstream_root)])
+            run(["git", "init", "-b", "main", str(repo_root)])
+            run(["git", "config", "user.name", "Codex Tests"], cwd=repo_root)
+            run(["git", "config", "user.email", "codex-tests@example.com"], cwd=repo_root)
+
+            tracked_file = repo_root / "tracked.txt"
+            tracked_file.write_text("base\n", encoding="utf-8")
+            run(["git", "add", "tracked.txt"], cwd=repo_root)
+            run(["git", "commit", "-m", "Initial commit"], cwd=repo_root)
+            run(["git", "remote", "add", "upstream", str(upstream_root)], cwd=repo_root)
+
+            with mock.patch.object(module, "stable_release_exists", return_value=True):
+                with self.assertRaisesRegex(
+                    module.CandidateValidationError,
+                    r"Unable to resolve stable tag .* remote origin",
+                ):
+                    module.validate_candidate_release(
+                        repo_root=repo_root,
+                        marketing_version="1.2.9",
+                        build_number="3",
+                        repository_full_name="cypherair/cypherair",
+                        require_stable_release=True,
+                    )
+
     def test_head_mismatch_against_remote_tag_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
