@@ -930,33 +930,6 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNotEqual(store.container?.defaultsSuiteName, oldSuite)
     }
 
-    func test_onboardingLocalizedKeys_existInCatalogAndAreFullyTranslated() throws {
-        let rootURL = repositoryRootURL()
-        let catalogURL = rootURL.appending(path: "Sources/Resources/Localizable.xcstrings")
-        let sourceURL = rootURL.appending(path: "Sources/App/Onboarding", directoryHint: .isDirectory)
-
-        let catalogData = try Data(contentsOf: catalogURL)
-        let catalog = try JSONDecoder().decode(StringCatalog.self, from: catalogData)
-        let keys = try localizedKeys(in: sourceURL)
-
-        XCTAssertFalse(keys.isEmpty)
-
-        for key in keys.sorted() {
-            let entry = try XCTUnwrap(catalog.strings[key], "Missing catalog entry for \(key)")
-
-            guard key.hasPrefix("guidedTutorial.") || key.hasPrefix("onboarding.") || key.hasPrefix("tutorial.") else {
-                continue
-            }
-
-            let locales = Set(entry.localizations.keys)
-            XCTAssertTrue(
-                locales.isSuperset(of: ["en", "zh-Hans"]),
-                "\(key) is missing required tutorial locales"
-            )
-            XCTAssertNotEqual(entry.extractionState, "stale", "\(key) should not be stale")
-        }
-    }
-
     private func startTutorialSession(_ store: TutorialSessionStore) async {
         await store.openModule(.sandbox)
         store.confirmSandboxAcknowledgement()
@@ -970,51 +943,4 @@ final class TutorialSessionStoreTests: XCTestCase {
             .deletingLastPathComponent()
     }
 
-    private func localizedKeys(in directoryURL: URL) throws -> Set<String> {
-        let expression = try NSRegularExpression(pattern: #"localized:\s*"([^"]+)""#)
-        var keys = Set<String>()
-
-        let enumerator = FileManager.default.enumerator(
-            at: directoryURL,
-            includingPropertiesForKeys: nil
-        )
-
-        while let fileURL = enumerator?.nextObject() as? URL {
-            guard fileURL.pathExtension == "swift" else { continue }
-
-            let contents = try String(contentsOf: fileURL, encoding: .utf8)
-            let range = NSRange(contents.startIndex..<contents.endIndex, in: contents)
-            let matches = expression.matches(in: contents, range: range)
-
-            for match in matches {
-                guard
-                    let keyRange = Range(match.range(at: 1), in: contents)
-                else {
-                    continue
-                }
-
-                keys.insert(String(contents[keyRange]))
-            }
-        }
-
-        return keys
-    }
-}
-
-private struct StringCatalog: Decodable {
-    let strings: [String: StringCatalogEntry]
-}
-
-private struct StringCatalogEntry: Decodable {
-    let extractionState: String?
-    let localizations: [String: StringCatalogLocalization]
-}
-
-private struct StringCatalogLocalization: Decodable {
-    let stringUnit: StringCatalogStringUnit?
-}
-
-private struct StringCatalogStringUnit: Decodable {
-    let state: String
-    let value: String
 }

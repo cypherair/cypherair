@@ -5,7 +5,13 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "%1$@ • %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@ • %2$@"
           }
         }
@@ -27,40 +33,6 @@
         }
       }
     },
-    "about.base64" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "base64"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "base64"
-          }
-        }
-      }
-    },
-    "about.dependencies" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dependencies"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "依赖项"
-          }
-        }
-      }
-    },
     "about.description" : {
       "localizations" : {
         "en" : {
@@ -73,23 +45,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完全离线的 OpenPGP 加密工具。零网络访问。最小权限。"
-          }
-        }
-      }
-    },
-    "about.ffi" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "UniFFI"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "UniFFI"
           }
         }
       }
@@ -126,57 +81,6 @@
         }
       }
     },
-    "about.openssl" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenSSL"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenSSL"
-          }
-        }
-      }
-    },
-    "about.pgp" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sequoia PGP"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sequoia PGP"
-          }
-        }
-      }
-    },
-    "about.thiserror" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "thiserror"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "thiserror"
-          }
-        }
-      }
-    },
     "about.title" : {
       "localizations" : {
         "en" : {
@@ -205,23 +109,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版本"
-          }
-        }
-      }
-    },
-    "about.zeroize" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "zeroize"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "zeroize"
           }
         }
       }
@@ -914,23 +801,6 @@
         }
       }
     },
-    "common.share" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "分享"
-          }
-        }
-      }
-    },
     "common.yes" : {
       "localizations" : {
         "en" : {
@@ -1567,1145 +1437,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "解密"
-          }
-        }
-      }
-    },
-    "demo.auth.backup" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authenticate to create the demo backup"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请认证以创建演示备份"
-          }
-        }
-      }
-    },
-    "demo.auth.decrypt" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authenticate to decrypt the demo message"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请认证以解密演示消息"
-          }
-        }
-      }
-    },
-    "demo.auth.encrypt" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authenticate to sign the demo message"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请认证以签名演示消息"
-          }
-        }
-      }
-    },
-    "demo.auth.settings" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authenticate to switch the demo to High Security"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请认证以将演示切换到高安全模式"
-          }
-        }
-      }
-    },
-    "demo.back" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Previous Step"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上一步"
-          }
-        }
-      }
-    },
-    "demo.backup.action" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate Demo Backup"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成演示备份"
-          }
-        }
-      }
-    },
-    "demo.backup.inline" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demo mode shows the backup inline instead of exporting a real file."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "演示模式会在页面内显示备份结果，而不会导出真实文件。"
-          }
-        }
-      }
-    },
-    "demo.badge.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This tutorial runs in a fully isolated sandbox. It never uses your real keys, contacts, settings, clipboard, camera, files, or backups."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这个教程运行在完全隔离的沙盒中，不会使用你的真实密钥、联系人、设置、剪贴板、相机、文件或备份。"
-          }
-        }
-      }
-    },
-    "demo.badge.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demo Mode"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "演示模式"
-          }
-        }
-      }
-    },
-    "demo.complete" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demo complete. You can safely leave this screen or reset it to run the sandbox again."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "演示已完成。你可以安全离开这个页面，或重置后再次运行沙盒演示。"
-          }
-        }
-      }
-    },
-    "demo.decrypt.action" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Decrypt and Verify"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "解密并验证"
-          }
-        }
-      }
-    },
-    "demo.decrypt.check" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Check Demo Recipients"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检查演示收件人"
-          }
-        }
-      }
-    },
-    "demo.decrypt.matched" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Matched Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "匹配到的密钥"
-          }
-        }
-      }
-    },
-    "demo.encrypt.action" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encrypt and Sign Demo Message"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "加密并签名演示消息"
-          }
-        }
-      }
-    },
-    "demo.encrypt.recipient" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recipient"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接收者"
-          }
-        }
-      }
-    },
-    "demo.encrypt.sender" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sender"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发送者"
-          }
-        }
-      }
-    },
-    "demo.error.backupFirst" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create the demo backup first. High Security mode requires a backed-up key."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请先创建演示备份。启用高安全模式前必须先完成备份。"
-          }
-        }
-      }
-    },
-    "demo.error.contactsDirectory" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could not create isolated demo contacts storage."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法创建隔离的演示联系人存储。"
-          }
-        }
-      }
-    },
-    "demo.error.defaults" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could not create isolated demo preferences."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法创建隔离的演示偏好设置。"
-          }
-        }
-      }
-    },
-    "demo.error.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demo Error"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "演示错误"
-          }
-        }
-      }
-    },
-    "demo.exchange.action" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exchange Public Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "交换公钥"
-          }
-        }
-      }
-    },
-    "demo.exchange.contacts" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sandbox Contacts"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "沙盒联系人"
-          }
-        }
-      }
-    },
-    "demo.identity.alice" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alice"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alice"
-          }
-        }
-      }
-    },
-    "demo.identity.bob" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bob"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bob"
-          }
-        }
-      }
-    },
-    "demo.keys.action" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate Demo Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成演示密钥"
-          }
-        }
-      }
-    },
-    "demo.message.default" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hi Bob, this is a sandbox message from Alice. It is signed and encrypted inside the interactive demo."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你好 Bob，这是一条来自 Alice 的沙盒消息。它会在交互式演示里被签名并加密。"
-          }
-        }
-      }
-    },
-    "demo.message.label" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demo message"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "演示消息"
-          }
-        }
-      }
-    },
-    "demo.navigate" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开 %@"
-          }
-        }
-      }
-    },
-    "demo.progress.label" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Step %lld of %lld"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %lld / %lld 步"
-          }
-        }
-      }
-    },
-    "demo.reset" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset Demo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重置演示"
-          }
-        }
-      }
-    },
-    "demo.security.action" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enable High Security for Demo Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "为演示密钥启用高安全模式"
-          }
-        }
-      }
-    },
-    "demo.security.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Switching this demo to High Security re-wraps only the sandbox keys. Your real app settings and stored keys are never touched."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "把这个演示切换到高安全模式时，只会重新包裹沙盒密钥，不会触碰你的真实 App 设置和已存储密钥。"
-          }
-        }
-      }
-    },
-    "demo.security.mode" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sandbox Security Mode"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "沙盒安全模式"
-          }
-        }
-      }
-    },
-    "demo.start" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start Interactive Demo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开始交互式演示"
-          }
-        }
-      }
-    },
-    "demo.step.backup.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate a demo backup and switch the sandbox keys to High Security mode without affecting your real settings."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成演示备份，并将沙盒密钥切换到高安全模式，而不会影响你的真实设置。"
-          }
-        }
-      }
-    },
-    "demo.step.backup.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back Up and Review High Security"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "备份并了解高安全模式"
-          }
-        }
-      }
-    },
-    "demo.step.complete.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have completed the full sandbox walkthrough. You can reset the demo or leave at any time without affecting your real app."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你已经完成了完整的沙盒演示。你可以随时重置或离开，而不会影响真实 App。"
-          }
-        }
-      }
-    },
-    "demo.step.complete.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demo Complete"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "演示完成"
-          }
-        }
-      }
-    },
-    "demo.step.decrypt.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bob checks the recipient header, decrypts the message, and verifies Alice's signature."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bob 先检查收件人头部，再解密消息并验证 Alice 的签名。"
-          }
-        }
-      }
-    },
-    "demo.step.decrypt.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Check Recipients and Decrypt"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检查收件人并解密"
-          }
-        }
-      }
-    },
-    "demo.step.encrypt.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alice signs and encrypts a demo message addressed to Bob inside the isolated sandbox."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alice 在隔离沙盒里为 Bob 签名并加密一条演示消息。"
-          }
-        }
-      }
-    },
-    "demo.step.encrypt.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encrypt and Sign"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "加密并签名"
-          }
-        }
-      }
-    },
-    "demo.step.exchange.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import both demo public keys into the sandbox contact list so the full message loop can run locally."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将两个演示公钥都导入沙盒联系人列表，这样就可以在本地跑完整的消息流程。"
-          }
-        }
-      }
-    },
-    "demo.step.exchange.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exchange Public Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "交换公钥"
-          }
-        }
-      }
-    },
-    "demo.step.exportBackup.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use the real backup form to enter a passphrase and generate a sandbox backup. Demo mode shows the result inline instead of exporting a real file."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用真实的备份表单输入口令并生成沙盒备份。演示模式会在页面内显示结果，而不是导出真实文件。"
-          }
-        }
-      }
-    },
-    "demo.step.exportBackup.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate Demo Backup"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成演示备份"
-          }
-        }
-      }
-    },
-    "demo.step.generateAlice.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In the real app, you first generate your own key. This demo pre-fills Alice and uses the Advanced profile so the rest of the flow can run end to end."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在真实 App 中，你首先会生成自己的密钥。这个演示会预填 Alice，并使用高级配置，以便后续流程能完整跑通。"
-          }
-        }
-      }
-    },
-    "demo.step.generateAlice.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create Your Demo Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "创建你的演示密钥"
-          }
-        }
-      }
-    },
-    "demo.step.highSecurity.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finish by enabling High Security in the real Settings page. The change affects only sandbox keys and uses a real biometric gate."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最后在真实的设置页启用高安全模式。这个改动只会影响沙盒密钥，并且会使用真实的生物识别认证。"
-          }
-        }
-      }
-    },
-    "demo.step.highSecurity.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enable High Security"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "启用高安全模式"
-          }
-        }
-      }
-    },
-    "demo.step.importBob.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import Bob's public key using the real Add Contact page. In demo mode, the Paste path is preloaded with sandbox data instead of opening system pickers."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用真实的“添加联系人”页面导入 Bob 的公钥。在演示模式下，粘贴路径会预填沙盒数据，而不会打开系统选择器。"
-          }
-        }
-      }
-    },
-    "demo.step.importBob.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import Bob's Public Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导入 Bob 的公钥"
-          }
-        }
-      }
-    },
-    "demo.step.intro.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This demo uses isolated identities, contacts, and settings. Nothing here touches your real data."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这个演示使用隔离的身份、联系人和设置，这里的任何操作都不会触碰你的真实数据。"
-          }
-        }
-      }
-    },
-    "demo.step.intro.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sandbox Overview"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "沙盒概览"
-          }
-        }
-      }
-    },
-    "demo.step.keys.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create fixed demo identities for Alice and Bob using the Advanced profile."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用高级配置为 Alice 和 Bob 创建固定的演示身份。"
-          }
-        }
-      }
-    },
-    "demo.step.keys.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate Demo Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成演示密钥"
-          }
-        }
-      }
-    },
-    "demo.step.openAddContact.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Add Contact from the real Contacts page. Bob's demo identity is already prepared inside the sandbox."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从真实的“联系人”页面打开“添加联系人”。Bob 的演示身份已经在沙盒中准备好了。"
-          }
-        }
-      }
-    },
-    "demo.step.openAddContact.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Add Contact"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开添加联系人"
-          }
-        }
-      }
-    },
-    "demo.step.openBackup.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "From Alice's real key detail page, open the backup flow."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从 Alice 的真实密钥详情页进入备份流程。"
-          }
-        }
-      }
-    },
-    "demo.step.openBackup.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Backup"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开备份"
-          }
-        }
-      }
-    },
-    "demo.step.openKeyDetail.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Go back to My Keys and open Alice's key detail page, just like a real user would before creating a backup."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "回到“我的密钥”，打开 Alice 的密钥详情页，就像真实用户在创建备份前会做的那样。"
-          }
-        }
-      }
-    },
-    "demo.step.openKeyDetail.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Alice's Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开 Alice 的密钥"
-          }
-        }
-      }
-    },
-    "demo.step.parse.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "On the real Decrypt page, first check the recipients. This preserves the normal two-phase decrypt flow."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在真实的解密页面中，先检查收件人。这会保留正常的两阶段解密流程。"
-          }
-        }
-      }
-    },
-    "demo.step.parse.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Check Recipients"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检查收件人"
-          }
-        }
-      }
-    },
-    "demo.step.postGeneration.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The real app shows a post-generation prompt. Tap Done to return to the Keys list and continue the normal workflow."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "真实 App 会显示生成完成后的提示页。点击 Done 返回“我的密钥”列表，然后继续正常流程。"
-          }
-        }
-      }
-    },
-    "demo.step.postGeneration.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Return to My Keys"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "返回我的密钥"
-          }
-        }
-      }
-    },
-    "demo.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interactive Demo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "交互式演示"
           }
         }
       }
@@ -4054,23 +2785,6 @@
         }
       }
     },
-    "guidedTutorial.blocked.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This action is unavailable inside the guided tutorial sandbox."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此操作在引导教程沙箱中不可用。"
-          }
-        }
-      }
-    },
     "guidedTutorial.blocked.importKey.body" : {
       "localizations" : {
         "en" : {
@@ -4195,91 +2909,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法使用证书签名"
-          }
-        }
-      }
-    },
-    "guidedTutorial.blocked.sign.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signing is outside the guided tutorial path and is hidden to keep the sandbox focused."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "签名不属于引导教程路径，因此已隐藏以保持沙箱聚焦。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.blocked.sign.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sign Unavailable"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法使用签名"
-          }
-        }
-      }
-    },
-    "guidedTutorial.blocked.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unavailable in Tutorial"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "教程中不可用"
-          }
-        }
-      }
-    },
-    "guidedTutorial.blocked.verify.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verification outside the decrypt lesson is hidden to keep the tutorial focused."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "解密课程之外的验证功能已被隐藏，以保持教程聚焦。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.blocked.verify.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verify Unavailable"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法使用验证"
           }
         }
       }
@@ -5420,23 +4049,6 @@
         }
       }
     },
-    "guidedTutorial.return" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Return to Tutorial"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "返回教程"
-          }
-        }
-      }
-    },
     "guidedTutorial.returnToOverview" : {
       "localizations" : {
         "en" : {
@@ -5869,23 +4481,6 @@
         }
       }
     },
-    "home.macOS.hint" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use the sidebar to encrypt, decrypt, sign, or verify messages."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用侧边栏来加密、解密、签名或验证消息。"
-          }
-        }
-      }
-    },
     "home.noKeys.subtitle" : {
       "localizations" : {
         "en" : {
@@ -5962,23 +4557,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "验证"
-          }
-        }
-      }
-    },
-    "import.addToContacts" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add to Contacts"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加到通讯录"
           }
         }
       }
@@ -8127,23 +6705,6 @@
         }
       }
     },
-    "onboarding.getStarted" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Get Started"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开始使用"
-          }
-        }
-      }
-    },
     "onboarding.next" : {
       "localizations" : {
         "en" : {
@@ -8268,23 +6829,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "跳过教程并进入应用"
-          }
-        }
-      }
-    },
-    "onboarding.viewTutorial" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View Usage Tutorial"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查看使用教程"
           }
         }
       }
@@ -9473,23 +8017,6 @@
         }
       }
     },
-    "settings.interactiveDemo" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interactive Demo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "交互式演示"
-          }
-        }
-      }
-    },
     "settings.license" : {
       "localizations" : {
         "en" : {
@@ -9602,23 +8129,6 @@
         }
       }
     },
-    "settings.mode.highWarning.noBackup.useSheet" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have not backed up any keys. A separate confirmation is required."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你尚未备份任何密钥。需要单独确认。"
-          }
-        }
-      }
-    },
     "settings.mode.highWarning.title" : {
       "localizations" : {
         "en" : {
@@ -9679,23 +8189,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "切换到标准模式"
-          }
-        }
-      }
-    },
-    "settings.requireAuthOnLaunch" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Require Authentication on Launch"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "启动时要求认证"
           }
         }
       }
@@ -9776,23 +8269,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查看引导"
-          }
-        }
-      }
-    },
-    "settings.viewTutorial" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usage Tutorial"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用教程"
           }
         }
       }
@@ -9973,23 +8449,6 @@
         }
       }
     },
-    "sign.share.preview" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signed Message"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "签名消息"
-          }
-        }
-      }
-    },
     "sign.share.signature" : {
       "localizations" : {
         "en" : {
@@ -10066,23 +8525,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "签名验证失败——内容可能已被修改"
-          }
-        }
-      }
-    },
-    "signature.detailed.section" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Detailed Signatures"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "详细签名"
           }
         }
       }
@@ -10803,6 +9245,1126 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "验证中…"
+          }
+        }
+      }
+    },
+    "addcontact.file.readFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not read key file"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取密钥文件"
+          }
+        }
+      }
+    },
+    "app.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir"
+          }
+        }
+      }
+    },
+    "common.working" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Working..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "处理中..."
+          }
+        }
+      }
+    },
+    "contactcertsig.action.certify" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate Certification"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成认证签名"
+          }
+        }
+      }
+    },
+    "contactcertsig.action.verifyBinding" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verify User ID Binding"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证用户 ID 绑定"
+          }
+        }
+      }
+    },
+    "contactcertsig.action.verifyDirect" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verify Direct-Key Signature"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证直接密钥签名"
+          }
+        }
+      }
+    },
+    "contactcertsig.certificationKind" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certification Kind"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "认证类型"
+          }
+        }
+      }
+    },
+    "contactcertsig.clearImportedFile" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear imported signature file"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除已导入的签名文件"
+          }
+        }
+      }
+    },
+    "contactcertsig.contact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人"
+          }
+        }
+      }
+    },
+    "contactcertsig.import.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not read signature file."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取签名文件。"
+          }
+        }
+      }
+    },
+    "contactcertsig.importSignature" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Signature File"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入签名文件"
+          }
+        }
+      }
+    },
+    "contactcertsig.kind.casual" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Casual"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
+          }
+        }
+      }
+    },
+    "contactcertsig.kind.generic" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generic"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通用"
+          }
+        }
+      }
+    },
+    "contactcertsig.kind.persona" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Persona"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "身份"
+          }
+        }
+      }
+    },
+    "contactcertsig.kind.positive" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Positive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "积极"
+          }
+        }
+      }
+    },
+    "contactcertsig.loadFailed.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could Not Load Certificate Details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载证书详情"
+          }
+        }
+      }
+    },
+    "contactcertsig.loading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading certificate signature context..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载证书签名上下文..."
+          }
+        }
+      }
+    },
+    "contactcertsig.mode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模式"
+          }
+        }
+      }
+    },
+    "contactcertsig.mode.binding" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User ID Binding Verify"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户 ID 绑定验证"
+          }
+        }
+      }
+    },
+    "contactcertsig.mode.certify" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certify User ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "认证用户 ID"
+          }
+        }
+      }
+    },
+    "contactcertsig.mode.direct" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Direct Key Verify"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接密钥验证"
+          }
+        }
+      }
+    },
+    "contactcertsig.notFound.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact Not Found"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到联系人"
+          }
+        }
+      }
+    },
+    "contactcertsig.overview" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "概览"
+          }
+        }
+      }
+    },
+    "contactcertsig.result" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Result"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果"
+          }
+        }
+      }
+    },
+    "contactcertsig.result.kind" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certification Kind"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "认证类型"
+          }
+        }
+      }
+    },
+    "contactcertsig.result.signer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名者"
+          }
+        }
+      }
+    },
+    "contactcertsig.result.signingKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signing Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名密钥"
+          }
+        }
+      }
+    },
+    "contactcertsig.result.status" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "状态"
+          }
+        }
+      }
+    },
+    "contactcertsig.signature" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signature"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名"
+          }
+        }
+      }
+    },
+    "contactcertsig.signature.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports .asc and .sig signature files. Imported file bytes remain authoritative until the text is edited or cleared."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持 .asc 和 .sig 签名文件。在编辑或清除文本之前，导入文件的字节内容始终作为权威来源。"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名者"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.contact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No local keys are available to certify this contact."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可用于为此联系人认证的本地密钥。"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.footer.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create or import one of your own keys before generating a certification signature."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先创建或导入你自己的密钥，再生成认证签名。"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.ownKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的密钥"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.unknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.verified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verified Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已验证联系人"
+          }
+        }
+      }
+    },
+    "contactcertsig.status.invalid" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无效"
+          }
+        }
+      }
+    },
+    "contactcertsig.status.signerMissing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer Missing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缺少签名者"
+          }
+        }
+      }
+    },
+    "contactcertsig.status.valid" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valid"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有效"
+          }
+        }
+      }
+    },
+    "contactcertsig.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate Signatures"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书签名"
+          }
+        }
+      }
+    },
+    "contactcertsig.userId.occurrence" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Occurrence %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 个"
+          }
+        }
+      }
+    },
+    "contactcertsig.userId.primary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primary"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主"
+          }
+        }
+      }
+    },
+    "contactcertsig.userId.revoked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revoked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已吊销"
+          }
+        }
+      }
+    },
+    "contactcertsig.userIds" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户 ID"
+          }
+        }
+      }
+    },
+    "contactcertsig.userIds.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No selectable User IDs were found."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到可供选择的用户 ID。"
+          }
+        }
+      }
+    },
+    "contactcertsig.userIds.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate User IDs remain separate choices. The occurrence number identifies the exact packet."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复的用户 ID 会分别保留为独立选项。出现序号用于标识确切的数据包。"
+          }
+        }
+      }
+    },
+    "contactdetail.actions" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作"
+          }
+        }
+      }
+    },
+    "contactdetail.certificateSignatures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate Signatures"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书签名"
+          }
+        }
+      }
+    },
+    "contactdetail.markVerified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I Verified This Fingerprint"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我已核对该指纹"
+          }
+        }
+      }
+    },
+    "contactdetail.shortKeyId" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short Key ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "短密钥 ID"
+          }
+        }
+      }
+    },
+    "contactdetail.unverified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This contact has not been verified yet. Confirm the fingerprint with the key owner before relying on it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此联系人尚未验证。在依赖该联系人前，请先与密钥所有者核对指纹。"
+          }
+        }
+      }
+    },
+    "contacts.notFound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected contact could not be found."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到所选联系人。"
+          }
+        }
+      }
+    },
+    "contacts.unverified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unverified"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未验证"
+          }
+        }
+      }
+    },
+    "encrypt.contact.unverified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unverified"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未验证"
+          }
+        }
+      }
+    },
+    "encrypt.unverified.confirm.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypt Anyway"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍然加密"
+          }
+        }
+      }
+    },
+    "encrypt.unverified.confirm.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These recipients are not verified yet: %@. Continue only if you trust these keys."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些收件人尚未验证：%@。仅在你信任这些密钥时才继续。"
+          }
+        }
+      }
+    },
+    "encrypt.unverified.confirm.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Unverified Recipients?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要使用未验证的收件人吗？"
+          }
+        }
+      }
+    },
+    "encrypt.unverified.warning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One or more selected recipients are still unverified. Verify their fingerprints before relying on them."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个或多个已选收件人尚未验证。在信任这些密钥前，请先核对其指纹。"
+          }
+        }
+      }
+    },
+    "import.file.readFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not read key file"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取密钥文件"
+          }
+        }
+      }
+    },
+    "settings.appIcon.visionosUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps built natively with the visionOS SDK do not support changing alternate app icons at runtime."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 visionOS SDK 原生构建的 App 不支持在运行时更换备用 App 图标。"
+          }
+        }
+      }
+    },
+    "signature.fingerprint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fingerprint"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指纹"
+          }
+        }
+      }
+    },
+    "signature.identity.contact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人"
+          }
+        }
+      }
+    },
+    "signature.identity.contact.unverified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unverified Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未验证联系人"
+          }
+        }
+      }
+    },
+    "signature.identity.contact.unverified.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This signer matches a contact in your address book, but you have not verified that contact's fingerprint yet."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该签名者与你通讯录中的联系人匹配，但你尚未验证该联系人的指纹。"
+          }
+        }
+      }
+    },
+    "signature.identity.ownKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的密钥"
+          }
+        }
+      }
+    },
+    "signature.identity.unknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown Signer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知签名者"
+          }
+        }
+      }
+    },
+    "signature.shortKeyId" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short Key ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "短密钥 ID"
+          }
+        }
+      }
+    },
+    "startup.recovery.retryable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A previous secure key migration could not be fully recovered. CypherAir will retry recovery on next launch."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先前的安全密钥迁移未能完全恢复。CypherAir 将在下次启动时重试恢复。"
+          }
+        }
+      }
+    },
+    "startup.recovery.unrecoverable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A previous secure key migration could not be recovered. Restore from backup if private-key operations fail."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先前的安全密钥迁移无法恢复。如果私钥操作失败，请从备份恢复。"
           }
         }
       }

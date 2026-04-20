@@ -7,7 +7,13 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "CypherAir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "CypherAir"
           }
         }
@@ -19,7 +25,13 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "CypherAir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "CypherAir"
           }
         }
@@ -48,7 +60,13 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "CypherAir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "CypherAir"
           }
         }
