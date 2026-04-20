@@ -103,6 +103,17 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("about.ready")
     }
 
+    func test_settingsRoot_aboutOpensSourceCompliance() throws {
+        launchSettings()
+
+        element("settings.about").tap()
+        waitForScreenReady("about.ready")
+
+        element("about.sourceCompliance").tap()
+
+        waitForScreenReady("sourcecompliance.ready")
+    }
+
     func test_settingsRoot_opensLicenseList() throws {
         launchSettings()
 

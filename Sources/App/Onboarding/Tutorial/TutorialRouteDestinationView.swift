@@ -136,6 +136,8 @@ struct TutorialRouteDestinationView: View {
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { SelfTestView() })
         case .about:
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { AboutView() })
+        case .sourceCompliance:
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { SourceComplianceView() })
         case .license:
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { LicenseListView() })
         case .appIcon:
