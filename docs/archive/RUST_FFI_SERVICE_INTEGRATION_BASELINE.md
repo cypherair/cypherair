@@ -1,9 +1,11 @@
 # Rust / FFI Service Integration Baseline
 
-> Status: Active current-state document for Swift service and app-layer ownership of the tracked Rust / FFI capability families.
-> Purpose: Record what exists today at the Rust / FFI boundary, which production Swift service owns each family, which shipped app workflow consumes it, and what downstream gaps still remain.
+> Status: Archived snapshot from 2026-04-20.
+> Archival reason: Current Rust / FFI ownership and shipped-vs-deferred state were consolidated into the canonical docs.
+> Purpose: Preserve the final standalone current-state matrix from the Rust/FFI rollout.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [RUST_FFI_APP_SURFACE_ADOPTION_PLAN](RUST_FFI_APP_SURFACE_ADOPTION_PLAN.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
+> Successor docs: [ARCHITECTURE](../ARCHITECTURE.md) · [PRD](../PRD.md) · [TESTING](../TESTING.md) · [TDD](../TDD.md)
+> Historical note: Current code and active canonical docs outrank this historical file.
 
 ## 1. Role And Scope
 

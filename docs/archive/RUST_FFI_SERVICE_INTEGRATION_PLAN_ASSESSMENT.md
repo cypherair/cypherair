@@ -1,15 +1,15 @@
 # Rust / FFI Service Integration Plan Assessment
 
-> Status: Archived feasibility assessment snapshot. Its still-relevant conclusions were absorbed into the active [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md); this file remains for historical review context.
+> Status: Archived feasibility assessment snapshot. Its historical successor is the archived [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) snapshot; current canonical guidance now lives in [ARCHITECTURE](../ARCHITECTURE.md), [PRD](../PRD.md), [TDD](../TDD.md), and [TESTING](../TESTING.md).
 > Purpose: Preserve the earlier assessment of whether the Service-layer integration plan was accurate, reasonable, and executable against the repository state at the time of review.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_SERVICE_INTEGRATION_BASELINE](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](../RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md)
+> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_SERVICE_INTEGRATION_BASELINE](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md)
 > Assessment posture: This document records verified code-and-test facts first, then adds cautious architectural conclusions where the current implementation shape clearly supports them.
 > Important framing: When the plan document and the repository disagree, production code and tests are treated as the source of truth. Any mismatch becomes a documentation finding, not an implementation assumption.
 
 ## 1. Scope And Method
 
-This assessment reviews the five planned workstreams in [RUST_FFI_SERVICE_INTEGRATION_PLAN](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md):
+This assessment reviews the five planned workstreams in [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md):
 
 1. selector discovery and selector-bearing Swift models
 2. selective revocation in `KeyManagementService`

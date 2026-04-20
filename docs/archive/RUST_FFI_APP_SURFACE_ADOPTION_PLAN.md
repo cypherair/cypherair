@@ -1,10 +1,11 @@
 # Rust / FFI App-Surface Adoption Plan
 
-> Status: Active product-scoped plan for the remaining app-surface adoption work on shipped Rust / FFI service families.
-> Purpose: Define the next UI-owned workflow to add on top of the current Rust / FFI service baseline without re-planning work that is already landed in the app.
+> Status: Archived snapshot from 2026-04-20.
+> Archival reason: Shipped app-surface ownership and deferred Rust/FFI product scope were consolidated into the canonical docs.
+> Purpose: Preserve the final standalone app-surface adoption snapshot from the Rust/FFI rollout.
 > Audience: Human developers, reviewers, designers, and AI coding tools.
-> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [RUST_FFI_IMPLEMENTATION_REFERENCE](RUST_FFI_IMPLEMENTATION_REFERENCE.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
-> Plan posture: This document covers remaining app-surface adoption work only. It is not a statement that every Rust / FFI capability family still lacks UI ownership.
+> Successor docs: [PRD](../PRD.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [TESTING](../TESTING.md) · [SECURITY](../SECURITY.md)
+> Historical note: Current code and active canonical docs outrank this historical file.
 
 ## 1. Role And Scope
 

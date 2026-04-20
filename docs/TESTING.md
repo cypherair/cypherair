@@ -85,7 +85,7 @@ The workspace currently includes three Xcode Test Plans:
 
 **CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, biometric auth modes, mode switching, crash recovery, MIE validation.
 
-**CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for macOS UI automation, including `UITests/MacUISmokeTests.swift` coverage for main, settings, tutorial launch/smoke flows, and the contact-scoped certificate-signature route.
+**CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`.
 
 There is currently no dedicated visionOS XCTest plan. Native visionOS validation uses a generic build probe together with the existing Rust, macOS-local, and iOS-device validation paths.
 
@@ -263,6 +263,8 @@ stable public-only contract end to end:
 - the Rust surface returns `InvalidKeyData` with the stable contact-import reason token
 - Swift maps that stable token to the explicit contact-import public-certificate error
 
+Sections 2.5-2.8 below are the canonical family-level Rust / FFI validation minima after archival of the former Rust/FFI rollout documents.
+
 ## 2.5 Revocation Construction Coverage
 
 When changing revocation-construction behavior, validation must cover:
@@ -278,6 +280,7 @@ When changing revocation-construction behavior, validation must cover:
 - revocation export still succeeds when legacy backfill metadata persistence fails, while a fresh service still observes the old persisted state
 - export of existing revocation without Secure Enclave unwrap
 - ASCII-armored revocation export matching the stored binary signature after `dearmor`
+- selective revocation remaining export-on-demand: subkey and User ID revocation export must not mutate `PGPKeyIdentity.revocationCert` or assume a new persisted selective-revocation store
 
 ## 2.6 Password / SKESK Coverage
 
@@ -312,6 +315,7 @@ When changing certificate-signature verification or User ID certification behavi
 - `Invalid` clears both fingerprint fields
 - `SignerMissing` clears both fingerprint fields
 - public-only certification input rejection and secret-cert-with-no-usable-certifier rejection
+- generated certification output being treated as exported artifact bytes, not as an implicit contact mutation or trust-state update
 
 ## 2.8 Richer Signature Result Coverage
 
@@ -612,7 +616,7 @@ Run on iPhone 17 or iPhone Air (A19/A19 Pro) with Hardware Memory Tagging enable
 - For security changes: both positive and negative tests (see Section 6).
 - For new PgpError variants: test that the error is thrown and maps correctly to Swift.
 - For UI changes: at minimum, verify the view compiles and renders (snapshot or manual).
-- For screen ownership, launch, routing, or tutorial-host refactors: run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted `MacUISmokeTests` subset.
+- For screen ownership, launch, routing, or tutorial-host refactors: run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted macOS smoke/routing subset together with the relevant screen-model or routing tests.
 
 ### Coverage Goals
 

@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD)
 
-> **Version:** v4.3
+> **Version:** v4.4
 > **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+
 > **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code  
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
@@ -146,12 +146,19 @@ The App decrypts both SEIPDv1 and SEIPDv2 messages regardless of the user's own 
 
 Text: cleartext sig. File: detached .sig. Auto-verify during decryption. Graded results.
 
+The shipped verify and decrypt routes preserve a summary-first result presentation while also showing detailed per-signature entries when available.
+
+Contact detail includes a contact-scoped certificate-signature workflow for direct-key verification, User ID binding verification, and User ID certification generation.
+
+Password / SKESK message handling exists at the service layer, but it is not part of the current shipped app surface.
+
 ### 4.6 Backup & Restore
 
 - **Profile A backup:** Auth → passphrase → Iterated+Salted S2K → .asc → Share Sheet.
 - **Profile B backup:** Auth → passphrase → Argon2id S2K (512 MB / p=4 / t=3, ~3s target on contemporary hardware) → .asc → Share Sheet.
 - **Restore:** Import .asc → enter passphrase → stored with SE protection.
 - **Revocation cert:** Can be exported separately from key detail page via Share Sheet.
+- **Selective revocation:** Key detail also exposes a dedicated export flow for subkey and User ID revocation certificates.
 
 ### 4.7 Error Messages
 
@@ -211,7 +218,7 @@ The App offers two authentication modes, selectable in Settings:
 - **Generation:** Ed25519+X25519 (Profile A) or Ed448+X448 (Profile B). Revocation cert auto-generated.
 - **Multi-Key:** Multiple keys with different profiles supported. One key = "Default."
 - **Public Key Update:** Same UID + same fingerprint = absorb any new public update material (revocations, refreshed bindings, added User IDs/subkeys); exact duplicate re-import remains a no-op. Same UID + different fingerprint = key regenerated (warning: verify with contact before accepting update).
-- **Key Detail Page:** Full fingerprint, Short Key ID (de-emphasized), profile indicator (A/B), backup status badge, expiry modification (MVP).
+- **Key Detail Page:** Full fingerprint, Short Key ID (de-emphasized), profile indicator (A/B), backup status badge, expiry modification (MVP), key-level revocation export, and selective revocation launchers for subkey/User ID revocation export.
 
 ### 5.2 Encryption / Decryption
 
@@ -222,6 +229,10 @@ The App offers two authentication modes, selectable in Settings:
 ### 5.3 Signing / Verification
 
 Text: cleartext sig. File: detached .sig. Auto-verify. Graded results.
+
+- Verify and decrypt screens keep the legacy summary-first result while also rendering detailed per-signature entries when available.
+- Contact detail includes a contact-scoped certificate-signature tool for direct-key verification, User ID binding verification, and User ID certification generation.
+- Password / SKESK message workflows are not currently exposed in the shipped app UI.
 
 ### 5.4 Private Key Protection
 
