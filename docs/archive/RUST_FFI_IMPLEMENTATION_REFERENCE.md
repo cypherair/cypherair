@@ -33,27 +33,29 @@ This document is intentionally narrower than a full design package:
 
 ### 1.1 Role In The Documentation Stack
 
-Use this document when planning or implementing new Rust / FFI capability in `pgp-mobile`.
+This section is preserved as a historical snapshot of how the pre-consolidation Rust / FFI doc stack divided responsibilities.
 
-Use the companion documents as follows:
+For current implementation work, use the canonical docs listed at the top of this file rather than the archived rollout stack below.
+
+At the time this document was active, the companion documents were intended to divide ownership as follows:
 
 - product goals and user-facing requirements live in [PRD.md](../PRD.md)
 - library choice, platform constraints, and existing FFI architecture live in [TDD.md](../TDD.md)
-- current Swift service ownership, app ownership, and current integration gaps live in [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md)
-- rollout sequencing and planned downstream service ownership live in [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md)
+- historical current-state Swift service ownership, app ownership, and integration gaps lived in [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md)
+- historical rollout sequencing and planned downstream service ownership lived in [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md)
 - historical workstream context from the Sequoia expansion phase lives in [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](RUST_SEQUOIA_INTEGRATION_TODO.md)
-- this document defines implementation-facing rules, semantics, validation, and the current build-boundary notes that still affect Rust / FFI work
+- this document captured implementation-facing rules, semantics, validation, and the build-boundary notes that affected Rust / FFI work at that time
 
-### 1.2 Current Build Baseline And Boundary Notes
+### 1.2 Build Baseline And Boundary Notes Recorded At Archival
 
-Current repository baseline:
+Repository baseline at the time this snapshot was archived:
 
 - `sequoia-openpgp = 2.2.0`
 - `default-features = false`
 - enabled features: `crypto-openssl`, `compression-deflate`
 - source of truth: [`pgp-mobile/Cargo.toml`](../../pgp-mobile/Cargo.toml)
 
-Current build-boundary notes that still matter for implementation work:
+Build-boundary notes captured here from the then-current implementation reference:
 
 - generic packet / metadata introspection beyond recipient-header parsing remains unwrapped
 - runtime policy customization beyond `StandardPolicy` remains intentionally excluded
@@ -61,9 +63,9 @@ Current build-boundary notes that still matter for implementation work:
 - outgoing compression remains intentionally excluded by current product/security policy
 - QR URL encode/decode helpers are app-specific extensions built on top of Sequoia parsing, not missing Sequoia wrappers
 
-### 1.3 What This Document Must Answer
+### 1.3 What This Document Was Intended To Answer
 
-For every active-roadmap Rust / FFI capability family, this document should answer:
+While this document was active, it was expected to answer the following for each in-scope capability family:
 
 - what behavior is in scope
 - what behavior is explicitly deferred
@@ -72,15 +74,15 @@ For every active-roadmap Rust / FFI capability family, this document should answ
 - which helper exports are required to make the API usable
 - what the minimum Rust and Swift FFI validation must cover
 
-### 1.4 Decision-Complete Rule
+### 1.4 Historical Decision-Complete Rule
 
-This document is the implementation reference, not a parking lot for unresolved interface decisions or a substitute for a final API contract.
+While active, this document served as the implementation reference, not a parking lot for unresolved interface decisions or a substitute for a final API contract.
 
-- Active-roadmap families in this document must be specific enough that an implementer does not need to choose semantic meaning, safety boundaries, or validation scope on the fly.
+- Families described here were expected to be specific enough that an implementer did not need to choose semantic meaning, safety boundaries, or validation scope on the fly.
 - Some families in this document are still recorded at the semantic-baseline level rather than the exact type-name level.
 - If a future option is intentionally left for later, it belongs in `Deferred / Out-of-Scope`, not in `Open Questions`.
 - `Open Questions` are reserved for current blockers that still affect interface semantics, helper requirements, or validation commitments, not merely later naming freeze work.
-- If implementation work needs to change a conclusion recorded here, update this reference first and then implement the code change.
+- If later work revisits a conclusion recorded here, update the active canonical docs first; keep this archived file aligned only when preserving the historical snapshot still adds value.
 
 ## 2. Global Rust / FFI Rules
 
