@@ -24,3 +24,7 @@ Packages/
 
 # Claude Code local worktrees (not project config)
 .claude/worktrees/
+
+# Python bytecode caches
+__pycache__/
+*.pyc
