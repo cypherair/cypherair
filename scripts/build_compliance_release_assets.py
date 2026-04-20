@@ -6,7 +6,6 @@ import argparse
 import hashlib
 import json
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -87,7 +86,7 @@ def build_source_bundle(output_path: Path, commit_sha: str, release_tag: str) ->
             "vendor",
             "--locked",
             "--versioned-dirs",
-            str(vendor_dir),
+            vendor_dir.name,
             "--manifest-path",
             str(checkout_root / "pgp-mobile" / "Cargo.toml"),
             cwd=checkout_root,
