@@ -192,8 +192,8 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 
 ## License
 
-This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.
+Unless otherwise noted, first-party CypherAir source code is licensed under **`GPL-3.0-or-later OR MPL-2.0`**.
 
 The OpenPGP engine uses [Sequoia PGP](https://sequoia-pgp.org/) (`LGPL-2.0-or-later`).
 
-Current licensing and distribution-compliance migration questions, including the App Store / first-party `GPLv3` posture and `LGPL-2.0-or-later` obligations for Sequoia-linked binaries, are tracked in [docs/COMPLIANCE_REMEDIATION_PLAN.md](docs/COMPLIANCE_REMEDIATION_PLAN.md).
+Current licensing and distribution-compliance implementation work, including the first-party dual-license rollout and the `LGPL-2.0-or-later` obligations for Sequoia-linked binaries, is tracked in [docs/COMPLIANCE_REMEDIATION_PLAN.md](docs/COMPLIANCE_REMEDIATION_PLAN.md).

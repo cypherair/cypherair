@@ -118,13 +118,15 @@ git push origin ":refs/tags/<tag>"
 
 ## Future Stable Releases
 
-Future stable XCFramework releases are reserved for versioned tags of the form:
+Stable `XCFramework` assets are published through the unified stable app-build release page.
 
-- `pgpmobile-vX.Y.Z-buildN`
+- Stable release tags use the app-build format `cypherair-vX.Y.Z-buildN`.
+- The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
+- Edge and drill prereleases remain separate from the stable release channel.
 
-Stable releases should:
+Stable unified releases should:
 
-- point to a fixed marketing-version + build-number pair instead of only a marketing version
-- keep the same asset naming convention where practical
-- publish release notes that describe compatibility and consumer expectations
-- use immutable releases and release attestation verification
+- point to a fixed marketing-version + build-number pair
+- publish exact source and compliance materials together with the stable `XCFramework` assets
+- keep immutable release assets and immutable tag-to-build binding
+- publish release notes that describe compatibility, verification, and compliance-material expectations

@@ -2,7 +2,7 @@
 
 > **Version:** v4.3
 > **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+
-> **License:** GPLv3  
+> **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code  
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
 
 ## 1. Product Overview
@@ -28,7 +28,7 @@ No messaging. No key-server sync. No custom encryption formats.
 
 ### 1.5 Open-Source License
 
-GPLv3. All source code remains open-source.
+`GPL-3.0-or-later OR MPL-2.0` for first-party code. All source code remains open-source.
 
 ### 1.6 Localization
 

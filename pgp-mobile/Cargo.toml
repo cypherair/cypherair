@@ -2,7 +2,7 @@
 name = "pgp-mobile"
 version = "0.1.0"
 edition = "2021"
-license = "GPL-3.0-or-later"
+license = "GPL-3.0-or-later OR MPL-2.0"
 description = "OpenPGP wrapper for CypherAir iOS app, powered by Sequoia PGP"
 
 [lib]
