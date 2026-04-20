@@ -77,6 +77,18 @@ Orchestrates user-facing operations by coordinating the Security layer and the R
 | `FileProgressReporter` | Bridges Rust streaming progress callbacks to SwiftUI `@Observable` state. Implements UniFFI `ProgressReporter` protocol. Thread-safe via `OSAllocatedUnfairLock`. |
 | `DiskSpaceChecker` | Runtime disk space validation before streaming file encryption. Uses `volumeAvailableCapacityForImportantUsageKey` to prevent Jetsam termination during large file operations. The legacy in-memory `encryptFile(...)` helper still retains its fixed 100 MB guard. |
 
+### Current Rust / FFI Capability Ownership
+
+| Family | Swift service owner | Current app owner | Status |
+|--------|---------------------|-------------------|--------|
+| Certificate Merge / Update | `ContactService` | `ContactImportWorkflow`, `AddContactView`, `IncomingURLImportCoordinator`, URL import flow in `CypherAirApp` | Shipped |
+| Revocation Construction | `KeyManagementService` | `KeyDetailView`, `SelectiveRevocationView`, `SelectiveRevocationScreenModel` | Shipped |
+| Password / SKESK Symmetric Messages | `PasswordMessageService` | None | Service-only |
+| Certification And Binding Verification | `CertificateSignatureService` | `ContactDetailView`, `ContactCertificateSignaturesView`, `ContactCertificateSignaturesScreenModel` | Shipped |
+| Richer Signature Results | `SigningService` and `DecryptionService` | `VerifyView`, `VerifyScreenModel`, `DecryptView`, `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Shipped |
+
+Current app-surface workflows call the owning Swift service rather than `PgpEngine` directly. `PasswordMessageService` remains intentionally service-only until product scope adds a dedicated route and plaintext-handling contract.
+
 ### Security Layer (`Sources/Security/`)
 
 Manages all hardware-backed security operations. This is the most sensitive module.

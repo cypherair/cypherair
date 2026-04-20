@@ -1,21 +1,25 @@
 # Rust / FFI Implementation Reference
 
-> Purpose: Provide the implementation reference for future `pgp-mobile` and UniFFI surface expansion.
+> Status: Archived snapshot from 2026-04-20.
+> Archival reason: Durable Rust / FFI contracts and family summaries were consolidated into the canonical docs.
+> Purpose: Preserve the final standalone Rust / FFI implementation reference snapshot.
 > Audience: Human developers, reviewers, and AI coding tools.
-> Companion documents: [RUST_FFI_SERVICE_INTEGRATION_BASELINE](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) · [RUST_FFI_SERVICE_INTEGRATION_PLAN](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) · [PRD](PRD.md) · [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [CODE_REVIEW](CODE_REVIEW.md)
+> Successor docs: [TDD](../TDD.md) · [TESTING](../TESTING.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [PRD](../PRD.md)
+> Historical note: Current code and active canonical docs outrank this historical file.
 
-This document is the only active Rust / FFI technical reference in the current doc stack.
+This file is kept as the final standalone Rust / FFI reference snapshot from before the canonical-doc consolidation.
 
-Use the active docs as follows:
+Current durable guidance now lives in:
 
-- [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) owns current downstream Swift service/app integration state.
-- [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md) owns active rollout order, service ownership, and downstream interface decisions.
-- this document owns Rust / FFI rules, family-level semantic contracts, validation minima, and the small set of current-build boundary facts that still matter for implementation work.
+- [TDD.md](../TDD.md) for Rust / FFI semantic rules and current capability-family summaries
+- [TESTING.md](../TESTING.md) for family-level validation minima
+- [ARCHITECTURE.md](../ARCHITECTURE.md) and [PRD.md](../PRD.md) for current service/app ownership and user-visible product surface
+- [SECURITY.md](../SECURITY.md) for secret-data lifecycle and trust-boundary rules
 
 Historical context remains in archived docs when needed, especially:
 
-- [archive/SEQUOIA_CAPABILITY_AUDIT.md](archive/SEQUOIA_CAPABILITY_AUDIT.md)
-- [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](archive/RUST_SEQUOIA_INTEGRATION_TODO.md)
+- [archive/SEQUOIA_CAPABILITY_AUDIT.md](SEQUOIA_CAPABILITY_AUDIT.md)
+- [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](RUST_SEQUOIA_INTEGRATION_TODO.md)
 
 This document is intentionally narrower than a full design package:
 
@@ -29,27 +33,29 @@ This document is intentionally narrower than a full design package:
 
 ### 1.1 Role In The Documentation Stack
 
-Use this document when planning or implementing new Rust / FFI capability in `pgp-mobile`.
+This section is preserved as a historical snapshot of how the pre-consolidation Rust / FFI doc stack divided responsibilities.
 
-Use the companion documents as follows:
+For current implementation work, use the canonical docs listed at the top of this file rather than the archived rollout stack below.
 
-- product goals and user-facing requirements live in [PRD.md](PRD.md)
-- library choice, platform constraints, and existing FFI architecture live in [TDD.md](TDD.md)
-- current Swift service ownership, app ownership, and current integration gaps live in [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md)
-- rollout sequencing and planned downstream service ownership live in [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md)
-- historical workstream context from the Sequoia expansion phase lives in [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](archive/RUST_SEQUOIA_INTEGRATION_TODO.md)
-- this document defines implementation-facing rules, semantics, validation, and the current build-boundary notes that still affect Rust / FFI work
+At the time this document was active, the companion documents were intended to divide ownership as follows:
 
-### 1.2 Current Build Baseline And Boundary Notes
+- product goals and user-facing requirements live in [PRD.md](../PRD.md)
+- library choice, platform constraints, and existing FFI architecture live in [TDD.md](../TDD.md)
+- historical current-state Swift service ownership, app ownership, and integration gaps lived in [RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](RUST_FFI_SERVICE_INTEGRATION_BASELINE.md)
+- historical rollout sequencing and planned downstream service ownership lived in [RUST_FFI_SERVICE_INTEGRATION_PLAN.md](RUST_FFI_SERVICE_INTEGRATION_PLAN.md)
+- historical workstream context from the Sequoia expansion phase lives in [archive/RUST_SEQUOIA_INTEGRATION_TODO.md](RUST_SEQUOIA_INTEGRATION_TODO.md)
+- this document captured implementation-facing rules, semantics, validation, and the build-boundary notes that affected Rust / FFI work at that time
 
-Current repository baseline:
+### 1.2 Build Baseline And Boundary Notes Recorded At Archival
+
+Repository baseline at the time this snapshot was archived:
 
 - `sequoia-openpgp = 2.2.0`
 - `default-features = false`
 - enabled features: `crypto-openssl`, `compression-deflate`
-- source of truth: [`pgp-mobile/Cargo.toml`](../pgp-mobile/Cargo.toml)
+- source of truth: [`pgp-mobile/Cargo.toml`](../../pgp-mobile/Cargo.toml)
 
-Current build-boundary notes that still matter for implementation work:
+Build-boundary notes captured here from the then-current implementation reference:
 
 - generic packet / metadata introspection beyond recipient-header parsing remains unwrapped
 - runtime policy customization beyond `StandardPolicy` remains intentionally excluded
@@ -57,9 +63,9 @@ Current build-boundary notes that still matter for implementation work:
 - outgoing compression remains intentionally excluded by current product/security policy
 - QR URL encode/decode helpers are app-specific extensions built on top of Sequoia parsing, not missing Sequoia wrappers
 
-### 1.3 What This Document Must Answer
+### 1.3 What This Document Was Intended To Answer
 
-For every active-roadmap Rust / FFI capability family, this document should answer:
+While this document was active, it was expected to answer the following for each in-scope capability family:
 
 - what behavior is in scope
 - what behavior is explicitly deferred
@@ -68,15 +74,15 @@ For every active-roadmap Rust / FFI capability family, this document should answ
 - which helper exports are required to make the API usable
 - what the minimum Rust and Swift FFI validation must cover
 
-### 1.4 Decision-Complete Rule
+### 1.4 Historical Decision-Complete Rule
 
-This document is the implementation reference, not a parking lot for unresolved interface decisions or a substitute for a final API contract.
+While active, this document served as the implementation reference, not a parking lot for unresolved interface decisions or a substitute for a final API contract.
 
-- Active-roadmap families in this document must be specific enough that an implementer does not need to choose semantic meaning, safety boundaries, or validation scope on the fly.
+- Families described here were expected to be specific enough that an implementer did not need to choose semantic meaning, safety boundaries, or validation scope on the fly.
 - Some families in this document are still recorded at the semantic-baseline level rather than the exact type-name level.
 - If a future option is intentionally left for later, it belongs in `Deferred / Out-of-Scope`, not in `Open Questions`.
 - `Open Questions` are reserved for current blockers that still affect interface semantics, helper requirements, or validation commitments, not merely later naming freeze work.
-- If implementation work needs to change a conclusion recorded here, update this reference first and then implement the code change.
+- If later work revisits a conclusion recorded here, update the active canonical docs first; keep this archived file aligned only when preserving the historical snapshot still adds value.
 
 ## 2. Global Rust / FFI Rules
 
@@ -144,7 +150,7 @@ This boundary should remain aligned with the current `verify` / `decrypt` split:
 
 ### 2.6 Sensitive Input Handling
 
-Any new API that consumes secret certificate material must follow the same boundary discipline already used by existing secret-sensitive exports in [`pgp-mobile/src/lib.rs`](../pgp-mobile/src/lib.rs).
+Any new API that consumes secret certificate material must follow the same boundary discipline already used by existing secret-sensitive exports in [`pgp-mobile/src/lib.rs`](../../pgp-mobile/src/lib.rs).
 
 - Secret certificate inputs must be wrapped in `Zeroizing` at the FFI entrypoint.
 - Password inputs must be converted into Sequoia `Password` as early as practical and should not remain in ordinary Rust-owned buffers longer than necessary.
@@ -156,10 +162,10 @@ Current legacy behavior returns the signer certificate's primary fingerprint, no
 
 This behavior is observable today in:
 
-- [`pgp-mobile/src/verify.rs`](../pgp-mobile/src/verify.rs)
-- [`pgp-mobile/src/decrypt.rs`](../pgp-mobile/src/decrypt.rs)
-- [`Sources/Services/SigningService.swift`](../Sources/Services/SigningService.swift)
-- [`Sources/Services/DecryptionService.swift`](../Sources/Services/DecryptionService.swift)
+- [`pgp-mobile/src/verify.rs`](../../pgp-mobile/src/verify.rs)
+- [`pgp-mobile/src/decrypt.rs`](../../pgp-mobile/src/decrypt.rs)
+- [`Sources/Services/SigningService.swift`](../../Sources/Services/SigningService.swift)
+- [`Sources/Services/DecryptionService.swift`](../../Sources/Services/DecryptionService.swift)
 
 Future Rust / FFI work must either:
 
@@ -175,7 +181,7 @@ CypherAir is sensitive to stable Rust/Swift error mapping.
 - Family-specific semantic expansion should prefer new result/status types over new `PgpError` variants.
 - A new `PgpError` variant is allowed only for cross-family fatal failure semantics that cannot be modeled as a family-local result status.
 - Any new `PgpError` variant requires same-change updates to Rust mapping, UniFFI bindings, Swift error mapping, and tests that prove the Rust/Swift 1:1 contract still holds.
-- This rule must stay aligned with [CODE_REVIEW.md](CODE_REVIEW.md) and [TESTING.md](TESTING.md).
+- This rule must stay aligned with [CODE_REVIEW.md](../CODE_REVIEW.md) and [TESTING.md](../TESTING.md).
 
 ### 2.9 Generated Binding Workflow
 
@@ -203,7 +209,7 @@ At minimum:
 - both Profile A and Profile B coverage where the capability applies
 - FFI round-trip and error-shape coverage for any new public API or any new `PgpError` behavior
 
-Nothing in this document lowers requirements from [CODE_REVIEW.md](CODE_REVIEW.md) or [TESTING.md](TESTING.md).
+Nothing in this document lowers requirements from [CODE_REVIEW.md](../CODE_REVIEW.md) or [TESTING.md](../TESTING.md).
 
 ### 2.11 Naming Freeze Level
 
@@ -723,24 +729,24 @@ Implementation-reference statements in this document should only be added if the
 Before implementing a capability family, re-check:
 
 - upstream Sequoia docs and source for the specific APIs involved
-- [`pgp-mobile/src/lib.rs`](../pgp-mobile/src/lib.rs)
+- [`pgp-mobile/src/lib.rs`](../../pgp-mobile/src/lib.rs)
 - the family-specific Rust module that currently owns the closest legacy behavior
 - existing Swift consumers that rely on legacy result semantics
 
 At minimum, legacy signer and verification semantics should be checked against:
 
-- [`pgp-mobile/src/verify.rs`](../pgp-mobile/src/verify.rs)
-- [`pgp-mobile/src/decrypt.rs`](../pgp-mobile/src/decrypt.rs)
-- [`pgp-mobile/src/streaming.rs`](../pgp-mobile/src/streaming.rs)
-- [`Sources/Services/SigningService.swift`](../Sources/Services/SigningService.swift)
-- [`Sources/Services/DecryptionService.swift`](../Sources/Services/DecryptionService.swift)
+- [`pgp-mobile/src/verify.rs`](../../pgp-mobile/src/verify.rs)
+- [`pgp-mobile/src/decrypt.rs`](../../pgp-mobile/src/decrypt.rs)
+- [`pgp-mobile/src/streaming.rs`](../../pgp-mobile/src/streaming.rs)
+- [`Sources/Services/SigningService.swift`](../../Sources/Services/SigningService.swift)
+- [`Sources/Services/DecryptionService.swift`](../../Sources/Services/DecryptionService.swift)
 
 ### 4.3 Review-Gate Alignment
 
 This document must stay aligned with the repository's broader validation and review rules.
 
-- [CODE_REVIEW.md](CODE_REVIEW.md) remains the checklist for build, binding, error-mapping, and cross-profile review expectations.
-- [TESTING.md](TESTING.md) remains the source of truth for test-layer expectations, FFI round-trip coverage, and `PgpError` mapping coverage.
+- [CODE_REVIEW.md](../CODE_REVIEW.md) remains the checklist for build, binding, error-mapping, and cross-profile review expectations.
+- [TESTING.md](../TESTING.md) remains the source of truth for test-layer expectations, FFI round-trip coverage, and `PgpError` mapping coverage.
 - This document may add family-specific minimum tests, but it must not define a lower bar than those documents.
 - Every public semantic rule in family sections must map to a Rust minimum test and, when the API is public across UniFFI, to a Swift FFI minimum test.
 

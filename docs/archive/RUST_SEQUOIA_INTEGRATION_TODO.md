@@ -1,7 +1,7 @@
 # Rust Sequoia Integration Roadmap
 
 > Status: Archived roadmap snapshot. Kept for historical execution context; no longer treated as the active roadmap.
-> Current service integration docs now live in [../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md](../RUST_FFI_SERVICE_INTEGRATION_BASELINE.md) and [../RUST_FFI_SERVICE_INTEGRATION_PLAN.md](../RUST_FFI_SERVICE_INTEGRATION_PLAN.md).
+> Current durable Rust/FFI guidance now lives in [TDD.md](../TDD.md), [TESTING.md](../TESTING.md), [ARCHITECTURE.md](../ARCHITECTURE.md), and [PRD.md](../PRD.md).
 
 > Purpose: Preserve the historical Sequoia expansion roadmap for `pgp-mobile`.
 > Audience: Human developers, reviewers, and AI coding tools.
