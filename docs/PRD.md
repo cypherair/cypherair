@@ -1,8 +1,8 @@
 # Product Requirements Document (PRD)
 
-> **Version:** v4.4
-> **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+
-> **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code  
+> **Version:** v4.4<br>
+> **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+<br>
+> **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code<br>
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
 
 ## 1. Product Overview

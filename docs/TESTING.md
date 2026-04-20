@@ -135,6 +135,7 @@ The release steps and candidate gating rules live in [APP_RELEASE_PROCESS.md](AP
 
 - Use the standard `CypherAir` scheme for internal or experimental TestFlight uploads.
 - Use `CypherAir AppStore Candidate` only for the formal App Store candidate path.
+- The candidate path now rejects tracked worktree or index changes and requires `HEAD` to match the remote stable tag commit exactly.
 
 ## 2.4 Rust Artifacts, UniFFI Outputs, and Xcode Validation
 

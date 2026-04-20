@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -50,9 +51,37 @@ def load_dependency_versions(cargo_lock_path: Path) -> list[dict[str, str]]:
     return [{"name": name, "version": package_map[name]} for name in KEY_DEPENDENCIES]
 
 
-def resolved_commit_sha(explicit_commit_sha: str) -> str:
-    if explicit_commit_sha:
-        return explicit_commit_sha
+def resolve_git_head_commit(repo_root: Path) -> str:
+    completed = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    return completed.stdout.strip()
+
+
+def resolved_commit_sha(
+    explicit_commit_sha: str,
+    require_stable_release: bool,
+    repo_root: Path = ROOT,
+) -> str:
+    normalized_commit_sha = explicit_commit_sha.strip()
+    if normalized_commit_sha and normalized_commit_sha.lower() != "unknown":
+        return normalized_commit_sha
+
+    if require_stable_release:
+        try:
+            resolved_commit = resolve_git_head_commit(repo_root)
+        except subprocess.CalledProcessError as error:
+            raise RuntimeError(
+                "stable-required build must resolve an exact git commit SHA"
+            ) from error
+
+        if not resolved_commit:
+            raise RuntimeError("stable-required build resolved an empty git commit SHA")
+        return resolved_commit
+
     return "unknown"
 
 
@@ -74,9 +103,10 @@ def derived_release_tag(marketing_version: str, build_number: str) -> str:
 
 def generate() -> None:
     args = parse_args()
+    stable_release_required = requires_stable_release(args.require_stable_release)
 
     stable_release_tag = args.stable_release_tag.strip()
-    if requires_stable_release(args.require_stable_release) and not stable_release_tag:
+    if stable_release_required and not stable_release_tag:
         stable_release_tag = derived_release_tag(
             args.marketing_version.strip(),
             args.build_number.strip(),
@@ -91,7 +121,10 @@ def generate() -> None:
     info = {
         "marketingVersion": args.marketing_version.strip(),
         "buildNumber": args.build_number.strip(),
-        "commitSHA": resolved_commit_sha(args.commit_sha.strip()),
+        "commitSHA": resolved_commit_sha(
+            args.commit_sha,
+            stable_release_required,
+        ),
         "stableReleaseTag": stable_release_tag,
         "stableReleaseURL": stable_release_url,
         "dependencies": load_dependency_versions(args.cargo_lock),
