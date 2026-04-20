@@ -108,6 +108,10 @@ Update the relevant docs in the same change when one of these surfaces changes:
 - **Test-plan or workflow changes**
   - Update `README.md`, `CLAUDE.md`, `AGENTS.md`, and `docs/TESTING.md`
 
+- **Release / compliance surface changes**
+  - Update `README.md`, `CLAUDE.md`, `docs/APP_RELEASE_PROCESS.md`, and `docs/XCFRAMEWORK_RELEASES.md`
+  - Update these docs when stable release workflow behavior, stable tag rules, `Source & Compliance` metadata, release asset names, relink-kit semantics, or immutability guarantees change
+
 - **Rust / FFI service ownership, downstream adoption, or durable contract changes**
   - Update `docs/ARCHITECTURE.md` for current Swift service ownership, app ownership, and shipped vs deferred status
   - Update `docs/PRD.md` for user-visible product-surface changes
