@@ -519,9 +519,9 @@ For any domain migration:
 
 ### 11.3 File Protection
 
-- protected domain files are created with explicit complete file protection
-- bootstrap metadata also receives explicit file protection
-- temporary scratch files receive explicit file protection when created
+- iOS / iPadOS / visionOS protected-domain files are created with explicit `complete` file protection
+- macOS protected-domain files live inside the app sandbox/container and use the strongest platform-supported local static protection defined by the implementation
+- bootstrap metadata and temporary scratch files follow the same platform-specific protection policy as their host platform
 
 ### 11.4 Zeroization
 
