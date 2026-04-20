@@ -148,7 +148,7 @@ The GitHub Actions workflows in this repository currently target `macos-26`, but
 
 ### XCFramework Prerelease
 
-CypherAir publishes unique edge prerelease XCFrameworks for the current `main` branch using `pgpmobile-edge-` release tags. For discovery, asset names, download commands, verification steps, and future stable-release conventions, see [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md).
+CypherAir publishes unique edge prerelease XCFrameworks for the current `main` branch using `pgpmobile-edge-` release tags. For discovery, asset names, download commands, verification steps, and the current stable-release channel contract, see [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md).
 
 ## Security Model
 
@@ -176,18 +176,19 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 
 | Document | Description |
 |----------|-------------|
-| [COMPLIANCE_REMEDIATION_PLAN](docs/COMPLIANCE_REMEDIATION_PLAN.md) | Active roadmap for licensing and distribution-compliance migration research |
 | [PRD](docs/PRD.md) | Product requirements, workflows, and acceptance criteria |
 | [TDD](docs/TDD.md) | Technical design — library selection, FFI, SE wrapping |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Module breakdown, data flows, storage layout |
 | [SECURITY](docs/SECURITY.md) | Encryption scheme, key lifecycle, threat model |
 | [TESTING](docs/TESTING.md) | Test strategy and coverage |
+| [APP_RELEASE_PROCESS](docs/APP_RELEASE_PROCESS.md) | Current app-build release modes, stable asset contract, and App Store candidate ordering |
 | [DOCUMENTATION_GOVERNANCE](docs/DOCUMENTATION_GOVERNANCE.md) | Documentation classes, metadata rules, archive rules, and update triggers |
+| [COMPLIANCE_REMEDIATION_PLAN (Archive)](docs/archive/COMPLIANCE_REMEDIATION_PLAN.md) | Archived remediation plan and close-out history for the licensing/distribution rollout |
 | [POC](docs/archive/POC.md) | Proof-of-concept test plan (archived) |
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards and SwiftUI patterns |
 | [LIQUID_GLASS](docs/LIQUID_GLASS.md) | iOS 26 Liquid Glass and platform-native SwiftUI chrome guidance |
 | [CODE_REVIEW](docs/CODE_REVIEW.md) | Code review checklist by change type |
-| [XCFRAMEWORK_RELEASES](docs/XCFRAMEWORK_RELEASES.md) | Rolling XCFramework prerelease channel, verification, and future stable release policy |
+| [XCFRAMEWORK_RELEASES](docs/XCFRAMEWORK_RELEASES.md) | Current edge, drill, and stable XCFramework release channels and verification |
 | [CHANGELOG](docs/CHANGELOG.md) | PRD revision history |
 
 ## License
@@ -196,4 +197,4 @@ Unless otherwise noted, first-party CypherAir source code is licensed under **`G
 
 The OpenPGP engine uses [Sequoia PGP](https://sequoia-pgp.org/) (`LGPL-2.0-or-later`).
 
-Current licensing and distribution-compliance implementation work, including the first-party dual-license rollout and the `LGPL-2.0-or-later` obligations for Sequoia-linked binaries, is tracked in [docs/COMPLIANCE_REMEDIATION_PLAN.md](docs/COMPLIANCE_REMEDIATION_PLAN.md).
+Current stable app-build release ordering and exact source/compliance asset expectations are documented in [docs/APP_RELEASE_PROCESS.md](docs/APP_RELEASE_PROCESS.md) and [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md). The historical rollout record is preserved in [docs/archive/COMPLIANCE_REMEDIATION_PLAN.md](docs/archive/COMPLIANCE_REMEDIATION_PLAN.md).

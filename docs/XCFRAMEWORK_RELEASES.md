@@ -1,9 +1,15 @@
 # XCFramework Releases
 
-> Purpose: Describe the current XCFramework distribution channel, how to discover and verify releases, and how future stable releases will differ.
+> Status: Canonical current-state.
+> Purpose: Describe the current edge, drill, and stable `PgpMobile.xcframework` release channels, including discovery, verification, and the stable channel's relationship to the unified app-build release page.
 > Audience: Human developers and automation that consume prebuilt `PgpMobile.xcframework` assets.
+> Source of truth: `.github/workflows/xcframework-edge-release.yml`, `.github/workflows/stable-build-release.yml`, and published GitHub releases.
+> Last reviewed: 2026-04-20.
+> Update triggers: channel naming/routing, asset names, verification commands, stable asset contract, or relink-kit semantics.
 
-## Current Channel
+## 1. Release Channels
+
+### Edge Channel
 
 CypherAir publishes a unique edge prerelease XCFramework from the current `main` branch for each successful edge release workflow run.
 
@@ -14,6 +20,8 @@ CypherAir publishes a unique edge prerelease XCFramework from the current `main`
 - It is not treated as a stable SDK release.
 
 The legacy rolling `pgpmobile-edge` tag/release is deprecated and removed during the migration to unique edge prereleases. Consumers must not use the fixed `pgpmobile-edge` tag.
+
+### Drill Channel
 
 Non-`main` manual validation must use a `pgpmobile-drill-*` prefix.
 
@@ -46,7 +54,23 @@ Each edge prerelease publishes exactly these assets:
 
 This is intentional: a single app marketing version can have multiple Xcode build numbers during development, so XCFramework metadata must carry both values to identify the exact build instance that produced the binary.
 
-## Downloading
+### Stable Channel
+
+CypherAir publishes stable XCFramework assets through the same unified stable GitHub release page used by formal app builds.
+
+- Stable release tags use the app-build format `cypherair-vX.Y.Z-buildN`.
+- The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
+- Stable releases publish these assets together:
+  `CypherAir-source-bundle.tar.zst`,
+  `CypherAir-compliance-manifest.json`,
+  `PgpMobile.xcframework.zip`,
+  `PgpMobile.xcframework.sha256`,
+  and `PgpMobile-relink-kit.tar.zst`.
+- `PgpMobile-relink-kit.tar.zst` is a technical supplement for SDK consumers and relink-focused compliance review. It does not replace the shared source bundle and is not an in-app asset.
+- Stable assets are immutable once published. If a stable asset set is wrong, publish a new build number under a new stable tag instead of replacing assets in place.
+- Edge and drill prereleases remain separate from the stable channel.
+
+## 2. Edge Discovery And Downloading
 
 First discover the newest edge prerelease by matching the `pgpmobile-edge-` prefix:
 
@@ -75,7 +99,7 @@ Extract the XCFramework after verification:
 ditto -x -k PgpMobile.xcframework.zip .
 ```
 
-## Verification
+## 3. Edge Verification
 
 First validate the checksum:
 
@@ -101,7 +125,33 @@ gh attestation verify PgpMobile.xcframework.zip \
 
 Drill releases are verified using the exact ref-pinned command rendered in that release's notes. Do not reuse the canonical edge command for drill artifacts.
 
-## Failed Run Cleanup
+## 4. Stable Release Retrieval
+
+Stable releases are retrieved by their exact app-build tag:
+
+```bash
+TAG="cypherair-vX.Y.Z-buildN"
+
+gh release download "$TAG" \
+    --repo cypherair/cypherair \
+    --pattern 'CypherAir-source-bundle.tar.zst' \
+    --pattern 'CypherAir-compliance-manifest.json' \
+    --pattern 'PgpMobile.xcframework.zip' \
+    --pattern 'PgpMobile.xcframework.sha256' \
+    --pattern 'PgpMobile-relink-kit.tar.zst'
+```
+
+Validate the stable XCFramework artifact with:
+
+```bash
+shasum -a 256 -c PgpMobile.xcframework.sha256
+gh release verify "$TAG" -R cypherair/cypherair
+gh release verify-asset "$TAG" PgpMobile.xcframework.zip -R cypherair/cypherair
+```
+
+Use the source bundle, compliance manifest, and relink kit together when you need exact source-compliance materials for that stable SDK build.
+
+## 5. Failed Run Cleanup
 
 The workflow performs best-effort cleanup if a run fails after creating a draft release or tag.
 
@@ -115,20 +165,5 @@ Manual cleanup commands:
 gh release delete <tag> -R cypherair/cypherair --cleanup-tag --yes
 git push origin ":refs/tags/<tag>"
 ```
-
-## Future Stable Releases
-
-Stable `XCFramework` assets are published through the unified stable app-build release page.
-
-- Stable release tags use the app-build format `cypherair-vX.Y.Z-buildN`.
-- The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
-- Edge and drill prereleases remain separate from the stable release channel.
-
-Stable unified releases should:
-
-- point to a fixed marketing-version + build-number pair
-- publish exact source and compliance materials together with the stable `XCFramework` assets
-- keep immutable release assets and immutable tag-to-build binding
-- publish release notes that describe compatibility, verification, and compliance-material expectations
 
 For the App-side release ordering, including when a stable GitHub release must exist before an Xcode archive is allowed, see [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md).
