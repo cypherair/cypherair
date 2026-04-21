@@ -74,12 +74,23 @@ Properties:
 - unique per domain
 - never stored in plaintext
 - used to encrypt domain payload generations on disk
-- in v1, persisted directly as the `secret` behind one domain-specific `LAPersistedRight`
-- the authorized `LASecret.rawData` is the only plaintext source of the `Domain Master Key`
-- re-established independently on import or recovery flows when needed
-- stable across startup, relock, and crash recovery through that single persisted-right-backed form
+- persisted in a protected form wrapped by the shared app-data secret
+- lazy-unwrapped on first domain access inside an already authorized app-data session
+- remains independent from other domain DMKs for envelope, deletion, recovery, and future rekey behavior
 
-### 3.4 Bootstrap Metadata
+### 3.4 Shared App-Data Secret
+
+The shared app-data secret is the only system-gated secret released by the shared `LAPersistedRight`.
+
+Properties:
+
+- one shared app-data right/secret pair covers all app-data domains in v1
+- the secret acts as the session KEK for per-domain DMKs
+- the secret may remain in memory for the authorized app-data session
+- the secret must be zeroized on relock
+- the secret does not replace per-domain DMKs
+
+### 3.5 Bootstrap Metadata
 
 Minimal non-secret metadata stored outside the encrypted domain payload so cold start and deterministic recovery remain possible.
 
@@ -97,7 +108,7 @@ Disallowed examples:
 - user text, notes, tags, recipient sets, or meaningful business data
 - plaintext caches or search indexes
 
-### 3.5 Locked / Unlocked / RecoveryNeeded
+### 3.6 Locked / Unlocked / RecoveryNeeded
 
 Protected domains expose explicit runtime state:
 
@@ -135,6 +146,7 @@ Rationale:
 - limits blast radius
 - allows independent migration, export, import, and recovery behavior per domain
 - avoids treating every app-owned state transition as a single all-or-nothing vault event
+- keeps domain boundaries at the DMK/envelope/recovery layer even when authorization is shared
 
 ### 5.2 Device-Bound Wrapping
 
@@ -143,42 +155,45 @@ The current private-key design uses Secure Enclave indirect wrapping because Ope
 Protected app-data domains use a different primary model in v1:
 
 - encrypted domain payloads remain app-managed on disk
-- the domain unlock secret is gated by `LAPersistedRight`
+- one shared app-data secret is gated by one shared `LAPersistedRight`
 - Apple documents `LAPersistedRight` as being backed by a unique key in the Secure Enclave
+- per-domain DMKs remain distinct and are wrapped by the shared app-data secret
 
 This means the v1 app-data proposal still relies on Secure Enclave-backed system authorization, but it does so through Apple's higher-level LocalAuthentication right model rather than through custom Secure Enclave wrapping as the primary gate.
 
 Implementation rule:
 
-- treat `LAPersistedRight` / `LASecret` as the primary authorization gate for app-data unlock secrets
+- treat one shared `LAPersistedRight` / `LASecret` pair as the primary authorization gate for app-data unlock
 - do not promise custom SE self-ECDH wrapping as the primary app-data design in v1
 - reuse lower-level primitives only where they support the domain model without replacing the primary system gate
 
 Expected properties:
 
 - local-only
-- system-gated access to the domain unlock secret
+- system-gated access to the shared app-data secret
 - app code must not receive that secret before authorization succeeds
+- one successful authorization covers all app-data domains in the current session
 - source-device authorization state must not be exported as part of portable recovery
 
 ### 5.3 App-Data Wrapping Access-Control Contract
 
-`ProtectedDomainKeyManager` owns the lifecycle of the app-data domain unlock secret, but the primary authorization gate is the system-managed persisted right.
+`ProtectedDataSessionCoordinator` owns the lifecycle of the shared app-data authorization gate, while `ProtectedDomainKeyManager` owns per-domain DMK lifecycle under that gate.
 
 This policy is a normative requirement, not an implementation detail left for later.
 
 Required rules:
 
-- app-data domains use `LAPersistedRight` as the primary app-data authorization gate in v1
-- all v1 app-data domains use `LAAuthenticationRequirement.default`
+- app-data domains use one shared `LAPersistedRight` as the primary app-data authorization gate in v1
+- the shared app-data right uses `LAAuthenticationRequirement.default`
 - app-data authorization must **not** call `AuthenticationMode.createAccessControl()`
 - app-data authorization must **not** call `AuthenticationManager.createAccessControl(for:)`
 - app-data authorization must **not** derive from the private-key authentication mode
 - app-data domains must **not** inherit current `Standard` / `High Security` semantics
 - app-data domains must **not** inherit future `Special Security Mode` or `biometryCurrentSet` semantics
 - per-domain authorization-policy variation is out of scope in v1
+- per-domain right authorization is out of scope in v1
 - protected app-data domains must never rewrap merely because private-key auth mode changes
-- the system must not return the domain unlock secret before right authorization succeeds
+- the system must not return the shared app-data secret before right authorization succeeds
 
 The purpose of this contract is to prevent the new layer from attaching itself to the private-key access-control source of truth.
 
@@ -189,21 +204,25 @@ Protected app-data domains unlock for the authenticated app session rather than 
 Canonical behavior:
 
 - `ProtectedDataSessionCoordinator` owns the authoritative app-data unlock boundary
-- that boundary is `LAPersistedRight.authorize(...)`
-- the domain unlock secret is fetched only after authorization succeeds
+- that boundary is the shared `LAPersistedRight.authorize(...)`
+- the shared app-data secret is fetched only after authorization succeeds
+- per-domain DMKs are lazy-unwrapped on first domain access
+- already-opened domain DMKs remain in memory until relock
+- unopened domains do not preload their DMKs
 - ordinary in-session reads and writes reuse the authorized session
 - authorization survives background / inactive transitions while the app remains inside the current grace window
 - relock occurs on explicit app lock, grace-period expiry, session loss, or app exit
-- relock must also deauthorize the right and clear any cached unlock secret from memory
+- relock must also deauthorize the shared right and clear any cached shared secret and any unwrapped domain DMKs from memory
 
 This model intentionally differs from the private-key domain.
 
 The authoritative v1 orchestration model is:
 
-- `ProtectedDataSessionCoordinator` authorizes the app-data right and owns app-data session reuse
+- `ProtectedDataSessionCoordinator` authorizes the shared app-data right and owns app-data session reuse
 - existing `AuthenticationManager` / `AuthenticationMode` launch-resume auth is not the normative app-data authorization source
 - if current shipped app-shell privacy auth remains in place, it is treated as separate UX and not as the required gate for future app-data unlock semantics
-- app-data domains do not bypass the right by treating prior app-auth alone as sufficient to release the unlock secret
+- app-data domains do not bypass the shared right by treating prior app-auth alone as sufficient to release the shared app-data secret
+- opening a second or third app-data domain inside the same app-data session must not require another authorization prompt
 
 Repeated-prompt avoidance is a required design goal. The v1 proposal must not rely on undocumented prompt coalescing between different authorization systems. Instead, the proposal treats `ProtectedDataSessionCoordinator` and its right authorization as the only normative app-data unlock contract.
 
@@ -225,13 +244,13 @@ Stated differently:
 
 The framework separates:
 
-- **system authorization** of the app-data unlock secret
-- **runtime session reuse** for ordinary access after that authorization
+- **system authorization** of the shared app-data secret
+- **runtime session reuse** plus lazy per-domain DMK unlock after that authorization
 
 This separation is required so:
 
 - protected app-data domains do not need rewrapping when private-key auth modes change
-- the system, not only application code, prevents pre-auth access to the unlock secret
+- the system, not only application code, prevents pre-auth access to the shared app-data secret
 - the app can still enforce session reuse and relock behavior without coupling app-data semantics to private-key rewrap cycles
 
 ### 5.7 Bootstrap-Critical Settings Whitelist
@@ -266,7 +285,8 @@ Before app-data authorization succeeds, the app may:
 Before app-data authorization succeeds, the app must **not**:
 
 - fetch `LASecret`
-- authorize a right implicitly from a repository/service initializer or getter
+- authorize the shared app-data right implicitly from a repository/service initializer or getter
+- unwrap any domain DMK
 - attempt to open protected-domain generations
 - classify final `locked / unlocked / recoveryNeeded` state from protected-domain contents
 
@@ -274,8 +294,9 @@ Before app-data authorization succeeds, the app must **not**:
 
 After app-data authorization succeeds, the app may:
 
-- fetch the domain unlock secret
-- open `current / previous / pending`
+- fetch the shared app-data secret
+- lazy-unlock each domain DMK on first access
+- open `current / previous / pending` for domains that are accessed
 - classify final `locked / unlocked / recoveryNeeded`
 
 This is a required implementation boundary, not a best-effort guideline.
@@ -355,21 +376,24 @@ The v1 persistence model for each protected app-data domain is:
 
 - the domain payload generations are stored as encrypted envelopes on disk
 - the `Domain Master Key` is not stored in plaintext on disk
-- the `Domain Master Key` itself is the `secret` persisted behind one domain-specific `LAPersistedRight`
-- there is no second app-managed wrapped master-key blob in v1
-- the authorized `LASecret.rawData` is the only plaintext source of the `Domain Master Key`
+- one shared app-data secret is persisted behind one shared `LAPersistedRight`
+- each domain DMK is persisted in one protected form wrapped by that shared app-data secret
+- there is no v1 model where each domain owns its own independent right
+- there is no v1 single global DMK for all app-data domains
+- the shared secret is the only system-gated secret released by `LAPersistedRight`
 
 The canonical v1 lifecycle is:
 
-- create: generate the `Domain Master Key`, persist it behind the domain-specific right, then write initial domain state; if initialization fails, remove the right and any partial domain files
-- steady-state updates: rewrite generations only; do not rotate the `Domain Master Key` unless a later domain-specific design explicitly introduces rekey
-- delete: remove domain generations and bootstrap metadata, then remove the persisted right
+- create: ensure the shared app-data right/secret exists, create the domain DMK, wrap it with the shared secret, then write initial domain state; if initialization fails, remove partial domain files and the wrapped DMK state, and remove the shared right only if it was created solely for this first domain
+- steady-state updates: rewrite domain generations only; do not rotate the shared app-data secret or the domain DMK unless a later domain-specific design explicitly introduces rekey
+- delete domain: remove domain generations, bootstrap metadata, and wrapped DMK state for that domain; do not remove the shared right unless the last protected domain is being removed
 - recovery: distinguish between:
   - unreadable payload generations
-  - missing persisted right
-  - unreadable or missing right-protected secret data
+  - unreadable wrapped domain DMK state
+  - missing shared persisted right
+  - unreadable or missing shared-right-protected secret data
 
-The v1 docs do not permit multiple equally valid persistence shapes for the master key. The direct-secret model above is the single canonical v1 model and must be applied consistently across startup, relock, deletion, migration, and recovery.
+The v1 docs do not permit multiple equally valid persistence shapes for the master key ladder. The shared-gate / per-domain-DMK model above is the single canonical v1 model and must be applied consistently across startup, relock, deletion, migration, and recovery.
 
 ### 6.5 Bootstrap Metadata
 
@@ -427,28 +451,36 @@ This is the v1 acceptance floor. Stronger macOS protection claims require later 
 
 ### 7.1 Domain Master Key Lifecycle
 
+The shared app-data session lifecycle is:
+
+1. create one shared app-data `LAPersistedRight`
+2. persist one shared app-data secret behind that right
+3. authorize the shared right before retrieving `LASecret.rawData`
+4. use the authorized shared secret as the KEK for per-domain DMKs
+5. zeroize plaintext shared-secret buffers on relock
+
 For each protected app-data domain:
 
 1. generate random 256-bit `Domain Master Key`
-2. persist that `Domain Master Key` as the `secret` behind the domain-specific `LAPersistedRight`
-3. authorize the right before retrieving `LASecret.rawData`
-4. use the authorized `LASecret.rawData` directly as the plaintext `Domain Master Key`
-5. zeroize plaintext secret/master-key buffers after initialization, use, or relock as appropriate
+2. wrap that DMK with the shared app-data secret
+3. persist the wrapped DMK in the domain's protected metadata state
+4. lazy-unwrap the DMK on first domain access after shared authorization succeeds
+5. zeroize plaintext DMK buffers on relock or explicit domain eviction if later introduced
 
-The primary v1 contract is that the system must not release the `Domain Master Key` before authorization succeeds.
+The primary v1 contract is that the system must not release the shared app-data secret before authorization succeeds.
 
 The v1 `Domain Master Key` lifecycle must also define:
 
-- creation-time persistence of the right-protected `Domain Master Key`
+- creation-time persistence of the wrapped domain DMK
 - stable re-open behavior across relock/relaunch
-- explicit deletion semantics for both domain files and the persisted right
-- recovery behavior when either the persisted right or the right-protected `Domain Master Key` becomes unreadable
+- explicit deletion semantics for domain files, wrapped DMK state, and the shared right when no protected domains remain
+- recovery behavior when either the shared persisted right, the shared secret, or a wrapped domain DMK becomes unreadable
 
 ### 7.2 Keychain Namespace Rule
 
-If any domain-specific auxiliary Keychain material is used in support of the app-data domain, it must remain separate from current private-key storage names.
+If any auxiliary Keychain material is used in support of the app-data domain, it must remain separate from current private-key storage names.
 
-In v1, bootstrap metadata is not stored in Keychain. The primary authorization state for app-data unlock is the persisted right, and the primary persisted key material for app-data unlock is the right-protected `Domain Master Key` secret itself.
+In v1, bootstrap metadata is not stored in Keychain. The primary authorization state for app-data unlock is the shared persisted right, and the only system-gated secret released by that right is the shared app-data secret.
 
 ### 7.3 Session Unlock
 
@@ -456,9 +488,10 @@ In v1, bootstrap metadata is not stored in Keychain. The primary authorization s
 
 Required behavior:
 
-- authorize the right as the authoritative app-data unlock boundary
-- fetch the domain unlock secret only after authorization succeeds
+- authorize the shared right as the authoritative app-data unlock boundary
+- fetch the shared app-data secret only after authorization succeeds
 - reuse the authorized app-data session
+- lazy-unlock domain DMKs on first domain access
 - avoid domain-specific redundant prompts during ordinary in-session use
 - expose domain availability as locked/unlocked/recoveryNeeded
 
@@ -466,15 +499,15 @@ Required behavior:
 
 Relock must invalidate:
 
-- in-memory domain unlock secret
-- in-memory domain master keys
+- in-memory shared app-data secret
+- all in-memory unwrapped domain DMKs
 - decrypted domain payloads in memory
 - plaintext serialization scratch buffers
 - plaintext in-memory search or lookup indexes derived from protected domains
 
 Sensitive buffers must be zeroized rather than only dereferenced.
 
-Relock must also deauthorize the right for the current session.
+Relock must also deauthorize the shared right for the current session.
 
 App-data relock does **not** occur merely because the app entered background or inactive state while the current grace window remains valid.
 
@@ -518,16 +551,17 @@ Owns:
 
 Owns:
 
-- domain unlock secret creation and lifecycle
-- domain master key lifecycle after secret retrieval
-- system-gated unlock-secret retrieval backed by `LAPersistedRight`
+- per-domain DMK creation and wrapped-DMK persistence
+- lazy per-domain DMK unwrap under the shared app-data secret
+- deletion and zeroization of per-domain key material
 - zeroization of transient key material
 
 ### `ProtectedDataSessionCoordinator.swift`
 
 Owns:
 
-- right authorization, session unlock, relock, and deauthorize state
+- shared right authorization, session unlock, relock, and deauthorize state
+- shared app-data secret lifecycle
 - reuse of authenticated app-session context
 - domain runtime visibility as locked / unlocked / recoveryNeeded
 
@@ -536,6 +570,7 @@ Owns:
 Owns:
 
 - pending/current/previous inspection
+- wrapped-DMK state validation
 - generation validation
 - authoritative generation selection
 - deterministic recovery routing
@@ -635,6 +670,13 @@ Initial classification baseline:
 | `Documents/self-test/` | App sandbox documents | `remain plaintext with rationale` | Diagnostic output remains outside protected-domain scope in v1 |
 | future protected-domain bootstrap metadata | App-owned bootstrap files | `early-readable` | Read before app-data authorization by design |
 
+Proposed protected-data storage concepts for v1 design work:
+
+| Concept | Proposed location | v1 class | Notes |
+|---------|-------------------|----------|-------|
+| shared app-data `LAPersistedRight` / secret | System-managed LocalAuthentication persistent store | `protected-after-unlock` | Shared gate for all app-data domains |
+| per-domain wrapped DMK state | App-owned protected-domain metadata under each domain directory | `protected-after-unlock` | Lazy-unwrapped after shared app-data authorization |
+
 ## 11. Domain Recovery Contracts
 
 Each protected domain must declare a recovery contract explicitly.
@@ -670,12 +712,14 @@ Required behavior:
 
 ### 12.1 Unlock / Relock
 
-- `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary
-- the domain unlock secret is fetched only after authorization
+- one shared `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary
+- the shared app-data secret is fetched only after authorization
+- a second or third app-data domain does not require another authorization prompt inside the active app-data session
+- domain DMKs are lazy-unwrapped on first access
 - ordinary in-session access triggers no redundant prompts
 - relock deauthorizes the right
 - relock clears cached unlock secrets
-- relock clears in-memory domain master keys
+- relock clears all in-memory unwrapped domain DMKs
 - relock clears decrypted payloads and derived indexes
 - backgrounding within the active grace window does not deauthorize app-data access
 

@@ -88,6 +88,8 @@ Rationale:
 
 This initiative therefore treats "AppKey" as a conceptual app-data protection layer, not as a mandate for one monolithic symmetric key.
 
+Per-domain DMKs do **not** imply per-domain authorization boundaries in v1. Domain isolation remains at the key, envelope, recovery, and lifecycle level even when multiple domains share one app-data authorization gate.
+
 ### 4.3 Recoverable App-Data Domains
 
 Protected app-data domains are **recoverable domains**.
@@ -107,15 +109,17 @@ Protected app-data domains use a **system-gated persisted right** as the primary
 
 The canonical v1 model is:
 
-- each domain persists encrypted payload generations on disk
-- the domain unlock secret is protected by `LAPersistedRight`
-- the right uses `LAAuthenticationRequirement.default`
-- the system must not return the unlock secret before the right is authorized
-- once authorized, the secret may be cached for the authenticated app session and must be cleared on relock
+- one shared app-data `LAPersistedRight` protects one shared app-data secret
+- the shared app-data right uses `LAAuthenticationRequirement.default`
+- one successful authorization covers all app-data domains in the current app-data session
+- the shared app-data secret acts as the session KEK for per-domain DMKs
+- each domain persists encrypted payload generations on disk and retains its own DMK
+- once authorized, the shared app-data secret may be cached for the authenticated app-data session and per-domain DMKs may be lazy-unlocked on first access
+- the system must not return the shared app-data secret before the shared right is authorized
 
 This means the first gate for app-data unlock is no longer "application code remembered to check session state first." The first gate is the system-managed authorization boundary for the persisted right.
 
-For future protected domains, `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary.
+For future protected domains, the shared `LAPersistedRight.authorize(...)` call is the single normative app-data authorization boundary.
 
 Existing `AuthenticationManager` / `AuthenticationMode` launch-resume authentication may remain as separate privacy UX in shipped code, but it must not be described as the required gate for future app-data unlock semantics.
 
@@ -165,10 +169,11 @@ In v1, this means:
 - app-data authorization must not derive from `AuthenticationMode`
 - app-data authorization must not call `AuthenticationMode.createAccessControl()`
 - app-data authorization must not call `AuthenticationManager.createAccessControl(for:)`
-- all v1 app-data domains use `LAAuthenticationRequirement.default`
+- the shared app-data right uses `LAAuthenticationRequirement.default`
 - app-data domains must not inherit current `Standard` / `High Security` semantics
 - app-data domains must not inherit future `Special Security Mode` or `biometryCurrentSet` semantics
 - per-domain authorization-policy variation is out of scope in v1 unless a later domain-specific proposal explicitly reopens it
+- per-domain right authorization is out of scope in v1
 
 This rule exists to preserve the intended boundary: private-key security semantics remain private-key-specific.
 
@@ -184,6 +189,7 @@ Goals:
 
 - establish shared terminology and lifecycle
 - define common envelope and recovery rules
+- define the shared-gate / per-domain-DMK topology
 - define a system-gated app-data authorization model that is separate from the private-key access-control source of truth
 - define a strict startup authentication boundary
 - define common relock, deauthorize, and session-unlock semantics
@@ -289,7 +295,22 @@ After app-data authorization succeeds, the app may:
 
 This startup boundary is a required implementation constraint, not a best-effort guideline.
 
-### 5.2 Persistent-State Classification Inventory
+### 5.2 App-Data Session Lifetime
+
+The shared app-data session follows the current grace-window model.
+
+In v1:
+
+- the shared app-data right remains authorized while the app is backgrounded or inactive inside the current grace window
+- app-data relock and deauthorize occur only on:
+  - explicit app lock
+  - grace-period expiration
+  - session loss
+  - app termination or exit
+- entering background alone does **not** deauthorize app-data while the grace window is still valid
+- `gracePeriod = 0` is the supported posture for "always reauthenticate on resume"
+
+### 5.3 Persistent-State Classification Inventory
 
 Before any real protected domain lands, implementation planning must maintain a complete inventory of currently persisted app-owned state.
 
@@ -313,7 +334,7 @@ The inventory must prevent three failure modes:
 
 The reviewed inventory must include not only `UserDefaults`, but also currently persisted app-owned files and directories that remain outside the protected-domain migration in this round.
 
-### 5.3 Startup Architecture Impact
+### 5.4 Startup Architecture Impact
 
 The protected app-data proposal is no longer just a narrow service-layer addition.
 
@@ -344,7 +365,7 @@ The preferred implementation posture is:
 
 - new files for the new layer
 - narrow dependency wiring
-- use `LAPersistedRight` as the primary app-data authorization gate in v1
+- use one shared `LAPersistedRight` as the primary app-data authorization gate in v1
 - reuse existing lower-level primitives by composition only where they support, rather than replace, that system gate
 - never attach the new layer to the private-key access-control source of truth
 - no "cleanup refactor" of the private-key domain just to make the new layer look symmetrical
@@ -404,9 +425,10 @@ Any implementation derived from this roadmap should be reviewable against these 
 
 - does it preserve the existing private-key domain without semantic drift?
 - does it introduce a reusable protected app-data substrate rather than a one-off vault?
-- does it treat `LAPersistedRight` as the first gate for app-data unlock secret access?
+- does it treat one shared `LAPersistedRight` as the first gate for app-data unlock secret access?
 - does it avoid making `AuthenticationMode` the normative gate for future app-data authorization?
 - does it fully specify the `Domain Master Key` persistence and recovery model?
+- does it clearly express one shared app-data gate with per-domain DMKs?
 - does it keep app-data domains recoverable rather than private-key-style invalidating?
 - does it keep bootstrap metadata minimal and non-sensitive?
 - does it harden file protection explicitly instead of relying on platform defaults?
