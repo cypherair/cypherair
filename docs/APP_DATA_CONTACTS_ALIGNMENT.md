@@ -45,8 +45,8 @@ Current Contacts docs still say:
 
 Current app-data docs now say:
 
-- app-data domains use `LAPersistedRight` as the primary authorization gate in v1
-- the `Domain Master Key` is the right-protected secret itself in the canonical v1 model
+- app-data domains use one shared `LAPersistedRight` as the primary authorization gate in v1
+- app-data uses one shared app-data secret plus per-domain DMKs in the canonical v1 model
 - custom Secure Enclave wrapping is no longer promised as the primary v1 app-data design
 
 ### 3.2 Unlock Lifecycle Authority
@@ -57,9 +57,10 @@ Current Contacts docs still say:
 
 Current app-data docs now say:
 
-- `ProtectedDataSessionCoordinator` owns right authorization timing
+- `ProtectedDataSessionCoordinator` owns shared app-data right authorization timing
 - `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary
-- the domain unlock secret is not released before `LAPersistedRight` authorization succeeds
+- the shared app-data secret is not released before `LAPersistedRight` authorization succeeds
+- one successful app-data authorization covers all app-data domains in the current session
 - startup is split into pre-auth bootstrap and post-auth unlock phases
 
 ### 3.3 Recovery Contract Ownership
@@ -75,6 +76,7 @@ Current app-data docs now define:
 - a shared protected-data recovery taxonomy
 - `import-recoverable`, `resettable-with-confirmation`, and `blocking` domain contracts
 - shared protected-domain recovery coordination
+- a shared app-data gate plus per-domain DMK recovery ladder
 
 ### 3.4 Service-Architecture Ownership
 
@@ -85,6 +87,16 @@ Current Contacts docs still describe Contacts-specific ownership of:
 - startup recovery semantics
 
 Current app-data docs now define those responsibilities as shared protected-data framework concerns, with Contacts intended to become a domain-specific consumer.
+
+### 3.5 Multi-Domain Gate And Session Model
+
+Current Contacts docs still imply a Contacts-specific vault session.
+
+Current app-data docs now say:
+
+- one shared app-data right gates all app-data domains
+- per-domain DMKs are lazy-unwrapped on first access
+- app-data session lifetime follows the shared grace-window model
 
 ## 4. How To Read The Conflict For Now
 
