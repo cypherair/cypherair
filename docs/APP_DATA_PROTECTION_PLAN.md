@@ -6,7 +6,7 @@
 > **Audience:** Engineering, security review, QA, and AI coding tools.  
 > **Companion document:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)  
 > **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
-> **Related documents:** [SECURITY](SECURITY.md) · [ARCHITECTURE](ARCHITECTURE.md) · [TESTING](TESTING.md) · [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md) · [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Related documents:** [SECURITY](SECURITY.md) · [ARCHITECTURE](ARCHITECTURE.md) · [TESTING](TESTING.md) · [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Intent
 
@@ -173,7 +173,9 @@ See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.12 and [APP_
 
 ### 5.2 App-Data Session Lifetime
 
-The shared app-data session follows the current grace-window model, but the grace window has only one owner: `AppSessionOrchestrator`. Shared-right authorization begins on first real protected-domain access and relock/deauthorize must remain fail-closed.
+The shared app-data session follows the current grace-window model, but the grace window has only one owner: `AppSessionOrchestrator`.
+
+`First real protected-domain access` means the first route in the current app session that actually needs protected-domain contents, not process launch by itself. If launch or resume immediately enters such a route, the same orchestrated unlock flow may authorize the shared right there so the user does not encounter a second distinct app-data prompt. Shared-right authorization must still remain fail-closed and must not be triggered merely because process launch or service initialization happened.
 
 See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7.3-7.4, plus [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.2.
 

@@ -6,7 +6,7 @@
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Primary authority:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) for roadmap intent and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture and security constraints.
 > **Companion documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
-> **Related documents:** [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md) · [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md)
+> **Related documents:** [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md)
 
 ## 1. Scope And Relationship
 
@@ -165,9 +165,13 @@ In v1:
 
 - launch/resume first enters `AppSessionOrchestrator`
 - if app session is not active, the orchestrator completes app-level privacy unlock first
-- shared right authorization starts only on first real protected-domain access
+- `first real protected-domain access` means the first route in the current app session that actually needs protected-domain content, not process launch by itself
+- if cold start or resume immediately enters such a route, that same orchestrated flow may authorize the shared right and activate the shared app-data session there
+- shared right authorization does not occur merely because process launch or service initialization happened
 - shared right authorization does not eagerly unwrap every domain DMK
+- launch/resume authentication alone does not imply that the shared app-data session is already active
 - a second or third protected domain in the same active app-data session must not prompt again
+- `ProtectedDataSessionCoordinator` does not own an independent grace timer or second launch/resume UX surface
 - app-data relock and deauthorize occur only on:
   - explicit app lock
   - grace-period expiration
@@ -191,6 +195,18 @@ For any future real protected domain, the implementation plan must treat the fol
 - final framework and domain state classification timing
 
 This is especially important for future Contacts adoption, where cold-start loading and locked-state presentation already exist in the app surface.
+
+### 3.4 Current-State Owner Map
+
+This migration guide documents the handoff points that the future single-owner session model must absorb. It does not redesign the current app.
+
+| Concern | Current shipping owner(s) | Current behavior | Future handoff |
+|------|------------------|--------------|---------------------|
+| Launch authentication on cold start | `PrivacyScreenModifier` + `AuthenticationManager.evaluate(...)` | `onAppear` checks `requireAuthOnLaunch`, presents the privacy unlock prompt, and records success in `AppConfiguration` | Absorb launch sequencing into `AppSessionOrchestrator`, with protected-domain handoff through `ProtectedDataSessionCoordinator` when the initial route requires protected content |
+| Resume authentication after grace expiry | `PrivacyScreenModifier` + `AuthenticationManager.evaluate(...)` | scene-activation and resume routing blur the UI, re-authenticate after expiry, and unblock the app shell on success | Move resume sequencing and re-entry decisions under `AppSessionOrchestrator` |
+| Grace-window timing | `AppConfiguration` | `gracePeriod`, `lastAuthenticationDate`, and `isGracePeriodExpired` currently determine whether re-auth is required | Make `AppSessionOrchestrator` the only grace-window owner |
+| Content clearing on auth boundary | `AppConfiguration` + view observers | grace-expiry re-auth increments `contentClearGeneration` before authentication so decrypted UI state clears | Move relock-driven clearing into framework relock plus `ProtectedDataRelockParticipant` fan-out |
+| Cold-start loading and temp cleanup | `AppStartupCoordinator` | cold start loads keys and Contacts, runs recovery checks, and cleans temporary files before any future protected app-data layer exists | Split startup into pre-auth bootstrap plus post-auth protected-domain unlock; future protected-domain loading must not happen merely from startup initialization |
 
 ## 4. Persisted-State Classification Inventory
 
@@ -237,8 +253,8 @@ Initial classification baseline:
 | `rewrapTargetMode` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain |
 | `modifyExpiryInProgress` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain |
 | `modifyExpiryFingerprint` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain |
-| `Documents/contacts/*.gpg` | App sandbox documents | `remain plaintext with rationale` | n/a in this round | Existing Contacts storage stays outside this round until Contacts docs are revised |
-| `Documents/contacts/contact-metadata.json` | App sandbox documents | `remain plaintext with rationale` | n/a in this round | Existing Contacts metadata stays outside this round until Contacts docs are revised |
+| `Documents/contacts/*.gpg` | App sandbox documents | `remain plaintext with rationale` | n/a in this round | Existing Contacts storage remains plaintext until App Data Phase 4 Contacts adoption begins |
+| `Documents/contacts/contact-metadata.json` | App sandbox documents | `remain plaintext with rationale` | n/a in this round | Existing Contacts metadata remains plaintext until App Data Phase 4 Contacts adoption begins |
 | `Documents/self-test/` | App sandbox documents | `remain plaintext with rationale` | n/a in v1 | Diagnostic output remains outside protected-domain scope |
 | `tmp/decrypted/` | App temporary directory | `remain plaintext with rationale` | n/a in v1 | Ephemeral decrypted previews; explicit cleanup path, not a protected-domain candidate |
 | `tmp/streaming/` | App temporary directory | `remain plaintext with rationale` | n/a in v1 | Ephemeral streaming outputs; explicit cleanup path, not a protected-domain candidate |

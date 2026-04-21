@@ -7,7 +7,7 @@
 > **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific product direction.  
 > **Companion document:** [CONTACTS_TDD](CONTACTS_TDD.md)  
 > **Primary framework references:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)  
-> **Related documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Related documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Product Intent
 
@@ -173,7 +173,10 @@ The Contacts domain follows shared app-data session semantics:
 
 - `AppSessionOrchestrator` owns the app-wide session boundary
 - `ProtectedDataSessionCoordinator` owns shared app-data authorization under that boundary
-- the first real Contacts access in a locked app-data session may trigger shared app-data authorization
+- `first real Contacts access` means the first route in the current app session that actually needs to open Contacts protected-domain contents, not process launch by itself
+- if launch/resume immediately continues into a Contacts-dependent route and the shared app-data session is inactive, that same orchestrated flow may authorize the shared right there
+- completing launch/resume authentication alone does not imply that the shared app-data session is already active
+- when that first Contacts access occurs inside launch/resume routing, the user-facing flow remains one understandable unlock step rather than a later second Contacts-specific prompt
 - ordinary Contacts browsing, search, tag/list management, and recipient selection do not trigger a separate Contacts-specific routine prompt once the app-data session is active
 - a second or third protected domain in the same active app-data session must not trigger another prompt merely because Contacts is opened later
 - Contacts access relocks after app lock, session loss, grace-period expiry, or app exit
@@ -434,7 +437,9 @@ Required preconditions:
 - Phase 2 file-protection baseline is already implemented
 - Phase 3 first low-risk protected domain is already implemented
 
-Once those preconditions are true, migration from legacy plaintext storage is automatic on first launch into the new Contacts architecture.
+Contacts adoption and migration occur on the first Contacts-required protected-domain access into the new Contacts architecture. That access may happen during launch or resume if the initial route immediately needs Contacts data, and the same orchestrated unlock flow may activate the shared app-data session there.
+
+Contacts migration must not be triggered merely because process launch or service initialization happened.
 
 Contacts migration uses the shared framework create/write path. It does not define separate Contacts-specific rules for shared-right provisioning, first-domain creation, or last-domain cleanup.
 
@@ -496,6 +501,7 @@ This initiative is product-complete only if all of the following are true:
 - users can merge contacts explicitly
 - multi-key contacts are understandable in the UI
 - preferred-key behavior is deterministic and user-controllable
+- if launch/resume immediately enters a Contacts-dependent protected route, the same orchestrated unlock flow may activate the shared app-data session without a later second Contacts-specific prompt
 - entering Contacts or Encrypt during an already active protected app-data session does not trigger redundant Contacts-specific authentication prompts
 - grace-period expiry or app lock relocks Contacts access explicitly
 - decrypt does not silently lose signer recognition when the Contacts domain is locked
@@ -538,28 +544,36 @@ This initiative is product-complete only if all of the following are true:
 2. User later imports it on a target installation.
 3. Contact identities, key records, tags, recipient lists, preferred-key state, and verification/certification integration state are restored coherently.
 
-### Scenario E: Use Contacts Within An Active App-Data Session
+### Scenario E: Launch Into Contacts-Protected Access
 
-1. User has already completed app launch or resume authentication.
+1. User cold-launches or resumes the app from a state that requires authentication.
+2. The first route immediately needs Contacts protected-domain data.
+3. `AppSessionOrchestrator` runs the user-visible unlock flow and hands off to shared app-data authorization for that first real Contacts access.
+4. Contacts opens without a later second Contacts-specific prompt.
+5. Later in the same active app-data session, opening recipient selection in `Encrypt` reuses that session.
+
+### Scenario F: Use Contacts Within An Already Active App-Data Session
+
+1. Earlier in the current app session, the user already completed shared app-data authorization by accessing a protected domain.
 2. User opens `Contacts` and later opens recipient selection in `Encrypt`.
-3. The app does not show a second Contacts-specific authentication prompt.
+3. The app does not show another Contacts-specific authentication prompt.
 4. If the grace period later expires, Contacts returns to an explicit locked state.
 
-### Scenario F: Export Contacts Recovery Data
+### Scenario G: Export Contacts Recovery Data
 
-1. User opens the Contacts backup export action during an already unlocked session.
+1. User opens the Contacts backup export action during an already active app-data session.
 2. App requires a fresh authentication before generating the backup.
 3. User enters a backup passphrase.
 4. App produces a passphrase-protected portable recovery artifact and hands it to the system export flow so the user can choose where to save it.
 
-### Scenario G: Contacts Domain Recovery Needed
+### Scenario H: Contacts Domain Recovery Needed
 
 1. App starts and the Contacts domain cannot be opened because the Contacts payload is damaged or the domain-specific wrapped-DMK state is unreadable.
 2. `Contacts` does not appear empty.
 3. The app presents an explicit Contacts `recovery needed` state.
 4. The user is directed toward import-based recovery rather than silent reset.
 
-### Scenario H: Protected App-Data Framework Recovery Blocks Contacts
+### Scenario I: Protected App-Data Framework Recovery Blocks Contacts
 
 1. App starts and the shared protected app-data framework cannot safely determine or use the shared authorization resource.
 2. `Contacts` does not bypass that framework state independently.

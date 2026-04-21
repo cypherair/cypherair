@@ -1,7 +1,7 @@
 # App Data Documentation Review
 
 > Status: Active review snapshot from 2026-04-20. This file records one point-in-time review of the App Data proposal stack against the current repository state.
-> Scope: `APP_DATA_PROTECTION_PLAN.md`, `APP_DATA_PROTECTION_TDD.md`, `APP_DATA_FRAMEWORK_SPEC.md`, `APP_DATA_MIGRATION_GUIDE.md`, and `APP_DATA_VALIDATION.md`, with comparison against `APP_DATA_CONTACTS_ALIGNMENT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TESTING.md`, and current code.
+> Scope: `APP_DATA_PROTECTION_PLAN.md`, `APP_DATA_PROTECTION_TDD.md`, `APP_DATA_FRAMEWORK_SPEC.md`, `APP_DATA_MIGRATION_GUIDE.md`, and `APP_DATA_VALIDATION.md`, with comparison against archived `archive/APP_DATA_CONTACTS_ALIGNMENT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TESTING.md`, and current code.
 > Source priority: Current code and active canonical docs outrank this review snapshot whenever they disagree.
 
 ## Executive Summary
@@ -22,7 +22,7 @@ Non-findings from this pass:
 
 - The proposal stack consistently preserves the private-key domain as a separate authority and does not weaken existing Secure Enclave wrapping semantics.
 - The proposal stack consistently rejects silent reset to empty state for unreadable protected-domain data.
-- `APP_DATA_CONTACTS_ALIGNMENT.md` still reads as a temporary bridge document rather than a third permanent architecture source.
+- archived `APP_DATA_CONTACTS_ALIGNMENT.md` still reads as a temporary bridge document rather than a third permanent architecture source.
 
 ## Source Priority
 
@@ -33,7 +33,7 @@ Primary evidence for this pass:
 - `docs/APP_DATA_FRAMEWORK_SPEC.md`
 - `docs/APP_DATA_MIGRATION_GUIDE.md`
 - `docs/APP_DATA_VALIDATION.md`
-- `docs/APP_DATA_CONTACTS_ALIGNMENT.md`
+- `docs/archive/APP_DATA_CONTACTS_ALIGNMENT.md`
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY.md`
 - `docs/TESTING.md`
@@ -219,7 +219,7 @@ Review rules for this pass:
 | `APP_DATA_FRAMEWORK_SPEC.md` | Concrete execution rules and interface/file breakdown | Mostly consistent | Contains the highest-severity ambiguity because the recovery matrix is not registry-only in practice. |
 | `APP_DATA_MIGRATION_GUIDE.md` | Rollout sequencing, startup adoption, persisted-state inventory | Useful but incomplete | Inventory needs scope correction or explicit exclusions; startup migration would benefit from a current-owner map. |
 | `APP_DATA_VALIDATION.md` | Review matrix and acceptance criteria | Useful but not fully operationalized | Good checklist language, but not yet tied to concrete test-layer ownership. |
-| `APP_DATA_CONTACTS_ALIGNMENT.md` | Temporary bridge over stale Contacts docs | Still temporary, not yet overgrown | Exit criteria and guardrail are clear enough in the current snapshot. |
+| `archive/APP_DATA_CONTACTS_ALIGNMENT.md` | Temporary bridge over stale Contacts docs | Still temporary, not yet overgrown | Exit criteria and guardrail are clear enough in the current snapshot. |
 
 ## Appendix B: Terminology and State Consistency Matrix
 
@@ -233,7 +233,7 @@ Review rules for this pass:
 | domain-scoped `recoveryNeeded` | `APP_DATA_PROTECTION_TDD.md:194-202` | Consistent | Cleanly separated from framework-level recovery. |
 | `LAPersistedRight` shared gate | `APP_DATA_PROTECTION_TDD.md:257-304` | Consistent | Stable across Plan, TDD, Validation, and Alignment. |
 | `ProtectedSettingsStore` first-domain rule | `APP_DATA_PROTECTION_TDD.md:416-433`, `APP_DATA_MIGRATION_GUIDE.md:265-269` | Consistent | The bootstrap-critical whitelist and no-shadow-copy rule are stable. |
-| Contacts as framework consumer | `APP_DATA_PROTECTION_TDD.md:779-792`, `APP_DATA_CONTACTS_ALIGNMENT.md:149-172` | Consistent | Current docs still require a later Contacts rewrite, but the desired destination is clear. |
+| Contacts as framework consumer | `APP_DATA_PROTECTION_TDD.md:779-792`, archived `APP_DATA_CONTACTS_ALIGNMENT.md` | Consistent | The desired destination remains clear even though the bridge document is now archived. |
 
 ## Appendix C: Persisted-State Inventory Validation Table
 

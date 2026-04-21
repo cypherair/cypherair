@@ -6,7 +6,7 @@
 > **Audience:** Engineering, security review, QA, and AI coding tools.  
 > **Companion document:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md)  
 > **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
-> **Related documents:** [SECURITY](SECURITY.md) · [ARCHITECTURE](ARCHITECTURE.md) · [TESTING](TESTING.md) · [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Related documents:** [SECURITY](SECURITY.md) · [ARCHITECTURE](ARCHITECTURE.md) · [TESTING](TESTING.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Technical Scope
 
@@ -371,8 +371,11 @@ Canonical behavior:
 
 - launch/resume enters `AppSessionOrchestrator`
 - if app session is not active, the orchestrator completes app-level privacy unlock first
-- on first real protected-domain access, the orchestrator asks `ProtectedDataSessionCoordinator` to authorize the shared right
+- `first real protected-domain access` means the first route in the current app session that actually needs protected-domain content, not process launch by itself
+- on that first real protected-domain access, the orchestrator asks `ProtectedDataSessionCoordinator` to authorize the shared right
+- if cold start or resume immediately continues into a route that needs protected-domain content while the shared app-data session is inactive, that same orchestrated flow may authorize the shared right and activate the shared app-data session there
 - after shared authorization succeeds, the requested domain DMK may lazy-unlock
+- launch/resume authentication alone does not imply that the shared app-data session is already active
 - ordinary in-session reads and writes reuse the active shared app-data session
 - second or third domains in that same session do not trigger another authorization prompt
 - authorization survives background/inactive transitions while the app remains inside the active grace window
@@ -382,7 +385,7 @@ Canonical behavior:
 
 This model intentionally differs from the private-key domain.
 
-Repeated-prompt avoidance is a required design goal. The v1 proposal must not rely on undocumented prompt coalescing between different authorization systems. Instead, the proposal treats the orchestrator-driven shared right authorization as the only normative app-data unlock contract.
+Repeated-prompt avoidance is a required design goal. The v1 proposal must not rely on undocumented prompt coalescing between different authorization systems. Instead, the proposal treats the orchestrator-driven shared right authorization as the only normative app-data unlock contract, and the user-visible launch/resume flow should remain one understandable unlock path even when its first protected-domain access occurs inside that same orchestrated sequence.
 
 ### 5.7 Recoverable App-Data Semantics
 
@@ -500,6 +503,7 @@ Before app-data authorization succeeds, the app must not:
 
 After app-data authorization succeeds, the app may:
 
+- continue the orchestrated launch/resume flow into shared-right authorization when the initial route immediately requires protected-domain content
 - fetch the shared app-data secret
 - lazy-unlock the requested domain DMK
 - open `current / previous / pending` for that domain
@@ -507,7 +511,7 @@ After app-data authorization succeeds, the app may:
 
 This is a required implementation boundary, not a best-effort guideline.
 
-The current app startup path already performs cold-start loading and recovery work. Future real protected domains must therefore treat this two-phase model as an explicit startup-architecture migration, not as a mere local refactor inside one new service.
+The current app startup path already performs cold-start loading and recovery work. Future real protected domains must therefore treat this two-phase model as an explicit startup-architecture migration, not as a mere local refactor inside one new service. The current owner split that this migration must absorb is documented in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.4.
 
 The rollout sequencing details live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.1.
 
@@ -787,7 +791,7 @@ In practical terms:
 - Contacts owns person/key/tag/list semantics
 - the protected app-data framework owns registry authority, shared-session authority, wrapped-DMK lifecycle, envelope rules, generation recovery, and relock posture
 
-The temporary precedence and rewrite guidance for the existing Contacts docs live in [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md).
+Contacts-specific adoption behavior now lives directly in [CONTACTS_PRD](CONTACTS_PRD.md), [CONTACTS_TDD](CONTACTS_TDD.md), and the rollout sequencing sections of [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md).
 
 ## 10. Migration Rules
 
