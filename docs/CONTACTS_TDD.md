@@ -1,29 +1,37 @@
 # Contacts Technical Design Document (TDD)
 
-> **Version:** Draft v1.0  
-> **Status:** Draft future technical spec. This document does not describe current shipped Contacts implementation.
-> **Purpose:** Technical design for implementing the Contacts enhancement initiative.  
+> **Version:** Draft v1.1  
+> **Status:** Draft future technical spec. This document does not describe current shipped Contacts implementation.  
+> **Purpose:** Technical design for implementing the Contacts enhancement initiative as a Contacts domain on the shared protected app-data framework.  
 > **Audience:** Engineering, QA, and AI coding tools.  
 > **Companion document:** [CONTACTS_PRD](CONTACTS_PRD.md)  
 > **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific technical direction.  
-> **Related document:** [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Primary framework references:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) · [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md)  
+> **Related documents:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Technical Scope
 
-This document defines the implementation design for the Contacts enhancement initiative. It assumes the product direction in [CONTACTS_PRD](CONTACTS_PRD.md) is approved and fixed.
+This document defines the implementation design for the Contacts enhancement initiative. It assumes the product direction in [CONTACTS_PRD](CONTACTS_PRD.md) is approved and fixed, and it assumes the shared protected app-data framework from the `APP_DATA_*` documents already exists before Contacts adoption begins.
 
 This TDD covers:
 
 - person-centered Contacts modeling
-- multi-key contact support
-- contacts vault architecture
-- contacts-vault cryptographic container and vault-key protection
+- Contacts domain payload schema and runtime model
+- shared-framework integration for Contacts domain access
 - search, tags, recipient lists, and merge behavior
 - manual verification and certification integration
 - migration, quarantine, and final legacy deletion
-- contacts vault export/import as a formal recovery path
+- Contacts domain export/import as a formal recovery path
 
-This document does not redesign the separate certification feature. It assumes certification capability exists before Contacts implementation begins and defines how Contacts consumes its results.
+This TDD does not redefine the shared protected app-data framework. The following remain owned by the `APP_DATA_*` documents:
+
+- domain envelope rules
+- wrapped-DMK persistence and transaction behavior
+- `ProtectedDataRegistry` semantics
+- shared session authorization and relock behavior
+- framework-level recovery and `restartRequired`
+
+This document also does not redesign the separate certification feature. It assumes certification capability exists before Contacts implementation begins and defines how Contacts consumes its results.
 
 ## 2. Design Principles
 
@@ -32,12 +40,13 @@ The implementation must satisfy these principles:
 - person-centered contact management
 - offline-only operation
 - no plaintext source of truth for the Contacts domain after migration
-- no plaintext derivative caches persisted outside the encrypted vault
-- session-authenticated contacts access
+- no plaintext derivative caches persisted outside the protected Contacts domain
+- Contacts is a domain-specific consumer of the shared protected app-data framework, not a second security architecture
+- shared-session-authenticated Contacts access rather than Contacts-owned session ownership
 - deterministic behavior for multi-key contacts
 - conservative identity-linking behavior
-- explicit recovery path for user data
-- deterministic crash recovery with no silent reset to an empty vault
+- explicit import-recoverable domain semantics
+- deterministic crash recovery with no silent reset to an empty Contacts domain
 - stable UI dependency through a single `ContactService` facade
 
 ## 3. Domain Model
@@ -289,53 +298,48 @@ Tags are normalized as follows:
 
 Normalization is applied at write time, not only at display time.
 
-## 7. Contacts Vault Architecture
+## 7. Contacts Domain On Protected App-Data Framework
 
-### 7.1 Storage Model
+### 7.1 Domain Storage Model
 
-The Contacts domain source of truth is one encrypted, versioned contacts vault file stored under `Application Support`.
+The Contacts source of truth is one protected app-data domain managed through the shared framework. User-facing product copy may continue to say "Contacts vault," but the technical design uses Contacts protected-domain terminology.
 
-Primary on-disk artifacts:
+Storage ownership is split as follows.
 
-- `contacts.vault` - current authoritative generation
-- `contacts.vault.previous` - previous readable generation retained for rollback
-- `contacts.vault.pending` - transient staging file during write or startup recovery
+Framework-owned storage mechanics:
 
-The vault payload contains:
+- protected-domain directory location
+- `current / previous / pending` generation mechanics
+- encrypted domain envelope rules
+- wrapped-DMK persistence and validation
+- per-domain bootstrap metadata
+- registry membership and lifecycle authority
+
+Contacts-owned domain content:
+
+- canonical Contacts snapshot payload
+- Contacts schema versioning
+- Contacts-specific decode and validation rules
+- no-plaintext-derivative-cache rule for Contacts business data
+
+No plaintext search index, tag cache, recipient-resolution cache, or signer-recognition cache may be persisted outside the encrypted Contacts domain payload.
+
+### 7.2 Canonical Payload
+
+The Contacts domain payload is a single canonical snapshot.
+
+The payload contains:
 
 - `ContactIdentity` records
 - `ContactKeyRecord` records
 - recipient lists
 - normalized tag representations or equivalent
 - certification projection state and reconciliation metadata
-- vault metadata
+- Contacts domain metadata
 
-No plaintext search index, tag cache, recipient-resolution cache, or signer-recognition cache may be persisted outside the encrypted vault payload.
+Contacts owns the snapshot schema. The framework owns how that snapshot is encrypted, staged, promoted, reopened, and recovered on disk.
 
-### 7.2 Cryptographic Container
-
-`contacts.vault` is stored as a versioned envelope.
-
-Required envelope fields:
-
-- vault format version
-- vault-wrap version
-- generation counter
-- random 96-bit nonce
-- ciphertext
-- AEAD authentication tag
-- minimal pre-decryption metadata required for deterministic recovery
-
-Cryptographic requirements:
-
-- encrypt the serialized vault payload with `AES.GCM` using `contactsVaultMasterKey`
-- bind envelope metadata through AEAD associated data
-- any header mismatch, AEAD tag failure, or associated-data mismatch is a hard failure
-- unreadable ciphertext must not produce partial plaintext or partial runtime state
-
-### 7.3 Runtime Model
-
-Runtime state is loaded from the vault after successful contacts-vault unlock.
+### 7.3 Runtime Model And Availability Mapping
 
 The unlocked runtime state contains:
 
@@ -345,113 +349,96 @@ The unlocked runtime state contains:
 - search index
 - contacts-aware signer-recognition lookup cache
 
-`ContactService` exposes three runtime states:
+`ContactService` derives its availability from framework session state plus Contacts domain runtime state. The minimum user-visible distinctions are:
 
-- `locked`
-- `unlocked`
-- `recoveryNeeded`
+- `locked`: the framework is healthy, but the Contacts domain is not currently open in memory
+- `unlocked`: the framework session is authorized and the Contacts domain snapshot is open in memory
+- `recoveryNeeded`: the framework is healthy enough to route domain access, but the Contacts domain itself cannot open a readable authoritative state
+- `frameworkUnavailable`: framework-level blocked state such as `frameworkRecoveryNeeded` or `restartRequired`
 
-`recoveryNeeded` is entered when no readable vault generation can be recovered or the local wrapped master key cannot be unwrapped.
+Contacts must never present `frameworkUnavailable` as an empty dataset or as a Contacts import-recovery screen.
 
-### 7.4 Write And Recovery Model
+### 7.4 Domain Write And Recovery Responsibilities
 
-`ContactsVaultStore` is a single-writer subsystem.
+`ContactsDomainRepository` is the single-writer subsystem for Contacts business data.
 
-Write sequence:
+Write sequence at the Contacts layer:
 
 1. mutate unlocked in-memory model
-2. serialize a canonical vault snapshot
-3. encrypt the payload into a new envelope using the next generation counter and a fresh random nonce
-4. write the envelope to `contacts.vault.pending`
-5. read back `contacts.vault.pending`, decrypt it, and parse it to verify structural readability before promotion
-6. atomically promote the existing `contacts.vault` to `contacts.vault.previous`
-7. atomically promote `contacts.vault.pending` to `contacts.vault`
-8. remove stale pending artifacts only after successful promotion
+2. serialize a canonical Contacts snapshot
+3. hand the snapshot to the shared framework write path
+4. rely on the framework to encrypt, stage, validate, and promote generations according to the shared `current / previous / pending` contract
+5. rebuild in-memory derived state from the committed authoritative snapshot
 
-Startup recovery sequence:
+Startup and recovery boundary:
 
-1. inspect `current`, `previous`, and `pending`
-2. attempt to open each candidate using the local wrapped master key
-3. keep only structurally valid, decryptable generations
-4. select the highest readable generation as authoritative
-5. select the next-highest readable generation, if any, as `previous`
-6. if no readable generation exists or the local wrapped master key cannot be unwrapped, enter `recoveryNeeded`
+1. before app-data authorization, Contacts may consult only framework-readable bootstrap inputs such as registry state and minimal per-domain bootstrap metadata
+2. before app-data authorization, Contacts must not attempt to open domain payload generations
+3. after shared app-data authorization succeeds, the Contacts DMK may lazy-unlock and the framework may select an authoritative readable generation
+4. Contacts then validates schema and business invariants for the selected snapshot
+5. if no readable authoritative Contacts state exists, the Contacts domain enters `recoveryNeeded`
 
-The implementation must never silently create a new empty vault because a previous generation is unreadable.
+Contacts never silently creates a new empty domain because prior local state is unreadable.
 
-## 8. Vault Key And Session Lifecycle
+## 8. Shared Session And Domain Access Lifecycle
 
-### 8.1 Vault Key
+### 8.1 Shared Authorization Dependency
 
-`contactsVaultMasterKey` is a random 256-bit symmetric key.
+Contacts depends on the shared app-data authorization model defined by the framework.
 
-The master key is never stored in plaintext. It is wrapped using a dedicated Secure Enclave wrapping key and a contacts-specific wrapping context.
+Required rules:
 
-Required Keychain namespace:
-
-- `com.cypherair.contacts.v1.vault-se-key`
-- `com.cypherair.contacts.v1.vault-salt`
-- `com.cypherair.contacts.v1.vault-sealed-master-key`
-- `com.cypherair.contacts.v1.vault-metadata`
-
-Required properties:
-
-- `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` for all vault-key Keychain items
-- a contacts-specific wrap version distinct from private-key wrapping
-- a contacts-specific HKDF info string such as `CypherAir-Contacts-Vault-Wrap-v1`
-- device-bound local protection that does not attempt to survive device migration, backup restore, or Secure Enclave loss
-
-This document does not redefine the final certification feature or private-key access-control implementation. It does define the contacts-vault lifecycle:
-
-- session-auth-gated
-- not per-operation gated
-- not rewrapped when private-key authentication mode changes
-- not bound to private-key loss semantics from `Special Security Mode`
+- Contacts uses the framework-owned shared app-data right as the normative session gate
+- Contacts depends on one Contacts domain DMK under that shared gate
+- Contacts never provisions or deletes the shared right or shared secret directly
+- Contacts never decides first-domain provisioning or last-domain cleanup itself
+- Contacts authorization policy does not derive from private-key `AuthenticationMode`
 
 ### 8.2 Unlock Lifecycle
 
-The vault unlocks after successful app launch or resume authentication.
+`AppSessionOrchestrator` is the only app-wide session owner.
 
-`ContactsVaultKeyManager` unwraps `contactsVaultMasterKey` once per authenticated app session by reusing the authenticated context from the launch or resume authentication path. Ordinary Contacts browsing, search, tag/list management, and recipient selection reuse this in-memory session unlock and do not trigger an additional Contacts-specific prompt.
+`ProtectedDataSessionCoordinator` is the only owner of shared app-data authorization.
 
-The vault relocks when:
+Contacts access follows this order:
 
-- app lock occurs
-- session expires
-- grace period expires
-- app exits
+1. the app enters `AppSessionOrchestrator`
+2. if protected-domain access is needed and the shared app-data session is inactive, the orchestrator asks `ProtectedDataSessionCoordinator` to authorize the shared right
+3. after authorization succeeds, the Contacts domain DMK may lazy-unlock through framework-owned key management
+4. `ContactService` opens the Contacts domain snapshot and derived in-memory indexes
 
-Relock invalidates:
+Ordinary Contacts browsing, search, tag/list management, and recipient selection reuse the active shared app-data session and do not trigger a Contacts-specific second prompt.
 
-- in-memory `contactsVaultMasterKey`
-- decrypted vault contents in memory
-- serialization scratch buffers that held plaintext vault bytes
+### 8.3 Relock And Cleanup
+
+Contacts does not own relock policy, but it does own domain-local cleanup obligations.
+
+On relock, Contacts must register a `ProtectedDataRelockParticipant` that clears or zeroizes:
+
+- decrypted Contacts snapshot data in memory
+- serialization scratch buffers that held plaintext snapshot bytes
 - in-memory search indexes
 - contacts-aware signer-recognition lookup state
 
-All sensitive buffers listed above must be zeroized rather than merely dereferenced.
+The framework owns:
 
-### 8.3 Export Authentication Boundary
+- closing new protected-domain access
+- zeroizing the shared secret and unwrapped domain DMKs
+- deauthorizing the shared right
+- latching `restartRequired` on unsafe relock failure
 
-Contacts backup export is treated as a high-risk externalization action.
+If the framework enters `restartRequired`, Contacts must treat that as `frameworkUnavailable` until restart and must not attempt an independent in-process recovery path.
+
+### 8.4 Export Authentication Boundary
+
+Contacts backup export is a high-risk externalization action.
 
 Required behavior:
 
-- export requires an already unlocked Contacts session
+- export requires a currently available and unlocked Contacts domain
 - export requires a fresh authentication immediately before snapshot generation
-- import requires an unlocked app session but does not require a second fresh-auth prompt beyond session unlock
-
-### 8.4 Locked-State And Recovery UX Contract
-
-Locked and unrecoverable vault states are explicit.
-
-Required runtime/UI contract:
-
-- `Contacts` shows a locked state, not an empty state
-- `Encrypt` shows locked recipient state, not an empty recipient list
-- actions that need unlocked Contacts data are blocked or placed into pending state according to product rules
-- `Contacts` shows a `recoveryNeeded` state when the local vault cannot be opened and no readable fallback generation exists
-- `recoveryNeeded` offers import-based recovery guidance rather than silent reset
+- export serializes Contacts business data, not framework artifacts
+- import requires framework availability and an unlocked app session but does not require a routine second prompt beyond session unlock unless a later product decision adds one
 
 ## 9. Decrypt And Verify Integration
 
@@ -462,21 +449,32 @@ Decrypt is split into:
 - core decryption
 - contacts-aware verification enrichment
 
-If the contacts vault is locked:
+If the Contacts domain is locked:
 
 - core plaintext decryption may complete
 - signer recognition and contact-aware verification remain pending
 - UI shows `Unlock Contacts to complete verification`
-- no silent fallback to `unknown signer`
+- there is no silent fallback to `unknown signer`
+
+If the framework is unavailable:
+
+- core decryption behavior remains governed by the decrypt subsystem
+- Contacts enrichment does not bypass framework state
+- the UI must distinguish framework unavailability from ordinary Contacts lock state
 
 ### 9.2 Verify
 
 Independent verify requires full contacts-aware context to complete its intended behavior.
 
-If the contacts vault is locked:
+If the Contacts domain is locked:
 
 - unlock is required before final verify completion
 - if unlock fails or is canceled, verify stops
+
+If the framework is unavailable:
+
+- verify does not route through Contacts domain recovery
+- the UI shows framework-level blocked state
 
 ### 9.3 Signer Recognition Sources
 
@@ -520,13 +518,20 @@ Legacy source:
 
 ### 11.2 Migration Phases
 
-1. Read legacy files
-2. Build new person-centered graph
-3. Create encrypted vault
-4. Validate vault readability
-5. Switch source of truth to new vault
-6. Move legacy plaintext into quarantine state
-7. Delete legacy plaintext only after the next successful vault open
+Contacts migration occurs only after the shared framework prerequisites from App Data Phases 1-3 are already satisfied.
+
+Migration sequence:
+
+1. confirm the shared protected app-data framework, file-protection baseline, and first low-risk domain are already present
+2. read legacy files
+3. build the new person-centered graph and canonical Contacts snapshot
+4. create or write the Contacts domain through the shared framework create/write path
+5. validate target Contacts domain readability through the normal post-auth open path
+6. switch source of truth to the Contacts domain
+7. move legacy plaintext into quarantine state
+8. delete legacy plaintext only after the next successful Contacts domain open
+
+Contacts migration does not directly provision the shared app-data right or secret. It also does not infer first-domain or last-domain lifecycle from Contacts-local state.
 
 ### 11.3 Quarantine
 
@@ -536,23 +541,24 @@ Quarantine requirements:
 - old plaintext is not deleted immediately on first cutover success
 - old plaintext remains available only as a short rollback safety window
 - old plaintext is not loaded into normal search, recipient selection, or Contacts display paths during quarantine
-- final deletion requires one later successful vault-open confirmation
+- final deletion requires one later successful Contacts domain open confirmation
 
 ### 11.4 Interrupted Migration
 
 If migration is interrupted:
 
-- old storage remains authoritative until cutover is proven
+- old storage remains authoritative until Contacts domain cutover is proven
 - quarantine state must be distinguishable from active legacy state
 - later recovery logic must be deterministic and idempotent
+- any framework `pendingMutation` or Contacts domain generation cleanup resumes under the shared framework recovery rules rather than a Contacts-specific parallel mechanism
 
-## 12. Contacts Vault Export / Import
+## 12. Contacts Domain Export / Import
 
 The Contacts subsystem must provide a first-class export/import path.
 
 ### 12.1 Export Package
 
-Export produces a portable recovery artifact rather than a copy of the raw local vault file.
+Export produces a portable recovery artifact rather than a copy of raw local protected-domain files.
 
 Required export envelope fields:
 
@@ -578,15 +584,15 @@ Export encryption requirements:
 - require a user passphrase for every export
 - derive the export encryption key with the app's canonical Argon2id backup profile
 - encrypt the export payload with `AES.GCM`
-- never export the local device-bound wrapped master key or any source-device Secure Enclave wrapping material
+- never export the shared app-data secret, Contacts wrapped-DMK record, `ProtectedDataRegistry` state, source-device authorization state, or other framework-owned recovery artifacts
 
 ### 12.2 Export Flow
 
 Export flow:
 
-1. require a currently unlocked Contacts session
+1. require a currently unlocked Contacts domain inside an available app-data session
 2. require a fresh authentication immediately before export
-3. serialize a canonical contacts snapshot from unlocked runtime state
+3. serialize a canonical Contacts snapshot from unlocked runtime state
 4. derive an export key from the user passphrase using Argon2id
 5. encrypt the snapshot into the versioned export envelope
 6. write a temporary export file for the system file exporter / Share Sheet
@@ -601,38 +607,46 @@ Import flow:
 1. open the portable recovery artifact
 2. validate the encoded Argon2id parameters against the memory guard before key derivation
 3. derive the export key from the user passphrase
-4. decrypt and parse the exported contacts snapshot
-5. generate a brand-new local `contactsVaultMasterKey` on the target installation
-6. wrap the new local master key with the target device's dedicated Secure Enclave wrapping key
-7. write the imported snapshot as a fresh local vault generation
+4. decrypt and parse the exported Contacts snapshot
+5. ask the shared framework to create or write the Contacts domain on the target installation
+6. if the target installation has no protected domains yet, let the framework own any required first-domain provisioning
+7. write the imported snapshot as fresh local Contacts domain state and validate post-auth readability
 
-Import restores vault contents into a new contacts vault on the target device or installation. The source device's local wrapping material is never migrated.
+Import restores Contacts contents into a new or explicitly replaced Contacts domain on the target installation. The source device's local authorization material is never migrated.
 
 ## 13. Service Architecture
 
 The UI continues to depend on a single `ContactService` facade.
 
-Planned subsystem components:
+Planned Contacts-owned components:
 
 - `ContactService`
-- `ContactsVaultStore`
-- `ContactsVaultKeyManager`
+- `ContactsDomainRepository`
 - `ContactsMigrationCoordinator`
 - `ContactsSearchIndex`
 
+Framework-owned dependencies consumed by Contacts:
+
+- `AppSessionOrchestrator`
+- `ProtectedDataSessionCoordinator`
+- `ProtectedDomainKeyManager`
+- `ProtectedDataRegistryStore`
+- `ProtectedDomainRecoveryCoordinator`
+
 Responsibilities:
 
-- `ContactService`: UI-facing state, orchestration, and `locked` / `unlocked` / `recoveryNeeded` runtime state
-- `ContactsVaultStore`: vault-envelope encode/decode, atomic generation promotion, and startup recovery
-- `ContactsVaultKeyManager`: local vault-key creation, Secure Enclave wrapping, session unlock/relock behavior, export fresh-auth enforcement, and memory zeroization
+- `ContactService`: UI-facing state, orchestration, availability mapping from framework state plus Contacts domain state, and user actions
+- `ContactsDomainRepository`: canonical snapshot encode/decode, Contacts schema validation, translation between snapshot and runtime graphs, and delegation into the shared framework storage path
 - `ContactsMigrationCoordinator`: legacy import, quarantine, and final cleanup flow
-- `ContactsSearchIndex`: in-memory search and ranking over unlocked contacts data
+- `ContactsSearchIndex`: in-memory search and ranking over unlocked Contacts data plus relock-time cleanup participation
 
 Minimum supporting internal types:
 
-- `ContactsVaultEnvelopeHeader`
-- `ContactsVaultGeneration`
-- `ContactsVaultRecoveryState`
+- `ContactsDomainSnapshot`
+- `ContactsDomainSchemaVersion`
+- `ContactsAvailability`
+
+Vault-specific infrastructure types such as dedicated vault envelope headers, vault-key managers, or Contacts-owned recovery state machines are not the authoritative design for this round.
 
 ## 14. Validation Matrix
 
@@ -658,34 +672,39 @@ Minimum supporting internal types:
 - certification remains per-key
 - contact detail exposes both layers distinctly
 
-### 14.4 Locked Vault
+### 14.4 Shared Access And Locked State
 
-- locked vault produces explicit `Contacts` locked state
-- locked vault produces explicit `Encrypt` locked state
+- locked Contacts domain produces explicit `Contacts` locked state
+- locked Contacts domain produces explicit `Encrypt` locked recipient state
 - decrypt completes plaintext while verification stays pending
 - verify requires unlock
 - unlock cancel/failure results in hard stop for verify
-- ordinary Contacts use within an already authenticated app session does not trigger redundant prompts
+- ordinary Contacts use within an already active app-data session does not trigger redundant prompts
+- if another protected domain already activated the shared session, opening Contacts does not prompt again
+- framework-level blocked state is surfaced distinctly from Contacts domain recovery
 - export requires fresh authentication and cancellation produces no offline backup file
 
-### 14.5 Vault Integrity And Recovery
+### 14.5 Domain Integrity And Recovery
 
-- incorrect AEAD tag hard-fails
-- incorrect envelope header or associated data hard-fails
-- local wrapped master-key unwrap failure enters `recoveryNeeded`
-- startup recovery from `pending` / `current` / `previous` is deterministic
-- unreadable vault never silently resets to an empty dataset
-- relock zeroizes in-memory search and signer-recognition state
+- unreadable Contacts wrapped-DMK state enters Contacts domain-scoped `recoveryNeeded`
+- unreadable authoritative Contacts payload enters Contacts domain-scoped `recoveryNeeded`
+- shared-resource or registry failure enters framework-level recovery and blocks Contacts
+- startup recovery from framework-managed `pending / current / previous` state is deterministic
+- unreadable Contacts state never silently resets to an empty dataset
+- relock clears Contacts in-memory search and signer-recognition state through relock-participant cleanup
+- `restartRequired` is treated as framework-level blocked state, not as Contacts data loss
 
 ### 14.6 Migration And Recovery
 
-- cutover succeeds
-- quarantine is created
+- Contacts adoption occurs only after App Data Phase 1-3 prerequisites
+- target Contacts domain is validated before legacy source retirement
 - quarantine storage is inactive for normal Contacts resolution
-- final deletion happens only after next successful vault open
+- final deletion happens only after next successful Contacts domain open
 - interrupted migration recovers deterministically
-- export/import restores contacts state coherently
+- export/import restores Contacts state coherently
 - import with wrong passphrase fails gracefully
+- export/import never transports shared secret, wrapped-DMK record, registry state, or source-device authorization state
+- if target-install first-domain provisioning is required during import, the framework owns it
 
 ### 14.7 Search And Tags
 
@@ -699,4 +718,5 @@ This document does not define:
 
 - the internals of the certification feature
 - the final localized UI copy for passphrase education and recovery messaging
+- shared protected app-data framework internals such as registry invariants, wrapped-DMK transactions, shared-right lifecycle, or framework recovery classification
 - implementation details for unrelated canonical documents outside the Contacts initiative
