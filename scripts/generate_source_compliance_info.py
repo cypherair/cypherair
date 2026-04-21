@@ -26,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--marketing-version", required=True)
     parser.add_argument("--build-number", required=True)
     parser.add_argument("--commit-sha", default="")
+    parser.add_argument("--metadata-file", type=Path)
     parser.add_argument("--repository-url", default=DEFAULT_REPOSITORY_URL)
     parser.add_argument("--stable-release-tag", default="")
     parser.add_argument("--stable-release-url", default="")
@@ -61,14 +62,35 @@ def resolve_git_head_commit(repo_root: Path) -> str:
     return completed.stdout.strip()
 
 
+def load_source_compliance_metadata(metadata_file: Path | None) -> dict[str, str]:
+    if metadata_file is None or not metadata_file.exists():
+        return {}
+
+    payload = json.loads(metadata_file.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError("source compliance metadata file must contain a JSON object")
+
+    return {
+        "commit_sha": str(payload.get("commit_sha", "")).strip(),
+        "stable_release_tag": str(payload.get("stable_release_tag", "")).strip(),
+        "stable_release_url": str(payload.get("stable_release_url", "")).strip(),
+    }
+
+
+def resolved_metadata_value(explicit_value: str, metadata_value: str) -> str:
+    return explicit_value.strip() or metadata_value.strip()
+
+
 def resolved_commit_sha(
     explicit_commit_sha: str,
     require_stable_release: bool,
     repo_root: Path = ROOT,
+    metadata_commit_sha: str = "",
 ) -> str:
-    normalized_commit_sha = explicit_commit_sha.strip()
-    if normalized_commit_sha and normalized_commit_sha.lower() != "unknown":
-        return normalized_commit_sha
+    for candidate_commit_sha in (explicit_commit_sha, metadata_commit_sha):
+        normalized_commit_sha = candidate_commit_sha.strip()
+        if normalized_commit_sha and normalized_commit_sha.lower() != "unknown":
+            return normalized_commit_sha
 
     if require_stable_release:
         try:
@@ -104,8 +126,12 @@ def derived_release_tag(marketing_version: str, build_number: str) -> str:
 def generate() -> None:
     args = parse_args()
     stable_release_required = requires_stable_release(args.require_stable_release)
+    metadata_values = load_source_compliance_metadata(args.metadata_file)
 
-    stable_release_tag = args.stable_release_tag.strip()
+    stable_release_tag = resolved_metadata_value(
+        args.stable_release_tag,
+        metadata_values.get("stable_release_tag", ""),
+    )
     if stable_release_required and not stable_release_tag:
         stable_release_tag = derived_release_tag(
             args.marketing_version.strip(),
@@ -115,7 +141,10 @@ def generate() -> None:
     stable_release_url = resolved_release_url(
         args.repository_url.strip(),
         stable_release_tag,
-        args.stable_release_url.strip(),
+        resolved_metadata_value(
+            args.stable_release_url,
+            metadata_values.get("stable_release_url", ""),
+        ),
     )
 
     info = {
@@ -124,6 +153,7 @@ def generate() -> None:
         "commitSHA": resolved_commit_sha(
             args.commit_sha,
             stable_release_required,
+            metadata_commit_sha=metadata_values.get("commit_sha", ""),
         ),
         "stableReleaseTag": stable_release_tag,
         "stableReleaseURL": stable_release_url,

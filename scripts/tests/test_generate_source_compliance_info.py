@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from support import head_sha, init_repo_with_remote, load_script_module
 
@@ -57,6 +59,66 @@ class GenerateSourceComplianceInfoTests(unittest.TestCase):
                     require_stable_release=True,
                     repo_root=non_repo_root,
                 )
+
+    def test_resolved_metadata_value_prefers_explicit_value(self) -> None:
+        self.assertEqual(
+            module.resolved_metadata_value("explicit", "metadata"),
+            "explicit",
+        )
+
+    def test_resolved_metadata_value_falls_back_to_metadata(self) -> None:
+        self.assertEqual(
+            module.resolved_metadata_value("", "metadata"),
+            "metadata",
+        )
+
+    def test_load_source_compliance_metadata_reads_json_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            metadata_path = Path(temp_dir_name) / "metadata.json"
+            metadata_path.write_text(
+                json.dumps(
+                    {
+                        "commit_sha": "abc123",
+                        "stable_release_tag": "cypherair-v1.2.9-build4",
+                        "stable_release_url": "https://github.com/cypherair/cypherair/releases/tag/cypherair-v1.2.9-build4",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                module.load_source_compliance_metadata(metadata_path),
+                {
+                    "commit_sha": "abc123",
+                    "stable_release_tag": "cypherair-v1.2.9-build4",
+                    "stable_release_url": "https://github.com/cypherair/cypherair/releases/tag/cypherair-v1.2.9-build4",
+                },
+            )
+
+    def test_stable_required_build_prefers_explicit_commit_over_metadata(self) -> None:
+        self.assertEqual(
+            module.resolved_commit_sha(
+                "explicit-sha",
+                require_stable_release=True,
+                metadata_commit_sha="metadata-sha",
+            ),
+            "explicit-sha",
+        )
+
+    def test_stable_required_build_prefers_metadata_commit_over_git(self) -> None:
+        with mock.patch.object(
+            module,
+            "resolve_git_head_commit",
+            side_effect=AssertionError("git fallback should not run"),
+        ):
+            self.assertEqual(
+                module.resolved_commit_sha(
+                    "",
+                    require_stable_release=True,
+                    metadata_commit_sha="metadata-sha",
+                ),
+                "metadata-sha",
+            )
 
 
 if __name__ == "__main__":

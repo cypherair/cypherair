@@ -461,6 +461,7 @@
 			inputPaths = (
 				"$(SRCROOT)/scripts/generate_source_compliance_info.py",
 				"$(SRCROOT)/pgp-mobile/Cargo.lock",
+				"$(TARGET_TEMP_DIR)/SourceComplianceOverrides.json",
 			);
 			name = "Generate Source Compliance Info";
 			outputFileListPaths = (
@@ -470,7 +471,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\n\nOUTPUT_PATH=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SourceComplianceInfo.json\"\nmkdir -p \"$(dirname \"$OUTPUT_PATH\")\"\nCOMMIT_SHA=\"${SOURCE_COMPLIANCE_COMMIT_SHA:-}\"\nREQUIRE_STABLE_RELEASE=\"${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}\"\n\npython3 \"${SRCROOT}/scripts/generate_source_compliance_info.py\" \\\n    --cargo-lock \"${SRCROOT}/pgp-mobile/Cargo.lock\" \\\n    --marketing-version \"${MARKETING_VERSION}\" \\\n    --build-number \"${CURRENT_PROJECT_VERSION}\" \\\n    --commit-sha \"${COMMIT_SHA}\" \\\n    --repository-url \"https://github.com/cypherair/cypherair\" \\\n    --stable-release-tag \"${SOURCE_COMPLIANCE_STABLE_RELEASE_TAG:-}\" \\\n    --stable-release-url \"${SOURCE_COMPLIANCE_STABLE_RELEASE_URL:-}\" \\\n    --require-stable-release \"${REQUIRE_STABLE_RELEASE}\" \\\n    --output \"$OUTPUT_PATH\"\n";
+			shellScript = "set -euo pipefail\n\nOUTPUT_PATH=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SourceComplianceInfo.json\"\nMETADATA_FILE=\"${TARGET_TEMP_DIR}/SourceComplianceOverrides.json\"\nmkdir -p \"$(dirname \"$OUTPUT_PATH\")\"\nCOMMIT_SHA=\"${SOURCE_COMPLIANCE_COMMIT_SHA:-}\"\nREQUIRE_STABLE_RELEASE=\"${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}\"\n\nset -- \\\n    --cargo-lock \"${SRCROOT}/pgp-mobile/Cargo.lock\" \\\n    --marketing-version \"${MARKETING_VERSION}\" \\\n    --build-number \"${CURRENT_PROJECT_VERSION}\" \\\n    --commit-sha \"${COMMIT_SHA}\" \\\n    --repository-url \"https://github.com/cypherair/cypherair\" \\\n    --stable-release-tag \"${SOURCE_COMPLIANCE_STABLE_RELEASE_TAG:-}\" \\\n    --stable-release-url \"${SOURCE_COMPLIANCE_STABLE_RELEASE_URL:-}\" \\\n    --require-stable-release \"${REQUIRE_STABLE_RELEASE}\" \\\n    --output \"$OUTPUT_PATH\"\n\nif [ -f \"$METADATA_FILE\" ]; then\n    set -- \"$@\" --metadata-file \"$METADATA_FILE\"\nfi\n\npython3 \"${SRCROOT}/scripts/generate_source_compliance_info.py\" \"$@\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

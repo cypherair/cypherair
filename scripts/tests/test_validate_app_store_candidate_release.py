@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import argparse
+import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from support import create_annotated_stable_tag, init_repo_with_remote, load_script_module, run
+from support import create_annotated_stable_tag, head_sha, init_repo_with_remote, load_script_module, run
 
 
 module = load_script_module(
@@ -148,6 +150,53 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         repository_full_name="cypherair/cypherair",
                         require_stable_release=True,
                     )
+
+    def test_main_writes_candidate_release_metadata_on_success(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            create_annotated_stable_tag(repo_root, build_number="4")
+            output_path = Path(temp_dir_name) / "SourceComplianceOverrides.json"
+            args = argparse.Namespace(
+                repo_root=repo_root,
+                marketing_version="1.2.9",
+                build_number="4",
+                github_repository="cypherair/cypherair",
+                output_metadata_file=output_path,
+                require_stable_release="YES",
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args):
+                with mock.patch.object(module, "stable_release_exists", return_value=True):
+                    module.main()
+
+            self.assertEqual(
+                json.loads(output_path.read_text(encoding="utf-8")),
+                {
+                    "commit_sha": head_sha(repo_root),
+                    "stable_release_tag": "cypherair-v1.2.9-build4",
+                    "stable_release_url": "https://github.com/cypherair/cypherair/releases/tag/cypherair-v1.2.9-build4",
+                },
+            )
+
+    def test_main_does_not_write_metadata_when_validation_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            run(["git", "checkout", "-b", "feature"], cwd=repo_root)
+            output_path = Path(temp_dir_name) / "SourceComplianceOverrides.json"
+            args = argparse.Namespace(
+                repo_root=repo_root,
+                marketing_version="1.2.9",
+                build_number="4",
+                github_repository="cypherair/cypherair",
+                output_metadata_file=output_path,
+                require_stable_release="YES",
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args):
+                with self.assertRaises(SystemExit):
+                    module.main()
+
+            self.assertFalse(output_path.exists())
 
 
 if __name__ == "__main__":

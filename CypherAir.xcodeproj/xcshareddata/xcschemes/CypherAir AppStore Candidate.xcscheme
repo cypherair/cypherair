@@ -27,7 +27,7 @@
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
                title = "Validate App Store Candidate Release"
-               scriptText = "set -euo pipefail&#10;&#10;python3 &quot;${SRCROOT}/scripts/validate_app_store_candidate_release.py&quot; \&#10;    --repo-root &quot;${SRCROOT}&quot; \&#10;    --marketing-version &quot;${MARKETING_VERSION}&quot; \&#10;    --build-number &quot;${CURRENT_PROJECT_VERSION}&quot; \&#10;    --github-repository &quot;cypherair/cypherair&quot; \&#10;    --require-stable-release &quot;${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}&quot;&#10;">
+               scriptText = "set -euo pipefail&#10;&#10;METADATA_FILE=&quot;${TARGET_TEMP_DIR}/SourceComplianceOverrides.json&quot;&#10;mkdir -p &quot;${TARGET_TEMP_DIR}&quot;&#10;&#10;python3 &quot;${SRCROOT}/scripts/validate_app_store_candidate_release.py&quot; \&#10;    --repo-root &quot;${SRCROOT}&quot; \&#10;    --marketing-version &quot;${MARKETING_VERSION}&quot; \&#10;    --build-number &quot;${CURRENT_PROJECT_VERSION}&quot; \&#10;    --github-repository &quot;cypherair/cypherair&quot; \&#10;    --require-stable-release &quot;${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}&quot; \&#10;    --output-metadata-file &quot;${METADATA_FILE}&quot;&#10;">
                <EnvironmentBuildable>
                   <BuildableReference
                      BuildableIdentifier = "primary"
