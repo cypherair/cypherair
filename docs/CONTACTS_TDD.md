@@ -2,6 +2,7 @@
 
 > **Version:** Draft v1.1  
 > **Status:** Draft future technical spec. This document does not describe current shipped Contacts implementation.  
+> **Implementation note:** For this initiative, use this proposal document and its linked app-data / Contacts proposal companions as the primary implementation reference. Canonical current-state docs such as [SECURITY](SECURITY.md), [ARCHITECTURE](ARCHITECTURE.md), and [TESTING](TESTING.md) may temporarily lag and will be updated after implementation maturity.  
 > **Purpose:** Technical design for implementing the Contacts enhancement initiative as a Contacts domain on the shared protected app-data framework.  
 > **Audience:** Engineering, QA, and AI coding tools.  
 > **Companion document:** [CONTACTS_PRD](CONTACTS_PRD.md)  

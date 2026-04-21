@@ -2,6 +2,7 @@
 
 > **Version:** Draft v1.0  
 > **Status:** Draft future technical spec. This document does not describe current shipped behavior.  
+> **Implementation note:** For this initiative, use this proposal document and its linked app-data / Contacts proposal companions as the primary implementation reference. Canonical current-state docs such as [SECURITY](SECURITY.md), [ARCHITECTURE](ARCHITECTURE.md), and [TESTING](TESTING.md) may temporarily lag and will be updated after implementation maturity.  
 > **Purpose:** Define the reusable technical substrate for protected app-owned persistent data outside the existing private-key domain.  
 > **Audience:** Engineering, security review, QA, and AI coding tools.  
 > **Companion document:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md)  
