@@ -66,7 +66,10 @@ This document is a downstream review aid. It does not change the architecture or
 
 - iOS / iPadOS / visionOS protected-domain files are created with explicit `complete` file protection
 - `ProtectedDataRegistry` follows the same explicit file-protection rule
-- macOS protected-domain files live inside the app sandbox/container and use the strongest platform-supported local static protection defined by the implementation
+- macOS protected-domain files live inside the app's sandbox/container `Application Support` area and use the strongest platform-supported local static protection defined by the implementation
+- on macOS, `ProtectedDataRegistry` and bootstrap metadata stay inside the same app-owned container boundary
+- on macOS, protected-domain payloads are not stored in user-managed document locations by default
+- macOS validation verifies containment, ownership, and absence of fallback to broader storage locations
 - bootstrap metadata and temporary scratch files follow the same platform-specific protection policy as their host platform
 
 ### 2.5 Zeroization
@@ -134,7 +137,7 @@ Any implementation derived from this proposal should be reviewable against these
 - does it define fail-closed relock semantics and `restartRequired` clearly?
 - does it keep bootstrap metadata minimal and non-sensitive?
 - does it harden file protection explicitly instead of relying on platform defaults?
-- does it classify all existing persisted app-owned state into a reviewed target class and migration-readiness state?
+- does it classify all existing persisted app-owned state in app-data migration scope into a reviewed target class and migration-readiness state, while recording reviewed private-key-domain exclusions explicitly?
 - does it make Contacts a consumer of the framework rather than the owner of a separate architecture?
 - does it keep anti-rollback explicitly out of scope in v1 rather than implying freshness guarantees?
 

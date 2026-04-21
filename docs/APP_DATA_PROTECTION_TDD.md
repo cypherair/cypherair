@@ -808,7 +808,7 @@ The phased rollout, startup adoption sequencing, inventory table, and first-doma
 
 ### 10.1 Persisted-State Classification Inventory
 
-Implementation planning must maintain one reviewed inventory of currently persisted app-owned state, with each item tracked by target class and migration readiness.
+Implementation planning must maintain one reviewed inventory of currently persisted app-owned state in app-data migration scope, with each item tracked by target class and migration readiness and with reviewed private-key-domain exclusions called out explicitly.
 
 The full inventory baseline and first-domain adoption rules live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 4-5.
 

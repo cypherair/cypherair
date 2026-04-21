@@ -181,7 +181,7 @@ See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7
 
 ### 5.3 Persistent-State Classification Inventory
 
-Before any real protected domain lands, implementation planning must maintain a complete inventory of persisted app-owned state, with target class and migration readiness tracked explicitly.
+Before any real protected domain lands, implementation planning must maintain a complete inventory of persisted app-owned state in app-data migration scope, with target class and migration readiness tracked explicitly and with reviewed private-key-domain exclusions called out explicitly.
 
 The detailed inventory table and first-domain readiness rules live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 4-5.
 

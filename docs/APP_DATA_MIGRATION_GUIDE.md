@@ -210,9 +210,11 @@ This migration guide documents the handoff points that the future single-owner s
 
 ## 4. Persisted-State Classification Inventory
 
-Before any real protected domain lands, implementation planning must maintain a complete inventory of currently persisted app-owned state.
+Before any real protected domain lands, implementation planning must maintain a complete inventory of currently persisted app-owned state in app-data migration scope.
 
-Each persisted item must have:
+This inventory does not authorize migration of the existing private-key domain. Keychain-backed private-key-domain persisted surfaces must still be reviewed explicitly so they are not mistaken for omissions, but they remain excluded from app-data target classification in this guide.
+
+Each in-scope persisted item must have:
 
 - a `target class`
 - a `migration readiness`
@@ -223,7 +225,7 @@ Allowed target classes:
 - `protected-after-unlock`
 - `remain plaintext with rationale`
 
-At minimum this inventory must include:
+At minimum this in-scope inventory must include:
 
 - current `AppConfiguration` keys
 - auth and recovery flags currently stored in `UserDefaults`
@@ -260,6 +262,16 @@ Initial classification baseline:
 | `tmp/streaming/` | App temporary directory | `remain plaintext with rationale` | n/a in v1 | Ephemeral streaming outputs; explicit cleanup path, not a protected-domain candidate |
 | `ProtectedDataRegistry` | App-owned bootstrap manifest | `early-readable` | framework prerequisite | Bootstrap authority for membership and shared-resource lifecycle |
 | future per-domain bootstrap metadata | App-owned bootstrap files | `early-readable` | domain-specific | Read before app-data authorization by design |
+
+### 4.1 Reviewed-But-Excluded Private-Key-Domain Persisted Surfaces
+
+The following currently persisted surfaces are reviewed explicitly for scope control, but they are not app-data migration targets in this guide because the private-key domain remains semantically unchanged:
+
+- Keychain metadata items storing `PGPKeyIdentity` JSON for cold-launch key enumeration
+- permanent SE-wrapped private-key bundles
+- pending SE-wrapped private-key bundles used during mode-switch and modify-expiry recovery
+
+These exclusions are narrower than the `remain plaintext with rationale` rows in the baseline table above. Startup-relevant UserDefaults flags remain classified in the baseline because they are app-owned preference and recovery surfaces, even when they intentionally stay outside protected app-data domains in v1.
 
 ## 5. Domain Migration Rules
 
