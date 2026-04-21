@@ -827,7 +827,9 @@ Required triggers:
 - registry rows that cannot be classified by the documented consistency matrix
 - committed membership that expects `ready`, but the shared persisted right is missing
 - committed membership that expects `ready`, but shared-right-protected secret data is unreadable or missing
-- indeterminate shared-resource cleanup state after allowed evidence inspection
+- a row already classified to the shared-resource cleanup path (`0 / cleanupPending / deleteDomain(..., membershipRemoved or sharedResourceCleanupStarted)`) remains indeterminate after its matrix-authorized cleanup evidence is inspected
+
+This trigger does not apply to the empty steady-state row (`0 / absent / none / n/a`): that row may still run post-classification orphan `cleanupOnly`, but its final recovery disposition remains `resumeSteadyState`.
 
 Required behavior:
 
