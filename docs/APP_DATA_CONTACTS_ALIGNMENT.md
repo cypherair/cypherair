@@ -45,60 +45,83 @@ Current Contacts docs still say:
 
 Current app-data docs now say:
 
-- app-data domains use `LAPersistedRight` as the primary authorization gate in v1
-- the `Domain Master Key` is the right-protected secret itself in the canonical v1 model
+- app-data uses one shared `LAPersistedRight` as the primary authorization gate in v1
+- app-data uses one shared app-data secret plus per-domain wrapped DMKs in the canonical v1 model
 - custom Secure Enclave wrapping is no longer promised as the primary v1 app-data design
 
-### 3.2 Unlock Lifecycle Authority
+### 3.2 Session Ownership And Unlock Authority
 
 Current Contacts docs still say:
 
 - `ContactsVaultKeyManager` unwraps the master key once per authenticated app session by reusing launch/resume authentication context
+- Contacts effectively owns its own vault session boundary
 
 Current app-data docs now say:
 
-- `ProtectedDataSessionCoordinator` owns right authorization timing
-- `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary
-- the domain unlock secret is not released before `LAPersistedRight` authorization succeeds
-- startup is split into pre-auth bootstrap and post-auth unlock phases
+- `AppSessionOrchestrator` is the app-wide session owner
+- `ProtectedDataSessionCoordinator` is the app-data subsystem coordinator under that owner
+- `LAPersistedRight.authorize(...)` remains the single normative app-data authorization boundary
+- the shared app-data secret is not released before shared-right authorization succeeds
+- Contacts is expected to live under `AppSessionOrchestrator` -> `ProtectedDataSessionCoordinator` -> Contacts domain
 
-### 3.3 Recovery Contract Ownership
+### 3.3 Shared Gate And Multi-Domain Session Model
+
+Current Contacts docs still imply a Contacts-specific vault session and Contacts-specific relock ownership.
+
+Current app-data docs now say:
+
+- one shared app-data right gates all protected domains
+- per-domain DMKs are lazy-unwrapped on first access
+- one successful app-data authorization covers all protected domains in the active app-data session
+- a second or third protected domain does not trigger another prompt in that same session
+
+### 3.4 Lifecycle Authority And Recovery Ownership
+
+Current Contacts docs still imply that Contacts-vault files and vault-key state are sufficient to determine Contacts lifecycle and recovery.
+
+Current app-data docs now say:
+
+- `ProtectedDataRegistry` is the sole authority for committed domain membership and shared-resource lifecycle
+- filesystem artifacts are recovery evidence, not the normal authority
+- framework-level recovery and domain-scoped recovery are separate layers
+- Contacts is a domain-specific consumer with its own recovery contract, not the owner of framework session or lifecycle authority
+
+### 3.5 Recovery Contract Ownership
 
 Current Contacts docs define:
 
 - Contacts-specific `recoveryNeeded`
 - import-based recovery guidance
-- Contacts-specific vault key failure language
+- Contacts-specific vault-key failure language
 
 Current app-data docs now define:
 
 - a shared protected-data recovery taxonomy
+- `frameworkRecoveryNeeded` for shared-resource failure
+- domain-scoped `recoveryNeeded` for wrapped-DMK or payload failure
 - `import-recoverable`, `resettable-with-confirmation`, and `blocking` domain contracts
-- shared protected-domain recovery coordination
-
-### 3.4 Service-Architecture Ownership
-
-Current Contacts docs still describe Contacts-specific ownership of:
-
-- vault-key lifecycle
-- unlock and relock behavior
-- startup recovery semantics
-
-Current app-data docs now define those responsibilities as shared protected-data framework concerns, with Contacts intended to become a domain-specific consumer.
 
 ## 4. How To Read The Conflict For Now
 
 Until the Contacts docs are updated:
 
 - keep all Contacts product behavior assumptions that do **not** conflict with the app-data framework
-- treat Contacts-specific storage, vault-key, unlock, and recovery implementation details as stale where they contradict the newer app-data proposal
+- treat Contacts-specific storage, vault-key, session, lifecycle, and recovery implementation details as stale where they contradict the newer app-data proposal
 
 In practice, the newer app-data proposal should be treated as the future architectural source of truth for:
 
 - protected-domain authorization boundary
+- shared session ownership
+- registry authority
 - startup authentication split
 - shared recovery taxonomy
 - first-party protected-domain ownership boundaries
+
+The following Contacts assumptions remain compatible unless a later rewrite explicitly changes them:
+
+- Contacts may still use one encrypted Contacts payload as its domain storage choice
+- Contacts remains `import-recoverable`
+- no plaintext derivative caches or indexes may persist outside the protected Contacts domain
 
 ## 5. Contacts Sections That Must Be Rewritten Next Round
 
@@ -106,11 +129,10 @@ The next documentation round must revise these areas in the Contacts docs:
 
 ### In `CONTACTS_PRD.md`
 
-- storage model
-- vault-key protection language
-- authentication position
-- recovery position
-- failure position where it depends on older vault-key assumptions
+- storage model where it assumes Contacts-specific vault-key protection
+- authentication position where it assumes a Contacts-owned session boundary
+- recovery position where it assumes Contacts-owned lifecycle authority
+- failure position where it assumes Contacts-vault artifacts are sufficient to classify all recovery state
 
 ### In `CONTACTS_TDD.md`
 
@@ -118,7 +140,8 @@ The next documentation round must revise these areas in the Contacts docs:
 - unlock lifecycle
 - startup recovery model where it assumes Contacts-specific key-unlock ownership
 - service architecture ownership
-- validation matrix entries that assume the older Contacts-specific vault-key model
+- lifecycle authority where it assumes no shared registry
+- validation matrix entries that assume the older Contacts-specific vault-key and session model
 
 ## 6. Exit Criteria For Archiving This Document
 
