@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -27,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--marketing-version", required=True)
     parser.add_argument("--build-number", required=True)
     parser.add_argument("--github-repository", default=DEFAULT_REPOSITORY)
+    parser.add_argument("--output-metadata-file", type=Path)
     parser.add_argument(
         "--require-stable-release",
         default=os.environ.get("SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE", "NO"),
@@ -40,6 +42,26 @@ def requires_stable_release(raw_value: str) -> bool:
 
 def derived_release_tag(marketing_version: str, build_number: str) -> str:
     return f"cypherair-v{marketing_version}-build{build_number}"
+
+
+def stable_release_url(repository_full_name: str, release_tag: str) -> str:
+    return f"https://github.com/{repository_full_name}/releases/tag/{release_tag}"
+
+
+def write_candidate_release_metadata(
+    output_path: Path,
+    *,
+    commit_sha: str,
+    repository_full_name: str,
+    release_tag: str,
+) -> None:
+    payload = {
+        "commit_sha": commit_sha,
+        "stable_release_tag": release_tag,
+        "stable_release_url": stable_release_url(repository_full_name, release_tag),
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def run_git(repo_root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -193,14 +215,23 @@ def validate_candidate_release(
 
 def main() -> None:
     args = parse_args()
+    repo_root = args.repo_root.resolve()
+    stable_release_required = requires_stable_release(args.require_stable_release)
     try:
-        validate_candidate_release(
-            repo_root=args.repo_root.resolve(),
+        release_tag = validate_candidate_release(
+            repo_root=repo_root,
             marketing_version=args.marketing_version,
             build_number=args.build_number,
             repository_full_name=args.github_repository,
-            require_stable_release=requires_stable_release(args.require_stable_release),
+            require_stable_release=stable_release_required,
         )
+        if stable_release_required and args.output_metadata_file is not None:
+            write_candidate_release_metadata(
+                args.output_metadata_file,
+                commit_sha=head_commit_sha(repo_root),
+                repository_full_name=args.github_repository,
+                release_tag=release_tag,
+            )
     except CandidateValidationError as error:
         print(f"error: {error}", file=sys.stderr)
         sys.exit(1)
