@@ -5,23 +5,30 @@
 > **Purpose:** Define the reusable technical substrate for protected app-owned persistent data outside the existing private-key domain.  
 > **Audience:** Engineering, security review, QA, and AI coding tools.  
 > **Companion document:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md)  
+> **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
 > **Related documents:** [SECURITY](SECURITY.md) · [ARCHITECTURE](ARCHITECTURE.md) · [TESTING](TESTING.md) · [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Technical Scope
 
 This document defines the reusable framework for protecting app-owned persistent data at rest while keeping the existing private-key architecture separate.
 
-This TDD covers:
+This TDD is the primary app-data technical source for:
 
 - shared terminology for protected app-data domains
-- shared app-data session and relock behavior
+- architecture boundaries between app-data protection and the private-key domain
+- shared session and relock behavior
 - domain master key lifecycle
-- protected-domain storage, membership, and recovery model
+- protected-domain storage roles and recovery boundaries
 - explicit file-protection posture for protected-domain files
-- initial framework interfaces for future implementation
-- migration rules for moving plaintext or non-uniform state into protected domains
+- framework-level and domain-level recovery contracts
 
-This TDD does **not** redesign the current private-key system.
+The detailed framework mechanics, migration sequencing, and validation checklists live in:
+
+- [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md)
+- [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md)
+- [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
+
+This TDD does not redesign the current private-key system.
 
 ## 2. Non-Goals
 
@@ -284,11 +291,11 @@ Required rules:
 
 - app-data domains use one shared `LAPersistedRight` as the primary app-data authorization gate in v1
 - the shared app-data right uses `LAAuthenticationRequirement.default`
-- app-data authorization must **not** call `AuthenticationMode.createAccessControl()`
-- app-data authorization must **not** call `AuthenticationManager.createAccessControl(for:)`
-- app-data authorization must **not** derive from the private-key authentication mode
-- app-data domains must **not** inherit current `Standard` / `High Security` semantics
-- app-data domains must **not** inherit future `Special Security Mode` or `biometryCurrentSet` semantics
+- app-data authorization must not call `AuthenticationMode.createAccessControl()`
+- app-data authorization must not call `AuthenticationManager.createAccessControl(for:)`
+- app-data authorization must not derive from the private-key authentication mode
+- app-data domains must not inherit current `Standard` / `High Security` semantics
+- app-data domains must not inherit future `Special Security Mode` or `biometryCurrentSet` semantics
 - per-domain authorization-policy variation is out of scope in v1
 - per-domain right authorization is out of scope in v1
 - protected app-data domains must never rewrap merely because private-key auth mode changes
@@ -322,6 +329,8 @@ Recovery rules:
 - on-disk artifacts are evidence for repair, quarantine, or cleanup
 - no implementation may infer "last domain removed" from filesystem state alone
 - any registry row that violates the documented consistency invariants enters `frameworkRecoveryNeeded`
+
+The detailed registry manifest, invariants, transaction rules, and consistency matrix live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 2.1-2.6.
 
 ### 5.5 AppSessionOrchestrator And ProtectedDataSessionCoordinator
 
@@ -393,9 +402,9 @@ Stated differently:
 
 The framework separates:
 
-- **system authorization** of the shared app-data secret
-- **app-wide session orchestration** owned by `AppSessionOrchestrator`
-- **per-domain DMK unwrap and payload access** after shared authorization
+- system authorization of the shared app-data secret
+- app-wide session orchestration owned by `AppSessionOrchestrator`
+- per-domain DMK unwrap and payload access after shared authorization
 
 This separation is required so:
 
@@ -421,6 +430,8 @@ Rules:
 - protected settings must not rely on a shadow copy to recreate early boot behavior
 - any future migration of a bootstrap-critical setting requires a separately documented two-phase startup design
 
+The detailed rollout and inventory handling for these settings live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 2.3, 3.1, and 4.
+
 ### 5.10 Deterministic Registry Recovery Model
 
 Framework recovery begins from a registry row, not from filesystem inference.
@@ -438,6 +449,8 @@ Allowed framework recovery dispositions:
 - `continuePendingMutation`
 - `cleanupOnly`
 - `frameworkRecoveryNeeded`
+
+The detailed matrix and evidence ordering rules live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 2.2-2.6.
 
 ### 5.11 Recovery Evidence Ordering
 
@@ -460,6 +473,8 @@ Evidence must not:
 - substitute for a committed shared-resource promise
 - turn an uncommitted domain into a committed member
 
+The operational details live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Section 2.6.
+
 ### 5.12 Startup Authentication Boundary
 
 Protected app-data domains must follow a two-phase startup model.
@@ -473,7 +488,7 @@ Before app-data authorization succeeds, the app may:
 - read file-side per-domain bootstrap metadata
 - determine whether protected domains exist and require later unlock
 
-Before app-data authorization succeeds, the app must **not**:
+Before app-data authorization succeeds, the app must not:
 
 - fetch `LASecret`
 - authorize the shared app-data right implicitly from a repository/service initializer or getter
@@ -493,6 +508,8 @@ After app-data authorization succeeds, the app may:
 This is a required implementation boundary, not a best-effort guideline.
 
 The current app startup path already performs cold-start loading and recovery work. Future real protected domains must therefore treat this two-phase model as an explicit startup-architecture migration, not as a mere local refactor inside one new service.
+
+The rollout sequencing details live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.1.
 
 ## 6. Storage Model
 
@@ -534,149 +551,29 @@ Any domain that wants to deviate from this default must document the reason expl
 
 ### 6.3 Generations And Domain Recovery
 
-Protected domains use deterministic generation handling modeled after the future Contacts direction.
+Protected domains use a `current / previous / pending` generation model to preserve deterministic crash consistency and explicit domain recovery behavior.
 
-Minimum generation set:
+This section establishes the high-level guarantees:
 
-- `current`
-- `previous`
-- `pending`
+- writes validate a new generation before promotion
+- recovery selects an authoritative readable generation after authorization
+- unreadable local state must lead to domain-scoped `recoveryNeeded`, not a silent reset
+- the generation model does not imply anti-rollback or freshness guarantees in v1
 
-Write sequence:
-
-1. mutate unlocked in-memory model
-2. serialize canonical plaintext payload
-3. encrypt into a fresh `pending` envelope
-4. write `pending`
-5. read back and validate `pending`
-6. promote `current` to `previous`
-7. promote `pending` to `current`
-8. clean up stale artifacts only after successful promotion
-
-Startup recovery sequence for one domain:
-
-1. inspect available generations
-2. after authorization, attempt to open candidates using the unwrapped domain DMK
-3. keep only structurally valid, decryptable generations
-4. select the highest valid generation as authoritative
-5. retain the next-highest valid generation as `previous` when present
-6. enter domain-scoped `recoveryNeeded` if no readable authoritative generation exists
-
-The framework must never silently create a new empty domain because prior local state is unreadable.
-
-The generation model in v1 provides crash consistency only. It does **not** provide freshness or anti-rollback guarantees.
+The detailed write sequence, promotion order, and domain recovery flow live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Section 3.1.
 
 ### 6.4 ProtectedDataRegistry Manifest
 
 `ProtectedDataRegistry` is a plaintext bootstrap artifact with explicit local file protection.
 
-Required manifest concepts:
+This TDD keeps the normative roles:
 
-- registry format version
-- shared-resource record
-  - shared right identifier
-  - `SharedResourceLifecycleState`
-- committed domain membership map
-  - `domainID`
-  - committed domain state (`active` or `recoveryNeeded`)
-  - domain directory location
-  - wrapped-DMK record presence/version
-  - domain recovery contract category
-- optional `pendingMutation`
-  - mutation ID
-  - tagged union payload (`createDomain` or `deleteDomain`)
-  - target domain
-  - phase enum
+- the registry is authoritative for committed domain membership and shared-resource lifecycle
+- registry shape must support committed membership, shared-resource state, and optional `pendingMutation`
+- recovery begins from the registry row before filesystem evidence is consulted
+- rows that violate the documented consistency rules enter `frameworkRecoveryNeeded`
 
-The registry is authoritative even when on-disk artifacts disagree.
-
-#### 6.4.1 Registry Consistency Invariants
-
-The registry row must satisfy all of the following:
-
-- if committed membership is empty and there is no pending delete cleanup, shared-resource lifecycle state is `absent`
-- if committed membership is non-empty, shared-resource lifecycle state is `ready`
-- `cleanupPending` appears only when committed membership is empty
-- if `pendingMutation` is absent, no execution phase is present
-- for `createDomain` phases before `membershipCommitted`, the target domain is absent from committed membership and shared-resource lifecycle state remains `absent`
-- for `createDomain`, the target domain is absent from committed membership until phase `membershipCommitted`
-- for `createDomain` phase `membershipCommitted`, the target domain is present in committed membership and shared-resource lifecycle state is `ready`
-- for `deleteDomain`, the target domain remains present in committed membership until phase `membershipRemoved`
-- for `deleteDomain` phase `membershipRemoved`, the target domain is absent from committed membership
-- if `deleteDomain` phase is `membershipRemoved` or `sharedResourceCleanupStarted` and committed membership is empty, shared-resource lifecycle state is `cleanupPending`
-- committed membership never stores transient `creating` or `deleting` values
-- at most one `pendingMutation` may exist at a time
-
-Any registry row that violates these invariants is classified as `frameworkRecoveryNeeded`.
-
-#### 6.4.2 Registry-Backed Create Transaction
-
-Domain creation must follow this order:
-
-1. read and lock `ProtectedDataRegistry`
-2. write `pendingMutation = createDomain(targetDomainID, journaled)`
-3. if the mutation stages the first committed protected domain, provision the shared right/secret and advance the phase to `sharedResourceProvisioned`
-4. create the domain directory, staged wrapped-DMK state, and initial payload generation, then advance the phase to `artifactsStaged`
-5. validate wrapped-DMK state and initial payload readability, then advance the phase to `validated`
-6. commit the target domain into membership and, when this is the first committed domain, commit shared-resource lifecycle state to `ready` in the same registry write; advance the phase to `membershipCommitted`
-7. clear `pendingMutation`
-
-If the create operation is not staging the first committed domain, step 3 is skipped and shared-resource lifecycle state remains `ready`.
-
-The target domain is not a committed member until step 6 succeeds.
-
-#### 6.4.3 Registry-Backed Delete Transaction
-
-Domain deletion must follow this order:
-
-1. read and lock `ProtectedDataRegistry`
-2. write `pendingMutation = deleteDomain(targetDomainID, journaled)`
-3. delete the target domain payloads, per-domain bootstrap metadata, and wrapped-DMK state, then advance the phase to `artifactsDeleted`
-4. remove the target domain from committed membership and, when that removal empties membership, commit shared-resource lifecycle state to `cleanupPending` in the same registry write; advance the phase to `membershipRemoved`
-5. if shared-resource lifecycle state is `cleanupPending`, begin shared-resource cleanup and advance the phase to `sharedResourceCleanupStarted`
-6. if shared-resource cleanup was required, commit shared-resource lifecycle state back to `absent` and clear `pendingMutation` in the same registry write
-7. if shared-resource cleanup was not required, clear `pendingMutation`
-
-If committed membership remains non-empty after step 4, steps 5 and 6 are skipped and shared-resource lifecycle state remains `ready`.
-
-The "last domain removed" decision happens only after step 4 commits successfully.
-
-#### 6.4.4 Registry Consistency Matrix
-
-Startup recovery must classify the registry row through this matrix before it inspects external evidence.
-
-| Committed membership | Shared-resource state | Pending mutation | Target relation | Allowed external evidence | Recovery disposition |
-|----------------------|-----------------------|------------------|-----------------|---------------------------|----------------------|
-| `0` | `absent` | none | n/a | none required | `resumeSteadyState` |
-| `0` | `absent` | none | n/a | orphan shared-resource evidence only | `cleanupOnly` |
-| `>0` | `ready` | none | n/a | committed domain directories, wrapped-DMK records, and generations for committed members | `resumeSteadyState` |
-| `0` | `absent` | `createDomain(..., journaled)` | target absent from membership | staged domain artifacts may be absent or partial; no committed shared-resource promise exists yet | `continuePendingMutation` |
-| `0` | `absent` | `createDomain(..., sharedResourceProvisioned or artifactsStaged or validated)` | target absent from membership | staged domain artifacts plus provisioned shared-resource evidence | `continuePendingMutation` |
-| `>0` | `ready` | `createDomain(..., membershipCommitted)` | target present in membership | committed domain artifacts for the new target plus any residual staging evidence | `continuePendingMutation` |
-| `>0` | `ready` | `deleteDomain(..., journaled or artifactsDeleted)` | target still present in membership | target domain artifacts may still exist or be partially removed | `continuePendingMutation` |
-| `>0` | `ready` | `deleteDomain(..., membershipRemoved)` | target absent from membership | residual cleanup evidence for a non-last-domain delete | `continuePendingMutation` |
-| `0` | `cleanupPending` | `deleteDomain(..., membershipRemoved or sharedResourceCleanupStarted)` | target absent from membership | shared-resource cleanup evidence plus any orphan target cleanup evidence | `continuePendingMutation` |
-| any other row | any other value | any unclassifiable mutation row | any other relation | evidence inspection is not authorized | `frameworkRecoveryNeeded` |
-
-Rows that classify to `continuePendingMutation` may continue the journaled transaction or, when the documented step is already satisfied, finish by clearing `pendingMutation`. They do not create new committed membership beyond what the registry row already declares.
-
-#### 6.4.5 Recovery Evidence Ordering Rule
-
-Recovery uses registry-first ordering:
-
-1. read `ProtectedDataRegistry`
-2. validate schema and consistency invariants
-3. classify the row through the consistency matrix
-4. inspect only the external evidence authorized by that matrix row
-5. emit exactly one recovery disposition
-
-External evidence may prove orphan cleanup is legal or that a pending mutation advanced far enough to continue.
-
-External evidence must not:
-
-- create committed membership
-- satisfy a missing committed shared-resource requirement by inference alone
-- reinterpret an uncommitted target domain as committed state
+The detailed manifest fields, invariants, transaction rules, consistency matrix, and evidence ordering live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 2.1-2.6.
 
 ### 6.5 Wrapped-DMK Persistence Model
 
@@ -699,20 +596,7 @@ Required `WrappedDomainMasterKeyRecord` properties:
 - authentication tag
 - associated data that includes at minimum domain ID and wrap-version metadata
 
-The canonical wrapped-DMK lifecycle is:
-
-- create: journal `createDomain` first, provision the shared right/secret only after that journal exists, then stage and validate the wrapped-DMK record plus initial domain state before committing membership
-- steady-state updates: rewrite payload generations only; do not rotate the wrapped-DMK record unless a later design explicitly introduces rekey
-- delete domain: journal `deleteDomain` first, remove domain generations/bootstrap metadata/wrapped-DMK state, then remove the domain from committed membership
-- last-domain cleanup: only after committed membership becomes empty and shared-resource lifecycle state commits to `cleanupPending` may shared right/secret deletion proceed
-
-Wrapped-DMK writes must use an explicit transaction:
-
-1. write staged wrapped-DMK state
-2. read back and validate the staged record
-3. atomically promote the staged record to committed wrapped-DMK state
-
-The v1 docs do not permit multiple equally valid persistence shapes for the master-key ladder. The shared-gate / wrapped-DMK model above is the single canonical v1 model and must be applied consistently across startup, relock, deletion, migration, and recovery.
+Wrapped-DMK persistence remains a stable, non-rotating part of domain metadata unless a later design explicitly introduces rekey. The detailed staged-write transaction and lifecycle rules live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Section 3.2.
 
 ### 6.6 Bootstrap Metadata
 
@@ -806,6 +690,8 @@ The v1 domain lifecycle must also define:
 - explicit deletion semantics for domain files, wrapped-DMK state, and registry membership
 - recovery behavior when either wrapped-DMK state or payload generations become unreadable
 
+The detailed persistence mechanics live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 2.3-2.4 and 3.1-3.2.
+
 ### 7.3 Session Unlock
 
 `AppSessionOrchestrator` is responsible for app-wide sequencing.
@@ -856,123 +742,13 @@ In `restartRequired`:
 
 Relock failure diagnostics must remain generic and must not expose domain IDs, paths, membership counts, or other sensitive recovery details.
 
-App-data relock does **not** occur merely because the app entered background or inactive state while the current grace window remains valid.
+App-data relock does not occur merely because the app entered background or inactive state while the current grace window remains valid.
 
 ## 8. New Framework Interfaces And Types
 
-The new layer should live primarily in new files under:
+The initial framework files, type responsibilities, and directory layout are part of the detailed framework specification rather than the core architecture contract.
 
-```text
-Sources/Security/ProtectedData/
-```
-
-Recommended initial files and responsibilities:
-
-### `ProtectedDataDomain.swift`
-
-Defines:
-
-- `ProtectedDataDomainID`
-- domain identity rules
-- shared domain metadata such as version or namespace descriptors
-
-### `ProtectedDomainEnvelope.swift`
-
-Defines:
-
-- `ProtectedDomainEnvelope`
-- envelope header fields
-- encode/decode rules
-- associated-data composition rules
-
-### `ProtectedDataRegistry.swift`
-
-Owns:
-
-- registry manifest encode/decode
-- committed membership
-- shared-resource lifecycle record
-- optional pending mutation record
-
-### `ProtectedDataRegistryStore.swift`
-
-Owns:
-
-- single-writer access to `ProtectedDataRegistry`
-- registry lock scope and transaction boundaries
-- advancement and clearing of `pendingMutation`
-- enforcement of registry consistency invariants
-- framework-level recovery classification before external evidence inspection
-
-### `ProtectedDomainBootstrapStore.swift`
-
-Owns:
-
-- per-domain bootstrap metadata persistence
-- generation routing metadata
-- wrapped-DMK presence/version hints
-- coarse domain recovery state markers
-
-### `ProtectedDomainKeyManager.swift`
-
-Owns:
-
-- per-domain DMK creation
-- wrapped-DMK persistence and validation
-- lazy DMK unwrap after shared authorization succeeds
-- zeroization of transient key material
-
-### `ProtectedDataSessionCoordinator.swift`
-
-Owns:
-
-- shared right authorization, deauthorization, and secret lifetime
-- framework session state
-- reuse of active shared app-data session
-- relock orchestration
-- zeroization of the shared secret and all unwrapped DMKs on relock
-- latching `restartRequired` and blocking further protected-domain access in the current process
-
-### `ProtectedDataRelockParticipant.swift`
-
-Owns:
-
-- zeroization or destruction of domain-local decrypted payloads
-- zeroization or destruction of plaintext scratch buffers
-- zeroization or destruction of derived in-memory indexes or lookup structures
-- relock success/failure reporting without short-circuiting peer cleanup
-
-### `ProtectedDomainRecoveryCoordinator.swift`
-
-Owns:
-
-- matrix-guided external evidence inspection after registry classification
-- pending/current/previous inspection
-- wrapped-DMK state validation
-- generation validation
-- authoritative generation selection
-- domain-scoped recovery routing
-- distinction between `frameworkRecoveryNeeded` and domain-scoped `recoveryNeeded`
-
-### `AppSessionOrchestrator.swift`
-
-Owns:
-
-- grace-window policy
-- launch/resume privacy-auth sequencing
-- scene lifecycle intake
-- app lock/relock initiation
-- handoff to `ProtectedDataSessionCoordinator` for first protected-domain access
-
-### `ProtectedSettingsStore.swift`
-
-First concrete adopter.
-
-Purpose:
-
-- validate the framework on a low-risk domain before Contacts
-- reduce security-sensitive plaintext preferences over time
-- prove the framework without touching private-key semantics
+This TDD keeps the ownership boundaries in Sections 5, 7, and 9. The concrete file/type breakdown for the first implementation lives in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Section 4.
 
 ## 9. Integration Rules
 
@@ -998,80 +774,39 @@ Expected initial integration points:
 
 This still implies explicit startup-ordering work when a real protected domain is introduced. It is a narrow code ownership boundary, not a promise of zero initialization-flow changes.
 
+The expanded interface/file breakdown lives in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 4-5.
+
 ### 9.3 Contacts Relationship
 
 Contacts must later plug into this framework as a domain-specific consumer.
 
-Contacts is **not** allowed to become a second independent security architecture if this framework exists.
+Contacts is not allowed to become a second independent security architecture if this framework exists.
 
 In practical terms:
 
 - Contacts owns person/key/tag/list semantics
 - the protected app-data framework owns registry authority, shared-session authority, wrapped-DMK lifecycle, envelope rules, generation recovery, and relock posture
 
+The temporary precedence and rewrite guidance for the existing Contacts docs live in [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md).
+
 ## 10. Migration Rules
 
-Migration from current plaintext or non-uniform state into protected domains must follow these rules:
+Migration from current plaintext or non-uniform state into protected domains must preserve readable source state, avoid silent reset behavior, and make unreadable converted state a recovery surface instead of a wipe.
 
-- preserve readable source state until protected destination is confirmed valid
+This TDD keeps the cross-cutting rule set:
+
+- preserve readable source state until the protected destination is confirmed valid
 - never silently reset to empty state on conversion failure
-- define explicit post-cutover cleanup rules
-- make unreadable converted state a recovery surface, not a silent wipe
+- require explicit post-cutover cleanup rules
+- keep `ProtectedSettingsStore` constrained to non-bootstrap settings/control state in the first-domain round
 
-For any domain migration:
-
-1. read current source state
-2. validate and normalize
-3. write protected destination using the new domain model
-4. verify readability of the destination
-5. only then retire or quarantine the old source state
+The phased rollout, startup adoption sequencing, inventory table, and first-domain detail live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 2-5.
 
 ### 10.1 Persisted-State Classification Inventory
 
-Before any real protected domain migration, implementation planning must maintain one reviewed inventory of currently persisted app-owned state.
+Implementation planning must maintain one reviewed inventory of currently persisted app-owned state, with each item tracked by target class and migration readiness.
 
-Each item must be tracked with:
-
-- a `target class`
-- a `migration readiness`
-
-Allowed target classes:
-
-- `early-readable`
-- `protected-after-unlock`
-- `remain plaintext with rationale`
-
-At minimum this inventory must include the currently persisted `AppConfiguration` keys, auth/recovery flags already stored in `UserDefaults`, and documented cross-launch temporary disk surfaces.
-
-Initial classification baseline:
-
-| Item | Current location | Target class | Migration readiness | Notes |
-|------|------------------|--------------|---------------------|-------|
-| `authMode` | `UserDefaults` | `early-readable` | n/a in v1 | Read before app-data authorization |
-| `gracePeriod` | `UserDefaults` | `early-readable` | n/a in v1 | Read before app-data authorization |
-| `requireAuthOnLaunch` | `UserDefaults` | `early-readable` | n/a in v1 | Read before app-data authorization |
-| `hasCompletedOnboarding` | `UserDefaults` | `early-readable` | n/a in v1 | Affects startup routing |
-| `colorTheme` | `UserDefaults` | `early-readable` | n/a in v1 | Affects early scene presentation |
-| `encryptToSelf` | `UserDefaults` | `protected-after-unlock` | no | Current synchronous read path still exists in Encrypt flow |
-| `clipboardNotice` | `UserDefaults` | `protected-after-unlock` | no | Current synchronous read path still exists in clipboard UX flow |
-| `guidedTutorialCompletedVersion` | `UserDefaults` | `protected-after-unlock` | no | Current synchronous read path still exists in tutorial and Settings entry flows |
-| `rewrapInProgress` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain in v1 |
-| `rewrapTargetMode` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain in v1 |
-| `modifyExpiryInProgress` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain in v1 |
-| `modifyExpiryFingerprint` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain in v1 |
-| `Documents/contacts/*.gpg` | App sandbox documents | `remain plaintext with rationale` | n/a in this round | Existing Contacts storage stays outside this round until Contacts docs are revised |
-| `Documents/contacts/contact-metadata.json` | App sandbox documents | `remain plaintext with rationale` | n/a in this round | Existing Contacts metadata stays outside this round until Contacts docs are revised |
-| `Documents/self-test/` | App sandbox documents | `remain plaintext with rationale` | n/a in v1 | Diagnostic output remains outside protected-domain scope in v1 |
-| `tmp/decrypted/` | App temporary directory | `remain plaintext with rationale` | n/a in v1 | Ephemeral decrypted previews; explicit cleanup path, not a protected-domain candidate |
-| `tmp/streaming/` | App temporary directory | `remain plaintext with rationale` | n/a in v1 | Ephemeral streaming outputs; explicit cleanup path, not a protected-domain candidate |
-| `ProtectedDataRegistry` | App-owned bootstrap manifest | `early-readable` | framework prerequisite | Bootstrap authority for membership and shared-resource lifecycle |
-| future per-domain bootstrap metadata | App-owned bootstrap files | `early-readable` | domain-specific | Read before app-data authorization by design |
-
-First-domain rule for `ProtectedSettingsStore`:
-
-- a setting may enter the first protected settings domain only if it is target-classified as `protected-after-unlock`
-- and it is no longer required by synchronous or pre-unlock read paths
-- shadow copies are not allowed to preserve early-boot behavior
+The full inventory baseline and first-domain adoption rules live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 4-5.
 
 ## 11. Recovery Contracts
 
@@ -1138,91 +873,12 @@ Required behavior:
 
 ## 12. Validation Matrix
 
-### 12.1 Registry Authority
+The app-data proposal must still be validated across registry authority, unlock/relock behavior, crash recovery, file protection, zeroization, and failure paths.
 
-- `ProtectedDataRegistry` is the only authority for committed domain membership
-- committed membership stores only `active` or domain-scoped `recoveryNeeded`
-- `pendingMutation` is the sole authority for uncommitted create/delete work
-- shared-resource lifecycle state never doubles as mutation execution phase
-- `cleanupPending` appears only when committed membership is empty
-- directory enumeration never drives normal shared-right deletion
-- a committed domain in domain-scoped `recoveryNeeded` still counts as a member
-- orphaned directories or wrapped-DMK artifacts do not implicitly become committed members
-
-### 12.2 Unlock / Relock
-
-- one shared `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary
-- the shared app-data secret is fetched only after authorization
-- a second or third protected domain does not require another prompt in the same active app-data session
-- `AppSessionOrchestrator` is the only grace-window owner
-- `ProtectedDataSessionCoordinator` does not run an independent grace timer
-- relock closes new protected-domain access before cleanup begins
-- relock participant fan-out is non-short-circuit
-- relock deauthorizes the shared right
-- relock clears the shared secret and all unwrapped domain DMKs
-- relock clears decrypted payloads and derived indexes
-- relock failure enters `restartRequired`
-- `restartRequired` blocks all in-process re-auth and is not persisted to the registry
-- backgrounding within the active grace window does not deauthorize app-data access
-
-### 12.3 Crash Recovery
-
-- startup recovery classifies registry rows through documented invariants plus the consistency matrix before inspecting evidence
-- interrupted create/delete operations recover deterministically from registry plus pending mutation state
-- orphan shared-resource evidence with empty membership uses `cleanupOnly`
-- invariant violations or unclassifiable rows enter `frameworkRecoveryNeeded`
-- valid `current` and `previous` generations are selected consistently
-- no unreadable local state silently resets to empty domain content
-- `frameworkRecoveryNeeded` and domain-scoped `recoveryNeeded` are explicit and stable
-
-### 12.4 File Protection
-
-- iOS / iPadOS / visionOS protected-domain files are created with explicit `complete` file protection
-- `ProtectedDataRegistry` follows the same explicit file-protection rule
-- macOS protected-domain files live inside the app sandbox/container and use the strongest platform-supported local static protection defined by the implementation
-- bootstrap metadata and temporary scratch files follow the same platform-specific protection policy as their host platform
-
-### 12.5 Zeroization
-
-- plaintext serialization buffers are zeroized after use
-- the shared app-data secret is zeroized on relock
-- unlocked domain DMKs are zeroized on relock
-- decrypted domain snapshots or derived sensitive indexes are zeroized on relock
-
-### 12.6 Failure Paths
-
-- wrong auth does not unlock the shared app-data session
-- pre-auth attempts must not fetch `LASecret`
-- invariant violation or unclassifiable registry row enters `frameworkRecoveryNeeded`
-- orphan shared-resource evidence with empty membership triggers `cleanupOnly`
-- missing shared right or unreadable shared secret for a row that expects `ready` enters `frameworkRecoveryNeeded`
-- unreadable wrapped-DMK state enters only that domain's `recoveryNeeded`
-- corrupted envelope hard-fails on authentication or structural validation
-- interrupted migration does not destroy readable source state
-- `ProtectedDataRelockParticipant` failure enters `restartRequired`
-- shared-right deauthorize failure enters `restartRequired`
-- `ProtectedSettingsStore` reset requires explicit destructive confirmation
-- Contacts recovery remains import-based
-- anti-rollback is not implied by `current / previous / pending`
+This TDD keeps validation as a required outcome, but the detailed matrix and checklist now live in [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) Section 2.
 
 ## 13. Implementation Readiness Expectations
 
-This TDD is only acceptable if an implementer can proceed without making hidden architectural decisions.
+This proposal is only acceptable if an implementer can proceed without making hidden architectural decisions.
 
-At minimum, an implementer must be able to tell:
-
-- that the current private-key domain should remain semantically unchanged
-- that protected app data uses one shared app-data right plus per-domain DMKs
-- that `ProtectedDataRegistry` is the only membership authority
-- that shared-resource lifecycle state and mutation execution phase are distinct concepts
-- that `AppSessionOrchestrator` is the app-wide session owner
-- that `ProtectedDataSessionCoordinator` is the app-data subsystem coordinator under that owner
-- that `LAPersistedRight` is the primary app-data authorization gate in v1
-- that app-data domains are recoverable rather than private-key-style invalidating
-- that framework-level and domain-level recovery are distinct
-- that startup recovery is registry-first and matrix-driven
-- that `restartRequired` is distinct from `frameworkRecoveryNeeded`
-- that file protection must be explicit
-- that startup is split into pre-auth bootstrap and post-auth unlock phases
-- that the generation model does not promise anti-rollback semantics
-- that Contacts later depends on the framework rather than inventing its own vault base layer
+The detailed readiness criteria, review questions, and document-level acceptance checks now live in [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) Sections 3-5.

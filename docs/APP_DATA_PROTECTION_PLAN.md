@@ -5,6 +5,7 @@
 > **Purpose:** Define the migration strategy for introducing a protected app-data layer beside the existing private-key security architecture.  
 > **Audience:** Engineering, security review, QA, and AI coding tools.  
 > **Companion document:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)  
+> **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
 > **Related documents:** [SECURITY](SECURITY.md) · [ARCHITECTURE](ARCHITECTURE.md) · [TESTING](TESTING.md) · [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md) · [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Intent
@@ -20,7 +21,7 @@ That private-key path remains the authoritative security domain for key material
 
 This roadmap exists because the rest of the app's persistent state does not yet share a uniform protection model. Contacts, security-sensitive app state, recovery state, and future local caches should ultimately live inside a dedicated protected app-data architecture rather than relying on ad hoc file or preferences storage.
 
-This initiative introduces a **new protected app-data layer**. It is not a rewrite of the private-key system.
+This initiative introduces a new protected app-data layer. It is not a rewrite of the private-key system.
 
 ## 2. Problem Statement
 
@@ -39,7 +40,7 @@ The missing capability is not "stronger private-key protection." The missing cap
 - recovering deterministically from interrupted writes or unreadable state
 - supporting later feature domains without forcing each one to invent a new vault architecture
 
-The current proposal direction is also too dependent on app-managed authorization timing. For app-data domains, the revised v1 goal is to make the **first release of the shared app-data secret itself** a system-enforced boundary rather than a convention owned only by application code.
+The current proposal direction is also too dependent on app-managed authorization timing. For app-data domains, the revised v1 goal is to make the first release of the shared app-data secret itself a system-enforced boundary rather than a convention owned only by application code.
 
 ## 3. Hard Constraints
 
@@ -54,7 +55,7 @@ This roadmap is bounded by the following non-negotiable constraints:
 
 ### 3.1 Private-Key Stability Rule
 
-Unless a concrete security defect is discovered, this initiative does **not** change:
+Unless a concrete security defect is discovered, this initiative does not change:
 
 - current Secure Enclave private-key wrapping semantics
 - current Standard / High Security behavior
@@ -66,209 +67,69 @@ Private-key protection is treated as already sound enough to remain the separate
 
 ### 4.1 Separate Security Domains
 
-CypherAir will explicitly separate two security domains:
+CypherAir will explicitly separate the Private Key Domain from Protected App Data Domains. Secret key material remains under the existing private-key design, while recoverable app-owned persistent data moves into the new app-data framework.
 
-- **Private Key Domain**
-- **Protected App Data Domains**
-
-The Private Key Domain retains the existing design for secret key material.
-
-Protected App Data Domains cover persistent app-owned data that should be protected at rest and unlocked only for the authenticated app session, but that should not inherit private-key-specific loss semantics.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 3.1, 3.2, and 5.7.
 
 ### 4.2 Shared Gate With Per-Domain Master Keys
 
-Protected app data will use:
+Protected app data will use one shared app-data `LAPersistedRight`, one shared app-data secret, and one `Domain Master Key` per protected domain. This keeps authorization shared at the session boundary while preserving per-domain isolation for lifecycle, deletion, and recovery.
 
-- one shared app-data `LAPersistedRight`
-- one shared app-data secret protected by that right
-- one `Domain Master Key` per protected domain
-
-The shared app-data secret acts as the session-level KEK for per-domain DMKs.
-
-Rationale:
-
-- preserves per-domain isolation for envelope, recovery, deletion, and future rekey behavior
-- avoids per-domain prompt repetition inside one active app-data session
-- avoids a literal single global DMK for every protected byte
-- keeps the first system-gated secret release at the shared app-data session boundary
-
-Per-domain DMKs do **not** imply per-domain authorization prompts in v1. Domain isolation remains at the DMK, envelope, lifecycle, and recovery layers even when authorization is shared.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.1 and 6.5, plus [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Section 3.2.
 
 ### 4.3 Recoverable App-Data Domains
 
-Protected app-data domains are **recoverable domains**.
+Protected app-data domains remain device-bound and session-authenticated, but they are recoverable domains rather than private-key-style invalidating domains. They must not inherit future private-key loss semantics from `Special Security Mode`.
 
-This means:
-
-- they remain device-bound on the local installation
-- they reuse authenticated app-session unlock semantics
-- they do **not** inherit private-key-style biometric re-enrollment invalidation semantics from future `Special Security Mode`
-- they do **not** require rewrapping merely because the private-key authentication mode changes
-
-The design goal is to keep private-key risk surfaces and app-data risk surfaces deliberately separate.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.7 and 11.2-11.4.
 
 ### 4.4 System-Gated App-Data Authorization
 
-Protected app-data domains use a **system-gated persisted right** as the primary authorization boundary in v1.
+The first normative gate for app-data unlock is the system-managed right/secret boundary, not an app-level convention. One successful shared-right authorization covers all protected domains in the current app-data session.
 
-The canonical v1 model is:
-
-- one shared app-data `LAPersistedRight` protects one shared app-data secret
-- the shared right uses `LAAuthenticationRequirement.default`
-- the shared app-data secret is the only system-gated secret released by the right
-- per-domain DMKs remain distinct and are unwrapped only after shared authorization succeeds
-- one successful shared-right authorization covers all protected domains in the current app-data session
-- later domain access in that same app-data session must not require another authorization prompt
-
-This means the first gate for app-data unlock is no longer "application code remembered to check session state first." The first gate is the system-managed authorization boundary for the shared persisted right.
-
-For future protected domains, `LAPersistedRight.authorize(...)` remains the single normative app-data authorization boundary.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.2 and 5.3.
 
 ### 4.5 ProtectedDataRegistry As Lifecycle Authority
 
-Protected app-data must use one global **`ProtectedDataRegistry`** as the sole authority for:
+Protected app-data must use one global `ProtectedDataRegistry` as the sole authority for committed domain membership, shared-resource lifecycle state, pending mutation state, and recovery reconciliation order.
 
-- committed protected-domain membership
-- shared-resource lifecycle state
-- optional pending mutation state
-- recovery reconciliation order
-
-The registry is a single manifest stored under:
-
-```text
-Application Support/ProtectedData/
-```
-
-Normal lifecycle decisions must follow registry state, not filesystem inference.
-
-In v1:
-
-- committed domains may be only `active` or domain-scoped `recoveryNeeded`
-- uncommitted create/delete work is represented only by `pendingMutation`
-- shared-resource lifecycle state may be only `absent`, `ready`, or `cleanupPending`
-- shared-resource lifecycle state must not double as mutation execution phase
-- `cleanupPending` is valid only when committed membership is empty
-- orphaned directories, bootstrap metadata files, or wrapped-DMK artifacts never implicitly become members
-- shared right and shared secret must exist whenever committed membership is non-empty and lifecycle state is `ready`
-- shared right and shared secret may be deleted only after committed membership becomes empty and lifecycle state commits to `cleanupPending`
-
-Directory enumeration and per-domain bootstrap metadata may be used during recovery as evidence to repair or quarantine state, but they are never the normal authority for deciding whether the last protected domain still exists.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.4 and Section 6.4. Detailed execution rules live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 2.1-2.6.
 
 ### 4.6 Unified Session Orchestration
 
-The target app-data architecture uses two layers:
+The target app-data architecture uses `AppSessionOrchestrator` as the app-wide session owner and `ProtectedDataSessionCoordinator` as the app-data subsystem coordinator under that owner. Grace-window policy, launch/resume sequencing, relock initiation, and fail-closed relock behavior must not split across competing owners.
 
-- **`AppSessionOrchestrator`**
-- **`ProtectedDataSessionCoordinator`**
-
-`AppSessionOrchestrator` is the app-wide session owner.
-
-In v1 planning, it is the only owner of:
-
-- grace-window policy
-- launch/resume privacy-auth sequencing
-- app lock / relock initiation
-- scene lifecycle intake
-- the decision that protected-domain access may proceed
-
-`ProtectedDataSessionCoordinator` sits under that orchestrator and is the app-data subsystem coordinator.
-
-In v1 planning, it is the only owner of:
-
-- the strong reference to the shared `LAPersistedRight`
-- shared app-data secret lifetime in memory
-- shared right authorize/deauthorize behavior
-- app-data shared-session state
-- relock orchestration
-- zeroization of the shared secret and all unwrapped DMKs on relock
-- fail-closed blocking through `restartRequired` when relock cannot complete safely
-
-Existing launch/resume privacy auth is therefore not the long-term parallel authority for app-data unlock. It is absorbed into the top-level `AppSessionOrchestrator`, while `LAPersistedRight.authorize(...)` remains the normative app-data gate triggered through orchestrator-controlled sequencing.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7.1-7.4.
 
 ### 4.7 Minimal Bootstrap Metadata
 
-The system may keep a minimal layer of plaintext bootstrap metadata outside encrypted domain payloads when required for cold start, recovery, or migration routing.
+The system may keep minimal non-secret bootstrap metadata outside encrypted payloads for cold start, recovery, and migration routing. This metadata must remain insufficient to recreate meaningful business data and must never outrank registry authority.
 
-In v1, this bootstrap layer consists of:
-
-- the global `ProtectedDataRegistry`
-- minimal per-domain bootstrap metadata stored beside encrypted generations
-
-This bootstrap layer must be:
-
-- minimal
-- non-secret
-- non-social-graph-bearing
-- non-content-bearing
-- insufficient to recreate meaningful business data
-
-Typical acceptable bootstrap information includes:
-
-- registry or envelope version markers
-- committed domain membership
-- shared-resource lifecycle state
-- pending mutation kind/phase
-- generation identifiers
-- coarse recovery state markers
-- wrapped-DMK record presence/version
-
-This allowance exists to keep startup recovery deterministic. It is not permission to leave broad app state outside protected domains.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 3.13, 6.4, and 6.6, plus [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Section 3.3.
 
 ### 4.8 Private-Key And App-Data Secure Enclave Boundary
 
-The current private-key design uses indirect Secure Enclave wrapping because the app's OpenPGP private keys are not directly managed by the Secure Enclave.
+Using `LAPersistedRight` as the primary app-data gate does not remove Secure Enclave involvement. It means the app-data design relies on Apple's higher-level LocalAuthentication right model instead of reusing the private-key wrapping model as the primary gate.
 
-Protected app-data domains are different:
-
-- their shared app-data secret is app-generated and persisted through `LAPersistedRight`
-- Apple provides a higher-level LocalAuthentication right model for gating access to a key and a secret
-- Apple documents `LAPersistedRight` as being backed by a unique key in the Secure Enclave
-
-Choosing `LAPersistedRight` as the primary app-data gate in v1 therefore does **not** mean dropping Secure Enclave involvement. It means preferring the system's higher-level right/secret model over a custom app-managed unlock-secret gate.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.2.
 
 ### 4.9 Dedicated App-Data Authorization Policy
 
-Protected app-data domains must use a dedicated app-data authorization policy.
+Protected app-data authorization is a separate policy surface from private-key authentication mode. App-data must not derive from `AuthenticationMode`, `AuthenticationManager.createAccessControl(for:)`, or future private-key-only semantics.
 
-This policy is separate from the private-key access-control source of truth.
-
-In v1, this means:
-
-- app-data authorization must not derive from `AuthenticationMode`
-- app-data authorization must not call `AuthenticationMode.createAccessControl()`
-- app-data authorization must not call `AuthenticationManager.createAccessControl(for:)`
-- the shared app-data right uses `LAAuthenticationRequirement.default`
-- app-data domains must not inherit current `Standard` / `High Security` semantics
-- app-data domains must not inherit future `Special Security Mode` or `biometryCurrentSet` semantics
-- per-domain authorization-policy variation is out of scope in v1 unless a later domain-specific proposal explicitly reopens it
-- per-domain right authorization is out of scope in v1
-
-This rule exists to preserve the intended boundary: private-key security semantics remain private-key-specific.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.3.
 
 ### 4.10 Deterministic Registry Recovery Model
 
-Startup recovery must begin from the registry row, not from filesystem inference.
+Startup recovery begins from the registry row, not filesystem inference. Shared-resource lifecycle state and pending mutation phase remain distinct inputs, and every valid row must classify to one documented recovery disposition.
 
-In v1:
-
-- shared-resource lifecycle state and pending mutation phase are separate inputs
-- startup recovery must first validate registry self-consistency
-- a valid row must classify to exactly one recovery disposition
-- the allowed framework recovery dispositions are `resumeSteadyState`, `continuePendingMutation`, `cleanupOnly`, and `frameworkRecoveryNeeded`
-- unclassifiable or inconsistent rows must enter `frameworkRecoveryNeeded`
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.10-5.12 and 11.1, plus [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 2.2-2.6.
 
 ### 4.11 Fail-Closed Relock Failure Semantics
 
-Relock is not a best-effort cleanup path.
+Relock is not best-effort cleanup. New protected-domain access must close first, cleanup must still fan out even after earlier failures, and any unsafe relock outcome must enter runtime-only `restartRequired`.
 
-In v1:
-
-- relock first closes new protected-domain access for the current process
-- relock then fans out cleanup to every registered relock participant
-- shared-secret zeroization and shared-right deauthorization still run even if an earlier participant fails
-- any relock failure enters `restartRequired`
-- `restartRequired` blocks further protected-domain access in the current process and clears only by process restart
-- `restartRequired` is runtime-only and does not persist into the registry
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 7.4 and Section 11.1.
 
 ## 5. Migration Order
 
@@ -276,226 +137,61 @@ Implementation should follow this sequence.
 
 ### Phase 1: Protected App-Data Framework
 
-Build the reusable protected app-data substrate first.
+Build the reusable protected app-data substrate first so later domains inherit a shared architecture instead of inventing one-off vault behavior.
 
-Goals:
-
-- establish shared terminology and lifecycle
-- define common envelope and recovery rules
-- define the shared-gate / per-domain-DMK topology
-- define the `ProtectedDataRegistry` contract before any real domain lands
-- define separated shared-resource lifecycle state and mutation execution phase semantics
-- define registry consistency invariants and a deterministic recovery matrix
-- define registry-first evidence ordering rules
-- define unified session orchestration before any real domain lands
-- define a system-gated app-data authorization model that is separate from the private-key access-control source of truth
-- define a strict startup authentication boundary
-- define common relock, deauthorize, and session-unlock semantics
-- define fail-closed relock behavior including `restartRequired`
-- define the v1 DMK persistence and wrapped-DMK model
-- define the initial persistent-state classification inventory
-
-This phase should land before Contacts migration so Contacts can depend on the shared framework instead of creating its own parallel architecture.
+Detailed phase goals and framework mechanics live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.1 and [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md).
 
 ### Phase 2: File-Protection Baseline
 
-Establish the file/static-protection baseline required by protected-domain storage before any real protected domain lands in code.
+Establish the platform-specific file/static-protection baseline for registry files, protected-domain files, bootstrap metadata, and scratch files before any real protected domain ships.
 
-Goals:
-
-- define the minimum platform-specific local static protection contract for registry files, protected-domain files, bootstrap metadata, and temporary scratch files
-- ensure no real protected domain ships without its file/static-protection baseline
+See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.2 and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 6.7.
 
 ### Phase 3: First Low-Risk Real Domain
 
-Use a low-risk domain such as protected-after-unlock settings or recovery/control state as the first adopter.
+Use a low-risk domain such as protected-after-unlock settings or recovery/control state as the first concrete adopter. This phase proves the shared authorize / unlock / relock model without touching the private-key domain.
 
-Goals:
-
-- exercise the new framework without touching the private-key domain
-- validate shared authorize / lazy unlock / relock / deauthorize behavior on real app-owned data
-- reduce plaintext or lightly protected security-sensitive preferences over time
-
-Phase 3 uses a split-settings model.
-
-#### Bootstrap-Critical Settings
-
-The following settings remain in the early-readable layer in v1 because they are read before protected domains unlock:
-
-- `authMode`
-- `gracePeriod`
-- `requireAuthOnLaunch`
-- `hasCompletedOnboarding`
-- `colorTheme`
-
-These settings are not eligible for `ProtectedSettingsStore` in Phase 3.
-
-#### Protected-After-Unlock Settings / Control State
-
-Phase 3 may migrate only settings or control state that:
-
-- are target-classified as `protected-after-unlock`
-- are no longer required by synchronous or pre-unlock read paths
-
-Phase 3 must not rely on a shadow copy of protected settings to recreate early boot behavior.
-
-This first real domain must also declare its recovery contract up front:
-
-- `ProtectedSettingsStore`-style non-bootstrap settings/control state are **resettable with explicit destructive confirmation**
-- they are not import-recoverable in v1
-- they must never silently reset on unreadable local state
+See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.3 and Section 5.
 
 ### Phase 4: Contacts Vault On Shared Framework
 
-Migrate Contacts to the shared protected app-data framework rather than letting Contacts become a one-off vault system.
+Migrate Contacts onto the shared protected app-data framework rather than allowing Contacts to remain or become a separate architecture.
 
-Goals:
-
-- preserve the Contacts product and TDD direction
-- ensure Contacts remains a domain-specific consumer of the shared substrate
-- avoid duplicating domain key lifecycle, envelope handling, recovery logic, registry authority, and relock rules
-- keep Contacts explicitly **import-recoverable**
+See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.4, [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 9.3, and Section 11.4.
 
 ### Phase 5: Remaining Persistent Domains
 
-Migrate remaining app-owned persistent domains in order of security value and implementation risk.
+Migrate remaining app-owned persistent domains in order of security value and implementation risk after the framework and first-domain path have been proven.
 
-Candidate areas include:
-
-- additional settings or recovery state not yet moved in Phase 3
-- future local drafts or protected caches
-- future user-managed local data that should not remain plaintext at rest
+See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.5.
 
 ### 5.1 Startup Authentication Boundary
 
-All future implementations derived from this roadmap must follow a two-phase startup model.
+All future implementations derived from this roadmap must follow a two-phase startup model with a pre-auth bootstrap phase and a post-auth unlock phase. This remains a roadmap-level constraint rather than an implementation detail.
 
-#### Pre-Auth Bootstrap Phase
-
-Before app-data authorization succeeds, the app may:
-
-- read bootstrap-critical settings
-- read the `ProtectedDataRegistry`
-- read file-side per-domain bootstrap metadata
-- route cold start and determine whether protected domains exist
-
-Before app-data authorization succeeds, the app must **not**:
-
-- fetch `LASecret`
-- authorize the shared app-data right implicitly in an initializer or getter
-- unwrap any domain DMK
-- attempt to open protected-domain generations
-- finalize framework or domain recovery state from protected-domain contents alone
-
-#### Post-Auth Unlock Phase
-
-After app-data authorization succeeds, the app may:
-
-- authorize the shared right through the protected-data session layer
-- fetch the shared app-data secret
-- lazy-unlock a requested domain DMK
-- open `current / previous / pending`
-- determine final framework and domain state
-
-This startup boundary is a required implementation constraint, not a best-effort guideline.
-
-Startup recovery derived from this roadmap must also:
-
-- validate registry schema and consistency rules before inspecting evidence
-- use the registry row to decide which evidence is allowed to be consulted
-- emit exactly one documented recovery disposition instead of implementation-defined branching
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.12 and [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.1.
 
 ### 5.2 App-Data Session Lifetime
 
-The shared app-data session follows the current grace-window model, but the grace window has only one owner: `AppSessionOrchestrator`.
+The shared app-data session follows the current grace-window model, but the grace window has only one owner: `AppSessionOrchestrator`. Shared-right authorization begins on first real protected-domain access and relock/deauthorize must remain fail-closed.
 
-In v1:
-
-- launch/resume first enters `AppSessionOrchestrator`
-- if app session is not active, the orchestrator completes app-level privacy unlock first
-- shared right authorization starts only on first real protected-domain access
-- shared right authorization does not eagerly unwrap every domain DMK
-- a second or third protected domain in the same active app-data session must not prompt again
-- app-data relock and deauthorize occur only on:
-  - explicit app lock
-  - grace-period expiration
-  - session loss
-  - app termination or exit
-- if relock cannot complete safely, the current process enters `restartRequired` and may not unlock protected domains again until restart
-- entering background alone does **not** deauthorize app-data while the grace window is still valid
-- `gracePeriod = 0` is the supported posture for "every resume requires fresh authorization before protected-domain access"
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7.3-7.4, plus [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.2.
 
 ### 5.3 Persistent-State Classification Inventory
 
-Before any real protected domain lands, implementation planning must maintain a complete inventory of currently persisted app-owned state.
+Before any real protected domain lands, implementation planning must maintain a complete inventory of persisted app-owned state, with target class and migration readiness tracked explicitly.
 
-Each persisted item must have:
-
-- a `target class`
-- a `migration readiness`
-
-Allowed target classes:
-
-- `early-readable`
-- `protected-after-unlock`
-- `remain plaintext with rationale`
-
-At minimum this inventory must include:
-
-- current `AppConfiguration` keys
-- auth and recovery flags currently stored in `UserDefaults`
-- any future app-owned bootstrap metadata
-- documented cross-launch temporary disk surfaces
-
-The inventory must prevent four failure modes:
-
-- omitted state that never gets reviewed for migration
-- state that is moved into a protected domain even though startup still needs it before authorization
-- state that remains plaintext indefinitely without an explicit documented reason
-- state that is target-classified correctly but migrated before its read paths are actually ready
-
-Initial classification baseline:
-
-| Item | Current location | Target class | Migration readiness | Notes |
-|------|------------------|--------------|---------------------|-------|
-| `authMode` | `UserDefaults` | `early-readable` | n/a in v1 | Read before app-data authorization |
-| `gracePeriod` | `UserDefaults` | `early-readable` | n/a in v1 | Read before app-data authorization |
-| `requireAuthOnLaunch` | `UserDefaults` | `early-readable` | n/a in v1 | Read before app-data authorization |
-| `hasCompletedOnboarding` | `UserDefaults` | `early-readable` | n/a in v1 | Affects startup routing |
-| `colorTheme` | `UserDefaults` | `early-readable` | n/a in v1 | Affects early scene presentation |
-| `encryptToSelf` | `UserDefaults` | `protected-after-unlock` | no | Current sync read path still exists in Encrypt flow |
-| `clipboardNotice` | `UserDefaults` | `protected-after-unlock` | no | Current sync read path still exists in clipboard UX flow |
-| `guidedTutorialCompletedVersion` | `UserDefaults` | `protected-after-unlock` | no | Current sync read path still exists in tutorial and Settings entry flows |
-| `rewrapInProgress` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain |
-| `rewrapTargetMode` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain |
-| `modifyExpiryInProgress` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain |
-| `modifyExpiryFingerprint` | `UserDefaults` | `remain plaintext with rationale` | n/a in v1 | Private-key recovery flag; stays outside app-data domain |
-| `Documents/contacts/*.gpg` | App sandbox documents | `remain plaintext with rationale` | n/a in this round | Existing Contacts storage stays outside this round until Contacts docs are revised |
-| `Documents/contacts/contact-metadata.json` | App sandbox documents | `remain plaintext with rationale` | n/a in this round | Existing Contacts metadata stays outside this round until Contacts docs are revised |
-| `Documents/self-test/` | App sandbox documents | `remain plaintext with rationale` | n/a in v1 | Diagnostic output remains outside protected-domain scope |
-| `tmp/decrypted/` | App temporary directory | `remain plaintext with rationale` | n/a in v1 | Ephemeral decrypted previews; explicit cleanup path, not a protected-domain candidate |
-| `tmp/streaming/` | App temporary directory | `remain plaintext with rationale` | n/a in v1 | Ephemeral streaming outputs; explicit cleanup path, not a protected-domain candidate |
-| `ProtectedDataRegistry` | App-owned bootstrap manifest | `early-readable` | framework prerequisite | Bootstrap authority for membership and shared-resource lifecycle |
-| future per-domain bootstrap metadata | App-owned bootstrap files | `early-readable` | domain-specific | Read before app-data authorization by design |
+The detailed inventory table and first-domain readiness rules live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 4-5.
 
 ### 5.4 Startup Architecture Impact
 
-The protected app-data proposal is no longer just a narrow service-layer addition.
+Protected app-data is not only a local service addition. Any real protected-domain rollout must treat startup ordering, service initialization timing, locked-state routing, and orchestrator wiring as explicit migration surfaces.
 
-For any future real protected domain, the implementation plan must treat the following as explicit architecture migration areas:
-
-- startup ordering
-- service initialization timing
-- locked-state UI routing
-- `AppSessionOrchestrator` wiring
-- `ProtectedDataSessionCoordinator` wiring
-- final framework and domain state classification timing
-
-This is especially important for future Contacts adoption, where cold-start loading and locked-state presentation already exist in the app surface.
+See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.3.
 
 ## 6. Explicit Do-Not-Change List
 
-This roadmap does **not** authorize broad edits to the current private-key security path.
+This roadmap does not authorize broad edits to the current private-key security path.
 
 Treat the following as out of scope unless a concrete defect requires targeted follow-up:
 
@@ -525,35 +221,11 @@ The new protected app-data layer should primarily appear as new code under a ded
 Sources/Security/ProtectedData/
 ```
 
-Recommended initial files:
-
-- `ProtectedDataDomain.swift`
-- `ProtectedDomainEnvelope.swift`
-- `ProtectedDataRegistry.swift`
-- `ProtectedDataRegistryStore.swift`
-- `ProtectedDomainBootstrapStore.swift`
-- `ProtectedDomainKeyManager.swift`
-- `ProtectedDataSessionCoordinator.swift`
-- `ProtectedDataRelockParticipant.swift`
-- `ProtectedDomainRecoveryCoordinator.swift`
-- `AppSessionOrchestrator.swift`
-
-Recommended first concrete adopter:
-
-- `ProtectedSettingsStore`
-
-Expected narrow integration seams:
-
-- `AppContainer` for dependency construction
-- `AppStartupCoordinator` for protected-domain startup recovery
-- app lock / resume flow through `AppSessionOrchestrator`
-- future Contacts integration
-
-The phrase "narrow integration seams" must not be interpreted as "no startup architecture impact." Future real protected domains are still expected to require explicit startup-flow changes.
+This roadmap keeps only the high-level direction: new files, clear ownership boundaries, and narrow integration seams. The detailed file/type breakdown and initial responsibilities live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 4-5.
 
 ## 8. Canonicalization Plan
 
-These two new documents are planning and design inputs first. They are not yet canonical replacements for current-state docs.
+These proposal documents are planning and design inputs first. They are not yet canonical replacements for current-state docs.
 
 After approval and implementation maturity:
 
@@ -570,24 +242,4 @@ Until then:
 
 ## 9. Review Questions For Future Implementation
 
-Any implementation derived from this roadmap should be reviewable against these questions:
-
-- does it preserve the existing private-key domain without semantic drift?
-- does it introduce a reusable protected app-data substrate rather than a one-off vault?
-- does it treat one shared `LAPersistedRight` as the first gate for app-data unlock secret access?
-- does it avoid making `AuthenticationMode` the normative gate for future app-data authorization?
-- does it fully specify `ProtectedDataRegistry` as the only membership authority?
-- does it keep shared-resource lifecycle state distinct from mutation execution phase?
-- does it define registry consistency invariants plus a deterministic recovery matrix?
-- does it keep recovery registry-first and evidence-second?
-- does it fully specify the shared-resource create/delete lifecycle and last-domain rule?
-- does it fully specify the DMK persistence and wrapped-DMK model?
-- does it make `AppSessionOrchestrator` the only grace-window owner?
-- does it keep app-data domains recoverable rather than private-key-style invalidating?
-- does it keep framework-level and domain-level recovery separate?
-- does it define fail-closed relock semantics and `restartRequired` clearly?
-- does it keep bootstrap metadata minimal and non-sensitive?
-- does it harden file protection explicitly instead of relying on platform defaults?
-- does it classify all existing persisted app-owned state into a reviewed target class and migration-readiness state?
-- does it make Contacts a consumer of the framework rather than the owner of a separate architecture?
-- does it keep anti-rollback explicitly out of scope in v1 rather than implying freshness guarantees?
+This roadmap no longer carries the detailed checklist inline. Use [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) Sections 2-5 as the review, readiness, and acceptance source for future implementation work.

@@ -5,7 +5,7 @@
 > **Purpose:** Record the temporary divergence between the current app-data protection proposal and the older Contacts proposal docs, and define how that divergence is resolved until the Contacts docs are updated.  
 > **Audience:** Engineering, security review, QA, and AI coding tools.  
 > **Companion documents:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)  
-> **Related documents:** [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md)
+> **Related documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md)
 
 ## 1. Why This Document Exists
 
@@ -14,6 +14,7 @@ The app-data protection proposal has evolved faster than the still-unrevised Con
 At the moment:
 
 - `APP_DATA_PROTECTION_PLAN.md` and `APP_DATA_PROTECTION_TDD.md` define the intended future shared protected-data framework
+- `APP_DATA_FRAMEWORK_SPEC.md`, `APP_DATA_MIGRATION_GUIDE.md`, and `APP_DATA_VALIDATION.md` hold the detailed execution, rollout, and review material for that framework
 - `CONTACTS_PRD.md` and `CONTACTS_TDD.md` still describe an older Contacts-specific vault protection model
 
 This document exists only to prevent that temporary divergence from becoming ambiguous implementation guidance.
@@ -26,17 +27,21 @@ For future protected-data planning work only:
 
 - `APP_DATA_PROTECTION_PLAN.md`
 - `APP_DATA_PROTECTION_TDD.md`
+- the detailed `APP_DATA_*` framework / migration / validation docs
 - this alignment document
 
 outrank conflicting older Contacts-vault implementation assumptions in `CONTACTS_PRD.md` and `CONTACTS_TDD.md`.
 
-This precedence rule does **not** make the Contacts docs current or obsolete by itself. It only defines how to interpret the temporary mismatch until the next documentation round updates the Contacts docs directly.
+This precedence rule does not make the Contacts docs current or obsolete by itself. It only defines how to interpret the temporary mismatch until the next documentation round updates the Contacts docs directly.
 
 For protected-data planning work, the effective reading order is:
 
 1. `APP_DATA_PROTECTION_PLAN.md`
 2. `APP_DATA_PROTECTION_TDD.md`
-3. this alignment document
+3. `APP_DATA_FRAMEWORK_SPEC.md`
+4. `APP_DATA_MIGRATION_GUIDE.md`
+5. `APP_DATA_VALIDATION.md`
+6. this alignment document
 
 ## 3. Current Conflict Inventory
 
@@ -55,6 +60,11 @@ Current app-data docs now say:
 - app-data uses one shared app-data secret plus per-domain wrapped DMKs in the canonical v1 model
 - custom Secure Enclave wrapping is no longer promised as the primary v1 app-data design
 
+Primary references:
+
+- [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.1-5.3 and 6.5
+- [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Section 3.2
+
 ### 3.2 Session Ownership And Unlock Authority
 
 Current Contacts docs still say:
@@ -70,6 +80,11 @@ Current app-data docs now say:
 - the shared app-data secret is not released before shared-right authorization succeeds
 - Contacts is expected to live under `AppSessionOrchestrator` -> `ProtectedDataSessionCoordinator` -> Contacts domain
 
+Primary references:
+
+- [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.3 and 5.5-5.8
+- [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.2
+
 ### 3.3 Shared Gate And Multi-Domain Session Model
 
 Current Contacts docs still imply a Contacts-specific vault session and Contacts-specific relock ownership.
@@ -80,6 +95,10 @@ Current app-data docs now say:
 - per-domain DMKs are lazy-unwrapped on first access
 - one successful app-data authorization covers all protected domains in the active app-data session
 - a second or third protected domain does not trigger another prompt in that same session
+
+Primary references:
+
+- [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.1, 5.6, and 7.3-7.4
 
 ### 3.4 Lifecycle Authority And Recovery Ownership
 
@@ -93,6 +112,11 @@ Current app-data docs now say:
 - filesystem artifacts are recovery evidence, not the normal authority
 - framework-level recovery and domain-scoped recovery are separate layers
 - Contacts is a domain-specific consumer with its own recovery contract, not the owner of framework session or lifecycle authority
+
+Primary references:
+
+- [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.4, 5.10-5.12, and 11.1-11.4
+- [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 2.1-2.6 and 3.1
 
 ### 3.5 Recovery Contract Ownership
 
@@ -110,11 +134,16 @@ Current app-data docs now define:
 - domain-scoped `recoveryNeeded` for wrapped-DMK or payload failure
 - `import-recoverable`, `resettable-with-confirmation`, and `blocking` domain contracts
 
+Primary references:
+
+- [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 11
+- [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) Sections 2-4
+
 ## 4. How To Read The Conflict For Now
 
 Until the Contacts docs are updated:
 
-- keep all Contacts product behavior assumptions that do **not** conflict with the app-data framework
+- keep all Contacts product behavior assumptions that do not conflict with the app-data framework
 - treat Contacts-specific storage, vault-key, session, lifecycle, and recovery implementation details as stale where they contradict the newer app-data proposal
 
 In practice, the newer app-data proposal should be treated as the future architectural source of truth for:
@@ -127,6 +156,13 @@ In practice, the newer app-data proposal should be treated as the future archite
 - shared recovery taxonomy
 - fail-closed relock semantics including `restartRequired`
 - first-party protected-domain ownership boundaries
+
+Use these detailed references when resolving conflicts:
+
+- [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture and security rules
+- [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) for registry, generation, wrapped-DMK, and interface mechanics
+- [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) for rollout sequencing and startup adoption detail
+- [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) for validation and review criteria
 
 The following Contacts assumptions remain compatible unless a later rewrite explicitly changes them:
 
