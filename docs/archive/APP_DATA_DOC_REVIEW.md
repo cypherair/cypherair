@@ -1,8 +1,10 @@
 # App Data Documentation Review
 
-> Status: Active review snapshot from 2026-04-20. This file records one point-in-time review of the App Data proposal stack against the current repository state.
+> Status: Archived review snapshot from 2026-04-20. Kept as historical evidence for one point-in-time review of the App Data proposal stack against the current repository state.
+> Archival reason: The active `APP_DATA_*` proposal docs have since absorbed the key follow-up fixes and now serve as the working implementation reference.
+> Successor docs: [APP_DATA_PROTECTION_PLAN](../APP_DATA_PROTECTION_PLAN.md), [APP_DATA_PROTECTION_TDD](../APP_DATA_PROTECTION_TDD.md), [APP_DATA_FRAMEWORK_SPEC](../APP_DATA_FRAMEWORK_SPEC.md), [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md), and [APP_DATA_VALIDATION](../APP_DATA_VALIDATION.md).
 > Scope: `APP_DATA_PROTECTION_PLAN.md`, `APP_DATA_PROTECTION_TDD.md`, `APP_DATA_FRAMEWORK_SPEC.md`, `APP_DATA_MIGRATION_GUIDE.md`, and `APP_DATA_VALIDATION.md`, with comparison against archived `archive/APP_DATA_CONTACTS_ALIGNMENT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TESTING.md`, and current code.
-> Source priority: Current code and active canonical docs outrank this review snapshot whenever they disagree.
+> Current code and active canonical docs outrank this archived file whenever they disagree.
 
 ## Executive Summary
 
