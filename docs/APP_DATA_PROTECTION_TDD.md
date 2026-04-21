@@ -450,8 +450,9 @@ Allowed framework recovery dispositions:
 
 - `resumeSteadyState`
 - `continuePendingMutation`
-- `cleanupOnly`
 - `frameworkRecoveryNeeded`
+
+`cleanupOnly` is not a standalone framework recovery disposition. It is the named post-classification orphan shared-resource cleanup action that may run only under the empty steady-state row (`0 / absent / none / n/a`) before `resumeSteadyState` is returned.
 
 The detailed matrix and evidence ordering rules live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 2.2-2.6.
 
@@ -467,11 +468,12 @@ Recovery follows a fixed ordering:
 
 Evidence may:
 
-- prove orphan cleanup is legal
+- authorize post-classification `cleanupOnly` under the empty steady-state row without changing row classification or final disposition
 - prove a pending mutation advanced far enough that recovery should continue it
 
 Evidence must not:
 
+- change the classified registry row
 - create committed membership
 - substitute for a committed shared-resource promise
 - turn an uncommitted domain into a committed member

@@ -56,7 +56,7 @@ This document is a downstream review aid. It does not change the architecture or
 
 - startup recovery classifies registry rows through documented invariants plus the consistency matrix before inspecting evidence
 - interrupted create/delete operations recover deterministically from registry plus pending mutation state
-- orphan shared-resource evidence with empty membership uses `cleanupOnly`
+- orphan shared-resource evidence with empty membership may authorize post-classification `cleanupOnly` under the empty steady-state row without changing row classification or final disposition
 - invariant violations or unclassifiable rows enter `frameworkRecoveryNeeded`
 - valid `current` and `previous` generations are selected consistently
 - no unreadable local state silently resets to empty domain content
@@ -84,7 +84,7 @@ This document is a downstream review aid. It does not change the architecture or
 - wrong auth does not unlock the shared app-data session
 - pre-auth attempts must not fetch `LASecret`
 - invariant violation or unclassifiable registry row enters `frameworkRecoveryNeeded`
-- orphan shared-resource evidence with empty membership triggers `cleanupOnly`
+- orphan shared-resource evidence with empty membership must only authorize post-classification `cleanupOnly` under the empty steady-state row; it must not split registry classification or final disposition
 - missing shared right or unreadable shared secret for a row that expects `ready` enters `frameworkRecoveryNeeded`
 - unreadable wrapped-DMK state enters only that domain's `recoveryNeeded`
 - corrupted envelope hard-fails on authentication or structural validation
@@ -94,6 +94,16 @@ This document is a downstream review aid. It does not change the architecture or
 - `ProtectedSettingsStore` reset requires explicit destructive confirmation
 - Contacts recovery remains import-based
 - anti-rollback is not implied by `current / previous / pending`
+
+### 2.7 Repository Validation Ownership
+
+This draft proposal must map its validation buckets onto the repository's existing test layers and commands. This section assigns that ownership for draft-phase implementation work only; `TESTING.md` remains the later synchronization target after approval and implementation maturity.
+
+- registry authority, state-machine, consistency-matrix, and invariant checks belong to Swift unit coverage in `CypherAir-UnitTests` using `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
+- startup recovery, relock orchestration, and route-handoff integration belong to macOS-local validation using `CypherAir-UnitTests`, with `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` added whenever launch, routing, or protected-content smoke coverage is part of the change
+- `LAPersistedRight` behavior, real LocalAuthentication prompt semantics, and device-only authorization guarantees belong to `CypherAir-DeviceTests` using `xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests -destination 'platform=iOS,name=<DEVICE_NAME>'`, plus explicit manual device validation whenever automation cannot prove platform prompt timing or system UX behavior
+- file-protection strength, container containment, and absence of fallback to broader storage locations belong to platform-targeted macOS-local integration/manual verification, with automated macOS-local test coverage added where feasible and manual verification retained where the current repository does not yet have a dedicated protected-data file-metadata lane
+- migration survivability, startup adoption, and no-silent-reset guarantees belong to Swift unit coverage in `CypherAir-UnitTests` plus targeted macOS-local integration validation, adding the `CypherAir-MacUITests` macOS smoke path when startup routing or user-visible recovery flows are part of the scenario
 
 ## 3. Implementation Readiness Expectations
 

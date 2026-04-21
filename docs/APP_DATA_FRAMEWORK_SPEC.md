@@ -104,8 +104,7 @@ Startup recovery must classify the registry row through this matrix before it in
 
 | Committed membership | Shared-resource state | Pending mutation | Target relation | Allowed external evidence | Recovery disposition |
 |----------------------|-----------------------|------------------|-----------------|---------------------------|----------------------|
-| `0` | `absent` | none | n/a | none required | `resumeSteadyState` |
-| `0` | `absent` | none | n/a | orphan shared-resource evidence only | `cleanupOnly` |
+| `0` | `absent` | none | n/a | none required; orphan shared-resource evidence may authorize post-classification `cleanupOnly` | `resumeSteadyState` |
 | `>0` | `ready` | none | n/a | committed domain directories, wrapped-DMK records, and generations for committed members | `resumeSteadyState` |
 | `0` | `absent` | `createDomain(..., journaled)` | target absent from membership | staged domain artifacts may be absent or partial; no committed shared-resource promise exists yet | `continuePendingMutation` |
 | `0` | `absent` | `createDomain(..., sharedResourceProvisioned or artifactsStaged or validated)` | target absent from membership | staged domain artifacts plus provisioned shared-resource evidence | `continuePendingMutation` |
@@ -117,6 +116,8 @@ Startup recovery must classify the registry row through this matrix before it in
 
 Rows that classify to `continuePendingMutation` may continue the journaled transaction or, when the documented step is already satisfied, finish by clearing `pendingMutation`. They do not create new committed membership beyond what the registry row already declares.
 
+The empty steady-state row (`0 / absent / none / n/a`) may run the documented post-classification `cleanupOnly` action when orphan shared-resource evidence is present, but that action does not change row classification or the final `resumeSteadyState` recovery disposition.
+
 ### 2.6 Recovery Evidence Ordering
 
 Recovery uses registry-first ordering:
@@ -127,10 +128,15 @@ Recovery uses registry-first ordering:
 4. inspect only the external evidence authorized by that matrix row
 5. emit exactly one recovery disposition
 
-External evidence may prove orphan cleanup is legal or that a pending mutation advanced far enough to continue.
+External evidence may:
+
+- authorize post-classification `cleanupOnly` under the empty steady-state row
+- prove that a pending mutation advanced far enough to continue
 
 External evidence must not:
 
+- change the classified registry row
+- change the final `resumeSteadyState` disposition of the empty steady-state row
 - create committed membership
 - satisfy a missing committed shared-resource requirement by inference alone
 - reinterpret an uncommitted target domain as committed state

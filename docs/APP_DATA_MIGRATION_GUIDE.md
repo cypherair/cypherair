@@ -155,6 +155,7 @@ Startup recovery derived from this guide must also:
 
 - validate registry schema and consistency rules before inspecting evidence
 - use the registry row to decide which evidence is allowed to be consulted
+- keep registry classification single-valued, using orphan shared-resource evidence only to authorize post-classification `cleanupOnly` under the empty steady-state row
 - emit exactly one documented recovery disposition instead of implementation-defined branching
 
 ### 3.2 App-Data Session Lifetime

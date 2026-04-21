@@ -121,7 +121,7 @@ See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.3.
 
 ### 4.10 Deterministic Registry Recovery Model
 
-Startup recovery begins from the registry row, not filesystem inference. Shared-resource lifecycle state and pending mutation phase remain distinct inputs, and every valid row must classify to one documented recovery disposition.
+Startup recovery begins from the registry row, not filesystem inference. Shared-resource lifecycle state and pending mutation phase remain distinct inputs, every valid row must classify to one documented recovery disposition, and orphan shared-resource cleanup is limited to an optional post-classification `cleanupOnly` action under the empty steady-state row.
 
 See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.10-5.12 and 11.1, plus [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 2.2-2.6.
 
