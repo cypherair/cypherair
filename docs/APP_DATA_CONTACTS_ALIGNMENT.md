@@ -32,6 +32,12 @@ outrank conflicting older Contacts-vault implementation assumptions in `CONTACTS
 
 This precedence rule does **not** make the Contacts docs current or obsolete by itself. It only defines how to interpret the temporary mismatch until the next documentation round updates the Contacts docs directly.
 
+For protected-data planning work, the effective reading order is:
+
+1. `APP_DATA_PROTECTION_PLAN.md`
+2. `APP_DATA_PROTECTION_TDD.md`
+3. this alignment document
+
 ## 3. Current Conflict Inventory
 
 The following conflicts currently exist between the app-data proposal and the Contacts proposal docs.
@@ -82,6 +88,8 @@ Current Contacts docs still imply that Contacts-vault files and vault-key state 
 Current app-data docs now say:
 
 - `ProtectedDataRegistry` is the sole authority for committed domain membership and shared-resource lifecycle
+- registry consistency is evaluated before filesystem evidence is interpreted
+- shared-resource lifecycle state and mutation execution phase are separate concepts
 - filesystem artifacts are recovery evidence, not the normal authority
 - framework-level recovery and domain-scoped recovery are separate layers
 - Contacts is a domain-specific consumer with its own recovery contract, not the owner of framework session or lifecycle authority
@@ -98,6 +106,7 @@ Current app-data docs now define:
 
 - a shared protected-data recovery taxonomy
 - `frameworkRecoveryNeeded` for shared-resource failure
+- `restartRequired` for fail-closed relock failure in the current process
 - domain-scoped `recoveryNeeded` for wrapped-DMK or payload failure
 - `import-recoverable`, `resettable-with-confirmation`, and `blocking` domain contracts
 
@@ -113,8 +122,10 @@ In practice, the newer app-data proposal should be treated as the future archite
 - protected-domain authorization boundary
 - shared session ownership
 - registry authority
+- registry consistency matrix and recovery ordering
 - startup authentication split
 - shared recovery taxonomy
+- fail-closed relock semantics including `restartRequired`
 - first-party protected-domain ownership boundaries
 
 The following Contacts assumptions remain compatible unless a later rewrite explicitly changes them:
@@ -122,6 +133,7 @@ The following Contacts assumptions remain compatible unless a later rewrite expl
 - Contacts may still use one encrypted Contacts payload as its domain storage choice
 - Contacts remains `import-recoverable`
 - no plaintext derivative caches or indexes may persist outside the protected Contacts domain
+- Contacts later reusing the shared framework means Contacts also inherits the registry consistency matrix and fail-closed relock semantics of that framework
 
 ## 5. Contacts Sections That Must Be Rewritten Next Round
 
