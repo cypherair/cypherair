@@ -6,7 +6,7 @@
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Primary authority:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture and security rules, and [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) for rollout intent.
 > **Companion documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md)
-> **Related documents:** [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md) · [TESTING](TESTING.md)
+> **Related documents:** [TESTING](TESTING.md) · [CONTACTS_TDD](CONTACTS_TDD.md)
 
 ## 1. Scope And Relationship
 
@@ -38,6 +38,8 @@ This document is a downstream review aid. It does not change the architecture or
 
 - one shared `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary
 - the shared app-data secret is fetched only after authorization
+- if launch/resume immediately enters a route that needs protected-domain content, that same orchestrated flow may activate the shared app-data session without surfacing a later second prompt
+- launch/resume authentication alone does not imply that the shared app-data session is already active
 - a second or third protected domain does not require another prompt in the same active app-data session
 - `AppSessionOrchestrator` is the only grace-window owner
 - `ProtectedDataSessionCoordinator` does not run an independent grace timer
@@ -145,4 +147,4 @@ Before treating this proposal stack as implementation-ready:
 - `APP_DATA_MIGRATION_GUIDE.md` must stand alone as the rollout and inventory reference
 - this validation guide must stand alone as the review and checklist reference
 - `APP_DATA_PROTECTION_PLAN.md` must remain concise and phase-oriented rather than duplicating the detailed specs
-- `APP_DATA_CONTACTS_ALIGNMENT.md` must point readers to the right successor documents without adding a third architecture
+- archived bridge documents must point readers to the right successor documents without adding a third architecture

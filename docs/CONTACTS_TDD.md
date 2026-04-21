@@ -7,7 +7,7 @@
 > **Companion document:** [CONTACTS_PRD](CONTACTS_PRD.md)  
 > **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific technical direction.  
 > **Primary framework references:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) · [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md)  
-> **Related documents:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Related documents:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Technical Scope
 
@@ -403,9 +403,14 @@ Required rules:
 Contacts access follows this order:
 
 1. the app enters `AppSessionOrchestrator`
-2. if protected-domain access is needed and the shared app-data session is inactive, the orchestrator asks `ProtectedDataSessionCoordinator` to authorize the shared right
-3. after authorization succeeds, the Contacts domain DMK may lazy-unlock through framework-owned key management
-4. `ContactService` opens the Contacts domain snapshot and derived in-memory indexes
+2. if app session is not active, `AppSessionOrchestrator` completes app-level privacy unlock first
+3. `first real protected-domain access` means the first route in the current app session that actually needs protected-domain content, not process launch by itself
+4. on first real Contacts access, if the shared app-data session is inactive, the orchestrator asks `ProtectedDataSessionCoordinator` to authorize the shared right
+5. if launch/resume immediately continues into a Contacts-dependent route, that same orchestrated flow may authorize the shared right there rather than surfacing a later second Contacts-specific prompt
+6. after authorization succeeds, the Contacts domain DMK may lazy-unlock through framework-owned key management
+7. `ContactService` opens the Contacts domain snapshot and derived in-memory indexes
+
+Completing launch/resume authentication alone does not imply that the shared app-data session is already active.
 
 Ordinary Contacts browsing, search, tag/list management, and recipient selection reuse the active shared app-data session and do not trigger a Contacts-specific second prompt.
 
@@ -519,6 +524,8 @@ Legacy source:
 ### 11.2 Migration Phases
 
 Contacts migration occurs only after the shared framework prerequisites from App Data Phases 1-3 are already satisfied.
+
+The cutover trigger is the first Contacts-required protected-domain access after that Phase 4 adoption point is reached. That access may occur during launch or resume if the initial route immediately needs Contacts data, but migration must not be triggered merely by process launch or service initialization.
 
 Migration sequence:
 
@@ -679,6 +686,8 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 - decrypt completes plaintext while verification stays pending
 - verify requires unlock
 - unlock cancel/failure results in hard stop for verify
+- if launch/resume immediately enters Contacts-required protected access, the same orchestrated flow authorizes the shared app-data session before Contacts opens
+- launch/resume authentication alone is not treated as an already active app-data session unless shared-right authorization also completed
 - ordinary Contacts use within an already active app-data session does not trigger redundant prompts
 - if another protected domain already activated the shared session, opening Contacts does not prompt again
 - framework-level blocked state is surfaced distinctly from Contacts domain recovery
@@ -697,6 +706,7 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 ### 14.6 Migration And Recovery
 
 - Contacts adoption occurs only after App Data Phase 1-3 prerequisites
+- Contacts migration is triggered by first Contacts-required protected-domain access, not by process launch or service initialization alone
 - target Contacts domain is validated before legacy source retirement
 - quarantine storage is inactive for normal Contacts resolution
 - final deletion happens only after next successful Contacts domain open

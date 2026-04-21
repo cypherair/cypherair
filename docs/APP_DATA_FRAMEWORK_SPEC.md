@@ -6,7 +6,7 @@
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Primary authority:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture boundaries, security posture, and core design constraints.
 > **Companion documents:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
-> **Related documents:** [APP_DATA_CONTACTS_ALIGNMENT](APP_DATA_CONTACTS_ALIGNMENT.md) · [CONTACTS_TDD](CONTACTS_TDD.md)
+> **Related documents:** [CONTACTS_TDD](CONTACTS_TDD.md)
 
 ## 1. Scope And Precedence
 
@@ -295,6 +295,7 @@ Owns:
 - shared right authorization, deauthorization, and secret lifetime
 - framework session state
 - reuse of active shared app-data session
+- no independent grace-window or launch/resume UX ownership
 - relock orchestration
 - zeroization of the shared secret and all unwrapped DMKs on relock
 - latching `restartRequired` and blocking further protected-domain access in the current process
@@ -326,6 +327,7 @@ Owns:
 
 - grace-window policy
 - launch/resume privacy-auth sequencing
+- single user-visible unlock sequencing for launch/resume plus first protected-domain handoff when the initial route requires protected contents
 - scene lifecycle intake
 - app lock/relock initiation
 - handoff to `ProtectedDataSessionCoordinator` for first protected-domain access
