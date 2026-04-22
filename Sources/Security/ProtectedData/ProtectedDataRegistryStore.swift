@@ -61,7 +61,7 @@ struct ProtectedDataRegistryStore {
 
     func loadRegistry() throws -> ProtectedDataRegistry {
         try storageRoot.validatePersistentStorageContract()
-        let data = try Data(contentsOf: storageRoot.registryURL)
+        let data = try storageRoot.readManagedData(at: storageRoot.registryURL)
         let decoder = PropertyListDecoder()
         let registry = try decoder.decode(ProtectedDataRegistry.self, from: data)
 

@@ -131,6 +131,86 @@ final class ProtectedDataStorageRootTests: XCTestCase {
         XCTAssertFalse(fileManager.fileExists(atPath: storageRoot.rootURL.path))
     }
 
+    func test_productionContract_rootSymlinkEscapingApplicationSupport_failsClosedBeforeBootstrap() throws {
+        let baseDirectory = try makeApplicationSupportTestDirectory("ProtectedDataRootSymlinkEscape")
+        let outsideTarget = makeTemporaryDirectory("ProtectedDataRootSymlinkOutside")
+        defer { try? fileManager.removeItem(at: baseDirectory) }
+        defer { try? fileManager.removeItem(at: outsideTarget) }
+
+        try fileManager.createSymbolicLink(
+            at: baseDirectory.appendingPathComponent("ProtectedData", isDirectory: true),
+            withDestinationURL: outsideTarget
+        )
+
+        let storageRoot = makeProductionStorageRoot(baseDirectory: baseDirectory)
+        let store = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.root-symlink-escape"
+        )
+
+        XCTAssertThrowsError(try store.performSynchronousBootstrap()) { error in
+            XCTAssertEqual(error as? ProtectedDataError, .storageRootOutsideApplicationSupport)
+        }
+        try assertDirectoryIsEmpty(outsideTarget)
+    }
+
+    func test_productionContract_baseDirectorySymlinkEscapingApplicationSupport_failsClosedBeforeBootstrap() throws {
+        let applicationSupportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let symlinkBaseDirectory = applicationSupportDirectory.appendingPathComponent(
+            "ProtectedDataBaseSymlinkEscape-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let outsideTarget = makeTemporaryDirectory("ProtectedDataBaseSymlinkOutside")
+        defer { try? fileManager.removeItem(at: symlinkBaseDirectory) }
+        defer { try? fileManager.removeItem(at: outsideTarget) }
+
+        try fileManager.createSymbolicLink(at: symlinkBaseDirectory, withDestinationURL: outsideTarget)
+
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: symlinkBaseDirectory,
+            validationMode: .enforceAppSupportContainment
+        )
+        let store = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.base-symlink-escape"
+        )
+
+        XCTAssertThrowsError(try store.performSynchronousBootstrap()) { error in
+            XCTAssertEqual(error as? ProtectedDataError, .storageRootOutsideApplicationSupport)
+        }
+        try assertDirectoryIsEmpty(outsideTarget)
+    }
+
+    func test_productionContract_rootSymlinkResolvingInsideApplicationSupport_bootstrapsSuccessfully() throws {
+        let baseDirectory = try makeApplicationSupportTestDirectory("ProtectedDataRootSymlinkContained")
+        let applicationSupportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let containedTarget = applicationSupportDirectory.appendingPathComponent(
+            "ProtectedDataRootSymlinkTarget-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? fileManager.removeItem(at: baseDirectory) }
+        defer { try? fileManager.removeItem(at: containedTarget) }
+
+        try fileManager.createDirectory(at: containedTarget, withIntermediateDirectories: true)
+        try fileManager.createSymbolicLink(
+            at: baseDirectory.appendingPathComponent("ProtectedData", isDirectory: true),
+            withDestinationURL: containedTarget
+        )
+
+        let storageRoot = makeProductionStorageRoot(baseDirectory: baseDirectory)
+        let store = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.root-symlink-contained"
+        )
+
+        XCTAssertNoThrow(try store.performSynchronousBootstrap())
+        XCTAssertTrue(
+            fileManager.fileExists(
+                atPath: containedTarget.appendingPathComponent("ProtectedDataRegistry.plist").path
+            )
+        )
+    }
+
     private func makeProductionStorageRoot(baseDirectory: URL) -> AppProtectedDataStorageRoot {
         AppProtectedDataStorageRoot(
             baseDirectory: baseDirectory,
@@ -165,6 +245,15 @@ final class ProtectedDataStorageRootTests: XCTestCase {
             file: file,
             line: line
         )
+    }
+
+    private func assertDirectoryIsEmpty(
+        _ url: URL,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+        XCTAssertTrue(contents.isEmpty, file: file, line: line)
     }
 
     private func cleanupUITestContainer(_ container: AppAppContainer) {

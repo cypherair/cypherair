@@ -150,7 +150,7 @@ final class ProtectedDomainKeyManager {
 
         try storageRoot.writeProtectedData(data, to: stagedURL)
 
-        let stagedData = try Data(contentsOf: stagedURL)
+        let stagedData = try storageRoot.readManagedData(at: stagedURL)
         let decoded = try PropertyListDecoder().decode(WrappedDomainMasterKeyRecord.self, from: stagedData)
         var validatedDomainMasterKey = try unwrapDomainMasterKey(from: decoded, wrappingRootKey: wrappingRootKey)
         validatedDomainMasterKey.protectedDataZeroize()
@@ -161,11 +161,11 @@ final class ProtectedDomainKeyManager {
     func loadWrappedDomainMasterKeyRecord(for domainID: ProtectedDataDomainID) throws -> WrappedDomainMasterKeyRecord? {
         try storageRoot.validatePersistentStorageContract()
         let url = storageRoot.committedWrappedDomainMasterKeyURL(for: domainID)
-        guard FileManager.default.fileExists(atPath: url.path) else {
+        guard try storageRoot.managedItemExists(at: url) else {
             return nil
         }
 
-        let data = try Data(contentsOf: url)
+        let data = try storageRoot.readManagedData(at: url)
         let record = try PropertyListDecoder().decode(WrappedDomainMasterKeyRecord.self, from: data)
         try record.validateContract()
         return record
