@@ -2,6 +2,7 @@ import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
+#if os(iOS)
 final class DeviceProtectedDataRightStoreTests: XCTestCase {
     private var rightStoreClient: ProtectedDataRightStoreClient!
     private var trackedRightIdentifiers: [String] = []
@@ -70,3 +71,4 @@ final class DeviceProtectedDataRightStoreTests: XCTestCase {
         try await Task.sleep(for: .seconds(2))
     }
 }
+#endif

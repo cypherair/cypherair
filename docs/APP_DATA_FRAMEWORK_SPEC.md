@@ -116,6 +116,8 @@ Startup recovery must classify the registry row through this matrix before it in
 
 Rows that classify to `continuePendingMutation` may continue the journaled transaction or, when the documented step is already satisfied, finish by clearing `pendingMutation`. They do not create new committed membership beyond what the registry row already declares.
 
+Bootstrap APIs must preserve `continuePendingMutation` as an explicit output. It must not be collapsed into ordinary steady-state `sessionLocked` semantics.
+
 The empty steady-state row (`0 / absent / none / n/a`) may run the documented post-classification `cleanupOnly` action when orphan shared-resource evidence is present, but that action does not change row classification or the final `resumeSteadyState` recovery disposition.
 
 ### 2.6 Recovery Evidence Ordering
@@ -306,6 +308,10 @@ Owns:
 - enforcement of registry consistency invariants
 - framework-level recovery classification before external evidence inspection
 - synchronous empty-registry bootstrap when the protected-data root contains no artifacts
+- bootstrap outcome construction that can represent:
+  - trusted empty steady-state registry
+  - trusted loaded registry plus recovery disposition
+  - framework-recovery with no trusted registry
 
 ### `ProtectedDomainBootstrapStore.swift`
 
@@ -336,6 +342,8 @@ Owns:
 - relock orchestration
 - zeroization of the shared secret and all unwrapped DMKs on relock
 - latching `restartRequired` and blocking further protected-domain access in the current process
+- post-bootstrap shared-right/shared-secret validation before protected-domain access proceeds
+- explicit cleanup when authorization partially succeeds but secret loading or root-key derivation fails
 
 ### `ProtectedDataRelockParticipant.swift`
 
@@ -368,6 +376,12 @@ Owns:
 - scene lifecycle intake
 - app lock/relock initiation
 - handoff to `ProtectedDataSessionCoordinator` for first protected-domain access
+- protected-data access-gate evaluation that distinguishes:
+  - framework recovery
+  - pending mutation recovery required
+  - authorization required
+  - already authorized
+  - no protected domain present
 
 Phase 1 implementation note:
 

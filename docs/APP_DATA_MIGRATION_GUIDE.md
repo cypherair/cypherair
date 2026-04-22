@@ -157,6 +157,7 @@ Phase 1 implementation note:
 - `CypherAirApp.init()` remains the synchronous startup entry point
 - `AppStartupCoordinator.performPreAuthBootstrap(...)` is the only startup hook allowed to touch `ProtectedDataRegistry` before authorization
 - that bootstrap path may create the empty steady-state registry but may not authorize the shared right
+- cold-start bootstrap output is an initial handoff only; later protected-domain access must consult current framework state instead of treating the startup snapshot as perpetual truth
 
 Startup recovery derived from this guide must also:
 
@@ -221,6 +222,8 @@ Current Phase 1 implementation status:
 - `AppStartupCoordinator.performPreAuthBootstrap(...)` now owns the synchronous pre-auth registry bootstrap/classification step
 - `AppSessionOrchestrator` owns grace-window timing, content-clear generation, and privacy-auth sequencing
 - `ProtectedDataSessionCoordinator` exists but is not triggered during ordinary startup because no real protected domain has landed yet
+- `continuePendingMutation` is now preserved as a distinct bootstrap outcome instead of being folded into steady state
+- shared-right/shared-secret usability is a post-bootstrap framework-gate concern, not a synchronous `init()` concern
 
 ## 4. Persisted-State Classification Inventory
 

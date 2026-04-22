@@ -32,29 +32,63 @@ final class ProtectedDataSessionCoordinator {
         )
     }
 
-    func authorizeSharedRight(localizedReason: String) async throws {
+    func beginProtectedDataAuthorization(
+        registry: ProtectedDataRegistry,
+        localizedReason: String
+    ) async -> ProtectedDataAuthorizationResult {
         if frameworkState == .restartRequired {
-            throw ProtectedDataError.restartRequired
+            return .frameworkRecoveryNeeded
         }
 
-        if sharedRight == nil {
-            sharedRight = try await rightStoreClient.right(forIdentifier: sharedRightIdentifier)
+        guard registry.sharedResourceLifecycleState == .ready else {
+            return .frameworkRecoveryNeeded
+        }
+
+        do {
+            if sharedRight == nil {
+                sharedRight = try await rightStoreClient.right(forIdentifier: registry.sharedRightIdentifier)
+            }
+        } catch {
+            frameworkState = .frameworkRecoveryNeeded
+            return .frameworkRecoveryNeeded
         }
 
         guard let sharedRight else {
-            throw ProtectedDataError.missingPersistedRight(sharedRightIdentifier)
+            frameworkState = .frameworkRecoveryNeeded
+            return .frameworkRecoveryNeeded
         }
 
-        try await sharedRight.authorize(localizedReason: localizedReason)
-
-        var rawSecret = try await sharedRight.rawSecretData()
-        let derivedWrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rawSecret)
-
-        if wrappingRootKey != nil {
-            wrappingRootKey?.protectedDataZeroize()
+        do {
+            try await sharedRight.authorize(localizedReason: localizedReason)
+        } catch {
+            return .cancelledOrDenied
         }
-        wrappingRootKey = derivedWrappingRootKey
-        frameworkState = .sessionAuthorized
+        do {
+            var rawSecret = try await sharedRight.rawSecretData()
+            let derivedWrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rawSecret)
+
+            if wrappingRootKey != nil {
+                wrappingRootKey?.protectedDataZeroize()
+            }
+            wrappingRootKey = derivedWrappingRootKey
+            frameworkState = .sessionAuthorized
+            return .authorized
+        } catch {
+            await sharedRight.deauthorize()
+            if wrappingRootKey != nil {
+                wrappingRootKey?.protectedDataZeroize()
+                wrappingRootKey = nil
+            }
+            frameworkState = .frameworkRecoveryNeeded
+            return .frameworkRecoveryNeeded
+        }
+    }
+
+    func authorizeSharedRight(localizedReason: String) async throws {
+        if frameworkState == .sessionAuthorized {
+            return
+        }
+        throw ProtectedDataError.authorizingUnavailable
     }
 
     func wrappingRootKeyData() throws -> Data {

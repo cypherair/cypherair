@@ -10448,6 +10448,22 @@
           }
         }
       }
+    },
+    "startup.protectedData.pendingRecovery" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected app data has pending recovery work that must complete before protected content can open."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的应用数据仍有待完成的恢复工作，必须先完成恢复后才能打开受保护内容。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
