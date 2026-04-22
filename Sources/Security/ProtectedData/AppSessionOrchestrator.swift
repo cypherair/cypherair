@@ -154,28 +154,15 @@ final class AppSessionOrchestrator {
                 if registry.committedMembership.isEmpty && registry.sharedResourceLifecycleState == .absent {
                     return .noProtectedDomainPresent
                 }
-                if protectedDataSessionCoordinator.frameworkState == .sessionAuthorized {
+                switch protectedDataSessionCoordinator.frameworkState {
+                case .frameworkRecoveryNeeded, .restartRequired:
+                    return .frameworkRecoveryNeeded
+                case .sessionAuthorized:
                     return .alreadyAuthorized(registry: registry)
+                case .sessionLocked:
+                    return .authorizationRequired(registry: registry)
                 }
-                return .authorizationRequired(registry: registry)
             }
-        }
-    }
-
-    func beginProtectedDataAuthorizationIfNeeded(
-        gateDecision: ProtectedDataAccessGateDecision,
-        localizedReason: String
-    ) async -> ProtectedDataAuthorizationResult {
-        switch gateDecision {
-        case .frameworkRecoveryNeeded, .pendingMutationRecoveryRequired, .noProtectedDomainPresent:
-            return .frameworkRecoveryNeeded
-        case .alreadyAuthorized:
-            return .authorized
-        case .authorizationRequired(let registry):
-            return await protectedDataSessionCoordinator.beginProtectedDataAuthorization(
-                registry: registry,
-                localizedReason: localizedReason
-            )
         }
     }
 }

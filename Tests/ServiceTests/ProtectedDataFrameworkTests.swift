@@ -605,6 +605,96 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(reusedRegistry, registry)
     }
 
+    func test_accessGate_readyRegistryWithLatchedFrameworkRecovery_returnsFrameworkRecoveryNeeded() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessFrameworkRecovery"))
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rightStoreClient: rightStoreClient,
+            domainKeyManager: keyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.framework-recovery"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.framework-recovery",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["contacts": .active],
+            pendingMutation: nil
+        )
+
+        let authorizationResult = await coordinator.beginProtectedDataAuthorization(
+            registry: registry,
+            localizedReason: "Trigger framework recovery"
+        )
+        XCTAssertEqual(authorizationResult, .frameworkRecoveryNeeded)
+        XCTAssertEqual(coordinator.frameworkState, .frameworkRecoveryNeeded)
+
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: { registry },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 180 },
+            requireAuthOnLaunchProvider: { true },
+            evaluateAppAuthentication: { _ in true },
+            protectedDataSessionCoordinator: coordinator
+        )
+
+        let decision = orchestrator.evaluateProtectedDataAccessGate(
+            startupBootstrapOutcome: .loadedRegistry(registry: registry, recoveryDisposition: .resumeSteadyState),
+            isFirstProtectedAccessInCurrentProcess: true
+        )
+
+        XCTAssertEqual(decision, .frameworkRecoveryNeeded)
+    }
+
+    func test_accessGate_readyRegistryWithRestartRequired_returnsFrameworkRecoveryNeeded() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessRestartRequired"))
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
+            identifier: "com.cypherair.tests.protected-data.gate.restart-required",
+            secretData: Data(repeating: 0xB0, count: 32)
+        )
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rightStoreClient: rightStoreClient,
+            domainKeyManager: keyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.restart-required"
+        )
+        let participant = MockProtectedDataRelockParticipant()
+        participant.shouldThrow = true
+        coordinator.registerRelockParticipant(participant)
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.restart-required",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["contacts": .active],
+            pendingMutation: nil
+        )
+
+        let authorizationResult = await coordinator.beginProtectedDataAuthorization(
+            registry: registry,
+            localizedReason: "Authorize protected data"
+        )
+        XCTAssertEqual(authorizationResult, .authorized)
+        await coordinator.relockCurrentSession()
+        XCTAssertEqual(coordinator.frameworkState, .restartRequired)
+
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: { registry },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 180 },
+            requireAuthOnLaunchProvider: { true },
+            evaluateAppAuthentication: { _ in true },
+            protectedDataSessionCoordinator: coordinator
+        )
+
+        let decision = orchestrator.evaluateProtectedDataAccessGate(
+            startupBootstrapOutcome: .loadedRegistry(registry: registry, recoveryDisposition: .resumeSteadyState),
+            isFirstProtectedAccessInCurrentProcess: true
+        )
+
+        XCTAssertEqual(decision, .frameworkRecoveryNeeded)
+    }
+
     func test_authorization_missingRight_returnsFrameworkRecoveryNeeded() async throws {
         let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAuthorizationMissingRight"))
         let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
