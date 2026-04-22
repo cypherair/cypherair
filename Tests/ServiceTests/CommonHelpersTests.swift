@@ -441,6 +441,10 @@ final class CommonHelpersTests: XCTestCase {
             sharedRightIdentifier: CypherAir.ProtectedDataRightIdentifiers.productionSharedRightIdentifier
         )
         let appSessionOrchestrator = CypherAir.AppSessionOrchestrator(
+            currentRegistryProvider: {
+                try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
+            },
+            shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { config.gracePeriod },
             requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthentication: { reason in

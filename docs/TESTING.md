@@ -35,7 +35,7 @@ are not part of the standard GitHub workflows.
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
-**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData Phase 1 framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, and startup seam validation. Uses protocol-based mocks for Keychain and SE.
+**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData Phase 1 framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, and protected-data access-gate decisions. Uses protocol-based mocks for Keychain and SE.
 
 ```bash
 # Practical local path used in this repository
@@ -91,6 +91,13 @@ ProtectedData device-test isolation rules:
 - never use the production shared-right identifier in tests
 - clean up by identifier before and after each device test
 - do not call `removeAllRightsWithCompletion()`
+
+ProtectedData Phase 1 unit-test expectations:
+
+- verify that pre-auth bootstrap never touches `LARightStore`
+- verify that bootstrap can return framework recovery without a trusted registry object
+- verify that `.continuePendingMutation` is preserved as an explicit bootstrap outcome
+- verify that the access gate distinguishes authorization-required, already-authorized, pending-mutation-recovery, framework-recovery, and no-protected-domain states
 
 **CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`.
 

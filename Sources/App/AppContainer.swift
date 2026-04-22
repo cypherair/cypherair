@@ -96,6 +96,10 @@ final class AppContainer {
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
         )
         let appSessionOrchestrator = AppSessionOrchestrator(
+            currentRegistryProvider: {
+                try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
+            },
+            shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { config.gracePeriod },
             requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthentication: { reason in
@@ -210,6 +214,10 @@ final class AppContainer {
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
         )
         let appSessionOrchestrator = AppSessionOrchestrator(
+            currentRegistryProvider: {
+                try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
+            },
+            shouldBypassPrivacyAuthentication: { !requiresManualAuthentication },
             gracePeriodProvider: { config.gracePeriod },
             requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthentication: { reason in

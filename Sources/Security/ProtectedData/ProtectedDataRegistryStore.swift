@@ -1,9 +1,8 @@
 import Foundation
 
 struct ProtectedDataRegistryBootstrapResult: Equatable, Sendable {
-    let bootstrapState: ProtectedDataBootstrapState
+    let bootstrapOutcome: ProtectedDataBootstrapOutcome
     let frameworkState: ProtectedDataFrameworkState
-    let didBootstrapEmptyRegistry: Bool
 }
 
 struct ProtectedDataRegistryStore {
@@ -24,34 +23,37 @@ struct ProtectedDataRegistryStore {
             let disposition = registry.classifyRecoveryDisposition()
             if disposition == .frameworkRecoveryNeeded {
                 return ProtectedDataRegistryBootstrapResult(
-                    bootstrapState: .frameworkRecoveryNeeded,
+                    bootstrapOutcome: .frameworkRecoveryNeeded,
                     frameworkState: .frameworkRecoveryNeeded,
-                    didBootstrapEmptyRegistry: false
                 )
             }
 
             return ProtectedDataRegistryBootstrapResult(
-                bootstrapState: .loadedExistingRegistry,
+                bootstrapOutcome: .loadedRegistry(
+                    registry: registry,
+                    recoveryDisposition: disposition
+                ),
                 frameworkState: .sessionLocked,
-                didBootstrapEmptyRegistry: false
             )
         }
 
         if try storageRoot.hasProtectedDataArtifactsExcludingRegistry() {
             return ProtectedDataRegistryBootstrapResult(
-                bootstrapState: .frameworkRecoveryNeeded,
+                bootstrapOutcome: .frameworkRecoveryNeeded,
                 frameworkState: .frameworkRecoveryNeeded,
-                didBootstrapEmptyRegistry: false
             )
         }
 
         try storageRoot.ensureRootDirectoryExists()
-        try saveRegistry(.emptySteadyState(sharedRightIdentifier: sharedRightIdentifier))
+        let registry = ProtectedDataRegistry.emptySteadyState(sharedRightIdentifier: sharedRightIdentifier)
+        try saveRegistry(registry)
 
         return ProtectedDataRegistryBootstrapResult(
-            bootstrapState: .bootstrappedEmptyRegistry,
+            bootstrapOutcome: .emptySteadyState(
+                registry: registry,
+                didBootstrap: true
+            ),
             frameworkState: .sessionLocked,
-            didBootstrapEmptyRegistry: true
         )
     }
 

@@ -10,4 +10,8 @@ struct ProtectedDomainRecoveryCoordinator {
     func performPreAuthBootstrapClassification() throws -> ProtectedDataRegistryBootstrapResult {
         try registryStore.performSynchronousBootstrap()
     }
+
+    func loadCurrentRegistry() throws -> ProtectedDataRegistry {
+        try registryStore.loadRegistry()
+    }
 }

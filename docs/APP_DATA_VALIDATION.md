@@ -85,7 +85,8 @@ This document is a downstream review aid. It does not change the architecture or
 - pre-auth attempts must not fetch `LASecret`
 - invariant violation or unclassifiable registry row enters `frameworkRecoveryNeeded`
 - orphan shared-resource evidence with empty membership must only authorize post-classification `cleanupOnly` under the empty steady-state row; it must not split registry classification or final disposition
-- missing shared right or unreadable shared secret for a row that expects `ready` enters `frameworkRecoveryNeeded`
+- missing shared right or unreadable shared secret for a row that expects `ready` enters `frameworkRecoveryNeeded` before protected-domain access proceeds
+- user-cancelled or denied shared-right authorization remains a normal access outcome rather than an automatic framework-recovery state
 - unreadable wrapped-DMK state enters only that domain's `recoveryNeeded`
 - corrupted envelope hard-fails on authentication or structural validation
 - interrupted migration does not destroy readable source state
@@ -105,6 +106,7 @@ This draft proposal must map its validation buckets onto the repository's existi
 - device tests for `LARightStore` must use test-only identifiers of the form `com.cypherair.tests.protected-data.<TestCase>.<UUID>`
 - device tests must never use the production shared-right identifier
 - device tests must perform per-identifier cleanup before and after each test and must not call `removeAllRightsWithCompletion()`
+- bootstrap outcome and access-gate coverage belong to Swift unit tests, including explicit assertions that `continuePendingMutation` is preserved and that post-bootstrap validation can distinguish authorization-required vs already-authorized vs framework-recovery paths
 - file-protection strength, container containment, and absence of fallback to broader storage locations belong to platform-targeted macOS-local integration/manual verification, with automated macOS-local test coverage added where feasible and manual verification retained where the current repository does not yet have a dedicated protected-data file-metadata lane
 - migration survivability, startup adoption, and no-silent-reset guarantees belong to Swift unit coverage in `CypherAir-UnitTests` plus targeted macOS-local integration validation, adding the `CypherAir-MacUITests` macOS smoke path when startup routing or user-visible recovery flows are part of the scenario
 

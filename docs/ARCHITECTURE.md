@@ -100,7 +100,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, and auth-mode crash recovery |
 | `ProtectedDataSessionCoordinator` | Shared `LAPersistedRight` authorization, `LASecret` → wrapping-root-key derivation, relock, and `restartRequired` latching for protected app-data domains |
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, staged wrapped-DMK validation/promotion, and unlocked-domain-key zeroization |
-| `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, and future protected-domain handoff |
+| `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
 | `KeyMetadataStore` | Shared persistence helper for non-sensitive key metadata items |
 | `KeyMigrationCoordinator` | Shared migration state machine for pending/permanent recovery, including safe/retryable/unrecoverable outcomes |
@@ -110,7 +110,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 ### ProtectedData Phase 1 Additions (`Sources/Security/ProtectedData/`)
 
 - `ProtectedDataStorageRoot.swift` — resolves `Application Support/ProtectedData/`, file-protection application, and registry/domain metadata paths
-- `ProtectedDataRegistry.swift` / `ProtectedDataRegistryStore.swift` — registry manifest, consistency validation, recovery classification, and empty-registry bootstrap
+- `ProtectedDataRegistry.swift` / `ProtectedDataRegistryStore.swift` — registry manifest, consistency validation, recovery classification, empty-registry bootstrap, and bootstrap outcome construction
 - `ProtectedDataRightStoreClient.swift` — `LARightStore` wrapper used by the protected-data session layer
 - `ProtectedDomainBootstrapStore.swift` — file-side bootstrap metadata persistence
 
@@ -118,6 +118,7 @@ Current Phase 1 scope:
 
 - the framework exists and is wired into startup/bootstrap and app-session ownership
 - no real protected domain has been migrated yet, so ordinary launch does not authorize the shared app-data right
+- cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
 
 ### Models (`Sources/Models/`)
 

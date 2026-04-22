@@ -460,6 +460,13 @@ Allowed framework recovery dispositions:
 
 `cleanupOnly` is not a standalone framework recovery disposition. It is the named post-classification orphan shared-resource cleanup action that may run only under the empty steady-state row (`0 / absent / none / n/a`) before `resumeSteadyState` is returned.
 
+Bootstrap output may not always contain a trusted registry object:
+
+- empty steady-state bootstrap may return a trusted empty registry plus `resumeSteadyState`
+- successful registry load may return a trusted registry plus `resumeSteadyState` or `continuePendingMutation`
+- framework-recovery paths may return no trusted registry object at all
+- implementations must not fabricate placeholder registry values merely to satisfy a non-optional bootstrap shape
+
 The detailed matrix and evidence ordering rules live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Sections 2.2-2.6.
 
 ### 5.11 Recovery Evidence Ordering
@@ -527,6 +534,8 @@ Phase 1 implementation note:
 - `CypherAirApp.init()` may run only synchronous pre-auth bootstrap work
 - that bootstrap may create `Application Support/ProtectedData/ProtectedDataRegistry.plist` in the empty steady state
 - `CypherAirApp.init()` must not call `LARightStore`, `LAPersistedRight.authorize`, `LASecret.rawData`, or DMK unwrap logic
+- cold-start bootstrap output is an initial handoff, not the lifetime source of truth for registry state
+- future protected-domain access must re-evaluate current framework state instead of assuming the cold-start snapshot remains current forever
 
 The rollout sequencing details live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.1.
 
@@ -879,6 +888,12 @@ Required behavior:
 - all protected domains are blocked
 - no domain may independently bypass framework recovery
 - recovery must reconcile from registry first, then only from matrix-authorized evidence
+
+Phase 1 / post-bootstrap validation note:
+
+- the current Phase 1 startup boundary forbids synchronous pre-auth access to `LARightStore`
+- therefore a `ready` row's shared-right/shared-secret usability is validated in a post-bootstrap framework gate before protected-domain access proceeds, not inside `CypherAirApp.init()`
+- user-cancelled or denied authorization during that gate is a normal access outcome, not an automatic `frameworkRecoveryNeeded`
 
 `restartRequired` is not a persisted framework-recovery state. It is a current-process fatal runtime stop entered only when relock cannot complete safely.
 

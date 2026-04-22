@@ -42,6 +42,26 @@ enum ProtectedDataRecoveryDisposition: Equatable, Sendable {
     case frameworkRecoveryNeeded
 }
 
+enum ProtectedDataBootstrapOutcome: Equatable, Sendable {
+    case emptySteadyState(registry: ProtectedDataRegistry, didBootstrap: Bool)
+    case loadedRegistry(registry: ProtectedDataRegistry, recoveryDisposition: ProtectedDataRecoveryDisposition)
+    case frameworkRecoveryNeeded
+}
+
+enum ProtectedDataAccessGateDecision: Equatable, Sendable {
+    case frameworkRecoveryNeeded
+    case pendingMutationRecoveryRequired
+    case authorizationRequired(registry: ProtectedDataRegistry)
+    case alreadyAuthorized(registry: ProtectedDataRegistry)
+    case noProtectedDomainPresent
+}
+
+enum ProtectedDataAuthorizationResult: Equatable, Sendable {
+    case authorized
+    case cancelledOrDenied
+    case frameworkRecoveryNeeded
+}
+
 enum ProtectedDataError: Error, LocalizedError, Equatable {
     case invalidDomainMasterKeyLength(Int)
     case invalidNonceLength(Int)
@@ -52,6 +72,7 @@ enum ProtectedDataError: Error, LocalizedError, Equatable {
     case missingPersistedRight(String)
     case missingWrappingRootKey
     case internalFailure(String)
+    case authorizingUnavailable
     case restartRequired
 
     var errorDescription: String? {
@@ -74,6 +95,8 @@ enum ProtectedDataError: Error, LocalizedError, Equatable {
             "ProtectedData wrapping root key is not available in the current session."
         case .internalFailure(let reason):
             reason
+        case .authorizingUnavailable:
+            "ProtectedData authorization is currently unavailable."
         case .restartRequired:
             "ProtectedData access is blocked until the app restarts."
         }

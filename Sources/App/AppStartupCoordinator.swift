@@ -8,9 +8,8 @@ struct AppStartupCoordinator {
 
     struct AppStartupBootstrapSnapshot {
         let loadError: String?
-        let protectedDataBootstrapState: ProtectedDataBootstrapState
+        let bootstrapOutcome: ProtectedDataBootstrapOutcome
         let protectedDataFrameworkState: ProtectedDataFrameworkState
-        let didBootstrapEmptyRegistry: Bool
     }
 
     func performStartup(using container: AppContainer) -> Result {
@@ -21,16 +20,14 @@ struct AppStartupCoordinator {
     func performPreAuthBootstrap(using container: AppContainer) -> AppStartupBootstrapSnapshot {
         var errors: [String] = []
         var recoveryDiagnostics: [String] = []
-        var protectedDataBootstrapState: ProtectedDataBootstrapState = .loadedExistingRegistry
+        var bootstrapOutcome: ProtectedDataBootstrapOutcome = .frameworkRecoveryNeeded
         var protectedDataFrameworkState: ProtectedDataFrameworkState = .sessionLocked
-        var didBootstrapEmptyRegistry = false
 
         do {
             let protectedDataBootstrapResult = try container.protectedDomainRecoveryCoordinator
                 .performPreAuthBootstrapClassification()
-            protectedDataBootstrapState = protectedDataBootstrapResult.bootstrapState
+            bootstrapOutcome = protectedDataBootstrapResult.bootstrapOutcome
             protectedDataFrameworkState = protectedDataBootstrapResult.frameworkState
-            didBootstrapEmptyRegistry = protectedDataBootstrapResult.didBootstrapEmptyRegistry
             if protectedDataBootstrapResult.frameworkState == .frameworkRecoveryNeeded {
                 recoveryDiagnostics.append(
                     String(
@@ -39,8 +36,16 @@ struct AppStartupCoordinator {
                     )
                 )
             }
+            if case .loadedRegistry(_, .continuePendingMutation) = protectedDataBootstrapResult.bootstrapOutcome {
+                recoveryDiagnostics.append(
+                    String(
+                        localized: "startup.protectedData.pendingRecovery",
+                        defaultValue: "Protected app data has pending recovery work that must complete before protected content can open."
+                    )
+                )
+            }
         } catch {
-            protectedDataBootstrapState = .frameworkRecoveryNeeded
+            bootstrapOutcome = .frameworkRecoveryNeeded
             protectedDataFrameworkState = .frameworkRecoveryNeeded
             recoveryDiagnostics.append(
                 String(
@@ -79,9 +84,8 @@ struct AppStartupCoordinator {
                 loadErrors: errors,
                 recoveryDiagnostics: recoveryDiagnostics
             ),
-            protectedDataBootstrapState: protectedDataBootstrapState,
-            protectedDataFrameworkState: protectedDataFrameworkState,
-            didBootstrapEmptyRegistry: didBootstrapEmptyRegistry
+            bootstrapOutcome: bootstrapOutcome,
+            protectedDataFrameworkState: protectedDataFrameworkState
         )
     }
 
