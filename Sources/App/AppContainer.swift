@@ -6,6 +6,12 @@ final class AppContainer {
     let keychain: any KeychainManageable
     let authManager: AuthenticationManager
     let config: AppConfiguration
+    let protectedDataStorageRoot: ProtectedDataStorageRoot
+    let protectedDataRegistryStore: ProtectedDataRegistryStore
+    let protectedDomainKeyManager: ProtectedDomainKeyManager
+    let protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator
+    let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
+    let appSessionOrchestrator: AppSessionOrchestrator
     let engine: PgpEngine
     let keyManagement: KeyManagementService
     let contactService: ContactService
@@ -24,6 +30,12 @@ final class AppContainer {
         keychain: any KeychainManageable,
         authManager: AuthenticationManager,
         config: AppConfiguration,
+        protectedDataStorageRoot: ProtectedDataStorageRoot,
+        protectedDataRegistryStore: ProtectedDataRegistryStore,
+        protectedDomainKeyManager: ProtectedDomainKeyManager,
+        protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator,
+        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
+        appSessionOrchestrator: AppSessionOrchestrator,
         engine: PgpEngine,
         keyManagement: KeyManagementService,
         contactService: ContactService,
@@ -41,6 +53,12 @@ final class AppContainer {
         self.keychain = keychain
         self.authManager = authManager
         self.config = config
+        self.protectedDataStorageRoot = protectedDataStorageRoot
+        self.protectedDataRegistryStore = protectedDataRegistryStore
+        self.protectedDomainKeyManager = protectedDomainKeyManager
+        self.protectedDomainRecoveryCoordinator = protectedDomainRecoveryCoordinator
+        self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
+        self.appSessionOrchestrator = appSessionOrchestrator
         self.engine = engine
         self.keyManagement = keyManagement
         self.contactService = contactService
@@ -63,6 +81,28 @@ final class AppContainer {
             keychain: keychain
         )
         let config = AppConfiguration()
+        let protectedDataStorageRoot = ProtectedDataStorageRoot()
+        let protectedDomainKeyManager = ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
+        let protectedDataRegistryStore = ProtectedDataRegistryStore(
+            storageRoot: protectedDataStorageRoot,
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+        )
+        let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
+            registryStore: protectedDataRegistryStore
+        )
+        let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
+            rightStoreClient: ProtectedDataRightStoreClient(),
+            domainKeyManager: protectedDomainKeyManager,
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+        )
+        let appSessionOrchestrator = AppSessionOrchestrator(
+            gracePeriodProvider: { config.gracePeriod },
+            requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
+            evaluateAppAuthentication: { reason in
+                try await authManager.evaluate(mode: config.authMode, reason: reason)
+            },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator
+        )
         let engine = PgpEngine()
 
         let keyManagement = KeyManagementService(
@@ -106,6 +146,12 @@ final class AppContainer {
             keychain: keychain,
             authManager: authManager,
             config: config,
+            protectedDataStorageRoot: protectedDataStorageRoot,
+            protectedDataRegistryStore: protectedDataRegistryStore,
+            protectedDomainKeyManager: protectedDomainKeyManager,
+            protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,
             contactService: contactService,
@@ -139,9 +185,37 @@ final class AppContainer {
         let engine = PgpEngine()
         let contactsDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirUITests-\(UUID().uuidString)", isDirectory: true)
+        let protectedDataBaseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirUITestProtectedData-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(
             at: contactsDirectory,
             withIntermediateDirectories: true
+        )
+        try? FileManager.default.createDirectory(
+            at: protectedDataBaseDirectory,
+            withIntermediateDirectories: true
+        )
+        let protectedDataStorageRoot = ProtectedDataStorageRoot(baseDirectory: protectedDataBaseDirectory)
+        let protectedDomainKeyManager = ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
+        let protectedDataRegistryStore = ProtectedDataRegistryStore(
+            storageRoot: protectedDataStorageRoot,
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+        )
+        let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
+            registryStore: protectedDataRegistryStore
+        )
+        let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
+            rightStoreClient: ProtectedDataRightStoreClient(),
+            domainKeyManager: protectedDomainKeyManager,
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+        )
+        let appSessionOrchestrator = AppSessionOrchestrator(
+            gracePeriodProvider: { config.gracePeriod },
+            requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
+            evaluateAppAuthentication: { reason in
+                try await authManager.evaluate(mode: config.authMode, reason: reason)
+            },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator
         )
 
         let keyManagement = KeyManagementService(
@@ -192,6 +266,12 @@ final class AppContainer {
             keychain: keychain,
             authManager: authManager,
             config: config,
+            protectedDataStorageRoot: protectedDataStorageRoot,
+            protectedDataRegistryStore: protectedDataRegistryStore,
+            protectedDomainKeyManager: protectedDomainKeyManager,
+            protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,
             contactService: contactService,

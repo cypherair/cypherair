@@ -304,6 +304,11 @@ Required rules:
 
 The purpose of this contract is to prevent the new layer from attaching itself to the private-key access-control source of truth.
 
+Implementation note for Phase 1:
+
+- Swift implementation uses the Swift-imported API name `LAAuthenticationRequirement.default`
+- Objective-C header names such as `defaultRequirement` are not valid Swift call sites for this codebase
+
 ### 5.4 ProtectedDataRegistry Is The Only Membership Authority
 
 `ProtectedDataRegistry` is the single authoritative source for:
@@ -493,6 +498,7 @@ Before app-data authorization succeeds, the app may:
 - read `ProtectedDataRegistry`
 - read file-side per-domain bootstrap metadata
 - determine whether protected domains exist and require later unlock
+- synchronously bootstrap an empty steady-state registry when the protected-data root contains no artifacts
 
 Before app-data authorization succeeds, the app must not:
 
@@ -515,6 +521,12 @@ After app-data authorization succeeds, the app may:
 This is a required implementation boundary, not a best-effort guideline.
 
 The current app startup path already performs cold-start loading and recovery work. Future real protected domains must therefore treat this two-phase model as an explicit startup-architecture migration, not as a mere local refactor inside one new service. The current owner split that this migration must absorb is documented in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.4.
+
+Phase 1 implementation note:
+
+- `CypherAirApp.init()` may run only synchronous pre-auth bootstrap work
+- that bootstrap may create `Application Support/ProtectedData/ProtectedDataRegistry.plist` in the empty steady state
+- `CypherAirApp.init()` must not call `LARightStore`, `LAPersistedRight.authorize`, `LASecret.rawData`, or DMK unwrap logic
 
 The rollout sequencing details live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.1.
 
@@ -602,6 +614,31 @@ Required `WrappedDomainMasterKeyRecord` properties:
 - authenticated ciphertext
 - authentication tag
 - associated data that includes at minimum domain ID and wrap-version metadata
+
+The v1 wrapping profile is fixed:
+
+- fetch `LASecret.rawData` only after shared-right authorization succeeds
+- derive `AppDataWrappingRootKey` with `HKDF-SHA256`
+  - input key material: raw `LASecret` bytes
+  - salt: `"CypherAir.AppData.WrapRoot.Salt.v1"`
+  - info: `"CypherAir.AppData.WrapRoot.Info.v1"`
+  - output: 32 bytes
+- zeroize the raw `LASecret` bytes immediately after root-key derivation
+- derive `DomainWrappingKey` per domain with `HKDF-SHA256`
+  - input key material: `AppDataWrappingRootKey`
+  - salt: `"CypherAir.AppData.DomainWrap.Salt.v1"`
+  - info: `WrappedDMKKeyInfoV1(domainID, wrapVersion = 1)`
+  - output: 32 bytes
+- wrap the 32-byte DMK using `AES.GCM`
+  - nonce: 12 random bytes
+  - tag: 16 bytes
+- canonical AAD bytes are:
+  - magic `"CADMKAD1"`
+  - `wrapVersion = 1`
+  - `domainIDLength` as `UInt16 big-endian`
+  - domain ID UTF-8 bytes
+  - `wrappedKeyLength = 32`
+- persisted record files may use versioned binary property-list encoding; cryptographic canonicalization is required for AAD, not for the outer file bytes
 
 Wrapped-DMK persistence remains a stable, non-rotating part of domain metadata unless a later design explicitly introduces rekey. The detailed staged-write transaction and lifecycle rules live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Section 3.2.
 
@@ -829,6 +866,11 @@ Required triggers:
 - committed membership that expects `ready`, but the shared persisted right is missing
 - committed membership that expects `ready`, but shared-right-protected secret data is unreadable or missing
 - a row already classified to the shared-resource cleanup path (`0 / cleanupPending / deleteDomain(..., membershipRemoved or sharedResourceCleanupStarted)`) remains indeterminate after its matrix-authorized cleanup evidence is inspected
+
+The "missing registry" trigger has one narrow exception:
+
+- if the protected-data root does not exist, or exists but contains no protected-data artifacts, the implementation may synchronously bootstrap an empty steady-state registry instead of entering `frameworkRecoveryNeeded`
+- if the registry file is missing while any protected-data artifact already exists under the root, bootstrap is forbidden and the framework must enter `frameworkRecoveryNeeded`
 
 This trigger does not apply to the empty steady-state row (`0 / absent / none / n/a`): that row may still run post-classification orphan `cleanupOnly`, but its final recovery disposition remains `resumeSteadyState`.
 

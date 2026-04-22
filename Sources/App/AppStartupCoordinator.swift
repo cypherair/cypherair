@@ -6,9 +6,49 @@ struct AppStartupCoordinator {
         let loadError: String?
     }
 
+    struct AppStartupBootstrapSnapshot {
+        let loadError: String?
+        let protectedDataBootstrapState: ProtectedDataBootstrapState
+        let protectedDataFrameworkState: ProtectedDataFrameworkState
+        let didBootstrapEmptyRegistry: Bool
+    }
+
     func performStartup(using container: AppContainer) -> Result {
+        let snapshot = performPreAuthBootstrap(using: container)
+        return Result(loadError: snapshot.loadError)
+    }
+
+    func performPreAuthBootstrap(using container: AppContainer) -> AppStartupBootstrapSnapshot {
         var errors: [String] = []
         var recoveryDiagnostics: [String] = []
+        var protectedDataBootstrapState: ProtectedDataBootstrapState = .loadedExistingRegistry
+        var protectedDataFrameworkState: ProtectedDataFrameworkState = .sessionLocked
+        var didBootstrapEmptyRegistry = false
+
+        do {
+            let protectedDataBootstrapResult = try container.protectedDomainRecoveryCoordinator
+                .performPreAuthBootstrapClassification()
+            protectedDataBootstrapState = protectedDataBootstrapResult.bootstrapState
+            protectedDataFrameworkState = protectedDataBootstrapResult.frameworkState
+            didBootstrapEmptyRegistry = protectedDataBootstrapResult.didBootstrapEmptyRegistry
+            if protectedDataBootstrapResult.frameworkState == .frameworkRecoveryNeeded {
+                recoveryDiagnostics.append(
+                    String(
+                        localized: "startup.protectedData.recoveryNeeded",
+                        defaultValue: "Protected app data is unavailable and may require recovery."
+                    )
+                )
+            }
+        } catch {
+            protectedDataBootstrapState = .frameworkRecoveryNeeded
+            protectedDataFrameworkState = .frameworkRecoveryNeeded
+            recoveryDiagnostics.append(
+                String(
+                    localized: "startup.protectedData.recoveryNeeded",
+                    defaultValue: "Protected app data is unavailable and may require recovery."
+                )
+            )
+        }
 
         do {
             try container.keyManagement.loadKeys()
@@ -34,11 +74,14 @@ struct AppStartupCoordinator {
 
         cleanupTemporaryFiles()
 
-        return Result(
+        return AppStartupBootstrapSnapshot(
             loadError: mergedStartupMessages(
                 loadErrors: errors,
                 recoveryDiagnostics: recoveryDiagnostics
-            )
+            ),
+            protectedDataBootstrapState: protectedDataBootstrapState,
+            protectedDataFrameworkState: protectedDataFrameworkState,
+            didBootstrapEmptyRegistry: didBootstrapEmptyRegistry
         )
     }
 
