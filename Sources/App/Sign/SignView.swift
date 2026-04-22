@@ -38,6 +38,7 @@ struct SignView: View {
     @Environment(SigningService.self) private var signingService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
+    @Environment(\.protectedSettingsHost) private var protectedSettingsHost
 
     let configuration: Configuration
 
@@ -50,6 +51,7 @@ struct SignView: View {
             signingService: signingService,
             keyManagement: keyManagement,
             config: config,
+            protectedSettingsHost: protectedSettingsHost,
             configuration: configuration
         )
     }
@@ -62,6 +64,7 @@ private struct SignScreenHostView: View {
         signingService: SigningService,
         keyManagement: KeyManagementService,
         config: AppConfiguration,
+        protectedSettingsHost: ProtectedSettingsHost?,
         configuration: SignView.Configuration
     ) {
         _model = State(
@@ -69,6 +72,7 @@ private struct SignScreenHostView: View {
                 signingService: signingService,
                 keyManagement: keyManagement,
                 config: config,
+                protectedSettingsHost: protectedSettingsHost,
                 configuration: configuration
             )
         )

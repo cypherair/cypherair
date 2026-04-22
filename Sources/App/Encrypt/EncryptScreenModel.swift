@@ -26,6 +26,7 @@ final class EncryptScreenModel {
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
     private let appConfiguration: AppConfiguration
+    private let protectedSettingsHost: ProtectedSettingsHost?
     private let textEncryptionAction: TextEncryptionAction
     private let fileEncryptionAction: FileEncryptionAction
 
@@ -49,6 +50,7 @@ final class EncryptScreenModel {
         keyManagement: KeyManagementService,
         contactService: ContactService,
         config: AppConfiguration,
+        protectedSettingsHost: ProtectedSettingsHost? = nil,
         configuration: EncryptView.Configuration,
         operation: OperationController = OperationController(),
         exportController: FileExportController = FileExportController(),
@@ -61,6 +63,7 @@ final class EncryptScreenModel {
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.appConfiguration = config
+        self.protectedSettingsHost = protectedSettingsHost
         self.textEncryptionAction = textEncryptionAction ?? {
             plaintext,
             recipients,
@@ -291,7 +294,14 @@ final class EncryptScreenModel {
             appConfiguration,
             .ciphertext
         ) != true {
-            operation.copyToClipboard(ciphertextString, config: appConfiguration)
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let shouldShowNotice = await self.protectedSettingsHost?.clipboardNoticeDecision() ?? true
+                self.operation.copyToClipboard(
+                    ciphertextString,
+                    shouldShowNotice: shouldShowNotice
+                )
+            }
         }
     }
 
@@ -354,9 +364,13 @@ final class EncryptScreenModel {
     }
 
     func dismissClipboardNotice(disableFutureNotices: Bool = false) {
-        operation.dismissClipboardNotice(
-            disableFutureNoticesIn: disableFutureNotices ? appConfiguration : nil
-        )
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if disableFutureNotices {
+                await self.protectedSettingsHost?.disableClipboardNotice()
+            }
+            self.operation.dismissClipboardNotice()
+        }
     }
 
     func finishExport() {

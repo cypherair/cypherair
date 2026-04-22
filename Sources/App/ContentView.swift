@@ -90,7 +90,7 @@ struct MacAppShellView: View {
             case .contacts:
                 ContactsView()
             case .settings:
-                SettingsView()
+                MainWindowSettingsRootView()
             case .encrypt:
                 EncryptView()
             case .decrypt:

@@ -1,0 +1,347 @@
+import Foundation
+import SwiftUI
+
+@MainActor
+@Observable
+final class ProtectedSettingsHost {
+    enum AccessGateDecision: Equatable {
+        case frameworkRecoveryNeeded
+        case pendingMutationRecoveryRequired
+        case noProtectedDomainPresent
+        case authorizationRequired
+        case alreadyAuthorized
+    }
+
+    enum AuthorizationOutcome: Equatable {
+        case authorized
+        case cancelledOrDenied
+        case frameworkRecoveryNeeded
+    }
+
+    enum DomainState: Equatable {
+        case locked
+        case unlocked
+        case recoveryNeeded
+        case pendingMutationRecoveryRequired
+        case frameworkUnavailable
+    }
+
+    enum Mode: Equatable {
+        case mainWindowLive
+        case settingsSceneProxy
+        case tutorialSandbox
+    }
+
+    enum SectionState: Equatable {
+        case loading
+        case locked
+        case available(clipboardNoticeEnabled: Bool)
+        case recoveryNeeded
+        case pendingMutationRecoveryRequired
+        case frameworkUnavailable
+        case settingsSceneProxy
+        case tutorialSandbox
+    }
+
+    private struct LiveDependencies: @unchecked Sendable {
+        let evaluateAccessGate: @MainActor (_ isFirstProtectedAccess: Bool) -> AccessGateDecision
+        let authorizeSharedRight: @MainActor (_ localizedReason: String) async -> AuthorizationOutcome
+        let currentWrappingRootKey: @MainActor () throws -> Data
+        let syncPreAuthorizationState: @MainActor () -> Void
+        let currentDomainState: @MainActor () -> DomainState
+        let currentClipboardNotice: @MainActor () -> Bool?
+        let migrateLegacyClipboardNoticeIfNeeded: @MainActor () async throws -> Void
+        let openDomainIfNeeded: @MainActor (_ wrappingRootKey: Data) async throws -> Void
+        let updateClipboardNotice: @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void
+        let resetDomain: @MainActor () async throws -> Void
+    }
+
+    let mode: Mode
+    private let openMainWindowAction: (() -> Void)?
+    private let liveDependencies: LiveDependencies?
+
+    private(set) var sectionState: SectionState
+
+    @ObservationIgnored
+    private var hasEvaluatedProtectedAccessGate = false
+
+    init(
+        evaluateAccessGate: @escaping @MainActor (_ isFirstProtectedAccess: Bool) -> AccessGateDecision,
+        authorizeSharedRight: @escaping @MainActor (_ localizedReason: String) async -> AuthorizationOutcome,
+        currentWrappingRootKey: @escaping @MainActor () throws -> Data,
+        syncPreAuthorizationState: @escaping @MainActor () -> Void,
+        currentDomainState: @escaping @MainActor () -> DomainState,
+        currentClipboardNotice: @escaping @MainActor () -> Bool?,
+        migrateLegacyClipboardNoticeIfNeeded: @escaping @MainActor () async throws -> Void,
+        openDomainIfNeeded: @escaping @MainActor (_ wrappingRootKey: Data) async throws -> Void,
+        updateClipboardNotice: @escaping @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void,
+        resetDomain: @escaping @MainActor () async throws -> Void
+    ) {
+        self.mode = .mainWindowLive
+        self.openMainWindowAction = nil
+        self.liveDependencies = LiveDependencies(
+            evaluateAccessGate: evaluateAccessGate,
+            authorizeSharedRight: authorizeSharedRight,
+            currentWrappingRootKey: currentWrappingRootKey,
+            syncPreAuthorizationState: syncPreAuthorizationState,
+            currentDomainState: currentDomainState,
+            currentClipboardNotice: currentClipboardNotice,
+            migrateLegacyClipboardNoticeIfNeeded: migrateLegacyClipboardNoticeIfNeeded,
+            openDomainIfNeeded: openDomainIfNeeded,
+            updateClipboardNotice: updateClipboardNotice,
+            resetDomain: resetDomain
+        )
+        self.sectionState = .locked
+    }
+
+    init(
+        mode: Mode,
+        openMainWindowAction: (() -> Void)? = nil
+    ) {
+        self.mode = mode
+        self.openMainWindowAction = openMainWindowAction
+        self.liveDependencies = nil
+        switch mode {
+        case .mainWindowLive:
+            self.sectionState = .locked
+        case .settingsSceneProxy:
+            self.sectionState = .settingsSceneProxy
+        case .tutorialSandbox:
+            self.sectionState = .tutorialSandbox
+        }
+    }
+
+    func refreshSettingsSection() async {
+        guard let liveDependencies else {
+            return
+        }
+
+        switch currentAccessGateDecision(liveDependencies) {
+        case .frameworkRecoveryNeeded:
+            liveDependencies.syncPreAuthorizationState()
+            syncSectionStateFromStore(liveDependencies)
+        case .pendingMutationRecoveryRequired:
+            liveDependencies.syncPreAuthorizationState()
+            syncSectionStateFromStore(liveDependencies)
+        case .noProtectedDomainPresent, .authorizationRequired:
+            liveDependencies.syncPreAuthorizationState()
+            sectionState = .locked
+        case .alreadyAuthorized:
+            _ = await openProtectedSettings(
+                using: liveDependencies,
+                localizedReason: settingsLocalizedReason
+            )
+        }
+    }
+
+    func unlockForSettings() async {
+        guard let liveDependencies else {
+            return
+        }
+
+        _ = await openProtectedSettings(
+            using: liveDependencies,
+            localizedReason: settingsLocalizedReason
+        )
+    }
+
+    func setClipboardNoticeEnabled(_ isEnabled: Bool) async {
+        guard let liveDependencies else {
+            return
+        }
+
+        sectionState = .loading
+        do {
+            guard try await ensureProtectedSettingsAccess(
+                using: liveDependencies,
+                localizedReason: settingsLocalizedReason
+            ) else {
+                syncSectionStateFromStore(liveDependencies)
+                return
+            }
+
+            let wrappingRootKey = try liveDependencies.currentWrappingRootKey()
+            try await liveDependencies.updateClipboardNotice(
+                isEnabled,
+                wrappingRootKey
+            )
+            sectionState = .available(clipboardNoticeEnabled: isEnabled)
+        } catch {
+            syncSectionStateFromStore(liveDependencies)
+        }
+    }
+
+    func resetProtectedSettingsDomain() async {
+        guard let liveDependencies else {
+            return
+        }
+
+        sectionState = .loading
+        do {
+            try await liveDependencies.resetDomain()
+
+            let didOpen = await openProtectedSettings(
+                using: liveDependencies,
+                localizedReason: settingsLocalizedReason
+            )
+            if !didOpen {
+                liveDependencies.syncPreAuthorizationState()
+                syncSectionStateFromStore(liveDependencies)
+            }
+        } catch {
+            liveDependencies.syncPreAuthorizationState()
+            syncSectionStateFromStore(liveDependencies)
+        }
+    }
+
+    func clipboardNoticeDecision() async -> Bool {
+        guard let liveDependencies else {
+            return true
+        }
+
+        do {
+            guard try await ensureProtectedSettingsAccess(
+                using: liveDependencies,
+                localizedReason: clipboardLocalizedReason
+            ) else {
+                return true
+            }
+
+            return liveDependencies.currentClipboardNotice() ?? true
+        } catch {
+            return true
+        }
+    }
+
+    func disableClipboardNotice() async {
+        await setClipboardNoticeEnabled(false)
+    }
+
+    func openMainWindow() {
+        openMainWindowAction?()
+    }
+
+    private func openProtectedSettings(
+        using liveDependencies: LiveDependencies,
+        localizedReason: String
+    ) async -> Bool {
+        sectionState = .loading
+        do {
+            guard try await ensureProtectedSettingsAccess(
+                using: liveDependencies,
+                localizedReason: localizedReason
+            ) else {
+                syncSectionStateFromStore(liveDependencies)
+                return false
+            }
+
+            let clipboardNotice = liveDependencies.currentClipboardNotice() ?? true
+            sectionState = .available(clipboardNoticeEnabled: clipboardNotice)
+            return true
+        } catch {
+            syncSectionStateFromStore(liveDependencies)
+            return false
+        }
+    }
+
+    private func ensureProtectedSettingsAccess(
+        using liveDependencies: LiveDependencies,
+        localizedReason: String
+    ) async throws -> Bool {
+        switch currentAccessGateDecision(liveDependencies) {
+        case .frameworkRecoveryNeeded:
+            liveDependencies.syncPreAuthorizationState()
+            sectionState = .frameworkUnavailable
+            return false
+        case .pendingMutationRecoveryRequired:
+            liveDependencies.syncPreAuthorizationState()
+            sectionState = .pendingMutationRecoveryRequired
+            return false
+        case .noProtectedDomainPresent:
+            try await liveDependencies.migrateLegacyClipboardNoticeIfNeeded()
+            let authorizationResult = await liveDependencies.authorizeSharedRight(
+                localizedReason
+            )
+            switch authorizationResult {
+            case .authorized:
+                break
+            case .cancelledOrDenied:
+                sectionState = .locked
+                return false
+            case .frameworkRecoveryNeeded:
+                sectionState = .frameworkUnavailable
+                return false
+            }
+        case .authorizationRequired:
+            let authorizationResult = await liveDependencies.authorizeSharedRight(
+                localizedReason
+            )
+            switch authorizationResult {
+            case .authorized:
+                break
+            case .cancelledOrDenied:
+                sectionState = .locked
+                return false
+            case .frameworkRecoveryNeeded:
+                sectionState = .frameworkUnavailable
+                return false
+            }
+        case .alreadyAuthorized:
+            break
+        }
+
+        let wrappingRootKey = try liveDependencies.currentWrappingRootKey()
+        try await liveDependencies.openDomainIfNeeded(wrappingRootKey)
+        return true
+    }
+
+    private func currentAccessGateDecision(
+        _ liveDependencies: LiveDependencies
+    ) -> AccessGateDecision {
+        let decision = liveDependencies.evaluateAccessGate(!hasEvaluatedProtectedAccessGate)
+        hasEvaluatedProtectedAccessGate = true
+        return decision
+    }
+
+    private func syncSectionStateFromStore(_ liveDependencies: LiveDependencies) {
+        switch liveDependencies.currentDomainState() {
+        case .locked:
+            sectionState = .locked
+        case .unlocked:
+            sectionState = .available(
+                clipboardNoticeEnabled: liveDependencies.currentClipboardNotice() ?? true
+            )
+        case .recoveryNeeded:
+            sectionState = .recoveryNeeded
+        case .pendingMutationRecoveryRequired:
+            sectionState = .pendingMutationRecoveryRequired
+        case .frameworkUnavailable:
+            sectionState = .frameworkUnavailable
+        }
+    }
+
+    private var settingsLocalizedReason: String {
+        String(
+            localized: "protectedSettings.unlock.reason",
+            defaultValue: "Authenticate to access protected preferences."
+        )
+    }
+
+    private var clipboardLocalizedReason: String {
+        String(
+            localized: "protectedSettings.clipboard.reason",
+            defaultValue: "Authenticate to access the protected clipboard preference."
+        )
+    }
+}
+
+private struct ProtectedSettingsHostKey: EnvironmentKey {
+    static let defaultValue: ProtectedSettingsHost? = nil
+}
+
+extension EnvironmentValues {
+    var protectedSettingsHost: ProtectedSettingsHost? {
+        get { self[ProtectedSettingsHostKey.self] }
+        set { self[ProtectedSettingsHostKey.self] = newValue }
+    }
+}

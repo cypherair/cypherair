@@ -1,7 +1,7 @@
 import Foundation
 
 /// Centralized dependency container for the application.
-final class AppContainer {
+final class AppContainer: @unchecked Sendable {
     let secureEnclave: any SecureEnclaveManageable
     let keychain: any KeychainManageable
     let authManager: AuthenticationManager
@@ -11,6 +11,7 @@ final class AppContainer {
     let protectedDomainKeyManager: ProtectedDomainKeyManager
     let protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator
     let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
+    let protectedSettingsStore: ProtectedSettingsStore
     let appSessionOrchestrator: AppSessionOrchestrator
     let engine: PgpEngine
     let keyManagement: KeyManagementService
@@ -35,6 +36,7 @@ final class AppContainer {
         protectedDomainKeyManager: ProtectedDomainKeyManager,
         protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
+        protectedSettingsStore: ProtectedSettingsStore,
         appSessionOrchestrator: AppSessionOrchestrator,
         engine: PgpEngine,
         keyManagement: KeyManagementService,
@@ -58,6 +60,7 @@ final class AppContainer {
         self.protectedDomainKeyManager = protectedDomainKeyManager
         self.protectedDomainRecoveryCoordinator = protectedDomainRecoveryCoordinator
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
+        self.protectedSettingsStore = protectedSettingsStore
         self.appSessionOrchestrator = appSessionOrchestrator
         self.engine = engine
         self.keyManagement = keyManagement
@@ -80,7 +83,8 @@ final class AppContainer {
             secureEnclave: secureEnclave,
             keychain: keychain
         )
-        let config = AppConfiguration()
+        let defaults = UserDefaults.standard
+        let config = AppConfiguration(defaults: defaults)
         let protectedDataStorageRoot = ProtectedDataStorageRoot()
         let protectedDomainKeyManager = ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
         let protectedDataRegistryStore = ProtectedDataRegistryStore(
@@ -95,6 +99,13 @@ final class AppContainer {
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
         )
+        let protectedSettingsStore = ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager
+        )
+        protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -155,6 +166,7 @@ final class AppContainer {
             protectedDomainKeyManager: protectedDomainKeyManager,
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            protectedSettingsStore: protectedSettingsStore,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,
@@ -217,6 +229,13 @@ final class AppContainer {
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
         )
+        let protectedSettingsStore = ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager
+        )
+        protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -283,6 +302,7 @@ final class AppContainer {
             protectedDomainKeyManager: protectedDomainKeyManager,
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            protectedSettingsStore: protectedSettingsStore,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,

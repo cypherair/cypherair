@@ -295,6 +295,33 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_settingsSceneProxy_configuration_exposesProxyProtectedSettingsStateAndAction() {
+        var didOpenMainWindow = false
+        var configuration = SettingsView.Configuration.default
+        configuration.protectedSettingsHostMode = .settingsSceneProxy
+        configuration.protectedSettingsHost = CypherAir.ProtectedSettingsHost(
+            mode: .settingsSceneProxy,
+            openMainWindowAction: {
+                didOpenMainWindow = true
+            }
+        )
+
+        let model = makeModel(configuration: configuration)
+
+        XCTAssertEqual(model.protectedSettingsSectionState, .settingsSceneProxy)
+        model.openProtectedSettingsInMainWindow()
+        XCTAssertTrue(didOpenMainWindow)
+    }
+
+    @MainActor
+    func test_tutorialSettings_configuration_usesTutorialProtectedSettingsState() {
+        let store = TutorialSessionStore()
+        let model = makeModel(configuration: store.configurationFactory.settingsConfiguration())
+
+        XCTAssertEqual(model.protectedSettingsSectionState, .tutorialSandbox)
+    }
+
+    @MainActor
     private func makeModel(
         configuration: SettingsView.Configuration = .default,
         iosPresentationController: IOSPresentationController? = nil,

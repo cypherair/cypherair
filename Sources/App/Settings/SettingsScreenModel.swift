@@ -7,6 +7,7 @@ final class SettingsScreenModel {
 
     let configuration: SettingsView.Configuration
     let appConfiguration: AppConfiguration
+    let protectedSettingsHost: ProtectedSettingsHost?
 
     private let authManager: AuthenticationManager
     private let keyManagement: KeyManagementService
@@ -22,6 +23,7 @@ final class SettingsScreenModel {
     var showSwitchError = false
     var showOnboarding = false
     var showTutorialOnboarding = false
+    var showProtectedSettingsResetConfirmation = false
 
     init(
         config: AppConfiguration,
@@ -34,6 +36,7 @@ final class SettingsScreenModel {
     ) {
         self.configuration = configuration
         self.appConfiguration = config
+        self.protectedSettingsHost = configuration.protectedSettingsHost
         self.authManager = authManager
         self.keyManagement = keyManagement
         self.iosPresentationController = iosPresentationController
@@ -56,6 +59,24 @@ final class SettingsScreenModel {
             String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
         case .completedPreviousVersion:
             String(localized: "guidedTutorial.updated.entry", defaultValue: "Updated Guided Tutorial Available")
+        }
+    }
+
+    var protectedSettingsSectionState: ProtectedSettingsHost.SectionState {
+        protectedSettingsHost?.sectionState ?? fallbackProtectedSettingsSectionState
+    }
+
+    var isProtectedClipboardNoticeEnabled: Bool {
+        if case .available(let clipboardNoticeEnabled) = protectedSettingsSectionState {
+            return clipboardNoticeEnabled
+        }
+        return true
+    }
+
+    var shouldShowProtectedSettingsSection: Bool {
+        switch configuration.protectedSettingsHostMode {
+        case .mainWindowLive, .settingsSceneProxy, .tutorialSandbox:
+            true
         }
     }
 
@@ -150,8 +171,54 @@ final class SettingsScreenModel {
         #endif
     }
 
+    func prepareProtectedSettingsSection() async {
+        await protectedSettingsHost?.refreshSettingsSection()
+    }
+
+    func requestProtectedSettingsUnlock() {
+        Task {
+            await protectedSettingsHost?.unlockForSettings()
+        }
+    }
+
+    func setProtectedClipboardNoticeEnabled(_ isEnabled: Bool) {
+        Task {
+            await protectedSettingsHost?.setClipboardNoticeEnabled(isEnabled)
+        }
+    }
+
+    func requestProtectedSettingsReset() {
+        showProtectedSettingsResetConfirmation = true
+    }
+
+    func confirmProtectedSettingsReset() {
+        showProtectedSettingsResetConfirmation = false
+        Task {
+            await protectedSettingsHost?.resetProtectedSettingsDomain()
+        }
+    }
+
+    func dismissProtectedSettingsResetConfirmation() {
+        showProtectedSettingsResetConfirmation = false
+    }
+
+    func openProtectedSettingsInMainWindow() {
+        protectedSettingsHost?.openMainWindow()
+    }
+
     private var hasBackup: Bool {
         keyManagement.keys.contains(where: \.isBackedUp)
+    }
+
+    private var fallbackProtectedSettingsSectionState: ProtectedSettingsHost.SectionState {
+        switch configuration.protectedSettingsHostMode {
+        case .mainWindowLive:
+            .locked
+        case .settingsSceneProxy:
+            .settingsSceneProxy
+        case .tutorialSandbox:
+            .tutorialSandbox
+        }
     }
 
     private func confirmPendingModeChange(
