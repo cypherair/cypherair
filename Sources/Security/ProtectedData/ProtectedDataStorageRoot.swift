@@ -8,6 +8,12 @@ enum ProtectedDataStorageValidationMode {
 struct ProtectedDataStorageRoot {
     typealias FileProtectionCapabilityProvider = (URL) throws -> Bool
 
+    private struct ValidatedPersistentStorageContract {
+        let applicationSupportDirectory: URL
+        let baseDirectory: URL
+        let rootURL: URL
+    }
+
     private let baseDirectory: URL
     private let fileManager: FileManager
     private let validationMode: ProtectedDataStorageValidationMode
@@ -19,8 +25,8 @@ struct ProtectedDataStorageRoot {
         validationMode: ProtectedDataStorageValidationMode? = nil,
         fileProtectionCapabilityProvider: @escaping FileProtectionCapabilityProvider = Self.defaultFileProtectionCapability(for:)
     ) {
-        let resolvedBaseDirectory = baseDirectory ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        self.baseDirectory = resolvedBaseDirectory.standardizedFileURL
+        let configuredBaseDirectory = baseDirectory ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        self.baseDirectory = configuredBaseDirectory.standardizedFileURL
         self.fileManager = fileManager
         self.validationMode = validationMode ?? {
             if baseDirectory == nil {
@@ -56,50 +62,61 @@ struct ProtectedDataStorageRoot {
     }
 
     func ensureRootDirectoryExists() throws {
-        try createDirectoryIfNeeded(at: rootURL)
+        let validatedContract = try validatedPersistentStorageContract()
+        try createDirectoryIfNeeded(at: rootURL, validatedContract: validatedContract)
     }
 
     func ensureDomainDirectoryExists(for domainID: ProtectedDataDomainID) throws {
-        try createDirectoryIfNeeded(at: domainDirectory(for: domainID))
+        let validatedContract = try validatedPersistentStorageContract()
+        try createDirectoryIfNeeded(
+            at: domainDirectory(for: domainID),
+            validatedContract: validatedContract
+        )
     }
 
     func registryExists() throws -> Bool {
-        try validatePersistentStorageContract()
-        return fileManager.fileExists(atPath: registryURL.path)
+        try managedItemExists(at: registryURL)
     }
 
     func hasProtectedDataArtifacts() throws -> Bool {
-        try validatePersistentStorageContract()
+        let validatedContract = try validatedPersistentStorageContract()
+        let resolvedRootURL = try validateManagedPath(rootURL, within: validatedContract)
 
-        guard fileManager.fileExists(atPath: rootURL.path) else {
+        guard fileManager.fileExists(atPath: resolvedRootURL.path) else {
             return false
         }
 
         let contents = try fileManager.contentsOfDirectory(
-            at: rootURL,
+            at: resolvedRootURL,
             includingPropertiesForKeys: nil
         )
         return !contents.isEmpty
     }
 
     func hasProtectedDataArtifactsExcludingRegistry() throws -> Bool {
-        try validatePersistentStorageContract()
+        let validatedContract = try validatedPersistentStorageContract()
+        let resolvedRootURL = try validateManagedPath(rootURL, within: validatedContract)
 
-        guard fileManager.fileExists(atPath: rootURL.path) else {
+        guard fileManager.fileExists(atPath: resolvedRootURL.path) else {
             return false
         }
 
         let contents = try fileManager.contentsOfDirectory(
-            at: rootURL,
+            at: resolvedRootURL,
             includingPropertiesForKeys: nil
         )
         return contents.contains { $0.lastPathComponent != registryURL.lastPathComponent }
     }
 
     func writeProtectedData(_ data: Data, to url: URL) throws {
-        try validatePersistentStorageContract()
-        try createDirectoryIfNeeded(at: url.deletingLastPathComponent())
+        let validatedContract = try validatedPersistentStorageContract()
+        try createDirectoryIfNeeded(
+            at: url.deletingLastPathComponent(),
+            validatedContract: validatedContract
+        )
+        _ = try validateManagedPath(url, within: validatedContract)
         let scratchURL = temporaryProtectedWriteURL(for: url)
+        _ = try validateManagedPath(scratchURL, within: validatedContract)
         var shouldCleanupScratch = true
         defer {
             if shouldCleanupScratch {
@@ -113,32 +130,46 @@ struct ProtectedDataStorageRoot {
     }
 
     func promoteStagedFile(from stagedURL: URL, to committedURL: URL) throws {
-        try validatePersistentStorageContract()
-        try createDirectoryIfNeeded(at: committedURL.deletingLastPathComponent())
+        let validatedContract = try validatedPersistentStorageContract()
+        _ = try validateManagedPath(stagedURL, within: validatedContract)
+        try createDirectoryIfNeeded(
+            at: committedURL.deletingLastPathComponent(),
+            validatedContract: validatedContract
+        )
+        _ = try validateManagedPath(committedURL, within: validatedContract)
         try promoteProtectedFile(from: stagedURL, to: committedURL)
     }
 
     func removeItemIfPresent(at url: URL) throws {
-        guard fileManager.fileExists(atPath: url.path) else {
+        let validatedContract = try validatedPersistentStorageContract()
+        let resolvedURL = try validateManagedPath(url, within: validatedContract)
+        guard fileManager.fileExists(atPath: resolvedURL.path) else {
             return
         }
         try fileManager.removeItem(at: url)
     }
 
     func validatePersistentStorageContract() throws {
-        switch validationMode {
-        case .allowArbitraryBaseDirectoryForTesting:
-            return
-        case .enforceAppSupportContainment:
-            try validateBaseDirectoryIsWithinApplicationSupport()
-            guard try fileProtectionCapabilityProvider(baseDirectory) else {
-                throw ProtectedDataError.fileProtectionUnsupported
-            }
-        }
+        _ = try validatedPersistentStorageContract()
     }
 
-    private func createDirectoryIfNeeded(at url: URL) throws {
-        try validatePersistentStorageContract()
+    func managedItemExists(at url: URL) throws -> Bool {
+        let validatedContract = try validatedPersistentStorageContract()
+        let resolvedURL = try validateManagedPath(url, within: validatedContract)
+        return fileManager.fileExists(atPath: resolvedURL.path)
+    }
+
+    func readManagedData(at url: URL) throws -> Data {
+        let validatedContract = try validatedPersistentStorageContract()
+        let resolvedURL = try validateManagedPath(url, within: validatedContract)
+        return try Data(contentsOf: resolvedURL)
+    }
+
+    private func createDirectoryIfNeeded(
+        at url: URL,
+        validatedContract: ValidatedPersistentStorageContract
+    ) throws {
+        _ = try validateManagedPath(url, within: validatedContract)
 
         guard !fileManager.fileExists(atPath: url.path) else {
             try applyAndVerifyFileProtection(to: url)
@@ -149,14 +180,36 @@ struct ProtectedDataStorageRoot {
         try applyAndVerifyFileProtection(to: url)
     }
 
-    private func validateBaseDirectoryIsWithinApplicationSupport() throws {
-        let applicationSupportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .standardizedFileURL
-        let standardizedBaseDirectory = baseDirectory.standardizedFileURL
+    private func validatedPersistentStorageContract() throws -> ValidatedPersistentStorageContract {
+        let validatedContract = ValidatedPersistentStorageContract(
+            applicationSupportDirectory: resolvedFileSystemURL(
+                for: fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            ),
+            baseDirectory: resolvedFileSystemURL(for: baseDirectory),
+            rootURL: resolvedFileSystemURL(for: rootURL)
+        )
 
-        guard standardizedBaseDirectory == applicationSupportDirectory ||
-                standardizedBaseDirectory.path.hasPrefix(applicationSupportDirectory.path + "/") else {
-            throw ProtectedDataError.storageRootOutsideApplicationSupport
+        switch validationMode {
+        case .allowArbitraryBaseDirectoryForTesting:
+            return validatedContract
+        case .enforceAppSupportContainment:
+            guard isContained(validatedContract.baseDirectory, within: validatedContract.applicationSupportDirectory),
+                    isContained(validatedContract.rootURL, within: validatedContract.applicationSupportDirectory) else {
+                throw ProtectedDataError.storageRootOutsideApplicationSupport
+            }
+
+            let fileProtectionProbeURL: URL
+            if fileManager.fileExists(atPath: rootURL.path) {
+                fileProtectionProbeURL = validatedContract.rootURL
+            } else {
+                fileProtectionProbeURL = validatedContract.baseDirectory
+            }
+
+            guard try fileProtectionCapabilityProvider(fileProtectionProbeURL) else {
+                throw ProtectedDataError.fileProtectionUnsupported
+            }
+
+            return validatedContract
         }
     }
 
@@ -193,12 +246,14 @@ struct ProtectedDataStorageRoot {
     }
 
     private func applyAndVerifyFileProtection(to url: URL) throws {
-        guard try fileProtectionCapabilityProvider(url) else {
+        let resolvedURL = resolvedFileSystemURL(for: url)
+
+        guard try fileProtectionCapabilityProvider(resolvedURL) else {
             throw ProtectedDataError.fileProtectionUnsupported
         }
 
-        try applyFileProtection(to: url)
-        try verifyFileProtection(at: url)
+        try applyFileProtection(to: resolvedURL)
+        try verifyFileProtection(at: resolvedURL)
     }
 
     private func applyFileProtection(to url: URL) throws {
@@ -219,5 +274,41 @@ struct ProtectedDataStorageRoot {
     private static func defaultFileProtectionCapability(for url: URL) throws -> Bool {
         let values = try url.resourceValues(forKeys: [.volumeSupportsFileProtectionKey])
         return values.allValues[.volumeSupportsFileProtectionKey] as? Bool ?? false
+    }
+
+    private func validateManagedPath(
+        _ url: URL,
+        within validatedContract: ValidatedPersistentStorageContract
+    ) throws -> URL {
+        let resolvedURL = resolvedFileSystemURL(for: url)
+        guard isContained(resolvedURL, within: validatedContract.rootURL) else {
+            throw ProtectedDataError.storageRootOutsideApplicationSupport
+        }
+        return resolvedURL
+    }
+
+    private func resolvedFileSystemURL(for url: URL) -> URL {
+        let standardizedURL = url.standardizedFileURL
+        if fileManager.fileExists(atPath: standardizedURL.path) || isSymbolicLink(at: standardizedURL) {
+            return standardizedURL.resolvingSymlinksInPath().standardizedFileURL
+        }
+
+        let parentURL = standardizedURL.deletingLastPathComponent()
+        guard parentURL != standardizedURL else {
+            return standardizedURL
+        }
+
+        return resolvedFileSystemURL(for: parentURL).appendingPathComponent(
+            standardizedURL.lastPathComponent,
+            isDirectory: standardizedURL.hasDirectoryPath
+        ).standardizedFileURL
+    }
+
+    private func isContained(_ candidateURL: URL, within parentURL: URL) -> Bool {
+        candidateURL == parentURL || candidateURL.path.hasPrefix(parentURL.path + "/")
+    }
+
+    private func isSymbolicLink(at url: URL) -> Bool {
+        (try? fileManager.destinationOfSymbolicLink(atPath: url.path)) != nil
     }
 }

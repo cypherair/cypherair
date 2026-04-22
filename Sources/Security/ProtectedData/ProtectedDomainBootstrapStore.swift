@@ -17,11 +17,11 @@ struct ProtectedDomainBootstrapStore {
     func loadMetadata(for domainID: ProtectedDataDomainID) throws -> ProtectedDomainBootstrapMetadata? {
         try storageRoot.validatePersistentStorageContract()
         let url = storageRoot.bootstrapMetadataURL(for: domainID)
-        guard FileManager.default.fileExists(atPath: url.path) else {
+        guard try storageRoot.managedItemExists(at: url) else {
             return nil
         }
 
-        let data = try Data(contentsOf: url)
+        let data = try storageRoot.readManagedData(at: url)
         return try PropertyListDecoder().decode(ProtectedDomainBootstrapMetadata.self, from: data)
     }
 
