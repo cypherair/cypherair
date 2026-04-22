@@ -13,11 +13,7 @@ import AppKit
 struct PrivacyScreenModifier: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
-    #if os(macOS)
-    /// Suppresses the next didBecomeActive notification after auth completes,
-    /// because the Touch ID dialog itself causes a resign/become-active cycle.
-    @State private var suppressNextActivation = false
-    #endif
+    @State private var lifecycleGate = PrivacyScreenLifecycleGate()
 
     func body(content: Content) -> some View {
         content
@@ -50,8 +46,18 @@ struct PrivacyScreenModifier: ViewModifier {
             .onChange(of: scenePhase) { _, newPhase in
                 switch newPhase {
                 case .background, .inactive:
+                    guard lifecycleGate.shouldHandleResignActive(
+                        isAuthenticating: appSessionOrchestrator.isAuthenticating
+                    ) else {
+                        return
+                    }
                     appSessionOrchestrator.handleSceneDidResignActive()
                 case .active:
+                    guard lifecycleGate.shouldHandleBecomeActive(
+                        isAuthenticating: appSessionOrchestrator.isAuthenticating
+                    ) else {
+                        return
+                    }
                     performResumeAction()
                 @unknown default:
                     break
@@ -60,17 +66,19 @@ struct PrivacyScreenModifier: ViewModifier {
             #endif
             #if os(macOS)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-                // Skip if auth is in progress — the system Touch ID dialog causes
-                // the app to resign active, and we must not re-blur during that.
-                guard !appSessionOrchestrator.isAuthenticating && !suppressNextActivation else { return }
+                guard lifecycleGate.shouldHandleResignActive(
+                    isAuthenticating: appSessionOrchestrator.isAuthenticating
+                ) else {
+                    return
+                }
                 appSessionOrchestrator.handleSceneDidResignActive()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                if suppressNextActivation {
-                    suppressNextActivation = false
+                guard lifecycleGate.shouldHandleBecomeActive(
+                    isAuthenticating: appSessionOrchestrator.isAuthenticating
+                ) else {
                     return
                 }
-                guard !appSessionOrchestrator.isAuthenticating else { return }
                 performResumeAction()
             }
             #endif
@@ -92,11 +100,9 @@ struct PrivacyScreenModifier: ViewModifier {
             let attemptedAuthentication = await appSessionOrchestrator.handleInitialAppearance(
                 localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume")
             )
-            #if os(macOS)
             if attemptedAuthentication {
-                suppressNextActivation = true
+                lifecycleGate.armForAuthenticationAttempt()
             }
-            #endif
         }
     }
 
@@ -112,11 +118,9 @@ struct PrivacyScreenModifier: ViewModifier {
                     localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume")
                 )
             }
-            #if os(macOS)
             if attemptedAuthentication {
-                suppressNextActivation = true
+                lifecycleGate.armForAuthenticationAttempt()
             }
-            #endif
         }
     }
 }
