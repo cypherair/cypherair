@@ -11,6 +11,7 @@ The important conclusion is:
 - the failing Xcode unit tests are **not** the smallest reproduction
 - the issue reproduces in **pure Rust** on `arm64e-apple-darwin`
 - the issue reproduces even in a standalone scratch Cargo binary outside this repo
+- the same host can run an `arm64e` binary built by `clang`
 
 That makes the current leading diagnosis:
 
@@ -142,17 +143,74 @@ Key details:
 That points below CypherAir and below Sequoia, into Rust runtime / TLS startup on
 the current `arm64e-apple-darwin` toolchain path.
 
+### 4. Platform sanity check: `clang` arm64e works
+
+On the same machine, the following succeeds:
+
+```bash
+xcrun clang -arch arm64e hello.c -o hello-c
+./hello-c
+```
+
+Observed output:
+
+```text
+hello-c
+```
+
+This matters because it makes the current issue look much less like
+"the machine cannot run arm64e binaries at all" and much more like
+"the current Rust host-runtime path is not viable on this environment."
+
+### 5. Ad-hoc re-signing does not change the crash
+
+The scratch Rust `arm64e` binary was inspected with `codesign -dv --verbose=4`.
+It was already linker-signed / ad-hoc signed by default. Re-signing a copy with:
+
+```bash
+codesign --force --sign - <binary>
+```
+
+did not change behavior. The re-signed binary still exited `139`.
+
+This reduces the likelihood that the current host crash is primarily a code
+signing issue.
+
+### 6. Toolchain time-sampling
+
+I sampled four nightly toolchains on the same host:
+
+| Toolchain | Rust version | Scratch build | Scratch run | `certificate_merge_tests` |
+|---|---|---:|---:|---:|
+| `nightly` | `1.97.0-nightly (e9e32aca5 2026-04-17)` | 0 | 139 | 101 |
+| `nightly-2026-04-01` | `1.96.0-nightly (48cc71ee8 2026-03-31)` | 0 | 139 | 101 |
+| `nightly-2026-03-15` | `1.96.0-nightly (03749d625 2026-03-14)` | 0 | 139 | 101 |
+| `nightly-2026-02-15` | `1.95.0-nightly (a33907a7a 2026-02-14)` | 0 | 139 | 101 |
+
+For the project test, the failure shape remained:
+
+```text
+signal: 11, SIGSEGV: invalid memory reference
+```
+
+For the scratch binary, the run log remained empty and the process exited `139`.
+
+This sampled window does **not** look like a very recent regression confined to
+the latest nightly.
+
 ## Current Conclusion
 
 The present evidence supports this ordering of likelihood:
 
 1. `arm64e-apple-darwin` Rust host binaries are currently not viable on this
-   toolchain path for local execution.
+   local toolchain path for host execution.
 2. The Xcode macOS unit-test crashes are a downstream symptom of that lower-level
    runtime issue.
 3. `discover_certificate_selectors` and `merge_public_certificate_update` appear
    in crash stacks because those tests happen to exercise Rust code heavily, not
    because they are uniquely broken business paths.
+4. Within the sampled nightly range (`2026-02-15` through current nightly), the
+   problem looks target-wide rather than like an obvious recent regression.
 
 ## Practical Impact
 
@@ -162,6 +220,8 @@ For the current experiment branch:
 - `macOS unit tests under arm64e` should currently be treated as **blocked by
   Rust host-runtime instability**
 - further Swift/XCTest debugging is unlikely to produce the primary root cause
+- the next-best escalation target is Rust/toolchain investigation or upstream
+  reporting, not more app-layer debugging
 
 ## Reproduction Helper
 

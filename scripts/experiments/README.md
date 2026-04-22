@@ -37,6 +37,10 @@ In other words:
   Minimal host-side repro matrix for the current macOS `arm64e` crash
   investigation. Uses existing `pgp-mobile` Rust tests plus a standalone
   scratch Cargo binary, and avoids relaunching the full Xcode macOS test host.
+- `sample_arm64e_darwin_toolchains.sh`
+  Samples a small set of nightly toolchains against the standalone scratch
+  binary and the smallest `pgp-mobile` merge test, to distinguish target-wide
+  host instability from a recent nightly regression.
 
 ## Investigation Notes
 
@@ -44,3 +48,7 @@ In other words:
   Current evidence summary for the macOS unit-test crash investigation,
   including the pure Rust `arm64` vs `arm64e` control/repro results and the
   standalone `arm64e` host-binary crash evidence.
+- `arm64e-apple-darwin-rust-issue-draft.md`
+  Draft upstream-facing issue text for Rust/toolchain reporting. Packages the
+  current minimal reproduction, environment, and sampled nightly results in a
+  format that can be adapted into a GitHub issue.
