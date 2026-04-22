@@ -292,6 +292,16 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
 
             try await deleteArtifacts()
 
+            // Known limitation: this cleanup decision is based on the committed
+            // membership before removing the target domain from the registry.
+            // If a first-domain create reached `.membershipCommitted` and then
+            // aborts here, `committedMembership` still contains the target, so
+            // shared-resource cleanup may be skipped even though removing the
+            // target would leave membership empty. That can leave the registry
+            // describing `absent` while an external persisted shared right still
+            // exists. We currently accept this corner case; a future fix must
+            // decide cleanup from the post-removal membership and must not
+            // swallow shared-resource cleanup failures.
             let requiresSharedResourceCleanup = registry.committedMembership.isEmpty
             if requiresSharedResourceCleanup {
                 do {
