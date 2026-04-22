@@ -35,7 +35,7 @@ are not part of the standard GitHub workflows.
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
-**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, and dedicated password-message service behavior. Uses protocol-based mocks for Keychain and SE.
+**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData Phase 1 framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, and startup seam validation. Uses protocol-based mocks for Keychain and SE.
 
 ```bash
 # Practical local path used in this repository
@@ -59,7 +59,7 @@ These tests exist in the Swift test target but call through the UniFFI bindings 
 ### Layer 4: Device-Only Tests
 
 **Run on:** Physical iOS device only. Cannot run in simulator.
-**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging.
+**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and LocalAuthentication protected-data right behavior through `LARightStore` / `LAPersistedRight`.
 
 ```bash
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
@@ -83,7 +83,14 @@ The workspace currently includes three Xcode Test Plans:
 
 **CypherAir-UnitTests.xctestplan** — Layers 2–3 (Swift unit tests + FFI integration tests). Runs in macOS local validation, simulator, and CI. Excludes device-only tests. Layer 1 (Rust unit tests) runs independently via `cargo test` as a separate CI step. This is the default test plan bound to the `CypherAir` scheme.
 
-**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, biometric auth modes, mode switching, crash recovery, MIE validation.
+**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data right-store validation.
+
+ProtectedData device-test isolation rules:
+
+- use test-only identifiers of the form `com.cypherair.tests.protected-data.<TestCase>.<UUID>`
+- never use the production shared-right identifier in tests
+- clean up by identifier before and after each device test
+- do not call `removeAllRightsWithCompletion()`
 
 **CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`.
 

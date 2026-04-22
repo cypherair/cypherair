@@ -130,6 +130,7 @@ Before app-data authorization succeeds, the app may:
 - read the `ProtectedDataRegistry`
 - read file-side per-domain bootstrap metadata
 - route cold start and determine whether protected domains exist
+- synchronously bootstrap an empty steady-state registry when no protected-data artifacts exist
 
 Before app-data authorization succeeds, the app must not:
 
@@ -150,6 +151,12 @@ After app-data authorization succeeds, the app may:
 - determine final framework and domain state
 
 This startup boundary is a required implementation constraint, not a best-effort guideline.
+
+Phase 1 implementation note:
+
+- `CypherAirApp.init()` remains the synchronous startup entry point
+- `AppStartupCoordinator.performPreAuthBootstrap(...)` is the only startup hook allowed to touch `ProtectedDataRegistry` before authorization
+- that bootstrap path may create the empty steady-state registry but may not authorize the shared right
 
 Startup recovery derived from this guide must also:
 
@@ -208,6 +215,12 @@ This migration guide documents the handoff points that the future single-owner s
 | Grace-window timing | `AppConfiguration` | `gracePeriod`, `lastAuthenticationDate`, and `isGracePeriodExpired` currently determine whether re-auth is required | Make `AppSessionOrchestrator` the only grace-window owner |
 | Content clearing on auth boundary | `AppConfiguration` + view observers | grace-expiry re-auth increments `contentClearGeneration` before authentication so decrypted UI state clears | Move relock-driven clearing into framework relock plus `ProtectedDataRelockParticipant` fan-out |
 | Cold-start loading and temp cleanup | `AppStartupCoordinator` | cold start loads keys and Contacts, runs recovery checks, and cleans temporary files before any future protected app-data layer exists | Split startup into pre-auth bootstrap plus post-auth protected-domain unlock; future protected-domain loading must not happen merely from startup initialization |
+
+Current Phase 1 implementation status:
+
+- `AppStartupCoordinator.performPreAuthBootstrap(...)` now owns the synchronous pre-auth registry bootstrap/classification step
+- `AppSessionOrchestrator` owns grace-window timing, content-clear generation, and privacy-auth sequencing
+- `ProtectedDataSessionCoordinator` exists but is not triggered during ordinary startup because no real protected domain has landed yet
 
 ## 4. Persisted-State Classification Inventory
 

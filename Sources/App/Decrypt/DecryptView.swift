@@ -82,7 +82,7 @@ struct DecryptView: View {
     }
 
     @Environment(DecryptionService.self) private var decryptionService
-    @Environment(AppConfiguration.self) private var config
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
 
     let configuration: Configuration
 
@@ -93,24 +93,24 @@ struct DecryptView: View {
     var body: some View {
         DecryptScreenHostView(
             decryptionService: decryptionService,
-            appConfiguration: config,
+            appSessionOrchestrator: appSessionOrchestrator,
             configuration: configuration
         )
     }
 }
 
 private struct DecryptScreenHostView: View {
-    let appConfiguration: AppConfiguration
+    let appSessionOrchestrator: AppSessionOrchestrator
     let configuration: DecryptView.Configuration
 
     @State private var model: DecryptScreenModel
 
     init(
         decryptionService: DecryptionService,
-        appConfiguration: AppConfiguration,
+        appSessionOrchestrator: AppSessionOrchestrator,
         configuration: DecryptView.Configuration
     ) {
-        self.appConfiguration = appConfiguration
+        self.appSessionOrchestrator = appSessionOrchestrator
         self.configuration = configuration
         _model = State(
             initialValue: DecryptScreenModel(
@@ -336,7 +336,7 @@ private struct DecryptScreenHostView: View {
         .onDisappear {
             model.handleDisappear()
         }
-        .onChange(of: appConfiguration.contentClearGeneration) {
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
             model.handleContentClearGenerationChange()
         }
         .onChange(of: runtimeSyncKey) { _, _ in

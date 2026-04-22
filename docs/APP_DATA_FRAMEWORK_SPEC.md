@@ -198,6 +198,29 @@ Required `WrappedDomainMasterKeyRecord` properties:
 - authentication tag
 - associated data that includes at minimum domain ID and wrap-version metadata
 
+The v1 `WrappedDomainMasterKeyRecord` implementation profile is fixed:
+
+- raw `LASecret` bytes are never used directly as the DMK wrapping key
+- derive `AppDataWrappingRootKey` first with `HKDF-SHA256`
+  - salt: `"CypherAir.AppData.WrapRoot.Salt.v1"`
+  - info: `"CypherAir.AppData.WrapRoot.Info.v1"`
+  - output: 32 bytes
+- zeroize the raw `LASecret` bytes immediately after root-key derivation
+- derive `DomainWrappingKey` per domain with `HKDF-SHA256`
+  - salt: `"CypherAir.AppData.DomainWrap.Salt.v1"`
+  - info: `WrappedDMKKeyInfoV1(domainID, wrapVersion = 1)`
+  - output: 32 bytes
+- wrap the 32-byte DMK with `AES.GCM`
+  - nonce: 12 random bytes
+  - tag: 16 bytes
+- canonical AAD bytes are:
+  - magic `"CADMKAD1"`
+  - `wrapVersion = 1`
+  - `domainIDLength` as `UInt16 big-endian`
+  - domain ID UTF-8 bytes
+  - `wrappedKeyLength = 32`
+- persisted record files use versioned binary property-list encoding
+
 The canonical wrapped-DMK lifecycle is:
 
 - create: journal `createDomain` first, provision the shared right/secret only after that journal exists, then stage and validate the wrapped-DMK record plus initial domain state before committing membership
@@ -210,6 +233,13 @@ Wrapped-DMK writes must use an explicit transaction:
 1. write staged wrapped-DMK state
 2. read back and validate the staged record
 3. atomically promote the staged record to committed wrapped-DMK state
+
+Validation of the staged record must:
+
+1. decode the staged property-list record
+2. re-derive `DomainWrappingKey`
+3. unwrap the staged DMK successfully
+4. only then promote the staged file to committed state
 
 The v1 docs do not permit multiple equally valid persistence shapes for the master-key ladder. The shared-gate / wrapped-DMK model above is the single canonical v1 model and must be applied consistently across startup, relock, deletion, migration, and recovery.
 
@@ -275,6 +305,7 @@ Owns:
 - advancement and clearing of `pendingMutation`
 - enforcement of registry consistency invariants
 - framework-level recovery classification before external evidence inspection
+- synchronous empty-registry bootstrap when the protected-data root contains no artifacts
 
 ### `ProtectedDomainBootstrapStore.swift`
 
@@ -337,6 +368,12 @@ Owns:
 - scene lifecycle intake
 - app lock/relock initiation
 - handoff to `ProtectedDataSessionCoordinator` for first protected-domain access
+
+Phase 1 implementation note:
+
+- `CypherAirApp.init()` performs only synchronous pre-auth bootstrap through `AppStartupCoordinator`
+- the bootstrap may create an empty steady-state registry
+- no `LARightStore` or `LASecret` call is permitted from that path
 
 ### `ProtectedSettingsStore.swift`
 

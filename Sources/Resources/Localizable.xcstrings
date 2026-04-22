@@ -2065,6 +2065,38 @@
         }
       }
     },
+    "error.protectedData.domainIdentifierEncoding" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A ProtectedData domain identifier could not be encoded."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法编码 ProtectedData 域标识符。"
+          }
+        }
+      }
+    },
+    "error.protectedData.randomFailure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A secure random-number operation failed while preparing protected app data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准备受保护应用数据时，安全随机数操作失败。"
+          }
+        }
+      }
+    },
     "error.invalidKeyData" : {
       "localizations" : {
         "en" : {
@@ -10397,6 +10429,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先前的安全密钥迁移无法恢复。如果私钥操作失败，请从备份恢复。"
+          }
+        }
+      }
+    },
+    "startup.protectedData.recoveryNeeded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected app data is unavailable and may require recovery."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的应用数据当前不可用，可能需要恢复。"
           }
         }
       }

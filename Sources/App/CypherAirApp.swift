@@ -15,6 +15,7 @@ struct CypherAirApp: App {
     @State private var container: AppContainer
 
     @State private var loadError: String?
+    @State private var startupSnapshot: AppStartupCoordinator.AppStartupBootstrapSnapshot
     @State private var tutorialStore: TutorialSessionStore
     @State private var incomingURLImportCoordinator: IncomingURLImportCoordinator
     @State private var launchConfiguration: AppLaunchConfiguration
@@ -41,7 +42,7 @@ struct CypherAirApp: App {
         }
         if launchConfiguration.isUITestMode && !launchConfiguration.requiresManualAuthentication {
             container.config.requireAuthOnLaunch = false
-            container.config.recordAuthentication()
+            container.appSessionOrchestrator.recordAuthentication()
         }
         if launchConfiguration.shouldSkipOnboarding {
             container.config.hasCompletedOnboarding = true
@@ -51,11 +52,12 @@ struct CypherAirApp: App {
             importLoader: PublicKeyImportLoader(qrService: container.qrService),
             importWorkflow: ContactImportWorkflow(contactService: container.contactService)
         )
-        let startupResult = AppStartupCoordinator().performStartup(using: container)
+        let startupSnapshot = AppStartupCoordinator().performPreAuthBootstrap(using: container)
 
         _launchConfiguration = State(initialValue: launchConfiguration)
         _container = State(initialValue: container)
-        _loadError = State(initialValue: startupResult.loadError)
+        _loadError = State(initialValue: startupSnapshot.loadError)
+        _startupSnapshot = State(initialValue: startupSnapshot)
         _tutorialStore = State(initialValue: tutorialStore)
         _incomingURLImportCoordinator = State(initialValue: incomingURLImportCoordinator)
     }
@@ -150,6 +152,7 @@ struct CypherAirApp: App {
                 .environment(container.qrService)
                 .environment(container.selfTestService)
                 .environment(container.authManager)
+                .environment(container.appSessionOrchestrator)
                 .environment(tutorialStore)
                 #if os(iOS) || os(visionOS)
                 .environment(\.iosPresentationController, iosPresentationControllerValue)

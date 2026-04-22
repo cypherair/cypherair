@@ -382,7 +382,32 @@ final class CommonHelpersTests: XCTestCase {
         let config = AppConfiguration(defaults: defaults)
         let contactDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirStartupTests-\(UUID().uuidString)", isDirectory: true)
+        let protectedDataBaseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirProtectedDataStartupTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: contactDirectory) }
+        defer { try? FileManager.default.removeItem(at: protectedDataBaseDirectory) }
+        let protectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot(baseDirectory: protectedDataBaseDirectory)
+        let protectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
+        let protectedDataRegistryStore = CypherAir.ProtectedDataRegistryStore(
+            storageRoot: protectedDataStorageRoot,
+            sharedRightIdentifier: CypherAir.ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+        )
+        let protectedDomainRecoveryCoordinator = CypherAir.ProtectedDomainRecoveryCoordinator(
+            registryStore: protectedDataRegistryStore
+        )
+        let protectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator(
+            rightStoreClient: CypherAir.ProtectedDataRightStoreClient(),
+            domainKeyManager: protectedDomainKeyManager,
+            sharedRightIdentifier: CypherAir.ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+        )
+        let appSessionOrchestrator = CypherAir.AppSessionOrchestrator(
+            gracePeriodProvider: { config.gracePeriod },
+            requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
+            evaluateAppAuthentication: { reason in
+                try await authManager.evaluate(mode: config.authMode, reason: reason)
+            },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator
+        )
         let contactService = ContactService(engine: engine, contactsDirectory: contactDirectory)
         let encryptionService = EncryptionService(
             engine: engine,
@@ -416,6 +441,12 @@ final class CommonHelpersTests: XCTestCase {
             keychain: mockKC,
             authManager: authManager,
             config: config,
+            protectedDataStorageRoot: protectedDataStorageRoot,
+            protectedDataRegistryStore: protectedDataRegistryStore,
+            protectedDomainKeyManager: protectedDomainKeyManager,
+            protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,
             contactService: contactService,

@@ -44,7 +44,7 @@ Key files:
 
 - `CypherAirApp.swift` — app entry point and scene configuration
 - `AppContainer.swift` — centralized dependency construction
-- `AppStartupCoordinator.swift` — cold-start loading, crash recovery, temporary file cleanup, startup warning aggregation
+- `AppStartupCoordinator.swift` — synchronous pre-auth bootstrap, cold-start loading, crash recovery, temporary file cleanup, startup warning aggregation
 - `ContentView.swift` — root navigation
 - `OnboardingView.swift` — first-run flow
 
@@ -57,7 +57,7 @@ Shared presentation-layer infrastructure used across multiple views.
 | `OperationController` | Shared task lifecycle, cancellation, progress state, error presentation, and clipboard notice handling for encrypt/decrypt/sign/verify flows |
 | `SecurityScopedFileAccess` | Uniform wrapper around security-scoped file URL access |
 | `FileExportController` | Shared `fileExporter` state for exporting generated data or existing files |
-| `PrivacyScreenModifier` | Background blur + re-authentication gating |
+| `PrivacyScreenModifier` | Background blur + re-authentication gating as a thin UI adapter over `AppSessionOrchestrator` |
 
 ### Services Layer (`Sources/Services/`)
 
@@ -98,11 +98,26 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `SecureEnclaveManager` | P-256 key generation in SE, self-ECDH + HKDF + AES-GCM wrapping/unwrapping, key deletion. Same wrapping scheme for Ed25519/X25519/Ed448/X448. |
 | `KeychainManager` | CRUD for Keychain items (SE key blob, salt, sealed box), access control flag configuration |
 | `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, and auth-mode crash recovery |
+| `ProtectedDataSessionCoordinator` | Shared `LAPersistedRight` authorization, `LASecret` → wrapping-root-key derivation, relock, and `restartRequired` latching for protected app-data domains |
+| `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, staged wrapped-DMK validation/promotion, and unlocked-domain-key zeroization |
+| `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, and future protected-domain handoff |
 | `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
 | `KeyMetadataStore` | Shared persistence helper for non-sensitive key metadata items |
 | `KeyMigrationCoordinator` | Shared migration state machine for pending/permanent recovery, including safe/retryable/unrecoverable outcomes |
 | `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K memory requirements before key import. 75% threshold prevents Jetsam termination. No-op for Profile A (Iterated+Salted S2K). |
 | `MemoryZeroingUtility` | Extensions on `Data` and `Array<UInt8>` for secure clearing |
+
+### ProtectedData Phase 1 Additions (`Sources/Security/ProtectedData/`)
+
+- `ProtectedDataStorageRoot.swift` — resolves `Application Support/ProtectedData/`, file-protection application, and registry/domain metadata paths
+- `ProtectedDataRegistry.swift` / `ProtectedDataRegistryStore.swift` — registry manifest, consistency validation, recovery classification, and empty-registry bootstrap
+- `ProtectedDataRightStoreClient.swift` — `LARightStore` wrapper used by the protected-data session layer
+- `ProtectedDomainBootstrapStore.swift` — file-side bootstrap metadata persistence
+
+Current Phase 1 scope:
+
+- the framework exists and is wired into startup/bootstrap and app-session ownership
+- no real protected domain has been migrated yet, so ordinary launch does not authorize the shared app-data right
 
 ### Models (`Sources/Models/`)
 
