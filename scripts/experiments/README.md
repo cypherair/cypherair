@@ -3,6 +3,20 @@
 This directory contains branch-local experiment helpers for CypherAir's Apple
 `arm64e` work.
 
+## Toolchain
+
+This experiment branch is expected to use the locally linked Rust toolchain:
+
+- `stage1-arm64e-patch`
+
+That toolchain currently comes from the local Rust fork checkout at:
+
+- `/Users/tianren/coding/rust`
+
+The branch-level `rust-toolchain.toml` points repo-root cargo/rustc invocations
+at that patched stage1 toolchain so local `pgp-mobile` validation uses the
+current upstream-fix spike by default.
+
 ## Carry Chain
 
 The current experiment intentionally uses a layered downstream carry chain:
@@ -41,6 +55,10 @@ In other words:
   Samples a small set of nightly toolchains against the standalone scratch
   binary and the smallest `pgp-mobile` merge test, to distinguish target-wide
   host instability from a recent nightly regression.
+- `probe_arm64e_tls_codegen_gap.sh`
+  Builds matching `arm64e` C++ and Rust TLS samples, then shows the current
+  wrapper-level codegen gap between clang and Rust. Also includes a manual LLVM
+  IR attribute experiment that changes Rust's wrapper from `blr` to `blraaz`.
 
 ## Investigation Notes
 

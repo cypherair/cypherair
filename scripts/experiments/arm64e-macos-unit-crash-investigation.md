@@ -198,6 +198,142 @@ For the scratch binary, the run log remained empty and the process exited `139`.
 This sampled window does **not** look like a very recent regression confined to
 the latest nightly.
 
+### 7. clang vs Rust TLS codegen gap
+
+Further investigation narrowed the most actionable difference to the TLS access
+path under `arm64e`.
+
+On the same host:
+
+- a C/C++ `thread_local` sample compiled with `clang -arch arm64e` runs
+  successfully
+- an equivalent Rust `thread_local!` sample compiled for
+  `arm64e-apple-darwin` crashes
+
+The generated code differs in an important way:
+
+- clang emits a TLS wrapper that uses an authenticated indirect call
+  (`blraaz`)
+- Rust currently emits a TLS wrapper that uses a plain indirect call (`blr`)
+
+Representative Rust wrapper before patching IR:
+
+```text
+adrp x0, ...
+ldr  x0, [x0]
+ldr  x8, [x0]
+blr  x8
+```
+
+Representative wrapper after manually patching the Rust-generated LLVM IR to
+add clang-like `ptrauth-*` function attributes:
+
+```text
+adrp   x0, ...
+ldr    x0, [x0]
+ldr    x8, [x0]
+blraaz x8
+```
+
+This matters because it means the current investigation now has a plausible
+upstream repair direction:
+
+- Rust's `arm64e-apple-darwin` codegen appears to be missing clang-like
+  pointer-authentication semantics for TLS/indirect-call paths.
+
+This is stronger evidence than the earlier "Rust crashes in `_tlv_get_addr`"
+observation, because it provides a concrete codegen-level difference rather
+than only a runtime symptom.
+
+### 8. Source-level Rust patch spike
+
+I then moved from manual LLVM IR patching to a source-level Rust compiler spike
+in a temporary Rust checkout:
+
+```text
+/Users/tianren/coding/rust
+branch: codex/arm64e-darwin-ptrauth-spike
+```
+
+The spike currently has two layers:
+
+1. `rustc_codegen_llvm/src/attributes.rs`
+   - default `arm64e-apple-darwin` function attributes:
+     - `ptrauth-auth-traps`
+     - `ptrauth-calls`
+     - `ptrauth-indirect-gotos`
+     - `ptrauth-returns`
+   - plus `+pauth` in `target-features`
+2. `rustc_codegen_llvm/src/context.rs`
+   - add a clang-style `ptrauth.abi-version` module flag for
+     `arm64e-apple-darwin`
+3. `rustc_codegen_ssa/src/back/metadata.rs`
+   - set Mach-O metadata objects to
+     `CPU_SUBTYPE_ARM64E | CPU_SUBTYPE_PTRAUTH_ABI`
+     (`CPU_SUBTYPE_LIB64` in Apple headers has the same bit pattern)
+
+This split matters:
+
+- function attributes fix the TLS wrapper call sequence
+- the `ptrauth.abi-version` / metadata subtype work fixes the
+  `arm64e.old` vs `arm64e` linker rejection
+
+### 9. What the patched compiler now does
+
+Using the patched stage1 compiler, the following now succeed for
+`arm64e-apple-darwin`:
+
+- scratch Rust `hello world`
+- scratch Rust `thread_local!` sample
+- scratch `std::thread::current().id()` sample
+
+Representative results:
+
+```text
+hello-stage1
+exit:0
+```
+
+```text
+7
+8
+exit:0
+```
+
+```text
+ThreadId(1)
+```
+
+That means the original "Rust arm64e host binaries crash immediately" problem
+is no longer reproduced for these minimal host samples with the patched
+compiler.
+
+### 10. Remaining limitation
+
+The direct host-runtime issue appears fixed for minimal programs, but downstream
+validation through `cargo` is still imperfect when using the temporary stage1
+toolchain as a rustup-linked toolchain:
+
+- `cargo` itself falls back to the installed nightly cargo binary
+- the ad-hoc stage1 sysroot layout still needs manual help for some host/target
+  crates during downstream verification
+
+This currently affects the convenience of validating `pgp-mobile` end-to-end
+through normal cargo/test workflows, but it does **not** negate the stronger
+result above:
+
+- the patched compiler can now produce runnable `arm64e-apple-darwin` host
+  binaries
+
+So the investigation has moved from:
+
+- "why does Rust arm64e crash at startup?"
+
+to:
+
+- "how do we turn this local patch spike into a clean upstreamable Rust/LLVM
+  change and a smoother validation workflow?"
+
 ## Current Conclusion
 
 The present evidence supports this ordering of likelihood:
@@ -211,6 +347,12 @@ The present evidence supports this ordering of likelihood:
    because they are uniquely broken business paths.
 4. Within the sampled nightly range (`2026-02-15` through current nightly), the
    problem looks target-wide rather than like an obvious recent regression.
+5. The most actionable remaining hypothesis is now a codegen/ABI gap in
+   `arm64e` TLS/indirect-call pointer authentication rather than a generic
+   application-layer crash.
+6. A source-level Rust patch spike now fixes the minimal host reproductions,
+   which strongly suggests the core issue is in Rust's `arm64e` codegen / ABI
+   glue rather than in CypherAir or Sequoia.
 
 ## Practical Impact
 
@@ -233,3 +375,12 @@ Use:
 
 to rerun the minimal host-side control/repro matrix without launching the full
 Xcode macOS unit-test host.
+
+Use:
+
+```bash
+./scripts/experiments/probe_arm64e_tls_codegen_gap.sh
+```
+
+to reproduce the clang-vs-Rust TLS wrapper difference and the manual IR
+attribute experiment that changes Rust's wrapper from `blr` to `blraaz`.
