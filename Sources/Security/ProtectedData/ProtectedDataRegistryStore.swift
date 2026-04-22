@@ -225,6 +225,155 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
         }
     }
 
+    func recoverPendingMutation(
+        targetDomainID: ProtectedDataDomainID,
+        continueReadyCreate: @escaping @Sendable (_ phase: CreateDomainPhase) async throws -> Void = { _ in },
+        continueDelete: @escaping @Sendable (_ phase: DeleteDomainPhase) async throws -> Void
+    ) async throws -> PendingRecoveryOutcome {
+        try await mutationGate.run { [self] in
+            let registry = try loadRegistry()
+            guard case let pendingMutation? = registry.pendingMutation,
+                    pendingMutation.targetDomainID == targetDomainID else {
+                return .frameworkRecoveryNeeded
+            }
+
+            switch pendingMutation {
+            case .createDomain(_, let phase):
+                // Accepted limitation: first-domain pending create rows stay reset-only
+                // because ordinary shared-right authorization is valid only in `ready`.
+                if registry.committedMembership.isEmpty && registry.sharedResourceLifecycleState == .absent {
+                    return .resetRequired
+                }
+
+                if registry.sharedResourceLifecycleState != .ready {
+                    return .frameworkRecoveryNeeded
+                }
+
+                do {
+                    switch phase {
+                    case .membershipCommitted:
+                        var updatedRegistry = registry
+                        updatedRegistry.pendingMutation = nil
+                        try saveRegistry(updatedRegistry)
+                    case .journaled, .sharedResourceProvisioned, .artifactsStaged, .validated:
+                        try await continueReadyCreate(phase)
+                    }
+                } catch {
+                    return try currentPendingRecoveryOutcome(for: targetDomainID)
+                }
+
+                return try currentPendingRecoveryOutcome(for: targetDomainID)
+
+            case .deleteDomain(_, let phase):
+                do {
+                    try await continueDelete(phase)
+                } catch {
+                    return try currentPendingRecoveryOutcome(for: targetDomainID)
+                }
+
+                return try currentPendingRecoveryOutcome(for: targetDomainID)
+            }
+        }
+    }
+
+    func abandonPendingCreate(
+        domainID: ProtectedDataDomainID,
+        deleteArtifacts: @escaping @Sendable () async throws -> Void,
+        cleanupSharedResourceIfNeeded: @escaping @Sendable () async throws -> Void
+    ) async throws -> ProtectedDataRegistry {
+        try await mutationGate.run { [self] in
+            var registry = try loadRegistry()
+            guard case let .createDomain(targetDomainID, _)? = registry.pendingMutation,
+                    targetDomainID == domainID else {
+                throw ProtectedDataError.invalidRegistry(
+                    "Pending create for domain \(domainID.rawValue) is missing."
+                )
+            }
+
+            try await deleteArtifacts()
+
+            let requiresSharedResourceCleanup = registry.committedMembership.isEmpty
+            if requiresSharedResourceCleanup {
+                do {
+                    try await cleanupSharedResourceIfNeeded()
+                } catch {
+                    // Best-effort cleanup here keeps reset idempotent when the right
+                    // was never provisioned or was already removed.
+                }
+            }
+
+            registry = try loadRegistry()
+            registry.committedMembership.removeValue(forKey: domainID)
+            registry.sharedResourceLifecycleState = registry.committedMembership.isEmpty ? .absent : .ready
+            registry.pendingMutation = nil
+            try saveRegistry(registry)
+            return registry
+        }
+    }
+
+    func completePendingDelete(
+        domainID: ProtectedDataDomainID,
+        deleteArtifacts: @escaping @Sendable () async throws -> Void,
+        cleanupSharedResourceIfNeeded: @escaping @Sendable () async throws -> Void
+    ) async throws -> ProtectedDataRegistry {
+        try await mutationGate.run { [self] in
+            var registry = try loadRegistry()
+            guard case let .deleteDomain(targetDomainID, phase)? = registry.pendingMutation,
+                    targetDomainID == domainID else {
+                throw ProtectedDataError.invalidRegistry(
+                    "Pending delete for domain \(domainID.rawValue) is missing."
+                )
+            }
+
+            let requiresMembershipRemoval = {
+                switch phase {
+                case .journaled, .artifactsDeleted:
+                    return true
+                case .membershipRemoved, .sharedResourceCleanupStarted:
+                    return false
+                }
+            }()
+
+            if requiresMembershipRemoval {
+                try await deleteArtifacts()
+                registry = try loadRegistry()
+                registry.pendingMutation = .deleteDomain(
+                    targetDomainID: domainID,
+                    phase: .artifactsDeleted
+                )
+                try saveRegistry(registry)
+
+                registry.committedMembership.removeValue(forKey: domainID)
+                let requiresSharedCleanup = registry.committedMembership.isEmpty
+                registry.sharedResourceLifecycleState = requiresSharedCleanup ? .cleanupPending : .ready
+                registry.pendingMutation = .deleteDomain(
+                    targetDomainID: domainID,
+                    phase: .membershipRemoved
+                )
+                try saveRegistry(registry)
+            } else {
+                try await deleteArtifacts()
+            }
+
+            registry = try loadRegistry()
+            if registry.sharedResourceLifecycleState == .cleanupPending {
+                registry.pendingMutation = .deleteDomain(
+                    targetDomainID: domainID,
+                    phase: .sharedResourceCleanupStarted
+                )
+                try saveRegistry(registry)
+
+                try await cleanupSharedResourceIfNeeded()
+                registry = try loadRegistry()
+                registry.sharedResourceLifecycleState = .absent
+            }
+
+            registry.pendingMutation = nil
+            try saveRegistry(registry)
+            return registry
+        }
+    }
+
     private func assertMutationPreconditions(
         registry: ProtectedDataRegistry,
         targetDomainID: ProtectedDataDomainID,
@@ -240,6 +389,28 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
             throw ProtectedDataError.invalidRegistry(
                 "Create-domain target \(targetDomainID.rawValue) is already committed."
             )
+        }
+    }
+
+    private func currentPendingRecoveryOutcome(
+        for targetDomainID: ProtectedDataDomainID
+    ) throws -> PendingRecoveryOutcome {
+        let registry = try loadRegistry()
+        guard registry.classifyRecoveryDisposition() == .continuePendingMutation,
+                registry.pendingMutation?.targetDomainID == targetDomainID else {
+            return .resumedToSteadyState
+        }
+
+        switch registry.pendingMutation {
+        case .some(.createDomain):
+            if registry.committedMembership.isEmpty && registry.sharedResourceLifecycleState == .absent {
+                return .resetRequired
+            }
+            return .retryablePending
+        case .some(.deleteDomain):
+            return .retryablePending
+        case nil:
+            return .resumedToSteadyState
         }
     }
 }

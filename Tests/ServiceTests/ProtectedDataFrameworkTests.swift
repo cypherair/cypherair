@@ -17,6 +17,7 @@ private typealias AppProtectedDataSessionCoordinator = CypherAir.ProtectedDataSe
 private typealias AppProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
 private typealias AppProtectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager
 private typealias AppProtectedDomainRecoveryCoordinator = CypherAir.ProtectedDomainRecoveryCoordinator
+private typealias AppPendingRecoveryOutcome = CypherAir.PendingRecoveryOutcome
 private typealias AppWrappedDomainMasterKeyRecord = CypherAir.WrappedDomainMasterKeyRecord
 
 private final class MockProtectedDataPersistedRightHandle: AppProtectedDataPersistedRightHandle {
@@ -103,6 +104,18 @@ private final class MockProtectedDataRelockParticipant: AppProtectedDataRelockPa
         if shouldThrow {
             throw ProtectedDataError.restartRequired
         }
+    }
+}
+
+private actor AsyncBooleanFlag {
+    private var value = false
+
+    func setTrue() {
+        value = true
+    }
+
+    func currentValue() -> Bool {
+        value
     }
 }
 
@@ -249,6 +262,14 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 wrappingRootKey: wrappingRootKey
             )
         )
+    }
+
+    func test_sensitiveBytes_zeroize_clearsOwnedStorage() {
+        var sensitiveBytes = CypherAir.SensitiveBytes(data: Data(repeating: 0xAB, count: 8))
+
+        sensitiveBytes.zeroize()
+
+        XCTAssertEqual(sensitiveBytes.dataCopy(), Data(repeating: 0x00, count: 8))
     }
 
     func test_sessionCoordinator_authorizeAndRelockClearsWrappingRootKeyAndUnlockedDomainKeys() async throws {
@@ -793,6 +814,168 @@ final class ProtectedDataFrameworkTests: XCTestCase {
 
         XCTAssertEqual(result, .cancelledOrDenied)
         XCTAssertEqual(coordinator.frameworkState, .sessionLocked)
+    }
+
+    func test_pendingRecovery_firstDomainCreateWithoutReady_returnsResetRequired() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataPendingCreateReset")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.pending-create"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.pending-create",
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
+                phase: .artifactsStaged
+            )
+        )
+        try registryStore.saveRegistry(registry)
+
+        let outcome = try await registryStore.recoverPendingMutation(
+            targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
+            continueDelete: { _ in }
+        )
+
+        XCTAssertEqual(outcome, AppPendingRecoveryOutcome.resetRequired)
+    }
+
+    func test_abandonPendingCreate_clearsPendingMutationAndArtifacts() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataAbandonPendingCreate")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let defaultsSuiteName = "com.cypherair.tests.protected-data.abandon-create.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-create"
+        )
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let settingsStore = CypherAir.ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: keyManager
+        )
+
+        try storageRoot.ensureDomainDirectoryExists(for: CypherAir.ProtectedSettingsStore.domainID)
+        try storageRoot.writeProtectedData(
+            Data("staged".utf8),
+            to: storageRoot.domainEnvelopeURL(
+                for: CypherAir.ProtectedSettingsStore.domainID,
+                slot: .pending
+            )
+        )
+
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-create",
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
+                phase: .artifactsStaged
+            )
+        )
+        try registryStore.saveRegistry(registry)
+
+        _ = try await registryStore.abandonPendingCreate(
+            domainID: CypherAir.ProtectedSettingsStore.domainID,
+            deleteArtifacts: {
+                try settingsStore.deleteDomainArtifactsForRecovery()
+            },
+            cleanupSharedResourceIfNeeded: {}
+        )
+
+        let clearedRegistry = try registryStore.loadRegistry()
+        XCTAssertNil(clearedRegistry.pendingMutation)
+        XCTAssertEqual(clearedRegistry.sharedResourceLifecycleState, .absent)
+        XCTAssertFalse(
+            try storageRoot.managedItemExists(
+                at: storageRoot.domainEnvelopeURL(
+                    for: CypherAir.ProtectedSettingsStore.domainID,
+                    slot: .pending
+                )
+            )
+        )
+    }
+
+    func test_completePendingDelete_clearsCleanupPendingAndPendingMutation() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataCompletePendingDelete")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let defaultsSuiteName = "com.cypherair.tests.protected-data.complete-delete.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.complete-delete"
+        )
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let settingsStore = CypherAir.ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: keyManager
+        )
+
+        try storageRoot.ensureDomainDirectoryExists(for: CypherAir.ProtectedSettingsStore.domainID)
+        try storageRoot.writeProtectedData(
+            Data("current".utf8),
+            to: storageRoot.domainEnvelopeURL(
+                for: CypherAir.ProtectedSettingsStore.domainID,
+                slot: .current
+            )
+        )
+
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.complete-delete",
+            sharedResourceLifecycleState: .cleanupPending,
+            committedMembership: [:],
+            pendingMutation: .deleteDomain(
+                targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
+                phase: .membershipRemoved
+            )
+        )
+        try registryStore.saveRegistry(registry)
+
+        let cleanupCalled = AsyncBooleanFlag()
+        _ = try await registryStore.completePendingDelete(
+            domainID: CypherAir.ProtectedSettingsStore.domainID,
+            deleteArtifacts: {
+                try settingsStore.deleteDomainArtifactsForRecovery()
+            },
+            cleanupSharedResourceIfNeeded: {
+                await cleanupCalled.setTrue()
+            }
+        )
+
+        let clearedRegistry = try registryStore.loadRegistry()
+        XCTAssertNil(clearedRegistry.pendingMutation)
+        XCTAssertEqual(clearedRegistry.sharedResourceLifecycleState, .absent)
+        let didCleanup = await cleanupCalled.currentValue()
+        XCTAssertTrue(didCleanup)
+        XCTAssertFalse(
+            try storageRoot.managedItemExists(
+                at: storageRoot.domainEnvelopeURL(
+                    for: CypherAir.ProtectedSettingsStore.domainID,
+                    slot: .current
+                )
+            )
+        )
     }
 }
 

@@ -18,11 +18,19 @@ final class ProtectedSettingsHost {
         case frameworkRecoveryNeeded
     }
 
+    enum RecoveryOutcome: Equatable {
+        case resumedToSteadyState
+        case retryablePending
+        case resetRequired
+        case frameworkRecoveryNeeded
+    }
+
     enum DomainState: Equatable {
         case locked
         case unlocked
         case recoveryNeeded
-        case pendingMutationRecoveryRequired
+        case pendingRetryRequired
+        case pendingResetRequired
         case frameworkUnavailable
     }
 
@@ -37,7 +45,8 @@ final class ProtectedSettingsHost {
         case locked
         case available(clipboardNoticeEnabled: Bool)
         case recoveryNeeded
-        case pendingMutationRecoveryRequired
+        case pendingRetryRequired
+        case pendingResetRequired
         case frameworkUnavailable
         case settingsSceneProxy
         case tutorialSandbox
@@ -53,6 +62,7 @@ final class ProtectedSettingsHost {
         let migrateLegacyClipboardNoticeIfNeeded: @MainActor () async throws -> Void
         let openDomainIfNeeded: @MainActor (_ wrappingRootKey: Data) async throws -> Void
         let updateClipboardNotice: @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void
+        let recoverPendingMutation: @MainActor () async throws -> RecoveryOutcome
         let resetDomain: @MainActor () async throws -> Void
     }
 
@@ -75,6 +85,7 @@ final class ProtectedSettingsHost {
         migrateLegacyClipboardNoticeIfNeeded: @escaping @MainActor () async throws -> Void,
         openDomainIfNeeded: @escaping @MainActor (_ wrappingRootKey: Data) async throws -> Void,
         updateClipboardNotice: @escaping @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void,
+        recoverPendingMutation: @escaping @MainActor () async throws -> RecoveryOutcome,
         resetDomain: @escaping @MainActor () async throws -> Void
     ) {
         self.mode = .mainWindowLive
@@ -89,6 +100,7 @@ final class ProtectedSettingsHost {
             migrateLegacyClipboardNoticeIfNeeded: migrateLegacyClipboardNoticeIfNeeded,
             openDomainIfNeeded: openDomainIfNeeded,
             updateClipboardNotice: updateClipboardNotice,
+            recoverPendingMutation: recoverPendingMutation,
             resetDomain: resetDomain
         )
         self.sectionState = .locked
@@ -125,7 +137,7 @@ final class ProtectedSettingsHost {
             syncSectionStateFromStore(liveDependencies)
         case .noProtectedDomainPresent, .authorizationRequired:
             liveDependencies.syncPreAuthorizationState()
-            sectionState = .locked
+            syncSectionStateFromStore(liveDependencies)
         case .alreadyAuthorized:
             _ = await openProtectedSettings(
                 using: liveDependencies,
@@ -171,6 +183,32 @@ final class ProtectedSettingsHost {
         }
     }
 
+    func retryPendingRecovery() async {
+        guard let liveDependencies else {
+            return
+        }
+
+        sectionState = .loading
+        do {
+            let outcome = try await liveDependencies.recoverPendingMutation()
+            switch outcome {
+            case .resumedToSteadyState:
+                liveDependencies.syncPreAuthorizationState()
+                syncSectionStateFromStore(liveDependencies)
+            case .retryablePending:
+                liveDependencies.syncPreAuthorizationState()
+                syncSectionStateFromStore(liveDependencies)
+            case .resetRequired:
+                sectionState = .pendingResetRequired
+            case .frameworkRecoveryNeeded:
+                sectionState = .frameworkUnavailable
+            }
+        } catch {
+            liveDependencies.syncPreAuthorizationState()
+            syncSectionStateFromStore(liveDependencies)
+        }
+    }
+
     func resetProtectedSettingsDomain() async {
         guard let liveDependencies else {
             return
@@ -200,6 +238,8 @@ final class ProtectedSettingsHost {
         }
 
         do {
+            liveDependencies.syncPreAuthorizationState()
+            syncSectionStateFromStore(liveDependencies)
             guard try await ensureProtectedSettingsAccess(
                 using: liveDependencies,
                 localizedReason: clipboardLocalizedReason
@@ -215,6 +255,17 @@ final class ProtectedSettingsHost {
 
     func disableClipboardNotice() async {
         await setClipboardNoticeEnabled(false)
+    }
+
+    func invalidateForContentClearGeneration(_ generation: Int) async {
+        _ = generation
+        guard let liveDependencies else {
+            return
+        }
+
+        await Task.yield()
+        liveDependencies.syncPreAuthorizationState()
+        syncSectionStateFromStore(liveDependencies)
     }
 
     func openMainWindow() {
@@ -255,7 +306,7 @@ final class ProtectedSettingsHost {
             return false
         case .pendingMutationRecoveryRequired:
             liveDependencies.syncPreAuthorizationState()
-            sectionState = .pendingMutationRecoveryRequired
+            syncSectionStateFromStore(liveDependencies)
             return false
         case .noProtectedDomainPresent:
             try await liveDependencies.migrateLegacyClipboardNoticeIfNeeded()
@@ -313,8 +364,10 @@ final class ProtectedSettingsHost {
             )
         case .recoveryNeeded:
             sectionState = .recoveryNeeded
-        case .pendingMutationRecoveryRequired:
-            sectionState = .pendingMutationRecoveryRequired
+        case .pendingRetryRequired:
+            sectionState = .pendingRetryRequired
+        case .pendingResetRequired:
+            sectionState = .pendingResetRequired
         case .frameworkUnavailable:
             sectionState = .frameworkUnavailable
         }

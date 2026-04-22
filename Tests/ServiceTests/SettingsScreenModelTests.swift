@@ -322,6 +322,57 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_liveProtectedSettingsHost_authorizationRequired_preservesRecoveryNeededOnRefresh() async {
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .recoveryNeeded
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .authorizationRequired },
+            authorizeSharedRight: { _ in .authorized },
+            currentWrappingRootKey: { Data() },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.refreshSettingsSection()
+
+        XCTAssertEqual(host.sectionState, .recoveryNeeded)
+        _ = domainState
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_invalidateForContentClearGeneration_reloadsLockedState() async {
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .unlocked
+        var clipboardNotice = false
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .alreadyAuthorized },
+            authorizeSharedRight: { _ in .authorized },
+            currentWrappingRootKey: { Data() },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { clipboardNotice },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.refreshSettingsSection()
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
+
+        domainState = .locked
+        clipboardNotice = true
+        await host.invalidateForContentClearGeneration(1)
+
+        XCTAssertEqual(host.sectionState, .locked)
+    }
+
+    @MainActor
     private func makeModel(
         configuration: SettingsView.Configuration = .default,
         iosPresentationController: IOSPresentationController? = nil,

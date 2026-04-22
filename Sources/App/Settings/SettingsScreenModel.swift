@@ -187,6 +187,12 @@ final class SettingsScreenModel {
         }
     }
 
+    func requestProtectedSettingsRetry() {
+        Task {
+            await protectedSettingsHost?.retryPendingRecovery()
+        }
+    }
+
     func requestProtectedSettingsReset() {
         showProtectedSettingsResetConfirmation = true
     }
