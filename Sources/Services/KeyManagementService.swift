@@ -24,7 +24,8 @@ final class KeyManagementService {
         keychain: any KeychainManageable,
         authenticator: any AuthenticationEvaluable,
         memoryInfo: any MemoryInfoProvidable = SystemMemoryInfo(),
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator()
     ) {
         let bundleStore = KeyBundleStore(keychain: keychain)
         let metadataStore = KeyMetadataStore(keychain: keychain)
@@ -32,7 +33,8 @@ final class KeyManagementService {
         let catalogStore = KeyCatalogStore(metadataStore: metadataStore)
         let privateKeyAccessService = PrivateKeyAccessService(
             secureEnclave: secureEnclave,
-            bundleStore: bundleStore
+            bundleStore: bundleStore,
+            authenticationPromptCoordinator: authenticationPromptCoordinator
         )
 
         self.engine = engine

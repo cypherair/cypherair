@@ -36,6 +36,7 @@ final class TutorialSandboxContainer {
     let defaultsSuiteName: String
 
     private let defaults: UserDefaults
+    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private var didCleanup = false
 
     init() throws {
@@ -43,6 +44,7 @@ final class TutorialSandboxContainer {
         self.mockSecureEnclave = MockSecureEnclave()
         self.mockKeychain = MockKeychain()
         self.mockAuthenticator = MockAuthenticator()
+        self.authenticationPromptCoordinator = AuthenticationPromptCoordinator()
 
         let suiteName = "com.cypherair.tutorial.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
@@ -64,7 +66,8 @@ final class TutorialSandboxContainer {
         self.authManager = AuthenticationManager(
             secureEnclave: mockSecureEnclave,
             keychain: mockKeychain,
-            defaults: defaults
+            defaults: defaults,
+            authenticationPromptCoordinator: authenticationPromptCoordinator
         )
         self.securitySimulationStack = TutorialSecuritySimulationStack(
             authManager: authManager,
@@ -78,7 +81,8 @@ final class TutorialSandboxContainer {
             secureEnclave: mockSecureEnclave,
             keychain: mockKeychain,
             authenticator: authManager,
-            defaults: defaults
+            defaults: defaults,
+            authenticationPromptCoordinator: authenticationPromptCoordinator
         )
         self.contactService = ContactService(engine: engine, contactsDirectory: contactsDirectory)
         self.encryptionService = EncryptionService(

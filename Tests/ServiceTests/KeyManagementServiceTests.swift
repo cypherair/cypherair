@@ -1,6 +1,65 @@
 import Foundation
+import LocalAuthentication
+import Security
 import XCTest
 @testable import CypherAir
+
+private final class PromptObservingSecureEnclave: SecureEnclaveManageable {
+    private let base: MockSecureEnclave
+    private let coordinator: CypherAir.AuthenticationPromptCoordinator
+    private(set) var sawPromptInProgressDuringReconstruct = false
+
+    init(
+        base: MockSecureEnclave,
+        coordinator: CypherAir.AuthenticationPromptCoordinator
+    ) {
+        self.base = base
+        self.coordinator = coordinator
+    }
+
+    static var isAvailable: Bool { MockSecureEnclave.isAvailable }
+
+    func generateWrappingKey(
+        accessControl: SecAccessControl?,
+        authenticationContext: LAContext?
+    ) throws -> any SEKeyHandle {
+        try base.generateWrappingKey(
+            accessControl: accessControl,
+            authenticationContext: authenticationContext
+        )
+    }
+
+    func wrap(
+        privateKey: Data,
+        using handle: any SEKeyHandle,
+        fingerprint: String
+    ) throws -> WrappedKeyBundle {
+        try base.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+    }
+
+    func unwrap(
+        bundle: WrappedKeyBundle,
+        using handle: any SEKeyHandle,
+        fingerprint: String
+    ) throws -> Data {
+        try base.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+    }
+
+    func deleteKey(_ handle: any SEKeyHandle) throws {
+        try base.deleteKey(handle)
+    }
+
+    func reconstructKey(
+        from data: Data,
+        authenticationContext: LAContext?
+    ) throws -> any SEKeyHandle {
+        sawPromptInProgressDuringReconstruct = coordinator.isPromptInProgress
+        return try base.reconstructKey(
+            from: data,
+            authenticationContext: authenticationContext
+        )
+    }
+}
 
 /// Tests for KeyManagementService — full key lifecycle with mock SE/Keychain/Auth.
 final class KeyManagementServiceTests: XCTestCase {
@@ -483,6 +542,30 @@ final class KeyManagementServiceTests: XCTestCase {
 
         // Verify SE unwrap was called
         XCTAssertEqual(mockSE.unwrapCallCount, 1)
+    }
+
+    func test_unwrapPrivateKey_usesAuthenticationPromptCoordinator() async throws {
+        let coordinator = CypherAir.AuthenticationPromptCoordinator()
+        let observingSecureEnclave = PromptObservingSecureEnclave(
+            base: mockSE,
+            coordinator: coordinator
+        )
+        let promptAwareService = KeyManagementService(
+            engine: engine,
+            secureEnclave: observingSecureEnclave,
+            keychain: mockKC,
+            authenticator: mockAuth,
+            authenticationPromptCoordinator: coordinator
+        )
+        let identity = try await TestHelpers.generateProfileAKey(service: promptAwareService)
+
+        let privateKeyData = try promptAwareService.unwrapPrivateKey(
+            fingerprint: identity.fingerprint
+        )
+
+        XCTAssertFalse(privateKeyData.isEmpty)
+        XCTAssertTrue(observingSecureEnclave.sawPromptInProgressDuringReconstruct)
+        XCTAssertFalse(coordinator.isPromptInProgress)
     }
 
     func test_unwrapPrivateKey_unknownFingerprint_throwsError() {

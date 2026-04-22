@@ -76,6 +76,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private let defaults: UserDefaults
     private let bundleStore: KeyBundleStore
     private let migrationCoordinator: KeyMigrationCoordinator
+    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
 
     // MARK: - State
 
@@ -105,11 +106,13 @@ final class AuthenticationManager: AuthenticationEvaluable {
     init(
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator()
     ) {
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.defaults = defaults
+        self.authenticationPromptCoordinator = authenticationPromptCoordinator
         let bundleStore = KeyBundleStore(keychain: keychain)
         self.bundleStore = bundleStore
         self.migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
@@ -141,35 +144,35 @@ final class AuthenticationManager: AuthenticationEvaluable {
         }
 
         let context = LAContext()
-        let success: Bool
-
-        switch mode {
-        case .standard:
-            // Face ID / Touch ID with device passcode fallback.
-            success = try await context.evaluatePolicy(
-                .deviceOwnerAuthentication,
-                localizedReason: reason
-            )
-
-        case .highSecurity:
-            // Face ID / Touch ID only. Hide the passcode fallback button.
-            context.localizedFallbackTitle = ""
-
-            do {
-                success = try await context.evaluatePolicy(
-                    .deviceOwnerAuthenticationWithBiometrics,
+        let success = try await authenticationPromptCoordinator.withPrompt {
+            switch mode {
+            case .standard:
+                // Face ID / Touch ID with device passcode fallback.
+                return try await context.evaluatePolicy(
+                    .deviceOwnerAuthentication,
                     localizedReason: reason
                 )
-            } catch let error as LAError where error.code == .biometryNotAvailable
-                                             || error.code == .biometryNotEnrolled
-                                             || error.code == .biometryLockout {
-                throw AuthenticationError.biometricsUnavailable
-            } catch let error as LAError where error.code == .userCancel
-                                             || error.code == .appCancel
-                                             || error.code == .systemCancel {
-                throw AuthenticationError.cancelled
-            } catch {
-                throw AuthenticationError.failed
+
+            case .highSecurity:
+                // Face ID / Touch ID only. Hide the passcode fallback button.
+                context.localizedFallbackTitle = ""
+
+                do {
+                    return try await context.evaluatePolicy(
+                        .deviceOwnerAuthenticationWithBiometrics,
+                        localizedReason: reason
+                    )
+                } catch let error as LAError where error.code == .biometryNotAvailable
+                                                 || error.code == .biometryNotEnrolled
+                                                 || error.code == .biometryLockout {
+                    throw AuthenticationError.biometricsUnavailable
+                } catch let error as LAError where error.code == .userCancel
+                                                 || error.code == .appCancel
+                                                 || error.code == .systemCancel {
+                    throw AuthenticationError.cancelled
+                } catch {
+                    throw AuthenticationError.failed
+                }
             }
         }
 

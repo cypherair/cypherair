@@ -13,8 +13,11 @@ struct PrivacyScreenLifecycleGate {
         suppressNextActivation = true
     }
 
-    mutating func shouldHandleResignActive(isAuthenticating: Bool) -> Bool {
-        if isAuthenticating {
+    mutating func shouldHandleResignActive(
+        isAuthenticating: Bool,
+        isSystemAuthenticationPromptInProgress: Bool = false
+    ) -> Bool {
+        if isAuthenticating || isSystemAuthenticationPromptInProgress {
             armForAuthenticationAttempt()
             return false
         }
@@ -22,12 +25,15 @@ struct PrivacyScreenLifecycleGate {
         return !suppressNextActivation
     }
 
-    mutating func shouldHandleBecomeActive(isAuthenticating: Bool) -> Bool {
+    mutating func shouldHandleBecomeActive(
+        isAuthenticating: Bool,
+        isSystemAuthenticationPromptInProgress: Bool = false
+    ) -> Bool {
         if suppressNextActivation {
             suppressNextActivation = false
             return false
         }
 
-        return !isAuthenticating
+        return !(isAuthenticating || isSystemAuthenticationPromptInProgress)
     }
 }
