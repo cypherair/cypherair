@@ -118,6 +118,46 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
     }
 
+    func test_privacyScreenLifecycleGate_allowsNormalResignAndActivation() {
+        var gate = PrivacyScreenLifecycleGate()
+
+        XCTAssertTrue(gate.shouldHandleResignActive(isAuthenticating: false))
+        XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
+    }
+
+    func test_privacyScreenLifecycleGate_suppressesAuthPromptActivationBeforeAuthCompletes() {
+        var gate = PrivacyScreenLifecycleGate()
+
+        XCTAssertFalse(gate.shouldHandleResignActive(isAuthenticating: true))
+        XCTAssertFalse(gate.shouldHandleBecomeActive(isAuthenticating: true))
+        XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
+    }
+
+    func test_privacyScreenLifecycleGate_suppressesOnlyOneActivationPerAuthPromptCycle() {
+        var gate = PrivacyScreenLifecycleGate()
+
+        XCTAssertFalse(gate.shouldHandleResignActive(isAuthenticating: true))
+        XCTAssertFalse(gate.shouldHandleBecomeActive(isAuthenticating: false))
+        XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
+    }
+
+    func test_privacyScreenLifecycleGate_authenticationAttemptSuppressesActivationWithoutResignEvent() {
+        var gate = PrivacyScreenLifecycleGate()
+
+        gate.armForAuthenticationAttempt()
+
+        XCTAssertFalse(gate.shouldHandleBecomeActive(isAuthenticating: false))
+    }
+
+    func test_privacyScreenLifecycleGate_authenticationAttemptSuppressionIsConsumedAfterOneActivation() {
+        var gate = PrivacyScreenLifecycleGate()
+
+        gate.armForAuthenticationAttempt()
+
+        XCTAssertFalse(gate.shouldHandleBecomeActive(isAuthenticating: false))
+        XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
+    }
+
     func test_operationController_runFileOperation_usesBackgroundRunnerAndClearsState() async {
         let runnerCallCounter = RunnerCallCounter()
         let controller = OperationController(
