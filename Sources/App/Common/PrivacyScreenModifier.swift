@@ -47,14 +47,16 @@ struct PrivacyScreenModifier: ViewModifier {
                 switch newPhase {
                 case .background, .inactive:
                     guard lifecycleGate.shouldHandleResignActive(
-                        isAuthenticating: appSessionOrchestrator.isAuthenticating
+                        isAuthenticating: appSessionOrchestrator.isAuthenticating,
+                        isSystemAuthenticationPromptInProgress: appSessionOrchestrator.isSystemAuthenticationPromptInProgress
                     ) else {
                         return
                     }
                     appSessionOrchestrator.handleSceneDidResignActive()
                 case .active:
                     guard lifecycleGate.shouldHandleBecomeActive(
-                        isAuthenticating: appSessionOrchestrator.isAuthenticating
+                        isAuthenticating: appSessionOrchestrator.isAuthenticating,
+                        isSystemAuthenticationPromptInProgress: appSessionOrchestrator.isSystemAuthenticationPromptInProgress
                     ) else {
                         return
                     }
@@ -67,7 +69,8 @@ struct PrivacyScreenModifier: ViewModifier {
             #if os(macOS)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
                 guard lifecycleGate.shouldHandleResignActive(
-                    isAuthenticating: appSessionOrchestrator.isAuthenticating
+                    isAuthenticating: appSessionOrchestrator.isAuthenticating,
+                    isSystemAuthenticationPromptInProgress: appSessionOrchestrator.isSystemAuthenticationPromptInProgress
                 ) else {
                     return
                 }
@@ -75,7 +78,8 @@ struct PrivacyScreenModifier: ViewModifier {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 guard lifecycleGate.shouldHandleBecomeActive(
-                    isAuthenticating: appSessionOrchestrator.isAuthenticating
+                    isAuthenticating: appSessionOrchestrator.isAuthenticating,
+                    isSystemAuthenticationPromptInProgress: appSessionOrchestrator.isSystemAuthenticationPromptInProgress
                 ) else {
                     return
                 }

@@ -135,10 +135,7 @@ final class ProtectedSettingsHost {
         case .pendingMutationRecoveryRequired:
             liveDependencies.syncPreAuthorizationState()
             syncSectionStateFromStore(liveDependencies)
-        case .noProtectedDomainPresent, .authorizationRequired:
-            liveDependencies.syncPreAuthorizationState()
-            syncSectionStateFromStore(liveDependencies)
-        case .alreadyAuthorized:
+        case .noProtectedDomainPresent, .authorizationRequired, .alreadyAuthorized:
             _ = await openProtectedSettings(
                 using: liveDependencies,
                 localizedReason: settingsLocalizedReason
@@ -286,9 +283,11 @@ final class ProtectedSettingsHost {
                 return false
             }
 
-            let clipboardNotice = liveDependencies.currentClipboardNotice() ?? true
-            sectionState = .available(clipboardNoticeEnabled: clipboardNotice)
-            return true
+            syncSectionStateFromStore(liveDependencies)
+            if case .available = sectionState {
+                return true
+            }
+            return false
         } catch {
             syncSectionStateFromStore(liveDependencies)
             return false

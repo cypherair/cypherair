@@ -6,6 +6,7 @@ final class ProtectedDataSessionCoordinator {
     private let rightStoreClient: any ProtectedDataRightStoreClientProtocol
     private let domainKeyManager: ProtectedDomainKeyManager
     private let sharedRightIdentifier: String
+    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
 
     private var sharedRight: (any ProtectedDataPersistedRightHandle)?
     private var wrappingRootKey: Data?
@@ -16,11 +17,13 @@ final class ProtectedDataSessionCoordinator {
     init(
         rightStoreClient: any ProtectedDataRightStoreClientProtocol,
         domainKeyManager: ProtectedDomainKeyManager,
-        sharedRightIdentifier: String
+        sharedRightIdentifier: String,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator()
     ) {
         self.rightStoreClient = rightStoreClient
         self.domainKeyManager = domainKeyManager
         self.sharedRightIdentifier = sharedRightIdentifier
+        self.authenticationPromptCoordinator = authenticationPromptCoordinator
     }
 
     func persistSharedRight(secretData: Data) async throws {
@@ -69,7 +72,9 @@ final class ProtectedDataSessionCoordinator {
         }
 
         do {
-            try await sharedRight.authorize(localizedReason: localizedReason)
+            try await authenticationPromptCoordinator.withPrompt {
+                try await sharedRight.authorize(localizedReason: localizedReason)
+            }
         } catch {
             return .cancelledOrDenied
         }

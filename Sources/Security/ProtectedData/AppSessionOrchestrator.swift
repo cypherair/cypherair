@@ -8,6 +8,7 @@ final class AppSessionOrchestrator {
     private let gracePeriodProvider: () -> Int
     private let requireAuthOnLaunchProvider: () -> Bool
     private let evaluateAppAuthentication: (String) async throws -> Bool
+    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
 
     private var hasAppearedOnce = false
 
@@ -23,7 +24,8 @@ final class AppSessionOrchestrator {
         gracePeriodProvider: @escaping () -> Int,
         requireAuthOnLaunchProvider: @escaping () -> Bool,
         evaluateAppAuthentication: @escaping (String) async throws -> Bool,
-        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
+        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator()
     ) {
         self.currentRegistryProvider = currentRegistryProvider
         self.shouldBypassPrivacyAuthentication = shouldBypassPrivacyAuthentication
@@ -31,6 +33,7 @@ final class AppSessionOrchestrator {
         self.requireAuthOnLaunchProvider = requireAuthOnLaunchProvider
         self.evaluateAppAuthentication = evaluateAppAuthentication
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
+        self.authenticationPromptCoordinator = authenticationPromptCoordinator
     }
 
     func recordAuthentication() {
@@ -39,6 +42,10 @@ final class AppSessionOrchestrator {
 
     func requestContentClear() {
         contentClearGeneration += 1
+    }
+
+    var isSystemAuthenticationPromptInProgress: Bool {
+        authenticationPromptCoordinator.isPromptInProgress
     }
 
     var isGracePeriodExpired: Bool {
@@ -70,6 +77,9 @@ final class AppSessionOrchestrator {
     }
 
     func handleSceneDidResignActive() {
+        guard !isSystemAuthenticationPromptInProgress else {
+            return
+        }
         isPrivacyScreenBlurred = true
         authFailed = false
     }
@@ -79,6 +89,10 @@ final class AppSessionOrchestrator {
         if shouldBypassPrivacyAuthentication() {
             authFailed = false
             isPrivacyScreenBlurred = false
+            return false
+        }
+
+        guard !isSystemAuthenticationPromptInProgress else {
             return false
         }
 

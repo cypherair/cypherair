@@ -141,6 +141,19 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
     }
 
+    func test_privacyScreenLifecycleGate_suppressesOneActivationForExternalAuthPromptCycle() {
+        var gate = PrivacyScreenLifecycleGate()
+
+        XCTAssertFalse(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                isSystemAuthenticationPromptInProgress: true
+            )
+        )
+        XCTAssertFalse(gate.shouldHandleBecomeActive(isAuthenticating: false))
+        XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
+    }
+
     func test_privacyScreenLifecycleGate_authenticationAttemptSuppressesActivationWithoutResignEvent() {
         var gate = PrivacyScreenLifecycleGate()
 
@@ -423,17 +436,20 @@ final class CommonHelpersTests: XCTestCase {
 
         try setupKeyManagement.deleteKey(fingerprint: fingerprint)
 
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
         let authManager = AuthenticationManager(
             secureEnclave: mockSE,
             keychain: mockKC,
-            defaults: defaults
+            defaults: defaults,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let keyManagement = KeyManagementService(
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: authManager,
-            defaults: defaults
+            defaults: defaults,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let config = AppConfiguration(defaults: defaults)
         let contactDirectory = FileManager.default.temporaryDirectory
@@ -454,7 +470,8 @@ final class CommonHelpersTests: XCTestCase {
         let protectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator(
             rightStoreClient: CypherAir.ProtectedDataRightStoreClient(),
             domainKeyManager: protectedDomainKeyManager,
-            sharedRightIdentifier: CypherAir.ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+            sharedRightIdentifier: CypherAir.ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let protectedSettingsStore = ProtectedSettingsStore(
             defaults: defaults,
@@ -473,7 +490,8 @@ final class CommonHelpersTests: XCTestCase {
             evaluateAppAuthentication: { reason in
                 try await authManager.evaluate(mode: config.authMode, reason: reason)
             },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let contactService = ContactService(engine: engine, contactsDirectory: contactDirectory)
         let encryptionService = EncryptionService(
@@ -504,6 +522,7 @@ final class CommonHelpersTests: XCTestCase {
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
         let container = AppContainer(
+            authPromptCoordinator: authPromptCoordinator,
             secureEnclave: mockSE,
             keychain: mockKC,
             authManager: authManager,

@@ -2,6 +2,7 @@ import Foundation
 
 /// Centralized dependency container for the application.
 final class AppContainer: @unchecked Sendable {
+    let authPromptCoordinator: AuthenticationPromptCoordinator
     let secureEnclave: any SecureEnclaveManageable
     let keychain: any KeychainManageable
     let authManager: AuthenticationManager
@@ -27,6 +28,7 @@ final class AppContainer: @unchecked Sendable {
     let defaultsSuiteName: String?
 
     init(
+        authPromptCoordinator: AuthenticationPromptCoordinator,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         authManager: AuthenticationManager,
@@ -51,6 +53,7 @@ final class AppContainer: @unchecked Sendable {
         contactsDirectory: URL? = nil,
         defaultsSuiteName: String? = nil
     ) {
+        self.authPromptCoordinator = authPromptCoordinator
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.authManager = authManager
@@ -79,9 +82,11 @@ final class AppContainer: @unchecked Sendable {
     static func makeDefault() -> AppContainer {
         let secureEnclave = HardwareSecureEnclave()
         let keychain = SystemKeychain()
+        let authPromptCoordinator = AuthenticationPromptCoordinator()
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
-            keychain: keychain
+            keychain: keychain,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
@@ -97,7 +102,8 @@ final class AppContainer: @unchecked Sendable {
         let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
             rightStoreClient: ProtectedDataRightStoreClient(),
             domainKeyManager: protectedDomainKeyManager,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let protectedSettingsStore = ProtectedSettingsStore(
             defaults: defaults,
@@ -116,7 +122,8 @@ final class AppContainer: @unchecked Sendable {
             evaluateAppAuthentication: { reason in
                 try await authManager.evaluate(mode: config.authMode, reason: reason)
             },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let engine = PgpEngine()
 
@@ -125,7 +132,8 @@ final class AppContainer: @unchecked Sendable {
             secureEnclave: secureEnclave,
             keychain: keychain,
             authenticator: authManager,
-            defaults: .standard
+            defaults: .standard,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let contactService = ContactService(engine: engine)
         let encryptionService = EncryptionService(
@@ -157,6 +165,7 @@ final class AppContainer: @unchecked Sendable {
         let selfTestService = SelfTestService(engine: engine)
 
         return AppContainer(
+            authPromptCoordinator: authPromptCoordinator,
             secureEnclave: secureEnclave,
             keychain: keychain,
             authManager: authManager,
@@ -187,6 +196,7 @@ final class AppContainer: @unchecked Sendable {
     ) -> AppContainer {
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
+        let authPromptCoordinator = AuthenticationPromptCoordinator()
         let suiteName = "com.cypherair.uitests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)
@@ -195,7 +205,8 @@ final class AppContainer: @unchecked Sendable {
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: defaults
+            defaults: defaults,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let config = AppConfiguration(defaults: defaults)
         let engine = PgpEngine()
@@ -227,7 +238,8 @@ final class AppContainer: @unchecked Sendable {
         let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
             rightStoreClient: ProtectedDataRightStoreClient(),
             domainKeyManager: protectedDomainKeyManager,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let protectedSettingsStore = ProtectedSettingsStore(
             defaults: defaults,
@@ -246,7 +258,8 @@ final class AppContainer: @unchecked Sendable {
             evaluateAppAuthentication: { reason in
                 try await authManager.evaluate(mode: config.authMode, reason: reason)
             },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
 
         let keyManagement = KeyManagementService(
@@ -254,7 +267,8 @@ final class AppContainer: @unchecked Sendable {
             secureEnclave: secureEnclave,
             keychain: keychain,
             authenticator: authManager,
-            defaults: defaults
+            defaults: defaults,
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let contactService = ContactService(
             engine: engine,
@@ -293,6 +307,7 @@ final class AppContainer: @unchecked Sendable {
         }
 
         return AppContainer(
+            authPromptCoordinator: authPromptCoordinator,
             secureEnclave: secureEnclave,
             keychain: keychain,
             authManager: authManager,
