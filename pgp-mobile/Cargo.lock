@@ -861,7 +861,7 @@ dependencies = [
 [[package]]
 name = "openssl-src"
 version = "300.6.0+3.6.2"
-source = "git+https://github.com/alexcrichton/openssl-src-rs?rev=767b8bffff4d690189d72d171feb224a41ea2e74#767b8bffff4d690189d72d171feb224a41ea2e74"
+source = "git+https://github.com/cypherair/openssl-src-rs?rev=12b87fb769bedbaa012739024c3342cc25b436a4#12b87fb769bedbaa012739024c3342cc25b436a4"
 dependencies = [
  "cc",
 ]
