@@ -189,7 +189,8 @@ final class AppContainer {
         let engine = PgpEngine()
         let contactsDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirUITests-\(UUID().uuidString)", isDirectory: true)
-        let protectedDataBaseDirectory = FileManager.default.temporaryDirectory
+        let applicationSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let protectedDataBaseDirectory = applicationSupportDirectory
             .appendingPathComponent("CypherAirUITestProtectedData-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(
             at: contactsDirectory,
@@ -199,7 +200,10 @@ final class AppContainer {
             at: protectedDataBaseDirectory,
             withIntermediateDirectories: true
         )
-        let protectedDataStorageRoot = ProtectedDataStorageRoot(baseDirectory: protectedDataBaseDirectory)
+        let protectedDataStorageRoot = ProtectedDataStorageRoot(
+            baseDirectory: protectedDataBaseDirectory,
+            validationMode: .enforceAppSupportContainment
+        )
         let protectedDomainKeyManager = ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
         let protectedDataRegistryStore = ProtectedDataRegistryStore(
             storageRoot: protectedDataStorageRoot,
