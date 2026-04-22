@@ -1,15 +1,34 @@
 import Foundation
 
+enum ProtectedDataStorageValidationMode {
+    case enforceAppSupportContainment
+    case allowArbitraryBaseDirectoryForTesting
+}
+
 struct ProtectedDataStorageRoot {
+    typealias FileProtectionCapabilityProvider = (URL) throws -> Bool
+
     private let baseDirectory: URL
     private let fileManager: FileManager
+    private let validationMode: ProtectedDataStorageValidationMode
+    private let fileProtectionCapabilityProvider: FileProtectionCapabilityProvider
 
     init(
         baseDirectory: URL? = nil,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        validationMode: ProtectedDataStorageValidationMode? = nil,
+        fileProtectionCapabilityProvider: @escaping FileProtectionCapabilityProvider = Self.defaultFileProtectionCapability(for:)
     ) {
-        self.baseDirectory = baseDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let resolvedBaseDirectory = baseDirectory ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        self.baseDirectory = resolvedBaseDirectory.standardizedFileURL
         self.fileManager = fileManager
+        self.validationMode = validationMode ?? {
+            if baseDirectory == nil {
+                return .enforceAppSupportContainment
+            }
+            return .allowArbitraryBaseDirectoryForTesting
+        }()
+        self.fileProtectionCapabilityProvider = fileProtectionCapabilityProvider
     }
 
     var rootURL: URL {
@@ -44,11 +63,14 @@ struct ProtectedDataStorageRoot {
         try createDirectoryIfNeeded(at: domainDirectory(for: domainID))
     }
 
-    func registryExists() -> Bool {
-        fileManager.fileExists(atPath: registryURL.path)
+    func registryExists() throws -> Bool {
+        try validatePersistentStorageContract()
+        return fileManager.fileExists(atPath: registryURL.path)
     }
 
     func hasProtectedDataArtifacts() throws -> Bool {
+        try validatePersistentStorageContract()
+
         guard fileManager.fileExists(atPath: rootURL.path) else {
             return false
         }
@@ -61,6 +83,8 @@ struct ProtectedDataStorageRoot {
     }
 
     func hasProtectedDataArtifactsExcludingRegistry() throws -> Bool {
+        try validatePersistentStorageContract()
+
         guard fileManager.fileExists(atPath: rootURL.path) else {
             return false
         }
@@ -73,32 +97,25 @@ struct ProtectedDataStorageRoot {
     }
 
     func writeProtectedData(_ data: Data, to url: URL) throws {
+        try validatePersistentStorageContract()
         try createDirectoryIfNeeded(at: url.deletingLastPathComponent())
-
-        #if os(macOS)
-        try data.write(to: url, options: .atomic)
-        if try volumeSupportsFileProtection(for: url) {
-            try applyFileProtection(to: url)
+        let scratchURL = temporaryProtectedWriteURL(for: url)
+        var shouldCleanupScratch = true
+        defer {
+            if shouldCleanupScratch {
+                try? fileManager.removeItem(at: scratchURL)
+            }
         }
-        #else
-        try data.write(to: url, options: [.atomic, .completeFileProtection])
-        try applyFileProtection(to: url)
-        #endif
+
+        try createProtectedFile(at: scratchURL, contents: data)
+        try promoteProtectedFile(from: scratchURL, to: url)
+        shouldCleanupScratch = false
     }
 
     func promoteStagedFile(from stagedURL: URL, to committedURL: URL) throws {
+        try validatePersistentStorageContract()
         try createDirectoryIfNeeded(at: committedURL.deletingLastPathComponent())
-        if fileManager.fileExists(atPath: committedURL.path) {
-            try fileManager.removeItem(at: committedURL)
-        }
-        try fileManager.moveItem(at: stagedURL, to: committedURL)
-        #if os(macOS)
-        if try volumeSupportsFileProtection(for: committedURL) {
-            try applyFileProtection(to: committedURL)
-        }
-        #else
-        try applyFileProtection(to: committedURL)
-        #endif
+        try promoteProtectedFile(from: stagedURL, to: committedURL)
     }
 
     func removeItemIfPresent(at url: URL) throws {
@@ -108,19 +125,80 @@ struct ProtectedDataStorageRoot {
         try fileManager.removeItem(at: url)
     }
 
+    func validatePersistentStorageContract() throws {
+        switch validationMode {
+        case .allowArbitraryBaseDirectoryForTesting:
+            return
+        case .enforceAppSupportContainment:
+            try validateBaseDirectoryIsWithinApplicationSupport()
+            guard try fileProtectionCapabilityProvider(baseDirectory) else {
+                throw ProtectedDataError.fileProtectionUnsupported
+            }
+        }
+    }
+
     private func createDirectoryIfNeeded(at url: URL) throws {
+        try validatePersistentStorageContract()
+
         guard !fileManager.fileExists(atPath: url.path) else {
+            try applyAndVerifyFileProtection(to: url)
             return
         }
 
         try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
-        #if os(macOS)
-        if try volumeSupportsFileProtection(for: url) {
-            try applyFileProtection(to: url)
+        try applyAndVerifyFileProtection(to: url)
+    }
+
+    private func validateBaseDirectoryIsWithinApplicationSupport() throws {
+        let applicationSupportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .standardizedFileURL
+        let standardizedBaseDirectory = baseDirectory.standardizedFileURL
+
+        guard standardizedBaseDirectory == applicationSupportDirectory ||
+                standardizedBaseDirectory.path.hasPrefix(applicationSupportDirectory.path + "/") else {
+            throw ProtectedDataError.storageRootOutsideApplicationSupport
         }
-        #else
+    }
+
+    private func createProtectedFile(at url: URL, contents: Data) throws {
+        guard fileManager.createFile(
+            atPath: url.path,
+            contents: contents,
+            attributes: [.protectionKey: FileProtectionType.complete]
+        ) else {
+            throw ProtectedDataError.protectedFileWriteFailed
+        }
+
+        try applyAndVerifyFileProtection(to: url)
+    }
+
+    private func promoteProtectedFile(from sourceURL: URL, to destinationURL: URL) throws {
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            _ = try fileManager.replaceItemAt(
+                destinationURL,
+                withItemAt: sourceURL,
+                backupItemName: nil
+            )
+        } else {
+            try fileManager.moveItem(at: sourceURL, to: destinationURL)
+        }
+
+        try applyAndVerifyFileProtection(to: destinationURL)
+    }
+
+    private func temporaryProtectedWriteURL(for destinationURL: URL) -> URL {
+        destinationURL.deletingLastPathComponent().appendingPathComponent(
+            ".\(destinationURL.lastPathComponent).\(UUID().uuidString).protected-write"
+        )
+    }
+
+    private func applyAndVerifyFileProtection(to url: URL) throws {
+        guard try fileProtectionCapabilityProvider(url) else {
+            throw ProtectedDataError.fileProtectionUnsupported
+        }
+
         try applyFileProtection(to: url)
-        #endif
+        try verifyFileProtection(at: url)
     }
 
     private func applyFileProtection(to url: URL) throws {
@@ -130,7 +208,15 @@ struct ProtectedDataStorageRoot {
         )
     }
 
-    private func volumeSupportsFileProtection(for url: URL) throws -> Bool {
+    private func verifyFileProtection(at url: URL) throws {
+        let attributes = try fileManager.attributesOfItem(atPath: url.path)
+        guard let protection = attributes[.protectionKey] as? FileProtectionType,
+                protection == .complete else {
+            throw ProtectedDataError.fileProtectionVerificationFailed
+        }
+    }
+
+    private static func defaultFileProtectionCapability(for url: URL) throws -> Bool {
         let values = try url.resourceValues(forKeys: [.volumeSupportsFileProtectionKey])
         return values.allValues[.volumeSupportsFileProtectionKey] as? Bool ?? false
     }

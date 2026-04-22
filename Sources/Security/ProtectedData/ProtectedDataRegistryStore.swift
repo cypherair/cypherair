@@ -18,7 +18,9 @@ struct ProtectedDataRegistryStore {
     }
 
     func performSynchronousBootstrap() throws -> ProtectedDataRegistryBootstrapResult {
-        if storageRoot.registryExists() {
+        try storageRoot.validatePersistentStorageContract()
+
+        if try storageRoot.registryExists() {
             let registry = try loadRegistry()
             let disposition = registry.classifyRecoveryDisposition()
             if disposition == .frameworkRecoveryNeeded {
@@ -58,6 +60,7 @@ struct ProtectedDataRegistryStore {
     }
 
     func loadRegistry() throws -> ProtectedDataRegistry {
+        try storageRoot.validatePersistentStorageContract()
         let data = try Data(contentsOf: storageRoot.registryURL)
         let decoder = PropertyListDecoder()
         let registry = try decoder.decode(ProtectedDataRegistry.self, from: data)
@@ -70,6 +73,7 @@ struct ProtectedDataRegistryStore {
     }
 
     func saveRegistry(_ registry: ProtectedDataRegistry) throws {
+        try storageRoot.validatePersistentStorageContract()
         if let invalidReason = registry.validateConsistency() {
             throw ProtectedDataError.invalidRegistry(invalidReason)
         }

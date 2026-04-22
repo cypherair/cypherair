@@ -66,7 +66,8 @@ This document is a downstream review aid. It does not change the architecture or
 
 - iOS / iPadOS / visionOS protected-domain files are created with explicit `complete` file protection
 - `ProtectedDataRegistry` follows the same explicit file-protection rule
-- macOS protected-domain files live inside the app's sandbox/container `Application Support` area and use the strongest platform-supported local static protection defined by the implementation
+- macOS protected-domain files fail closed unless the storage root is inside the app-owned `Application Support` area and the target volume reports file-protection support
+- macOS protected-domain files, registry files, bootstrap metadata files, and staged protected writes explicitly verify `complete` file protection after creation or promotion
 - on macOS, `ProtectedDataRegistry` and bootstrap metadata stay inside the same app-owned container boundary
 - on macOS, protected-domain payloads are not stored in user-managed document locations by default
 - macOS validation verifies containment, ownership, and absence of fallback to broader storage locations
@@ -107,7 +108,7 @@ This draft proposal must map its validation buckets onto the repository's existi
 - device tests must never use the production shared-right identifier
 - device tests must perform per-identifier cleanup before and after each test and must not call `removeAllRightsWithCompletion()`
 - bootstrap outcome and access-gate coverage belong to Swift unit tests, including explicit assertions that `continuePendingMutation` is preserved and that post-bootstrap validation can distinguish authorization-required vs already-authorized vs framework-recovery paths
-- file-protection strength, container containment, and absence of fallback to broader storage locations belong to platform-targeted macOS-local integration/manual verification, with automated macOS-local test coverage added where feasible and manual verification retained where the current repository does not yet have a dedicated protected-data file-metadata lane
+- file-protection strength, container containment, fail-closed capability checks, and absence of fallback to broader storage locations belong to Swift unit coverage plus platform-targeted macOS-local verification, with manual verification retained for lock-state semantics that repository automation cannot prove
 - migration survivability, startup adoption, and no-silent-reset guarantees belong to Swift unit coverage in `CypherAir-UnitTests` plus targeted macOS-local integration validation, adding the `CypherAir-MacUITests` macOS smoke path when startup routing or user-visible recovery flows are part of the scenario
 
 ## 3. Implementation Readiness Expectations

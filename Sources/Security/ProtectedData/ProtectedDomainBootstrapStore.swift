@@ -15,6 +15,7 @@ struct ProtectedDomainBootstrapStore {
     }
 
     func loadMetadata(for domainID: ProtectedDataDomainID) throws -> ProtectedDomainBootstrapMetadata? {
+        try storageRoot.validatePersistentStorageContract()
         let url = storageRoot.bootstrapMetadataURL(for: domainID)
         guard FileManager.default.fileExists(atPath: url.path) else {
             return nil
@@ -25,6 +26,7 @@ struct ProtectedDomainBootstrapStore {
     }
 
     func saveMetadata(_ metadata: ProtectedDomainBootstrapMetadata, for domainID: ProtectedDataDomainID) throws {
+        try storageRoot.validatePersistentStorageContract()
         try storageRoot.ensureDomainDirectoryExists(for: domainID)
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
@@ -33,6 +35,7 @@ struct ProtectedDomainBootstrapStore {
     }
 
     func removeMetadata(for domainID: ProtectedDataDomainID) throws {
+        try storageRoot.validatePersistentStorageContract()
         try storageRoot.removeItemIfPresent(at: storageRoot.bootstrapMetadataURL(for: domainID))
     }
 }

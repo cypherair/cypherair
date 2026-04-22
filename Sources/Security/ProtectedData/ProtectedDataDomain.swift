@@ -69,6 +69,10 @@ enum ProtectedDataError: Error, LocalizedError, Equatable {
     case invalidCiphertextLength(Int)
     case invalidRegistry(String)
     case registryMissingWithArtifacts
+    case storageRootOutsideApplicationSupport
+    case fileProtectionUnsupported
+    case fileProtectionVerificationFailed
+    case protectedFileWriteFailed
     case missingPersistedRight(String)
     case missingWrappingRootKey
     case internalFailure(String)
@@ -89,6 +93,14 @@ enum ProtectedDataError: Error, LocalizedError, Equatable {
             "ProtectedData registry is invalid: \(reason)"
         case .registryMissingWithArtifacts:
             "ProtectedData registry is missing while protected-data artifacts still exist."
+        case .storageRootOutsideApplicationSupport:
+            "ProtectedData storage must remain inside Application Support."
+        case .fileProtectionUnsupported:
+            "ProtectedData storage is unavailable because required file protection is unsupported."
+        case .fileProtectionVerificationFailed:
+            "ProtectedData storage could not verify the required file protection settings."
+        case .protectedFileWriteFailed:
+            "ProtectedData storage could not create a protected file."
         case .missingPersistedRight(let identifier):
             "ProtectedData shared right is missing for identifier \(identifier)."
         case .missingWrappingRootKey:

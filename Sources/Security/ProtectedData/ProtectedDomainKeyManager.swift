@@ -139,6 +139,7 @@ final class ProtectedDomainKeyManager {
         _ record: WrappedDomainMasterKeyRecord,
         wrappingRootKey: Data
     ) throws {
+        try storageRoot.validatePersistentStorageContract()
         try storageRoot.ensureDomainDirectoryExists(for: record.domainID)
 
         let encoder = PropertyListEncoder()
@@ -158,6 +159,7 @@ final class ProtectedDomainKeyManager {
     }
 
     func loadWrappedDomainMasterKeyRecord(for domainID: ProtectedDataDomainID) throws -> WrappedDomainMasterKeyRecord? {
+        try storageRoot.validatePersistentStorageContract()
         let url = storageRoot.committedWrappedDomainMasterKeyURL(for: domainID)
         guard FileManager.default.fileExists(atPath: url.path) else {
             return nil
