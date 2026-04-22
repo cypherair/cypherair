@@ -8097,6 +8097,22 @@
         }
       }
     },
+    "protectedSettings.pendingReset.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected preferences have unfinished setup work that cannot continue automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的偏好设置存在未完成的初始化工作，当前无法自动继续。"
+          }
+        }
+      }
+    },
     "protectedSettings.proxy.message" : {
       "localizations" : {
         "en" : {
@@ -8125,6 +8141,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开主窗口"
+          }
+        }
+      }
+    },
+    "protectedSettings.retry.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry Recovery"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试恢复"
           }
         }
       }

@@ -15,6 +15,44 @@ struct ProtectedDomainRecoveryCoordinator {
     func loadCurrentRegistry() throws -> ProtectedDataRegistry {
         try registryStore.loadRegistry()
     }
+
+    func recoverPendingSettingsMutation(
+        settingsStore: ProtectedSettingsStore,
+        removeSharedRight: @escaping @Sendable (String) async throws -> Void
+    ) async throws -> PendingRecoveryOutcome {
+        let registry = try registryStore.loadRegistry()
+        guard case let pendingMutation? = registry.pendingMutation,
+                pendingMutation.targetDomainID == ProtectedSettingsStore.domainID else {
+            return .frameworkRecoveryNeeded
+        }
+
+        return try await registryStore.recoverPendingMutation(
+            targetDomainID: ProtectedSettingsStore.domainID,
+            continueReadyCreate: { phase in
+                if phase == .membershipCommitted {
+                    return
+                }
+
+                // Accepted limitation: first-domain pending create stays reset-only
+                // and future ready-row create continuation is intentionally deferred
+                // until the framework grows a generic, domain-aware continuation path.
+                throw ProtectedDataError.invalidRegistry(
+                    "Ready-row pending create continuation is not implemented for ProtectedSettings."
+                )
+            },
+            continueDelete: { _ in
+                _ = try await registryStore.completePendingDelete(
+                    domainID: ProtectedSettingsStore.domainID,
+                    deleteArtifacts: {
+                        try settingsStore.deleteDomainArtifactsForRecovery()
+                    },
+                    cleanupSharedResourceIfNeeded: {
+                        try await removeSharedRight(registry.sharedRightIdentifier)
+                    }
+                )
+            }
+        )
+    }
 }
 
 @Observable
@@ -30,7 +68,6 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     private struct OpenedSnapshot {
         let payload: Payload
         let generationIdentifier: Int
-        let domainMasterKey: Data
     }
 
     private let defaults: UserDefaults
@@ -74,8 +111,8 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                 domainState = .frameworkUnavailable
                 return
             }
-            if registry.pendingMutation?.targetDomainID == Self.domainID {
-                domainState = .pendingMutationRecoveryRequired
+            if let pendingDomainState = pendingDomainState(for: registry) {
+                domainState = pendingDomainState
                 return
             }
             if registry.committedMembership[Self.domainID] == .recoveryNeeded {
@@ -103,26 +140,33 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             : defaults.bool(forKey: AppConfiguration.clipboardNoticeLegacyKey)
         let initialPayload = Payload(clipboardNotice: clipboardNotice)
 
-        let provisionedSecret = try randomData(count: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength)
-        var provisioningSecretCopy = provisionedSecret
-        let wrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &provisioningSecretCopy)
+        let provisionedSecret = SensitiveBytesBox(
+            data: try randomData(count: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength)
+        )
+        var rawRootKeyInput = provisionedSecret.dataCopy()
+        let derivedWrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rawRootKeyInput)
+        rawRootKeyInput.protectedDataZeroize()
+        let wrappingRootKey = SensitiveBytesBox(data: derivedWrappingRootKey)
         defer {
-            var secret = provisionedSecret
-            secret.protectedDataZeroize()
-            var mutableWrappingRootKey = wrappingRootKey
-            mutableWrappingRootKey.protectedDataZeroize()
+            provisionedSecret.zeroize()
+            wrappingRootKey.zeroize()
         }
 
         _ = try await registryStore.performCreateDomainTransaction(
             domainID: Self.domainID,
             provisionSharedResourceIfNeeded: {
-                try await persistSharedRight(provisionedSecret)
+                try await persistSharedRight(provisionedSecret.dataCopy())
             },
             stageArtifacts: { [self] in
-                try stageInitialPayload(initialPayload, wrappingRootKey: wrappingRootKey)
+                try stageInitialPayload(
+                    initialPayload,
+                    wrappingRootKey: wrappingRootKey.dataCopy()
+                )
             },
             validateArtifacts: { [self] in
-                _ = try readAuthoritativeSnapshot(wrappingRootKey: wrappingRootKey)
+                _ = try readAuthoritativeSnapshot(
+                    wrappingRootKey: wrappingRootKey.dataCopy()
+                )
             }
         )
 
@@ -137,8 +181,8 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         }
 
         let registry = try registryStore.loadRegistry()
-        if registry.pendingMutation?.targetDomainID == Self.domainID {
-            domainState = .pendingMutationRecoveryRequired
+        if let pendingDomainState = pendingDomainState(for: registry) {
+            domainState = pendingDomainState
             throw ProtectedDataError.invalidRegistry(
                 "Protected settings domain has pending recovery work."
             )
@@ -151,9 +195,13 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         }
 
         do {
-            let openedSnapshot = try readAuthoritativeSnapshot(wrappingRootKey: wrappingRootKey)
-            let cachedDomainMasterKey = Data(openedSnapshot.domainMasterKey)
+            let (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
+                wrappingRootKey: wrappingRootKey
+            )
+            let cachedDomainMasterKey = Data(unwrappedDomainMasterKey)
             domainKeyManager.cacheUnlockedDomainMasterKey(cachedDomainMasterKey, for: Self.domainID)
+            var mutableDomainMasterKey = unwrappedDomainMasterKey
+            mutableDomainMasterKey.protectedDataZeroize()
             payload = openedSnapshot.payload
             unlockedGenerationIdentifier = openedSnapshot.generationIdentifier
             domainState = .unlocked
@@ -209,17 +257,42 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         persistSharedRight: @escaping @Sendable (Data) async throws -> Void,
         removeSharedRight: @escaping @Sendable (String) async throws -> Void
     ) async throws {
-        if let registry = try? registryStore.loadRegistry(),
-           registry.committedMembership[Self.domainID] != nil {
-            _ = try await registryStore.performDeleteDomainTransaction(
-                domainID: Self.domainID,
-                deleteArtifacts: { [self] in
-                    try deleteDomainArtifacts()
-                },
-                cleanupSharedResourceIfNeeded: {
-                    try await removeSharedRight(registry.sharedRightIdentifier)
+        if let registry = try? registryStore.loadRegistry() {
+            if case let pendingMutation? = registry.pendingMutation,
+               pendingMutation.targetDomainID == Self.domainID {
+                switch pendingMutation {
+                case .createDomain:
+                    _ = try await registryStore.abandonPendingCreate(
+                        domainID: Self.domainID,
+                        deleteArtifacts: { [self] in
+                            try deleteDomainArtifactsForRecovery()
+                        },
+                        cleanupSharedResourceIfNeeded: {
+                            try await removeSharedRight(registry.sharedRightIdentifier)
+                        }
+                    )
+                case .deleteDomain:
+                    _ = try await registryStore.completePendingDelete(
+                        domainID: Self.domainID,
+                        deleteArtifacts: { [self] in
+                            try deleteDomainArtifactsForRecovery()
+                        },
+                        cleanupSharedResourceIfNeeded: {
+                            try await removeSharedRight(registry.sharedRightIdentifier)
+                        }
+                    )
                 }
-            )
+            } else if registry.committedMembership[Self.domainID] != nil {
+                _ = try await registryStore.performDeleteDomainTransaction(
+                    domainID: Self.domainID,
+                    deleteArtifacts: { [self] in
+                        try deleteDomainArtifacts()
+                    },
+                    cleanupSharedResourceIfNeeded: {
+                        try await removeSharedRight(registry.sharedRightIdentifier)
+                    }
+                )
+            }
         }
 
         clearUnlockedState()
@@ -315,7 +388,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
 
     private func readAuthoritativeSnapshot(
         wrappingRootKey: Data
-    ) throws -> OpenedSnapshot {
+    ) throws -> (OpenedSnapshot, Data) {
         guard let wrappedRecord = try domainKeyManager.loadWrappedDomainMasterKeyRecord(
             for: Self.domainID
         ) else {
@@ -348,8 +421,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                 candidates.append(
                     OpenedSnapshot(
                         payload: payload,
-                        generationIdentifier: envelope.generationIdentifier,
-                        domainMasterKey: Data(domainMasterKey)
+                        generationIdentifier: envelope.generationIdentifier
                     )
                 )
             } catch {
@@ -357,17 +429,16 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             }
         }
 
-        domainMasterKey.protectedDataZeroize()
-
         guard let selectedSnapshot = candidates.max(by: {
             $0.generationIdentifier < $1.generationIdentifier
         }) else {
+            domainMasterKey.protectedDataZeroize()
             throw ProtectedDataError.invalidEnvelope(
                 "Protected settings does not contain a readable authoritative generation."
             )
         }
 
-        return selectedSnapshot
+        return (selectedSnapshot, domainMasterKey)
     }
 
     private func activeDomainMasterKey(wrappingRootKey: Data) throws -> Data {
@@ -407,9 +478,34 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         try storageRoot.removeDomainDirectoryIfPresent(for: Self.domainID)
     }
 
+    func deleteDomainArtifactsForRecovery() throws {
+        try deleteDomainArtifacts()
+    }
+
     private func clearUnlockedState() {
         payload = nil
         unlockedGenerationIdentifier = nil
+    }
+
+    private func pendingDomainState(
+        for registry: ProtectedDataRegistry
+    ) -> ProtectedSettingsDomainState? {
+        guard let pendingMutation = registry.pendingMutation,
+                pendingMutation.targetDomainID == Self.domainID else {
+            return nil
+        }
+
+        switch pendingMutation {
+        case .createDomain:
+            // Accepted limitation: first-domain pending create remains reset-only
+            // because ordinary shared-right authorization is valid only in `ready`.
+            if registry.committedMembership.isEmpty && registry.sharedResourceLifecycleState == .absent {
+                return .pendingResetRequired
+            }
+            return .pendingRetryRequired
+        case .deleteDomain:
+            return .pendingRetryRequired
+        }
     }
 
     private func randomData(count: Int) throws -> Data {

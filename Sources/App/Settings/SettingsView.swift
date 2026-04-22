@@ -48,12 +48,18 @@ struct SettingsView: View {
 
 struct MainWindowSettingsRootView: View {
     @Environment(\.protectedSettingsHost) private var protectedSettingsHost
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
 
     var body: some View {
         var configuration = SettingsView.Configuration.default
         configuration.protectedSettingsHostMode = .mainWindowLive
         configuration.protectedSettingsHost = protectedSettingsHost
         return SettingsView(configuration: configuration)
+            .onChange(of: appSessionOrchestrator.contentClearGeneration) { _, generation in
+                Task {
+                    await protectedSettingsHost?.invalidateForContentClearGeneration(generation)
+                }
+            }
     }
 }
 
@@ -397,7 +403,7 @@ private struct SettingsScreenHostView: View {
                         model.requestProtectedSettingsReset()
                     }
                 }
-            case .pendingMutationRecoveryRequired:
+            case .pendingRetryRequired:
                 Text(
                     String(
                         localized: "protectedSettings.pending.message",
@@ -405,6 +411,34 @@ private struct SettingsScreenHostView: View {
                     )
                 )
                 .foregroundStyle(.secondary)
+                Button(
+                    String(
+                        localized: "protectedSettings.retry.action",
+                        defaultValue: "Retry Recovery"
+                    )
+                ) {
+                    model.requestProtectedSettingsRetry()
+                }
+            case .pendingResetRequired:
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(
+                        String(
+                            localized: "protectedSettings.pendingReset.message",
+                            defaultValue: "Protected preferences have unfinished setup work that cannot continue automatically."
+                        )
+                    )
+                    .foregroundStyle(.secondary)
+
+                    Button(
+                        String(
+                            localized: "protectedSettings.reset.action",
+                            defaultValue: "Reset Protected Preferences"
+                        ),
+                        role: .destructive
+                    ) {
+                        model.requestProtectedSettingsReset()
+                    }
+                }
             case .frameworkUnavailable:
                 Text(
                     String(

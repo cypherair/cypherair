@@ -106,8 +106,10 @@ struct CypherAirApp: App {
                     return .unlocked
                 case .recoveryNeeded:
                     return .recoveryNeeded
-                case .pendingMutationRecoveryRequired:
-                    return .pendingMutationRecoveryRequired
+                case .pendingRetryRequired:
+                    return .pendingRetryRequired
+                case .pendingResetRequired:
+                    return .pendingResetRequired
                 case .frameworkUnavailable:
                     return .frameworkUnavailable
                 }
@@ -132,6 +134,26 @@ struct CypherAirApp: App {
                     isEnabled,
                     wrappingRootKey: wrappingRootKey
                 )
+            },
+            recoverPendingMutation: {
+                let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingSettingsMutation(
+                    settingsStore: container.protectedSettingsStore,
+                    removeSharedRight: { identifier in
+                        try await container.protectedDataSessionCoordinator.removePersistedSharedRight(
+                            identifier: identifier
+                        )
+                    }
+                )
+                switch outcome {
+                case .resumedToSteadyState:
+                    return .resumedToSteadyState
+                case .retryablePending:
+                    return .retryablePending
+                case .resetRequired:
+                    return .resetRequired
+                case .frameworkRecoveryNeeded:
+                    return .frameworkRecoveryNeeded
+                }
             },
             resetDomain: {
                 try await container.protectedSettingsStore.resetDomain(

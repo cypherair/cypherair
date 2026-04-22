@@ -64,11 +64,19 @@ enum ProtectedDataAuthorizationResult: Equatable, Sendable {
     case frameworkRecoveryNeeded
 }
 
+enum PendingRecoveryOutcome: Equatable, Sendable {
+    case resumedToSteadyState
+    case retryablePending
+    case resetRequired
+    case frameworkRecoveryNeeded
+}
+
 enum ProtectedSettingsDomainState: Equatable {
     case locked
     case unlocked
     case recoveryNeeded
-    case pendingMutationRecoveryRequired
+    case pendingRetryRequired
+    case pendingResetRequired
     case frameworkUnavailable
 }
 
@@ -143,6 +151,43 @@ extension Data {
             return
         }
         resetBytes(in: startIndex..<endIndex)
+    }
+}
+
+struct SensitiveBytes: Sendable {
+    private var storage: ContiguousArray<UInt8>
+
+    init(data: Data) {
+        storage = ContiguousArray(data)
+    }
+
+    func dataCopy() -> Data {
+        Data(storage)
+    }
+
+    mutating func zeroize() {
+        guard !storage.isEmpty else {
+            return
+        }
+        storage.withUnsafeMutableBufferPointer { buffer in
+            buffer.initialize(repeating: 0)
+        }
+    }
+}
+
+final class SensitiveBytesBox: @unchecked Sendable {
+    private var sensitiveBytes: SensitiveBytes
+
+    init(data: Data) {
+        self.sensitiveBytes = SensitiveBytes(data: data)
+    }
+
+    func dataCopy() -> Data {
+        sensitiveBytes.dataCopy()
+    }
+
+    func zeroize() {
+        sensitiveBytes.zeroize()
     }
 }
 
