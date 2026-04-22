@@ -41,13 +41,6 @@ final class AppConfiguration {
         }
     }
 
-    /// Whether to show the clipboard safety notice on first copy.
-    var clipboardNotice: Bool {
-        didSet {
-            defaults.set(clipboardNotice, forKey: Self.clipboardNoticeKey)
-        }
-    }
-
     /// Whether to require device authentication on cold launch (default true).
     var requireAuthOnLaunch: Bool {
         didSet {
@@ -89,8 +82,8 @@ final class AppConfiguration {
 
     // MARK: - UserDefaults Keys
 
-    private static let encryptToSelfKey = "com.cypherair.preference.encryptToSelf"
-    private static let clipboardNoticeKey = "com.cypherair.preference.clipboardNotice"
+    static let encryptToSelfKey = "com.cypherair.preference.encryptToSelf"
+    static let clipboardNoticeLegacyKey = "com.cypherair.preference.clipboardNotice"
     private static let requireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
     private static let onboardingCompleteKey = "com.cypherair.preference.onboardingComplete"
     private static let guidedTutorialCompletedVersionKey = "com.cypherair.preference.guidedTutorialCompletedVersion"
@@ -114,13 +107,6 @@ final class AppConfiguration {
             self.encryptToSelf = defaults.bool(forKey: Self.encryptToSelfKey)
         } else {
             self.encryptToSelf = true
-        }
-
-        // Clipboard notice (default true)
-        if defaults.object(forKey: Self.clipboardNoticeKey) != nil {
-            self.clipboardNotice = defaults.bool(forKey: Self.clipboardNoticeKey)
-        } else {
-            self.clipboardNotice = true
         }
 
         // Require auth on launch (default true)

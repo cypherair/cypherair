@@ -155,7 +155,7 @@ enum AppShellComposition {
         case .settings:
             root = AnyView(
                 AppRouteHost(resolver: resolver) {
-                    SettingsView()
+                    MainWindowSettingsRootView()
                 }
             )
         case .encrypt:

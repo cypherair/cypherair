@@ -183,6 +183,22 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertFalse(controller.isShowingError)
     }
 
+    func test_operationController_copyToClipboard_showsNoticeWhenRequested() {
+        let controller = OperationController()
+
+        controller.copyToClipboard("ciphertext", shouldShowNotice: true)
+
+        XCTAssertTrue(controller.isShowingClipboardNotice)
+    }
+
+    func test_operationController_copyToClipboard_skipsNoticeWhenDisabled() {
+        let controller = OperationController()
+
+        controller.copyToClipboard("ciphertext", shouldShowNotice: false)
+
+        XCTAssertFalse(controller.isShowingClipboardNotice)
+    }
+
     func test_operationController_cancel_keepsBusyUntilTaskFinishes() async {
         let gate = OperationGate()
         let controller = OperationController()
@@ -440,6 +456,13 @@ final class CommonHelpersTests: XCTestCase {
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: CypherAir.ProtectedDataRightIdentifiers.productionSharedRightIdentifier
         )
+        let protectedSettingsStore = ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager
+        )
+        protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         let appSessionOrchestrator = CypherAir.AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -490,6 +513,7 @@ final class CommonHelpersTests: XCTestCase {
             protectedDomainKeyManager: protectedDomainKeyManager,
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            protectedSettingsStore: protectedSettingsStore,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,

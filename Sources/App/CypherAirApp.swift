@@ -16,6 +16,7 @@ struct CypherAirApp: App {
 
     @State private var loadError: String?
     @State private var startupSnapshot: AppStartupCoordinator.AppStartupBootstrapSnapshot
+    @State private var protectedSettingsHost: ProtectedSettingsHost
     @State private var tutorialStore: TutorialSessionStore
     @State private var incomingURLImportCoordinator: IncomingURLImportCoordinator
     @State private var launchConfiguration: AppLaunchConfiguration
@@ -53,11 +54,104 @@ struct CypherAirApp: App {
             importWorkflow: ContactImportWorkflow(contactService: container.contactService)
         )
         let startupSnapshot = AppStartupCoordinator().performPreAuthBootstrap(using: container)
+        let protectedSettingsHost = ProtectedSettingsHost(
+            evaluateAccessGate: { isFirstProtectedAccess in
+                let decision = container.appSessionOrchestrator.evaluateProtectedDataAccessGate(
+                    startupBootstrapOutcome: startupSnapshot.bootstrapOutcome,
+                    isFirstProtectedAccessInCurrentProcess: isFirstProtectedAccess
+                )
+                switch decision {
+                case .frameworkRecoveryNeeded:
+                    return .frameworkRecoveryNeeded
+                case .pendingMutationRecoveryRequired:
+                    return .pendingMutationRecoveryRequired
+                case .noProtectedDomainPresent:
+                    return .noProtectedDomainPresent
+                case .authorizationRequired:
+                    return .authorizationRequired
+                case .alreadyAuthorized:
+                    return .alreadyAuthorized
+                }
+            },
+            authorizeSharedRight: { localizedReason in
+                do {
+                    let registry = try container.protectedDomainRecoveryCoordinator.loadCurrentRegistry()
+                    let result = await container.protectedDataSessionCoordinator.beginProtectedDataAuthorization(
+                        registry: registry,
+                        localizedReason: localizedReason
+                    )
+                    switch result {
+                    case .authorized:
+                        return .authorized
+                    case .cancelledOrDenied:
+                        return .cancelledOrDenied
+                    case .frameworkRecoveryNeeded:
+                        return .frameworkRecoveryNeeded
+                    }
+                } catch {
+                    return .frameworkRecoveryNeeded
+                }
+            },
+            currentWrappingRootKey: {
+                try container.protectedDataSessionCoordinator.wrappingRootKeyData()
+            },
+            syncPreAuthorizationState: {
+                container.protectedSettingsStore.syncPreAuthorizationState()
+            },
+            currentDomainState: {
+                switch container.protectedSettingsStore.domainState {
+                case .locked:
+                    return .locked
+                case .unlocked:
+                    return .unlocked
+                case .recoveryNeeded:
+                    return .recoveryNeeded
+                case .pendingMutationRecoveryRequired:
+                    return .pendingMutationRecoveryRequired
+                case .frameworkUnavailable:
+                    return .frameworkUnavailable
+                }
+            },
+            currentClipboardNotice: {
+                container.protectedSettingsStore.clipboardNotice
+            },
+            migrateLegacyClipboardNoticeIfNeeded: {
+                try await container.protectedSettingsStore.migrateLegacyClipboardNoticeIfNeeded(
+                    persistSharedRight: { secret in
+                        try await container.protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
+                    }
+                )
+            },
+            openDomainIfNeeded: { wrappingRootKey in
+                _ = try await container.protectedSettingsStore.openDomainIfNeeded(
+                    wrappingRootKey: wrappingRootKey
+                )
+            },
+            updateClipboardNotice: { isEnabled, wrappingRootKey in
+                try await container.protectedSettingsStore.updateClipboardNotice(
+                    isEnabled,
+                    wrappingRootKey: wrappingRootKey
+                )
+            },
+            resetDomain: {
+                try await container.protectedSettingsStore.resetDomain(
+                    persistSharedRight: { secret in
+                        try await container.protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
+                    },
+                    removeSharedRight: { identifier in
+                        try await container.protectedDataSessionCoordinator.removePersistedSharedRight(
+                            identifier: identifier
+                        )
+                    }
+                )
+            }
+        )
 
         _launchConfiguration = State(initialValue: launchConfiguration)
         _container = State(initialValue: container)
         _loadError = State(initialValue: startupSnapshot.loadError)
         _startupSnapshot = State(initialValue: startupSnapshot)
+        _protectedSettingsHost = State(initialValue: protectedSettingsHost)
         _tutorialStore = State(initialValue: tutorialStore)
         _incomingURLImportCoordinator = State(initialValue: incomingURLImportCoordinator)
     }
@@ -153,6 +247,7 @@ struct CypherAirApp: App {
                 .environment(container.selfTestService)
                 .environment(container.authManager)
                 .environment(container.appSessionOrchestrator)
+                .environment(\.protectedSettingsHost, protectedSettingsHost)
                 .environment(tutorialStore)
                 #if os(iOS) || os(visionOS)
                 .environment(\.iosPresentationController, iosPresentationControllerValue)

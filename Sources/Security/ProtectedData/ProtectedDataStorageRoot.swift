@@ -61,6 +61,13 @@ struct ProtectedDataStorageRoot {
         domainDirectory(for: domainID).appendingPathComponent("wrapped-dmk.staged.plist")
     }
 
+    func domainEnvelopeURL(
+        for domainID: ProtectedDataDomainID,
+        slot: ProtectedDomainGenerationSlot
+    ) -> URL {
+        domainDirectory(for: domainID).appendingPathComponent("\(slot.rawValue).plist")
+    }
+
     func ensureRootDirectoryExists() throws {
         let validatedContract = try validatedPersistentStorageContract()
         try createDirectoryIfNeeded(at: rootURL, validatedContract: validatedContract)
@@ -147,6 +154,10 @@ struct ProtectedDataStorageRoot {
             return
         }
         try fileManager.removeItem(at: url)
+    }
+
+    func removeDomainDirectoryIfPresent(for domainID: ProtectedDataDomainID) throws {
+        try removeItemIfPresent(at: domainDirectory(for: domainID))
     }
 
     func validatePersistentStorageContract() throws {

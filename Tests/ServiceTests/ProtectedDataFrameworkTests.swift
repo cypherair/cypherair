@@ -374,6 +374,13 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: AppProtectedDataRightIdentifiers.productionSharedRightIdentifier
         )
+        let protectedSettingsStore = ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager
+        )
+        protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         let appSessionOrchestrator = AppAppSessionOrchestrator(
             currentRegistryProvider: {
                 try recoveryCoordinator.loadCurrentRegistry()
@@ -431,6 +438,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             protectedDomainKeyManager: domainKeyManager,
             protectedDomainRecoveryCoordinator: recoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            protectedSettingsStore: protectedSettingsStore,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,

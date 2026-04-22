@@ -72,17 +72,14 @@ final class OperationController {
         isShowingError = false
     }
 
-    func copyToClipboard(_ string: String, config: AppConfiguration) {
+    func copyToClipboard(_ string: String, shouldShowNotice: Bool) {
         PlatformClipboard.copy(string)
-        if config.clipboardNotice {
+        if shouldShowNotice {
             isShowingClipboardNotice = true
         }
     }
 
-    func dismissClipboardNotice(disableFutureNoticesIn config: AppConfiguration? = nil) {
-        if let config {
-            config.clipboardNotice = false
-        }
+    func dismissClipboardNotice() {
         isShowingClipboardNotice = false
     }
 

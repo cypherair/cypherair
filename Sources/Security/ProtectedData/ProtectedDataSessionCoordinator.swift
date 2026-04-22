@@ -32,6 +32,16 @@ final class ProtectedDataSessionCoordinator {
         )
     }
 
+    func removePersistedSharedRight(identifier: String) async throws {
+        try await rightStoreClient.removeRight(forIdentifier: identifier)
+        sharedRight = nil
+        if wrappingRootKey != nil {
+            wrappingRootKey?.protectedDataZeroize()
+            wrappingRootKey = nil
+        }
+        frameworkState = .sessionLocked
+    }
+
     func beginProtectedDataAuthorization(
         registry: ProtectedDataRegistry,
         localizedReason: String

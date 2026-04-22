@@ -3,6 +3,12 @@ import SwiftUI
 /// Settings screen with auth mode, grace period, and other preferences.
 struct SettingsView: View {
     struct Configuration {
+        enum ProtectedSettingsHostMode {
+            case mainWindowLive
+            case settingsSceneProxy
+            case tutorialSandbox
+        }
+
         var onAuthModeConfirmationRequested: (@MainActor (AuthModeChangeConfirmationRequest) -> Void)?
         var isOnboardingEntryEnabled = true
         var isGuidedTutorialEntryEnabled = true
@@ -10,6 +16,8 @@ struct SettingsView: View {
         var isAppIconEntryEnabled = true
         var navigationEducationFooter: String?
         var appearanceEducationFooter: String?
+        var protectedSettingsHostMode: ProtectedSettingsHostMode = .mainWindowLive
+        var protectedSettingsHost: ProtectedSettingsHost?
 
         static let `default` = Configuration()
     }
@@ -35,6 +43,17 @@ struct SettingsView: View {
             macPresentationController: macPresentationController,
             configuration: configuration
         )
+    }
+}
+
+struct MainWindowSettingsRootView: View {
+    @Environment(\.protectedSettingsHost) private var protectedSettingsHost
+
+    var body: some View {
+        var configuration = SettingsView.Configuration.default
+        configuration.protectedSettingsHostMode = .mainWindowLive
+        configuration.protectedSettingsHost = protectedSettingsHost
+        return SettingsView(configuration: configuration)
     }
 }
 
@@ -103,12 +122,12 @@ private struct SettingsScreenHostView: View {
                     String(localized: "settings.encryptToSelf", defaultValue: "Encrypt to Self"),
                     isOn: $appConfiguration.encryptToSelf
                 )
-                Toggle(
-                    String(localized: "settings.clipboardNotice", defaultValue: "Clipboard Safety Notice"),
-                    isOn: $appConfiguration.clipboardNotice
-                )
             } header: {
                 Text(String(localized: "settings.encryption", defaultValue: "Encryption"))
+            }
+
+            if model.shouldShowProtectedSettingsSection {
+                protectedSettingsSection(model: model)
             }
 
             Section {
@@ -248,6 +267,35 @@ private struct SettingsScreenHostView: View {
                 Text(switchError)
             }
         }
+        .confirmationDialog(
+            String(
+                localized: "protectedSettings.reset.title",
+                defaultValue: "Reset Protected Preferences?"
+            ),
+            isPresented: Binding(
+                get: { model.showProtectedSettingsResetConfirmation },
+                set: { if !$0 { model.dismissProtectedSettingsResetConfirmation() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(
+                String(
+                    localized: "protectedSettings.reset.confirm",
+                    defaultValue: "Reset Preferences"
+                ),
+                role: .destructive
+            ) {
+                model.confirmProtectedSettingsReset()
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) { }
+        } message: {
+            Text(
+                String(
+                    localized: "protectedSettings.reset.message",
+                    defaultValue: "This will delete and rebuild the protected preferences domain. Only protected preferences will be reset."
+                )
+            )
+        }
         #if !os(iOS)
         .sheet(isPresented: $model.showOnboarding) {
             OnboardingView(presentationContext: .inApp)
@@ -256,6 +304,9 @@ private struct SettingsScreenHostView: View {
             TutorialView(presentationContext: .inApp)
         }
         #endif
+        .task {
+            await model.prepareProtectedSettingsSection()
+        }
     }
 
     private func settingsActionRow(
@@ -270,6 +321,134 @@ private struct SettingsScreenHostView: View {
                 .foregroundStyle(.tertiary)
         }
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func protectedSettingsSection(model: SettingsScreenModel) -> some View {
+        Section {
+            switch model.protectedSettingsSectionState {
+            case .loading:
+                HStack {
+                    ProgressView()
+                    Text(
+                        String(
+                            localized: "protectedSettings.loading",
+                            defaultValue: "Loading protected preferences..."
+                        )
+                    )
+                    .foregroundStyle(.secondary)
+                }
+            case .locked:
+                LabeledContent {
+                    Button(
+                        String(
+                            localized: "protectedSettings.unlock",
+                            defaultValue: "Unlock"
+                        )
+                    ) {
+                        model.requestProtectedSettingsUnlock()
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(
+                            String(
+                                localized: "settings.clipboardNotice",
+                                defaultValue: "Clipboard Safety Notice"
+                            )
+                        )
+                        Text(
+                            String(
+                                localized: "protectedSettings.locked.message",
+                                defaultValue: "Authenticate to view and change this protected preference."
+                            )
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            case .available:
+                Toggle(
+                    String(
+                        localized: "settings.clipboardNotice",
+                        defaultValue: "Clipboard Safety Notice"
+                    ),
+                    isOn: Binding(
+                        get: { model.isProtectedClipboardNoticeEnabled },
+                        set: { model.setProtectedClipboardNoticeEnabled($0) }
+                    )
+                )
+            case .recoveryNeeded:
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(
+                        String(
+                            localized: "protectedSettings.recovery.message",
+                            defaultValue: "Protected preferences could not be opened safely and may need recovery."
+                        )
+                    )
+                    .foregroundStyle(.secondary)
+
+                    Button(
+                        String(
+                            localized: "protectedSettings.reset.action",
+                            defaultValue: "Reset Protected Preferences"
+                        ),
+                        role: .destructive
+                    ) {
+                        model.requestProtectedSettingsReset()
+                    }
+                }
+            case .pendingMutationRecoveryRequired:
+                Text(
+                    String(
+                        localized: "protectedSettings.pending.message",
+                        defaultValue: "Protected preferences have pending recovery work and are temporarily unavailable."
+                    )
+                )
+                .foregroundStyle(.secondary)
+            case .frameworkUnavailable:
+                Text(
+                    String(
+                        localized: "protectedSettings.frameworkUnavailable.message",
+                        defaultValue: "Protected preferences are unavailable because the protected-data framework is not ready."
+                    )
+                )
+                .foregroundStyle(.secondary)
+            case .settingsSceneProxy:
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(
+                        String(
+                            localized: "protectedSettings.proxy.message",
+                            defaultValue: "Protected preferences can only be viewed and changed from the main window."
+                        )
+                    )
+                    .foregroundStyle(.secondary)
+
+                    Button(
+                        String(
+                            localized: "protectedSettings.proxy.openMainWindow",
+                            defaultValue: "Open Main Window"
+                        )
+                    ) {
+                        model.openProtectedSettingsInMainWindow()
+                    }
+                }
+            case .tutorialSandbox:
+                Text(
+                    String(
+                        localized: "protectedSettings.tutorial.message",
+                        defaultValue: "The tutorial sandbox never reads or writes your real protected preferences."
+                    )
+                )
+                .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text(
+                String(
+                    localized: "protectedSettings.section",
+                    defaultValue: "Protected Preferences"
+                )
+            )
+        }
     }
 }
 
@@ -287,6 +466,7 @@ struct MacSettingsRootView: View {
     let presentationHostMode: MacPresentationHostMode
 
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.protectedSettingsHost) private var protectedSettingsHost
 
     @State private var path: [AppRoute] = []
     @State private var activePresentation: MacPresentation?
@@ -305,11 +485,13 @@ struct MacSettingsRootView: View {
     }
 
     var body: some View {
+        let configuration = settingsViewConfiguration
+
         AppRouteHost(
             resolver: .production,
             path: $path
         ) {
-            SettingsView()
+            SettingsView(configuration: configuration)
         }
         .environment(\.macPresentationController, macPresentationController)
         .task {
@@ -395,6 +577,24 @@ struct MacSettingsRootView: View {
                 defaultValue: "The main window is busy with another dialog. Finish or dismiss it, then start the Guided Tutorial again."
             )
         }
+    }
+
+    private var settingsViewConfiguration: SettingsView.Configuration {
+        var configuration = SettingsView.Configuration.default
+        switch presentationHostMode {
+        case .mainWindow:
+            configuration.protectedSettingsHostMode = .mainWindowLive
+            configuration.protectedSettingsHost = protectedSettingsHost
+        case .settingsScene:
+            configuration.protectedSettingsHostMode = .settingsSceneProxy
+            configuration.protectedSettingsHost = ProtectedSettingsHost(
+                mode: .settingsSceneProxy,
+                openMainWindowAction: {
+                    openWindow(id: mainWindowID)
+                }
+            )
+        }
+        return configuration
     }
 }
 #endif
