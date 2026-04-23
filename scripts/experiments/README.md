@@ -46,7 +46,8 @@ In other words:
 - `build_apple_arm64e_xcframework.sh`
   Unified Apple experiment entrypoint. Extends the experiment to:
   iOS device `arm64e`, Darwin host `arm64e`, macOS XCFramework `arm64e`,
-  while keeping iOS simulator and visionOS on stable `arm64`.
+  visionOS device `arm64e`, while keeping iOS and visionOS simulators on
+  stable `arm64`.
 - `repro_arm64e_rust_host_crashes.sh`
   Minimal host-side repro matrix for the current macOS `arm64e` crash
   investigation. Uses existing `pgp-mobile` Rust tests plus a standalone

@@ -3,10 +3,10 @@
 #
 # This script:
 # 1. Reproduces the stable arm64e baseline failures for iOS and Darwin.
-# 2. Builds iOS device and Darwin/macOS arm64e Rust artifacts using nightly
-#    and -Zbuild-std while keeping simulator and visionOS slices on stable arm64.
-# 3. Generates Swift bindings using an arm64e-apple-darwin host dylib while
-#    keeping the uniffi-bindgen executable on the default host toolchain.
+# 2. Builds Apple arm64e device artifacts using the locally linked patched Rust
+#    toolchain while keeping simulator slices on stable arm64.
+# 3. Generates Swift bindings using an arm64e-apple-darwin host dylib built by
+#    that same patched toolchain.
 # 4. Packages PgpMobile.xcframework and runs generic iOS/macOS build probes
 #    using ARCHS=arm64e without modifying the tracked Xcode project.
 #
@@ -32,6 +32,9 @@ EXPERIMENT_ROOT="$REPO_ROOT/pgp-mobile/target/apple-arm64e-experiment"
 EXPERIMENT_CARGO_HOME="$EXPERIMENT_ROOT/cargo-home"
 EXPERIMENT_TARGET_DIR="$EXPERIMENT_ROOT/build"
 GENERATED_BINDINGS_DIR="$EXPERIMENT_ROOT/generated-bindings"
+ARM64E_TOOLCHAIN="stage1-arm64e-patch"
+STABLE_TOOLCHAIN="stable"
+NIGHTLY_TOOLCHAIN="nightly"
 
 BUILD_MODE="${1:---release}"
 if [ "$BUILD_MODE" = "--debug" ]; then
@@ -62,7 +65,7 @@ trap cleanup EXIT INT TERM
 
 require_toolchain() {
     local toolchain="$1"
-    if ! rustup toolchain list | grep -q "^${toolchain}-"; then
+    if ! rustup toolchain list | sed 's/ .*//' | grep -Eq "^${toolchain}(-.*)?$"; then
         echo "error: missing Rust toolchain '${toolchain}'." >&2
         exit 1
     fi
@@ -110,7 +113,7 @@ seed_experiment_cache() {
     env \
         CARGO_HOME="$EXPERIMENT_CARGO_HOME" \
         CARGO_TARGET_DIR="$EXPERIMENT_TARGET_DIR" \
-        cargo +nightly fetch --manifest-path "$MANIFEST"
+        cargo +"$NIGHTLY_TOOLCHAIN" fetch --manifest-path "$MANIFEST"
 }
 
 reset_experiment_build_state() {
@@ -177,7 +180,7 @@ cleanup_target_specific_dylibs() {
         "$EXPERIMENT_TARGET_DIR/arm64e-apple-ios/$BUILD_DIR/libpgp_mobile.dylib"
         "$EXPERIMENT_TARGET_DIR/aarch64-apple-ios-sim/$BUILD_DIR/libpgp_mobile.dylib"
         "$EXPERIMENT_TARGET_DIR/arm64e-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
-        "$EXPERIMENT_TARGET_DIR/aarch64-apple-visionos/$BUILD_DIR/libpgp_mobile.dylib"
+        "$EXPERIMENT_TARGET_DIR/arm64e-apple-visionos/$BUILD_DIR/libpgp_mobile.dylib"
         "$EXPERIMENT_TARGET_DIR/aarch64-apple-visionos-sim/$BUILD_DIR/libpgp_mobile.dylib"
     )
 
@@ -191,7 +194,7 @@ assert_no_target_specific_dylibs() {
         "$EXPERIMENT_TARGET_DIR/arm64e-apple-ios/$BUILD_DIR/libpgp_mobile.dylib"
         "$EXPERIMENT_TARGET_DIR/aarch64-apple-ios-sim/$BUILD_DIR/libpgp_mobile.dylib"
         "$EXPERIMENT_TARGET_DIR/arm64e-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
-        "$EXPERIMENT_TARGET_DIR/aarch64-apple-visionos/$BUILD_DIR/libpgp_mobile.dylib"
+        "$EXPERIMENT_TARGET_DIR/arm64e-apple-visionos/$BUILD_DIR/libpgp_mobile.dylib"
         "$EXPERIMENT_TARGET_DIR/aarch64-apple-visionos-sim/$BUILD_DIR/libpgp_mobile.dylib"
     )
     local stale_found=0
@@ -220,7 +223,7 @@ generate_bindings() {
     env \
         CARGO_HOME="$EXPERIMENT_CARGO_HOME" \
         CARGO_TARGET_DIR="$EXPERIMENT_TARGET_DIR" \
-        cargo +nightly build -Zbuild-std $CARGO_FLAGS --target arm64e-apple-darwin --manifest-path "$MANIFEST"
+        cargo +"$ARM64E_TOOLCHAIN" build -Zbuild-std $CARGO_FLAGS --target arm64e-apple-darwin --manifest-path "$MANIFEST"
 
     mv "$MANIFEST.bak.apple-arm64e-experiment" "$MANIFEST"
 
@@ -259,7 +262,7 @@ create_xcframework() {
     local ios_device_lib="$1"
     local ios_sim_lib="$2"
     local macos_lib="$3"
-    local visionos_lib="$4"
+    local visionos_device_lib="$4"
     local visionos_sim_lib="$5"
     local headers_dir="$GENERATED_BINDINGS_DIR/headers"
 
@@ -278,7 +281,7 @@ create_xcframework() {
         -library "$ios_device_lib" -headers "$headers_dir" \
         -library "$ios_sim_lib" -headers "$headers_dir" \
         -library "$macos_lib" -headers "$headers_dir" \
-        -library "$visionos_lib" -headers "$headers_dir" \
+        -library "$visionos_device_lib" -headers "$headers_dir" \
         -library "$visionos_sim_lib" -headers "$headers_dir" \
         -output "$XCFRAMEWORK_OUTPUT"
 }
@@ -312,7 +315,7 @@ def require_arch(platform, variant, expected_arch):
 require_arch("ios", None, "arm64e")
 require_arch("ios", "simulator", "arm64")
 require_arch("macos", None, "arm64e")
-require_arch("xros", None, "arm64")
+require_arch("xros", None, "arm64e")
 require_arch("xros", "simulator", "arm64")
 PY
 
@@ -371,9 +374,10 @@ echo "=== CypherAir: Apple arm64e XCFramework Experiment ==="
 echo "Build mode: $BUILD_DIR"
 echo "Repo root: $REPO_ROOT"
 
-require_toolchain "stable"
-require_toolchain "nightly"
-ensure_component "nightly" "rust-src"
+require_toolchain "$STABLE_TOOLCHAIN"
+require_toolchain "$NIGHTLY_TOOLCHAIN"
+require_toolchain "$ARM64E_TOOLCHAIN"
+ensure_component "$NIGHTLY_TOOLCHAIN" "rust-src"
 
 mkdir -p "$EXPERIMENT_ROOT"
 baseline_root="$(mktemp -d "$EXPERIMENT_ROOT/baseline.XXXXXX")"
@@ -400,20 +404,20 @@ run_expected_failure \
 seed_experiment_cache
 reset_experiment_build_state
 
-build_rust_artifact "ios-device-arm64e" "nightly" "arm64e-apple-ios" -Zbuild-std
-build_rust_artifact "ios-sim-arm64" "stable" "aarch64-apple-ios-sim"
-build_rust_artifact "macos-arm64e" "nightly" "arm64e-apple-darwin" -Zbuild-std
-build_rust_artifact "visionos-arm64" "stable" "aarch64-apple-visionos"
-build_rust_artifact "visionos-sim-arm64" "stable" "aarch64-apple-visionos-sim"
+build_rust_artifact "ios-device-arm64e" "$ARM64E_TOOLCHAIN" "arm64e-apple-ios" -Zbuild-std
+build_rust_artifact "ios-sim-arm64" "$STABLE_TOOLCHAIN" "aarch64-apple-ios-sim"
+build_rust_artifact "macos-arm64e" "$ARM64E_TOOLCHAIN" "arm64e-apple-darwin" -Zbuild-std
+build_rust_artifact "visionos-device-arm64e" "$ARM64E_TOOLCHAIN" "arm64e-apple-visionos" -Zbuild-std
+build_rust_artifact "visionos-sim-arm64" "$STABLE_TOOLCHAIN" "aarch64-apple-visionos-sim"
 
 IOS_DEVICE_LIB="$(resolve_library_path "arm64e-apple-ios")"
 IOS_SIM_LIB="$(resolve_library_path "aarch64-apple-ios-sim")"
 MACOS_LIB="$(resolve_library_path "arm64e-apple-darwin")"
-VISIONOS_LIB="$(resolve_library_path "aarch64-apple-visionos")"
+VISIONOS_DEVICE_LIB="$(resolve_library_path "arm64e-apple-visionos")"
 VISIONOS_SIM_LIB="$(resolve_library_path "aarch64-apple-visionos-sim")"
 
 generate_bindings
-create_xcframework "$IOS_DEVICE_LIB" "$IOS_SIM_LIB" "$MACOS_LIB" "$VISIONOS_LIB" "$VISIONOS_SIM_LIB"
+create_xcframework "$IOS_DEVICE_LIB" "$IOS_SIM_LIB" "$MACOS_LIB" "$VISIONOS_DEVICE_LIB" "$VISIONOS_SIM_LIB"
 verify_xcframework
 verify_effective_archs "iOS" ARCHS=arm64e
 verify_effective_archs "macOS" ARCHS=arm64e
