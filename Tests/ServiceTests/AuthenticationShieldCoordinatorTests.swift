@@ -3,6 +3,10 @@ import XCTest
 
 @MainActor
 final class AuthenticationShieldCoordinatorTests: XCTestCase {
+    private func makeTraceStore(enabled: Bool = true) -> AuthLifecycleTraceStore {
+        AuthLifecycleTraceStore(isEnabled: enabled, sink: { _ in })
+    }
+
     func test_beginAndEndPrivacyPrompt_togglesVisibility() async {
         let coordinator = AuthenticationShieldCoordinator()
 
@@ -271,6 +275,83 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
         await settleShieldDismissal()
 
         XCTAssertFalse(coordinator.isVisible)
+    }
+
+    func test_traceRecordsFallbackDismissalWithoutLifecycleBounce() async {
+        let traceStore = makeTraceStore()
+        let coordinator = AuthenticationShieldCoordinator(traceStore: traceStore)
+
+        coordinator.begin(.operation)
+        coordinator.end(.operation)
+
+        await settleShieldDismissal()
+
+        guard let pendingEntry = traceStore.recentEntries.first(where: { $0.name == "shield.pendingDismissal.start" }) else {
+            XCTFail("Expected shield.pendingDismissal.start trace entry")
+            return
+        }
+        XCTAssertEqual(pendingEntry.metadata["cycle"], "1")
+        XCTAssertEqual(pendingEntry.metadata["primaryKind"], "operation")
+        XCTAssertEqual(pendingEntry.metadata["lastLifecyclePhase"], "active")
+
+        guard let completionEntry = traceStore.recentEntries.last(where: { $0.name == "shield.dismissal.complete" }) else {
+            XCTFail("Expected shield.dismissal.complete trace entry")
+            return
+        }
+        XCTAssertEqual(completionEntry.metadata["cycle"], "1")
+        XCTAssertEqual(completionEntry.metadata["reason"], "fallbackYield")
+        XCTAssertNotNil(Double(completionEntry.metadata["elapsedMs"] ?? ""))
+    }
+
+    func test_traceRecordsLifecycleSettledDismissalAfterBackgroundBounce() {
+        let traceStore = makeTraceStore()
+        let coordinator = AuthenticationShieldCoordinator(traceStore: traceStore)
+
+        coordinator.begin(.privacy)
+        coordinator.end(.privacy)
+        coordinator.sceneDidEnterBackground()
+        coordinator.sceneDidBecomeActive()
+
+        let lifecycleEntries = traceStore.recentEntries
+            .filter { $0.name == "shield.lifecycle.observed" }
+        XCTAssertEqual(
+            lifecycleEntries.compactMap { $0.metadata["phase"] },
+            ["background", "active"]
+        )
+        XCTAssertEqual(
+            lifecycleEntries.compactMap { $0.metadata["pending"] },
+            ["true", "true"]
+        )
+
+        guard let completionEntry = traceStore.recentEntries.last(where: { $0.name == "shield.dismissal.complete" }) else {
+            XCTFail("Expected shield.dismissal.complete trace entry")
+            return
+        }
+        XCTAssertEqual(completionEntry.metadata["cycle"], "1")
+        XCTAssertEqual(completionEntry.metadata["reason"], "lifecycleSettle")
+        XCTAssertNotNil(Double(completionEntry.metadata["elapsedMs"] ?? ""))
+    }
+
+    func test_traceRecordsPendingDismissalCancellationWithoutStaleCompletion() async {
+        let traceStore = makeTraceStore()
+        let coordinator = AuthenticationShieldCoordinator(traceStore: traceStore)
+
+        coordinator.begin(.operation)
+        coordinator.end(.operation)
+        coordinator.begin(.privacy)
+
+        await settleShieldDismissal()
+
+        let cancellationEntries = traceStore.recentEntries
+            .filter { $0.name == "shield.pendingDismissal.cancel" }
+        XCTAssertEqual(cancellationEntries.count, 1)
+        XCTAssertEqual(cancellationEntries[0].metadata["cycle"], "1")
+        XCTAssertEqual(cancellationEntries[0].metadata["reason"], "newPrompt")
+        XCTAssertFalse(
+            traceStore.recentEntries.contains {
+                $0.name == "shield.dismissal.complete" && $0.metadata["cycle"] == "1"
+            }
+        )
     }
 
     private func settleShieldDismissal() async {
