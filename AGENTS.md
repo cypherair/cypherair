@@ -2,6 +2,29 @@
 
 This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding agents can quickly understand the project, constraints, sensitive boundaries, and required validation steps before making changes.
 
+## Arm64e Experiment Context
+
+- Local path: `/Users/tianren/coding/cypherair-apple-arm64e-unified-experiment`
+- Git shape: this directory is a **git worktree**, not a standalone clone.
+- Owning repository path: `/Users/tianren/coding/cypherair-main`
+- Local experiment branch in this worktree: `codex/apple-arm64e-unified-experiment`
+- Remote repository: `cypherair/cypherair`
+- Remote experiment branch: `origin/codex/apple-arm64e-unified-experiment`
+- Current purpose: this worktree is the app-side integration branch for the Apple `arm64e` effort. The app-side adaptation is basically working here; the remaining work is keeping the experiment branch current with `main`, maintaining the dependency chain, and upstreaming the supporting forks, especially Rust.
+- Detailed arm64e status belongs in [docs/ARM64E_STATUS.md](docs/ARM64E_STATUS.md). Keep that file current whenever the branch topology, carry chain, toolchain pin, or progress changes.
+
+## Related Forks
+
+- Rust fork: `/Users/tianren/coding/rust` (`cypherair/rust`, experiment branch `codex/arm64e-darwin-ptrauth-spike`)
+- OpenSSL glue fork: `/Users/tianren/coding/openssl-src-rs` (`cypherair/openssl-src-rs`, carry branch `carry/apple-arm64e-openssl-fork`)
+- OpenSSL target-definition fork: `/Users/tianren/coding/openssl` (`cypherair/openssl`, carry branch `carry/apple-arm64e-targets`, prep branch `prep/apple-arm64e-targets`)
+- Related but currently unconfirmed arm64e role: `/Users/tianren/coding/rust-openssl` (`cypherair/rust-openssl`)
+
+## Documentation Scope
+
+- Update experiment-specific arm64e documentation in this worktree, not in `/Users/tianren/coding/cypherair-main`.
+- Prefer additive edits and clarified wording over large deletions in this worktree so future experiment-to-main reconciliation stays manageable.
+
 ## Project Overview
 
 CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and visionOS.
@@ -195,6 +218,7 @@ After editing:
 - Run the relevant tests
 - Verify no generated file was unintentionally hand-modified
 - Check `git diff --stat` and `git diff`
+- Update `docs/ARM64E_STATUS.md` if the arm64e toolchain chain, branch relationships, or progress changed
 
 ## Workflow Reminders
 
@@ -205,10 +229,12 @@ After editing:
 - When merging pull requests for this repository, prefer a regular merge commit by default. Do not squash-merge or rebase-merge unless the user explicitly asks for it.
 - Conventional commit prefixes are preferred:
   `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
+- Keep `docs/ARM64E_STATUS.md` synchronized with the current patched Rust toolchain pin, the OpenSSL carry-chain pin, and the experiment-vs-main branch posture.
 
 ## Key References
 
 - `CLAUDE.md`
+- `docs/ARM64E_STATUS.md`
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY.md`
 - `docs/TESTING.md`
