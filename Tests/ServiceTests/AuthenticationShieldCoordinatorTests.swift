@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 final class AuthenticationShieldCoordinatorTests: XCTestCase {
-    func test_beginAndEndPrivacyPrompt_togglesVisibility() {
+    func test_beginAndEndPrivacyPrompt_togglesVisibility() async {
         let coordinator = AuthenticationShieldCoordinator()
 
         XCTAssertFalse(coordinator.isVisible)
@@ -15,17 +15,30 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
             coordinator.presentationState,
             AuthenticationShieldPresentationState(
                 primaryKind: .privacy,
-                activeKinds: [.privacy]
+                activeKinds: [.privacy],
+                isPendingDismissal: false
             )
         )
 
         coordinator.end(.privacy)
 
+        XCTAssertTrue(coordinator.isVisible)
+        XCTAssertEqual(
+            coordinator.presentationState,
+            AuthenticationShieldPresentationState(
+                primaryKind: .privacy,
+                activeKinds: [],
+                isPendingDismissal: true
+            )
+        )
+
+        await settleShieldDismissal()
+
         XCTAssertFalse(coordinator.isVisible)
         XCTAssertNil(coordinator.presentationState)
     }
 
-    func test_beginAndEndOperationPrompt_togglesVisibility() {
+    func test_beginAndEndOperationPrompt_togglesVisibility() async {
         let coordinator = AuthenticationShieldCoordinator()
 
         coordinator.begin(.operation)
@@ -35,17 +48,30 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
             coordinator.presentationState,
             AuthenticationShieldPresentationState(
                 primaryKind: .operation,
-                activeKinds: [.operation]
+                activeKinds: [.operation],
+                isPendingDismissal: false
             )
         )
 
         coordinator.end(.operation)
 
+        XCTAssertTrue(coordinator.isVisible)
+        XCTAssertEqual(
+            coordinator.presentationState,
+            AuthenticationShieldPresentationState(
+                primaryKind: .operation,
+                activeKinds: [],
+                isPendingDismissal: true
+            )
+        )
+
+        await settleShieldDismissal()
+
         XCTAssertFalse(coordinator.isVisible)
         XCTAssertNil(coordinator.presentationState)
     }
 
-    func test_nestedMixedPrompts_keepShieldVisibleUntilLastPromptEnds() {
+    func test_nestedMixedPrompts_keepShieldVisibleUntilLastPromptEnds() async {
         let coordinator = AuthenticationShieldCoordinator()
 
         coordinator.begin(.operation)
@@ -56,7 +82,8 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
             coordinator.presentationState,
             AuthenticationShieldPresentationState(
                 primaryKind: .privacy,
-                activeKinds: [.operation, .privacy]
+                activeKinds: [.operation, .privacy],
+                isPendingDismissal: false
             )
         )
 
@@ -67,16 +94,29 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
             coordinator.presentationState,
             AuthenticationShieldPresentationState(
                 primaryKind: .privacy,
-                activeKinds: [.privacy]
+                activeKinds: [.privacy],
+                isPendingDismissal: false
             )
         )
 
         coordinator.end(.privacy)
 
+        XCTAssertTrue(coordinator.isVisible)
+        XCTAssertEqual(
+            coordinator.presentationState,
+            AuthenticationShieldPresentationState(
+                primaryKind: .privacy,
+                activeKinds: [],
+                isPendingDismissal: true
+            )
+        )
+
+        await settleShieldDismissal()
+
         XCTAssertFalse(coordinator.isVisible)
     }
 
-    func test_repeatedSameKindPrompt_doesNotHidePrematurely() {
+    func test_repeatedSameKindPrompt_doesNotHidePrematurely() async {
         let coordinator = AuthenticationShieldCoordinator()
 
         coordinator.begin(.operation)
@@ -88,10 +128,14 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.isVisible)
 
         coordinator.end(.operation)
+        XCTAssertTrue(coordinator.isVisible)
+
+        await settleShieldDismissal()
+
         XCTAssertFalse(coordinator.isVisible)
     }
 
-    func test_promptCoordinator_withOperationPrompt_showsShieldBeforeOperationAndClearsAfterSuccess() async throws {
+    func test_promptCoordinator_withOperationPrompt_showsShieldBeforeOperationAndSettlesAfterSuccess() async throws {
         let shieldCoordinator = AuthenticationShieldCoordinator()
         let promptCoordinator = AuthenticationPromptCoordinator(
             shieldEventHandler: { kind, delta in
@@ -113,10 +157,21 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(result, 42)
         XCTAssertFalse(promptCoordinator.isOperationPromptInProgress)
+        XCTAssertTrue(shieldCoordinator.isVisible)
+        XCTAssertEqual(
+            shieldCoordinator.presentationState,
+            AuthenticationShieldPresentationState(
+                primaryKind: .operation,
+                activeKinds: [],
+                isPendingDismissal: true
+            )
+        )
+
+        await settleShieldDismissal()
         XCTAssertFalse(shieldCoordinator.isVisible)
     }
 
-    func test_promptCoordinator_withOperationPrompt_clearsShieldAfterFailure() async {
+    func test_promptCoordinator_withOperationPrompt_settlesAfterFailure() async {
         enum ExpectedError: Error {
             case failed
         }
@@ -142,9 +197,85 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
             XCTFail("Expected withOperationPrompt to throw")
         } catch ExpectedError.failed {
             XCTAssertFalse(promptCoordinator.isOperationPromptInProgress)
+            XCTAssertTrue(shieldCoordinator.isVisible)
+            XCTAssertEqual(
+                shieldCoordinator.presentationState,
+                AuthenticationShieldPresentationState(
+                    primaryKind: .operation,
+                    activeKinds: [],
+                    isPendingDismissal: true
+                )
+            )
+
+            await settleShieldDismissal()
             XCTAssertFalse(shieldCoordinator.isVisible)
         } catch {
             XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func test_pendingDismissal_staysVisibleThroughBackgroundUntilActiveSettles() {
+        let coordinator = AuthenticationShieldCoordinator()
+
+        coordinator.begin(.privacy)
+        coordinator.end(.privacy)
+
+        coordinator.sceneDidEnterBackground()
+
+        XCTAssertTrue(coordinator.isVisible)
+        XCTAssertEqual(
+            coordinator.presentationState,
+            AuthenticationShieldPresentationState(
+                primaryKind: .privacy,
+                activeKinds: [],
+                isPendingDismissal: true
+            )
+        )
+
+        coordinator.sceneDidBecomeActive()
+
+        XCTAssertFalse(coordinator.isVisible)
+    }
+
+    func test_pendingDismissal_isCancelledWhenANewPromptBegins() {
+        let coordinator = AuthenticationShieldCoordinator()
+
+        coordinator.begin(.operation)
+        coordinator.end(.operation)
+
+        XCTAssertTrue(coordinator.isVisible)
+        XCTAssertEqual(coordinator.presentationState?.isPendingDismissal, true)
+
+        coordinator.begin(.privacy)
+
+        XCTAssertTrue(coordinator.isVisible)
+        XCTAssertEqual(
+            coordinator.presentationState,
+            AuthenticationShieldPresentationState(
+                primaryKind: .privacy,
+                activeKinds: [.privacy],
+                isPendingDismissal: false
+            )
+        )
+    }
+
+    func test_withoutLifecycleBounce_shieldClearsOnNextStableCycle() async {
+        let coordinator = AuthenticationShieldCoordinator()
+
+        coordinator.begin(.operation)
+        coordinator.end(.operation)
+
+        XCTAssertTrue(coordinator.isVisible)
+        XCTAssertEqual(coordinator.presentationState?.isPendingDismissal, true)
+
+        await settleShieldDismissal()
+
+        XCTAssertFalse(coordinator.isVisible)
+    }
+
+    private func settleShieldDismissal() async {
+        for _ in 0..<5 {
+            await Task.yield()
         }
     }
 }
