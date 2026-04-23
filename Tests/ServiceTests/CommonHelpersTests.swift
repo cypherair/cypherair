@@ -148,7 +148,7 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertFalse(
             gate.shouldHandleResignActive(
                 isAuthenticating: false,
-                isSystemAuthenticationPromptInProgress: true
+                isOperationPromptInProgress: true
             )
         )
         XCTAssertFalse(gate.shouldHandleBecomeActive(isAuthenticating: false))
@@ -163,7 +163,7 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertFalse(
             gate.shouldHandleBecomeActive(
                 isAuthenticating: false,
-                isSystemAuthenticationPromptInProgress: true
+                isOperationPromptInProgress: true
             )
         )
         XCTAssertFalse(gate.shouldHandleBecomeActive(isAuthenticating: false))

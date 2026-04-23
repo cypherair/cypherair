@@ -350,15 +350,72 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_liveProtectedSettingsHost_authorizationRequired_refreshAutoOpensAvailableState() async {
+    func test_liveProtectedSettingsHost_authorizationRequired_refreshLeavesLockedState() async {
         var authorizeCallCount = 0
         var openDomainCallCount = 0
-        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
-        var clipboardNotice = false
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .authorizationRequired },
             authorizeSharedRight: { _ in
                 authorizeCallCount += 1
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
+            syncPreAuthorizationState: {},
+            currentDomainState: { .locked },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in
+                openDomainCallCount += 1
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.refreshSettingsSection()
+
+        XCTAssertEqual(authorizeCallCount, 0)
+        XCTAssertEqual(openDomainCallCount, 0)
+        XCTAssertEqual(host.sectionState, .locked)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_noProtectedDomainPresent_refreshLeavesLockedState() async {
+        var authorizeCallCount = 0
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .noProtectedDomainPresent },
+            authorizeSharedRight: { _ in
+                authorizeCallCount += 1
+                return .authorized
+            },
+            currentWrappingRootKey: { Data() },
+            syncPreAuthorizationState: {},
+            currentDomainState: { .locked },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in
+                XCTFail("Refresh should not open protected settings when no domain is present")
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.refreshSettingsSection()
+
+        XCTAssertEqual(host.sectionState, .locked)
+        XCTAssertEqual(authorizeCallCount, 0)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_alreadyAuthorized_refreshAutoOpensAvailableState() async {
+        var openDomainCallCount = 0
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
+        var clipboardNotice = false
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .alreadyAuthorized },
+            authorizeSharedRight: { _ in
+                XCTFail("Already-authorized refresh should not prompt again")
                 return .authorized
             },
             currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
@@ -377,7 +434,6 @@ final class SettingsScreenModelTests: XCTestCase {
 
         await host.refreshSettingsSection()
 
-        XCTAssertEqual(authorizeCallCount, 1)
         XCTAssertEqual(openDomainCallCount, 1)
         XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
     }
@@ -434,7 +490,40 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_liveProtectedSettingsHost_warmUpAfterAppUnlock_shortCircuitsPendingStateWithoutAuthorization() async {
+    func test_liveProtectedSettingsHost_unlockForSettings_authorizesAndOpensAvailableState() async {
+        var authorizeCallCount = 0
+        var openDomainCallCount = 0
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
+        var clipboardNotice = false
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .authorizationRequired },
+            authorizeSharedRight: { _ in
+                authorizeCallCount += 1
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in
+                openDomainCallCount += 1
+                domainState = .unlocked
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.unlockForSettings()
+
+        XCTAssertEqual(authorizeCallCount, 1)
+        XCTAssertEqual(openDomainCallCount, 1)
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_refreshShortCircuitsPendingStateWithoutAuthorization() async {
         var authorizeCallCount = 0
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .authorizationRequired },
@@ -455,7 +544,7 @@ final class SettingsScreenModelTests: XCTestCase {
             resetDomain: {}
         )
 
-        await host.warmUpAfterAppUnlock()
+        await host.refreshSettingsSection()
 
         XCTAssertEqual(host.sectionState, .pendingRetryRequired)
         XCTAssertEqual(authorizeCallCount, 0)

@@ -7,7 +7,7 @@ import XCTest
 private final class PromptObservingSecureEnclave: SecureEnclaveManageable {
     private let base: MockSecureEnclave
     private let coordinator: CypherAir.AuthenticationPromptCoordinator
-    private(set) var sawPromptInProgressDuringReconstruct = false
+    private(set) var sawOperationPromptInProgressDuringReconstruct = false
 
     init(
         base: MockSecureEnclave,
@@ -53,7 +53,7 @@ private final class PromptObservingSecureEnclave: SecureEnclaveManageable {
         from data: Data,
         authenticationContext: LAContext?
     ) throws -> any SEKeyHandle {
-        sawPromptInProgressDuringReconstruct = coordinator.isPromptInProgress
+        sawOperationPromptInProgressDuringReconstruct = coordinator.isOperationPromptInProgress
         return try base.reconstructKey(
             from: data,
             authenticationContext: authenticationContext
@@ -564,8 +564,8 @@ final class KeyManagementServiceTests: XCTestCase {
         )
 
         XCTAssertFalse(privateKeyData.isEmpty)
-        XCTAssertTrue(observingSecureEnclave.sawPromptInProgressDuringReconstruct)
-        XCTAssertFalse(coordinator.isPromptInProgress)
+        XCTAssertTrue(observingSecureEnclave.sawOperationPromptInProgressDuringReconstruct)
+        XCTAssertFalse(coordinator.isOperationPromptInProgress)
     }
 
     func test_unwrapPrivateKey_unknownFingerprint_throwsError() {
