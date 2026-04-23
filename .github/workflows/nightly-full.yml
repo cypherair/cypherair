@@ -38,6 +38,25 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Select Xcode 26.4.1
+        run: |
+          set -euo pipefail
+
+          if [ -n "${XCODE_26_DEVELOPER_DIR:-}" ] && [ -d "${XCODE_26_DEVELOPER_DIR}" ]; then
+            SELECTED_DEVELOPER_DIR="${XCODE_26_DEVELOPER_DIR}"
+          elif [ -d "/Applications/Xcode_26.4.1.app/Contents/Developer" ]; then
+            SELECTED_DEVELOPER_DIR="/Applications/Xcode_26.4.1.app/Contents/Developer"
+          else
+            echo "::error::Xcode 26.4.1 was not found on this runner."
+            exit 1
+          fi
+
+          echo "DEVELOPER_DIR=${SELECTED_DEVELOPER_DIR}" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="${SELECTED_DEVELOPER_DIR}"
+
+          echo "Using DEVELOPER_DIR=${DEVELOPER_DIR}"
+          xcode-select -p
+          xcodebuild -version
       - name: Install Rust stable toolchain
         run: |
           rustup set profile minimal
@@ -81,6 +100,25 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Select Xcode 26.4.1
+        run: |
+          set -euo pipefail
+
+          if [ -n "${XCODE_26_DEVELOPER_DIR:-}" ] && [ -d "${XCODE_26_DEVELOPER_DIR}" ]; then
+            SELECTED_DEVELOPER_DIR="${XCODE_26_DEVELOPER_DIR}"
+          elif [ -d "/Applications/Xcode_26.4.1.app/Contents/Developer" ]; then
+            SELECTED_DEVELOPER_DIR="/Applications/Xcode_26.4.1.app/Contents/Developer"
+          else
+            echo "::error::Xcode 26.4.1 was not found on this runner."
+            exit 1
+          fi
+
+          echo "DEVELOPER_DIR=${SELECTED_DEVELOPER_DIR}" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="${SELECTED_DEVELOPER_DIR}"
+
+          echo "Using DEVELOPER_DIR=${DEVELOPER_DIR}"
+          xcode-select -p
+          xcodebuild -version
       - name: Download XCFramework artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
