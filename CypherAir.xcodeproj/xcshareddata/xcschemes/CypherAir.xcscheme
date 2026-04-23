@@ -82,7 +82,7 @@
          <EnvironmentVariable
             key = "CYPHERAIR_DEBUG_AUTH_TRACE"
             value = "1"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </EnvironmentVariable>
       </EnvironmentVariables>
    </LaunchAction>

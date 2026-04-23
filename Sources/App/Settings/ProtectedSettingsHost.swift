@@ -290,12 +290,9 @@ final class ProtectedSettingsHost {
     private func openProtectedSettings(
         using liveDependencies: LiveDependencies,
         localizedReason: String,
-        authorizationMode: AccessAuthorizationMode = .authorizeIfNeeded,
-        shouldShowLoadingState: Bool = true
+        authorizationMode: AccessAuthorizationMode = .authorizeIfNeeded
     ) async -> Bool {
-        if shouldShowLoadingState {
-            sectionState = .loading
-        }
+        sectionState = .loading
         do {
             guard try await ensureProtectedSettingsAccess(
                 using: liveDependencies,
