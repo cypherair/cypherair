@@ -575,6 +575,209 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
     }
 
+    func test_handleSceneDidEnterBackground_duringExternalAuthenticationPrompt_blursPrivacyScreen() {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataBackgroundSuppression")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rightStoreClient: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.background-suppression",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 180 },
+            requireAuthOnLaunchProvider: { true },
+            evaluateAppAuthentication: { _ in true },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        authPromptCoordinator.beginPrompt()
+        defer { authPromptCoordinator.endPrompt() }
+
+        orchestrator.handleSceneDidEnterBackground()
+
+        XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    func test_handleResume_successfulAuthentication_runsPostAuthenticationWarmUp() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataWarmUpSuccess")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rightStoreClient: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.warmup-success",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let didRunWarmUp = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            requireAuthOnLaunchProvider: { true },
+            evaluateAppAuthentication: { _ in true },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        orchestrator.postAuthenticationWarmUp = {
+            await didRunWarmUp.setTrue()
+        }
+
+        let attemptedAuthentication = await orchestrator.handleResume(
+            localizedReason: "Run warm-up after successful privacy unlock"
+        )
+        let didRunWarmUpValue = await didRunWarmUp.currentValue()
+
+        XCTAssertTrue(attemptedAuthentication)
+        XCTAssertTrue(didRunWarmUpValue)
+        XCTAssertNotNil(orchestrator.lastAuthenticationDate)
+        XCTAssertFalse(orchestrator.authFailed)
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    func test_handleResume_warmUpFailure_doesNotFailSuccessfulAuthentication() async {
+        struct WarmUpError: Error {}
+
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataWarmUpFailure")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rightStoreClient: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.warmup-failure",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let didRunWarmUp = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            requireAuthOnLaunchProvider: { true },
+            evaluateAppAuthentication: { _ in true },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        orchestrator.postAuthenticationWarmUp = {
+            await didRunWarmUp.setTrue()
+            throw WarmUpError()
+        }
+
+        let attemptedAuthentication = await orchestrator.handleResume(
+            localizedReason: "Warm-up failure should not re-fail privacy unlock"
+        )
+        let didRunWarmUpValue = await didRunWarmUp.currentValue()
+
+        XCTAssertTrue(attemptedAuthentication)
+        XCTAssertTrue(didRunWarmUpValue)
+        XCTAssertNotNil(orchestrator.lastAuthenticationDate)
+        XCTAssertFalse(orchestrator.authFailed)
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    func test_handleResume_failedAuthentication_doesNotRunPostAuthenticationWarmUp() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataWarmUpSkippedOnFailure")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rightStoreClient: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.warmup-skipped-failure",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let didRunWarmUp = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            requireAuthOnLaunchProvider: { true },
+            evaluateAppAuthentication: { _ in false },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        orchestrator.postAuthenticationWarmUp = {
+            await didRunWarmUp.setTrue()
+        }
+
+        let attemptedAuthentication = await orchestrator.handleResume(
+            localizedReason: "Failed privacy unlock should not run warm-up"
+        )
+        let didRunWarmUpValue = await didRunWarmUp.currentValue()
+
+        XCTAssertTrue(attemptedAuthentication)
+        XCTAssertFalse(didRunWarmUpValue)
+        XCTAssertNil(orchestrator.lastAuthenticationDate)
+        XCTAssertTrue(orchestrator.authFailed)
+    }
+
+    func test_handleResume_bypassAuthentication_doesNotRunPostAuthenticationWarmUp() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataWarmUpSkippedOnBypass")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rightStoreClient: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.warmup-skipped-bypass",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let didRunWarmUp = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { true },
+            gracePeriodProvider: { 0 },
+            requireAuthOnLaunchProvider: { true },
+            evaluateAppAuthentication: { _ in true },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        orchestrator.postAuthenticationWarmUp = {
+            await didRunWarmUp.setTrue()
+        }
+
+        let attemptedAuthentication = await orchestrator.handleResume(
+            localizedReason: "Bypassed privacy unlock should not run warm-up"
+        )
+        let didRunWarmUpValue = await didRunWarmUp.currentValue()
+
+        XCTAssertFalse(attemptedAuthentication)
+        XCTAssertFalse(didRunWarmUpValue)
+        XCTAssertFalse(orchestrator.authFailed)
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
     func test_accessGate_emptySteadyState_returnsNoProtectedDomainPresent() throws {
         let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessEmpty"))
         let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)

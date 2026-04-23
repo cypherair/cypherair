@@ -45,14 +45,19 @@ struct PrivacyScreenModifier: ViewModifier {
             #if canImport(UIKit)
             .onChange(of: scenePhase) { _, newPhase in
                 switch newPhase {
-                case .background, .inactive:
-                    guard lifecycleGate.shouldHandleResignActive(
+                case .inactive:
+                    guard lifecycleGate.shouldHandleInactive(
                         isAuthenticating: appSessionOrchestrator.isAuthenticating,
                         isSystemAuthenticationPromptInProgress: appSessionOrchestrator.isSystemAuthenticationPromptInProgress
                     ) else {
                         return
                     }
                     appSessionOrchestrator.handleSceneDidResignActive()
+                case .background:
+                    guard lifecycleGate.shouldHandleBackground() else {
+                        return
+                    }
+                    appSessionOrchestrator.handleSceneDidEnterBackground()
                 case .active:
                     guard lifecycleGate.shouldHandleBecomeActive(
                         isAuthenticating: appSessionOrchestrator.isAuthenticating,
