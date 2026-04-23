@@ -173,7 +173,7 @@ final class DecryptionService {
         // SE unwrap triggers Face ID / Touch ID
         var secretKey: Data
         do {
-            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
+            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
         } catch {
             throw CypherAirError.from(error) { _ in .authenticationFailed }
         }
@@ -235,7 +235,7 @@ final class DecryptionService {
 
         var secretKey: Data
         do {
-            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
+            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
         } catch {
             throw CypherAirError.from(error) { _ in .authenticationFailed }
         }
@@ -292,7 +292,7 @@ final class DecryptionService {
         // SE unwrap triggers Face ID / Touch ID
         var secretKey: Data
         do {
-            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
+            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
         } catch {
             throw CypherAirError.from(error) { _ in .authenticationFailed }
         }
@@ -370,7 +370,7 @@ final class DecryptionService {
 
         var secretKey: Data
         do {
-            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
+            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
         } catch {
             throw CypherAirError.from(error) { _ in .authenticationFailed }
         }

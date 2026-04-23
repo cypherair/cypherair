@@ -36,7 +36,7 @@ final class KeyMutationService {
         newExpirySeconds: UInt64?,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
-        var secretKey = try privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
+        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }

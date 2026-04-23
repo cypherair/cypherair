@@ -364,7 +364,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
 
         // Unwrap the private key and decrypt directly via engine
-        var secretKey = try stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
 
         let verificationKeys = [identity.publicKeyData]
@@ -384,7 +384,7 @@ final class DecryptionServiceTests: XCTestCase {
             profile: .advanced, plaintext: plaintext
         )
 
-        var secretKey = try stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
 
         let result = try stack.engine.decrypt(
@@ -403,7 +403,7 @@ final class DecryptionServiceTests: XCTestCase {
             profile: .universal, plaintext: plaintext
         )
 
-        var secretKey = try stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
 
         let result = try stack.engine.decrypt(
@@ -538,7 +538,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
 
         let plaintext = Data("Detailed decrypt own-key signer".utf8)
-        var senderSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
+        var senderSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
         defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
 
         let ciphertext = try stack.engine.encryptBinary(
@@ -742,7 +742,7 @@ final class DecryptionServiceTests: XCTestCase {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
             profile: .universal
         )
-        var secretKey = try stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
         let tampered = try findTargetedDecryptTamper(
             ciphertext: binaryCiphertext,
@@ -1095,7 +1095,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedURL)
         let originalCiphertext = try Data(contentsOf: encryptedURL)
-        var secretKey = try stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
         let targetedCiphertext = try findTargetedDecryptTamper(
             ciphertext: originalCiphertext,

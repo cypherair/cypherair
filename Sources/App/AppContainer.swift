@@ -3,6 +3,7 @@ import Foundation
 /// Centralized dependency container for the application.
 final class AppContainer: @unchecked Sendable {
     let authLifecycleTraceStore: AuthLifecycleTraceStore?
+    let authenticationShieldCoordinator: AuthenticationShieldCoordinator
     let authPromptCoordinator: AuthenticationPromptCoordinator
     let secureEnclave: any SecureEnclaveManageable
     let keychain: any KeychainManageable
@@ -30,6 +31,7 @@ final class AppContainer: @unchecked Sendable {
 
     init(
         authLifecycleTraceStore: AuthLifecycleTraceStore?,
+        authenticationShieldCoordinator: AuthenticationShieldCoordinator,
         authPromptCoordinator: AuthenticationPromptCoordinator,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
@@ -56,6 +58,7 @@ final class AppContainer: @unchecked Sendable {
         defaultsSuiteName: String? = nil
     ) {
         self.authLifecycleTraceStore = authLifecycleTraceStore
+        self.authenticationShieldCoordinator = authenticationShieldCoordinator
         self.authPromptCoordinator = authPromptCoordinator
         self.secureEnclave = secureEnclave
         self.keychain = keychain
@@ -88,7 +91,13 @@ final class AppContainer: @unchecked Sendable {
         let secureEnclave = HardwareSecureEnclave()
         let keychain = SystemKeychain()
         let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
-        let authPromptCoordinator = AuthenticationPromptCoordinator(traceStore: authLifecycleTraceStore)
+        let authenticationShieldCoordinator = AuthenticationShieldCoordinator()
+        let authPromptCoordinator = AuthenticationPromptCoordinator(
+            shieldEventHandler: makeShieldEventHandler(
+                coordinator: authenticationShieldCoordinator
+            ),
+            traceStore: authLifecycleTraceStore
+        )
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
@@ -175,6 +184,7 @@ final class AppContainer: @unchecked Sendable {
 
         return AppContainer(
             authLifecycleTraceStore: authLifecycleTraceStore,
+            authenticationShieldCoordinator: authenticationShieldCoordinator,
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: secureEnclave,
             keychain: keychain,
@@ -208,7 +218,13 @@ final class AppContainer: @unchecked Sendable {
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
         let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
-        let authPromptCoordinator = AuthenticationPromptCoordinator(traceStore: authLifecycleTraceStore)
+        let authenticationShieldCoordinator = AuthenticationShieldCoordinator()
+        let authPromptCoordinator = AuthenticationPromptCoordinator(
+            shieldEventHandler: makeShieldEventHandler(
+                coordinator: authenticationShieldCoordinator
+            ),
+            traceStore: authLifecycleTraceStore
+        )
         let suiteName = "com.cypherair.uitests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)
@@ -323,6 +339,7 @@ final class AppContainer: @unchecked Sendable {
 
         return AppContainer(
             authLifecycleTraceStore: authLifecycleTraceStore,
+            authenticationShieldCoordinator: authenticationShieldCoordinator,
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: secureEnclave,
             keychain: keychain,
@@ -348,6 +365,20 @@ final class AppContainer: @unchecked Sendable {
             contactsDirectory: contactsDirectory,
             defaultsSuiteName: suiteName
         )
+    }
+
+    private static func makeShieldEventHandler(
+        coordinator: AuthenticationShieldCoordinator
+    ) -> AuthenticationPromptCoordinator.ShieldEventHandler {
+        { kind, delta in
+            await MainActor.run {
+                if delta > 0 {
+                    coordinator.begin(kind)
+                } else {
+                    coordinator.end(kind)
+                }
+            }
+        }
     }
 
     private static func preloadUITestContact(

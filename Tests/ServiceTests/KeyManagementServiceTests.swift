@@ -537,7 +537,7 @@ final class KeyManagementServiceTests: XCTestCase {
     func test_unwrapPrivateKey_validFingerprint_returnsData() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: service)
 
-        let privateKeyData = try service.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        let privateKeyData = try await service.unwrapPrivateKey(fingerprint: identity.fingerprint)
         XCTAssertFalse(privateKeyData.isEmpty, "Unwrapped private key should not be empty")
 
         // Verify SE unwrap was called
@@ -559,7 +559,7 @@ final class KeyManagementServiceTests: XCTestCase {
         )
         let identity = try await TestHelpers.generateProfileAKey(service: promptAwareService)
 
-        let privateKeyData = try promptAwareService.unwrapPrivateKey(
+        let privateKeyData = try await promptAwareService.unwrapPrivateKey(
             fingerprint: identity.fingerprint
         )
 
@@ -568,8 +568,11 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertFalse(coordinator.isOperationPromptInProgress)
     }
 
-    func test_unwrapPrivateKey_unknownFingerprint_throwsError() {
-        XCTAssertThrowsError(try service.unwrapPrivateKey(fingerprint: "unknown-fp")) { _ in
+    func test_unwrapPrivateKey_unknownFingerprint_throwsError() async {
+        do {
+            _ = try await service.unwrapPrivateKey(fingerprint: "unknown-fp")
+            XCTFail("Expected unwrapPrivateKey to throw for unknown fingerprint")
+        } catch {
             // Expected: Keychain load fails for unknown fingerprint
         }
     }
@@ -577,7 +580,7 @@ final class KeyManagementServiceTests: XCTestCase {
     func test_unwrapPrivateKey_profileB_returnsData() async throws {
         let identity = try await TestHelpers.generateProfileBKey(service: service)
 
-        let privateKeyData = try service.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        let privateKeyData = try await service.unwrapPrivateKey(fingerprint: identity.fingerprint)
         XCTAssertFalse(privateKeyData.isEmpty)
     }
 

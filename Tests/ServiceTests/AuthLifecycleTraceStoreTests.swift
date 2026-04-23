@@ -126,9 +126,9 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         let coordinator = TraceAuthenticationPromptCoordinator(traceStore: store)
         let initialGeneration = coordinator.operationPromptAttemptGeneration
 
-        _ = try coordinator.withPrivacyPrompt { 1 }
+        _ = try await coordinator.withPrivacyPrompt { 1 }
         XCTAssertEqual(coordinator.operationPromptAttemptGeneration, initialGeneration)
-        _ = try coordinator.withOperationPrompt { 2 }
+        _ = try await coordinator.withOperationPrompt { 2 }
         XCTAssertEqual(coordinator.operationPromptAttemptGeneration, initialGeneration + 1)
 
         let kinds = store.recentEntries

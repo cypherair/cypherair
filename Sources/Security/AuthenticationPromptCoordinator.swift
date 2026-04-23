@@ -3,18 +3,25 @@ import Foundation
 /// Coordinates transient system-owned authentication prompts so app lifecycle
 /// handlers can distinguish them from real background/resume events.
 final class AuthenticationPromptCoordinator: @unchecked Sendable {
+    typealias ShieldEventHandler = @Sendable (AuthenticationShieldKind, Int) async -> Void
+
     private enum PromptKind {
         case privacy
         case operation
     }
 
     private let lock = NSLock()
+    private let shieldEventHandler: ShieldEventHandler?
     private let traceStore: AuthLifecycleTraceStore?
     private var privacyPromptDepth = 0
     private var operationPromptDepth = 0
     private var operationPromptAttemptGenerationValue: UInt64 = 0
 
-    init(traceStore: AuthLifecycleTraceStore? = nil) {
+    init(
+        shieldEventHandler: ShieldEventHandler? = nil,
+        traceStore: AuthLifecycleTraceStore? = nil
+    ) {
+        self.shieldEventHandler = shieldEventHandler
         self.traceStore = traceStore
     }
 
@@ -49,28 +56,36 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         adjustPromptDepth(for: .operation, delta: -1)
     }
 
-    func withPrivacyPrompt<T>(_ operation: () throws -> T) rethrows -> T {
-        beginPrivacyPrompt()
-        defer { endPrivacyPrompt() }
-        return try operation()
-    }
-
     func withPrivacyPrompt<T>(_ operation: () async throws -> T) async rethrows -> T {
         beginPrivacyPrompt()
-        defer { endPrivacyPrompt() }
-        return try await operation()
-    }
-
-    func withOperationPrompt<T>(_ operation: () throws -> T) rethrows -> T {
-        beginOperationPrompt()
-        defer { endOperationPrompt() }
-        return try operation()
+        await shieldEventHandler?(.privacy, 1)
+        await Task.yield()
+        do {
+            let result = try await operation()
+            endPrivacyPrompt()
+            await shieldEventHandler?(.privacy, -1)
+            return result
+        } catch {
+            endPrivacyPrompt()
+            await shieldEventHandler?(.privacy, -1)
+            throw error
+        }
     }
 
     func withOperationPrompt<T>(_ operation: () async throws -> T) async rethrows -> T {
         beginOperationPrompt()
-        defer { endOperationPrompt() }
-        return try await operation()
+        await shieldEventHandler?(.operation, 1)
+        await Task.yield()
+        do {
+            let result = try await operation()
+            endOperationPrompt()
+            await shieldEventHandler?(.operation, -1)
+            return result
+        } catch {
+            endOperationPrompt()
+            await shieldEventHandler?(.operation, -1)
+            throw error
+        }
     }
 
     private func adjustPromptDepth(for kind: PromptKind, delta: Int) {

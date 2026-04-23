@@ -20,7 +20,7 @@ final class KeyExportService {
         fingerprint: String,
         passphrase: String
     ) async throws -> Data {
-        var secretKey = try privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
+        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
@@ -52,7 +52,7 @@ final class KeyExportService {
             )
         }
 
-        var secretKey = try privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
+        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
