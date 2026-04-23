@@ -25,6 +25,9 @@ Packages/
 # Claude Code local worktrees (not project config)
 .claude/worktrees/
 
+# Local Codex/agent helper config
+.agents/
+
 # Python bytecode caches
 __pycache__/
 *.pyc
