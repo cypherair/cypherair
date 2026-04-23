@@ -7,13 +7,13 @@ import Foundation
 /// attempt has just started, or because the system reported resign/inactive
 /// while the auth prompt was already in progress.
 struct PrivacyScreenLifecycleGate {
-    private var suppressNextActivation = false
+    private var suppressNextSettledActivation = false
 
     mutating func armForAuthenticationAttempt() {
-        suppressNextActivation = true
+        suppressNextSettledActivation = true
     }
 
-    mutating func shouldHandleResignActive(
+    mutating func shouldHandleInactive(
         isAuthenticating: Bool,
         isSystemAuthenticationPromptInProgress: Bool = false
     ) -> Bool {
@@ -22,18 +22,37 @@ struct PrivacyScreenLifecycleGate {
             return false
         }
 
-        return !suppressNextActivation
+        return !suppressNextSettledActivation
+    }
+
+    mutating func shouldHandleBackground() -> Bool {
+        suppressNextSettledActivation = false
+        return true
+    }
+
+    mutating func shouldHandleResignActive(
+        isAuthenticating: Bool,
+        isSystemAuthenticationPromptInProgress: Bool = false
+    ) -> Bool {
+        shouldHandleInactive(
+            isAuthenticating: isAuthenticating,
+            isSystemAuthenticationPromptInProgress: isSystemAuthenticationPromptInProgress
+        )
     }
 
     mutating func shouldHandleBecomeActive(
         isAuthenticating: Bool,
         isSystemAuthenticationPromptInProgress: Bool = false
     ) -> Bool {
-        if suppressNextActivation {
-            suppressNextActivation = false
+        if isAuthenticating || isSystemAuthenticationPromptInProgress {
             return false
         }
 
-        return !(isAuthenticating || isSystemAuthenticationPromptInProgress)
+        if suppressNextSettledActivation {
+            suppressNextSettledActivation = false
+            return false
+        }
+
+        return true
     }
 }

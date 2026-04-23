@@ -128,6 +128,15 @@ final class ProtectedSettingsHost {
             return
         }
 
+        switch syncPreAuthorizationSectionState(liveDependencies) {
+        case .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
+            return
+        case .unlocked:
+            return
+        case .locked:
+            break
+        }
+
         switch currentAccessGateDecision(liveDependencies) {
         case .frameworkRecoveryNeeded:
             liveDependencies.syncPreAuthorizationState()
@@ -151,6 +160,18 @@ final class ProtectedSettingsHost {
         _ = await openProtectedSettings(
             using: liveDependencies,
             localizedReason: settingsLocalizedReason
+        )
+    }
+
+    func warmUpAfterAppUnlock() async {
+        guard let liveDependencies else {
+            return
+        }
+
+        _ = await openProtectedSettings(
+            using: liveDependencies,
+            localizedReason: settingsLocalizedReason,
+            shouldShowLoadingState: false
         )
     }
 
@@ -271,9 +292,12 @@ final class ProtectedSettingsHost {
 
     private func openProtectedSettings(
         using liveDependencies: LiveDependencies,
-        localizedReason: String
+        localizedReason: String,
+        shouldShowLoadingState: Bool = true
     ) async -> Bool {
-        sectionState = .loading
+        if shouldShowLoadingState {
+            sectionState = .loading
+        }
         do {
             guard try await ensureProtectedSettingsAccess(
                 using: liveDependencies,
@@ -298,6 +322,13 @@ final class ProtectedSettingsHost {
         using liveDependencies: LiveDependencies,
         localizedReason: String
     ) async throws -> Bool {
+        switch syncPreAuthorizationSectionState(liveDependencies) {
+        case .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
+            return false
+        case .locked, .unlocked:
+            break
+        }
+
         switch currentAccessGateDecision(liveDependencies) {
         case .frameworkRecoveryNeeded:
             liveDependencies.syncPreAuthorizationState()
@@ -370,6 +401,16 @@ final class ProtectedSettingsHost {
         case .frameworkUnavailable:
             sectionState = .frameworkUnavailable
         }
+    }
+
+    @discardableResult
+    private func syncPreAuthorizationSectionState(
+        _ liveDependencies: LiveDependencies
+    ) -> DomainState {
+        liveDependencies.syncPreAuthorizationState()
+        let domainState = liveDependencies.currentDomainState()
+        syncSectionStateFromStore(liveDependencies)
+        return domainState
     }
 
     private var settingsLocalizedReason: String {

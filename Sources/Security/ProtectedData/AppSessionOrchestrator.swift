@@ -12,6 +12,9 @@ final class AppSessionOrchestrator {
 
     private var hasAppearedOnce = false
 
+    @ObservationIgnored
+    var postAuthenticationWarmUp: (() async throws -> Void)?
+
     var isPrivacyScreenBlurred = false
     var isAuthenticating = false
     var authFailed = false
@@ -84,6 +87,11 @@ final class AppSessionOrchestrator {
         authFailed = false
     }
 
+    func handleSceneDidEnterBackground() {
+        isPrivacyScreenBlurred = true
+        authFailed = false
+    }
+
     @discardableResult
     func handleResume(localizedReason: String) async -> Bool {
         if shouldBypassPrivacyAuthentication() {
@@ -113,6 +121,7 @@ final class AppSessionOrchestrator {
                 let success = try await evaluateAppAuthentication(localizedReason)
                 if success {
                     recordAuthentication()
+                    await runPostAuthenticationWarmUpIfNeeded()
                     authFailed = false
                     isPrivacyScreenBlurred = false
                 } else {
@@ -177,6 +186,18 @@ final class AppSessionOrchestrator {
                     return .authorizationRequired(registry: registry)
                 }
             }
+        }
+    }
+
+    private func runPostAuthenticationWarmUpIfNeeded() async {
+        guard let postAuthenticationWarmUp else {
+            return
+        }
+
+        do {
+            try await postAuthenticationWarmUp()
+        } catch {
+            // Best-effort warm-up must never turn a successful privacy unlock into a failure.
         }
     }
 }

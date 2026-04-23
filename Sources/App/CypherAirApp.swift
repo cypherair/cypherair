@@ -168,6 +168,9 @@ struct CypherAirApp: App {
                 )
             }
         )
+        container.appSessionOrchestrator.postAuthenticationWarmUp = {
+            await protectedSettingsHost.warmUpAfterAppUnlock()
+        }
 
         _launchConfiguration = State(initialValue: launchConfiguration)
         _container = State(initialValue: container)
