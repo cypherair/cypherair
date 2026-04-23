@@ -57,6 +57,10 @@ final class AppSessionOrchestrator {
         authenticationPromptCoordinator.isOperationPromptInProgress
     }
 
+    var operationAuthenticationAttemptGeneration: UInt64 {
+        authenticationPromptCoordinator.operationPromptAttemptGeneration
+    }
+
     var isGracePeriodExpired: Bool {
         guard let lastAuthenticationDate else {
             return true

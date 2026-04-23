@@ -17,6 +17,7 @@ private typealias AppProtectedDataSessionCoordinator = CypherAir.ProtectedDataSe
 private typealias AppProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
 private typealias AppProtectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager
 private typealias AppProtectedDomainRecoveryCoordinator = CypherAir.ProtectedDomainRecoveryCoordinator
+private typealias AppPrivacyScreenLifecycleGate = CypherAir.PrivacyScreenLifecycleGate
 private typealias AppPendingRecoveryOutcome = CypherAir.PendingRecoveryOutcome
 private typealias AppWrappedDomainMasterKeyRecord = CypherAir.WrappedDomainMasterKeyRecord
 
@@ -573,6 +574,77 @@ final class ProtectedDataFrameworkTests: XCTestCase {
 
         orchestrator.handleSceneDidResignActive()
 
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    func test_lateLifecycleAfterOperationPromptEnds_doesNotTriggerPrivacyResumeAuthentication() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataLateLifecycleSuppression")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rightStoreClient: rightStoreClient,
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.late-lifecycle",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let relockParticipant = MockProtectedDataRelockParticipant()
+        coordinator.registerRelockParticipant(relockParticipant)
+        let didEvaluateAuthentication = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            requireAuthOnLaunchProvider: { true },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return true
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        var gate = AppPrivacyScreenLifecycleGate()
+
+        authPromptCoordinator.beginOperationPrompt()
+        authPromptCoordinator.endOperationPrompt()
+
+        gate.syncOperationAuthenticationAttemptGeneration(
+            orchestrator.operationAuthenticationAttemptGeneration
+        )
+        if gate.shouldHandleInactive(
+            isAuthenticating: orchestrator.isAuthenticating,
+            isOperationPromptInProgress: orchestrator.isOperationAuthenticationPromptInProgress
+        ) {
+            orchestrator.handleSceneDidResignActive()
+        }
+
+        gate.syncOperationAuthenticationAttemptGeneration(
+            orchestrator.operationAuthenticationAttemptGeneration
+        )
+        let attemptedAuthentication: Bool
+        if gate.shouldHandleBecomeActive(
+            isAuthenticating: orchestrator.isAuthenticating,
+            isOperationPromptInProgress: orchestrator.isOperationAuthenticationPromptInProgress
+        ) {
+            attemptedAuthentication = await orchestrator.handleResume(
+                localizedReason: "Late lifecycle after operation prompt"
+            )
+        } else {
+            attemptedAuthentication = false
+        }
+
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
+
+        XCTAssertFalse(attemptedAuthentication)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 0)
+        XCTAssertEqual(relockParticipant.relockCallCount, 0)
+        XCTAssertFalse(didEvaluate)
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
     }
 

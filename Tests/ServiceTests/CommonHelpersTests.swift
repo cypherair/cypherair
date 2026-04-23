@@ -155,6 +155,21 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
     }
 
+    func test_privacyScreenLifecycleGate_observedOperationPromptGenerationSuppressesLateInactiveAndActivation() {
+        var gate = PrivacyScreenLifecycleGate()
+
+        gate.syncOperationAuthenticationAttemptGeneration(1)
+
+        XCTAssertFalse(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                isOperationPromptInProgress: false
+            )
+        )
+        XCTAssertFalse(gate.shouldHandleBecomeActive(isAuthenticating: false))
+        XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
+    }
+
     func test_privacyScreenLifecycleGate_activeDuringPromptDoesNotConsumeSuppression() {
         var gate = PrivacyScreenLifecycleGate()
 
@@ -176,6 +191,18 @@ final class CommonHelpersTests: XCTestCase {
         gate.armForAuthenticationAttempt()
 
         XCTAssertTrue(gate.shouldHandleBackground())
+        XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
+    }
+
+    func test_privacyScreenLifecycleGate_backgroundClearsObservedOperationPromptSuppression() {
+        var gate = PrivacyScreenLifecycleGate()
+
+        gate.syncOperationAuthenticationAttemptGeneration(1)
+
+        XCTAssertTrue(gate.shouldHandleBackground())
+
+        gate.syncOperationAuthenticationAttemptGeneration(1)
+
         XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
     }
 

@@ -124,9 +124,12 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
     func test_authenticationPromptCoordinator_recordsPrivacyAndOperationPromptEvents() async throws {
         let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         let coordinator = TraceAuthenticationPromptCoordinator(traceStore: store)
+        let initialGeneration = coordinator.operationPromptAttemptGeneration
 
         _ = try coordinator.withPrivacyPrompt { 1 }
+        XCTAssertEqual(coordinator.operationPromptAttemptGeneration, initialGeneration)
         _ = try coordinator.withOperationPrompt { 2 }
+        XCTAssertEqual(coordinator.operationPromptAttemptGeneration, initialGeneration + 1)
 
         let kinds = store.recentEntries
             .filter { $0.name == "prompt.begin" }

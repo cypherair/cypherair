@@ -12,6 +12,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     private let traceStore: AuthLifecycleTraceStore?
     private var privacyPromptDepth = 0
     private var operationPromptDepth = 0
+    private var operationPromptAttemptGenerationValue: UInt64 = 0
 
     init(traceStore: AuthLifecycleTraceStore? = nil) {
         self.traceStore = traceStore
@@ -32,6 +33,15 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     var isOperationPromptInProgress: Bool {
         lock.withLock {
             operationPromptDepth > 0
+        }
+    }
+
+    /// Monotonic generation for operation-authentication attempts.
+    /// Increments when an operation prompt begins, even if the prompt ends before
+    /// app lifecycle callbacks for that system-owned dialog are delivered.
+    var operationPromptAttemptGeneration: UInt64 {
+        lock.withLock {
+            operationPromptAttemptGenerationValue
         }
     }
 
@@ -93,14 +103,17 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     private func adjustPromptDepth(for kind: PromptKind, delta: Int) {
-        let snapshot = lock.withLock { () -> (privacyDepth: Int, operationDepth: Int) in
+        let snapshot = lock.withLock { () -> (privacyDepth: Int, operationDepth: Int, operationGeneration: UInt64) in
             switch kind {
             case .privacy:
                 privacyPromptDepth = max(privacyPromptDepth + delta, 0)
             case .operation:
+                if delta > 0 {
+                    operationPromptAttemptGenerationValue &+= 1
+                }
                 operationPromptDepth = max(operationPromptDepth + delta, 0)
             }
-            return (privacyPromptDepth, operationPromptDepth)
+            return (privacyPromptDepth, operationPromptDepth, operationPromptAttemptGenerationValue)
         }
 
         traceStore?.record(
@@ -110,6 +123,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 "kind": kind == .privacy ? "privacy" : "operation",
                 "privacyDepth": String(snapshot.privacyDepth),
                 "operationDepth": String(snapshot.operationDepth),
+                "operationGeneration": String(snapshot.operationGeneration),
                 "active": snapshot.privacyDepth > 0 || snapshot.operationDepth > 0 ? "true" : "false"
             ]
         )
