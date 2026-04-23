@@ -226,7 +226,10 @@ struct CypherAirApp: App {
             .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
             .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
             .environment(tutorialStore)
-            .authenticationShieldHost(container.authenticationShieldCoordinator)
+            .authenticationShieldHost(
+                container.authenticationShieldCoordinator,
+                handlesLifecycleEvents: true
+            )
         }
         #endif
     }
@@ -366,7 +369,10 @@ struct CypherAirApp: App {
             }
         }
         .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
-        .authenticationShieldHost(container.authenticationShieldCoordinator)
+        .authenticationShieldHost(
+            container.authenticationShieldCoordinator,
+            handlesLifecycleEvents: true
+        )
         .onOpenURL { url in
             incomingURLImportCoordinator.handleIncomingURL(
                 url,
