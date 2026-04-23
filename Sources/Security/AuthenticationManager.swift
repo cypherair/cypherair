@@ -144,7 +144,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         }
 
         let context = LAContext()
-        let success = try await authenticationPromptCoordinator.withPrompt {
+        let success = try await authenticationPromptCoordinator.withPrivacyPrompt {
             switch mode {
             case .standard:
                 // Face ID / Touch ID with device passcode fallback.

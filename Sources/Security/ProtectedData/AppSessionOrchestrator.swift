@@ -12,9 +12,6 @@ final class AppSessionOrchestrator {
 
     private var hasAppearedOnce = false
 
-    @ObservationIgnored
-    var postAuthenticationWarmUp: (() async throws -> Void)?
-
     var isPrivacyScreenBlurred = false
     var isAuthenticating = false
     var authFailed = false
@@ -47,8 +44,8 @@ final class AppSessionOrchestrator {
         contentClearGeneration += 1
     }
 
-    var isSystemAuthenticationPromptInProgress: Bool {
-        authenticationPromptCoordinator.isPromptInProgress
+    var isOperationAuthenticationPromptInProgress: Bool {
+        authenticationPromptCoordinator.isOperationPromptInProgress
     }
 
     var isGracePeriodExpired: Bool {
@@ -80,7 +77,7 @@ final class AppSessionOrchestrator {
     }
 
     func handleSceneDidResignActive() {
-        guard !isSystemAuthenticationPromptInProgress else {
+        guard !isOperationAuthenticationPromptInProgress else {
             return
         }
         isPrivacyScreenBlurred = true
@@ -100,17 +97,17 @@ final class AppSessionOrchestrator {
             return false
         }
 
-        guard !isSystemAuthenticationPromptInProgress else {
+        guard !isOperationAuthenticationPromptInProgress else {
+            return false
+        }
+
+        guard !isAuthenticating else {
             return false
         }
 
         if gracePeriodProvider() == 0 || isGracePeriodExpired {
             requestContentClear()
             await protectedDataSessionCoordinator.relockCurrentSession()
-
-            guard !isAuthenticating else {
-                return false
-            }
 
             isAuthenticating = true
             authFailed = false
@@ -121,7 +118,6 @@ final class AppSessionOrchestrator {
                 let success = try await evaluateAppAuthentication(localizedReason)
                 if success {
                     recordAuthentication()
-                    await runPostAuthenticationWarmUpIfNeeded()
                     authFailed = false
                     isPrivacyScreenBlurred = false
                 } else {
@@ -186,18 +182,6 @@ final class AppSessionOrchestrator {
                     return .authorizationRequired(registry: registry)
                 }
             }
-        }
-    }
-
-    private func runPostAuthenticationWarmUpIfNeeded() async {
-        guard let postAuthenticationWarmUp else {
-            return
-        }
-
-        do {
-            try await postAuthenticationWarmUp()
-        } catch {
-            // Best-effort warm-up must never turn a successful privacy unlock into a failure.
         }
     }
 }

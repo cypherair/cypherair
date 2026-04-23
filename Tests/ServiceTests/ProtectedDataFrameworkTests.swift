@@ -527,8 +527,8 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             authenticationPromptCoordinator: authPromptCoordinator
         )
 
-        authPromptCoordinator.beginPrompt()
-        defer { authPromptCoordinator.endPrompt() }
+        authPromptCoordinator.beginOperationPrompt()
+        defer { authPromptCoordinator.endOperationPrompt() }
 
         let attemptedAuthentication = await orchestrator.handleResume(
             localizedReason: "External prompt in progress"
@@ -567,8 +567,8 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             authenticationPromptCoordinator: authPromptCoordinator
         )
 
-        authPromptCoordinator.beginPrompt()
-        defer { authPromptCoordinator.endPrompt() }
+        authPromptCoordinator.beginOperationPrompt()
+        defer { authPromptCoordinator.endOperationPrompt() }
 
         orchestrator.handleSceneDidResignActive()
 
@@ -601,29 +601,29 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             authenticationPromptCoordinator: authPromptCoordinator
         )
 
-        authPromptCoordinator.beginPrompt()
-        defer { authPromptCoordinator.endPrompt() }
+        authPromptCoordinator.beginOperationPrompt()
+        defer { authPromptCoordinator.endOperationPrompt() }
 
         orchestrator.handleSceneDidEnterBackground()
 
         XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
     }
 
-    func test_handleResume_successfulAuthentication_runsPostAuthenticationWarmUp() async {
+    func test_handleResume_successfulAuthentication_doesNotActivateProtectedDataSession() async {
         let storageRoot = AppProtectedDataStorageRoot(
-            baseDirectory: makeTemporaryDirectory("ProtectedDataWarmUpSuccess")
+            baseDirectory: makeTemporaryDirectory("ProtectedDataResumeNoWarmUp")
         )
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
 
         let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
         let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: MockProtectedDataRightStoreClient(),
+            rightStoreClient: rightStoreClient,
             domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.warmup-success",
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.resume-no-warmup",
             authenticationPromptCoordinator: authPromptCoordinator
         )
-        let didRunWarmUp = AsyncBooleanFlag()
         let orchestrator = AppAppSessionOrchestrator(
             currentRegistryProvider: {
                 throw ProtectedDataError.invalidRegistry("Not used in this test")
@@ -635,39 +635,37 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
         )
-        orchestrator.postAuthenticationWarmUp = {
-            await didRunWarmUp.setTrue()
-        }
 
         let attemptedAuthentication = await orchestrator.handleResume(
-            localizedReason: "Run warm-up after successful privacy unlock"
+            localizedReason: "Successful privacy unlock should not warm protected settings"
         )
-        let didRunWarmUpValue = await didRunWarmUp.currentValue()
 
         XCTAssertTrue(attemptedAuthentication)
-        XCTAssertTrue(didRunWarmUpValue)
         XCTAssertNotNil(orchestrator.lastAuthenticationDate)
         XCTAssertFalse(orchestrator.authFailed)
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+        XCTAssertEqual(coordinator.frameworkState, .sessionLocked)
+        XCTAssertEqual(rightStoreClient.rightLookupCallCount, 0)
     }
 
-    func test_handleResume_warmUpFailure_doesNotFailSuccessfulAuthentication() async {
-        struct WarmUpError: Error {}
-
+    func test_handleResume_afterBackgroundFollowingOperationPrompt_treatsReturnAsRealResume() async {
         let storageRoot = AppProtectedDataStorageRoot(
-            baseDirectory: makeTemporaryDirectory("ProtectedDataWarmUpFailure")
+            baseDirectory: makeTemporaryDirectory("ProtectedDataResumeAfterBackground")
         )
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
 
         let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
         let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: MockProtectedDataRightStoreClient(),
+            rightStoreClient: rightStoreClient,
             domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.warmup-failure",
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.resume-after-background",
             authenticationPromptCoordinator: authPromptCoordinator
         )
-        let didRunWarmUp = AsyncBooleanFlag()
+        let relockParticipant = MockProtectedDataRelockParticipant()
+        coordinator.registerRelockParticipant(relockParticipant)
+        let didEvaluateAuthentication = AsyncBooleanFlag()
         let orchestrator = AppAppSessionOrchestrator(
             currentRegistryProvider: {
                 throw ProtectedDataError.invalidRegistry("Not used in this test")
@@ -675,105 +673,28 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 0 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return true
+            },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
         )
-        orchestrator.postAuthenticationWarmUp = {
-            await didRunWarmUp.setTrue()
-            throw WarmUpError()
-        }
+
+        authPromptCoordinator.beginOperationPrompt()
+        orchestrator.handleSceneDidEnterBackground()
+        authPromptCoordinator.endOperationPrompt()
 
         let attemptedAuthentication = await orchestrator.handleResume(
-            localizedReason: "Warm-up failure should not re-fail privacy unlock"
+            localizedReason: "Resume after a real background should still re-authenticate"
         )
-        let didRunWarmUpValue = await didRunWarmUp.currentValue()
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
 
         XCTAssertTrue(attemptedAuthentication)
-        XCTAssertTrue(didRunWarmUpValue)
+        XCTAssertTrue(didEvaluate)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 1)
+        XCTAssertEqual(relockParticipant.relockCallCount, 1)
         XCTAssertNotNil(orchestrator.lastAuthenticationDate)
-        XCTAssertFalse(orchestrator.authFailed)
-        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
-    }
-
-    func test_handleResume_failedAuthentication_doesNotRunPostAuthenticationWarmUp() async {
-        let storageRoot = AppProtectedDataStorageRoot(
-            baseDirectory: makeTemporaryDirectory("ProtectedDataWarmUpSkippedOnFailure")
-        )
-        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
-
-        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
-        let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: MockProtectedDataRightStoreClient(),
-            domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.warmup-skipped-failure",
-            authenticationPromptCoordinator: authPromptCoordinator
-        )
-        let didRunWarmUp = AsyncBooleanFlag()
-        let orchestrator = AppAppSessionOrchestrator(
-            currentRegistryProvider: {
-                throw ProtectedDataError.invalidRegistry("Not used in this test")
-            },
-            shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { 0 },
-            requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in false },
-            protectedDataSessionCoordinator: coordinator,
-            authenticationPromptCoordinator: authPromptCoordinator
-        )
-        orchestrator.postAuthenticationWarmUp = {
-            await didRunWarmUp.setTrue()
-        }
-
-        let attemptedAuthentication = await orchestrator.handleResume(
-            localizedReason: "Failed privacy unlock should not run warm-up"
-        )
-        let didRunWarmUpValue = await didRunWarmUp.currentValue()
-
-        XCTAssertTrue(attemptedAuthentication)
-        XCTAssertFalse(didRunWarmUpValue)
-        XCTAssertNil(orchestrator.lastAuthenticationDate)
-        XCTAssertTrue(orchestrator.authFailed)
-    }
-
-    func test_handleResume_bypassAuthentication_doesNotRunPostAuthenticationWarmUp() async {
-        let storageRoot = AppProtectedDataStorageRoot(
-            baseDirectory: makeTemporaryDirectory("ProtectedDataWarmUpSkippedOnBypass")
-        )
-        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
-
-        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
-        let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: MockProtectedDataRightStoreClient(),
-            domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.warmup-skipped-bypass",
-            authenticationPromptCoordinator: authPromptCoordinator
-        )
-        let didRunWarmUp = AsyncBooleanFlag()
-        let orchestrator = AppAppSessionOrchestrator(
-            currentRegistryProvider: {
-                throw ProtectedDataError.invalidRegistry("Not used in this test")
-            },
-            shouldBypassPrivacyAuthentication: { true },
-            gracePeriodProvider: { 0 },
-            requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
-            protectedDataSessionCoordinator: coordinator,
-            authenticationPromptCoordinator: authPromptCoordinator
-        )
-        orchestrator.postAuthenticationWarmUp = {
-            await didRunWarmUp.setTrue()
-        }
-
-        let attemptedAuthentication = await orchestrator.handleResume(
-            localizedReason: "Bypassed privacy unlock should not run warm-up"
-        )
-        let didRunWarmUpValue = await didRunWarmUp.currentValue()
-
-        XCTAssertFalse(attemptedAuthentication)
-        XCTAssertFalse(didRunWarmUpValue)
         XCTAssertFalse(orchestrator.authFailed)
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
     }

@@ -52,6 +52,11 @@ final class ProtectedSettingsHost {
         case tutorialSandbox
     }
 
+    private enum AccessAuthorizationMode {
+        case authorizeIfNeeded
+        case requireExistingAuthorization
+    }
+
     private struct LiveDependencies: @unchecked Sendable {
         let evaluateAccessGate: @MainActor (_ isFirstProtectedAccess: Bool) -> AccessGateDecision
         let authorizeSharedRight: @MainActor (_ localizedReason: String) async -> AuthorizationOutcome
@@ -144,10 +149,13 @@ final class ProtectedSettingsHost {
         case .pendingMutationRecoveryRequired:
             liveDependencies.syncPreAuthorizationState()
             syncSectionStateFromStore(liveDependencies)
-        case .noProtectedDomainPresent, .authorizationRequired, .alreadyAuthorized:
+        case .noProtectedDomainPresent, .authorizationRequired:
+            sectionState = .locked
+        case .alreadyAuthorized:
             _ = await openProtectedSettings(
                 using: liveDependencies,
-                localizedReason: settingsLocalizedReason
+                localizedReason: settingsLocalizedReason,
+                authorizationMode: .requireExistingAuthorization
             )
         }
     }
@@ -160,18 +168,6 @@ final class ProtectedSettingsHost {
         _ = await openProtectedSettings(
             using: liveDependencies,
             localizedReason: settingsLocalizedReason
-        )
-    }
-
-    func warmUpAfterAppUnlock() async {
-        guard let liveDependencies else {
-            return
-        }
-
-        _ = await openProtectedSettings(
-            using: liveDependencies,
-            localizedReason: settingsLocalizedReason,
-            shouldShowLoadingState: false
         )
     }
 
@@ -293,6 +289,7 @@ final class ProtectedSettingsHost {
     private func openProtectedSettings(
         using liveDependencies: LiveDependencies,
         localizedReason: String,
+        authorizationMode: AccessAuthorizationMode = .authorizeIfNeeded,
         shouldShowLoadingState: Bool = true
     ) async -> Bool {
         if shouldShowLoadingState {
@@ -301,7 +298,8 @@ final class ProtectedSettingsHost {
         do {
             guard try await ensureProtectedSettingsAccess(
                 using: liveDependencies,
-                localizedReason: localizedReason
+                localizedReason: localizedReason,
+                authorizationMode: authorizationMode
             ) else {
                 syncSectionStateFromStore(liveDependencies)
                 return false
@@ -320,7 +318,8 @@ final class ProtectedSettingsHost {
 
     private func ensureProtectedSettingsAccess(
         using liveDependencies: LiveDependencies,
-        localizedReason: String
+        localizedReason: String,
+        authorizationMode: AccessAuthorizationMode = .authorizeIfNeeded
     ) async throws -> Bool {
         switch syncPreAuthorizationSectionState(liveDependencies) {
         case .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
@@ -339,6 +338,10 @@ final class ProtectedSettingsHost {
             syncSectionStateFromStore(liveDependencies)
             return false
         case .noProtectedDomainPresent:
+            guard authorizationMode == .authorizeIfNeeded else {
+                sectionState = .locked
+                return false
+            }
             try await liveDependencies.migrateLegacyClipboardNoticeIfNeeded()
             let authorizationResult = await liveDependencies.authorizeSharedRight(
                 localizedReason
@@ -354,6 +357,10 @@ final class ProtectedSettingsHost {
                 return false
             }
         case .authorizationRequired:
+            guard authorizationMode == .authorizeIfNeeded else {
+                sectionState = .locked
+                return false
+            }
             let authorizationResult = await liveDependencies.authorizeSharedRight(
                 localizedReason
             )

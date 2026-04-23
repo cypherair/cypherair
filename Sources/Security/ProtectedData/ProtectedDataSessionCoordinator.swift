@@ -72,7 +72,7 @@ final class ProtectedDataSessionCoordinator {
         }
 
         do {
-            try await authenticationPromptCoordinator.withPrompt {
+            try await authenticationPromptCoordinator.withOperationPrompt {
                 try await sharedRight.authorize(localizedReason: localizedReason)
             }
         } catch {
