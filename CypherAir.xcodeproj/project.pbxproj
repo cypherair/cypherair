@@ -549,6 +549,12 @@
 		318728F63CA0892A26F32057 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"ARCHS[sdk=*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=iphoneos*]" = arm64e;
+				"ARCHS[sdk=iphonesimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=macosx*]" = arm64e;
+				"ARCHS[sdk=xros*]" = arm64e;
+				"ARCHS[sdk=xrsimulator*]" = "$(ARCHS_STANDARD)";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -584,6 +590,12 @@
 		7238E936CABAED3287ACA9BE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"ARCHS[sdk=*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=iphoneos*]" = arm64e;
+				"ARCHS[sdk=iphonesimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=macosx*]" = arm64e;
+				"ARCHS[sdk=xros*]" = arm64e;
+				"ARCHS[sdk=xrsimulator*]" = "$(ARCHS_STANDARD)";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -620,6 +632,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=appletvsimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=iphoneos*]" = arm64e;
+				"ARCHS[sdk=iphonesimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=macosx*]" = arm64e;
+				"ARCHS[sdk=watchsimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=xros*]" = arm64e;
+				"ARCHS[sdk=xrsimulator*]" = "$(ARCHS_STANDARD)";
 				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconC AppIconB AppIcon";
 				"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=*]" = "AppIconC AppIconB AppIcon AppIconD";
 				"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=xr*]" = "";
@@ -632,7 +652,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -845,6 +865,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=appletvsimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=iphoneos*]" = arm64e;
+				"ARCHS[sdk=iphonesimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=macosx*]" = arm64e;
+				"ARCHS[sdk=watchsimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=xros*]" = arm64e;
+				"ARCHS[sdk=xrsimulator*]" = "$(ARCHS_STANDARD)";
 				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconC AppIconB AppIcon";
 				"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=*]" = "AppIconC AppIconB AppIcon AppIconD";
 				"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=xr*]" = "";
@@ -857,7 +885,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -990,6 +1018,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=appletvsimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=iphoneos*]" = arm64e;
+				"ARCHS[sdk=iphonesimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=macosx*]" = arm64e;
+				"ARCHS[sdk=watchsimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=xros*]" = arm64e;
+				"ARCHS[sdk=xrsimulator*]" = "$(ARCHS_STANDARD)";
 				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconC AppIconB AppIcon";
 				"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=*]" = "AppIconC AppIconB AppIcon AppIconD";
 				"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=xr*]" = "";
@@ -1002,7 +1038,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1060,6 +1096,12 @@
 		CE381AB82F95DDAA00A6C06A /* AppStore Candidate Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"ARCHS[sdk=*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=iphoneos*]" = arm64e;
+				"ARCHS[sdk=iphonesimulator*]" = "$(ARCHS_STANDARD)";
+				"ARCHS[sdk=macosx*]" = arm64e;
+				"ARCHS[sdk=xros*]" = arm64e;
+				"ARCHS[sdk=xrsimulator*]" = "$(ARCHS_STANDARD)";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1095,6 +1137,7 @@
 		CE381AB92F95DDAA00A6C06A /* AppStore Candidate Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"ARCHS[sdk=macosx*]" = arm64e;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -1117,6 +1160,7 @@
 		E10000092F90000100000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"ARCHS[sdk=macosx*]" = arm64e;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -1139,6 +1183,7 @@
 		E100000A2F90000100000001 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"ARCHS[sdk=macosx*]" = arm64e;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
