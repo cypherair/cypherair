@@ -76,6 +76,12 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         return url
     }
 
+    private func settleShieldDismissal() async {
+        for _ in 0..<5 {
+            await Task.yield()
+        }
+    }
+
     func test_traceStore_capsEntriesAtCapacity() {
         let sink = TraceLineSink()
         let store = TraceAuthLifecycleTraceStore(
@@ -136,6 +142,44 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             .compactMap { $0.metadata["kind"] }
 
         XCTAssertEqual(kinds, ["privacy", "operation"])
+    }
+
+    func test_authenticationShieldCoordinator_recordsShieldTraceEventsIntoStoreAndSink() async {
+        let sink = TraceLineSink()
+        let store = TraceAuthLifecycleTraceStore(
+            isEnabled: true,
+            sink: { sink.append($0) }
+        )
+        let coordinator = CypherAir.AuthenticationShieldCoordinator(traceStore: store)
+
+        coordinator.begin(.operation)
+        coordinator.end(.operation)
+        await settleShieldDismissal()
+
+        let names = store.recentEntries.map(\.name)
+        XCTAssertTrue(names.contains("shield.begin"))
+        XCTAssertTrue(names.contains("shield.pendingDismissal.start"))
+        XCTAssertTrue(names.contains("shield.dismissal.complete"))
+
+        let lines = sink.snapshot()
+        XCTAssertTrue(lines.contains(where: { $0.contains("shield.begin") }))
+        XCTAssertTrue(lines.contains(where: { $0.contains("shield.dismissal.complete") }))
+    }
+
+    func test_authenticationShieldCoordinator_disabledTraceStoreDoesNotRecordShieldEvents() async {
+        let sink = TraceLineSink()
+        let store = TraceAuthLifecycleTraceStore(
+            isEnabled: false,
+            sink: { sink.append($0) }
+        )
+        let coordinator = CypherAir.AuthenticationShieldCoordinator(traceStore: store)
+
+        coordinator.begin(.privacy)
+        coordinator.end(.privacy)
+        await settleShieldDismissal()
+
+        XCTAssertTrue(store.recentEntries.isEmpty)
+        XCTAssertTrue(sink.snapshot().isEmpty)
     }
 
     func test_appSessionOrchestrator_recordsHandleResumeAndContentClearEvents() async {

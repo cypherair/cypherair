@@ -91,7 +91,9 @@ final class AppContainer: @unchecked Sendable {
         let secureEnclave = HardwareSecureEnclave()
         let keychain = SystemKeychain()
         let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
-        let authenticationShieldCoordinator = AuthenticationShieldCoordinator()
+        let authenticationShieldCoordinator = AuthenticationShieldCoordinator(
+            traceStore: authLifecycleTraceStore
+        )
         let authPromptCoordinator = AuthenticationPromptCoordinator(
             shieldEventHandler: makeShieldEventHandler(
                 coordinator: authenticationShieldCoordinator
@@ -218,7 +220,9 @@ final class AppContainer: @unchecked Sendable {
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
         let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
-        let authenticationShieldCoordinator = AuthenticationShieldCoordinator()
+        let authenticationShieldCoordinator = AuthenticationShieldCoordinator(
+            traceStore: authLifecycleTraceStore
+        )
         let authPromptCoordinator = AuthenticationPromptCoordinator(
             shieldEventHandler: makeShieldEventHandler(
                 coordinator: authenticationShieldCoordinator
