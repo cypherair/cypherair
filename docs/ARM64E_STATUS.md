@@ -25,6 +25,13 @@ full dependency chain is usable by the app.
 - The app-side Apple `arm64e` adaptation is basically working in this worktree.
 - The experiment branch contains branch-local build helpers, a patched Rust
   toolchain pin, and a reproducible vendored OpenSSL carry chain.
+- Apple distribution rules require `arm64` whenever a shipped app bundle also
+  contains `arm64e`, so the experiment output must now package dual device
+  slices (`arm64` + `arm64e`) while keeping simulator slices on `arm64`.
+- The experiment still keeps `arm64e` as a first-class validation path by
+  generating UniFFI bindings from an `arm64e-apple-darwin` host dylib and by
+  building explicit `arm64e` device archives before they are merged with the
+  stable `arm64` device archives.
 - The remaining work is no longer "can CypherAir run with arm64e at all?".
   The remaining work is:
   - keeping this experiment branch current with the evolving `main` branch
@@ -37,6 +44,11 @@ full dependency chain is usable by the app.
   - `rust-toolchain.toml` points to `stage1-arm64e-patch`
   - local Rust fork path: `/Users/tianren/coding/rust`
   - Rust experiment branch: `codex/arm64e-darwin-ptrauth-spike`
+- XCFramework packaging posture:
+  - iOS/macOS/visionOS device artifacts are merged from stable `arm64` and
+    experiment `arm64e` archives
+  - iOS/visionOS simulator artifacts remain stable `arm64`
+  - UniFFI bindgen continues to use an `arm64e-apple-darwin` host dylib
 - OpenSSL source carry:
   - `pgp-mobile/Cargo.toml` patches `openssl-src` to `https://github.com/cypherair/openssl-src-rs`
   - pinned revision: `36d52f499d71d90c8c4b89c53210cbdde34e0528`

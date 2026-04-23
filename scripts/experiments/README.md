@@ -45,9 +45,9 @@ In other words:
 
 - `build_apple_arm64e_xcframework.sh`
   Unified Apple experiment entrypoint. Extends the experiment to:
-  iOS device `arm64e`, Darwin host `arm64e`, macOS XCFramework `arm64e`,
-  visionOS device `arm64e`, while keeping iOS and visionOS simulators on
-  stable `arm64`.
+  iOS/macOS/visionOS device `arm64` + `arm64e`, an `arm64e` Darwin host dylib
+  for bindgen validation, while keeping iOS and visionOS simulators on stable
+  `arm64`.
 - `repro_arm64e_rust_host_crashes.sh`
   Minimal host-side repro matrix for the current macOS `arm64e` crash
   investigation. Uses existing `pgp-mobile` Rust tests plus a standalone
@@ -104,6 +104,9 @@ If the locally linked `stage1-arm64e-patch` toolchain or the packaged
    CARGO_NET_GIT_FETCH_WITH_CLI=true \
        scripts/experiments/build_apple_arm64e_xcframework.sh --release
    ```
+
+   This produces dual device slices (`arm64` + `arm64e`) for iOS, macOS, and
+   visionOS, while simulator slices remain `arm64`.
 
 5. The script now skips the negative stable baseline repro by default.
    Re-enable it only when you explicitly want that proof:

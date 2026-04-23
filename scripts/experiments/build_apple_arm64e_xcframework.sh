@@ -3,12 +3,13 @@
 #
 # This script:
 # 1. Reproduces the stable arm64e baseline failures for iOS and Darwin.
-# 2. Builds Apple arm64e device artifacts using the locally linked patched Rust
-#    toolchain while keeping simulator slices on stable arm64.
+# 2. Builds Apple device artifacts for both arm64 and arm64e while keeping
+#    simulator slices on stable arm64.
 # 3. Generates Swift bindings using an arm64e-apple-darwin host dylib built by
-#    that same patched toolchain.
-# 4. Packages PgpMobile.xcframework and runs generic iOS/macOS build probes
-#    using ARCHS=arm64e without modifying the tracked Xcode project.
+#    the locally linked patched Rust toolchain.
+# 4. Packages PgpMobile.xcframework and runs generic iOS/macOS/visionOS build
+#    probes using ARCHS="arm64 arm64e" without modifying the tracked Xcode
+#    project.
 #
 # Dependency note:
 # This script intentionally relies on a layered downstream carry chain:
@@ -32,6 +33,7 @@ EXPERIMENT_ROOT="$REPO_ROOT/pgp-mobile/target/apple-arm64e-experiment"
 EXPERIMENT_CARGO_HOME="$EXPERIMENT_ROOT/cargo-home"
 EXPERIMENT_TARGET_DIR="$EXPERIMENT_ROOT/build"
 GENERATED_BINDINGS_DIR="$EXPERIMENT_ROOT/generated-bindings"
+UNIVERSAL_LIB_DIR="$EXPERIMENT_ROOT/universal-libs"
 ARM64E_TOOLCHAIN="stage1-arm64e-patch"
 STABLE_TOOLCHAIN="stable"
 NIGHTLY_TOOLCHAIN="nightly"
@@ -80,6 +82,15 @@ ensure_component() {
     fi
 }
 
+ensure_rustup_target() {
+    local toolchain="$1"
+    local target="$2"
+    if ! rustup target list --toolchain "${toolchain}" --installed | grep -q "^${target}$"; then
+        echo "  Installing ${target} for ${toolchain}..."
+        rustup target add "${target}" --toolchain "${toolchain}"
+    fi
+}
+
 run_expected_failure() {
     local label="$1"
     local expected_substring="$2"
@@ -118,7 +129,7 @@ seed_experiment_cache() {
 
 reset_experiment_build_state() {
     log_step "clean" "Resetting experiment build artifacts..."
-    rm -rf "$EXPERIMENT_TARGET_DIR" "$GENERATED_BINDINGS_DIR"
+    rm -rf "$EXPERIMENT_TARGET_DIR" "$GENERATED_BINDINGS_DIR" "$UNIVERSAL_LIB_DIR"
     mkdir -p "$EXPERIMENT_TARGET_DIR"
 }
 
@@ -173,6 +184,19 @@ resolve_library_path() {
     fi
 
     printf '%s\n' "$path"
+}
+
+combine_archives() {
+    local label="$1"
+    local output="$2"
+    local first_lib="$3"
+    local second_lib="$4"
+
+    log_step "$label" "Creating universal archive..."
+    mkdir -p "$(dirname "$output")"
+    lipo -create "$first_lib" "$second_lib" -output "$output"
+    echo "  ✓ universal library: $output"
+    lipo -info "$output"
 }
 
 cleanup_target_specific_dylibs() {
@@ -298,25 +322,25 @@ import sys
 info = plistlib.load(open(sys.argv[1], "rb"))
 libs = info["AvailableLibraries"]
 
-def require_arch(platform, variant, expected_arch):
+def require_archs(platform, variant, expected_archs):
     for lib in libs:
         if lib.get("SupportedPlatform") != platform:
             continue
         if lib.get("SupportedPlatformVariant") != variant:
             continue
         arches = lib.get("SupportedArchitectures", [])
-        if arches != [expected_arch]:
+        if sorted(arches) != sorted(expected_archs):
             raise SystemExit(
-                f"{platform}/{variant or 'device'} expected [{expected_arch}] but saw {arches}"
+                f"{platform}/{variant or 'device'} expected {sorted(expected_archs)} but saw {sorted(arches)}"
             )
         return
     raise SystemExit(f"missing XCFramework library for {platform}/{variant or 'device'}")
 
-require_arch("ios", None, "arm64e")
-require_arch("ios", "simulator", "arm64")
-require_arch("macos", None, "arm64e")
-require_arch("xros", None, "arm64e")
-require_arch("xros", "simulator", "arm64")
+require_archs("ios", None, ["arm64", "arm64e"])
+require_archs("ios", "simulator", ["arm64"])
+require_archs("macos", None, ["arm64", "arm64e"])
+require_archs("xros", None, ["arm64", "arm64e"])
+require_archs("xros", "simulator", ["arm64"])
 PY
 
     while IFS= read -r lib_path; do
@@ -326,47 +350,75 @@ PY
     done < <(find "$XCFRAMEWORK_OUTPUT" -type f -name 'libpgp_mobile.a' | sort)
 }
 
+normalize_archs() {
+    printf '%s\n' "$1" | tr ' ' '\n' | sed '/^$/d' | sort -u | xargs
+}
+
 verify_effective_archs() {
     local platform_label="$1"
-    shift
+    local expected_archs="$2"
+    shift 2
 
     log_step "xcode-settings" "Checking effective CypherAir ${platform_label} ARCHS override..."
 
-    local settings_output
-    settings_output="$(
+    local arch_lines
+    arch_lines="$(
         xcodebuild \
             -project "$REPO_ROOT/CypherAir.xcodeproj" \
             -target CypherAir \
             -showBuildSettings \
             "$@" \
             2>/dev/null \
-            | rg '^    ARCHS = '
+            | sed -n 's/^    ARCHS = //p'
     )"
 
-    echo "$settings_output"
+    printf '%s\n' "$arch_lines" | sed 's/^/    ARCHS = /'
 
-    if ! printf '%s\n' "$settings_output" | grep -q 'ARCHS = arm64e'; then
-        echo "warning: effective ${platform_label} ARCHS override did not resolve to arm64e before the build probe." >&2
+    local normalized_expected
+    normalized_expected="$(normalize_archs "$expected_archs")"
+    local matched=1
+    local line
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        if [ "$(normalize_archs "$line")" = "$normalized_expected" ]; then
+            matched=0
+            break
+        fi
+    done <<< "$arch_lines"
+
+    if [ "$matched" -ne 0 ]; then
+        echo "error: effective ${platform_label} ARCHS did not resolve to '${normalized_expected}'." >&2
+        exit 1
     fi
 }
 
 run_ios_probe() {
-    log_step "probe-ios" "Running generic iOS build probe with ARCHS=arm64e..."
+    log_step "probe-ios" "Running generic iOS build probe with ARCHS='arm64 arm64e'..."
     xcodebuild build \
         -scheme CypherAir \
         -project "$REPO_ROOT/CypherAir.xcodeproj" \
         -destination 'generic/platform=iOS' \
-        ARCHS=arm64e \
+        ARCHS="arm64 arm64e" \
         CODE_SIGNING_ALLOWED=NO
 }
 
 run_macos_probe() {
-    log_step "probe-macos" "Running generic macOS build probe with ARCHS=arm64e..."
+    log_step "probe-macos" "Running generic macOS build probe with ARCHS='arm64 arm64e'..."
     xcodebuild build \
         -scheme CypherAir \
         -project "$REPO_ROOT/CypherAir.xcodeproj" \
         -destination 'generic/platform=macOS' \
-        ARCHS=arm64e \
+        ARCHS="arm64 arm64e" \
+        CODE_SIGNING_ALLOWED=NO
+}
+
+run_visionos_probe() {
+    log_step "probe-visionos" "Running generic visionOS build probe with ARCHS='arm64 arm64e'..."
+    xcodebuild build \
+        -scheme CypherAir \
+        -project "$REPO_ROOT/CypherAir.xcodeproj" \
+        -destination 'generic/platform=visionOS' \
+        ARCHS="arm64 arm64e" \
         CODE_SIGNING_ALLOWED=NO
 }
 
@@ -378,6 +430,11 @@ require_toolchain "$STABLE_TOOLCHAIN"
 require_toolchain "$NIGHTLY_TOOLCHAIN"
 require_toolchain "$ARM64E_TOOLCHAIN"
 ensure_component "$NIGHTLY_TOOLCHAIN" "rust-src"
+ensure_rustup_target "$STABLE_TOOLCHAIN" "aarch64-apple-ios"
+ensure_rustup_target "$STABLE_TOOLCHAIN" "aarch64-apple-ios-sim"
+ensure_rustup_target "$STABLE_TOOLCHAIN" "aarch64-apple-darwin"
+ensure_rustup_target "$STABLE_TOOLCHAIN" "aarch64-apple-visionos"
+ensure_rustup_target "$STABLE_TOOLCHAIN" "aarch64-apple-visionos-sim"
 
 mkdir -p "$EXPERIMENT_ROOT"
 if [ "${RUN_STABLE_BASELINES:-0}" = "1" ]; then
@@ -408,25 +465,41 @@ fi
 seed_experiment_cache
 reset_experiment_build_state
 
+build_rust_artifact "ios-device-arm64" "$STABLE_TOOLCHAIN" "aarch64-apple-ios"
 build_rust_artifact "ios-device-arm64e" "$ARM64E_TOOLCHAIN" "arm64e-apple-ios" -Zbuild-std
 build_rust_artifact "ios-sim-arm64" "$STABLE_TOOLCHAIN" "aarch64-apple-ios-sim"
+build_rust_artifact "macos-arm64" "$STABLE_TOOLCHAIN" "aarch64-apple-darwin"
 build_rust_artifact "macos-arm64e" "$ARM64E_TOOLCHAIN" "arm64e-apple-darwin" -Zbuild-std
+build_rust_artifact "visionos-device-arm64" "$STABLE_TOOLCHAIN" "aarch64-apple-visionos"
 build_rust_artifact "visionos-device-arm64e" "$ARM64E_TOOLCHAIN" "arm64e-apple-visionos" -Zbuild-std
 build_rust_artifact "visionos-sim-arm64" "$STABLE_TOOLCHAIN" "aarch64-apple-visionos-sim"
 
-IOS_DEVICE_LIB="$(resolve_library_path "arm64e-apple-ios")"
+IOS_DEVICE_ARM64_LIB="$(resolve_library_path "aarch64-apple-ios")"
+IOS_DEVICE_ARM64E_LIB="$(resolve_library_path "arm64e-apple-ios")"
 IOS_SIM_LIB="$(resolve_library_path "aarch64-apple-ios-sim")"
-MACOS_LIB="$(resolve_library_path "arm64e-apple-darwin")"
-VISIONOS_DEVICE_LIB="$(resolve_library_path "arm64e-apple-visionos")"
+MACOS_ARM64_LIB="$(resolve_library_path "aarch64-apple-darwin")"
+MACOS_ARM64E_LIB="$(resolve_library_path "arm64e-apple-darwin")"
+VISIONOS_DEVICE_ARM64_LIB="$(resolve_library_path "aarch64-apple-visionos")"
+VISIONOS_DEVICE_ARM64E_LIB="$(resolve_library_path "arm64e-apple-visionos")"
 VISIONOS_SIM_LIB="$(resolve_library_path "aarch64-apple-visionos-sim")"
+
+IOS_DEVICE_LIB="$UNIVERSAL_LIB_DIR/ios-device/$BUILD_DIR/libpgp_mobile.a"
+MACOS_LIB="$UNIVERSAL_LIB_DIR/macos-device/$BUILD_DIR/libpgp_mobile.a"
+VISIONOS_DEVICE_LIB="$UNIVERSAL_LIB_DIR/visionos-device/$BUILD_DIR/libpgp_mobile.a"
+
+combine_archives "ios-device-universal" "$IOS_DEVICE_LIB" "$IOS_DEVICE_ARM64_LIB" "$IOS_DEVICE_ARM64E_LIB"
+combine_archives "macos-device-universal" "$MACOS_LIB" "$MACOS_ARM64_LIB" "$MACOS_ARM64E_LIB"
+combine_archives "visionos-device-universal" "$VISIONOS_DEVICE_LIB" "$VISIONOS_DEVICE_ARM64_LIB" "$VISIONOS_DEVICE_ARM64E_LIB"
 
 generate_bindings
 create_xcframework "$IOS_DEVICE_LIB" "$IOS_SIM_LIB" "$MACOS_LIB" "$VISIONOS_DEVICE_LIB" "$VISIONOS_SIM_LIB"
 verify_xcframework
-verify_effective_archs "iOS" ARCHS=arm64e
-verify_effective_archs "macOS" ARCHS=arm64e
+verify_effective_archs "iOS" "arm64 arm64e" -sdk iphoneos ARCHS="arm64 arm64e"
+verify_effective_archs "macOS" "arm64 arm64e" -sdk macosx ARCHS="arm64 arm64e"
+verify_effective_archs "visionOS" "arm64 arm64e" -sdk xros ARCHS="arm64 arm64e"
 run_ios_probe
 run_macos_probe
+run_visionos_probe
 
 echo
 echo "=== Experiment Complete ==="
