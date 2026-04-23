@@ -105,6 +105,7 @@ struct EncryptView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(ContactService.self) private var contactService
     @Environment(AppConfiguration.self) private var config
+    @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
     @Environment(\.protectedSettingsHost) private var protectedSettingsHost
 
     let configuration: Configuration
@@ -119,6 +120,7 @@ struct EncryptView: View {
             keyManagement: keyManagement,
             contactService: contactService,
             config: config,
+            authLifecycleTraceStore: authLifecycleTraceStore,
             protectedSettingsHost: protectedSettingsHost,
             configuration: configuration
         )
@@ -135,6 +137,7 @@ private struct EncryptScreenHostView: View {
         keyManagement: KeyManagementService,
         contactService: ContactService,
         config: AppConfiguration,
+        authLifecycleTraceStore: AuthLifecycleTraceStore?,
         protectedSettingsHost: ProtectedSettingsHost?,
         configuration: EncryptView.Configuration
     ) {
@@ -145,6 +148,7 @@ private struct EncryptScreenHostView: View {
                 keyManagement: keyManagement,
                 contactService: contactService,
                 config: config,
+                authLifecycleTraceStore: authLifecycleTraceStore,
                 protectedSettingsHost: protectedSettingsHost,
                 configuration: configuration
             )

@@ -547,6 +547,7 @@ final class CommonHelpersTests: XCTestCase {
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
         let container = AppContainer(
+            authLifecycleTraceStore: nil,
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: mockSE,
             keychain: mockKC,

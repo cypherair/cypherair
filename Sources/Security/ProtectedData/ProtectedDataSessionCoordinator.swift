@@ -7,6 +7,7 @@ final class ProtectedDataSessionCoordinator {
     private let domainKeyManager: ProtectedDomainKeyManager
     private let sharedRightIdentifier: String
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
+    private let traceStore: AuthLifecycleTraceStore?
 
     private var sharedRight: (any ProtectedDataPersistedRightHandle)?
     private var wrappingRootKey: Data?
@@ -18,12 +19,14 @@ final class ProtectedDataSessionCoordinator {
         rightStoreClient: any ProtectedDataRightStoreClientProtocol,
         domainKeyManager: ProtectedDomainKeyManager,
         sharedRightIdentifier: String,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator()
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
+        traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.rightStoreClient = rightStoreClient
         self.domainKeyManager = domainKeyManager
         self.sharedRightIdentifier = sharedRightIdentifier
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
+        self.traceStore = traceStore
     }
 
     func persistSharedRight(secretData: Data) async throws {
@@ -49,11 +52,29 @@ final class ProtectedDataSessionCoordinator {
         registry: ProtectedDataRegistry,
         localizedReason: String
     ) async -> ProtectedDataAuthorizationResult {
+        traceStore?.record(
+            category: .operation,
+            name: "protectedSettings.authorization.start",
+            metadata: [
+                "frameworkState": String(describing: frameworkState),
+                "sharedResourceState": registry.sharedResourceLifecycleState.rawValue
+            ]
+        )
         if frameworkState == .restartRequired {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedSettings.authorization.finish",
+                metadata: ["result": "frameworkRecoveryNeeded", "reason": "restartRequired"]
+            )
             return .frameworkRecoveryNeeded
         }
 
         guard registry.sharedResourceLifecycleState == .ready else {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedSettings.authorization.finish",
+                metadata: ["result": "frameworkRecoveryNeeded", "reason": "sharedResourceNotReady"]
+            )
             return .frameworkRecoveryNeeded
         }
 
@@ -63,11 +84,21 @@ final class ProtectedDataSessionCoordinator {
             }
         } catch {
             frameworkState = .frameworkRecoveryNeeded
+            traceStore?.record(
+                category: .operation,
+                name: "protectedSettings.authorization.finish",
+                metadata: ["result": "frameworkRecoveryNeeded", "reason": "rightLookupFailed"]
+            )
             return .frameworkRecoveryNeeded
         }
 
         guard let sharedRight else {
             frameworkState = .frameworkRecoveryNeeded
+            traceStore?.record(
+                category: .operation,
+                name: "protectedSettings.authorization.finish",
+                metadata: ["result": "frameworkRecoveryNeeded", "reason": "missingSharedRight"]
+            )
             return .frameworkRecoveryNeeded
         }
 
@@ -76,6 +107,11 @@ final class ProtectedDataSessionCoordinator {
                 try await sharedRight.authorize(localizedReason: localizedReason)
             }
         } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedSettings.authorization.finish",
+                metadata: ["result": "cancelledOrDenied", "reason": "authorizeThrew"]
+            )
             return .cancelledOrDenied
         }
         do {
@@ -87,6 +123,11 @@ final class ProtectedDataSessionCoordinator {
             }
             wrappingRootKey = derivedWrappingRootKey
             frameworkState = .sessionAuthorized
+            traceStore?.record(
+                category: .operation,
+                name: "protectedSettings.authorization.finish",
+                metadata: ["result": "authorized"]
+            )
             return .authorized
         } catch {
             await sharedRight.deauthorize()
@@ -95,6 +136,11 @@ final class ProtectedDataSessionCoordinator {
                 wrappingRootKey = nil
             }
             frameworkState = .frameworkRecoveryNeeded
+            traceStore?.record(
+                category: .operation,
+                name: "protectedSettings.authorization.finish",
+                metadata: ["result": "frameworkRecoveryNeeded", "reason": "secretReadFailed"]
+            )
             return .frameworkRecoveryNeeded
         }
     }

@@ -36,10 +36,13 @@ struct CypherAirApp: App {
         if launchConfiguration.isUITestMode {
             container = AppContainer.makeUITest(
                 requiresManualAuthentication: launchConfiguration.requiresManualAuthentication,
-                preloadContact: launchConfiguration.preloadsUITestContact
+                preloadContact: launchConfiguration.preloadsUITestContact,
+                authTraceEnabled: launchConfiguration.isAuthTraceEnabled
             )
         } else {
-            container = AppContainer.makeDefault()
+            container = AppContainer.makeDefault(
+                authTraceEnabled: launchConfiguration.isAuthTraceEnabled
+            )
         }
         if launchConfiguration.isUITestMode && !launchConfiguration.requiresManualAuthentication {
             container.config.requireAuthOnLaunch = false
@@ -220,6 +223,7 @@ struct CypherAirApp: App {
             .environment(container.authManager)
             .environment(container.keyManagement)
             .environment(container.selfTestService)
+            .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
             .environment(tutorialStore)
         }
         #endif
@@ -269,6 +273,7 @@ struct CypherAirApp: App {
                 .environment(container.selfTestService)
                 .environment(container.authManager)
                 .environment(container.appSessionOrchestrator)
+                .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
                 .environment(\.protectedSettingsHost, protectedSettingsHost)
                 .environment(tutorialStore)
                 #if os(iOS) || os(visionOS)
@@ -519,6 +524,7 @@ struct AppLaunchConfiguration {
     let requiresManualAuthentication: Bool
     let opensAuthModeConfirmation: Bool
     let preloadsUITestContact: Bool
+    let isAuthTraceEnabled: Bool
 
     init(processInfo: ProcessInfo = .processInfo) {
         let environment = processInfo.environment
@@ -527,6 +533,7 @@ struct AppLaunchConfiguration {
         self.requiresManualAuthentication = environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
         self.opensAuthModeConfirmation = environment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] == "1"
         self.preloadsUITestContact = environment["UITEST_PRELOAD_CONTACT"] == "1"
+        self.isAuthTraceEnabled = environment["CYPHERAIR_DEBUG_AUTH_TRACE"] == "1"
         self.shouldSkipOnboarding = environment["UITEST_SKIP_ONBOARDING"] == "1" || root != .main
         self.tutorialModule = environment["UITEST_TUTORIAL_TASK"].flatMap { value in
             switch value {

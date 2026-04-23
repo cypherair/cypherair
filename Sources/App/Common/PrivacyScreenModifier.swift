@@ -12,6 +12,7 @@ import AppKit
 /// - Uses `.ultraThinMaterial` (NOT Liquid Glass — privacy screen is a security overlay, not a UI element).
 struct PrivacyScreenModifier: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @State private var lifecycleGate = PrivacyScreenLifecycleGate()
 
@@ -44,6 +45,11 @@ struct PrivacyScreenModifier: ViewModifier {
             .animation(.easeInOut(duration: 0.15), value: appSessionOrchestrator.isPrivacyScreenBlurred)
             #if canImport(UIKit)
             .onChange(of: scenePhase) { _, newPhase in
+                authLifecycleTraceStore?.record(
+                    category: .lifecycle,
+                    name: "scenePhase.observed",
+                    metadata: ["phase": scenePhaseName(newPhase)]
+                )
                 switch newPhase {
                 case .inactive:
                     guard lifecycleGate.shouldHandleInactive(
@@ -92,6 +98,7 @@ struct PrivacyScreenModifier: ViewModifier {
             }
             #endif
             .onAppear {
+                lifecycleGate.attachTraceStore(authLifecycleTraceStore)
                 performInitialAppearanceAction()
             }
     }
@@ -102,6 +109,19 @@ struct PrivacyScreenModifier: ViewModifier {
         #else
         "faceid"
         #endif
+    }
+
+    private func scenePhaseName(_ phase: ScenePhase) -> String {
+        switch phase {
+        case .active:
+            "active"
+        case .inactive:
+            "inactive"
+        case .background:
+            "background"
+        @unknown default:
+            "unknown"
+        }
     }
 
     private func performInitialAppearanceAction() {

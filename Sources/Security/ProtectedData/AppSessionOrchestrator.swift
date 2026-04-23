@@ -9,6 +9,7 @@ final class AppSessionOrchestrator {
     private let requireAuthOnLaunchProvider: () -> Bool
     private let evaluateAppAuthentication: (String) async throws -> Bool
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
+    private let traceStore: AuthLifecycleTraceStore?
 
     private var hasAppearedOnce = false
 
@@ -25,7 +26,8 @@ final class AppSessionOrchestrator {
         requireAuthOnLaunchProvider: @escaping () -> Bool,
         evaluateAppAuthentication: @escaping (String) async throws -> Bool,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator()
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
+        traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.currentRegistryProvider = currentRegistryProvider
         self.shouldBypassPrivacyAuthentication = shouldBypassPrivacyAuthentication
@@ -34,14 +36,21 @@ final class AppSessionOrchestrator {
         self.evaluateAppAuthentication = evaluateAppAuthentication
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
+        self.traceStore = traceStore
     }
 
     func recordAuthentication() {
         lastAuthenticationDate = Date()
+        traceStore?.record(category: .session, name: "session.recordAuthentication")
     }
 
     func requestContentClear() {
         contentClearGeneration += 1
+        traceStore?.record(
+            category: .session,
+            name: "session.requestContentClear",
+            metadata: ["generation": String(contentClearGeneration)]
+        )
     }
 
     var isOperationAuthenticationPromptInProgress: Bool {
@@ -57,7 +66,13 @@ final class AppSessionOrchestrator {
 
     @discardableResult
     func handleInitialAppearance(localizedReason: String) async -> Bool {
+        traceStore?.record(category: .session, name: "session.handleInitialAppearance.enter")
         guard !hasAppearedOnce else {
+            traceStore?.record(
+                category: .session,
+                name: "session.handleInitialAppearance.exit",
+                metadata: ["reason": "alreadyAppeared"]
+            )
             return false
         }
         hasAppearedOnce = true
@@ -65,47 +80,109 @@ final class AppSessionOrchestrator {
         if shouldBypassPrivacyAuthentication() {
             authFailed = false
             isPrivacyScreenBlurred = false
+            traceStore?.record(
+                category: .session,
+                name: "session.handleInitialAppearance.exit",
+                metadata: ["reason": "bypass"]
+            )
             return false
         }
 
         guard requireAuthOnLaunchProvider() else {
+            traceStore?.record(
+                category: .session,
+                name: "session.handleInitialAppearance.exit",
+                metadata: ["reason": "launchAuthDisabled"]
+            )
             return false
         }
 
         isPrivacyScreenBlurred = true
+        traceStore?.record(
+            category: .session,
+            name: "session.handleInitialAppearance.exit",
+            metadata: ["reason": "delegatedToResume"]
+        )
         return await handleResume(localizedReason: localizedReason)
     }
 
     func handleSceneDidResignActive() {
         guard !isOperationAuthenticationPromptInProgress else {
+            traceStore?.record(
+                category: .session,
+                name: "session.handleSceneDidResignActive",
+                metadata: ["result": "ignoredForOperationPrompt"]
+            )
             return
         }
         isPrivacyScreenBlurred = true
         authFailed = false
+        traceStore?.record(
+            category: .session,
+            name: "session.handleSceneDidResignActive",
+            metadata: ["result": "handled"]
+        )
     }
 
     func handleSceneDidEnterBackground() {
         isPrivacyScreenBlurred = true
         authFailed = false
+        traceStore?.record(
+            category: .session,
+            name: "session.handleSceneDidEnterBackground",
+            metadata: ["result": "handled"]
+        )
     }
 
     @discardableResult
     func handleResume(localizedReason: String) async -> Bool {
+        traceStore?.record(
+            category: .session,
+            name: "session.handleResume.enter",
+            metadata: [
+                "operationPrompt": isOperationAuthenticationPromptInProgress ? "true" : "false",
+                "isAuthenticating": isAuthenticating ? "true" : "false",
+                "hasLastAuthenticationDate": lastAuthenticationDate == nil ? "false" : "true"
+            ]
+        )
         if shouldBypassPrivacyAuthentication() {
             authFailed = false
             isPrivacyScreenBlurred = false
+            traceStore?.record(
+                category: .session,
+                name: "session.handleResume.exit",
+                metadata: ["reason": "bypass", "attemptedAuthentication": "false"]
+            )
             return false
         }
 
         guard !isOperationAuthenticationPromptInProgress else {
+            traceStore?.record(
+                category: .session,
+                name: "session.handleResume.exit",
+                metadata: ["reason": "operationPromptInProgress", "attemptedAuthentication": "false"]
+            )
             return false
         }
 
         guard !isAuthenticating else {
+            traceStore?.record(
+                category: .session,
+                name: "session.handleResume.exit",
+                metadata: ["reason": "alreadyAuthenticating", "attemptedAuthentication": "false"]
+            )
             return false
         }
 
         if gracePeriodProvider() == 0 || isGracePeriodExpired {
+            traceStore?.record(
+                category: .session,
+                name: "session.handleResume.reauthRequired",
+                metadata: [
+                    "gracePeriod": String(gracePeriodProvider()),
+                    "graceExpired": isGracePeriodExpired ? "true" : "false"
+                ]
+            )
             requestContentClear()
             await protectedDataSessionCoordinator.relockCurrentSession()
 
@@ -120,23 +197,48 @@ final class AppSessionOrchestrator {
                     recordAuthentication()
                     authFailed = false
                     isPrivacyScreenBlurred = false
+                    traceStore?.record(
+                        category: .session,
+                        name: "session.handleResume.exit",
+                        metadata: ["reason": "authenticated", "attemptedAuthentication": "true"]
+                    )
                 } else {
                     authFailed = true
+                    traceStore?.record(
+                        category: .session,
+                        name: "session.handleResume.exit",
+                        metadata: ["reason": "authenticationReturnedFalse", "attemptedAuthentication": "true"]
+                    )
                 }
             } catch {
                 authFailed = true
+                traceStore?.record(
+                    category: .session,
+                    name: "session.handleResume.exit",
+                    metadata: [
+                        "reason": "authenticationThrew",
+                        "attemptedAuthentication": "true",
+                        "errorType": String(describing: type(of: error))
+                    ]
+                )
             }
             return true
         } else {
             authFailed = false
             isPrivacyScreenBlurred = false
+            traceStore?.record(
+                category: .session,
+                name: "session.handleResume.exit",
+                metadata: ["reason": "graceValid", "attemptedAuthentication": "false"]
+            )
             return false
         }
     }
 
     @discardableResult
     func retryPrivacyUnlock(localizedReason: String) async -> Bool {
-        await handleResume(localizedReason: localizedReason)
+        traceStore?.record(category: .session, name: "session.retryPrivacyUnlock")
+        return await handleResume(localizedReason: localizedReason)
     }
 
     func evaluateProtectedDataAccessGate(
