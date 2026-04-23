@@ -28,6 +28,25 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+      - name: Select Xcode 26.4.1
+        run: |
+          set -euo pipefail
+
+          if [ -n "${XCODE_26_DEVELOPER_DIR:-}" ] && [ -d "${XCODE_26_DEVELOPER_DIR}" ]; then
+            SELECTED_DEVELOPER_DIR="${XCODE_26_DEVELOPER_DIR}"
+          elif [ -d "/Applications/Xcode_26.4.1.app/Contents/Developer" ]; then
+            SELECTED_DEVELOPER_DIR="/Applications/Xcode_26.4.1.app/Contents/Developer"
+          else
+            echo "::error::Xcode 26.4.1 was not found on this runner."
+            exit 1
+          fi
+
+          echo "DEVELOPER_DIR=${SELECTED_DEVELOPER_DIR}" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="${SELECTED_DEVELOPER_DIR}"
+
+          echo "Using DEVELOPER_DIR=${DEVELOPER_DIR}"
+          xcode-select -p
+          xcodebuild -version
       - name: Install Rust stable toolchain
         run: |
           rustup set profile minimal
