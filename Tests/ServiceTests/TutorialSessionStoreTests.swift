@@ -643,7 +643,6 @@ final class TutorialSessionStoreTests: XCTestCase {
     }
 
     func test_toolViews_removeModeAllowlistAndAppearResetPatterns() throws {
-        let rootURL = repositoryRootURL()
         let files = [
             "Sources/App/Encrypt/EncryptView.swift",
             "Sources/App/Decrypt/DecryptView.swift",
@@ -652,22 +651,15 @@ final class TutorialSessionStoreTests: XCTestCase {
         ]
 
         for path in files {
-            let contents = try String(contentsOf: rootURL.appending(path: path), encoding: .utf8)
+            let contents = try loadRepositoryAuditSource(path)
             XCTAssertFalse(contents.contains("allowedModes"), "\(path) should not use mode allowlists")
             XCTAssertFalse(contents.contains("= configuration.allowedModes.first"), "\(path) should not reset mode on appear")
         }
     }
 
     func test_signView_establishesScreenModelHostBaseline() throws {
-        let rootURL = repositoryRootURL()
-        let signViewContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Sign/SignView.swift"),
-            encoding: .utf8
-        )
-        let signScreenModelContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Sign/SignScreenModel.swift"),
-            encoding: .utf8
-        )
+        let signViewContents = try loadRepositoryAuditSource("Sources/App/Sign/SignView.swift")
+        let signScreenModelContents = try loadRepositoryAuditSource("Sources/App/Sign/SignScreenModel.swift")
 
         XCTAssertFalse(
             signViewContents.contains("@State private var operation = OperationController()"),
@@ -692,15 +684,8 @@ final class TutorialSessionStoreTests: XCTestCase {
     }
 
     func test_verifyView_establishesScreenModelHostBaseline() throws {
-        let rootURL = repositoryRootURL()
-        let verifyViewContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Sign/VerifyView.swift"),
-            encoding: .utf8
-        )
-        let verifyScreenModelContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Sign/VerifyScreenModel.swift"),
-            encoding: .utf8
-        )
+        let verifyViewContents = try loadRepositoryAuditSource("Sources/App/Sign/VerifyView.swift")
+        let verifyScreenModelContents = try loadRepositoryAuditSource("Sources/App/Sign/VerifyScreenModel.swift")
 
         XCTAssertFalse(
             verifyViewContents.contains("@State private var operation = OperationController()"),
@@ -721,15 +706,8 @@ final class TutorialSessionStoreTests: XCTestCase {
     }
 
     func test_addContactView_establishesScreenModelHostBaselineAndRuntimeSyncHook() throws {
-        let rootURL = repositoryRootURL()
-        let addContactViewContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Contacts/AddContactView.swift"),
-            encoding: .utf8
-        )
-        let addContactScreenModelContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Contacts/AddContactScreenModel.swift"),
-            encoding: .utf8
-        )
+        let addContactViewContents = try loadRepositoryAuditSource("Sources/App/Contacts/AddContactView.swift")
+        let addContactScreenModelContents = try loadRepositoryAuditSource("Sources/App/Contacts/AddContactScreenModel.swift")
 
         XCTAssertFalse(
             addContactViewContents.contains("@State private var error: CypherAirError?"),
@@ -774,23 +752,10 @@ final class TutorialSessionStoreTests: XCTestCase {
     }
 
     func test_encryptAndDecryptViews_keepRuntimeConfigurationSyncHook() throws {
-        let rootURL = repositoryRootURL()
-        let encryptViewContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Encrypt/EncryptView.swift"),
-            encoding: .utf8
-        )
-        let encryptScreenModelContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Encrypt/EncryptScreenModel.swift"),
-            encoding: .utf8
-        )
-        let decryptViewContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Decrypt/DecryptView.swift"),
-            encoding: .utf8
-        )
-        let decryptScreenModelContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Decrypt/DecryptScreenModel.swift"),
-            encoding: .utf8
-        )
+        let encryptViewContents = try loadRepositoryAuditSource("Sources/App/Encrypt/EncryptView.swift")
+        let encryptScreenModelContents = try loadRepositoryAuditSource("Sources/App/Encrypt/EncryptScreenModel.swift")
+        let decryptViewContents = try loadRepositoryAuditSource("Sources/App/Decrypt/DecryptView.swift")
+        let decryptScreenModelContents = try loadRepositoryAuditSource("Sources/App/Decrypt/DecryptScreenModel.swift")
 
         XCTAssertFalse(
             encryptViewContents.contains("@State private var operation = OperationController()"),
@@ -872,7 +837,6 @@ final class TutorialSessionStoreTests: XCTestCase {
     }
 
     func test_outputPages_removeTutorialOutputCouplingFromPageImplementations() throws {
-        let rootURL = repositoryRootURL()
         let files = [
             "Sources/App/Encrypt/EncryptView.swift",
             "Sources/App/Sign/SignView.swift",
@@ -882,14 +846,11 @@ final class TutorialSessionStoreTests: XCTestCase {
         ]
 
         for path in files {
-            let contents = try String(contentsOf: rootURL.appending(path: path), encoding: .utf8)
+            let contents = try loadRepositoryAuditSource(path)
             XCTAssertFalse(contents.contains("tutorialSideEffectInterceptor"), "\(path) should not reference tutorial-specific output interception")
         }
 
-        let backupContents = try String(
-            contentsOf: rootURL.appending(path: "Sources/App/Keys/BackupKeyView.swift"),
-            encoding: .utf8
-        )
+        let backupContents = try loadRepositoryAuditSource("Sources/App/Keys/BackupKeyView.swift")
         XCTAssertFalse(backupContents.contains("tutorialArtifact"), "BackupKeyView should not expose tutorial-specific result presentation")
     }
 
@@ -936,11 +897,8 @@ final class TutorialSessionStoreTests: XCTestCase {
         await Task.yield()
     }
 
-    private func repositoryRootURL() -> URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+    private func loadRepositoryAuditSource(_ relativePath: String) throws -> String {
+        try RepositoryAuditLoader.loadString(relativePath: relativePath)
     }
 
 }

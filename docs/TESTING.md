@@ -83,6 +83,8 @@ The workspace currently includes three Xcode Test Plans:
 
 **CypherAir-UnitTests.xctestplan** — Layers 2–3 (Swift unit tests + FFI integration tests). Runs in macOS local validation, simulator, and CI. Excludes device-only tests. Layer 1 (Rust unit tests) runs independently via `cargo test` as a separate CI step. This is the default test plan bound to the `CypherAir` scheme.
 
+Build-input audit tests such as `LocalizationCatalogTests` and the source-audit assertions in `TutorialSessionStoreTests` read a build-time `RepositoryAudit` snapshot bundled into `CypherAirTests.xctest`. This keeps the same static-audit semantics across macOS, iOS Simulator, and physical-device `CypherAir-UnitTests` runs.
+
 **CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data right-store validation.
 
 ProtectedData device-test isolation rules:

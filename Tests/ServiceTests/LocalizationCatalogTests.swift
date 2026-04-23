@@ -4,7 +4,7 @@ import XCTest
 final class LocalizationCatalogTests: XCTestCase {
     func test_allLocalizedKeysExistInCatalogAndAreFullyTranslated() throws {
         let catalog = try loadCatalog(at: "Sources/Resources/Localizable.xcstrings")
-        let sourceURL = repositoryRootURL().appending(path: "Sources", directoryHint: .isDirectory)
+        let sourceURL = try RepositoryAuditLoader.sourcesRootURL()
         let keys = try localizedKeys(in: sourceURL)
 
         XCTAssertFalse(keys.isEmpty)
@@ -17,7 +17,7 @@ final class LocalizationCatalogTests: XCTestCase {
     }
 
     func test_localizedKeysIncludeLocalizedStringKeyArguments() throws {
-        let sourceURL = repositoryRootURL().appending(path: "Sources", directoryHint: .isDirectory)
+        let sourceURL = try RepositoryAuditLoader.sourcesRootURL()
         let keys = try localizedKeys(in: sourceURL)
 
         XCTAssertTrue(keys.contains("decrypt.signature"))
@@ -74,16 +74,8 @@ final class LocalizationCatalogTests: XCTestCase {
         }
     }
 
-    private func repositoryRootURL() -> URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-    }
-
     private func loadCatalog(at relativePath: String) throws -> StringCatalog {
-        let catalogURL = repositoryRootURL().appending(path: relativePath)
-        let catalogData = try Data(contentsOf: catalogURL)
+        let catalogData = try RepositoryAuditLoader.loadData(relativePath: relativePath)
         return try JSONDecoder().decode(StringCatalog.self, from: catalogData)
     }
 
