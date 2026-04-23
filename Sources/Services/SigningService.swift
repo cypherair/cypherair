@@ -30,7 +30,7 @@ final class SigningService {
     func signCleartext(_ text: String, signerFingerprint: String) async throws -> Data {
         var secretKey: Data
         do {
-            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
+            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
         } catch {
             throw CypherAirError.from(error) { _ in .authenticationFailed }
         }
@@ -57,7 +57,7 @@ final class SigningService {
     func signDetached(_ data: Data, signerFingerprint: String) async throws -> Data {
         var secretKey: Data
         do {
-            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
+            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
         } catch {
             throw CypherAirError.from(error) { _ in .authenticationFailed }
         }
@@ -91,7 +91,7 @@ final class SigningService {
     ) async throws -> Data {
         var secretKey: Data
         do {
-            secretKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
+            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
         } catch {
             throw CypherAirError.from(error) { _ in .authenticationFailed }
         }

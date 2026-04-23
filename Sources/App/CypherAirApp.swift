@@ -224,7 +224,9 @@ struct CypherAirApp: App {
             .environment(container.keyManagement)
             .environment(container.selfTestService)
             .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
+            .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
             .environment(tutorialStore)
+            .authenticationShieldHost(container.authenticationShieldCoordinator)
         }
         #endif
     }
@@ -363,6 +365,8 @@ struct CypherAirApp: App {
                 Text(loadError)
             }
         }
+        .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
+        .authenticationShieldHost(container.authenticationShieldCoordinator)
         .onOpenURL { url in
             incomingURLImportCoordinator.handleIncomingURL(
                 url,

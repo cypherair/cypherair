@@ -92,6 +92,7 @@ struct ModifyExpirySheetView: View {
         } message: { err in
             Text(err.localizedDescription)
         }
+        .authenticationShieldHost()
     }
 
     private func performModifyExpiry(seconds: UInt64?) {

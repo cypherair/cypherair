@@ -84,7 +84,7 @@ final class CertificateSignatureService {
 
         var signerSecretCert: Data
         do {
-            signerSecretCert = try keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
+            signerSecretCert = try await keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
         } catch {
             throw CypherAirError.from(error) { _ in .authenticationFailed }
         }

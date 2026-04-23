@@ -457,6 +457,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let selfTestService = SelfTestService(engine: engine)
         let container = AppAppContainer(
             authLifecycleTraceStore: nil,
+            authenticationShieldCoordinator: CypherAir.AuthenticationShieldCoordinator(),
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: secureEnclave,
             keychain: keychain,

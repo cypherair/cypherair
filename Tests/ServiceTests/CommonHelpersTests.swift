@@ -575,6 +575,7 @@ final class CommonHelpersTests: XCTestCase {
         let selfTestService = SelfTestService(engine: engine)
         let container = AppContainer(
             authLifecycleTraceStore: nil,
+            authenticationShieldCoordinator: CypherAir.AuthenticationShieldCoordinator(),
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: mockSE,
             keychain: mockKC,

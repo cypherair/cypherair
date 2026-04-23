@@ -118,7 +118,7 @@ final class PasswordMessageService {
         var signingKey: Data?
         if let signerFp = signWithFingerprint {
             do {
-                signingKey = try keyManagement.unwrapPrivateKey(fingerprint: signerFp)
+                signingKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFp)
             } catch {
                 throw CypherAirError.from(error) { _ in .authenticationFailed }
             }

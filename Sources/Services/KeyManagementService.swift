@@ -333,8 +333,8 @@ final class KeyManagementService {
     /// Triggers device authentication (Face ID / Touch ID) and returns the unwrapped
     /// secret certificate material for the selected key.
     /// The caller MUST zeroize the returned data after use.
-    func unwrapPrivateKey(fingerprint: String) throws -> Data {
-        try privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
+    func unwrapPrivateKey(fingerprint: String) async throws -> Data {
+        try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
     }
 
     @concurrent

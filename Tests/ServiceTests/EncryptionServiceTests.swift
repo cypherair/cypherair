@@ -127,7 +127,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         // Verify by decrypting directly via engine
         let binary = try stack.engine.dearmor(armored: ciphertext)
-        var secretKey = try stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
 
         let result = try stack.engine.decrypt(
@@ -153,7 +153,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         // Sender should be able to decrypt (encrypted to self)
         let binary = try stack.engine.dearmor(armored: ciphertext)
-        var senderSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
+        var senderSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
         defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
 
         let result = try stack.engine.decrypt(
@@ -178,7 +178,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         // Sender should NOT be able to decrypt — not encrypted to self
         let binary = try stack.engine.dearmor(armored: ciphertext)
-        var senderSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
+        var senderSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
         defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
 
         XCTAssertThrowsError(
@@ -213,7 +213,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         // Sender should be able to decrypt (encrypted to self)
         let binary = try stack.engine.dearmor(armored: ciphertext)
-        var senderSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
+        var senderSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
         defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
 
         let result = try stack.engine.decrypt(
@@ -238,7 +238,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         // Sender should NOT be able to decrypt — not encrypted to self
         let binary = try stack.engine.dearmor(armored: ciphertext)
-        var senderSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
+        var senderSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
         defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
 
         XCTAssertThrowsError(
@@ -345,7 +345,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         // Recipient (Profile A, v4) should be able to decrypt
         let binary = try stack.engine.dearmor(armored: ciphertext)
-        var recipientSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: recipient.fingerprint)
+        var recipientSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: recipient.fingerprint)
         defer { recipientSecret.resetBytes(in: 0..<recipientSecret.count) }
 
         let result = try stack.engine.decrypt(
@@ -373,7 +373,7 @@ final class EncryptionServiceTests: XCTestCase {
         let binary = try stack.engine.dearmor(armored: ciphertext)
 
         // v4 recipient can decrypt
-        var secretV4 = try stack.keyManagement.unwrapPrivateKey(fingerprint: keyV4.fingerprint)
+        var secretV4 = try await stack.keyManagement.unwrapPrivateKey(fingerprint: keyV4.fingerprint)
         defer { secretV4.resetBytes(in: 0..<secretV4.count) }
 
         let resultV4 = try stack.engine.decrypt(
@@ -384,7 +384,7 @@ final class EncryptionServiceTests: XCTestCase {
         XCTAssertEqual(String(data: resultV4.plaintext, encoding: .utf8), "Mixed recipients message")
 
         // v6 recipient can also decrypt
-        var secretV6 = try stack.keyManagement.unwrapPrivateKey(fingerprint: keyV6.fingerprint)
+        var secretV6 = try await stack.keyManagement.unwrapPrivateKey(fingerprint: keyV6.fingerprint)
         defer { secretV6.resetBytes(in: 0..<secretV6.count) }
 
         let resultV6 = try stack.engine.decrypt(
@@ -444,7 +444,7 @@ final class EncryptionServiceTests: XCTestCase {
         let binary = try stack.engine.dearmor(armored: ciphertext)
 
         // The specific (non-default) key should be able to decrypt
-        var specificSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: specificKey.fingerprint)
+        var specificSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: specificKey.fingerprint)
         defer { specificSecret.resetBytes(in: 0..<specificSecret.count) }
 
         let result = try stack.engine.decrypt(
@@ -455,7 +455,7 @@ final class EncryptionServiceTests: XCTestCase {
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "Specific key self-encrypt")
 
         // The default key should NOT be able to decrypt
-        var defaultSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)
+        var defaultSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)
         defer { defaultSecret.resetBytes(in: 0..<defaultSecret.count) }
 
         XCTAssertThrowsError(
@@ -494,7 +494,7 @@ final class EncryptionServiceTests: XCTestCase {
         let binary = try stack.engine.dearmor(armored: ciphertext)
 
         // Default key should be able to decrypt
-        var defaultSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)
+        var defaultSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)
         defer { defaultSecret.resetBytes(in: 0..<defaultSecret.count) }
 
         let result = try stack.engine.decrypt(
@@ -521,7 +521,7 @@ final class EncryptionServiceTests: XCTestCase {
         let binary = try stack.engine.dearmor(armored: ciphertext)
 
         // Specific key can decrypt
-        var specificSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: specificKey.fingerprint)
+        var specificSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: specificKey.fingerprint)
         defer { specificSecret.resetBytes(in: 0..<specificSecret.count) }
 
         let result = try stack.engine.decrypt(
@@ -532,7 +532,7 @@ final class EncryptionServiceTests: XCTestCase {
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "Profile B specific key")
 
         // Default key cannot decrypt
-        var defaultSecret = try stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)
+        var defaultSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)
         defer { defaultSecret.resetBytes(in: 0..<defaultSecret.count) }
 
         XCTAssertThrowsError(
@@ -618,7 +618,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         // Test that keyA can decrypt
         let binary = try stack.engine.dearmor(armored: ciphertext)
-        var secretA = try stack.keyManagement.unwrapPrivateKey(fingerprint: keyA.fingerprint)
+        var secretA = try await stack.keyManagement.unwrapPrivateKey(fingerprint: keyA.fingerprint)
         defer { secretA.resetBytes(in: 0..<secretA.count) }
 
         let resultA = try stack.engine.decrypt(
