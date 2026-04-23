@@ -18,18 +18,6 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         self.traceStore = traceStore
     }
 
-    var isPromptInProgress: Bool {
-        lock.withLock {
-            privacyPromptDepth > 0 || operationPromptDepth > 0
-        }
-    }
-
-    var isPrivacyPromptInProgress: Bool {
-        lock.withLock {
-            privacyPromptDepth > 0
-        }
-    }
-
     var isOperationPromptInProgress: Bool {
         lock.withLock {
             operationPromptDepth > 0
@@ -83,23 +71,6 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         beginOperationPrompt()
         defer { endOperationPrompt() }
         return try await operation()
-    }
-
-    // Legacy operation-scoped aliases kept to minimize churn in tests and helper code.
-    func beginPrompt() {
-        beginOperationPrompt()
-    }
-
-    func endPrompt() {
-        endOperationPrompt()
-    }
-
-    func withPrompt<T>(_ operation: () throws -> T) rethrows -> T {
-        try withOperationPrompt(operation)
-    }
-
-    func withPrompt<T>(_ operation: () async throws -> T) async rethrows -> T {
-        try await withOperationPrompt(operation)
     }
 
     private func adjustPromptDepth(for kind: PromptKind, delta: Int) {
