@@ -71,3 +71,52 @@ In other words:
   Draft upstream-facing issue text for Rust/toolchain reporting. Packages the
   current minimal reproduction, environment, and sampled nightly results in a
   format that can be adapted into a GitHub issue.
+
+## Local Recovery
+
+If the locally linked `stage1-arm64e-patch` toolchain or the packaged
+`PgpMobile.xcframework` is missing or broken, use this recovery flow.
+
+1. Restore the local Rust stage1 toolchain from
+   `/Users/tianren/coding/rust` on branch
+   `codex/arm64e-darwin-ptrauth-spike`.
+2. Create a local `bootstrap.toml` in the Rust fork if one is missing.
+   Keep `build = "aarch64-apple-darwin"` and
+   `host = ["aarch64-apple-darwin"]`, but include
+   `target = ["aarch64-apple-darwin", "arm64e-apple-darwin"]`.
+   Set `profile = "compiler"`, `llvm.download-ci-llvm = true`, and
+   `rust.download-rustc = false`.
+   This file is local bootstrap state and is typically ignored, not committed.
+3. Rebuild the Rust stage1 sysroot:
+
+   ```bash
+   cd /Users/tianren/coding/rust
+   python3 x.py build library -j$(sysctl -n hw.ncpu)
+   rustup toolchain link stage1-arm64e-patch \
+       /Users/tianren/coding/rust/build/aarch64-apple-darwin/stage1
+   rustc +stage1-arm64e-patch -vV
+   ```
+
+4. Recreate the app-side Apple arm64e artifacts:
+
+   ```bash
+   cd /Users/tianren/coding/cypherair-apple-arm64e-unified-experiment
+   CARGO_NET_GIT_FETCH_WITH_CLI=true \
+       scripts/experiments/build_apple_arm64e_xcframework.sh --release
+   ```
+
+5. The script now skips the negative stable baseline repro by default.
+   Re-enable it only when you explicitly want that proof:
+
+   ```bash
+   RUN_STABLE_BASELINES=1 \
+   CARGO_NET_GIT_FETCH_WITH_CLI=true \
+       scripts/experiments/build_apple_arm64e_xcframework.sh --release
+   ```
+
+6. After the XCFramework is recreated, run the macOS unit suite:
+
+   ```bash
+   xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
+       -destination 'platform=macOS'
+   ```

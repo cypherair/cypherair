@@ -380,26 +380,30 @@ require_toolchain "$ARM64E_TOOLCHAIN"
 ensure_component "$NIGHTLY_TOOLCHAIN" "rust-src"
 
 mkdir -p "$EXPERIMENT_ROOT"
-baseline_root="$(mktemp -d "$EXPERIMENT_ROOT/baseline.XXXXXX")"
+if [ "${RUN_STABLE_BASELINES:-0}" = "1" ]; then
+    baseline_root="$(mktemp -d "$EXPERIMENT_ROOT/baseline.XXXXXX")"
 
-log_step "baseline" "Reproducing the known stable arm64e failure baselines..."
-run_expected_failure \
-    "stable cargo arm64e iOS baseline" \
-    "can't find crate for \`core\`" \
-    "$baseline_root/stable-ios.log" \
-    env \
-        CARGO_HOME="$baseline_root/stable-ios-cargo-home" \
-        CARGO_TARGET_DIR="$baseline_root/stable-ios-target" \
-        cargo build --manifest-path "$MANIFEST" --target arm64e-apple-ios
+    log_step "baseline" "Reproducing the known stable arm64e failure baselines..."
+    run_expected_failure \
+        "stable cargo arm64e iOS baseline" \
+        "can't find crate for \`core\`" \
+        "$baseline_root/stable-ios.log" \
+        env \
+            CARGO_HOME="$baseline_root/stable-ios-cargo-home" \
+            CARGO_TARGET_DIR="$baseline_root/stable-ios-target" \
+            cargo build --manifest-path "$MANIFEST" --target arm64e-apple-ios
 
-run_expected_failure \
-    "stable cargo arm64e Darwin baseline" \
-    "can't find crate for \`core\`" \
-    "$baseline_root/stable-darwin.log" \
-    env \
-        CARGO_HOME="$baseline_root/stable-darwin-cargo-home" \
-        CARGO_TARGET_DIR="$baseline_root/stable-darwin-target" \
-        cargo build --manifest-path "$MANIFEST" --target arm64e-apple-darwin
+    run_expected_failure \
+        "stable cargo arm64e Darwin baseline" \
+        "can't find crate for \`core\`" \
+        "$baseline_root/stable-darwin.log" \
+        env \
+            CARGO_HOME="$baseline_root/stable-darwin-cargo-home" \
+            CARGO_TARGET_DIR="$baseline_root/stable-darwin-target" \
+            cargo build --manifest-path "$MANIFEST" --target arm64e-apple-darwin
+else
+    log_step "baseline" "Skipping stable failure baselines (set RUN_STABLE_BASELINES=1 to enable)."
+fi
 
 seed_experiment_cache
 reset_experiment_build_state
