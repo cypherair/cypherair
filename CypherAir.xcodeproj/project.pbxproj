@@ -317,6 +317,7 @@
 				1242D2BD7FB363D9F6CBAB8A /* Sources */,
 				D10000212F80000100000001 /* Resources */,
 				CE2F97D52F746A9E00232BC9 /* ShellScript */,
+				CE58C0052F96000000000001 /* Snapshot Repository Audit Inputs */,
 			);
 			buildRules = (
 			);
@@ -483,6 +484,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -euo pipefail\n\nOUTPUT_PATH=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SourceComplianceInfo.json\"\nMETADATA_FILE=\"${TARGET_TEMP_DIR}/SourceComplianceOverrides.json\"\nmkdir -p \"$(dirname \"$OUTPUT_PATH\")\"\nCOMMIT_SHA=\"${SOURCE_COMPLIANCE_COMMIT_SHA:-}\"\nREQUIRE_STABLE_RELEASE=\"${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}\"\n\nset -- \\\n    --cargo-lock \"${SRCROOT}/pgp-mobile/Cargo.lock\" \\\n    --marketing-version \"${MARKETING_VERSION}\" \\\n    --build-number \"${CURRENT_PROJECT_VERSION}\" \\\n    --commit-sha \"${COMMIT_SHA}\" \\\n    --repository-url \"https://github.com/cypherair/cypherair\" \\\n    --stable-release-tag \"${SOURCE_COMPLIANCE_STABLE_RELEASE_TAG:-}\" \\\n    --stable-release-url \"${SOURCE_COMPLIANCE_STABLE_RELEASE_URL:-}\" \\\n    --require-stable-release \"${REQUIRE_STABLE_RELEASE}\" \\\n    --output \"$OUTPUT_PATH\"\n\nif [ -f \"$METADATA_FILE\" ]; then\n    set -- \"$@\" --metadata-file \"$METADATA_FILE\"\nfi\n\npython3 \"${SRCROOT}/scripts/generate_source_compliance_info.py\" \"$@\"\n";
+		};
+		CE58C0052F96000000000001 /* Snapshot Repository Audit Inputs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Sources",
+			);
+			name = "Snapshot Repository Audit Inputs";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\n\nSNAPSHOT_SRC=\"${SRCROOT}/Sources\"\nSNAPSHOT_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RepositoryAudit\"\n\nrm -rf \"$SNAPSHOT_DST\"\nmkdir -p \"$SNAPSHOT_DST\"\n\nrsync -a \\\n    --prune-empty-dirs \\\n    --include '*/' \\\n    --include '*.swift' \\\n    --include 'Resources/Localizable.xcstrings' \\\n    --include 'Resources/InfoPlist.xcstrings' \\\n    --exclude '*' \\\n    \"$SNAPSHOT_SRC/\" \"$SNAPSHOT_DST/Sources/\"\n\n[ -f \"$SNAPSHOT_DST/Sources/App/Encrypt/EncryptView.swift\" ]\n[ -f \"$SNAPSHOT_DST/Sources/Resources/Localizable.xcstrings\" ]\n[ -f \"$SNAPSHOT_DST/Sources/Resources/InfoPlist.xcstrings\" ]\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
