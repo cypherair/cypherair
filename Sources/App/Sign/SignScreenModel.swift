@@ -12,6 +12,7 @@ final class SignScreenModel {
 
     private let keyManagement: KeyManagementService
     private let appConfiguration: AppConfiguration
+    private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let cleartextSigningAction: CleartextSigningAction
     private let detachedFileSigningAction: DetachedFileSigningAction
@@ -30,6 +31,7 @@ final class SignScreenModel {
         signingService: SigningService,
         keyManagement: KeyManagementService,
         config: AppConfiguration,
+        authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         protectedSettingsHost: ProtectedSettingsHost? = nil,
         configuration: SignView.Configuration,
         operation: OperationController = OperationController(),
@@ -42,6 +44,7 @@ final class SignScreenModel {
         self.exportController = exportController
         self.keyManagement = keyManagement
         self.appConfiguration = config
+        self.authLifecycleTraceStore = authLifecycleTraceStore
         self.protectedSettingsHost = protectedSettingsHost
         self.cleartextSigningAction = cleartextSigningAction ?? { message, signerFingerprint in
             try await signingService.signCleartext(message, signerFingerprint: signerFingerprint)
@@ -121,11 +124,17 @@ final class SignScreenModel {
 
         let message = text
         signedMessage = nil
+        authLifecycleTraceStore?.record(category: .operation, name: "sign.text.start", metadata: ["mode": "text"])
 
         operation.run(mapError: mapSigningError) { [self] in
             let signed = try await self.cleartextSigningAction(message, signerFingerprint)
             self.signedMessage = String(data: signed, encoding: .utf8)
             self.textInputSectionEpoch &+= 1
+            self.authLifecycleTraceStore?.record(
+                category: .operation,
+                name: "sign.text.finish",
+                metadata: ["result": "success"]
+            )
         }
     }
 
@@ -136,11 +145,17 @@ final class SignScreenModel {
         }
 
         detachedSignature = nil
+        authLifecycleTraceStore?.record(category: .operation, name: "sign.file.start", metadata: ["mode": "file"])
 
         operation.runFileOperation(mapError: mapSigningError) { [self] progress in
             let signature = try await self.detachedFileSigningAction(fileURL, signerFingerprint, progress)
             try Task.checkCancellation()
             self.detachedSignature = signature
+            self.authLifecycleTraceStore?.record(
+                category: .operation,
+                name: "sign.file.finish",
+                metadata: ["result": "success"]
+            )
         }
     }
 

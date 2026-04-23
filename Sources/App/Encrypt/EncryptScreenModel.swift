@@ -26,6 +26,7 @@ final class EncryptScreenModel {
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
     private let appConfiguration: AppConfiguration
+    private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let textEncryptionAction: TextEncryptionAction
     private let fileEncryptionAction: FileEncryptionAction
@@ -50,6 +51,7 @@ final class EncryptScreenModel {
         keyManagement: KeyManagementService,
         contactService: ContactService,
         config: AppConfiguration,
+        authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         protectedSettingsHost: ProtectedSettingsHost? = nil,
         configuration: EncryptView.Configuration,
         operation: OperationController = OperationController(),
@@ -63,6 +65,7 @@ final class EncryptScreenModel {
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.appConfiguration = config
+        self.authLifecycleTraceStore = authLifecycleTraceStore
         self.protectedSettingsHost = protectedSettingsHost
         self.textEncryptionAction = textEncryptionAction ?? {
             plaintext,
@@ -244,6 +247,11 @@ final class EncryptScreenModel {
         let onEncrypted = configuration.onEncrypted
 
         ciphertext = nil
+        authLifecycleTraceStore?.record(
+            category: .operation,
+            name: "encrypt.text.start",
+            metadata: ["mode": "text", "signed": signerFingerprint == nil ? "false" : "true"]
+        )
 
         operation.run(mapError: mapEncryptionError) { [self] in
             let result = try await self.textEncryptionAction(
@@ -256,6 +264,11 @@ final class EncryptScreenModel {
             self.ciphertext = result
             self.textInputSectionEpoch &+= 1
             onEncrypted?(result)
+            self.authLifecycleTraceStore?.record(
+                category: .operation,
+                name: "encrypt.text.finish",
+                metadata: ["result": "success"]
+            )
         }
     }
 
@@ -268,6 +281,11 @@ final class EncryptScreenModel {
         let encryptToSelfFingerprint = encryptToSelf ? self.encryptToSelfFingerprint : nil
 
         encryptedFileURL = nil
+        authLifecycleTraceStore?.record(
+            category: .operation,
+            name: "encrypt.file.start",
+            metadata: ["mode": "file", "signed": signerFingerprint == nil ? "false" : "true"]
+        )
 
         operation.runFileOperation(mapError: mapEncryptionError) { [self] progress in
             let result = try await self.fileEncryptionAction(
@@ -280,6 +298,11 @@ final class EncryptScreenModel {
             )
             try Task.checkCancellation()
             self.encryptedFileURL = result
+            self.authLifecycleTraceStore?.record(
+                category: .operation,
+                name: "encrypt.file.finish",
+                metadata: ["result": "success"]
+            )
         }
     }
 

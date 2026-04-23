@@ -9,8 +9,13 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     private let lock = NSLock()
+    private let traceStore: AuthLifecycleTraceStore?
     private var privacyPromptDepth = 0
     private var operationPromptDepth = 0
+
+    init(traceStore: AuthLifecycleTraceStore? = nil) {
+        self.traceStore = traceStore
+    }
 
     var isPromptInProgress: Bool {
         lock.withLock {
@@ -88,14 +93,26 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     private func adjustPromptDepth(for kind: PromptKind, delta: Int) {
-        lock.withLock {
+        let snapshot = lock.withLock { () -> (privacyDepth: Int, operationDepth: Int) in
             switch kind {
             case .privacy:
                 privacyPromptDepth = max(privacyPromptDepth + delta, 0)
             case .operation:
                 operationPromptDepth = max(operationPromptDepth + delta, 0)
             }
+            return (privacyPromptDepth, operationPromptDepth)
         }
+
+        traceStore?.record(
+            category: .prompt,
+            name: delta > 0 ? "prompt.begin" : "prompt.end",
+            metadata: [
+                "kind": kind == .privacy ? "privacy" : "operation",
+                "privacyDepth": String(snapshot.privacyDepth),
+                "operationDepth": String(snapshot.operationDepth),
+                "active": snapshot.privacyDepth > 0 || snapshot.operationDepth > 0 ? "true" : "false"
+            ]
+        )
     }
 }
 

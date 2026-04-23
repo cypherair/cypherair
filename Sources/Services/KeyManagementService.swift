@@ -25,7 +25,8 @@ final class KeyManagementService {
         authenticator: any AuthenticationEvaluable,
         memoryInfo: any MemoryInfoProvidable = SystemMemoryInfo(),
         defaults: UserDefaults = .standard,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator()
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
+        authLifecycleTraceStore: AuthLifecycleTraceStore? = nil
     ) {
         let bundleStore = KeyBundleStore(keychain: keychain)
         let metadataStore = KeyMetadataStore(keychain: keychain)
@@ -34,7 +35,8 @@ final class KeyManagementService {
         let privateKeyAccessService = PrivateKeyAccessService(
             secureEnclave: secureEnclave,
             bundleStore: bundleStore,
-            authenticationPromptCoordinator: authenticationPromptCoordinator
+            authenticationPromptCoordinator: authenticationPromptCoordinator,
+            traceStore: authLifecycleTraceStore
         )
 
         self.engine = engine

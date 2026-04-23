@@ -2,6 +2,7 @@ import Foundation
 
 /// Centralized dependency container for the application.
 final class AppContainer: @unchecked Sendable {
+    let authLifecycleTraceStore: AuthLifecycleTraceStore?
     let authPromptCoordinator: AuthenticationPromptCoordinator
     let secureEnclave: any SecureEnclaveManageable
     let keychain: any KeychainManageable
@@ -28,6 +29,7 @@ final class AppContainer: @unchecked Sendable {
     let defaultsSuiteName: String?
 
     init(
+        authLifecycleTraceStore: AuthLifecycleTraceStore?,
         authPromptCoordinator: AuthenticationPromptCoordinator,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
@@ -53,6 +55,7 @@ final class AppContainer: @unchecked Sendable {
         contactsDirectory: URL? = nil,
         defaultsSuiteName: String? = nil
     ) {
+        self.authLifecycleTraceStore = authLifecycleTraceStore
         self.authPromptCoordinator = authPromptCoordinator
         self.secureEnclave = secureEnclave
         self.keychain = keychain
@@ -79,10 +82,13 @@ final class AppContainer: @unchecked Sendable {
         self.defaultsSuiteName = defaultsSuiteName
     }
 
-    static func makeDefault() -> AppContainer {
+    static func makeDefault(
+        authTraceEnabled: Bool = false
+    ) -> AppContainer {
         let secureEnclave = HardwareSecureEnclave()
         let keychain = SystemKeychain()
-        let authPromptCoordinator = AuthenticationPromptCoordinator()
+        let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
+        let authPromptCoordinator = AuthenticationPromptCoordinator(traceStore: authLifecycleTraceStore)
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
@@ -103,7 +109,8 @@ final class AppContainer: @unchecked Sendable {
             rightStoreClient: ProtectedDataRightStoreClient(),
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: authLifecycleTraceStore
         )
         let protectedSettingsStore = ProtectedSettingsStore(
             defaults: defaults,
@@ -123,7 +130,8 @@ final class AppContainer: @unchecked Sendable {
                 try await authManager.evaluate(mode: config.authMode, reason: reason)
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: authLifecycleTraceStore
         )
         let engine = PgpEngine()
 
@@ -133,7 +141,8 @@ final class AppContainer: @unchecked Sendable {
             keychain: keychain,
             authenticator: authManager,
             defaults: .standard,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            authLifecycleTraceStore: authLifecycleTraceStore
         )
         let contactService = ContactService(engine: engine)
         let encryptionService = EncryptionService(
@@ -165,6 +174,7 @@ final class AppContainer: @unchecked Sendable {
         let selfTestService = SelfTestService(engine: engine)
 
         return AppContainer(
+            authLifecycleTraceStore: authLifecycleTraceStore,
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: secureEnclave,
             keychain: keychain,
@@ -192,11 +202,13 @@ final class AppContainer: @unchecked Sendable {
 
     static func makeUITest(
         requiresManualAuthentication: Bool = false,
-        preloadContact: Bool = false
+        preloadContact: Bool = false,
+        authTraceEnabled: Bool = false
     ) -> AppContainer {
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
-        let authPromptCoordinator = AuthenticationPromptCoordinator()
+        let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
+        let authPromptCoordinator = AuthenticationPromptCoordinator(traceStore: authLifecycleTraceStore)
         let suiteName = "com.cypherair.uitests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)
@@ -239,7 +251,8 @@ final class AppContainer: @unchecked Sendable {
             rightStoreClient: ProtectedDataRightStoreClient(),
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: authLifecycleTraceStore
         )
         let protectedSettingsStore = ProtectedSettingsStore(
             defaults: defaults,
@@ -259,7 +272,8 @@ final class AppContainer: @unchecked Sendable {
                 try await authManager.evaluate(mode: config.authMode, reason: reason)
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: authLifecycleTraceStore
         )
 
         let keyManagement = KeyManagementService(
@@ -268,7 +282,8 @@ final class AppContainer: @unchecked Sendable {
             keychain: keychain,
             authenticator: authManager,
             defaults: defaults,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            authLifecycleTraceStore: authLifecycleTraceStore
         )
         let contactService = ContactService(
             engine: engine,
@@ -307,6 +322,7 @@ final class AppContainer: @unchecked Sendable {
         }
 
         return AppContainer(
+            authLifecycleTraceStore: authLifecycleTraceStore,
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: secureEnclave,
             keychain: keychain,

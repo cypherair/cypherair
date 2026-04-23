@@ -455,6 +455,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
         let container = AppAppContainer(
+            authLifecycleTraceStore: nil,
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: secureEnclave,
             keychain: keychain,
