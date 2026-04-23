@@ -50,6 +50,9 @@ struct PrivacyScreenModifier: ViewModifier {
                     name: "scenePhase.observed",
                     metadata: ["phase": scenePhaseName(newPhase)]
                 )
+                lifecycleGate.syncOperationAuthenticationAttemptGeneration(
+                    appSessionOrchestrator.operationAuthenticationAttemptGeneration
+                )
                 switch newPhase {
                 case .inactive:
                     guard lifecycleGate.shouldHandleInactive(
@@ -79,6 +82,9 @@ struct PrivacyScreenModifier: ViewModifier {
             #endif
             #if os(macOS)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+                lifecycleGate.syncOperationAuthenticationAttemptGeneration(
+                    appSessionOrchestrator.operationAuthenticationAttemptGeneration
+                )
                 guard lifecycleGate.shouldHandleResignActive(
                     isAuthenticating: appSessionOrchestrator.isAuthenticating,
                     isOperationPromptInProgress: appSessionOrchestrator.isOperationAuthenticationPromptInProgress
@@ -88,6 +94,9 @@ struct PrivacyScreenModifier: ViewModifier {
                 appSessionOrchestrator.handleSceneDidResignActive()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                lifecycleGate.syncOperationAuthenticationAttemptGeneration(
+                    appSessionOrchestrator.operationAuthenticationAttemptGeneration
+                )
                 guard lifecycleGate.shouldHandleBecomeActive(
                     isAuthenticating: appSessionOrchestrator.isAuthenticating,
                     isOperationPromptInProgress: appSessionOrchestrator.isOperationAuthenticationPromptInProgress

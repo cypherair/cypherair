@@ -9,6 +9,7 @@ import Foundation
 struct PrivacyScreenLifecycleGate {
     private var traceStore: AuthLifecycleTraceStore?
     private var suppressNextSettledActivation = false
+    private var lastObservedOperationAuthenticationAttemptGeneration: UInt64 = 0
 
     init(traceStore: AuthLifecycleTraceStore? = nil) {
         self.traceStore = traceStore
@@ -25,6 +26,20 @@ struct PrivacyScreenLifecycleGate {
             name: "gate.armForAuthenticationAttempt",
             metadata: ["suppressed": "true"]
         )
+    }
+
+    mutating func syncOperationAuthenticationAttemptGeneration(_ generation: UInt64) {
+        guard generation > lastObservedOperationAuthenticationAttemptGeneration else {
+            return
+        }
+
+        lastObservedOperationAuthenticationAttemptGeneration = generation
+        traceStore?.record(
+            category: .lifecycle,
+            name: "gate.observeOperationAuthenticationAttempt",
+            metadata: ["generation": String(generation)]
+        )
+        armForAuthenticationAttempt()
     }
 
     mutating func shouldHandleInactive(

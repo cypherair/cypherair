@@ -256,7 +256,8 @@ final class ProtectedSettingsHost {
             syncSectionStateFromStore(liveDependencies)
             guard try await ensureProtectedSettingsAccess(
                 using: liveDependencies,
-                localizedReason: clipboardLocalizedReason
+                localizedReason: clipboardLocalizedReason,
+                authorizationMode: .requireExistingAuthorization
             ) else {
                 return true
             }
