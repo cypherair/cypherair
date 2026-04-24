@@ -12,6 +12,12 @@ This is a temporary migration checklist. It does not replace the permanent
 current-state docs. After the merge, current code, workflows, and normalized
 canonical docs outrank this file.
 
+## Migration Log
+
+- 2026-04-24T21:54:25Z: Created PR #222,
+  `https://github.com/cypherair/cypherair/pull/222`, from source branch
+  `codex/apple-arm64e-unified-experiment` to `main`.
+
 ## 1. Merge Facts
 
 - `origin/main` is an ancestor of the source branch.
