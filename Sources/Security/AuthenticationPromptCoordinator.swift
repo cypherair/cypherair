@@ -5,9 +5,24 @@ import Foundation
 final class AuthenticationPromptCoordinator: @unchecked Sendable {
     typealias ShieldEventHandler = @Sendable (AuthenticationShieldKind, Int) async -> Void
 
+    struct PromptTraceContext: Equatable, Sendable {
+        let promptID: UInt64
+        let source: String
+        let kind: String
+    }
+
     private enum PromptKind {
         case privacy
         case operation
+
+        var traceValue: String {
+            switch self {
+            case .privacy:
+                "privacy"
+            case .operation:
+                "operation"
+            }
+        }
     }
 
     private let lock = NSLock()
@@ -16,6 +31,9 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     private var privacyPromptDepth = 0
     private var operationPromptDepth = 0
     private var operationPromptAttemptGenerationValue: UInt64 = 0
+    private var nextPromptID: UInt64 = 1
+    private var privacyPromptStack: [PromptTraceContext] = []
+    private var operationPromptStack: [PromptTraceContext] = []
 
     init(
         shieldEventHandler: ShieldEventHandler? = nil,
@@ -40,79 +58,174 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         }
     }
 
-    func beginPrivacyPrompt() {
-        adjustPromptDepth(for: .privacy, delta: 1)
+    @discardableResult
+    func beginPrivacyPrompt(source: String = "unspecified") -> PromptTraceContext {
+        adjustPromptDepth(for: .privacy, delta: 1, source: source)
     }
 
-    func endPrivacyPrompt() {
-        adjustPromptDepth(for: .privacy, delta: -1)
+    func endPrivacyPrompt(_ context: PromptTraceContext? = nil) {
+        adjustPromptDepth(for: .privacy, delta: -1, context: context)
     }
 
-    func beginOperationPrompt() {
-        adjustPromptDepth(for: .operation, delta: 1)
+    @discardableResult
+    func beginOperationPrompt(source: String = "unspecified") -> PromptTraceContext {
+        adjustPromptDepth(for: .operation, delta: 1, source: source)
     }
 
-    func endOperationPrompt() {
-        adjustPromptDepth(for: .operation, delta: -1)
+    func endOperationPrompt(_ context: PromptTraceContext? = nil) {
+        adjustPromptDepth(for: .operation, delta: -1, context: context)
     }
 
-    func withPrivacyPrompt<T>(_ operation: () async throws -> T) async rethrows -> T {
-        beginPrivacyPrompt()
+    func withPrivacyPrompt<T>(
+        source: String = "unspecified",
+        _ operation: () async throws -> T
+    ) async rethrows -> T {
+        try await withPrivacyPrompt(source: source) { _ in
+            try await operation()
+        }
+    }
+
+    func withPrivacyPrompt<T>(
+        source: String = "unspecified",
+        _ operation: (PromptTraceContext) async throws -> T
+    ) async rethrows -> T {
+        let context = beginPrivacyPrompt(source: source)
         await shieldEventHandler?(.privacy, 1)
         await Task.yield()
         do {
-            let result = try await operation()
-            endPrivacyPrompt()
+            let result = try await operation(context)
+            endPrivacyPrompt(context)
             await shieldEventHandler?(.privacy, -1)
             return result
         } catch {
-            endPrivacyPrompt()
+            endPrivacyPrompt(context)
             await shieldEventHandler?(.privacy, -1)
             throw error
         }
     }
 
-    func withOperationPrompt<T>(_ operation: () async throws -> T) async rethrows -> T {
-        beginOperationPrompt()
+    func withOperationPrompt<T>(
+        source: String = "unspecified",
+        _ operation: () async throws -> T
+    ) async rethrows -> T {
+        try await withOperationPrompt(source: source) { _ in
+            try await operation()
+        }
+    }
+
+    func withOperationPrompt<T>(
+        source: String = "unspecified",
+        _ operation: (PromptTraceContext) async throws -> T
+    ) async rethrows -> T {
+        let context = beginOperationPrompt(source: source)
         await shieldEventHandler?(.operation, 1)
         await Task.yield()
         do {
-            let result = try await operation()
-            endOperationPrompt()
+            let result = try await operation(context)
+            endOperationPrompt(context)
             await shieldEventHandler?(.operation, -1)
             return result
         } catch {
-            endOperationPrompt()
+            endOperationPrompt(context)
             await shieldEventHandler?(.operation, -1)
             throw error
         }
     }
 
-    private func adjustPromptDepth(for kind: PromptKind, delta: Int) {
-        let snapshot = lock.withLock { () -> (privacyDepth: Int, operationDepth: Int, operationGeneration: UInt64) in
+    @discardableResult
+    private func adjustPromptDepth(
+        for kind: PromptKind,
+        delta: Int,
+        source: String = "unspecified",
+        context: PromptTraceContext? = nil
+    ) -> PromptTraceContext {
+        let snapshot = lock.withLock { () -> (
+            privacyDepth: Int,
+            operationDepth: Int,
+            operationGeneration: UInt64,
+            context: PromptTraceContext
+        ) in
+            let resolvedContext: PromptTraceContext
             switch kind {
             case .privacy:
-                privacyPromptDepth = max(privacyPromptDepth + delta, 0)
+                if delta > 0 {
+                    resolvedContext = makePromptTraceContext(kind: kind, source: source)
+                    privacyPromptStack.append(resolvedContext)
+                } else {
+                    resolvedContext = popPromptTraceContext(
+                        from: &privacyPromptStack,
+                        matching: context,
+                        kind: kind
+                    )
+                }
+                privacyPromptDepth = privacyPromptStack.count
             case .operation:
                 if delta > 0 {
+                    resolvedContext = makePromptTraceContext(kind: kind, source: source)
+                    operationPromptStack.append(resolvedContext)
                     operationPromptAttemptGenerationValue &+= 1
+                } else {
+                    resolvedContext = popPromptTraceContext(
+                        from: &operationPromptStack,
+                        matching: context,
+                        kind: kind
+                    )
                 }
-                operationPromptDepth = max(operationPromptDepth + delta, 0)
+                operationPromptDepth = operationPromptStack.count
             }
-            return (privacyPromptDepth, operationPromptDepth, operationPromptAttemptGenerationValue)
+            return (privacyPromptDepth, operationPromptDepth, operationPromptAttemptGenerationValue, resolvedContext)
         }
 
         traceStore?.record(
             category: .prompt,
             name: delta > 0 ? "prompt.begin" : "prompt.end",
             metadata: [
-                "kind": kind == .privacy ? "privacy" : "operation",
+                "promptID": String(snapshot.context.promptID),
+                "source": snapshot.context.source,
+                "kind": snapshot.context.kind,
                 "privacyDepth": String(snapshot.privacyDepth),
                 "operationDepth": String(snapshot.operationDepth),
                 "operationGeneration": String(snapshot.operationGeneration),
                 "active": snapshot.privacyDepth > 0 || snapshot.operationDepth > 0 ? "true" : "false"
             ]
         )
+        return snapshot.context
+    }
+
+    private func makePromptTraceContext(
+        kind: PromptKind,
+        source: String
+    ) -> PromptTraceContext {
+        defer { nextPromptID &+= 1 }
+        return PromptTraceContext(
+            promptID: nextPromptID,
+            source: source,
+            kind: kind.traceValue
+        )
+    }
+
+    private func popPromptTraceContext(
+        from stack: inout [PromptTraceContext],
+        matching context: PromptTraceContext?,
+        kind: PromptKind
+    ) -> PromptTraceContext {
+        guard let context else {
+            return stack.popLast() ?? PromptTraceContext(
+                promptID: 0,
+                source: "missing",
+                kind: kind.traceValue
+            )
+        }
+
+        if stack.last?.promptID == context.promptID {
+            _ = stack.popLast()
+            return context
+        }
+
+        if let index = stack.lastIndex(where: { $0.promptID == context.promptID }) {
+            stack.remove(at: index)
+        }
+        return context
     }
 }
 

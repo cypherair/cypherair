@@ -24,7 +24,7 @@ final class PrivateKeyAccessService {
     func unwrapPrivateKey(fingerprint: String) async throws -> Data {
         traceStore?.record(category: .operation, name: "privateKey.unwrap.start")
         do {
-            let unwrapped = try await authenticationPromptCoordinator.withOperationPrompt {
+            let unwrapped = try await authenticationPromptCoordinator.withOperationPrompt(source: "privateKey.unwrap") {
                 let bundle = try bundleStore.loadBundle(fingerprint: fingerprint)
                 let handle = try secureEnclave.reconstructKey(from: bundle.seKeyData)
                 return try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)

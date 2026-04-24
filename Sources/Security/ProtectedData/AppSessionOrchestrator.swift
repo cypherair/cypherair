@@ -8,7 +8,7 @@ final class AppSessionOrchestrator {
     private let shouldBypassPrivacyAuthentication: () -> Bool
     private let gracePeriodProvider: () -> Int
     private let requireAuthOnLaunchProvider: () -> Bool
-    private let evaluateAppAuthentication: (String) async throws -> AppSessionAuthenticationResult
+    private let evaluateAppAuthentication: (String, String) async throws -> AppSessionAuthenticationResult
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
 
@@ -21,7 +21,7 @@ final class AppSessionOrchestrator {
     private(set) var contentClearGeneration = 0
     private(set) var lastAuthenticationDate: Date?
 
-    init(
+    convenience init(
         currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry,
         shouldBypassPrivacyAuthentication: @escaping () -> Bool = { false },
         gracePeriodProvider: @escaping () -> Int,
@@ -31,11 +31,35 @@ final class AppSessionOrchestrator {
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
+        self.init(
+            currentRegistryProvider: currentRegistryProvider,
+            shouldBypassPrivacyAuthentication: shouldBypassPrivacyAuthentication,
+            gracePeriodProvider: gracePeriodProvider,
+            requireAuthOnLaunchProvider: requireAuthOnLaunchProvider,
+            evaluateAppAuthenticationWithSource: { reason, _ in
+                try await evaluateAppAuthentication(reason)
+            },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            authenticationPromptCoordinator: authenticationPromptCoordinator,
+            traceStore: traceStore
+        )
+    }
+
+    init(
+        currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry,
+        shouldBypassPrivacyAuthentication: @escaping () -> Bool = { false },
+        gracePeriodProvider: @escaping () -> Int,
+        requireAuthOnLaunchProvider: @escaping () -> Bool,
+        evaluateAppAuthenticationWithSource: @escaping (String, String) async throws -> AppSessionAuthenticationResult,
+        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
+        traceStore: AuthLifecycleTraceStore? = nil
+    ) {
         self.currentRegistryProvider = currentRegistryProvider
         self.shouldBypassPrivacyAuthentication = shouldBypassPrivacyAuthentication
         self.gracePeriodProvider = gracePeriodProvider
         self.requireAuthOnLaunchProvider = requireAuthOnLaunchProvider
-        self.evaluateAppAuthentication = evaluateAppAuthentication
+        self.evaluateAppAuthentication = evaluateAppAuthenticationWithSource
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
@@ -76,13 +100,20 @@ final class AppSessionOrchestrator {
     }
 
     @discardableResult
-    func handleInitialAppearance(localizedReason: String) async -> Bool {
-        traceStore?.record(category: .session, name: "session.handleInitialAppearance.enter")
+    func handleInitialAppearance(
+        localizedReason: String,
+        source: String = "initialAppearance"
+    ) async -> Bool {
+        traceStore?.record(
+            category: .session,
+            name: "session.handleInitialAppearance.enter",
+            metadata: ["source": source]
+        )
         guard !hasAppearedOnce else {
             traceStore?.record(
                 category: .session,
                 name: "session.handleInitialAppearance.exit",
-                metadata: ["reason": "alreadyAppeared"]
+                metadata: ["reason": "alreadyAppeared", "source": source]
             )
             return false
         }
@@ -94,7 +125,7 @@ final class AppSessionOrchestrator {
             traceStore?.record(
                 category: .session,
                 name: "session.handleInitialAppearance.exit",
-                metadata: ["reason": "bypass"]
+                metadata: ["reason": "bypass", "source": source]
             )
             return false
         }
@@ -103,7 +134,7 @@ final class AppSessionOrchestrator {
             traceStore?.record(
                 category: .session,
                 name: "session.handleInitialAppearance.exit",
-                metadata: ["reason": "launchAuthDisabled"]
+                metadata: ["reason": "launchAuthDisabled", "source": source]
             )
             return false
         }
@@ -112,9 +143,9 @@ final class AppSessionOrchestrator {
         traceStore?.record(
             category: .session,
             name: "session.handleInitialAppearance.exit",
-            metadata: ["reason": "delegatedToResume"]
+            metadata: ["reason": "delegatedToResume", "source": source]
         )
-        return await handleResume(localizedReason: localizedReason)
+        return await handleResume(localizedReason: localizedReason, source: source)
     }
 
     func handleSceneDidResignActive() {
@@ -148,11 +179,15 @@ final class AppSessionOrchestrator {
     }
 
     @discardableResult
-    func handleResume(localizedReason: String) async -> Bool {
+    func handleResume(
+        localizedReason: String,
+        source: String = "unspecified"
+    ) async -> Bool {
         traceStore?.record(
             category: .session,
             name: "session.handleResume.enter",
             metadata: [
+                "source": source,
                 "operationPrompt": isOperationAuthenticationPromptInProgress ? "true" : "false",
                 "isAuthenticating": isAuthenticating ? "true" : "false",
                 "hasLastAuthenticationDate": lastAuthenticationDate == nil ? "false" : "true"
@@ -164,7 +199,7 @@ final class AppSessionOrchestrator {
             traceStore?.record(
                 category: .session,
                 name: "session.handleResume.exit",
-                metadata: ["reason": "bypass", "attemptedAuthentication": "false"]
+                metadata: ["reason": "bypass", "attemptedAuthentication": "false", "source": source]
             )
             return false
         }
@@ -173,7 +208,7 @@ final class AppSessionOrchestrator {
             traceStore?.record(
                 category: .session,
                 name: "session.handleResume.exit",
-                metadata: ["reason": "operationPromptInProgress", "attemptedAuthentication": "false"]
+                metadata: ["reason": "operationPromptInProgress", "attemptedAuthentication": "false", "source": source]
             )
             return false
         }
@@ -182,7 +217,7 @@ final class AppSessionOrchestrator {
             traceStore?.record(
                 category: .session,
                 name: "session.handleResume.exit",
-                metadata: ["reason": "alreadyAuthenticating", "attemptedAuthentication": "false"]
+                metadata: ["reason": "alreadyAuthenticating", "attemptedAuthentication": "false", "source": source]
             )
             return false
         }
@@ -193,7 +228,8 @@ final class AppSessionOrchestrator {
                 name: "session.handleResume.reauthRequired",
                 metadata: [
                     "gracePeriod": String(gracePeriodProvider()),
-                    "graceExpired": isGracePeriodExpired ? "true" : "false"
+                    "graceExpired": isGracePeriodExpired ? "true" : "false",
+                    "source": source
                 ]
             )
             requestContentClear()
@@ -205,7 +241,7 @@ final class AppSessionOrchestrator {
             defer { isAuthenticating = false }
 
             do {
-                let result = try await evaluateAppAuthentication(localizedReason)
+                let result = try await evaluateAppAuthentication(localizedReason, source)
                 if result.isAuthenticated {
                     replacePendingAuthenticatedContext(with: result.context, reason: "resumeAuthenticated")
                     recordAuthentication()
@@ -214,7 +250,7 @@ final class AppSessionOrchestrator {
                     traceStore?.record(
                         category: .session,
                         name: "session.handleResume.exit",
-                        metadata: ["reason": "authenticated", "attemptedAuthentication": "true"]
+                        metadata: ["reason": "authenticated", "attemptedAuthentication": "true", "source": source]
                     )
                 } else {
                     discardPendingAuthenticatedContext(reason: "resumeReturnedFalse")
@@ -222,7 +258,7 @@ final class AppSessionOrchestrator {
                     traceStore?.record(
                         category: .session,
                         name: "session.handleResume.exit",
-                        metadata: ["reason": "authenticationReturnedFalse", "attemptedAuthentication": "true"]
+                        metadata: ["reason": "authenticationReturnedFalse", "attemptedAuthentication": "true", "source": source]
                     )
                 }
             } catch {
@@ -234,6 +270,7 @@ final class AppSessionOrchestrator {
                     metadata: [
                         "reason": "authenticationThrew",
                         "attemptedAuthentication": "true",
+                        "source": source,
                         "errorType": String(describing: type(of: error))
                     ]
                 )
@@ -245,16 +282,23 @@ final class AppSessionOrchestrator {
             traceStore?.record(
                 category: .session,
                 name: "session.handleResume.exit",
-                metadata: ["reason": "graceValid", "attemptedAuthentication": "false"]
+                metadata: ["reason": "graceValid", "attemptedAuthentication": "false", "source": source]
             )
             return false
         }
     }
 
     @discardableResult
-    func retryPrivacyUnlock(localizedReason: String) async -> Bool {
-        traceStore?.record(category: .session, name: "session.retryPrivacyUnlock")
-        return await handleResume(localizedReason: localizedReason)
+    func retryPrivacyUnlock(
+        localizedReason: String,
+        source: String = "retryButton"
+    ) async -> Bool {
+        traceStore?.record(
+            category: .session,
+            name: "session.retryPrivacyUnlock",
+            metadata: ["source": source]
+        )
+        return await handleResume(localizedReason: localizedReason, source: source)
     }
 
     func consumeAuthenticatedContextForProtectedData() -> LAContext? {

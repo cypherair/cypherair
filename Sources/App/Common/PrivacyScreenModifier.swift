@@ -15,6 +15,7 @@ struct PrivacyScreenModifier: ViewModifier {
     @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @State private var lifecycleGate = PrivacyScreenLifecycleGate()
+    @State private var appearanceCount = 0
 
     func body(content: Content) -> some View {
         content
@@ -107,6 +108,12 @@ struct PrivacyScreenModifier: ViewModifier {
             }
             #endif
             .onAppear {
+                appearanceCount += 1
+                authLifecycleTraceStore?.record(
+                    category: .lifecycle,
+                    name: "privacy.onAppear",
+                    metadata: ["appearanceCount": String(appearanceCount)]
+                )
                 lifecycleGate.attachTraceStore(authLifecycleTraceStore)
                 performInitialAppearanceAction()
             }
@@ -146,7 +153,8 @@ struct PrivacyScreenModifier: ViewModifier {
                 metadata: ["source": "initialAppearance"]
             )
             let attemptedAuthentication = await appSessionOrchestrator.handleInitialAppearance(
-                localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume")
+                localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume"),
+                source: "initialAppearance"
             )
             if attemptedAuthentication {
                 lifecycleGate.armForAuthenticationAttempt()
@@ -177,11 +185,13 @@ struct PrivacyScreenModifier: ViewModifier {
             let attemptedAuthentication: Bool
             if retry {
                 attemptedAuthentication = await appSessionOrchestrator.retryPrivacyUnlock(
-                    localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume")
+                    localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume"),
+                    source: source
                 )
             } else {
                 attemptedAuthentication = await appSessionOrchestrator.handleResume(
-                    localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume")
+                    localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume"),
+                    source: source
                 )
             }
             if attemptedAuthentication {
