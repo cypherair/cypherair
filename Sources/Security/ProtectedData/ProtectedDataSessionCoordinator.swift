@@ -3,44 +3,55 @@ import LocalAuthentication
 
 @Observable
 final class ProtectedDataSessionCoordinator {
-    private let rightStoreClient: any ProtectedDataRightStoreClientProtocol
+    private let rootSecretStore: any ProtectedDataRootSecretStoreProtocol
+    private let legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)?
     private let domainKeyManager: ProtectedDomainKeyManager
-    private let sharedRightIdentifier: String
+    private let rootSecretIdentifier: String
+    private let appSessionPolicyProvider: () -> AppSessionAuthenticationPolicy
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
 
-    private var sharedRight: (any ProtectedDataPersistedRightHandle)?
     private var wrappingRootKey: Data?
     private var relockParticipants: [any ProtectedDataRelockParticipant] = []
 
     private(set) var frameworkState: ProtectedDataFrameworkState = .sessionLocked
 
     init(
-        rightStoreClient: any ProtectedDataRightStoreClientProtocol,
+        rootSecretStore: any ProtectedDataRootSecretStoreProtocol = KeychainProtectedDataRootSecretStore(),
+        legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)? = nil,
         domainKeyManager: ProtectedDomainKeyManager,
         sharedRightIdentifier: String,
+        appSessionPolicyProvider: @escaping () -> AppSessionAuthenticationPolicy = { .userPresence },
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
-        self.rightStoreClient = rightStoreClient
+        self.rootSecretStore = rootSecretStore
+        self.legacyRightStoreClient = legacyRightStoreClient
         self.domainKeyManager = domainKeyManager
-        self.sharedRightIdentifier = sharedRightIdentifier
+        self.rootSecretIdentifier = sharedRightIdentifier
+        self.appSessionPolicyProvider = appSessionPolicyProvider
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
     }
 
     func persistSharedRight(secretData: Data) async throws {
-        let right = LARight(requirement: .default)
-        sharedRight = try await rightStoreClient.saveRight(
-            right,
-            identifier: sharedRightIdentifier,
-            secret: secretData
+        try rootSecretStore.saveRootSecret(
+            secretData,
+            identifier: rootSecretIdentifier,
+            policy: appSessionPolicyProvider()
         )
     }
 
     func removePersistedSharedRight(identifier: String) async throws {
-        try await rightStoreClient.removeRight(forIdentifier: identifier)
-        sharedRight = nil
+        do {
+            try rootSecretStore.deleteRootSecret(identifier: identifier)
+        } catch let error as KeychainError where error == .itemNotFound {
+            // Deleting the last protected domain can run against legacy or already
+            // cleaned-up state. Missing root secret is not a recovery failure here.
+        }
+        if let legacyRightStoreClient {
+            try? await legacyRightStoreClient.removeRight(forIdentifier: identifier)
+        }
         if wrappingRootKey != nil {
             wrappingRootKey?.protectedDataZeroize()
             wrappingRootKey = nil
@@ -50,7 +61,8 @@ final class ProtectedDataSessionCoordinator {
 
     func beginProtectedDataAuthorization(
         registry: ProtectedDataRegistry,
-        localizedReason: String
+        localizedReason: String,
+        authenticationContext: LAContext? = nil
     ) async -> ProtectedDataAuthorizationResult {
         traceStore?.record(
             category: .operation,
@@ -78,44 +90,31 @@ final class ProtectedDataSessionCoordinator {
             return .frameworkRecoveryNeeded
         }
 
-        do {
-            if sharedRight == nil {
-                sharedRight = try await rightStoreClient.right(forIdentifier: registry.sharedRightIdentifier)
-            }
-        } catch {
-            frameworkState = .frameworkRecoveryNeeded
-            traceStore?.record(
-                category: .operation,
-                name: "protectedSettings.authorization.finish",
-                metadata: ["result": "frameworkRecoveryNeeded", "reason": "rightLookupFailed"]
-            )
-            return .frameworkRecoveryNeeded
-        }
-
-        guard let sharedRight else {
-            frameworkState = .frameworkRecoveryNeeded
-            traceStore?.record(
-                category: .operation,
-                name: "protectedSettings.authorization.finish",
-                metadata: ["result": "frameworkRecoveryNeeded", "reason": "missingSharedRight"]
-            )
-            return .frameworkRecoveryNeeded
+        let context = authenticationContext ?? makeRootSecretAuthenticationContext(
+            localizedReason: localizedReason
+        )
+        let usesHandoffContext = authenticationContext != nil
+        if usesHandoffContext {
+            context.interactionNotAllowed = true
         }
 
         do {
-            try await authenticationPromptCoordinator.withOperationPrompt {
-                try await sharedRight.authorize(localizedReason: localizedReason)
+            var rawSecret: Data
+            do {
+                rawSecret = try await loadRootSecret(
+                    identifier: registry.sharedRightIdentifier,
+                    authenticationContext: context,
+                    usesHandoffContext: usesHandoffContext
+                )
+            } catch let error as KeychainError where error == .itemNotFound {
+                rawSecret = try await migrateLegacySharedRightIfNeeded(
+                    registry: registry,
+                    localizedReason: localizedReason,
+                    authenticationContext: context,
+                    usesHandoffContext: usesHandoffContext
+                )
             }
-        } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "protectedSettings.authorization.finish",
-                metadata: ["result": "cancelledOrDenied", "reason": "authorizeThrew"]
-            )
-            return .cancelledOrDenied
-        }
-        do {
-            var rawSecret = try await sharedRight.rawSecretData()
+
             let derivedWrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rawSecret)
 
             if wrappingRootKey != nil {
@@ -130,11 +129,19 @@ final class ProtectedDataSessionCoordinator {
             )
             return .authorized
         } catch {
-            await sharedRight.deauthorize()
             if wrappingRootKey != nil {
                 wrappingRootKey?.protectedDataZeroize()
                 wrappingRootKey = nil
             }
+            if isAuthorizationCancellationOrDenial(error) {
+                traceStore?.record(
+                    category: .operation,
+                    name: "protectedSettings.authorization.finish",
+                    metadata: ["result": "cancelledOrDenied", "reason": "rootSecretAccessDenied"]
+                )
+                return .cancelledOrDenied
+            }
+
             frameworkState = .frameworkRecoveryNeeded
             traceStore?.record(
                 category: .operation,
@@ -143,6 +150,33 @@ final class ProtectedDataSessionCoordinator {
             )
             return .frameworkRecoveryNeeded
         }
+    }
+
+    func hasPersistedRootSecret(identifier: String? = nil) -> Bool {
+        rootSecretStore.rootSecretExists(identifier: identifier ?? rootSecretIdentifier)
+    }
+
+    @discardableResult
+    func reprotectPersistedRootSecretIfPresent(
+        from currentPolicy: AppSessionAuthenticationPolicy,
+        to newPolicy: AppSessionAuthenticationPolicy,
+        authenticationContext: LAContext?
+    ) throws -> Bool {
+        guard rootSecretStore.rootSecretExists(identifier: rootSecretIdentifier) else {
+            return false
+        }
+        guard let authenticationContext else {
+            throw ProtectedDataError.authorizingUnavailable
+        }
+        authenticationContext.interactionNotAllowed = true
+
+        try rootSecretStore.reprotectRootSecret(
+            identifier: rootSecretIdentifier,
+            from: currentPolicy,
+            to: newPolicy,
+            authenticationContext: authenticationContext
+        )
+        return true
     }
 
     func authorizeSharedRight(localizedReason: String) async throws {
@@ -187,14 +221,131 @@ final class ProtectedDataSessionCoordinator {
         }
         domainKeyManager.clearUnlockedDomainMasterKeys()
 
-        if let sharedRight {
-            await sharedRight.deauthorize()
-        }
-
         frameworkState = participantErrorOccurred ? .restartRequired : .sessionLocked
     }
 
     var hasActiveWrappingRootKey: Bool {
         wrappingRootKey != nil
+    }
+
+    private func loadRootSecret(
+        identifier: String,
+        authenticationContext: LAContext,
+        usesHandoffContext: Bool
+    ) async throws -> Data {
+        if usesHandoffContext {
+            return try rootSecretStore.loadRootSecret(
+                identifier: identifier,
+                authenticationContext: authenticationContext
+            )
+        }
+
+        return try await authenticationPromptCoordinator.withOperationPrompt {
+            try rootSecretStore.loadRootSecret(
+                identifier: identifier,
+                authenticationContext: authenticationContext
+            )
+        }
+    }
+
+    private func migrateLegacySharedRightIfNeeded(
+        registry: ProtectedDataRegistry,
+        localizedReason: String,
+        authenticationContext: LAContext,
+        usesHandoffContext: Bool
+    ) async throws -> Data {
+        guard let legacyRightStoreClient else {
+            throw KeychainError.itemNotFound
+        }
+
+        let legacyRight = try await legacyRightStoreClient.right(
+            forIdentifier: registry.sharedRightIdentifier
+        )
+        try await authenticationPromptCoordinator.withOperationPrompt {
+            try await legacyRight.authorize(localizedReason: localizedReason)
+        }
+
+        do {
+            var legacySecret = try await legacyRight.rawSecretData()
+            defer {
+                legacySecret.protectedDataZeroize()
+            }
+
+            try rootSecretStore.saveRootSecret(
+                legacySecret,
+                identifier: registry.sharedRightIdentifier,
+                policy: appSessionPolicyProvider()
+            )
+
+            var verifiedSecret = try await loadRootSecret(
+                identifier: registry.sharedRightIdentifier,
+                authenticationContext: authenticationContext,
+                usesHandoffContext: usesHandoffContext
+            )
+            guard verifiedSecret == legacySecret else {
+                verifiedSecret.protectedDataZeroize()
+                throw ProtectedDataError.internalFailure(
+                    String(
+                        localized: "error.protectedData.rootSecretMigrationVerification",
+                        defaultValue: "The protected app data root secret could not be verified after migration."
+                    )
+                )
+            }
+
+            do {
+                try await legacyRightStoreClient.removeRight(forIdentifier: registry.sharedRightIdentifier)
+            } catch {
+                traceStore?.record(
+                    category: .operation,
+                    name: "protectedSettings.authorization.legacyCleanupFailed",
+                    metadata: ["errorType": String(describing: type(of: error))]
+                )
+            }
+
+            await legacyRight.deauthorize()
+            return verifiedSecret
+        } catch {
+            await legacyRight.deauthorize()
+            throw error
+        }
+    }
+
+    private func makeRootSecretAuthenticationContext(localizedReason: String) -> LAContext {
+        let context = LAContext()
+        let policy = appSessionPolicyProvider()
+        policy.configure(context)
+        context.localizedReason = localizedReason
+        return context
+    }
+
+    private func isAuthorizationCancellationOrDenial(_ error: Error) -> Bool {
+        if let keychainError = error as? KeychainError {
+            switch keychainError {
+            case .userCancelled, .authenticationFailed, .interactionNotAllowed:
+                return true
+            case .itemNotFound, .duplicateItem, .unhandledError:
+                return false
+            }
+        }
+
+        if let authenticationError = error as? AuthenticationError {
+            switch authenticationError {
+            case .cancelled, .failed, .biometricsUnavailable, .appAccessBiometricsUnavailable:
+                return true
+            case .accessControlCreationFailed, .modeSwitchFailed, .noIdentities, .backupRequired:
+                return false
+            }
+        }
+
+        if let laError = error as? LAError {
+            switch laError.code {
+            case .userCancel, .appCancel, .systemCancel, .authenticationFailed, .notInteractive:
+                return true
+            default:
+                return false
+            }
+        }
+
+        return false
     }
 }

@@ -191,7 +191,8 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         let authPromptCoordinator = TraceAuthenticationPromptCoordinator(traceStore: traceStore)
         let coordinator = TraceProtectedDataSessionCoordinator(
-            rightStoreClient: TraceTestRightStoreClient(),
+            rootSecretStore: CypherAir.MockProtectedDataRootSecretStore(),
+            legacyRightStoreClient: TraceTestRightStoreClient(),
             domainKeyManager: TraceProtectedDomainKeyManager(storageRoot: storageRoot),
             sharedRightIdentifier: "com.cypherair.tests.trace.resume",
             authenticationPromptCoordinator: authPromptCoordinator,
@@ -204,7 +205,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 0 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: traceStore

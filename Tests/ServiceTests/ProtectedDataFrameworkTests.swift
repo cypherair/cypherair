@@ -52,9 +52,16 @@ private final class MockProtectedDataPersistedRightHandle: AppProtectedDataPersi
         }
         return secretData
     }
+
+    func rootSecretData() throws -> Data {
+        if let rawSecretError {
+            throw rawSecretError
+        }
+        return secretData
+    }
 }
 
-private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStoreClientProtocol {
+private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStoreClientProtocol, ProtectedDataRootSecretStoreProtocol {
     var persistedRightHandle: MockProtectedDataPersistedRightHandle?
 
     private(set) var rightLookupCallCount = 0
@@ -62,6 +69,7 @@ private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStor
     private(set) var saveWithSecretCallCount = 0
     private(set) var removeCallCount = 0
     private(set) var lastRemovedIdentifier: String?
+    private(set) var lastAuthenticationContext: LAContext?
 
     func right(forIdentifier identifier: String) async throws -> any AppProtectedDataPersistedRightHandle {
         rightLookupCallCount += 1
@@ -93,6 +101,60 @@ private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStor
         removeCallCount += 1
         lastRemovedIdentifier = identifier
         persistedRightHandle = nil
+    }
+
+    func saveRootSecret(
+        _ secretData: Data,
+        identifier: String,
+        policy: AppSessionAuthenticationPolicy
+    ) throws {
+        _ = policy
+        saveWithSecretCallCount += 1
+        let handle = MockProtectedDataPersistedRightHandle(identifier: identifier, secretData: secretData)
+        persistedRightHandle = handle
+    }
+
+    func loadRootSecret(
+        identifier: String,
+        authenticationContext: LAContext
+    ) throws -> Data {
+        lastAuthenticationContext = authenticationContext
+        rightLookupCallCount += 1
+        guard let persistedRightHandle else {
+            throw KeychainError.itemNotFound
+        }
+        if let authorizeError = persistedRightHandle.authorizeError {
+            throw authorizeError
+        }
+        return try persistedRightHandle.rootSecretData()
+    }
+
+    func deleteRootSecret(identifier: String) throws {
+        removeCallCount += 1
+        lastRemovedIdentifier = identifier
+        guard persistedRightHandle != nil else {
+            throw KeychainError.itemNotFound
+        }
+        persistedRightHandle = nil
+    }
+
+    func rootSecretExists(identifier: String) -> Bool {
+        persistedRightHandle != nil
+    }
+
+    func reprotectRootSecret(
+        identifier: String,
+        from currentPolicy: AppSessionAuthenticationPolicy,
+        to newPolicy: AppSessionAuthenticationPolicy,
+        authenticationContext: LAContext
+    ) throws {
+        _ = identifier
+        _ = currentPolicy
+        _ = newPolicy
+        lastAuthenticationContext = authenticationContext
+        guard persistedRightHandle != nil else {
+            throw KeychainError.itemNotFound
+        }
     }
 }
 
@@ -285,7 +347,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             secretData: Data(repeating: 0xAB, count: 32)
         )
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.session"
         )
@@ -317,7 +379,74 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(coordinator.frameworkState, .sessionLocked)
         XCTAssertFalse(coordinator.hasActiveWrappingRootKey)
         XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
-        XCTAssertEqual(rightStoreClient.persistedRightHandle?.deauthorizeCallCount, 1)
+    }
+
+    func test_sessionCoordinator_authorizationUsesProvidedAppSessionContext() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataSessionHandoff")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rootSecretStore = MockProtectedDataRightStoreClient()
+        rootSecretStore.persistedRightHandle = MockProtectedDataPersistedRightHandle(
+            identifier: "com.cypherair.tests.protected-data.session-handoff",
+            secretData: Data(repeating: 0xBC, count: 32)
+        )
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rootSecretStore,
+            domainKeyManager: keyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.session-handoff"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.session-handoff",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["contacts": .active],
+            pendingMutation: nil
+        )
+        let context = LAContext()
+        defer { context.invalidate() }
+
+        let authorizationResult = await coordinator.beginProtectedDataAuthorization(
+            registry: registry,
+            localizedReason: "ProtectedData unit test handoff",
+            authenticationContext: context
+        )
+
+        XCTAssertEqual(authorizationResult, .authorized)
+        XCTAssertTrue(rootSecretStore.lastAuthenticationContext === context)
+        XCTAssertTrue(context.interactionNotAllowed)
+        XCTAssertEqual(rootSecretStore.rightLookupCallCount, 1)
+    }
+
+    func test_sessionCoordinator_reprotectRootSecretDisallowsSecondInteraction() throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataReprotectInteractionDisallowed")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rootSecretStore = MockProtectedDataRightStoreClient()
+        rootSecretStore.persistedRightHandle = MockProtectedDataPersistedRightHandle(
+            identifier: "com.cypherair.tests.protected-data.reprotect",
+            secretData: Data(repeating: 0xB7, count: 32)
+        )
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rootSecretStore,
+            domainKeyManager: keyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.reprotect"
+        )
+        let context = LAContext()
+        defer { context.invalidate() }
+
+        let didReprotect = try coordinator.reprotectPersistedRootSecretIfPresent(
+            from: .userPresence,
+            to: .biometricsOnly,
+            authenticationContext: context
+        )
+
+        XCTAssertTrue(didReprotect)
+        XCTAssertTrue(rootSecretStore.lastAuthenticationContext === context)
+        XCTAssertTrue(context.interactionNotAllowed)
     }
 
     func test_sessionCoordinator_relockParticipantFailure_entersRestartRequired() async throws {
@@ -332,7 +461,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             secretData: Data(repeating: 0xAC, count: 32)
         )
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.restart"
         )
@@ -394,7 +523,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let recoveryCoordinator = AppProtectedDomainRecoveryCoordinator(registryStore: registryStore)
         let rightStoreClient = MockProtectedDataRightStoreClient()
         let protectedDataSessionCoordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: AppProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             authenticationPromptCoordinator: authPromptCoordinator
@@ -414,7 +543,10 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             gracePeriodProvider: { config.gracePeriod },
             requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthentication: { reason in
-                try await authManager.evaluate(mode: config.authMode, reason: reason)
+                try await authManager.evaluateAppSession(
+                    policy: config.appSessionAuthenticationPolicy,
+                    reason: reason
+                )
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator
@@ -507,7 +639,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let rightStoreClient = MockProtectedDataRightStoreClient()
         let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.resume-suppression",
             authenticationPromptCoordinator: authPromptCoordinator
@@ -524,7 +656,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in
                 await didEvaluateAuthentication.setTrue()
-                return true
+                return .authenticated(context: nil)
             },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
@@ -553,7 +685,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
         let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: MockProtectedDataRightStoreClient(),
+            rootSecretStore: MockProtectedDataRightStoreClient(),
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.resign-suppression",
             authenticationPromptCoordinator: authPromptCoordinator
@@ -565,7 +697,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
         )
@@ -588,7 +720,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let rightStoreClient = MockProtectedDataRightStoreClient()
         let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.late-lifecycle",
             authenticationPromptCoordinator: authPromptCoordinator
@@ -605,7 +737,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in
                 await didEvaluateAuthentication.setTrue()
-                return true
+                return .authenticated(context: nil)
             },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
@@ -658,7 +790,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
         let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: MockProtectedDataRightStoreClient(),
+            rootSecretStore: MockProtectedDataRightStoreClient(),
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.background-suppression",
             authenticationPromptCoordinator: authPromptCoordinator
@@ -670,7 +802,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
         )
@@ -692,8 +824,9 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
         let rightStoreClient = MockProtectedDataRightStoreClient()
         let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let handoffContext = LAContext()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.resume-no-warmup",
             authenticationPromptCoordinator: authPromptCoordinator
@@ -705,7 +838,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 0 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in .authenticated(context: handoffContext) },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
         )
@@ -720,6 +853,9 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
         XCTAssertEqual(coordinator.frameworkState, .sessionLocked)
         XCTAssertEqual(rightStoreClient.rightLookupCallCount, 0)
+        XCTAssertTrue(orchestrator.consumeAuthenticatedContextForProtectedData() === handoffContext)
+        XCTAssertNil(orchestrator.consumeAuthenticatedContextForProtectedData())
+        handoffContext.invalidate()
     }
 
     func test_handleResume_afterBackgroundFollowingOperationPrompt_treatsReturnAsRealResume() async {
@@ -732,7 +868,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let rightStoreClient = MockProtectedDataRightStoreClient()
         let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.resume-after-background",
             authenticationPromptCoordinator: authPromptCoordinator
@@ -749,7 +885,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in
                 await didEvaluateAuthentication.setTrue()
-                return true
+                return .authenticated(context: nil)
             },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
@@ -778,7 +914,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
         let rightStoreClient = MockProtectedDataRightStoreClient()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.empty"
         )
@@ -787,7 +923,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
         let registry = ProtectedDataRegistry.emptySteadyState(
@@ -808,7 +944,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
         let rightStoreClient = MockProtectedDataRightStoreClient()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.pending"
         )
@@ -817,7 +953,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
         let registry = ProtectedDataRegistry(
@@ -842,7 +978,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
         let rightStoreClient = MockProtectedDataRightStoreClient()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.auth"
         )
@@ -851,7 +987,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
         let registry = ProtectedDataRegistry(
@@ -882,7 +1018,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             secretData: Data(repeating: 0xAD, count: 32)
         )
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.reuse"
         )
@@ -904,7 +1040,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
 
@@ -924,7 +1060,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
         let rightStoreClient = MockProtectedDataRightStoreClient()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.framework-recovery"
         )
@@ -948,7 +1084,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
 
@@ -969,7 +1105,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             secretData: Data(repeating: 0xB0, count: 32)
         )
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.restart-required"
         )
@@ -997,7 +1133,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
             requireAuthOnLaunchProvider: { true },
-            evaluateAppAuthentication: { _ in true },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
 
@@ -1014,7 +1150,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
         let rightStoreClient = MockProtectedDataRightStoreClient()
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.missing"
         )
@@ -1046,7 +1182,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         handle.rawSecretError = ProtectedDataError.internalFailure("secret unreadable")
         rightStoreClient.persistedRightHandle = handle
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.secret"
         )
@@ -1064,7 +1200,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         )
 
         XCTAssertEqual(result, .frameworkRecoveryNeeded)
-        XCTAssertEqual(handle.deauthorizeCallCount, 1)
         XCTAssertEqual(coordinator.frameworkState, .frameworkRecoveryNeeded)
         XCTAssertFalse(coordinator.hasActiveWrappingRootKey)
     }
@@ -1080,7 +1215,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         handle.authorizeError = AuthenticationError.cancelled
         rightStoreClient.persistedRightHandle = handle
         let coordinator = AppProtectedDataSessionCoordinator(
-            rightStoreClient: rightStoreClient,
+            rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.cancelled"
         )

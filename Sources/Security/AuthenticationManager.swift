@@ -12,6 +12,8 @@ private enum AuthStrings {
 enum AuthenticationError: Error, LocalizedError {
     /// Biometric authentication is not available (sensor damaged, locked out, etc.).
     case biometricsUnavailable
+    /// App Access biometrics-only authentication is unavailable.
+    case appAccessBiometricsUnavailable
     /// The user cancelled the authentication prompt.
     case cancelled
     /// Authentication failed (wrong biometric, wrong passcode, etc.).
@@ -32,6 +34,9 @@ enum AuthenticationError: Error, LocalizedError {
         case .biometricsUnavailable:
             String(localized: "error.auth.biometricsUnavailable",
                    defaultValue: "Biometric authentication is currently unavailable. In High Security mode, all private key operations are blocked until biometric authentication is restored.")
+        case .appAccessBiometricsUnavailable:
+            String(localized: "error.auth.appAccessBiometricsUnavailable",
+                   defaultValue: "Biometric authentication is currently unavailable. App Access Protection cannot use Biometrics Only until biometric authentication is restored.")
         case .cancelled:
             String(localized: "error.auth.cancelled",
                    defaultValue: "Authentication was cancelled.")
@@ -138,6 +143,15 @@ final class AuthenticationManager: AuthenticationEvaluable {
         }
     }
 
+    func canEvaluate(appSessionPolicy: AppSessionAuthenticationPolicy) -> Bool {
+        let context = LAContext()
+        var error: NSError?
+        return context.canEvaluatePolicy(
+            appSessionPolicy.localAuthenticationPolicy,
+            error: &error
+        )
+    }
+
     func evaluate(mode: AuthenticationMode, reason: String) async throws -> Bool {
         if defaults.bool(forKey: UITestPreferences.bypassAuthenticationKey) {
             return true
@@ -180,6 +194,38 @@ final class AuthenticationManager: AuthenticationEvaluable {
             lastEvaluatedContext = context
         }
         return success
+    }
+
+    func evaluateAppSession(
+        policy: AppSessionAuthenticationPolicy,
+        reason: String
+    ) async throws -> AppSessionAuthenticationResult {
+        if defaults.bool(forKey: UITestPreferences.bypassAuthenticationKey) {
+            return .authenticated(context: nil)
+        }
+
+        let context = LAContext()
+        policy.configure(context)
+
+        do {
+            let success = try await authenticationPromptCoordinator.withPrivacyPrompt {
+                try await context.evaluatePolicy(
+                    policy.localAuthenticationPolicy,
+                    localizedReason: reason
+                )
+            }
+            return success ? .authenticated(context: context) : .failed
+        } catch let error as LAError where error.code == .biometryNotAvailable
+                                         || error.code == .biometryNotEnrolled
+                                         || error.code == .biometryLockout {
+            throw AuthenticationError.appAccessBiometricsUnavailable
+        } catch let error as LAError where error.code == .userCancel
+                                         || error.code == .appCancel
+                                         || error.code == .systemCancel {
+            throw AuthenticationError.cancelled
+        } catch {
+            throw AuthenticationError.failed
+        }
     }
 
     // MARK: - Access Control Creation

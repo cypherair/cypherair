@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 @Observable
 final class AppSessionOrchestrator {
@@ -7,11 +8,12 @@ final class AppSessionOrchestrator {
     private let shouldBypassPrivacyAuthentication: () -> Bool
     private let gracePeriodProvider: () -> Int
     private let requireAuthOnLaunchProvider: () -> Bool
-    private let evaluateAppAuthentication: (String) async throws -> Bool
+    private let evaluateAppAuthentication: (String) async throws -> AppSessionAuthenticationResult
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
 
     private var hasAppearedOnce = false
+    private var pendingAuthenticatedContext: LAContext?
 
     var isPrivacyScreenBlurred = false
     var isAuthenticating = false
@@ -24,7 +26,7 @@ final class AppSessionOrchestrator {
         shouldBypassPrivacyAuthentication: @escaping () -> Bool = { false },
         gracePeriodProvider: @escaping () -> Int,
         requireAuthOnLaunchProvider: @escaping () -> Bool,
-        evaluateAppAuthentication: @escaping (String) async throws -> Bool,
+        evaluateAppAuthentication: @escaping (String) async throws -> AppSessionAuthenticationResult,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil
@@ -45,6 +47,7 @@ final class AppSessionOrchestrator {
     }
 
     func requestContentClear() {
+        discardPendingAuthenticatedContext()
         contentClearGeneration += 1
         traceStore?.record(
             category: .session,
@@ -119,6 +122,7 @@ final class AppSessionOrchestrator {
             )
             return
         }
+        discardPendingAuthenticatedContext()
         isPrivacyScreenBlurred = true
         authFailed = false
         traceStore?.record(
@@ -129,6 +133,7 @@ final class AppSessionOrchestrator {
     }
 
     func handleSceneDidEnterBackground() {
+        discardPendingAuthenticatedContext()
         isPrivacyScreenBlurred = true
         authFailed = false
         traceStore?.record(
@@ -196,8 +201,9 @@ final class AppSessionOrchestrator {
             defer { isAuthenticating = false }
 
             do {
-                let success = try await evaluateAppAuthentication(localizedReason)
-                if success {
+                let result = try await evaluateAppAuthentication(localizedReason)
+                if result.isAuthenticated {
+                    replacePendingAuthenticatedContext(with: result.context)
                     recordAuthentication()
                     authFailed = false
                     isPrivacyScreenBlurred = false
@@ -207,6 +213,7 @@ final class AppSessionOrchestrator {
                         metadata: ["reason": "authenticated", "attemptedAuthentication": "true"]
                     )
                 } else {
+                    discardPendingAuthenticatedContext()
                     authFailed = true
                     traceStore?.record(
                         category: .session,
@@ -215,6 +222,7 @@ final class AppSessionOrchestrator {
                     )
                 }
             } catch {
+                discardPendingAuthenticatedContext()
                 authFailed = true
                 traceStore?.record(
                     category: .session,
@@ -243,6 +251,17 @@ final class AppSessionOrchestrator {
     func retryPrivacyUnlock(localizedReason: String) async -> Bool {
         traceStore?.record(category: .session, name: "session.retryPrivacyUnlock")
         return await handleResume(localizedReason: localizedReason)
+    }
+
+    func consumeAuthenticatedContextForProtectedData() -> LAContext? {
+        let context = pendingAuthenticatedContext
+        pendingAuthenticatedContext = nil
+        traceStore?.record(
+            category: .session,
+            name: "session.consumeAuthenticatedContext",
+            metadata: ["hadContext": context == nil ? "false" : "true"]
+        )
+        return context
     }
 
     func evaluateProtectedDataAccessGate(
@@ -289,5 +308,15 @@ final class AppSessionOrchestrator {
                 }
             }
         }
+    }
+
+    private func replacePendingAuthenticatedContext(with context: LAContext?) {
+        discardPendingAuthenticatedContext()
+        pendingAuthenticatedContext = context
+    }
+
+    private func discardPendingAuthenticatedContext() {
+        pendingAuthenticatedContext?.invalidate()
+        pendingAuthenticatedContext = nil
     }
 }

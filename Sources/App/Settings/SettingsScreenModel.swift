@@ -1,9 +1,11 @@
 import Foundation
+import SwiftUI
 
 @MainActor
 @Observable
 final class SettingsScreenModel {
     typealias AuthModeSwitchAction = @MainActor (AuthenticationMode, [String], Bool) async throws -> Void
+    typealias AppAccessPolicySwitchAction = @MainActor (AppSessionAuthenticationPolicy) async throws -> Void
 
     let configuration: SettingsView.Configuration
     let appConfiguration: AppConfiguration
@@ -14,11 +16,13 @@ final class SettingsScreenModel {
     private let iosPresentationController: IOSPresentationController?
     private let macPresentationController: MacPresentationController?
     private let authModeSwitchAction: AuthModeSwitchAction
+    private let appAccessPolicySwitchAction: AppAccessPolicySwitchAction
 
     var pendingMode: AuthenticationMode?
     private var pendingModeRequestID: UUID?
     var presentedAuthModeRequest: AuthModeChangeConfirmationRequest?
     var isSwitching = false
+    var isSwitchingAppAccessPolicy = false
     var switchError: String?
     var showSwitchError = false
     var showOnboarding = false
@@ -32,7 +36,8 @@ final class SettingsScreenModel {
         iosPresentationController: IOSPresentationController?,
         macPresentationController: MacPresentationController?,
         configuration: SettingsView.Configuration,
-        authModeSwitchAction: AuthModeSwitchAction? = nil
+        authModeSwitchAction: AuthModeSwitchAction? = nil,
+        appAccessPolicySwitchAction: AppAccessPolicySwitchAction? = nil
     ) {
         self.configuration = configuration
         self.appConfiguration = config
@@ -48,6 +53,11 @@ final class SettingsScreenModel {
                 hasBackup: hasBackup,
                 authenticator: authManager
             )
+        }
+        self.appAccessPolicySwitchAction = appAccessPolicySwitchAction ?? { newPolicy in
+            guard authManager.canEvaluate(appSessionPolicy: newPolicy) else {
+                throw AuthenticationError.appAccessBiometricsUnavailable
+            }
         }
     }
 
@@ -118,6 +128,24 @@ final class SettingsScreenModel {
             macPresentationController.present(.authModeConfirmation(request))
         } else {
             presentedAuthModeRequest = request
+        }
+    }
+
+    func handleAppAccessPolicySelection(_ newPolicy: AppSessionAuthenticationPolicy) {
+        guard newPolicy != appConfiguration.appSessionAuthenticationPolicy else {
+            return
+        }
+
+        isSwitchingAppAccessPolicy = true
+        Task {
+            do {
+                try await appAccessPolicySwitchAction(newPolicy)
+                appConfiguration.appSessionAuthenticationPolicy = newPolicy
+            } catch {
+                switchError = error.localizedDescription
+                showSwitchError = true
+            }
+            isSwitchingAppAccessPolicy = false
         }
     }
 
@@ -269,5 +297,16 @@ final class SettingsScreenModel {
             }
             isSwitching = false
         }
+    }
+}
+
+private struct AppAccessPolicySwitchActionKey: EnvironmentKey {
+    static let defaultValue: SettingsScreenModel.AppAccessPolicySwitchAction? = nil
+}
+
+extension EnvironmentValues {
+    var appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? {
+        get { self[AppAccessPolicySwitchActionKey.self] }
+        set { self[AppAccessPolicySwitchActionKey.self] = newValue }
     }
 }

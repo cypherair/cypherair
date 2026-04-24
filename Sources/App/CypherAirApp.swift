@@ -79,9 +79,15 @@ struct CypherAirApp: App {
             authorizeSharedRight: { localizedReason in
                 do {
                     let registry = try container.protectedDomainRecoveryCoordinator.loadCurrentRegistry()
+                    let authenticationContext = container.appSessionOrchestrator
+                        .consumeAuthenticatedContextForProtectedData()
+                    defer {
+                        authenticationContext?.invalidate()
+                    }
                     let result = await container.protectedDataSessionCoordinator.beginProtectedDataAuthorization(
                         registry: registry,
-                        localizedReason: localizedReason
+                        localizedReason: localizedReason,
+                        authenticationContext: authenticationContext
                     )
                     switch result {
                     case .authorized:
@@ -223,6 +229,7 @@ struct CypherAirApp: App {
             .environment(container.authManager)
             .environment(container.keyManagement)
             .environment(container.selfTestService)
+            .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
             .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
             .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
             .environment(tutorialStore)
@@ -278,6 +285,7 @@ struct CypherAirApp: App {
                 .environment(container.selfTestService)
                 .environment(container.authManager)
                 .environment(container.appSessionOrchestrator)
+                .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
                 .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
                 .environment(\.protectedSettingsHost, protectedSettingsHost)
                 .environment(tutorialStore)
@@ -399,6 +407,46 @@ struct CypherAirApp: App {
             syncMacTutorialHostAvailability()
         }
         #endif
+    }
+
+    private var appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction {
+        { newPolicy in
+            let currentPolicy = container.config.appSessionAuthenticationPolicy
+            guard newPolicy != currentPolicy else {
+                return
+            }
+
+            if container.protectedDataSessionCoordinator.hasPersistedRootSecret() {
+                let authenticationPolicy = AppSessionAuthenticationPolicy
+                    .strictestPolicyForRootSecretReprotection(
+                        from: currentPolicy,
+                        to: newPolicy
+                    )
+                let result = try await container.authManager.evaluateAppSession(
+                    policy: authenticationPolicy,
+                    reason: String(
+                        localized: "settings.appAccessPolicy.change.reason",
+                        defaultValue: "Authenticate to change App Access Protection."
+                    )
+                )
+                guard result.isAuthenticated else {
+                    throw AuthenticationError.failed
+                }
+                defer {
+                    result.context?.invalidate()
+                }
+
+                try container.protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
+                    from: currentPolicy,
+                    to: newPolicy,
+                    authenticationContext: result.context
+                )
+            } else {
+                guard container.authManager.canEvaluate(appSessionPolicy: newPolicy) else {
+                    throw AuthenticationError.appAccessBiometricsUnavailable
+                }
+            }
+        }
     }
 
     #if os(iOS) || os(visionOS)

@@ -1793,6 +1793,22 @@
         }
       }
     },
+    "error.auth.appAccessBiometricsUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometric authentication is currently unavailable. App Access Protection cannot use Biometrics Only until biometric authentication is restored."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生物认证当前不可用。生物认证恢复前，App 访问保护不能使用仅生物识别。"
+          }
+        }
+      }
+    },
     "error.auth.cancelled" : {
       "localizations" : {
         "en" : {
@@ -2093,6 +2109,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "准备受保护应用数据时，安全随机数操作失败。"
+          }
+        }
+      }
+    },
+    "error.protectedData.rootSecretMigrationVerification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The protected app data root secret could not be verified after migration."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "迁移后无法验证受保护应用数据根密钥。"
+          }
+        }
+      }
+    },
+    "error.protectedData.rootSecretVerification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The protected app data root secret could not be verified after updating its access policy."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新访问策略后无法验证受保护应用数据根密钥。"
           }
         }
       }
@@ -8022,13 +8070,77 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Authentication Mode"
+            "value" : "Private Key Protection"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "认证模式"
+            "value" : "私钥保护"
+          }
+        }
+      }
+    },
+    "settings.appAccessPolicy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Access Protection"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 访问保护"
+          }
+        }
+      }
+    },
+    "settings.appAccessPolicy.biometricsOnly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometrics Only"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅生物识别"
+          }
+        }
+      }
+    },
+    "settings.appAccessPolicy.change.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to change App Access Protection."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "认证以更改 App 访问保护。"
+          }
+        }
+      }
+    },
+    "settings.appAccessPolicy.userPresence" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User Presence"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户在场"
           }
         }
       }
@@ -8454,13 +8566,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mode Switch Failed"
+            "value" : "Protection Change Failed"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "模式切换失败"
+            "value" : "保护设置更改失败"
           }
         }
       }
