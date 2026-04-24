@@ -133,7 +133,25 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertEqual(store.recentEntries.count, 1)
         XCTAssertEqual(lines.count, 1)
         XCTAssertTrue(lines[0].contains("[AuthTrace]"))
+        XCTAssertTrue(lines[0].contains("wall="))
+        XCTAssertTrue(lines[0].contains("elapsedMs="))
+        XCTAssertTrue(lines[0].contains("deltaMs="))
+        XCTAssertTrue(lines[0].contains("ref="))
         XCTAssertTrue(lines[0].contains("gate.active"))
+    }
+
+    func test_traceStore_recordsMonotonicRelativeTiming() {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+
+        store.record(category: .session, name: "one")
+        store.record(category: .session, name: "two")
+
+        let entries = store.recentEntries
+        XCTAssertEqual(entries.map(\.sequence), [1, 2])
+        XCTAssertGreaterThanOrEqual(entries[0].elapsedMilliseconds, 0)
+        XCTAssertGreaterThanOrEqual(entries[1].elapsedMilliseconds, entries[0].elapsedMilliseconds)
+        XCTAssertEqual(entries[0].deltaMilliseconds, 0, accuracy: 0.001)
+        XCTAssertGreaterThanOrEqual(entries[1].deltaMilliseconds, 0)
     }
 
     func test_authenticationPromptCoordinator_recordsPrivacyAndOperationPromptEvents() async throws {
@@ -141,16 +159,18 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         let coordinator = TraceAuthenticationPromptCoordinator(traceStore: store)
         let initialGeneration = coordinator.operationPromptAttemptGeneration
 
-        _ = try await coordinator.withPrivacyPrompt { 1 }
+        _ = try await coordinator.withPrivacyPrompt(source: "trace.privacy") { 1 }
         XCTAssertEqual(coordinator.operationPromptAttemptGeneration, initialGeneration)
-        _ = try await coordinator.withOperationPrompt { 2 }
+        _ = try await coordinator.withOperationPrompt(source: "trace.operation") { 2 }
         XCTAssertEqual(coordinator.operationPromptAttemptGeneration, initialGeneration + 1)
 
-        let kinds = store.recentEntries
-            .filter { $0.name == "prompt.begin" }
-            .compactMap { $0.metadata["kind"] }
+        let promptBegins = store.recentEntries.filter { $0.name == "prompt.begin" }
+        let promptEnds = store.recentEntries.filter { $0.name == "prompt.end" }
 
-        XCTAssertEqual(kinds, ["privacy", "operation"])
+        XCTAssertEqual(promptBegins.compactMap { $0.metadata["kind"] }, ["privacy", "operation"])
+        XCTAssertEqual(promptBegins.compactMap { $0.metadata["source"] }, ["trace.privacy", "trace.operation"])
+        XCTAssertEqual(promptBegins.compactMap { $0.metadata["promptID"] }, promptEnds.compactMap { $0.metadata["promptID"] })
+        XCTAssertEqual(Set(promptBegins.compactMap { $0.metadata["promptID"] }).count, 2)
     }
 
     func test_authenticationShieldCoordinator_recordsShieldTraceEventsIntoStoreAndSink() async {
@@ -249,8 +269,58 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
 
         XCTAssertTrue(result.isAuthenticated)
         XCTAssertNil(result.context)
-        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "appSession.evaluate.start" && $0.metadata["policy"] == "userPresence" }))
-        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "appSession.evaluate.finish" && $0.metadata["result"] == "bypass" && $0.metadata["hasContext"] == "false" }))
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "appSession.evaluate.start"
+                    && $0.metadata["policy"] == "userPresence"
+                    && $0.metadata["source"] == "unspecified"
+                    && $0.metadata["promptID"] == "none"
+            }
+        )
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "appSession.evaluate.finish"
+                    && $0.metadata["result"] == "bypass"
+                    && $0.metadata["hasContext"] == "false"
+                    && $0.metadata["promptID"] == "none"
+            }
+        )
+    }
+
+    func test_authenticationManager_evaluateModeBypass_recordsStartAndFinishTrace() async throws {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: "com.cypherair.preference.uiTestBypassAuthentication")
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let manager = TraceAuthenticationManager(
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            defaults: defaults,
+            traceStore: traceStore
+        )
+
+        let result = try await manager.evaluate(
+            mode: .standard,
+            reason: "Trace private key bypass",
+            source: "unit.evaluateMode"
+        )
+
+        XCTAssertTrue(result)
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "privateKey.evaluate.start"
+                    && $0.metadata["mode"] == "standard"
+                    && $0.metadata["source"] == "unit.evaluateMode"
+                    && $0.metadata["promptID"] == "none"
+            }
+        )
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "privateKey.evaluate.finish"
+                    && $0.metadata["result"] == "bypass"
+                    && $0.metadata["promptID"] == "none"
+            }
+        )
     }
 
     func test_authenticationManager_switchModeSuccess_recordsPhaseTraceWithoutFingerprints() async throws {

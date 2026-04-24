@@ -12,6 +12,8 @@ final class AuthLifecycleTraceStore: @unchecked Sendable {
     struct Entry: Equatable {
         let sequence: Int
         let timestamp: Date
+        let elapsedMilliseconds: Double
+        let deltaMilliseconds: Double
         let category: Category
         let name: String
         let metadata: [String: String]
@@ -21,13 +23,15 @@ final class AuthLifecycleTraceStore: @unchecked Sendable {
     private let capacity: Int
     private let sink: @Sendable (String) -> Void
     private let isEnabled: Bool
+    private let startedAt = Date()
 
     private var nextSequence = 1
     private var entries: [Entry] = []
+    private var lastTimestamp: Date?
 
     init(
         isEnabled: Bool,
-        capacity: Int = 200,
+        capacity: Int = 1000,
         sink: (@Sendable (String) -> Void)? = nil
     ) {
         self.capacity = max(capacity, 1)
@@ -59,9 +63,15 @@ final class AuthLifecycleTraceStore: @unchecked Sendable {
         }
 
         let entry = lock.withLock { () -> Entry in
+            let timestamp = Date()
+            let elapsedMilliseconds = timestamp.timeIntervalSince(startedAt) * 1000
+            let deltaMilliseconds = lastTimestamp.map { timestamp.timeIntervalSince($0) * 1000 } ?? 0
+            lastTimestamp = timestamp
             let entry = Entry(
                 sequence: nextSequence,
-                timestamp: Date(),
+                timestamp: timestamp,
+                elapsedMilliseconds: elapsedMilliseconds,
+                deltaMilliseconds: deltaMilliseconds,
                 category: category,
                 name: name,
                 metadata: metadata
@@ -78,10 +88,17 @@ final class AuthLifecycleTraceStore: @unchecked Sendable {
     }
 
     private static func format(_ entry: Entry) -> String {
+        let wallClockFormatter = ISO8601DateFormatter()
+        wallClockFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        wallClockFormatter.timeZone = .current
+
         var components = [
             "[AuthTrace]",
             "#\(entry.sequence)",
-            String(format: "%.6f", entry.timestamp.timeIntervalSinceReferenceDate),
+            "wall=\(wallClockFormatter.string(from: entry.timestamp))",
+            String(format: "elapsedMs=%.3f", entry.elapsedMilliseconds),
+            String(format: "deltaMs=%.3f", entry.deltaMilliseconds),
+            String(format: "ref=%.6f", entry.timestamp.timeIntervalSinceReferenceDate),
             entry.category.rawValue,
             entry.name
         ]

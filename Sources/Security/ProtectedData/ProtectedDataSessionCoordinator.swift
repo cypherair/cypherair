@@ -345,7 +345,9 @@ final class ProtectedDataSessionCoordinator {
         }
 
         do {
-            let secret = try await authenticationPromptCoordinator.withOperationPrompt {
+            let secret = try await authenticationPromptCoordinator.withOperationPrompt(
+                source: "protectedData.rootSecret.load.interactive"
+            ) {
                 try rootSecretStore.loadRootSecret(
                     identifier: identifier,
                     authenticationContext: authenticationContext
@@ -408,7 +410,7 @@ final class ProtectedDataSessionCoordinator {
             name: "protectedData.rootSecret.legacyAuthorize.start"
         )
         do {
-            try await authenticationPromptCoordinator.withOperationPrompt {
+            try await authenticationPromptCoordinator.withOperationPrompt(source: "protectedData.legacyAuthorize") {
                 try await legacyRight.authorize(localizedReason: localizedReason)
             }
             traceStore?.record(

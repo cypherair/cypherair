@@ -51,12 +51,36 @@ struct CypherAirApp: App {
         if launchConfiguration.shouldSkipOnboarding {
             container.config.hasCompletedOnboarding = true
         }
+        container.authLifecycleTraceStore?.record(
+            category: .lifecycle,
+            name: "app.init.containerReady",
+            metadata: [
+                "root": launchConfiguration.root.rawValue,
+                "uiTestMode": launchConfiguration.isUITestMode ? "true" : "false",
+                "requiresManualAuthentication": launchConfiguration.requiresManualAuthentication ? "true" : "false",
+                "authTraceEnabled": launchConfiguration.isAuthTraceEnabled ? "true" : "false"
+            ]
+        )
         let tutorialStore = TutorialSessionStore()
         let incomingURLImportCoordinator = IncomingURLImportCoordinator(
             importLoader: PublicKeyImportLoader(qrService: container.qrService),
             importWorkflow: ContactImportWorkflow(contactService: container.contactService)
         )
-        let startupSnapshot = AppStartupCoordinator().performPreAuthBootstrap(using: container)
+        let startupCoordinator = AppStartupCoordinator()
+        container.authLifecycleTraceStore?.record(
+            category: .lifecycle,
+            name: "app.init.preAuthBootstrap.start"
+        )
+        let startupSnapshot = startupCoordinator.performPreAuthBootstrap(using: container)
+        container.authLifecycleTraceStore?.record(
+            category: .lifecycle,
+            name: "app.init.preAuthBootstrap.finish",
+            metadata: [
+                "bootstrapOutcome": Self.traceValue(for: startupSnapshot.bootstrapOutcome),
+                "frameworkState": Self.traceValue(for: startupSnapshot.protectedDataFrameworkState),
+                "hasLoadError": startupSnapshot.loadError == nil ? "false" : "true"
+            ]
+        )
         let protectedSettingsHost = ProtectedSettingsHost(
             evaluateAccessGate: { isFirstProtectedAccess in
                 let decision = container.appSessionOrchestrator.evaluateProtectedDataAccessGate(
@@ -440,7 +464,8 @@ struct CypherAirApp: App {
                         reason: String(
                             localized: "settings.appAccessPolicy.change.reason",
                             defaultValue: "Authenticate to change App Access Protection."
-                        )
+                        ),
+                        source: "appAccessPolicy.switch"
                     )
                     guard result.isAuthenticated else {
                         throw AuthenticationError.failed
@@ -616,6 +641,41 @@ struct CypherAirApp: App {
         )
     }
     #endif
+
+    private static func traceValue(for outcome: ProtectedDataBootstrapOutcome) -> String {
+        switch outcome {
+        case .emptySteadyState(_, let didBootstrap):
+            didBootstrap ? "emptySteadyState.bootstrapped" : "emptySteadyState.existing"
+        case .loadedRegistry(_, let recoveryDisposition):
+            "loadedRegistry.\(traceValue(for: recoveryDisposition))"
+        case .frameworkRecoveryNeeded:
+            "frameworkRecoveryNeeded"
+        }
+    }
+
+    private static func traceValue(for recoveryDisposition: ProtectedDataRecoveryDisposition) -> String {
+        switch recoveryDisposition {
+        case .resumeSteadyState:
+            "resumeSteadyState"
+        case .continuePendingMutation:
+            "continuePendingMutation"
+        case .frameworkRecoveryNeeded:
+            "frameworkRecoveryNeeded"
+        }
+    }
+
+    private static func traceValue(for state: ProtectedDataFrameworkState) -> String {
+        switch state {
+        case .sessionLocked:
+            "sessionLocked"
+        case .sessionAuthorized:
+            "sessionAuthorized"
+        case .frameworkRecoveryNeeded:
+            "frameworkRecoveryNeeded"
+        case .restartRequired:
+            "restartRequired"
+        }
+    }
 
 }
 

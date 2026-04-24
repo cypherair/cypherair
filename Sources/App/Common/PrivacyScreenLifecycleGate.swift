@@ -51,7 +51,13 @@ struct PrivacyScreenLifecycleGate {
             traceStore?.record(
                 category: .lifecycle,
                 name: "gate.inactive",
-                metadata: ["decision": "suppressed", "isAuthenticating": isAuthenticating ? "true" : "false", "operationPrompt": isOperationPromptInProgress ? "true" : "false"]
+                metadata: [
+                    "decision": "suppressed",
+                    "isAuthenticating": isAuthenticating ? "true" : "false",
+                    "appSessionAuthenticating": isAuthenticating ? "true" : "false",
+                    "operationPrompt": isOperationPromptInProgress ? "true" : "false",
+                    "suppressionArmed": suppressNextSettledActivation ? "true" : "false"
+                ]
             )
             return false
         }
@@ -60,7 +66,14 @@ struct PrivacyScreenLifecycleGate {
         traceStore?.record(
             category: .lifecycle,
             name: "gate.inactive",
-            metadata: ["decision": shouldHandle ? "handled" : "suppressedForSettledActivation", "suppressed": suppressNextSettledActivation ? "true" : "false"]
+            metadata: [
+                "decision": shouldHandle ? "handled" : "suppressedForSettledActivation",
+                "suppressed": suppressNextSettledActivation ? "true" : "false",
+                "suppressionArmed": suppressNextSettledActivation ? "true" : "false",
+                "isAuthenticating": isAuthenticating ? "true" : "false",
+                "appSessionAuthenticating": isAuthenticating ? "true" : "false",
+                "operationPrompt": isOperationPromptInProgress ? "true" : "false"
+            ]
         )
         return shouldHandle
     }
@@ -93,7 +106,13 @@ struct PrivacyScreenLifecycleGate {
             traceStore?.record(
                 category: .lifecycle,
                 name: "gate.active",
-                metadata: ["decision": "suppressed", "isAuthenticating": isAuthenticating ? "true" : "false", "operationPrompt": isOperationPromptInProgress ? "true" : "false"]
+                metadata: [
+                    "decision": "suppressed",
+                    "isAuthenticating": isAuthenticating ? "true" : "false",
+                    "appSessionAuthenticating": isAuthenticating ? "true" : "false",
+                    "operationPrompt": isOperationPromptInProgress ? "true" : "false",
+                    "suppressionArmed": suppressNextSettledActivation ? "true" : "false"
+                ]
             )
             return false
         }
@@ -103,7 +122,14 @@ struct PrivacyScreenLifecycleGate {
             traceStore?.record(
                 category: .lifecycle,
                 name: "gate.active",
-                metadata: ["decision": "consumeSuppression", "suppressed": "false"]
+                metadata: [
+                    "decision": "consumeSuppression",
+                    "suppressed": "false",
+                    "suppressionArmed": "true",
+                    "isAuthenticating": "false",
+                    "appSessionAuthenticating": "false",
+                    "operationPrompt": "false"
+                ]
             )
             return false
         }
@@ -111,7 +137,14 @@ struct PrivacyScreenLifecycleGate {
         traceStore?.record(
             category: .lifecycle,
             name: "gate.active",
-            metadata: ["decision": "handled", "suppressed": "false"]
+            metadata: [
+                "decision": "handled",
+                "suppressed": "false",
+                "suppressionArmed": "false",
+                "isAuthenticating": "false",
+                "appSessionAuthenticating": "false",
+                "operationPrompt": "false"
+            ]
         )
         return true
     }
