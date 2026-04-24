@@ -160,7 +160,8 @@ hello-c
 
 This matters because it makes the current issue look much less like
 "the machine cannot run arm64e binaries at all" and much more like
-"the current Rust host-runtime path is not viable on this environment."
+"the original Rust host-runtime path was missing required arm64e ptrauth ABI
+semantics on this environment."
 
 ### 5. Ad-hoc re-signing does not change the crash
 
@@ -252,7 +253,7 @@ in a temporary Rust checkout:
 
 ```text
 /Users/tianren/coding/rust
-branch: codex/arm64e-darwin-ptrauth-spike
+branch: codex/arm64e-upstream-prep-2026-04-24
 ```
 
 The spike currently has two layers:
@@ -336,34 +337,71 @@ to:
 
 ## Current Conclusion
 
+2026-04-24 update: the minimal Rust host-runtime reproductions are no longer
+failing with the rebuilt upstream-prep Rust branch. The current stage1 compiler
+produces runnable `arm64e-apple-darwin` binaries for `hello world`,
+`thread_local!`, and `std::thread::current().id()`, and the TLS sample assembly
+contains authenticated `blraaz` calls.
+
+2026-04-24 GitHub Actions update: the CypherAir Rust fork workflow run
+<https://github.com/cypherair/rust/actions/runs/24868246845> passed
+`arm64e targeted validation` on both `macos-15` and `macos-26`. On the hosted
+`macos-26-arm64` runner, the stage1 `arm64e-apple-darwin` std build passed,
+hello/thread-id/fnptr/TLS diagnostics all ran successfully, and the uploaded
+fnptr/TLS diagnostics showed authenticated `blraaz` calls.
+
+2026-04-24 rebase update: the active Rust branch was rebased onto
+`upstream/main@9836b06b55f5` and force-pushed to the CypherAir fork PR. Local
+post-rebase validation passed for `x.py check`, targeted arm64e codegen/
+assembly/UI tests, and stage1 `arm64e-apple-darwin` std build. Fork-side
+split-prep branches were also pushed for visionOS target, ptrauth core,
+ptrauth diagnostics, and bootstrap shallow-ref handling.
+
+2026-04-24 upstream PR update: three clean ready PRs are open against
+`rust-lang/rust`: target <https://github.com/rust-lang/rust/pull/155715>,
+ptrauth/codegen <https://github.com/rust-lang/rust/pull/155716>, and bootstrap
+shallow-ref handling <https://github.com/rust-lang/rust/pull/155717>. The
+ptrauth PR includes the `write.rs` gate that limits unsupported ptrauth bundle
+stripping to Apple arm64e codegen.
+
+2026-04-24 integration refresh: a replacement CypherAir fork integration PR is
+open at <https://github.com/cypherair/rust/pull/5> from
+`codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`. It contains the
+three upstream-ready PR contents, an integration-only visionOS+ptrauth
+cross-check follow-up, and the fork-only arm64e validation workflow. Local
+validation passed for `x.py check`, targeted arm64e codegen/assembly/UI tests
+including `targets-macho`, stage1 `arm64e-apple-darwin` std build, and
+targeted stage1 bootstrap git-helper tests. The older four stacked split-prep
+branches were deleted to avoid confusion with the upstream-ready branches.
+
 The present evidence supports this ordering of likelihood:
 
-1. `arm64e-apple-darwin` Rust host binaries are currently not viable on this
-   local toolchain path for host execution.
-2. The Xcode macOS unit-test crashes are a downstream symptom of that lower-level
-   runtime issue.
-3. `discover_certificate_selectors` and `merge_public_certificate_update` appear
+1. The original minimal Rust `arm64e-apple-darwin` host-runtime crash appears
+   fixed by the ptrauth/codegen patch stack.
+2. The earlier Xcode macOS unit-test crashes were likely downstream symptoms of
+   that lower-level runtime issue.
+3. `discover_certificate_selectors` and `merge_public_certificate_update` appeared
    in crash stacks because those tests happen to exercise Rust code heavily, not
    because they are uniquely broken business paths.
 4. Within the sampled nightly range (`2026-02-15` through current nightly), the
-   problem looks target-wide rather than like an obvious recent regression.
-5. The most actionable remaining hypothesis is now a codegen/ABI gap in
-   `arm64e` TLS/indirect-call pointer authentication rather than a generic
-   application-layer crash.
-6. A source-level Rust patch spike now fixes the minimal host reproductions,
-   which strongly suggests the core issue is in Rust's `arm64e` codegen / ABI
-   glue rather than in CypherAir or Sequoia.
+   original problem looked target-wide rather than like an obvious recent
+   regression.
+5. The most actionable path is now upstream preparation: keep validating the
+   patched toolchain through the downstream app/sysroot flow, while preparing
+   the Rust changes as reviewable upstream PR slices.
 
 ## Practical Impact
 
 For the current experiment branch:
 
 - `iOS arm64e` build probing remains separately interesting
-- `macOS unit tests under arm64e` should currently be treated as **blocked by
-  Rust host-runtime instability**
-- further Swift/XCTest debugging is unlikely to produce the primary root cause
-- the next-best escalation target is Rust/toolchain investigation or upstream
-  reporting, not more app-layer debugging
+- `macOS unit tests under arm64e` are no longer blocked by the original minimal
+  Rust host-runtime crash; remaining failures should be treated as downstream
+  cargo/sysroot/app validation issues unless a new minimal Rust repro appears
+- further Swift/XCTest debugging should be guided by fresh failures from the
+  patched toolchain, not by the earlier `_tlv_get_addr` baseline
+- the next-best escalation target is a clean Rust upstream PR split and fork CI
+  validation, not more app-layer root-cause hunting for the old TLS symptom
 
 ## Reproduction Helper
 

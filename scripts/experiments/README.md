@@ -15,7 +15,26 @@ That toolchain currently comes from the local Rust fork checkout at:
 
 The branch-level `rust-toolchain.toml` points repo-root cargo/rustc invocations
 at that patched stage1 toolchain so local `pgp-mobile` validation uses the
-current upstream-fix spike by default.
+current upstream-prep stack by default. The active Rust integration branch is
+`codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`, based on
+`upstream/main@9836b06b55f5`. It is the union of the three upstream-ready Rust
+PR branches, a small integration-only visionOS+ptrauth cross-check follow-up,
+and a final CypherAir fork-only workflow commit, which should never be sent to
+rust-lang/rust. The earlier stacked `prep/arm64e-*` rehearsal branches have
+been deleted; use the `prep/upstream-ready-*` branches and the rust-lang/rust
+PRs as the upstream references.
+
+As of 2026-04-24, three clean upstream-ready Rust PRs are open:
+
+- target: <https://github.com/rust-lang/rust/pull/155715>
+- arm64e ptrauth/codegen: <https://github.com/rust-lang/rust/pull/155716>
+- bootstrap shallow upstream detection: <https://github.com/rust-lang/rust/pull/155717>
+
+The CypherAir integration PR
+<https://github.com/cypherair/rust/pull/5> is now the local validation/reference
+stack until those PRs land or are reshaped by upstream review. The older PR #4
+is closed as superseded, but its branch/run remains useful as a green
+historical reference.
 
 ## Carry Chain
 
@@ -79,7 +98,7 @@ If the locally linked `stage1-arm64e-patch` toolchain or the packaged
 
 1. Restore the local Rust stage1 toolchain from
    `/Users/tianren/coding/rust` on branch
-   `codex/arm64e-darwin-ptrauth-spike`.
+   `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`.
 2. Create a local `bootstrap.toml` in the Rust fork if one is missing.
    Keep `build = "aarch64-apple-darwin"` and
    `host = ["aarch64-apple-darwin"]`, but include

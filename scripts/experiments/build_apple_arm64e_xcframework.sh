@@ -37,6 +37,7 @@ UNIVERSAL_LIB_DIR="$EXPERIMENT_ROOT/universal-libs"
 ARM64E_TOOLCHAIN="stage1-arm64e-patch"
 STABLE_TOOLCHAIN="stable"
 NIGHTLY_TOOLCHAIN="nightly"
+ARM64E_RUSTC="${ARM64E_RUSTC:-}"
 
 BUILD_MODE="${1:---release}"
 if [ "$BUILD_MODE" = "--debug" ]; then
@@ -89,6 +90,20 @@ ensure_rustup_target() {
         echo "  Installing ${target} for ${toolchain}..."
         rustup target add "${target}" --toolchain "${toolchain}"
     fi
+}
+
+resolve_arm64e_rustc() {
+    if [ -z "$ARM64E_RUSTC" ]; then
+        ARM64E_RUSTC="$(rustup which --toolchain "$ARM64E_TOOLCHAIN" rustc)"
+    fi
+
+    if [ ! -x "$ARM64E_RUSTC" ]; then
+        echo "error: arm64e rustc is missing or not executable: $ARM64E_RUSTC" >&2
+        exit 1
+    fi
+
+    echo "  arm64e rustc: $ARM64E_RUSTC"
+    echo "  arm64e cargo driver: $NIGHTLY_TOOLCHAIN with explicit RUSTC"
 }
 
 run_expected_failure() {
@@ -168,10 +183,19 @@ build_rust_artifact() {
     shift 3
 
     log_step "$label" "Building ${target}..."
+
+    local cargo_toolchain="$toolchain"
+    local rustc_env=()
+    if [ "$toolchain" = "$ARM64E_TOOLCHAIN" ]; then
+        cargo_toolchain="$NIGHTLY_TOOLCHAIN"
+        rustc_env=(RUSTC="$ARM64E_RUSTC")
+    fi
+
     env \
         CARGO_HOME="$EXPERIMENT_CARGO_HOME" \
         CARGO_TARGET_DIR="$EXPERIMENT_TARGET_DIR" \
-        cargo +"$toolchain" build $CARGO_FLAGS "$@" --target "$target" --manifest-path "$MANIFEST"
+        "${rustc_env[@]}" \
+        cargo +"$cargo_toolchain" build $CARGO_FLAGS "$@" --target "$target" --manifest-path "$MANIFEST"
 }
 
 resolve_library_path() {
@@ -247,7 +271,8 @@ generate_bindings() {
     env \
         CARGO_HOME="$EXPERIMENT_CARGO_HOME" \
         CARGO_TARGET_DIR="$EXPERIMENT_TARGET_DIR" \
-        cargo +"$ARM64E_TOOLCHAIN" build -Zbuild-std $CARGO_FLAGS --target arm64e-apple-darwin --manifest-path "$MANIFEST"
+        RUSTC="$ARM64E_RUSTC" \
+        cargo +"$NIGHTLY_TOOLCHAIN" build -Zbuild-std $CARGO_FLAGS --target arm64e-apple-darwin --manifest-path "$MANIFEST"
 
     mv "$MANIFEST.bak.apple-arm64e-experiment" "$MANIFEST"
 
@@ -262,7 +287,7 @@ generate_bindings() {
         env \
             CARGO_HOME="$EXPERIMENT_CARGO_HOME" \
             CARGO_TARGET_DIR="$EXPERIMENT_TARGET_DIR" \
-            cargo run $CARGO_FLAGS --bin uniffi-bindgen generate \
+            cargo +"$NIGHTLY_TOOLCHAIN" run $CARGO_FLAGS --bin uniffi-bindgen generate \
                 --library "$host_dylib" \
                 --language swift \
                 --out-dir "$GENERATED_BINDINGS_DIR"
@@ -430,6 +455,7 @@ require_toolchain "$STABLE_TOOLCHAIN"
 require_toolchain "$NIGHTLY_TOOLCHAIN"
 require_toolchain "$ARM64E_TOOLCHAIN"
 ensure_component "$NIGHTLY_TOOLCHAIN" "rust-src"
+resolve_arm64e_rustc
 ensure_rustup_target "$STABLE_TOOLCHAIN" "aarch64-apple-ios"
 ensure_rustup_target "$STABLE_TOOLCHAIN" "aarch64-apple-ios-sim"
 ensure_rustup_target "$STABLE_TOOLCHAIN" "aarch64-apple-darwin"
@@ -448,7 +474,7 @@ if [ "${RUN_STABLE_BASELINES:-0}" = "1" ]; then
         env \
             CARGO_HOME="$baseline_root/stable-ios-cargo-home" \
             CARGO_TARGET_DIR="$baseline_root/stable-ios-target" \
-            cargo build --manifest-path "$MANIFEST" --target arm64e-apple-ios
+            cargo +"$STABLE_TOOLCHAIN" build --manifest-path "$MANIFEST" --target arm64e-apple-ios
 
     run_expected_failure \
         "stable cargo arm64e Darwin baseline" \
@@ -457,7 +483,7 @@ if [ "${RUN_STABLE_BASELINES:-0}" = "1" ]; then
         env \
             CARGO_HOME="$baseline_root/stable-darwin-cargo-home" \
             CARGO_TARGET_DIR="$baseline_root/stable-darwin-target" \
-            cargo build --manifest-path "$MANIFEST" --target arm64e-apple-darwin
+            cargo +"$STABLE_TOOLCHAIN" build --manifest-path "$MANIFEST" --target arm64e-apple-darwin
 else
     log_step "baseline" "Skipping stable failure baselines (set RUN_STABLE_BASELINES=1 to enable)."
 fi
