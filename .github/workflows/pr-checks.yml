@@ -82,6 +82,8 @@ jobs:
             --output arm64e-dependency-chain.json \
             --freshness-level warn
       - name: Build XCFramework and generated bindings
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./build-xcframework.sh --release
       - name: Package XCFramework artifact
         run: |

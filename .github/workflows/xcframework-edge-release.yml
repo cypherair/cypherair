@@ -176,6 +176,8 @@ jobs:
             --output arm64e-dependency-chain.json \
             --freshness-level error
       - name: Build XCFramework and generated bindings
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./build-xcframework.sh --release
       - name: Probe iOS build
         run: |
