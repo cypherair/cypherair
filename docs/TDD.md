@@ -122,7 +122,7 @@ Targets: `aarch64-apple-ios` (device) + `aarch64-apple-ios-sim` (Apple Silicon s
 The current release pipeline includes native visionOS support. `build-xcframework.sh` builds and validates the visionOS device and simulator archives, packages all Apple slices into `PgpMobile.xcframework`, and the Xcode project links that XCFramework. The native app path is probed with `xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS' CODE_SIGNING_ALLOWED=NO`.
 
 To keep vendored OpenSSL reproducible across the current Apple `arm64e`
-experiment chain, `pgp-mobile/Cargo.toml` patches `openssl-src` through
+build chain, `pgp-mobile/Cargo.toml` patches `openssl-src` through
 `[patch.crates-io]` to the CypherAir fork
 `https://github.com/cypherair/openssl-src-rs` on branch
 `carry/apple-arm64e-openssl-fork`. That branch is expected to track the
@@ -199,7 +199,7 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 3. The current Xcode project links `PgpMobile.xcframework` and imports the generated headers through `bindings/module.modulemap`
 4. Local Swift / FFI validation runs through `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 
-The current `openssl-src` override for the Apple `arm64e` experiment chain must
+The current `openssl-src` override for the Apple `arm64e` build chain must
 remain explicit: use the checked-in CypherAir `openssl-src-rs` git branch plus
 the checked-in `Cargo.lock`, not a machine-local `path` dependency. Release
 automation records the resolved `openssl-src-rs` commit and OpenSSL submodule

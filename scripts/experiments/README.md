@@ -1,7 +1,9 @@
-# Apple `arm64e` Experiment Notes
+# Apple `arm64e` Historical And Diagnostic Notes
 
-This directory contains branch-local experiment helpers for CypherAir's Apple
-`arm64e` work.
+This directory contains historical investigation notes and diagnostic helpers
+from CypherAir's Apple `arm64e` work. It is not the formal app build entrypoint.
+Use the repo-root `./build-xcframework.sh --release` path for current mainline
+packaging.
 
 ## Toolchain
 
@@ -51,7 +53,8 @@ historical reference.
 
 ## Carry Chain
 
-The current experiment intentionally uses a layered downstream carry chain:
+The current mainline arm64e build intentionally uses a layered downstream carry
+chain:
 
 - `pgp-mobile` tracks the CypherAir `openssl-src-rs` fork branch
   `carry/apple-arm64e-openssl-fork`
@@ -76,10 +79,9 @@ In other words:
 ## Script
 
 - `build_apple_arm64e_xcframework.sh`
-  Unified Apple experiment entrypoint. Extends the experiment to:
-  iOS/macOS/visionOS device `arm64` + `arm64e`, an `arm64e` Darwin host dylib
-  for bindgen validation, while keeping iOS and visionOS simulators on stable
-  `arm64`.
+  Historical diagnostic predecessor to the official repo-root entrypoint. It
+  still helps reproduce the original arm64e investigation path, but current
+  mainline packaging should use `./build-xcframework.sh --release`.
 - `repro_arm64e_rust_host_crashes.sh`
   Minimal host-side repro matrix for the current macOS `arm64e` crash
   investigation. Uses existing `pgp-mobile` Rust tests plus a standalone
@@ -137,7 +139,7 @@ local stage1 or the latest Rust fork prerelease.
 4. Recreate the app-side Apple arm64e artifacts:
 
    ```bash
-   cd /Users/tianren/coding/cypherair-apple-arm64e-unified-experiment
+   cd /Users/tianren/coding/cypherair-main
    CARGO_NET_GIT_FETCH_WITH_CLI=true \
        ./build-xcframework.sh --release
    ```
@@ -147,8 +149,8 @@ local stage1 or the latest Rust fork prerelease.
    `PgpMobile.arm64e-build-manifest.json`.
 
    The older `scripts/experiments/build_apple_arm64e_xcframework.sh` remains a
-   diagnostic/reproduction script for branch-local experiments. The repo-root
-   `./build-xcframework.sh --release` path is now the formal release build
+   diagnostic/reproduction script for historical investigations. The repo-root
+   `./build-xcframework.sh --release` path is the formal release build
    entrypoint.
 
 5. The script now skips the negative stable baseline repro by default.

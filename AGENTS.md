@@ -2,16 +2,24 @@
 
 This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding agents can quickly understand the project, constraints, sensitive boundaries, and required validation steps before making changes.
 
-## Arm64e Experiment Context
+## Apple arm64e Mainline Context
 
-- Local path: `/Users/tianren/coding/cypherair-apple-arm64e-unified-experiment`
-- Git shape: this directory is a **git worktree**, not a standalone clone.
-- Owning repository path: `/Users/tianren/coding/cypherair-main`
-- Local experiment branch in this worktree: `codex/apple-arm64e-unified-experiment`
+- Primary local main path: `/Users/tianren/coding/cypherair-main`
 - Remote repository: `cypherair/cypherair`
-- Remote experiment branch: `origin/codex/apple-arm64e-unified-experiment`
-- Current purpose: this worktree is the app-side integration branch for the Apple `arm64e` effort. The app-side adaptation builds and passes the unit-test path with the patched toolchain; the remaining work is keeping the experiment branch current with `main`, maintaining the dependency chain, and upstreaming the supporting forks, especially Rust.
-- Detailed arm64e status belongs in [docs/ARM64E_STATUS.md](docs/ARM64E_STATUS.md). Keep that file current whenever the branch topology, carry chain, toolchain pin, or progress changes.
+- Main branch: `main`
+- Apple `arm64e` app support landed on `main` through PR #222, merge commit
+  `98e9e9fcdcc3760538b2b0e260a5daf52dc67c0e`.
+- `./build-xcframework.sh --release` is the official app-side entrypoint. It
+  packages iOS/macOS/visionOS device libraries as `arm64` + `arm64e`, keeps
+  simulator libraries on `arm64`, and writes `PgpMobile.arm64e-build-manifest.json`.
+- Normal `arm64` Rust slices use official Rust stable. `arm64e` slices use
+  nightly Cargo with explicit `RUSTC=<stage1>/bin/rustc` from the CypherAir
+  patched Rust stage1.
+- The former experiment worktree may remain locally for post-merge comparison
+  and diagnostics, but `main` is now the app-side source of truth.
+- Detailed arm64e status belongs in [docs/ARM64E_STATUS.md](docs/ARM64E_STATUS.md).
+  Keep that file current whenever the Rust stage1 pin, OpenSSL carry chain,
+  release manifest shape, or app-side readiness changes.
 
 ## Related Forks
 
@@ -22,8 +30,10 @@ This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding ag
 
 ## Documentation Scope
 
-- Update experiment-specific arm64e documentation in this worktree, not in `/Users/tianren/coding/cypherair-main`.
-- Prefer additive edits and clarified wording over large deletions in this worktree so future experiment-to-main reconciliation stays manageable.
+- Update permanent documentation in the current `main` worktree.
+- Use [docs/ARM64E_MAIN_MIGRATION.md](docs/ARM64E_MAIN_MIGRATION.md) only as a
+  temporary checklist until post-merge edge and stable dry-run validation is
+  complete; normalized current-state docs outrank that checklist.
 
 ## Project Overview
 
