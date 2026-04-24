@@ -264,7 +264,7 @@ jobs:
 
       - name: Generate artifact attestation
         if: env.CREATE_RELEASE == 'true'
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
           subject-path: |
             ${{ env.SOURCE_BUNDLE }}
