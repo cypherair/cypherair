@@ -11,6 +11,9 @@ permissions:
 env:
   XCFRAMEWORK_ARTIFACT_NAME: pgpmobile-xcframework
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
+  ARM64E_MANIFEST: PgpMobile.arm64e-build-manifest.json
+  ARM64E_STAGE1_FORCE_DOWNLOAD: "1"
+  ARM64E_STAGE1_RELEASE_TAG: latest
 
 jobs:
   rust-full-tests:
@@ -22,16 +25,18 @@ jobs:
           rustup set profile minimal
           rustup toolchain install stable
           rustup default stable
-          rustc --version
-          cargo --version
+          # Keep ordinary Rust validation on the official stable channel.
+          # The arm64e stage1 compiler is resolved explicitly by build-xcframework.sh.
+          rustc +stable --version
+          cargo +stable --version
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: "pgp-mobile -> target"
       - name: Run full Rust suite
         run: |
-          cargo test --manifest-path pgp-mobile/Cargo.toml
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
+          cargo +stable test --manifest-path pgp-mobile/Cargo.toml
+          cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
+          cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
 
   xcframework-package:
     needs: rust-full-tests
@@ -62,12 +67,22 @@ jobs:
           rustup set profile minimal
           rustup toolchain install stable
           rustup default stable
-          rustc --version
-          cargo --version
+          # Keep ordinary Rust validation on the official stable channel.
+          # The arm64e stage1 compiler is resolved explicitly by build-xcframework.sh.
+          rustc +stable --version
+          cargo +stable --version
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: "pgp-mobile -> target"
+      - name: Check arm64e dependency chain freshness
+        run: |
+          python3 scripts/arm64e_release_metadata.py \
+            --cargo-lock pgp-mobile/Cargo.lock \
+            --output arm64e-dependency-chain.json \
+            --freshness-level warn
       - name: Build XCFramework and generated bindings
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./build-xcframework.sh --release
       - name: Package XCFramework artifact
         run: |
@@ -76,7 +91,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ env.XCFRAMEWORK_ARTIFACT_NAME }}
-          path: ${{ env.XCFRAMEWORK_ZIP }}
+          path: |
+            ${{ env.XCFRAMEWORK_ZIP }}
+            ${{ env.ARM64E_MANIFEST }}
           retention-days: 5
           if-no-files-found: error
       - name: Probe iOS build

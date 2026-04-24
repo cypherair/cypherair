@@ -35,5 +35,12 @@ lto = false
 strip = "none"
 codegen-units = 1
 
+# Temporary downstream carry for Apple arm64e experiments:
+# pgp-mobile -> cypherair/openssl-src-rs (carry/apple-arm64e-openssl-fork)
+#            -> cypherair/openssl (carry/apple-arm64e-targets)
+# The openssl-src-rs carry branch intentionally tracks a CypherAir OpenSSL fork
+# branch. Cargo.lock records the resolved commit for reproducibility, but the
+# manifest tracks the carry branch so branch-local status/docs updates are not
+# left behind.
 [patch.crates-io]
-openssl-src = { git = "https://github.com/alexcrichton/openssl-src-rs", rev = "767b8bffff4d690189d72d171feb224a41ea2e74" }
+openssl-src = { git = "https://github.com/cypherair/openssl-src-rs", branch = "carry/apple-arm64e-openssl-fork" }

@@ -20,6 +20,10 @@ permissions:
 env:
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
   XCFRAMEWORK_CHECKSUM: PgpMobile.xcframework.sha256
+  ARM64E_MANIFEST: PgpMobile.arm64e-build-manifest.json
+  ARM64E_STAGE1_FORCE_DOWNLOAD: "1"
+  ARM64E_STAGE1_RELEASE_TAG: latest
+  ARM64E_DEPENDENCY_FRESHNESS_LEVEL: error
 
 jobs:
   publish-edge-release:
@@ -52,8 +56,10 @@ jobs:
           rustup set profile minimal
           rustup toolchain install stable
           rustup default stable
-          rustc --version
-          cargo --version
+          # Keep ordinary Rust validation and release metadata on the official stable channel.
+          # The arm64e stage1 compiler is resolved explicitly by build-xcframework.sh.
+          rustc +stable --version
+          cargo +stable --version
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: "pgp-mobile -> target"
@@ -160,10 +166,18 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Run full Rust suite
         run: |
-          cargo test --manifest-path pgp-mobile/Cargo.toml
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
+          cargo +stable test --manifest-path pgp-mobile/Cargo.toml
+          cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
+          cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
+      - name: Check arm64e dependency chain freshness
+        run: |
+          python3 scripts/arm64e_release_metadata.py \
+            --cargo-lock pgp-mobile/Cargo.lock \
+            --output arm64e-dependency-chain.json \
+            --freshness-level error
       - name: Build XCFramework and generated bindings
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./build-xcframework.sh --release
       - name: Probe iOS build
         run: |
@@ -185,7 +199,7 @@ jobs:
 
           BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           XCODE_VERSION="$(xcodebuild -version | tr '\n' ' ' | sed 's/  */ /g; s/ $//')"
-          RUSTC_VERSION="$(rustc --version)"
+          RUSTC_VERSION="$(rustc +stable --version)"
           MARKETING_VERSION="$(xcodebuild -showBuildSettings -scheme CypherAir -project CypherAir.xcodeproj | sed -n 's/^[[:space:]]*MARKETING_VERSION = //p' | head -n1)"
           PROJECT_BUILD_NUMBER="$(xcodebuild -showBuildSettings -scheme CypherAir -project CypherAir.xcodeproj | sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION = //p' | head -n1)"
 
@@ -213,6 +227,7 @@ jobs:
             "project_build_number": "$PROJECT_BUILD_NUMBER",
             "xcode_version": "$XCODE_VERSION",
             "rustc_version": "$RUSTC_VERSION",
+            "arm64e_manifest": "$ARM64E_MANIFEST",
             "workflow_url": "$WORKFLOW_URL",
             "source_ref": "$RELEASE_SOURCE_REF"
           }
@@ -236,6 +251,7 @@ jobs:
 
           - \`$XCFRAMEWORK_ZIP\`
           - \`$XCFRAMEWORK_CHECKSUM\`
+          - \`$ARM64E_MANIFEST\`
           - \`$RELEASE_METADATA\`
 
           Verification:
@@ -248,14 +264,17 @@ jobs:
           \`\`\`
           EOF
       - name: Generate artifact attestation
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
-          subject-path: ${{ env.XCFRAMEWORK_ZIP }}
+          subject-path: |
+            ${{ env.XCFRAMEWORK_ZIP }}
+            ${{ env.XCFRAMEWORK_CHECKSUM }}
+            ${{ env.ARM64E_MANIFEST }}
+            ${{ env.RELEASE_METADATA }}
       - name: Create edge release tag
         run: |
           set -euo pipefail
 
-          git fetch --tags --force origin
           if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
             echo "::error::Release tag already exists: $RELEASE_TAG"
             exit 1
@@ -288,6 +307,7 @@ jobs:
           gh release upload "$RELEASE_TAG" \
             "$XCFRAMEWORK_ZIP" \
             "$XCFRAMEWORK_CHECKSUM" \
+            "$ARM64E_MANIFEST" \
             "$RELEASE_METADATA"
       - name: Publish draft edge prerelease
         env:

@@ -2,6 +2,29 @@
 
 This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding agents can quickly understand the project, constraints, sensitive boundaries, and required validation steps before making changes.
 
+## Arm64e Experiment Context
+
+- Local path: `/Users/tianren/coding/cypherair-apple-arm64e-unified-experiment`
+- Git shape: this directory is a **git worktree**, not a standalone clone.
+- Owning repository path: `/Users/tianren/coding/cypherair-main`
+- Local experiment branch in this worktree: `codex/apple-arm64e-unified-experiment`
+- Remote repository: `cypherair/cypherair`
+- Remote experiment branch: `origin/codex/apple-arm64e-unified-experiment`
+- Current purpose: this worktree is the app-side integration branch for the Apple `arm64e` effort. The app-side adaptation builds and passes the unit-test path with the patched toolchain; the remaining work is keeping the experiment branch current with `main`, maintaining the dependency chain, and upstreaming the supporting forks, especially Rust.
+- Detailed arm64e status belongs in [docs/ARM64E_STATUS.md](docs/ARM64E_STATUS.md). Keep that file current whenever the branch topology, carry chain, toolchain pin, or progress changes.
+
+## Related Forks
+
+- Rust fork: `/Users/tianren/coding/rust` (`cypherair/rust`, experiment branch `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`)
+- OpenSSL glue fork: `/Users/tianren/coding/openssl-src-rs` (`cypherair/openssl-src-rs`, carry branch `carry/apple-arm64e-openssl-fork`; CypherAir tracks this branch in `pgp-mobile/Cargo.toml`)
+- OpenSSL target-definition fork: `/Users/tianren/coding/openssl` (`cypherair/openssl`, carry branch `carry/apple-arm64e-targets`, prep branch `prep/apple-arm64e-targets`)
+- Related but currently unconfirmed arm64e role: `/Users/tianren/coding/rust-openssl` (`cypherair/rust-openssl`)
+
+## Documentation Scope
+
+- Update experiment-specific arm64e documentation in this worktree, not in `/Users/tianren/coding/cypherair-main`.
+- Prefer additive edits and clarified wording over large deletions in this worktree so future experiment-to-main reconciliation stays manageable.
+
 ## Project Overview
 
 CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and visionOS.
@@ -16,7 +39,8 @@ CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and 
 
 - Swift 6.2
 - SwiftUI with iOS 26 Liquid Glass conventions where applicable and native platform chrome elsewhere
-- Rust stable
+- Rust stable for normal targets, plus the CypherAir patched Rust stage1
+  toolchain for Apple `arm64e` slices
 - `sequoia-openpgp` 2.2.0 with `crypto-openssl`
 - UniFFI 0.31.x
 - CryptoKit + Security.framework
@@ -43,17 +67,18 @@ Start with `docs/ARCHITECTURE.md` and `docs/SECURITY.md` when working in unfamil
 
 ```bash
 # Rust builds
-cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
 
-# Full Rust + UniFFI + packaged-artifact sync
+# Full Rust + UniFFI + packaged-artifact sync. This now packages Apple
+# device slices as arm64 + arm64e and writes PgpMobile.arm64e-build-manifest.json.
 ./build-xcframework.sh --release
 
 # Rust tests
-cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 
 # macOS-local Swift unit + FFI validation
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
@@ -165,14 +190,14 @@ If the user asks to increment the build number, first read the current `CURRENT_
 - Add negative tests for failure paths, not only happy paths.
 - Secure Enclave / biometric tests must be guarded for real hardware availability.
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode uses for Swift/FFI tests.
-- If a Rust change can affect Swift-visible behavior, run `./build-xcframework.sh --release` before running `xcodebuild test`.
+- If a Rust change can affect Swift-visible behavior, run `./build-xcframework.sh --release` before running `xcodebuild test`. The script consumes the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease on GitHub Actions, or a local `stage1-arm64e-patch` rustup-linked toolchain when available.
 - See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
 - For route ownership, launch, tutorial-host, or macOS UI workflow changes, also run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted smoke subset.
 
 At minimum after meaningful code changes:
 
 ```bash
-cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
 ```
@@ -195,6 +220,7 @@ After editing:
 - Run the relevant tests
 - Verify no generated file was unintentionally hand-modified
 - Check `git diff --stat` and `git diff`
+- Update `docs/ARM64E_STATUS.md` if the arm64e toolchain chain, branch relationships, or progress changed
 
 ## Workflow Reminders
 
@@ -205,10 +231,12 @@ After editing:
 - When merging pull requests for this repository, prefer a regular merge commit by default. Do not squash-merge or rebase-merge unless the user explicitly asks for it.
 - Conventional commit prefixes are preferred:
   `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
+- Keep `docs/ARM64E_STATUS.md` synchronized with the current patched Rust toolchain pin, the OpenSSL carry-chain pin, and the experiment-vs-main branch posture.
 
 ## Key References
 
 - `CLAUDE.md`
+- `docs/ARM64E_STATUS.md`
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY.md`
 - `docs/TESTING.md`

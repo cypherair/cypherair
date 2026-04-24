@@ -122,7 +122,7 @@ The repository currently uses two validation tiers in GitHub Actions.
 **Blocking jobs** — must pass on pull requests and nightly validation:
 
 - `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
-- `xcframework-package` runs `./build-xcframework.sh --release`, uploads the `pgpmobile-xcframework` artifact for 5 days, and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes
+- `xcframework-package` checks the arm64e OpenSSL carry-chain freshness, runs `./build-xcframework.sh --release`, uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days, and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes
 
 **Observational jobs** — useful signal, but non-blocking while GitHub-hosted macOS remains below the project deployment target:
 
@@ -131,6 +131,14 @@ The repository currently uses two validation tiers in GitHub Actions.
 The repository also publishes unique edge XCFramework prereleases:
 
 - `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, rebuilds and validates the XCFramework, then publishes a unique `pgpmobile-edge-` prerelease for canonical `main` builds; non-main manual runs must use `pgpmobile-drill-*` prefixes
+- The arm64e XCFramework path consumes the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease on GitHub Actions. Stable `arm64` slices are still built with stable Rust, while `arm64e` slices use nightly Cargo with `RUSTC` pointing at the downloaded stage1 compiler.
+
+Toolchain contract:
+
+- `stable` means the official Rust stable channel, not a CypherAir release channel or Rust fork branch.
+- The repository root intentionally has no custom `rust-toolchain.toml` override. Use explicit `cargo +stable` / `rustc +stable` for ordinary Rust validation and metadata.
+- App-side Rust or UniFFI changes do not require waiting for a new GitHub Rust stage1 prerelease. Local full packaging uses a linked `stage1-arm64e-patch` toolchain when available, and GitHub-hosted release jobs force-download the latest attested Rust fork stage1 prerelease.
+- Only changes to the Rust compiler fork itself require rebuilding the local stage1 or publishing a new Rust fork stage1 prerelease before app-side arm64e packaging can consume the new compiler.
 
 ## 2.2 GitHub Actions Hosted macOS Limitation
 
@@ -168,10 +176,11 @@ Rust changes under `pgp-mobile/src` do **not** automatically refresh the build p
 Today, the Xcode project links:
 
 - `PgpMobile.xcframework`
+- `PgpMobile.arm64e-build-manifest.json`
 - `bindings/module.modulemap`
 - `Sources/PgpMobile/pgp_mobile.swift`
 
-`PgpMobile.xcframework` is a local generated artifact. It is ignored by git and must be refreshed with `./build-xcframework.sh --release` after Rust or UniFFI changes that can affect Swift-visible behavior. The shared scheme and app target both check for the artifact and fail with a clear error if the XCFramework is missing.
+`PgpMobile.xcframework` is a local generated artifact. It is ignored by git and must be refreshed with `./build-xcframework.sh --release` after Rust or UniFFI changes that can affect Swift-visible behavior. The build also emits `PgpMobile.arm64e-build-manifest.json`, which records the Rust stage1 prerelease provenance, the OpenSSL carry-chain commits, and the verified XCFramework slice layout. The shared scheme and app target both check for the XCFramework artifact and fail with a clear error if it is missing.
 
 GitHub Actions package jobs archive the generated `PgpMobile.xcframework` as the `pgpmobile-xcframework` artifact so downstream jobs can restore the exact build product on a clean runner.
 
@@ -190,7 +199,7 @@ This means there are three distinct workflows:
 Use this when you want to validate Rust logic in isolation.
 
 ```bash
-cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 ```
 
 This is the default local path and skips `#[ignore = "slow"]` Rust tests.
@@ -201,11 +210,11 @@ It does **not** refresh the release archives or generated UniFFI outputs that Xc
 Use this only when you want to refresh or inspect the platform-specific Rust release archives directly. This does **not** refresh the XCFramework artifact that Xcode consumes.
 
 ```bash
-cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
 ```
 
 ### C. Full UniFFI / bindings / XCFramework sync
@@ -218,13 +227,15 @@ Recommended path:
 ./build-xcframework.sh --release
 ```
 
-Prefer this path after Rust or UniFFI changes because it refreshes the intermediate static archives, regenerates bindings, recreates `PgpMobile.xcframework`, and enforces the dylib cleanup/validation that keeps Xcode linking deterministic.
+Prefer this path after Rust or UniFFI changes because it refreshes the stable `arm64` static archives, builds patched `arm64e` static archives with nightly Cargo plus explicit `RUSTC`, regenerates bindings from an `arm64e-apple-darwin` host dylib, recreates `PgpMobile.xcframework`, writes `PgpMobile.arm64e-build-manifest.json`, and enforces the dylib cleanup/validation that keeps Xcode linking deterministic.
+
+For local packaging, the script first uses `ARM64E_RUSTC` or `ARM64E_STAGE1_DIR` when supplied, then the locally linked `stage1-arm64e-patch` toolchain when present, and otherwise downloads the Rust fork prerelease. GitHub Actions sets `ARM64E_STAGE1_FORCE_DOWNLOAD=1` so prerelease and stable compliance artifacts never depend on runner-local toolchain state.
 
 If you must run the underlying bindgen step manually, run it from `pgp-mobile/`, not from the repo root:
 
 ```bash
 cd pgp-mobile
-cargo run --release --bin uniffi-bindgen generate \
+cargo +nightly run --release --bin uniffi-bindgen generate \
     --library target/release/libpgp_mobile.dylib \
     --language swift --out-dir ../bindings
 ```

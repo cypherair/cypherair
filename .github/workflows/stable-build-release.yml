@@ -29,9 +29,13 @@ permissions:
 env:
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
   XCFRAMEWORK_CHECKSUM: PgpMobile.xcframework.sha256
+  ARM64E_MANIFEST: PgpMobile.arm64e-build-manifest.json
   SOURCE_BUNDLE: CypherAir-source-bundle.tar.zst
   COMPLIANCE_MANIFEST: CypherAir-compliance-manifest.json
   RELINK_KIT: PgpMobile-relink-kit.tar.zst
+  ARM64E_STAGE1_FORCE_DOWNLOAD: "1"
+  ARM64E_STAGE1_RELEASE_TAG: latest
+  ARM64E_DEPENDENCY_FRESHNESS_LEVEL: error
 
 jobs:
   publish-stable-release:
@@ -66,8 +70,10 @@ jobs:
           rustup set profile minimal
           rustup toolchain install stable
           rustup default stable
-          rustc --version
-          cargo --version
+          # Keep ordinary Rust validation and release metadata on the official stable channel.
+          # The arm64e stage1 compiler is resolved explicitly by build-xcframework.sh.
+          rustc +stable --version
+          cargo +stable --version
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
@@ -140,11 +146,20 @@ jobs:
 
       - name: Run full Rust suite
         run: |
-          cargo test --manifest-path pgp-mobile/Cargo.toml
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
-          cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
+          cargo +stable test --manifest-path pgp-mobile/Cargo.toml
+          cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
+          cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
+
+      - name: Check arm64e dependency chain freshness
+        run: |
+          python3 scripts/arm64e_release_metadata.py \
+            --cargo-lock pgp-mobile/Cargo.lock \
+            --output arm64e-dependency-chain.json \
+            --freshness-level error
 
       - name: Build XCFramework and generated bindings
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./build-xcframework.sh --release
 
       - name: Probe iOS build with stable compliance metadata
@@ -175,7 +190,7 @@ jobs:
 
           BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           XCODE_VERSION="$(xcodebuild -version | tr '\n' ' ' | sed 's/  */ /g; s/ $//')"
-          RUSTC_VERSION="$(rustc --version)"
+          RUSTC_VERSION="$(rustc +stable --version)"
 
           ditto -c -k --sequesterRsrc --keepParent PgpMobile.xcframework "$XCFRAMEWORK_ZIP"
           shasum -a 256 "$XCFRAMEWORK_ZIP" > "$XCFRAMEWORK_CHECKSUM"
@@ -186,6 +201,7 @@ jobs:
             --build-number "$PROJECT_BUILD_NUMBER" \
             --commit-sha "$COMMIT_SHA" \
             --xcframework-zip "$XCFRAMEWORK_ZIP" \
+            --arm64e-manifest "$ARM64E_MANIFEST" \
             --output "$RELINK_KIT"
 
           python3 scripts/build_compliance_release_assets.py \
@@ -196,8 +212,10 @@ jobs:
             --commit-sha "$COMMIT_SHA" \
             --source-bundle-output "$SOURCE_BUNDLE" \
             --manifest-output "$COMPLIANCE_MANIFEST" \
+            --arm64e-manifest "$ARM64E_MANIFEST" \
             --binary-asset "$XCFRAMEWORK_ZIP" \
             --binary-asset "$XCFRAMEWORK_CHECKSUM" \
+            --binary-asset "$ARM64E_MANIFEST" \
             --binary-asset "$RELINK_KIT"
 
           {
@@ -228,6 +246,7 @@ jobs:
           - \`$COMPLIANCE_MANIFEST\`
           - \`$XCFRAMEWORK_ZIP\`
           - \`$XCFRAMEWORK_CHECKSUM\`
+          - \`$ARM64E_MANIFEST\`
           - \`$RELINK_KIT\`
           EOF
 
@@ -241,6 +260,7 @@ jobs:
             ${{ env.COMPLIANCE_MANIFEST }}
             ${{ env.XCFRAMEWORK_ZIP }}
             ${{ env.XCFRAMEWORK_CHECKSUM }}
+            ${{ env.ARM64E_MANIFEST }}
             ${{ env.RELINK_KIT }}
             release-notes.md
           retention-days: 7
@@ -248,9 +268,15 @@ jobs:
 
       - name: Generate artifact attestation
         if: env.CREATE_RELEASE == 'true'
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
-          subject-path: ${{ env.XCFRAMEWORK_ZIP }}
+          subject-path: |
+            ${{ env.SOURCE_BUNDLE }}
+            ${{ env.COMPLIANCE_MANIFEST }}
+            ${{ env.XCFRAMEWORK_ZIP }}
+            ${{ env.XCFRAMEWORK_CHECKSUM }}
+            ${{ env.ARM64E_MANIFEST }}
+            ${{ env.RELINK_KIT }}
 
       - name: Create immutable stable release
         if: env.CREATE_RELEASE == 'true'
@@ -273,4 +299,5 @@ jobs:
             "$COMPLIANCE_MANIFEST" \
             "$XCFRAMEWORK_ZIP" \
             "$XCFRAMEWORK_CHECKSUM" \
+            "$ARM64E_MANIFEST" \
             "$RELINK_KIT"

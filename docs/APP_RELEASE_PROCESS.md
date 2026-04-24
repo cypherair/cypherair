@@ -4,7 +4,7 @@
 > Purpose: Document the current release flows for CypherAir app builds and the stable build contract that backs formal App Store candidate archives.
 > Audience: Human developers, release owners, and AI coding tools.
 > Source of truth: `CypherAir` and `CypherAir AppStore Candidate` scheme behavior, `SourceComplianceInfo.json` build integration, and `.github/workflows/stable-build-release.yml`.
-> Last reviewed: 2026-04-20.
+> Last reviewed: 2026-04-24.
 > Update triggers: stable tag rules, stable asset names, `Source & Compliance` archive metadata, App Store candidate gating, or release-ordering changes.
 > Scope: App build release flow and the exact stable GitHub release contract used by the app. `XCFramework` channel discovery and verification remain in [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md).
 
@@ -35,11 +35,12 @@ Every published stable build release must include these assets:
 - `CypherAir-compliance-manifest.json`
 - `PgpMobile.xcframework.zip`
 - `PgpMobile.xcframework.sha256`
+- `PgpMobile.arm64e-build-manifest.json`
 - `PgpMobile-relink-kit.tar.zst`
 
 Stable build binding and immutability rules:
 
-- The source bundle, compliance manifest, XCFramework zip/checksum, and relink kit are rebuilt from the tagged commit; formal stable assets are not promoted from edge or drill prereleases.
+- The source bundle, compliance manifest, XCFramework zip/checksum, arm64e manifest, and relink kit are rebuilt from the tagged commit; formal stable assets are not promoted from edge or drill prereleases.
 - Stable assets must bind to one exact marketing version, build number, release tag, and commit SHA.
 - App Store candidate archives must embed the exact stable release tag, stable release URL, and commit SHA in `SourceComplianceInfo.json`.
 - Stable assets are immutable once published. If the asset set is wrong, fix it with a new build number, new stable tag, and new release rather than replacing assets in place.
@@ -94,6 +95,7 @@ The App Store candidate path is intentionally strict:
 - it is only allowed from `main`
 - it requires a clean tracked worktree and index
 - it requires a GitHub stable release to already exist
+- it requires that release to include a valid `PgpMobile.arm64e-build-manifest.json`
 - it requires `HEAD` to match the remote stable tag commit exactly
 - it requires the app archive to embed the exact stable release tag and URL in `SourceComplianceInfo.json`
 - it requires the app archive to embed an exact commit SHA in `SourceComplianceInfo.json`
@@ -104,6 +106,7 @@ The candidate archive path performs an automatic pre-archive validation:
 - confirms the tracked worktree and index are clean
 - derives `cypherair-vX.Y.Z-buildN` from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`
 - checks that `gh release view <tag> -R cypherair/cypherair` succeeds
+- downloads and validates `PgpMobile.arm64e-build-manifest.json`
 - resolves the remote stable tag commit from `origin`
 - blocks archive if `HEAD` does not match that remote stable tag commit
 - blocks archive if the release does not exist
@@ -139,6 +142,7 @@ Before uploading the App Store candidate to TestFlight, confirm:
   `CypherAir-compliance-manifest.json`,
   `PgpMobile.xcframework.zip`,
   `PgpMobile.xcframework.sha256`,
+  `PgpMobile.arm64e-build-manifest.json`,
   and `PgpMobile-relink-kit.tar.zst`
 - `HEAD` matches the remote stable tag commit
 - the archive was built from `CypherAir AppStore Candidate`

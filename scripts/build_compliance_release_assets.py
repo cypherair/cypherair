@@ -26,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--commit-sha", required=True)
     parser.add_argument("--source-bundle-output", type=Path, required=True)
     parser.add_argument("--manifest-output", type=Path, required=True)
+    parser.add_argument("--arm64e-manifest", type=Path)
     parser.add_argument("--binary-asset", type=Path, action="append", default=[])
     return parser.parse_args()
 
@@ -155,6 +156,15 @@ def binary_asset_entries(paths: list[Path]) -> list[dict[str, str]]:
     return entries
 
 
+def load_arm64e_manifest(path: Path | None) -> dict[str, object]:
+    if path is None:
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError("arm64e manifest must contain a JSON object")
+    return payload
+
+
 def main() -> None:
     global args
     args = parse_args()
@@ -166,6 +176,7 @@ def main() -> None:
     )
     binary_entries = binary_asset_entries(args.binary_asset)
     dependencies = dependency_versions()
+    arm64e_manifest = load_arm64e_manifest(args.arm64e_manifest)
 
     manifest = {
         "productKind": "unifiedBuild",
@@ -181,6 +192,7 @@ def main() -> None:
         "binaryAssets": binary_entries,
         "sequoiaOpenPGPVersion": dependencies["sequoia-openpgp"],
         "bufferedReaderVersion": dependencies["buffered-reader"],
+        "arm64eBuild": arm64e_manifest,
         "fulfillmentBasis": "LGPL 2.1",
         "firstPartyLicense": "GPL-3.0-or-later OR MPL-2.0",
     }

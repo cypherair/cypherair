@@ -27,6 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--build-number", required=True)
     parser.add_argument("--commit-sha", default="")
     parser.add_argument("--metadata-file", type=Path)
+    parser.add_argument("--arm64e-manifest", type=Path)
     parser.add_argument("--repository-url", default=DEFAULT_REPOSITORY_URL)
     parser.add_argument("--stable-release-tag", default="")
     parser.add_argument("--stable-release-url", default="")
@@ -75,6 +76,15 @@ def load_source_compliance_metadata(metadata_file: Path | None) -> dict[str, str
         "stable_release_tag": str(payload.get("stable_release_tag", "")).strip(),
         "stable_release_url": str(payload.get("stable_release_url", "")).strip(),
     }
+
+
+def load_arm64e_manifest(path: Path | None) -> dict[str, object]:
+    if path is None or not path.exists():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError("arm64e manifest must contain a JSON object")
+    return payload
 
 
 def resolved_metadata_value(explicit_value: str, metadata_value: str) -> str:
@@ -158,6 +168,7 @@ def generate() -> None:
         "stableReleaseTag": stable_release_tag,
         "stableReleaseURL": stable_release_url,
         "dependencies": load_dependency_versions(args.cargo_lock),
+        "arm64eBuild": load_arm64e_manifest(args.arm64e_manifest),
         "firstPartyLicense": "GPL-3.0-or-later OR MPL-2.0",
         "fulfillmentBasis": "LGPL 2.1",
         "isStableReleaseBuild": bool(stable_release_url),
