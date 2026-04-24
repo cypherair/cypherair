@@ -40,7 +40,7 @@ The missing capability is not "stronger private-key protection." The missing cap
 - recovering deterministically from interrupted writes or unreadable state
 - supporting later feature domains without forcing each one to invent a new vault architecture
 
-The current proposal direction is also too dependent on app-managed authorization timing. For app-data domains, the revised v1 goal is to make the first release of the shared app-data secret itself a system-enforced boundary rather than a convention owned only by application code.
+The current proposal direction is also too dependent on app-managed authorization timing. For app-data domains, the revised v1 goal is to make the first release of the shared app-data root secret itself a system-enforced boundary rather than a convention owned only by application code.
 
 ## 3. Hard Constraints
 
@@ -71,9 +71,9 @@ CypherAir will explicitly separate the Private Key Domain from Protected App Dat
 
 See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 3.1, 3.2, and 5.7.
 
-### 4.2 Shared Gate With Per-Domain Master Keys
+### 4.2 Shared Root-Secret Gate With Per-Domain Master Keys
 
-Protected app data will use one shared app-data `LAPersistedRight`, one shared app-data secret, and one `Domain Master Key` per protected domain. This keeps authorization shared at the session boundary while preserving per-domain isolation for lifecycle, deletion, and recovery.
+Protected app data will use one shared Keychain-protected app-data root secret and one `Domain Master Key` per protected domain. The root-secret Keychain item is protected by `SecAccessControl` and is released only through an authenticated `LAContext`, allowing launch/resume authentication and App Data session activation to be sequenced through one system authentication. This keeps authorization shared at the session boundary while preserving per-domain isolation for lifecycle, deletion, and recovery.
 
 See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.1 and 6.5, plus [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) Section 3.2.
 
@@ -85,7 +85,7 @@ See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.7 and 11.2-
 
 ### 4.4 System-Gated App-Data Authorization
 
-The first normative gate for app-data unlock is the system-managed right/secret boundary, not an app-level convention. One successful shared-right authorization covers all protected domains in the current app-data session.
+The first normative gate for app-data unlock is the system-managed Keychain root-secret boundary, not an app-level convention. One successful app-session authentication can cover all protected domains in the current app-data session when the authenticated `LAContext` is handed to the root-secret read.
 
 See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.2 and 5.3.
 
@@ -109,13 +109,15 @@ See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 3.13, 6.4, an
 
 ### 4.8 Private-Key And App-Data Secure Enclave Boundary
 
-Using `LAPersistedRight` as the primary app-data gate does not remove Secure Enclave involvement. It means the app-data design relies on Apple's higher-level LocalAuthentication right model instead of reusing the private-key wrapping model as the primary gate.
+Using Keychain / `SecAccessControl` / `LAContext` as the primary app-data gate does not make the gate app-managed. It means the app-data design relies on Apple's system authorization and Keychain access-control path instead of reusing the private-key wrapping model or the superseded `LAPersistedRight` model as the primary gate.
 
 See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.2.
 
 ### 4.9 Dedicated App-Data Authorization Policy
 
 Protected app-data authorization is a separate policy surface from private-key authentication mode. App-data must not derive from `AuthenticationMode`, `AuthenticationManager.createAccessControl(for:)`, or future private-key-only semantics.
+
+The dedicated app-data policy is represented as `AppSessionAuthenticationPolicy`. It governs launch/resume authentication and root-secret Keychain access, while private-key `AuthenticationMode` continues to govern only private-key Secure Enclave wrapping and per-operation private-key use.
 
 See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.3.
 
@@ -149,7 +151,7 @@ See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.2 and [APP
 
 ### Phase 3: First Low-Risk Real Domain
 
-Use a low-risk domain such as protected-after-unlock settings or recovery/control state as the first concrete adopter. This phase proves the shared authorize / unlock / relock model without touching the private-key domain.
+Use a low-risk domain such as protected-after-unlock settings or recovery/control state as the first concrete adopter. This phase proves the shared root-secret activation / domain unlock / relock model without touching the private-key domain.
 
 See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.3 and Section 5.
 
@@ -175,7 +177,7 @@ See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.12 and [APP_
 
 The shared app-data session follows the current grace-window model, but the grace window has only one owner: `AppSessionOrchestrator`.
 
-`First real protected-domain access` means the first route in the current app session that actually needs protected-domain contents, not process launch by itself. If launch or resume immediately enters such a route, the same orchestrated unlock flow may authorize the shared right there so the user does not encounter a second distinct app-data prompt. Shared-right authorization must still remain fail-closed and must not be triggered merely because process launch or service initialization happened.
+`First real protected-domain access` means the first route in the current app session that actually needs protected-domain contents, not process launch by itself. If launch or resume immediately enters such a route, the same orchestrated unlock flow may pass the authenticated `LAContext` into root-secret Keychain retrieval so the user does not encounter a second distinct app-data prompt. Root-secret retrieval must still remain fail-closed and must not be triggered merely because process launch or service initialization happened.
 
 See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7.3-7.4, plus [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.2.
 
@@ -189,7 +191,7 @@ The detailed inventory table and first-domain readiness rules live in [APP_DATA_
 
 Protected app-data is not only a local service addition. Any real protected-domain rollout must treat startup ordering, service initialization timing, locked-state routing, and orchestrator wiring as explicit migration surfaces.
 
-See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.3.
+See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.4.
 
 ## 6. Explicit Do-Not-Change List
 
@@ -208,7 +210,8 @@ The preferred implementation posture is:
 
 - new files for the new layer
 - narrow dependency wiring
-- use one shared `LAPersistedRight` as the primary app-data authorization gate in v1
+- use one shared Keychain-protected root secret as the primary app-data authorization gate in v1
+- treat any current `LAPersistedRight` / `LASecret` implementation as superseded legacy state and a future migration source
 - reuse existing lower-level primitives by composition only where they support, rather than replace, that system gate
 - never attach the new layer to the private-key access-control source of truth
 - no "cleanup refactor" of the private-key domain just to make the new layer look symmetrical

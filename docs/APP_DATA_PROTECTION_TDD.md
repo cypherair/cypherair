@@ -82,21 +82,24 @@ Properties:
 - unique per domain
 - never stored in plaintext
 - used to encrypt domain payload generations on disk
-- persisted only in wrapped form under the shared app-data secret
+- persisted only in wrapped form under the shared app-data root-secret-derived wrapping key
 - lazy-unwrapped on first domain access inside an already authorized app-data session
 - remains independent from other domains for deletion, recovery, and future rekey behavior
 
-### 3.4 Shared App-Data Secret
+### 3.4 Shared App-Data Root Secret
 
-The shared app-data secret is the only system-gated secret released by the shared `LAPersistedRight`.
+The shared app-data root secret is the only system-gated secret that can activate the shared app-data session.
 
 Properties:
 
-- one shared right/secret pair covers all protected app-data domains in v1
-- the secret acts as the session-level KEK for per-domain DMKs
-- the secret may remain in memory for the active shared app-data session
-- the secret must be zeroized on relock
-- the secret does not replace per-domain DMKs
+- one shared root-secret Keychain record covers all protected app-data domains in v1
+- the record is protected with `SecAccessControl` and can be read only through an authenticated `LAContext`
+- startup/resume authentication may hand the authenticated `LAContext` directly to the root-secret read so one system authentication can both unlock the app shell and activate the shared app-data session
+- the raw root secret acts only as input material for deriving the session-level wrapping root key
+- raw root-secret bytes must be zeroized immediately after wrapping-root-key derivation
+- the derived wrapping root key may remain in memory only for the active shared app-data session
+- the derived wrapping root key must be zeroized on relock
+- the root secret and derived wrapping root key do not replace per-domain DMKs
 
 ### 3.5 WrappedDomainMasterKeyRecord
 
@@ -122,13 +125,13 @@ Required responsibilities:
 
 ### 3.7 SharedResourceLifecycleState
 
-The durable lifecycle state of the shared app-data right/secret pair as committed in the registry.
+The durable lifecycle state of the shared app-data root-secret Keychain record as committed in the registry.
 
 Allowed values:
 
-- `absent`: no committed protected domain currently requires the shared authorization resource
-- `ready`: committed membership is non-empty and the shared right/secret must exist and be usable
-- `cleanupPending`: committed membership is empty, but deletion of the shared right/secret is incomplete and must resume before the empty steady state is restored
+- `absent`: no committed protected domain currently requires the shared root-secret resource
+- `ready`: committed membership is non-empty and the shared root-secret Keychain record must exist and be usable after system authentication
+- `cleanupPending`: committed membership is empty, but deletion of the shared root-secret Keychain record is incomplete and must resume before the empty steady state is restored
 
 Rules:
 
@@ -188,9 +191,9 @@ The framework exposes explicit shared-session state:
 - `frameworkRecoveryNeeded`
 - `restartRequired`
 
-`frameworkRecoveryNeeded` means the framework cannot safely determine or use the shared authorization resource and therefore must block all protected-domain access.
+`frameworkRecoveryNeeded` means the framework cannot safely determine or use the shared root-secret resource and therefore must block all protected-domain access.
 
-`restartRequired` means relock, zeroization, or deauthorization failed inside the current process. This state is fail-closed, blocks all future protected-domain access in that process, and clears only by process restart. It is not persisted into the registry.
+`restartRequired` means relock, zeroization, or session teardown failed inside the current process. This state is fail-closed, blocks all future protected-domain access in that process, and clears only by process restart. It is not persisted into the registry.
 
 ### 3.12 Domain Runtime State
 
@@ -235,7 +238,7 @@ The framework must satisfy these principles:
 - no silent reset to empty state
 - explicit session unlock and relock behavior
 - fail-closed relock that blocks the current process on cleanup failure
-- system-enforced authorization before the app receives the shared app-data secret
+- system-enforced authorization before the app receives the shared app-data root secret
 - explicit zeroization expectations for sensitive in-memory buffers
 - explicit file-protection policy instead of relying on platform defaults
 
@@ -243,7 +246,7 @@ The framework must satisfy these principles:
 
 ### 5.1 Per-Domain Master Keys Under One Shared Gate
 
-Each protected app-data domain owns its own `Domain Master Key`, but all domains share one system-gated app-data right and one shared app-data secret.
+Each protected app-data domain owns its own `Domain Master Key`, but all domains share one system-gated app-data root secret and one derived wrapping root key.
 
 This is the canonical design.
 
@@ -255,59 +258,66 @@ Rationale:
 - avoids treating every app-owned state transition as a single all-or-nothing vault event
 - avoids repeated authorization prompts inside one active app-data session
 
-### 5.2 Device-Bound Wrapping
+### 5.2 Device-Bound Root Secret Gate
 
 The current private-key design uses Secure Enclave indirect wrapping because OpenPGP private keys are not directly managed by the Secure Enclave.
 
 Protected app-data domains use a different primary model in v1:
 
 - encrypted domain payloads remain app-managed on disk
-- one shared app-data secret is gated by one shared `LAPersistedRight`
-- Apple documents `LAPersistedRight` as being backed by a unique key in the Secure Enclave
-- per-domain DMKs remain distinct and are wrapped by the shared app-data secret
+- one shared app-data root secret is stored as a Keychain item protected by `SecAccessControl`
+- root-secret reads must provide an authenticated `LAContext` through `kSecUseAuthenticationContext`
+- the root-secret Keychain item must use this-device-only accessibility and must not migrate through backups
+- per-domain DMKs remain distinct and are wrapped by a key derived from the shared root secret
 
-This means the v1 app-data proposal still relies on Secure Enclave-backed system authorization, but it does so through Apple's higher-level LocalAuthentication right model rather than through custom Secure Enclave wrapping as the primary gate.
+This means the v1 app-data proposal still relies on Apple's system authorization boundary, but it uses the Keychain / `SecAccessControl` / `LAContext` path because that path has an explicit public API for reusing the same authenticated context across launch/resume authentication and the root-secret read.
 
 Implementation rule:
 
-- treat one shared `LAPersistedRight` / `LASecret` pair as the primary authorization gate for app-data unlock
+- treat one shared Keychain-protected root secret as the primary authorization gate for app-data unlock
+- release that root secret only through `kSecUseAuthenticationContext` with an authenticated `LAContext`
 - do not promise custom SE self-ECDH wrapping as the primary app-data design in v1
+- treat any existing `LAPersistedRight` / `LASecret` implementation as superseded legacy state and a future migration source, not as the target normative gate
 - reuse lower-level primitives only where they support the domain model without replacing the primary system gate
 
 Expected properties:
 
 - local-only
-- system-gated access to the shared app-data secret
-- app code must not receive that secret before authorization succeeds
+- system-gated access to the shared app-data root secret
+- app code must not receive that secret before the system accepts the authenticated `LAContext`
 - one successful authorization covers all protected app-data domains in the current session
 - source-device authorization state must not be exported as part of portable recovery
 
 ### 5.3 App-Data Access-Control Contract
 
-`ProtectedDataSessionCoordinator` owns the shared app-data authorization resource, while `ProtectedDomainKeyManager` owns per-domain DMK lifecycle under that gate.
+`ProtectedDataSessionCoordinator` owns shared app-data root-secret retrieval, while `ProtectedDomainKeyManager` owns per-domain DMK lifecycle under that gate.
 
 This policy is a normative requirement, not an implementation detail left for later.
 
 Required rules:
 
-- app-data domains use one shared `LAPersistedRight` as the primary app-data authorization gate in v1
-- the shared app-data right uses `LAAuthenticationRequirement.default`
+- app-data domains use one shared Keychain-protected root secret as the primary app-data authorization gate in v1
+- the root-secret Keychain item uses `SecAccessControl` with a dedicated app-session authentication policy
+- the dedicated policy is represented as `AppSessionAuthenticationPolicy`, separate from the private-key `AuthenticationMode`
+- app-session authentication produces an `LAContext` that may be handed directly to root-secret retrieval
+- root-secret retrieval uses `kSecUseAuthenticationContext`
+- root-secret retrieval must be able to fail without displaying a second prompt when the supplied context is not already authorized for the required policy
 - app-data authorization must not call `AuthenticationMode.createAccessControl()`
 - app-data authorization must not call `AuthenticationManager.createAccessControl(for:)`
 - app-data authorization must not derive from the private-key authentication mode
 - app-data domains must not inherit current `Standard` / `High Security` semantics
 - app-data domains must not inherit future `Special Security Mode` or `biometryCurrentSet` semantics
 - per-domain authorization-policy variation is out of scope in v1
-- per-domain right authorization is out of scope in v1
+- per-domain root-secret authorization is out of scope in v1
 - protected app-data domains must never rewrap merely because private-key auth mode changes
-- the system must not return the shared app-data secret before right authorization succeeds
+- the system must not return the shared app-data root secret before the root-secret Keychain access succeeds with an authenticated `LAContext`
 
 The purpose of this contract is to prevent the new layer from attaching itself to the private-key access-control source of truth.
 
-Implementation note for Phase 1:
+Implementation note:
 
-- Swift implementation uses the Swift-imported API name `LAAuthenticationRequirement.default`
-- Objective-C header names such as `defaultRequirement` are not valid Swift call sites for this codebase
+- public `LAPersistedRight` APIs do not provide an `LAContext` handoff surface that can guarantee reuse of the launch/resume authentication
+- Keychain's `kSecUseAuthenticationContext` API is therefore the target handoff point for unified app-session and app-data authorization
 
 ### 5.4 ProtectedDataRegistry Is The Only Membership Authority
 
@@ -326,8 +336,8 @@ Normal lifecycle rules:
 - `cleanupPending` is valid only when committed membership is empty
 - shared-resource lifecycle state must not double as mutation execution phase
 - orphaned directories, bootstrap metadata, or wrapped-DMK artifacts never implicitly become members
-- the shared right and shared secret must exist whenever committed membership is non-empty and shared-resource lifecycle state is `ready`
-- the shared right and shared secret may be deleted only after committed membership becomes empty and the registry has committed `cleanupPending`
+- the shared root-secret Keychain record must exist whenever committed membership is non-empty and shared-resource lifecycle state is `ready`
+- the shared root-secret Keychain record may be deleted only after committed membership becomes empty and the registry has committed `cleanupPending`
 
 Recovery rules:
 
@@ -359,12 +369,11 @@ Required responsibilities:
 
 Required responsibilities:
 
-- strong reference to the shared `LAPersistedRight`
-- shared app-data secret lifetime in memory
-- shared right authorize/deauthorize
+- root-secret Keychain retrieval through an authenticated `LAContext`
+- derived wrapping-root-key lifetime in memory
 - framework session state exposure
 - relock orchestration
-- relock-time zeroization of the shared secret and all unwrapped DMKs
+- relock-time zeroization of the derived wrapping root key and all unwrapped DMKs
 - fail-closed blocking through `restartRequired` when relock cannot complete safely
 
 `ProtectedDataSessionCoordinator` is therefore not a second grace owner and not an app-wide UX owner.
@@ -378,20 +387,20 @@ Canonical behavior:
 - launch/resume enters `AppSessionOrchestrator`
 - if app session is not active, the orchestrator completes app-level privacy unlock first
 - `first real protected-domain access` means the first route in the current app session that actually needs protected-domain content, not process launch by itself
-- on that first real protected-domain access, the orchestrator asks `ProtectedDataSessionCoordinator` to authorize the shared right
-- if cold start or resume immediately continues into a route that needs protected-domain content while the shared app-data session is inactive, that same orchestrated flow may authorize the shared right and activate the shared app-data session there
-- after shared authorization succeeds, the requested domain DMK may lazy-unlock
-- launch/resume authentication alone does not imply that the shared app-data session is already active
+- on that first real protected-domain access, the orchestrator asks `ProtectedDataSessionCoordinator` to activate the shared app-data session by reading the root-secret Keychain record
+- if cold start or resume immediately continues into a route that needs protected-domain content while the shared app-data session is inactive, that same orchestrated flow may pass the already authenticated `LAContext` to the root-secret read so the user does not see a second prompt
+- after root-secret retrieval and wrapping-root-key derivation succeed, the requested domain DMK may lazy-unlock
+- launch/resume authentication alone does not imply that the shared app-data session is already active unless the root-secret handoff also completed successfully
 - ordinary in-session reads and writes reuse the active shared app-data session
 - second or third domains in that same session do not trigger another authorization prompt
-- authorization survives background/inactive transitions while the app remains inside the active grace window
+- the active shared app-data session survives background/inactive transitions while the app remains inside the active grace window
 - relock occurs on explicit app lock, grace-period expiry, session loss, or app exit
-- relock deauthorizes the shared right and clears the shared secret plus every unwrapped DMK from memory
+- relock clears the derived wrapping root key plus every unwrapped DMK from memory and discards any session-local authentication context retained only for the unlock transaction
 - if relock cannot complete safely, the current process enters `restartRequired` and may not unlock protected domains again until restart
 
 This model intentionally differs from the private-key domain.
 
-Repeated-prompt avoidance is a required design goal. The v1 proposal must not rely on undocumented prompt coalescing between different authorization systems. Instead, the proposal treats the orchestrator-driven shared right authorization as the only normative app-data unlock contract, and the user-visible launch/resume flow should remain one understandable unlock path even when its first protected-domain access occurs inside that same orchestrated sequence.
+Repeated-prompt avoidance is a required design goal. The v1 proposal must not rely on undocumented prompt coalescing between different authorization systems. Instead, the proposal treats the `LAContext` handoff into Keychain root-secret retrieval as the only normative app-data unlock contract, and the user-visible launch/resume flow should remain one understandable unlock path even when its first protected-domain access occurs inside that same orchestrated sequence.
 
 ### 5.7 Recoverable App-Data Semantics
 
@@ -411,14 +420,14 @@ Stated differently:
 
 The framework separates:
 
-- system authorization of the shared app-data secret
+- system authorization of the shared app-data root secret
 - app-wide session orchestration owned by `AppSessionOrchestrator`
-- per-domain DMK unwrap and payload access after shared authorization
+- per-domain DMK unwrap and payload access after shared app-data session activation
 
 This separation is required so:
 
 - protected app-data domains do not need rewrapping when private-key auth modes change
-- the system, not only application code, prevents pre-auth access to the shared app-data secret
+- the system, not only application code, prevents pre-auth access to the shared app-data root secret
 - one owner controls grace-window and launch/resume sequencing
 - per-domain unlock remains lazy and isolated
 
@@ -499,7 +508,7 @@ Protected app-data domains must follow a two-phase startup model.
 
 #### Pre-Auth Bootstrap Phase
 
-Before app-data authorization succeeds, the app may:
+Before app-session authentication succeeds, the app may:
 
 - read bootstrap-critical settings
 - read `ProtectedDataRegistry`
@@ -507,33 +516,33 @@ Before app-data authorization succeeds, the app may:
 - determine whether protected domains exist and require later unlock
 - synchronously bootstrap an empty steady-state registry when the protected-data root contains no artifacts
 
-Before app-data authorization succeeds, the app must not:
+Before app-session authentication succeeds, the app must not:
 
-- fetch `LASecret`
-- authorize the shared app-data right implicitly from a repository/service initializer or getter
+- fetch the shared app-data root secret
+- read the root-secret Keychain item implicitly from a repository/service initializer or getter
 - unwrap any domain DMK
 - attempt to open protected-domain generations
 - classify final framework or domain state from protected-domain contents alone
 
 #### Post-Auth Unlock Phase
 
-After app-data authorization succeeds, the app may:
+After app-session authentication succeeds and protected-domain access is requested, the app may:
 
-- continue the orchestrated launch/resume flow into shared-right authorization when the initial route immediately requires protected-domain content
-- fetch the shared app-data secret
+- continue the orchestrated launch/resume flow into root-secret retrieval when the initial route immediately requires protected-domain content
+- fetch the shared app-data root secret through the authenticated `LAContext`
 - lazy-unlock the requested domain DMK
 - open `current / previous / pending` for that domain
 - classify final framework and domain state
 
 This is a required implementation boundary, not a best-effort guideline.
 
-The current app startup path already performs cold-start loading and recovery work. Future real protected domains must therefore treat this two-phase model as an explicit startup-architecture migration, not as a mere local refactor inside one new service. The current owner split that this migration must absorb is documented in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.4.
+The current app startup path already performs cold-start loading and recovery work. Future real protected domains must therefore treat this two-phase model as an explicit startup-architecture migration, not as a mere local refactor inside one new service. The current owner split that this migration must absorb is documented in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.5.
 
 Phase 1 implementation note:
 
 - `CypherAirApp.init()` may run only synchronous pre-auth bootstrap work
 - that bootstrap may create `Application Support/ProtectedData/ProtectedDataRegistry.plist` in the empty steady state
-- `CypherAirApp.init()` must not call `LARightStore`, `LAPersistedRight.authorize`, `LASecret.rawData`, or DMK unwrap logic
+- `CypherAirApp.init()` must not call root-secret Keychain retrieval, legacy `LARightStore`, legacy `LAPersistedRight.authorize`, legacy `LASecret.rawData`, or DMK unwrap logic
 - cold-start bootstrap output is an initial handoff, not the lifetime source of truth for registry state
 - future protected-domain access must re-evaluate current framework state instead of assuming the cold-start snapshot remains current forever
 
@@ -609,11 +618,11 @@ The v1 persistence model for each protected app-data domain is:
 
 - domain payload generations are stored as encrypted envelopes on disk
 - the DMK is not stored in plaintext on disk
-- one shared app-data secret is persisted behind one shared `LAPersistedRight`
+- one shared app-data root secret is persisted as a Keychain item protected by `SecAccessControl`
 - each domain DMK is persisted only as a `WrappedDomainMasterKeyRecord`
-- there is no v1 model where each domain owns its own independent right
+- there is no v1 model where each domain owns its own independent authorization resource
 - there is no v1 single global DMK for all app-data domains
-- the shared secret is the only system-gated secret released by `LAPersistedRight`
+- the shared root secret is the only system-gated secret released by the Keychain gate
 
 Required `WrappedDomainMasterKeyRecord` properties:
 
@@ -626,13 +635,13 @@ Required `WrappedDomainMasterKeyRecord` properties:
 
 The v1 wrapping profile is fixed:
 
-- fetch `LASecret.rawData` only after shared-right authorization succeeds
+- fetch the root-secret Keychain item only after app-session authentication succeeds and an authenticated `LAContext` is available
 - derive `AppDataWrappingRootKey` with `HKDF-SHA256`
-  - input key material: raw `LASecret` bytes
+  - input key material: raw root-secret bytes
   - salt: `"CypherAir.AppData.WrapRoot.Salt.v1"`
   - info: `"CypherAir.AppData.WrapRoot.Info.v1"`
   - output: 32 bytes
-- zeroize the raw `LASecret` bytes immediately after root-key derivation
+- zeroize the raw root-secret bytes immediately after root-key derivation
 - derive `DomainWrappingKey` per domain with `HKDF-SHA256`
   - input key material: `AppDataWrappingRootKey`
   - salt: `"CypherAir.AppData.DomainWrap.Salt.v1"`
@@ -704,12 +713,12 @@ This is the v1 acceptance floor. Stronger macOS protection claims require later 
 
 ## 7. Key And Session Lifecycle
 
-### 7.1 Shared Authorization Resource Lifecycle
+### 7.1 Shared Root-Secret Resource Lifecycle
 
-The shared app-data authorization resource lifecycle is governed by the registry:
+The shared app-data root-secret resource lifecycle is governed by the registry:
 
-- `absent`: no committed protected domain requires the shared authorization resource and shared-right authorization may not begin
-- `ready`: committed membership is non-empty and the shared right/secret must exist and be usable before protected-domain access proceeds
+- `absent`: no committed protected domain requires the shared root-secret resource and root-secret retrieval may not begin
+- `ready`: committed membership is non-empty and the shared root-secret Keychain record must exist and be usable before protected-domain access proceeds
 - `cleanupPending`: committed membership is empty, but shared-resource cleanup must resume before the framework returns to the empty steady state
 
 Required rules:
@@ -718,22 +727,22 @@ Required rules:
 - shared-resource lifecycle state may become `ready` only in the same registry commit that first makes committed membership non-empty
 - last-domain deletion may move shared-resource lifecycle state to `cleanupPending` only in the same registry commit that makes committed membership empty
 - shared-resource lifecycle state may return to `absent` only after shared-resource cleanup succeeds and the pending delete mutation is ready to clear
-- authorization of the shared right is permitted only while lifecycle state is `ready`
-- the shared app-data secret may remain in memory only while the shared app-data session is active
-- zeroization of the shared secret remains required on relock
+- root-secret retrieval is permitted only while lifecycle state is `ready`
+- the derived wrapping root key may remain in memory only while the shared app-data session is active
+- zeroization of the derived wrapping root key remains required on relock
 
-The primary v1 contract is that the system must not release the shared app-data secret before authorization succeeds.
+The primary v1 contract is that the system must not release the shared app-data root secret before Keychain access succeeds with an authenticated `LAContext`.
 
 ### 7.2 Domain Master Key Lifecycle
 
 For each protected app-data domain:
 
 1. generate a random 256-bit DMK
-2. wrap that DMK with the shared app-data secret
+2. wrap that DMK with a domain wrapping key derived from the shared app-data root secret
 3. persist the wrapped-DMK record
 4. write initial domain state
 5. commit domain membership in `ProtectedDataRegistry`
-6. on later access, lazy-unwrap the DMK only after shared authorization succeeds
+6. on later access, lazy-unwrap the DMK only after shared app-data session activation succeeds
 7. zeroize the plaintext DMK on relock
 
 The v1 domain lifecycle must also define:
@@ -754,8 +763,8 @@ The detailed persistence mechanics live in [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FR
 Required behavior:
 
 - only `AppSessionOrchestrator` may decide that protected-domain access can proceed
-- only `ProtectedDataSessionCoordinator` may authorize the shared right
-- the shared app-data secret is fetched only after authorization succeeds
+- only `ProtectedDataSessionCoordinator` may fetch and derive from the shared root secret
+- the shared app-data root secret is fetched only through an authenticated `LAContext`
 - per-domain DMKs are lazy-unwrapped on first domain access
 - the shared app-data session is reused for ordinary in-session access
 - domain availability is exposed as framework state plus domain state, not as one merged state machine
@@ -766,7 +775,7 @@ Relock is fail-closed. It is not a best-effort cleanup path.
 
 Relock must invalidate:
 
-- in-memory shared app-data secret
+- in-memory derived wrapping root key
 - all in-memory unwrapped domain DMKs
 - decrypted domain payloads in memory
 - plaintext serialization scratch buffers
@@ -778,17 +787,17 @@ Relock executes in this order:
 
 1. close new protected-domain access for the current process
 2. invoke every registered `ProtectedDataRelockParticipant`
-3. zeroize the shared app-data secret and all unwrapped domain DMKs
-4. deauthorize the shared right for the current session
+3. zeroize the derived wrapping root key and all unwrapped domain DMKs
+4. discard or invalidate any session-local `LAContext` retained only for the current unlock transaction
 
-Participant fan-out is non-short-circuit. One participant failure does not permit skipping later participant cleanup or skipping shared-secret / DMK cleanup.
+Participant fan-out is non-short-circuit. One participant failure does not permit skipping later participant cleanup or skipping wrapping-root-key / DMK cleanup.
 
 If any relock step fails, `ProtectedDataSessionCoordinator` must enter `restartRequired`.
 
 In `restartRequired`:
 
 - all protected-domain access remains blocked for the current process
-- no new shared-right authorization may begin
+- no new root-secret retrieval may begin
 - no in-process retry or recovery path exists
 - recovery is limited to a fresh app launch and normal startup recovery
 - the state is runtime-only and must not be persisted into the registry
@@ -865,15 +874,15 @@ The full inventory baseline and first-domain adoption rules live in [APP_DATA_MI
 
 ### 11.1 Framework-Level Recovery
 
-`frameworkRecoveryNeeded` is entered when the framework cannot safely determine or use the shared authorization resource.
+`frameworkRecoveryNeeded` is entered when the framework cannot safely determine or use the shared root-secret resource.
 
 Required triggers:
 
 - missing or unreadable `ProtectedDataRegistry`
 - registry rows that violate documented consistency invariants
 - registry rows that cannot be classified by the documented consistency matrix
-- committed membership that expects `ready`, but the shared persisted right is missing
-- committed membership that expects `ready`, but shared-right-protected secret data is unreadable or missing
+- committed membership that expects `ready`, but the shared root-secret Keychain record is missing
+- committed membership that expects `ready`, but root-secret retrieval fails after valid app-session authentication
 - a row already classified to the shared-resource cleanup path (`0 / cleanupPending / deleteDomain(..., membershipRemoved or sharedResourceCleanupStarted)`) remains indeterminate after its matrix-authorized cleanup evidence is inspected
 
 The "missing registry" trigger has one narrow exception:
@@ -891,9 +900,9 @@ Required behavior:
 
 Phase 1 / post-bootstrap validation note:
 
-- the current Phase 1 startup boundary forbids synchronous pre-auth access to `LARightStore`
-- therefore a `ready` row's shared-right/shared-secret usability is validated in a post-bootstrap framework gate before protected-domain access proceeds, not inside `CypherAirApp.init()`
-- user-cancelled or denied authorization during that gate is a normal access outcome, not an automatic `frameworkRecoveryNeeded`
+- the startup boundary forbids synchronous pre-auth access to the root-secret store
+- therefore a `ready` row's root-secret usability is validated in a post-bootstrap framework gate before protected-domain access proceeds, not inside `CypherAirApp.init()`
+- user-cancelled or denied app-session authentication during that gate is a normal access outcome, not an automatic `frameworkRecoveryNeeded`
 
 `restartRequired` is not a persisted framework-recovery state. It is a current-process fatal runtime stop entered only when relock cannot complete safely.
 

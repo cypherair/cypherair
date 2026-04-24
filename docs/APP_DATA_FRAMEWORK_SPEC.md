@@ -31,7 +31,7 @@ Required manifest concepts:
 
 - registry format version
 - shared-resource record
-  - shared right identifier
+  - shared root-secret Keychain identifier
   - `SharedResourceLifecycleState`
 - committed domain membership map
   - `domainID`
@@ -72,7 +72,7 @@ Domain creation must follow this order:
 
 1. read and lock `ProtectedDataRegistry`
 2. write `pendingMutation = createDomain(targetDomainID, journaled)`
-3. if the mutation stages the first committed protected domain, provision the shared right/secret and advance the phase to `sharedResourceProvisioned`
+3. if the mutation stages the first committed protected domain, provision the shared root-secret Keychain record and advance the phase to `sharedResourceProvisioned`
 4. create the domain directory, staged wrapped-DMK state, and initial payload generation, then advance the phase to `artifactsStaged`
 5. validate wrapped-DMK state and initial payload readability, then advance the phase to `validated`
 6. commit the target domain into membership and, when this is the first committed domain, commit shared-resource lifecycle state to `ready` in the same registry write; advance the phase to `membershipCommitted`
@@ -185,11 +185,13 @@ The v1 persistence model for each protected app-data domain is:
 
 - domain payload generations are stored as encrypted envelopes on disk
 - the DMK is not stored in plaintext on disk
-- one shared app-data secret is persisted behind one shared `LAPersistedRight`
+- one shared app-data root secret is persisted as a Keychain item protected by `SecAccessControl`
+- the root-secret Keychain item uses this-device-only accessibility and the access-control flags selected by `AppSessionAuthenticationPolicy`
+- normal root-secret reads supply the authenticated `LAContext` with `kSecUseAuthenticationContext`
 - each domain DMK is persisted only as a `WrappedDomainMasterKeyRecord`
-- there is no v1 model where each domain owns its own independent right
+- there is no v1 model where each domain owns its own independent authorization resource
 - there is no v1 single global DMK for all app-data domains
-- the shared secret is the only system-gated secret released by `LAPersistedRight`
+- the shared root secret is the only system-gated secret released by the Keychain root-secret gate
 
 Required `WrappedDomainMasterKeyRecord` properties:
 
@@ -202,12 +204,12 @@ Required `WrappedDomainMasterKeyRecord` properties:
 
 The v1 `WrappedDomainMasterKeyRecord` implementation profile is fixed:
 
-- raw `LASecret` bytes are never used directly as the DMK wrapping key
+- raw root-secret bytes are never used directly as the DMK wrapping key
 - derive `AppDataWrappingRootKey` first with `HKDF-SHA256`
   - salt: `"CypherAir.AppData.WrapRoot.Salt.v1"`
   - info: `"CypherAir.AppData.WrapRoot.Info.v1"`
   - output: 32 bytes
-- zeroize the raw `LASecret` bytes immediately after root-key derivation
+- zeroize the raw root-secret bytes immediately after root-key derivation
 - derive `DomainWrappingKey` per domain with `HKDF-SHA256`
   - salt: `"CypherAir.AppData.DomainWrap.Salt.v1"`
   - info: `WrappedDMKKeyInfoV1(domainID, wrapVersion = 1)`
@@ -225,10 +227,10 @@ The v1 `WrappedDomainMasterKeyRecord` implementation profile is fixed:
 
 The canonical wrapped-DMK lifecycle is:
 
-- create: journal `createDomain` first, provision the shared right/secret only after that journal exists, then stage and validate the wrapped-DMK record plus initial domain state before committing membership
+- create: journal `createDomain` first, provision the shared root-secret Keychain record only after that journal exists, then stage and validate the wrapped-DMK record plus initial domain state before committing membership
 - steady-state updates: rewrite payload generations only; do not rotate the wrapped-DMK record unless a later design explicitly introduces rekey
 - delete domain: journal `deleteDomain` first, remove domain generations/bootstrap metadata/wrapped-DMK state, then remove the domain from committed membership
-- last-domain cleanup: only after committed membership becomes empty and shared-resource lifecycle state commits to `cleanupPending` may shared right/secret deletion proceed
+- last-domain cleanup: only after committed membership becomes empty and shared-resource lifecycle state commits to `cleanupPending` may shared root-secret Keychain deletion proceed
 
 Wrapped-DMK writes must use an explicit transaction:
 
@@ -261,6 +263,19 @@ Recommended per-domain bootstrap contents:
 - wrapped-DMK record presence/version
 
 Bootstrap metadata is a cold-start and recovery routing hint, not a secret-bearing store.
+
+### 3.4 Launch / Resume LAContext Handoff
+
+The target launch/resume handoff is:
+
+1. `AppSessionOrchestrator` determines that app-session authentication is required.
+2. `AppSessionOrchestrator` evaluates the dedicated `AppSessionAuthenticationPolicy` and receives an authenticated `LAContext`.
+3. If the initial route immediately requires protected-domain content, `AppSessionOrchestrator` passes that same `LAContext` to `ProtectedDataSessionCoordinator`.
+4. `ProtectedDataSessionCoordinator` reads the shared root-secret Keychain record with `kSecUseAuthenticationContext`.
+5. The raw root-secret bytes are used only to derive `AppDataWrappingRootKey`, then are zeroized.
+6. Domain DMKs remain lazy-unwrapped; activating the shared app-data session does not open every protected domain.
+
+If root-secret retrieval fails with an already authenticated context, the framework must not fall back to app-managed plaintext state or silently retry with a different authorization mechanism. User-cancelled or denied authentication remains a normal access outcome; a missing or unreadable root-secret record for a `ready` registry row is framework recovery.
 
 ## 4. Initial Framework Interfaces And File Layout
 
@@ -328,22 +343,24 @@ Owns:
 
 - per-domain DMK creation
 - wrapped-DMK persistence and validation
-- lazy DMK unwrap after shared authorization succeeds
+- lazy DMK unwrap after shared app-data session activation succeeds
 - zeroization of transient key material
 
 ### `ProtectedDataSessionCoordinator.swift`
 
 Owns:
 
-- shared right authorization, deauthorization, and secret lifetime
+- root-secret Keychain retrieval through authenticated `LAContext`
+- raw root-secret zeroization after wrapping-root-key derivation
+- derived wrapping-root-key lifetime
 - framework session state
 - reuse of active shared app-data session
 - no independent grace-window or launch/resume UX ownership
 - relock orchestration
-- zeroization of the shared secret and all unwrapped DMKs on relock
+- zeroization of the derived wrapping root key and all unwrapped DMKs on relock
 - latching `restartRequired` and blocking further protected-domain access in the current process
-- post-bootstrap shared-right/shared-secret validation before protected-domain access proceeds
-- explicit cleanup when authorization partially succeeds but secret loading or root-key derivation fails
+- post-bootstrap root-secret validation before protected-domain access proceeds
+- explicit cleanup when app-session authentication succeeds but root-secret loading or root-key derivation fails
 
 ### `ProtectedDataRelockParticipant.swift`
 
@@ -375,7 +392,7 @@ Owns:
 - single user-visible unlock sequencing for launch/resume plus first protected-domain handoff when the initial route requires protected contents
 - scene lifecycle intake
 - app lock/relock initiation
-- handoff to `ProtectedDataSessionCoordinator` for first protected-domain access
+- handoff of the authenticated `LAContext` to `ProtectedDataSessionCoordinator` when launch/resume should also activate the shared app-data session
 - protected-data access-gate evaluation that distinguishes:
   - framework recovery
   - pending mutation recovery required
@@ -387,7 +404,7 @@ Phase 1 implementation note:
 
 - `CypherAirApp.init()` performs only synchronous pre-auth bootstrap through `AppStartupCoordinator`
 - the bootstrap may create an empty steady-state registry
-- no `LARightStore` or `LASecret` call is permitted from that path
+- no root-secret Keychain retrieval, legacy `LARightStore`, or legacy `LASecret` call is permitted from that path
 
 ### `ProtectedSettingsStore.swift`
 

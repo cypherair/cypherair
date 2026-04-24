@@ -40,7 +40,7 @@ Goals:
 - define unified session orchestration before any real domain lands
 - define a system-gated app-data authorization model that is separate from the private-key access-control source of truth
 - define a strict startup authentication boundary
-- define common relock, deauthorize, and session-unlock semantics
+- define common relock, session teardown, and session-unlock semantics
 - define fail-closed relock behavior including `restartRequired`
 - define the v1 DMK persistence and wrapped-DMK model
 - define the initial persistent-state classification inventory
@@ -63,7 +63,8 @@ Use a low-risk domain such as protected-after-unlock settings or recovery/contro
 Goals:
 
 - exercise the new framework without touching the private-key domain
-- validate shared authorize / lazy unlock / relock / deauthorize behavior on real app-owned data
+- validate shared root-secret activation / lazy domain unlock / relock behavior on real app-owned data
+- prove that launch/resume authentication can activate the shared app-data session with the same authenticated `LAContext` when the first route needs protected settings
 - reduce plaintext or lightly protected security-sensitive preferences over time
 
 Phase 3 uses a split-settings model.
@@ -124,7 +125,7 @@ All future implementations derived from this proposal must follow a two-phase st
 
 #### 3.1.1 Pre-Auth Bootstrap Phase
 
-Before app-data authorization succeeds, the app may:
+Before app-session authentication succeeds, the app may:
 
 - read bootstrap-critical settings
 - read the `ProtectedDataRegistry`
@@ -132,20 +133,20 @@ Before app-data authorization succeeds, the app may:
 - route cold start and determine whether protected domains exist
 - synchronously bootstrap an empty steady-state registry when no protected-data artifacts exist
 
-Before app-data authorization succeeds, the app must not:
+Before app-session authentication succeeds, the app must not:
 
-- fetch `LASecret`
-- authorize the shared app-data right implicitly in an initializer or getter
+- fetch the shared app-data root secret
+- read the root-secret Keychain item implicitly in an initializer or getter
 - unwrap any domain DMK
 - attempt to open protected-domain generations
 - finalize framework or domain recovery state from protected-domain contents alone
 
 #### 3.1.2 Post-Auth Unlock Phase
 
-After app-data authorization succeeds, the app may:
+After app-session authentication succeeds and protected-domain access is requested, the app may:
 
-- authorize the shared right through the protected-data session layer
-- fetch the shared app-data secret
+- pass the authenticated `LAContext` from app-session authentication into the protected-data session layer
+- fetch the shared app-data root secret through Keychain / `SecAccessControl` / `kSecUseAuthenticationContext`
 - lazy-unlock a requested domain DMK
 - open `current / previous / pending`
 - determine final framework and domain state
@@ -156,7 +157,7 @@ Phase 1 implementation note:
 
 - `CypherAirApp.init()` remains the synchronous startup entry point
 - `AppStartupCoordinator.performPreAuthBootstrap(...)` is the only startup hook allowed to touch `ProtectedDataRegistry` before authorization
-- that bootstrap path may create the empty steady-state registry but may not authorize the shared right
+- that bootstrap path may create the empty steady-state registry but may not retrieve the shared root secret
 - cold-start bootstrap output is an initial handoff only; later protected-domain access must consult current framework state instead of treating the startup snapshot as perpetual truth
 
 Startup recovery derived from this guide must also:
@@ -175,22 +176,37 @@ In v1:
 - launch/resume first enters `AppSessionOrchestrator`
 - if app session is not active, the orchestrator completes app-level privacy unlock first
 - `first real protected-domain access` means the first route in the current app session that actually needs protected-domain content, not process launch by itself
-- if cold start or resume immediately enters such a route, that same orchestrated flow may authorize the shared right and activate the shared app-data session there
-- shared right authorization does not occur merely because process launch or service initialization happened
-- shared right authorization does not eagerly unwrap every domain DMK
-- launch/resume authentication alone does not imply that the shared app-data session is already active
+- if cold start or resume immediately enters such a route, that same orchestrated flow may pass the authenticated `LAContext` into root-secret Keychain retrieval and activate the shared app-data session there
+- root-secret retrieval does not occur merely because process launch or service initialization happened
+- root-secret retrieval does not eagerly unwrap every domain DMK
+- launch/resume authentication alone does not imply that the shared app-data session is already active unless root-secret retrieval and wrapping-root-key derivation also completed successfully
 - a second or third protected domain in the same active app-data session must not prompt again
 - `ProtectedDataSessionCoordinator` does not own an independent grace timer or second launch/resume UX surface
-- app-data relock and deauthorize occur only on:
+- app-data relock and session teardown occur only on:
   - explicit app lock
   - grace-period expiration
   - session loss
   - app termination or exit
 - if relock cannot complete safely, the current process enters `restartRequired` and may not unlock protected domains again until restart
-- entering background alone does not deauthorize app-data while the grace window is still valid
+- entering background alone does not tear down app-data access while the grace window is still valid
 - `gracePeriod = 0` is the supported posture for "every resume requires fresh authorization before protected-domain access"
 
-### 3.3 Startup Architecture Impact
+### 3.3 Legacy Gate Migration Requirement
+
+Any implementation that has already provisioned `LAPersistedRight` / `LASecret` app-data state must treat that state as a legacy migration source.
+
+Required migration rules:
+
+- never hand-edit or silently delete legacy `LAPersistedRight` state before the replacement root-secret Keychain record is written and verified
+- authorize the legacy right only inside an explicit migration flow
+- copy the legacy raw secret into the new root-secret Keychain record protected by `SecAccessControl`
+- validate that the new record can be read through an authenticated `LAContext`
+- update registry/shared-resource metadata only after the new record is usable
+- zeroize all raw secret buffers used during migration
+- if migration fails, preserve the legacy state and keep protected domains fail-closed
+- after migration succeeds, ordinary app-data unlock must use the Keychain root-secret gate, not the legacy right
+
+### 3.4 Startup Architecture Impact
 
 The protected app-data proposal is no longer just a narrow service-layer addition.
 
@@ -205,7 +221,7 @@ For any future real protected domain, the implementation plan must treat the fol
 
 This is especially important for future Contacts adoption, where cold-start loading and locked-state presentation already exist in the app surface.
 
-### 3.4 Current-State Owner Map
+### 3.5 Current-State Owner Map
 
 This migration guide documents the handoff points that the future single-owner session model must absorb. It does not redesign the current app.
 
@@ -223,7 +239,7 @@ Current Phase 1 implementation status:
 - `AppSessionOrchestrator` owns grace-window timing, content-clear generation, and privacy-auth sequencing
 - `ProtectedDataSessionCoordinator` exists but is not triggered during ordinary startup because no real protected domain has landed yet
 - `continuePendingMutation` is now preserved as a distinct bootstrap outcome instead of being folded into steady state
-- shared-right/shared-secret usability is a post-bootstrap framework-gate concern, not a synchronous `init()` concern
+- shared root-secret usability is a post-bootstrap framework-gate concern, not a synchronous `init()` concern
 
 ## 4. Persisted-State Classification Inventory
 
