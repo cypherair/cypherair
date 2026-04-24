@@ -103,7 +103,8 @@ final class AppContainer: @unchecked Sendable {
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: authLifecycleTraceStore
         )
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
@@ -242,7 +243,8 @@ final class AppContainer: @unchecked Sendable {
             secureEnclave: secureEnclave,
             keychain: keychain,
             defaults: defaults,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: authLifecycleTraceStore
         )
         let config = AppConfiguration(defaults: defaults)
         let engine = PgpEngine()

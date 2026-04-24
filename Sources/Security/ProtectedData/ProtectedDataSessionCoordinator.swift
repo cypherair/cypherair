@@ -35,19 +35,53 @@ final class ProtectedDataSessionCoordinator {
     }
 
     func persistSharedRight(secretData: Data) async throws {
-        try rootSecretStore.saveRootSecret(
-            secretData,
-            identifier: rootSecretIdentifier,
-            policy: appSessionPolicyProvider()
+        let policy = appSessionPolicyProvider()
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.rootSecret.save.start",
+            metadata: ["policy": policy.rawValue]
         )
+        do {
+            try rootSecretStore.saveRootSecret(
+                secretData,
+                identifier: rootSecretIdentifier,
+                policy: policy
+            )
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.save.finish",
+                metadata: ["result": "success", "policy": policy.rawValue]
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.save.finish",
+                metadata: traceErrorMetadata(error, extra: ["result": "failed", "policy": policy.rawValue])
+            )
+            throw error
+        }
     }
 
     func removePersistedSharedRight(identifier: String) async throws {
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.rootSecret.delete.start"
+        )
         do {
             try rootSecretStore.deleteRootSecret(identifier: identifier)
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.delete.finish",
+                metadata: ["result": "success"]
+            )
         } catch let error as KeychainError where error == .itemNotFound {
             // Deleting the last protected domain can run against legacy or already
             // cleaned-up state. Missing root secret is not a recovery failure here.
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.delete.finish",
+                metadata: ["result": "missing"]
+            )
         }
         if let legacyRightStoreClient {
             try? await legacyRightStoreClient.removeRight(forIdentifier: identifier)
@@ -97,6 +131,15 @@ final class ProtectedDataSessionCoordinator {
         if usesHandoffContext {
             context.interactionNotAllowed = true
         }
+        traceStore?.record(
+            category: .operation,
+            name: "protectedSettings.authorization.context",
+            metadata: [
+                "source": usesHandoffContext ? "handoff" : "interactive",
+                "interactionNotAllowed": context.interactionNotAllowed ? "true" : "false",
+                "policy": appSessionPolicyProvider().rawValue
+            ]
+        )
 
         do {
             var rawSecret: Data
@@ -162,20 +205,57 @@ final class ProtectedDataSessionCoordinator {
         to newPolicy: AppSessionAuthenticationPolicy,
         authenticationContext: LAContext?
     ) throws -> Bool {
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.rootSecret.reprotect.start",
+            metadata: [
+                "currentPolicy": currentPolicy.rawValue,
+                "newPolicy": newPolicy.rawValue,
+                "hasContext": authenticationContext == nil ? "false" : "true"
+            ]
+        )
         guard rootSecretStore.rootSecretExists(identifier: rootSecretIdentifier) else {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.reprotect.finish",
+                metadata: ["result": "missing", "newPolicy": newPolicy.rawValue]
+            )
             return false
         }
         guard let authenticationContext else {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.reprotect.finish",
+                metadata: ["result": "missingContext", "newPolicy": newPolicy.rawValue]
+            )
             throw ProtectedDataError.authorizingUnavailable
         }
         authenticationContext.interactionNotAllowed = true
 
-        try rootSecretStore.reprotectRootSecret(
-            identifier: rootSecretIdentifier,
-            from: currentPolicy,
-            to: newPolicy,
-            authenticationContext: authenticationContext
-        )
+        do {
+            try rootSecretStore.reprotectRootSecret(
+                identifier: rootSecretIdentifier,
+                from: currentPolicy,
+                to: newPolicy,
+                authenticationContext: authenticationContext
+            )
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.reprotect.finish",
+                metadata: [
+                    "result": "success",
+                    "newPolicy": newPolicy.rawValue,
+                    "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
+                ]
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.reprotect.finish",
+                metadata: traceErrorMetadata(error, extra: ["result": "failed", "newPolicy": newPolicy.rawValue])
+            )
+            throw error
+        }
         return true
     }
 
@@ -233,18 +313,57 @@ final class ProtectedDataSessionCoordinator {
         authenticationContext: LAContext,
         usesHandoffContext: Bool
     ) async throws -> Data {
+        let metadata = [
+            "source": usesHandoffContext ? "handoff" : "interactive",
+            "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
+        ]
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.rootSecret.load.start",
+            metadata: metadata
+        )
         if usesHandoffContext {
-            return try rootSecretStore.loadRootSecret(
-                identifier: identifier,
-                authenticationContext: authenticationContext
-            )
+            do {
+                let secret = try rootSecretStore.loadRootSecret(
+                    identifier: identifier,
+                    authenticationContext: authenticationContext
+                )
+                traceStore?.record(
+                    category: .operation,
+                    name: "protectedData.rootSecret.load.finish",
+                    metadata: metadata.merging(["result": "success"], uniquingKeysWith: { _, new in new })
+                )
+                return secret
+            } catch {
+                traceStore?.record(
+                    category: .operation,
+                    name: "protectedData.rootSecret.load.finish",
+                    metadata: traceErrorMetadata(error, extra: metadata.merging(["result": "failed"], uniquingKeysWith: { _, new in new }))
+                )
+                throw error
+            }
         }
 
-        return try await authenticationPromptCoordinator.withOperationPrompt {
-            try rootSecretStore.loadRootSecret(
-                identifier: identifier,
-                authenticationContext: authenticationContext
+        do {
+            let secret = try await authenticationPromptCoordinator.withOperationPrompt {
+                try rootSecretStore.loadRootSecret(
+                    identifier: identifier,
+                    authenticationContext: authenticationContext
+                )
+            }
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.load.finish",
+                metadata: metadata.merging(["result": "success"], uniquingKeysWith: { _, new in new })
             )
+            return secret
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.load.finish",
+                metadata: traceErrorMetadata(error, extra: metadata.merging(["result": "failed"], uniquingKeysWith: { _, new in new }))
+            )
+            throw error
         }
     }
 
@@ -255,14 +374,55 @@ final class ProtectedDataSessionCoordinator {
         usesHandoffContext: Bool
     ) async throws -> Data {
         guard let legacyRightStoreClient else {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.legacyMigration.finish",
+                metadata: ["result": "missingLegacySource"]
+            )
             throw KeychainError.itemNotFound
         }
 
-        let legacyRight = try await legacyRightStoreClient.right(
-            forIdentifier: registry.sharedRightIdentifier
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.rootSecret.legacyMigration.start",
+            metadata: [
+                "source": usesHandoffContext ? "handoff" : "interactive",
+                "policy": appSessionPolicyProvider().rawValue
+            ]
         )
-        try await authenticationPromptCoordinator.withOperationPrompt {
-            try await legacyRight.authorize(localizedReason: localizedReason)
+        let legacyRight: any ProtectedDataPersistedRightHandle
+        do {
+            legacyRight = try await legacyRightStoreClient.right(
+                forIdentifier: registry.sharedRightIdentifier
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.legacyMigration.finish",
+                metadata: traceErrorMetadata(error, extra: ["result": "failed", "step": "loadLegacyRight"])
+            )
+            throw error
+        }
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.rootSecret.legacyAuthorize.start"
+        )
+        do {
+            try await authenticationPromptCoordinator.withOperationPrompt {
+                try await legacyRight.authorize(localizedReason: localizedReason)
+            }
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.legacyAuthorize.finish",
+                metadata: ["result": "success"]
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.legacyAuthorize.finish",
+                metadata: traceErrorMetadata(error, extra: ["result": "failed"])
+            )
+            throw error
         }
 
         do {
@@ -303,9 +463,19 @@ final class ProtectedDataSessionCoordinator {
             }
 
             await legacyRight.deauthorize()
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.legacyMigration.finish",
+                metadata: ["result": "success"]
+            )
             return verifiedSecret
         } catch {
             await legacyRight.deauthorize()
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.legacyMigration.finish",
+                metadata: traceErrorMetadata(error, extra: ["result": "failed"])
+            )
             throw error
         }
     }
@@ -347,5 +517,21 @@ final class ProtectedDataSessionCoordinator {
         }
 
         return false
+    }
+
+    private func traceErrorMetadata(
+        _ error: Error,
+        extra: [String: String] = [:]
+    ) -> [String: String] {
+        var metadata = extra
+        metadata["errorType"] = String(describing: type(of: error))
+        if let keychainError = error as? KeychainError {
+            metadata["keychainError"] = String(describing: keychainError)
+        }
+        if let laError = error as? LAError {
+            metadata["laCode"] = String(laError.errorCode)
+            metadata["laCodeName"] = String(describing: laError.code)
+        }
+        return metadata
     }
 }

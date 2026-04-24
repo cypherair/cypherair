@@ -43,11 +43,15 @@ final class AppSessionOrchestrator {
 
     func recordAuthentication() {
         lastAuthenticationDate = Date()
-        traceStore?.record(category: .session, name: "session.recordAuthentication")
+        traceStore?.record(
+            category: .session,
+            name: "session.recordAuthentication",
+            metadata: ["hasPendingContext": pendingAuthenticatedContext == nil ? "false" : "true"]
+        )
     }
 
     func requestContentClear() {
-        discardPendingAuthenticatedContext()
+        discardPendingAuthenticatedContext(reason: "contentClear")
         contentClearGeneration += 1
         traceStore?.record(
             category: .session,
@@ -122,7 +126,7 @@ final class AppSessionOrchestrator {
             )
             return
         }
-        discardPendingAuthenticatedContext()
+        discardPendingAuthenticatedContext(reason: "sceneResignActive")
         isPrivacyScreenBlurred = true
         authFailed = false
         traceStore?.record(
@@ -133,7 +137,7 @@ final class AppSessionOrchestrator {
     }
 
     func handleSceneDidEnterBackground() {
-        discardPendingAuthenticatedContext()
+        discardPendingAuthenticatedContext(reason: "sceneBackground")
         isPrivacyScreenBlurred = true
         authFailed = false
         traceStore?.record(
@@ -203,7 +207,7 @@ final class AppSessionOrchestrator {
             do {
                 let result = try await evaluateAppAuthentication(localizedReason)
                 if result.isAuthenticated {
-                    replacePendingAuthenticatedContext(with: result.context)
+                    replacePendingAuthenticatedContext(with: result.context, reason: "resumeAuthenticated")
                     recordAuthentication()
                     authFailed = false
                     isPrivacyScreenBlurred = false
@@ -213,7 +217,7 @@ final class AppSessionOrchestrator {
                         metadata: ["reason": "authenticated", "attemptedAuthentication": "true"]
                     )
                 } else {
-                    discardPendingAuthenticatedContext()
+                    discardPendingAuthenticatedContext(reason: "resumeReturnedFalse")
                     authFailed = true
                     traceStore?.record(
                         category: .session,
@@ -222,7 +226,7 @@ final class AppSessionOrchestrator {
                     )
                 }
             } catch {
-                discardPendingAuthenticatedContext()
+                discardPendingAuthenticatedContext(reason: "resumeThrew")
                 authFailed = true
                 traceStore?.record(
                     category: .session,
@@ -259,7 +263,10 @@ final class AppSessionOrchestrator {
         traceStore?.record(
             category: .session,
             name: "session.consumeAuthenticatedContext",
-            metadata: ["hadContext": context == nil ? "false" : "true"]
+            metadata: [
+                "hadContext": context == nil ? "false" : "true",
+                "remainingContext": pendingAuthenticatedContext == nil ? "false" : "true"
+            ]
         )
         return context
     }
@@ -310,13 +317,29 @@ final class AppSessionOrchestrator {
         }
     }
 
-    private func replacePendingAuthenticatedContext(with context: LAContext?) {
-        discardPendingAuthenticatedContext()
+    private func replacePendingAuthenticatedContext(with context: LAContext?, reason: String) {
+        let hadExistingContext = pendingAuthenticatedContext != nil
+        pendingAuthenticatedContext?.invalidate()
         pendingAuthenticatedContext = context
+        traceStore?.record(
+            category: .session,
+            name: "session.pendingContext.store",
+            metadata: [
+                "reason": reason,
+                "hasContext": context == nil ? "false" : "true",
+                "replacedExisting": hadExistingContext ? "true" : "false"
+            ]
+        )
     }
 
-    private func discardPendingAuthenticatedContext() {
+    private func discardPendingAuthenticatedContext(reason: String) {
+        let hadContext = pendingAuthenticatedContext != nil
         pendingAuthenticatedContext?.invalidate()
         pendingAuthenticatedContext = nil
+        traceStore?.record(
+            category: .session,
+            name: "session.pendingContext.discard",
+            metadata: ["reason": reason, "hadContext": hadContext ? "true" : "false"]
+        )
     }
 }

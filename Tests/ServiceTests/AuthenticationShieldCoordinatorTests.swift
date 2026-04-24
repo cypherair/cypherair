@@ -301,6 +301,8 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
         XCTAssertEqual(completionEntry.metadata["cycle"], "1")
         XCTAssertEqual(completionEntry.metadata["reason"], "fallbackYield")
         XCTAssertNotNil(Double(completionEntry.metadata["elapsedMs"] ?? ""))
+        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "shield.pendingDismissal.fallbackScheduled" }))
+        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "shield.pendingDismissal.fallbackFired" }))
     }
 
     func test_traceRecordsLifecycleSettledDismissalAfterBackgroundBounce() {
@@ -354,9 +356,39 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
         )
     }
 
+    func test_traceRecordsRenderHiddenTimingAfterDismissalCompletion() async {
+        let traceStore = makeTraceStore()
+        let coordinator = AuthenticationShieldCoordinator(traceStore: traceStore)
+
+        coordinator.begin(.privacy)
+        if let presentationState = coordinator.presentationState {
+            coordinator.noteRenderVisible(presentationState)
+        }
+        coordinator.end(.privacy)
+        await settleShieldDismissal()
+        coordinator.noteRenderHidden()
+
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "shield.render.visible"
+                    && $0.metadata["primaryKind"] == "privacy"
+                    && $0.metadata["activeKinds"] == "privacy"
+            }
+        )
+        guard let hiddenEntry = traceStore.recentEntries.last(where: { $0.name == "shield.render.hidden" }) else {
+            XCTFail("Expected shield.render.hidden trace entry")
+            return
+        }
+        XCTAssertEqual(hiddenEntry.metadata["pending"], "false")
+        XCTAssertEqual(hiddenEntry.metadata["lastDismissalCycle"], "1")
+        XCTAssertNotNil(Double(hiddenEntry.metadata["lastDismissalElapsedMs"] ?? ""))
+        XCTAssertNotNil(Double(hiddenEntry.metadata["elapsedSinceDismissalCompleteMs"] ?? ""))
+    }
+
     private func settleShieldDismissal() async {
         for _ in 0..<5 {
             await Task.yield()
         }
+        try? await Task.sleep(nanoseconds: 10_000_000)
     }
 }

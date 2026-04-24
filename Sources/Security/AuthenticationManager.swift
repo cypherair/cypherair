@@ -82,6 +82,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private let bundleStore: KeyBundleStore
     private let migrationCoordinator: KeyMigrationCoordinator
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
+    private let traceStore: AuthLifecycleTraceStore?
 
     // MARK: - State
 
@@ -112,12 +113,14 @@ final class AuthenticationManager: AuthenticationEvaluable {
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         defaults: UserDefaults = .standard,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator()
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
+        traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.defaults = defaults
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
+        self.traceStore = traceStore
         let bundleStore = KeyBundleStore(keychain: keychain)
         self.bundleStore = bundleStore
         self.migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
@@ -200,7 +203,18 @@ final class AuthenticationManager: AuthenticationEvaluable {
         policy: AppSessionAuthenticationPolicy,
         reason: String
     ) async throws -> AppSessionAuthenticationResult {
+        traceStore?.record(
+            category: .prompt,
+            name: "appSession.evaluate.start",
+            metadata: ["policy": policy.rawValue]
+        )
+
         if defaults.bool(forKey: UITestPreferences.bypassAuthenticationKey) {
+            traceStore?.record(
+                category: .prompt,
+                name: "appSession.evaluate.finish",
+                metadata: ["result": "bypass", "policy": policy.rawValue, "hasContext": "false"]
+            )
             return .authenticated(context: nil)
         }
 
@@ -214,16 +228,79 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     localizedReason: reason
                 )
             }
+            traceStore?.record(
+                category: .prompt,
+                name: "appSession.evaluate.finish",
+                metadata: [
+                    "result": success ? "success" : "failed",
+                    "policy": policy.rawValue,
+                    "hasContext": success ? "true" : "false"
+                ]
+            )
             return success ? .authenticated(context: context) : .failed
         } catch let error as LAError where error.code == .biometryNotAvailable
                                          || error.code == .biometryNotEnrolled
                                          || error.code == .biometryLockout {
+            traceStore?.record(
+                category: .prompt,
+                name: "appSession.evaluate.error",
+                metadata: traceErrorMetadata(
+                    error,
+                    extra: ["policy": policy.rawValue, "mappedError": "appAccessBiometricsUnavailable"]
+                )
+            )
+            traceStore?.record(
+                category: .prompt,
+                name: "appSession.evaluate.finish",
+                metadata: [
+                    "result": "error",
+                    "policy": policy.rawValue,
+                    "mappedError": "appAccessBiometricsUnavailable",
+                    "hasContext": "false"
+                ]
+            )
             throw AuthenticationError.appAccessBiometricsUnavailable
         } catch let error as LAError where error.code == .userCancel
                                          || error.code == .appCancel
                                          || error.code == .systemCancel {
+            traceStore?.record(
+                category: .prompt,
+                name: "appSession.evaluate.error",
+                metadata: traceErrorMetadata(
+                    error,
+                    extra: ["policy": policy.rawValue, "mappedError": "cancelled"]
+                )
+            )
+            traceStore?.record(
+                category: .prompt,
+                name: "appSession.evaluate.finish",
+                metadata: [
+                    "result": "error",
+                    "policy": policy.rawValue,
+                    "mappedError": "cancelled",
+                    "hasContext": "false"
+                ]
+            )
             throw AuthenticationError.cancelled
         } catch {
+            traceStore?.record(
+                category: .prompt,
+                name: "appSession.evaluate.error",
+                metadata: traceErrorMetadata(
+                    error,
+                    extra: ["policy": policy.rawValue, "mappedError": "failed"]
+                )
+            )
+            traceStore?.record(
+                category: .prompt,
+                name: "appSession.evaluate.finish",
+                metadata: [
+                    "result": "error",
+                    "policy": policy.rawValue,
+                    "mappedError": "failed",
+                    "hasContext": "false"
+                ]
+            )
             throw AuthenticationError.failed
         }
     }
@@ -260,25 +337,89 @@ final class AuthenticationManager: AuthenticationEvaluable {
         hasBackup: Bool,
         authenticator: any AuthenticationEvaluable
     ) async throws {
+        let oldMode = currentMode
+        traceStore?.record(
+            category: .operation,
+            name: "privateKeyProtection.switch.start",
+            metadata: [
+                "currentMode": oldMode.rawValue,
+                "targetMode": newMode.rawValue,
+                "keyCount": String(fingerprints.count),
+                "hasBackup": hasBackup ? "true" : "false"
+            ]
+        )
+
         guard !fingerprints.isEmpty else {
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.finish",
+                metadata: ["result": "noIdentities", "targetMode": newMode.rawValue]
+            )
             throw AuthenticationError.noIdentities
         }
 
         // Defense-in-depth: require at least one backed-up key before enabling
         // High Security mode. The UI should also warn; this is the safety net.
         if newMode == .highSecurity && !hasBackup {
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.finish",
+                metadata: ["result": "backupRequired", "targetMode": newMode.rawValue]
+            )
             throw AuthenticationError.backupRequired
         }
 
-        let oldMode = currentMode
-        guard newMode != oldMode else { return }
+        guard newMode != oldMode else {
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.finish",
+                metadata: ["result": "noChange", "targetMode": newMode.rawValue]
+            )
+            return
+        }
 
         // Step 0: Authenticate under the CURRENT mode before any Keychain modification.
-        let authenticated = try await authenticator.evaluate(
-            mode: oldMode,
-            reason: AuthStrings.switchModeReason
+        traceStore?.record(
+            category: .prompt,
+            name: "privateKeyProtection.switch.auth.start",
+            metadata: ["mode": oldMode.rawValue, "targetMode": newMode.rawValue]
         )
+        let authenticated: Bool
+        do {
+            authenticated = try await authenticator.evaluate(
+                mode: oldMode,
+                reason: AuthStrings.switchModeReason
+            )
+            traceStore?.record(
+                category: .prompt,
+                name: "privateKeyProtection.switch.auth.finish",
+                metadata: ["result": authenticated ? "success" : "failed", "mode": oldMode.rawValue]
+            )
+        } catch {
+            traceStore?.record(
+                category: .prompt,
+                name: "privateKeyProtection.switch.auth.finish",
+                metadata: traceErrorMetadata(
+                    error,
+                    extra: ["result": "error", "mode": oldMode.rawValue]
+                )
+            )
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.finish",
+                metadata: traceErrorMetadata(
+                    error,
+                    extra: ["result": "authError", "targetMode": newMode.rawValue]
+                )
+            )
+            throw error
+        }
         guard authenticated else {
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.finish",
+                metadata: ["result": "authFailed", "targetMode": newMode.rawValue]
+            )
             throw AuthenticationError.failed
         }
 
@@ -289,10 +430,20 @@ final class AuthenticationManager: AuthenticationEvaluable {
         // Phase A: Create all pending items (Steps 2-3).
         // If anything fails here, old items are intact — safe to clean up pending and abort.
         do {
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.phaseA.start",
+                metadata: ["keyCount": String(fingerprints.count), "targetMode": newMode.rawValue]
+            )
             let newAccessControl = try createAccessControl(for: newMode)
 
             // Step 2: Re-wrap each identity under temporary Keychain names.
-            for fingerprint in fingerprints {
+            for (index, fingerprint) in fingerprints.enumerated() {
+                traceStore?.record(
+                    category: .operation,
+                    name: "privateKeyProtection.switch.phaseA.key.start",
+                    metadata: ["index": String(index), "keyCount": String(fingerprints.count)]
+                )
                 // 2a. Load existing wrapped bundle from permanent Keychain items.
                 let existingBundle = try bundleStore.loadBundle(fingerprint: fingerprint)
 
@@ -334,6 +485,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     fingerprint: fingerprint,
                     namespace: .pending
                 )
+                traceStore?.record(
+                    category: .operation,
+                    name: "privateKeyProtection.switch.phaseA.key.finish",
+                    metadata: ["index": String(index), "result": "success"]
+                )
             }
 
             // Step 3: Verify all new items stored successfully by loading each one.
@@ -343,11 +499,26 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     namespace: .pending
                 )
             }
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.phaseA.finish",
+                metadata: ["result": "success", "keyCount": String(fingerprints.count)]
+            )
         } catch {
             // Phase A failed: old items are intact. Safe to clean up pending and abort.
             fingerprints.forEach { bundleStore.cleanupPendingBundle(fingerprint: $0) }
             defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
             defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.phaseA.finish",
+                metadata: traceErrorMetadata(error, extra: ["result": "failed"])
+            )
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.finish",
+                metadata: traceErrorMetadata(error, extra: ["result": "phaseAFailed"])
+            )
             throw AuthenticationError.modeSwitchFailed(underlying: error)
         }
 
@@ -356,8 +527,18 @@ final class AuthenticationManager: AuthenticationEvaluable {
         // we must NOT clean up pending items — they may be the only copy of some keys.
         // Instead, leave the rewrapInProgress flag set so crash recovery can handle it.
         do {
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.phaseB.start",
+                metadata: ["keyCount": String(fingerprints.count), "targetMode": newMode.rawValue]
+            )
             // Step 4: Delete OLD Keychain items. All new items are confirmed stored.
-            for fingerprint in fingerprints {
+            for (index, fingerprint) in fingerprints.enumerated() {
+                traceStore?.record(
+                    category: .operation,
+                    name: "privateKeyProtection.switch.phaseB.delete.start",
+                    metadata: ["index": String(index)]
+                )
                 try bundleStore.deleteBundle(fingerprint: fingerprint)
             }
 
@@ -366,10 +547,20 @@ final class AuthenticationManager: AuthenticationEvaluable {
             // the primary enforcement is at the SE level: the SE key was generated
             // in Phase A with the correct biometric/passcode flags, and
             // reconstructKey(from:) enforces those flags in hardware.
-            for fingerprint in fingerprints {
+            for (index, fingerprint) in fingerprints.enumerated() {
+                traceStore?.record(
+                    category: .operation,
+                    name: "privateKeyProtection.switch.phaseB.promote.start",
+                    metadata: ["index": String(index)]
+                )
                 try bundleStore.promotePendingToPermanent(
                     fingerprint: fingerprint,
                     seKeyAccessControl: nil
+                )
+                traceStore?.record(
+                    category: .operation,
+                    name: "privateKeyProtection.switch.phaseB.promote.finish",
+                    metadata: ["index": String(index), "result": "success"]
                 )
             }
 
@@ -379,13 +570,46 @@ final class AuthenticationManager: AuthenticationEvaluable {
             // Step 7: Clear in-progress flag and target mode.
             defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
             defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.phaseB.finish",
+                metadata: ["result": "success", "keyCount": String(fingerprints.count)]
+            )
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.finish",
+                metadata: ["result": "success", "targetMode": newMode.rawValue]
+            )
 
         } catch {
             // Phase B failed: some old items may already be deleted.
             // Do NOT clean up pending items — they are the only remaining copy.
             // Leave rewrapInProgress flag set so crash recovery runs on next launch.
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.phaseB.finish",
+                metadata: traceErrorMetadata(error, extra: ["result": "failed"])
+            )
+            traceStore?.record(
+                category: .operation,
+                name: "privateKeyProtection.switch.finish",
+                metadata: traceErrorMetadata(error, extra: ["result": "phaseBFailed"])
+            )
             throw AuthenticationError.modeSwitchFailed(underlying: error)
         }
+    }
+
+    private func traceErrorMetadata(
+        _ error: Error,
+        extra: [String: String] = [:]
+    ) -> [String: String] {
+        var metadata = extra
+        metadata["errorType"] = String(describing: type(of: error))
+        if let laError = error as? LAError {
+            metadata["laCode"] = String(laError.errorCode)
+            metadata["laCodeName"] = String(describing: laError.code)
+        }
+        return metadata
     }
 
     // MARK: - Crash Recovery
