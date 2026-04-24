@@ -27,6 +27,7 @@ struct SettingsView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
+    @Environment(\.appAccessPolicySwitchAction) private var appAccessPolicySwitchAction
 
     let configuration: Configuration
 
@@ -41,6 +42,7 @@ struct SettingsView: View {
             keyManagement: keyManagement,
             iosPresentationController: iosPresentationController,
             macPresentationController: macPresentationController,
+            appAccessPolicySwitchAction: appAccessPolicySwitchAction,
             configuration: configuration
         )
     }
@@ -72,6 +74,7 @@ private struct SettingsScreenHostView: View {
         keyManagement: KeyManagementService,
         iosPresentationController: IOSPresentationController?,
         macPresentationController: MacPresentationController?,
+        appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction?,
         configuration: SettingsView.Configuration
     ) {
         _model = State(
@@ -81,7 +84,8 @@ private struct SettingsScreenHostView: View {
                 keyManagement: keyManagement,
                 iosPresentationController: iosPresentationController,
                 macPresentationController: macPresentationController,
-                configuration: configuration
+                configuration: configuration,
+                appAccessPolicySwitchAction: appAccessPolicySwitchAction
             )
         )
     }
@@ -93,7 +97,25 @@ private struct SettingsScreenHostView: View {
         Form {
             Section {
                 Picker(
-                    String(localized: "settings.authMode", defaultValue: "Authentication Mode"),
+                    String(localized: "settings.appAccessPolicy", defaultValue: "App Access Protection"),
+                    selection: Binding(
+                        get: { appConfiguration.appSessionAuthenticationPolicy },
+                        set: { newPolicy in
+                            guard newPolicy != appConfiguration.appSessionAuthenticationPolicy else { return }
+                            model.handleAppAccessPolicySelection(newPolicy)
+                        }
+                    )
+                ) {
+                    Text(String(localized: "settings.appAccessPolicy.userPresence", defaultValue: "User Presence"))
+                        .tag(AppSessionAuthenticationPolicy.userPresence)
+                    Text(String(localized: "settings.appAccessPolicy.biometricsOnly", defaultValue: "Biometrics Only"))
+                        .tag(AppSessionAuthenticationPolicy.biometricsOnly)
+                }
+                .accessibilityIdentifier("settings.appAccessPolicy")
+                .disabled(model.isSwitchingAppAccessPolicy)
+
+                Picker(
+                    String(localized: "settings.authMode", defaultValue: "Private Key Protection"),
                     selection: Binding(
                         get: { appConfiguration.authMode },
                         set: { newMode in
@@ -259,7 +281,7 @@ private struct SettingsScreenHostView: View {
             }
         }
         .alert(
-            String(localized: "settings.mode.error.title", defaultValue: "Mode Switch Failed"),
+            String(localized: "settings.mode.error.title", defaultValue: "Protection Change Failed"),
             isPresented: Binding(
                 get: { model.showSwitchError },
                 set: { if !$0 { model.dismissSwitchError() } }

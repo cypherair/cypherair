@@ -14,14 +14,20 @@ struct AuthenticationShieldPresentationState: Equatable {
     let isPendingDismissal: Bool
 }
 
-private enum AuthenticationShieldLifecyclePhase: Equatable {
+private enum AuthenticationShieldLifecyclePhase: String, Equatable {
     case active
     case inactive
     case background
 }
 
+private enum AuthenticationShieldDismissalCompletionReason: String {
+    case lifecycleSettle
+    case fallbackYield
+}
+
 @Observable
 final class AuthenticationShieldCoordinator: @unchecked Sendable {
+    private let traceStore: AuthLifecycleTraceStore?
     private var privacyPromptDepth = 0
     private var operationPromptDepth = 0
     private var isPendingDismissal = false
@@ -30,6 +36,15 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
     private var lastLifecyclePhase: AuthenticationShieldLifecyclePhase = .active
     private var observedNonActiveLifecycleInCurrentCycle = false
     private var dismissalFallbackTask: Task<Void, Never>?
+    private var pendingDismissalStartedAt: Date?
+    private var pendingDismissalCycleID: UInt64?
+    private var lastDismissalCompletedAt: Date?
+    private var lastDismissalCompletedCycleID: UInt64?
+    private var lastDismissalElapsedMilliseconds: String?
+
+    init(traceStore: AuthLifecycleTraceStore? = nil) {
+        self.traceStore = traceStore
+    }
 
     var isVisible: Bool {
         totalPromptDepth > 0 || isPendingDismissal
@@ -55,19 +70,28 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
 
     func begin(_ kind: AuthenticationShieldKind) {
         if totalPromptDepth == 0 {
+            if isPendingDismissal {
+                tracePendingDismissalCancellation(reason: "newPrompt", cycleID: promptCycleID)
+            }
             promptCycleID &+= 1
             isPendingDismissal = false
             observedNonActiveLifecycleInCurrentCycle = false
+            clearPendingDismissalTiming()
             cancelDismissalFallback()
         }
         adjustDepth(for: kind, delta: 1)
         refreshLastVisiblePrimaryKind()
+        traceShieldPromptEvent(name: "shield.begin", kind: kind)
     }
 
     func end(_ kind: AuthenticationShieldKind) {
         adjustDepth(for: kind, delta: -1)
+        traceShieldPromptEvent(name: "shield.end", kind: kind)
         if totalPromptDepth == 0 {
             isPendingDismissal = true
+            pendingDismissalStartedAt = Date()
+            pendingDismissalCycleID = promptCycleID
+            tracePendingDismissalStart(for: promptCycleID)
             scheduleFallbackDismissalIfNeeded(for: promptCycleID)
         } else {
             refreshLastVisiblePrimaryKind()
@@ -84,6 +108,34 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
 
     func sceneDidEnterBackground() {
         noteLifecyclePhase(.background)
+    }
+
+    func noteRenderVisible(_ presentationState: AuthenticationShieldPresentationState) {
+        traceStore?.record(
+            category: .lifecycle,
+            name: "shield.render.visible",
+            metadata: [
+                "cycle": String(promptCycleID),
+                "pending": presentationState.isPendingDismissal ? "true" : "false",
+                "primaryKind": presentationState.primaryKind.rawValue,
+                "activeKinds": presentationState.activeKinds.map(\.rawValue).sorted().joined(separator: ",")
+            ]
+        )
+    }
+
+    func noteRenderHidden() {
+        traceStore?.record(
+            category: .lifecycle,
+            name: "shield.render.hidden",
+            metadata: [
+                "cycle": String(promptCycleID),
+                "pending": isPendingDismissal ? "true" : "false",
+                "elapsedSincePendingDismissalMs": pendingDismissalElapsedMilliseconds(),
+                "lastDismissalCycle": lastDismissalCompletedCycleID.map(String.init) ?? "none",
+                "lastDismissalElapsedMs": lastDismissalElapsedMilliseconds ?? "none",
+                "elapsedSinceDismissalCompleteMs": dismissalCompletionToRenderHiddenElapsedMilliseconds()
+            ]
+        )
     }
 
     private var activeKinds: Set<AuthenticationShieldKind> {
@@ -112,12 +164,13 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
 
     private func noteLifecyclePhase(_ phase: AuthenticationShieldLifecyclePhase) {
         lastLifecyclePhase = phase
+        traceLifecycleObservation(phase)
 
         switch phase {
         case .active:
             guard isPendingDismissal else { return }
             if observedNonActiveLifecycleInCurrentCycle {
-                completePendingDismissalIfEligible(for: promptCycleID)
+                completePendingDismissalIfEligible(for: promptCycleID, reason: .lifecycleSettle)
             } else {
                 scheduleFallbackDismissalIfNeeded(for: promptCycleID)
             }
@@ -131,21 +184,29 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
         guard isPendingDismissal, lastLifecyclePhase == .active else { return }
 
         cancelDismissalFallback()
+        tracePendingDismissalFallbackScheduled(for: cycleID)
         dismissalFallbackTask = Task { @MainActor [weak self] in
             await Task.yield()
-            self?.completePendingDismissalIfEligible(for: cycleID)
+            guard !Task.isCancelled else { return }
+            self?.tracePendingDismissalFallbackFired(for: cycleID)
+            self?.completePendingDismissalIfEligible(for: cycleID, reason: .fallbackYield)
         }
     }
 
-    private func completePendingDismissalIfEligible(for cycleID: UInt64) {
+    private func completePendingDismissalIfEligible(
+        for cycleID: UInt64,
+        reason: AuthenticationShieldDismissalCompletionReason
+    ) {
         guard isPendingDismissal else { return }
         guard promptCycleID == cycleID else { return }
         guard totalPromptDepth == 0 else { return }
         guard lastLifecyclePhase == .active else { return }
 
+        traceDismissalCompletion(for: cycleID, reason: reason)
         isPendingDismissal = false
         observedNonActiveLifecycleInCurrentCycle = false
         lastVisiblePrimaryKind = nil
+        clearPendingDismissalTiming()
         cancelDismissalFallback()
     }
 
@@ -168,6 +229,122 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
             return .operation
         }
         return nil
+    }
+
+    private func clearPendingDismissalTiming() {
+        pendingDismissalStartedAt = nil
+        pendingDismissalCycleID = nil
+    }
+
+    private func pendingDismissalElapsedMilliseconds() -> String {
+        guard let pendingDismissalStartedAt else {
+            return "none"
+        }
+        return String(format: "%.3f", Date().timeIntervalSince(pendingDismissalStartedAt) * 1000)
+    }
+
+    private func dismissalCompletionToRenderHiddenElapsedMilliseconds() -> String {
+        guard let lastDismissalCompletedAt else {
+            return "none"
+        }
+        return String(format: "%.3f", Date().timeIntervalSince(lastDismissalCompletedAt) * 1000)
+    }
+
+    private func traceShieldPromptEvent(name: String, kind: AuthenticationShieldKind) {
+        traceStore?.record(
+            category: .prompt,
+            name: name,
+            metadata: [
+                "cycle": String(promptCycleID),
+                "kind": kind.rawValue,
+                "operationDepth": String(operationPromptDepth),
+                "privacyDepth": String(privacyPromptDepth),
+                "totalDepth": String(totalPromptDepth)
+            ]
+        )
+    }
+
+    private func tracePendingDismissalStart(for cycleID: UInt64) {
+        traceStore?.record(
+            category: .lifecycle,
+            name: "shield.pendingDismissal.start",
+            metadata: [
+                "cycle": String(cycleID),
+                "lastLifecyclePhase": lastLifecyclePhase.rawValue,
+                "primaryKind": lastVisiblePrimaryKind?.rawValue ?? "unknown"
+            ]
+        )
+    }
+
+    private func tracePendingDismissalFallbackScheduled(for cycleID: UInt64) {
+        traceStore?.record(
+            category: .lifecycle,
+            name: "shield.pendingDismissal.fallbackScheduled",
+            metadata: [
+                "cycle": String(cycleID),
+                "lastLifecyclePhase": lastLifecyclePhase.rawValue
+            ]
+        )
+    }
+
+    private func tracePendingDismissalFallbackFired(for cycleID: UInt64) {
+        traceStore?.record(
+            category: .lifecycle,
+            name: "shield.pendingDismissal.fallbackFired",
+            metadata: [
+                "cycle": String(cycleID),
+                "elapsedMs": pendingDismissalElapsedMilliseconds()
+            ]
+        )
+    }
+
+    private func tracePendingDismissalCancellation(reason: String, cycleID: UInt64) {
+        traceStore?.record(
+            category: .lifecycle,
+            name: "shield.pendingDismissal.cancel",
+            metadata: [
+                "cycle": String(cycleID),
+                "reason": reason
+            ]
+        )
+    }
+
+    private func traceLifecycleObservation(_ phase: AuthenticationShieldLifecyclePhase) {
+        traceStore?.record(
+            category: .lifecycle,
+            name: "shield.lifecycle.observed",
+            metadata: [
+                "cycle": String(promptCycleID),
+                "pending": isPendingDismissal ? "true" : "false",
+                "phase": phase.rawValue
+            ]
+        )
+    }
+
+    private func traceDismissalCompletion(
+        for cycleID: UInt64,
+        reason: AuthenticationShieldDismissalCompletionReason
+    ) {
+        let elapsedMilliseconds: String
+        let now = Date()
+        if pendingDismissalCycleID == cycleID, let pendingDismissalStartedAt {
+            elapsedMilliseconds = String(format: "%.3f", now.timeIntervalSince(pendingDismissalStartedAt) * 1000)
+        } else {
+            elapsedMilliseconds = "unknown"
+        }
+        lastDismissalCompletedAt = now
+        lastDismissalCompletedCycleID = cycleID
+        lastDismissalElapsedMilliseconds = elapsedMilliseconds
+
+        traceStore?.record(
+            category: .lifecycle,
+            name: "shield.dismissal.complete",
+            metadata: [
+                "cycle": String(cycleID),
+                "elapsedMs": elapsedMilliseconds,
+                "reason": reason.rawValue
+            ]
+        )
     }
 
     deinit {
@@ -205,6 +382,12 @@ private struct AuthenticationShieldHostModifier: ViewModifier {
                let presentationState = coordinator.presentationState {
                 AuthenticationShieldView(presentationState: presentationState)
                     .zIndex(10)
+                    .onAppear {
+                        coordinator.noteRenderVisible(presentationState)
+                    }
+                    .onDisappear {
+                        coordinator.noteRenderHidden()
+                    }
             }
         }
 

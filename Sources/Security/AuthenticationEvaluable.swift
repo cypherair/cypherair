@@ -2,6 +2,78 @@ import Foundation
 import LocalAuthentication
 import Security
 
+/// Authentication policy for app launch/resume and App Data root-secret access.
+///
+/// This policy is intentionally separate from `AuthenticationMode`, which is
+/// only for Secure Enclave private-key operations.
+enum AppSessionAuthenticationPolicy: String, CaseIterable {
+    /// Face ID / Touch ID with device passcode fallback.
+    case userPresence
+
+    /// Face ID / Touch ID only. No passcode fallback.
+    case biometricsOnly
+
+    var localAuthenticationPolicy: LAPolicy {
+        switch self {
+        case .userPresence:
+            .deviceOwnerAuthentication
+        case .biometricsOnly:
+            .deviceOwnerAuthenticationWithBiometrics
+        }
+    }
+
+    func configure(_ context: LAContext) {
+        if self == .biometricsOnly {
+            context.localizedFallbackTitle = ""
+        }
+    }
+
+    func createRootSecretAccessControl() throws -> SecAccessControl {
+        let flags: SecAccessControlCreateFlags = switch self {
+        case .userPresence:
+            [.userPresence]
+        case .biometricsOnly:
+            [.biometryAny]
+        }
+
+        var error: Unmanaged<CFError>?
+        guard let accessControl = SecAccessControlCreateWithFlags(
+            kCFAllocatorDefault,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            flags,
+            &error
+        ) else {
+            _ = error?.takeRetainedValue()
+            throw AuthenticationError.accessControlCreationFailed
+        }
+
+        return accessControl
+    }
+
+    static func strictestPolicyForRootSecretReprotection(
+        from currentPolicy: AppSessionAuthenticationPolicy,
+        to newPolicy: AppSessionAuthenticationPolicy
+    ) -> AppSessionAuthenticationPolicy {
+        if currentPolicy == .biometricsOnly || newPolicy == .biometricsOnly {
+            return .biometricsOnly
+        }
+        return .userPresence
+    }
+}
+
+struct AppSessionAuthenticationResult {
+    let isAuthenticated: Bool
+    let context: LAContext?
+
+    static func authenticated(context: LAContext?) -> AppSessionAuthenticationResult {
+        AppSessionAuthenticationResult(isAuthenticated: true, context: context)
+    }
+
+    static var failed: AppSessionAuthenticationResult {
+        AppSessionAuthenticationResult(isAuthenticated: false, context: nil)
+    }
+}
+
 /// Authentication mode for the app.
 /// Determines the SecAccessControl flags used for SE key wrapping.
 enum AuthenticationMode: String {

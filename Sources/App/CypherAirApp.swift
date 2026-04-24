@@ -51,12 +51,36 @@ struct CypherAirApp: App {
         if launchConfiguration.shouldSkipOnboarding {
             container.config.hasCompletedOnboarding = true
         }
+        container.authLifecycleTraceStore?.record(
+            category: .lifecycle,
+            name: "app.init.containerReady",
+            metadata: [
+                "root": launchConfiguration.root.rawValue,
+                "uiTestMode": launchConfiguration.isUITestMode ? "true" : "false",
+                "requiresManualAuthentication": launchConfiguration.requiresManualAuthentication ? "true" : "false",
+                "authTraceEnabled": launchConfiguration.isAuthTraceEnabled ? "true" : "false"
+            ]
+        )
         let tutorialStore = TutorialSessionStore()
         let incomingURLImportCoordinator = IncomingURLImportCoordinator(
             importLoader: PublicKeyImportLoader(qrService: container.qrService),
             importWorkflow: ContactImportWorkflow(contactService: container.contactService)
         )
-        let startupSnapshot = AppStartupCoordinator().performPreAuthBootstrap(using: container)
+        let startupCoordinator = AppStartupCoordinator()
+        container.authLifecycleTraceStore?.record(
+            category: .lifecycle,
+            name: "app.init.preAuthBootstrap.start"
+        )
+        let startupSnapshot = startupCoordinator.performPreAuthBootstrap(using: container)
+        container.authLifecycleTraceStore?.record(
+            category: .lifecycle,
+            name: "app.init.preAuthBootstrap.finish",
+            metadata: [
+                "bootstrapOutcome": Self.traceValue(for: startupSnapshot.bootstrapOutcome),
+                "frameworkState": Self.traceValue(for: startupSnapshot.protectedDataFrameworkState),
+                "hasLoadError": startupSnapshot.loadError == nil ? "false" : "true"
+            ]
+        )
         let protectedSettingsHost = ProtectedSettingsHost(
             evaluateAccessGate: { isFirstProtectedAccess in
                 let decision = container.appSessionOrchestrator.evaluateProtectedDataAccessGate(
@@ -79,9 +103,15 @@ struct CypherAirApp: App {
             authorizeSharedRight: { localizedReason in
                 do {
                     let registry = try container.protectedDomainRecoveryCoordinator.loadCurrentRegistry()
+                    let authenticationContext = container.appSessionOrchestrator
+                        .consumeAuthenticatedContextForProtectedData()
+                    defer {
+                        authenticationContext?.invalidate()
+                    }
                     let result = await container.protectedDataSessionCoordinator.beginProtectedDataAuthorization(
                         registry: registry,
-                        localizedReason: localizedReason
+                        localizedReason: localizedReason,
+                        authenticationContext: authenticationContext
                     )
                     switch result {
                     case .authorized:
@@ -169,7 +199,8 @@ struct CypherAirApp: App {
                         )
                     }
                 )
-            }
+            },
+            traceStore: container.authLifecycleTraceStore
         )
 
         _launchConfiguration = State(initialValue: launchConfiguration)
@@ -223,6 +254,7 @@ struct CypherAirApp: App {
             .environment(container.authManager)
             .environment(container.keyManagement)
             .environment(container.selfTestService)
+            .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
             .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
             .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
             .environment(tutorialStore)
@@ -278,6 +310,7 @@ struct CypherAirApp: App {
                 .environment(container.selfTestService)
                 .environment(container.authManager)
                 .environment(container.appSessionOrchestrator)
+                .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
                 .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
                 .environment(\.protectedSettingsHost, protectedSettingsHost)
                 .environment(tutorialStore)
@@ -401,6 +434,97 @@ struct CypherAirApp: App {
         #endif
     }
 
+    private var appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction {
+        { newPolicy in
+            let currentPolicy = container.config.appSessionAuthenticationPolicy
+            guard newPolicy != currentPolicy else {
+                return
+            }
+
+            var didTraceFinish = false
+            do {
+                if container.protectedDataSessionCoordinator.hasPersistedRootSecret() {
+                    let authenticationPolicy = AppSessionAuthenticationPolicy
+                        .strictestPolicyForRootSecretReprotection(
+                            from: currentPolicy,
+                            to: newPolicy
+                        )
+                    container.authLifecycleTraceStore?.record(
+                        category: .operation,
+                        name: "appAccessPolicy.switch.start",
+                        metadata: [
+                            "currentPolicy": currentPolicy.rawValue,
+                            "newPolicy": newPolicy.rawValue,
+                            "authPolicy": authenticationPolicy.rawValue,
+                            "hasRootSecret": "true"
+                        ]
+                    )
+                    let result = try await container.authManager.evaluateAppSession(
+                        policy: authenticationPolicy,
+                        reason: String(
+                            localized: "settings.appAccessPolicy.change.reason",
+                            defaultValue: "Authenticate to change App Access Protection."
+                        ),
+                        source: "appAccessPolicy.switch"
+                    )
+                    guard result.isAuthenticated else {
+                        throw AuthenticationError.failed
+                    }
+                    defer {
+                        result.context?.invalidate()
+                    }
+
+                    try container.protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
+                        from: currentPolicy,
+                        to: newPolicy,
+                        authenticationContext: result.context
+                    )
+                    container.authLifecycleTraceStore?.record(
+                        category: .operation,
+                        name: "appAccessPolicy.switch.finish",
+                        metadata: ["result": "success", "newPolicy": newPolicy.rawValue, "hasRootSecret": "true"]
+                    )
+                    didTraceFinish = true
+                } else {
+                    container.authLifecycleTraceStore?.record(
+                        category: .operation,
+                        name: "appAccessPolicy.switch.start",
+                        metadata: [
+                            "currentPolicy": currentPolicy.rawValue,
+                            "newPolicy": newPolicy.rawValue,
+                            "authPolicy": newPolicy.rawValue,
+                            "hasRootSecret": "false"
+                        ]
+                    )
+                    guard container.authManager.canEvaluate(appSessionPolicy: newPolicy) else {
+                        container.authLifecycleTraceStore?.record(
+                            category: .operation,
+                            name: "appAccessPolicy.switch.finish",
+                            metadata: ["result": "biometricsUnavailable", "newPolicy": newPolicy.rawValue, "hasRootSecret": "false"]
+                        )
+                        didTraceFinish = true
+                        throw AuthenticationError.appAccessBiometricsUnavailable
+                    }
+                    container.authLifecycleTraceStore?.record(
+                        category: .operation,
+                        name: "appAccessPolicy.switch.finish",
+                        metadata: ["result": "success", "newPolicy": newPolicy.rawValue, "hasRootSecret": "false"]
+                    )
+                    didTraceFinish = true
+                }
+            } catch {
+                if !didTraceFinish {
+                    container.authLifecycleTraceStore?.record(
+                        category: .operation,
+                        name: "appAccessPolicy.switch.finish",
+                        metadata: ["result": "error", "newPolicy": newPolicy.rawValue, "errorType": String(describing: type(of: error))]
+                    )
+                }
+                throw error
+            }
+        }
+    }
+
     #if os(iOS) || os(visionOS)
     private var onboardingPresentationBinding: Binding<IOSPresentation?> {
         Binding(
@@ -517,6 +641,41 @@ struct CypherAirApp: App {
         )
     }
     #endif
+
+    private static func traceValue(for outcome: ProtectedDataBootstrapOutcome) -> String {
+        switch outcome {
+        case .emptySteadyState(_, let didBootstrap):
+            didBootstrap ? "emptySteadyState.bootstrapped" : "emptySteadyState.existing"
+        case .loadedRegistry(_, let recoveryDisposition):
+            "loadedRegistry.\(traceValue(for: recoveryDisposition))"
+        case .frameworkRecoveryNeeded:
+            "frameworkRecoveryNeeded"
+        }
+    }
+
+    private static func traceValue(for recoveryDisposition: ProtectedDataRecoveryDisposition) -> String {
+        switch recoveryDisposition {
+        case .resumeSteadyState:
+            "resumeSteadyState"
+        case .continuePendingMutation:
+            "continuePendingMutation"
+        case .frameworkRecoveryNeeded:
+            "frameworkRecoveryNeeded"
+        }
+    }
+
+    private static func traceValue(for state: ProtectedDataFrameworkState) -> String {
+        switch state {
+        case .sessionLocked:
+            "sessionLocked"
+        case .sessionAuthorized:
+            "sessionAuthorized"
+        case .frameworkRecoveryNeeded:
+            "frameworkRecoveryNeeded"
+        case .restartRequired:
+            "restartRequired"
+        }
+    }
 
 }
 

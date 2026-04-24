@@ -30,27 +30,29 @@ This document is a downstream review aid. It does not change the architecture or
 - `pendingMutation` is the sole authority for uncommitted create/delete work
 - shared-resource lifecycle state never doubles as mutation execution phase
 - `cleanupPending` appears only when committed membership is empty
-- directory enumeration never drives normal shared-right deletion
+- directory enumeration never drives normal root-secret deletion
 - a committed domain in domain-scoped `recoveryNeeded` still counts as a member
 - orphaned directories or wrapped-DMK artifacts do not implicitly become committed members
 
 ### 2.2 Unlock / Relock
 
-- one shared `LAPersistedRight.authorize(...)` is the single normative app-data authorization boundary
-- the shared app-data secret is fetched only after authorization
+- one shared Keychain-protected root-secret record is the single normative app-data authorization boundary
+- root-secret retrieval uses `kSecUseAuthenticationContext` with an authenticated `LAContext`
+- launch/resume authentication and root-secret retrieval use the dedicated `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`
+- the raw root secret is fetched only after app-session authentication succeeds
 - if launch/resume immediately enters a route that needs protected-domain content, that same orchestrated flow may activate the shared app-data session without surfacing a later second prompt
-- launch/resume authentication alone does not imply that the shared app-data session is already active
+- launch/resume authentication alone does not imply that the shared app-data session is already active unless root-secret retrieval and wrapping-root-key derivation also succeed
 - a second or third protected domain does not require another prompt in the same active app-data session
 - `AppSessionOrchestrator` is the only grace-window owner
 - `ProtectedDataSessionCoordinator` does not run an independent grace timer
 - relock closes new protected-domain access before cleanup begins
 - relock participant fan-out is non-short-circuit
-- relock deauthorizes the shared right
-- relock clears the shared secret and all unwrapped domain DMKs
+- relock discards or invalidates any session-local `LAContext` retained only for the unlock transaction
+- relock clears the derived wrapping root key and all unwrapped domain DMKs
 - relock clears decrypted payloads and derived indexes
 - relock failure enters `restartRequired`
 - `restartRequired` blocks all in-process re-auth and is not persisted to the registry
-- backgrounding within the active grace window does not deauthorize app-data access
+- backgrounding within the active grace window does not tear down app-data access
 
 ### 2.3 Crash Recovery
 
@@ -76,23 +78,25 @@ This document is a downstream review aid. It does not change the architecture or
 ### 2.5 Zeroization
 
 - plaintext serialization buffers are zeroized after use
-- the shared app-data secret is zeroized on relock
+- raw root-secret bytes are zeroized immediately after wrapping-root-key derivation
+- the derived wrapping root key is zeroized on relock
 - unlocked domain DMKs are zeroized on relock
 - decrypted domain snapshots or derived sensitive indexes are zeroized on relock
 
 ### 2.6 Failure Paths
 
 - wrong auth does not unlock the shared app-data session
-- pre-auth attempts must not fetch `LASecret`
+- pre-auth attempts must not fetch the root-secret Keychain item
+- an unauthenticated `LAContext` does not release the root secret
+- an interaction-disallowed context that is not already authenticated fails without displaying a second prompt and does not release the root secret
 - invariant violation or unclassifiable registry row enters `frameworkRecoveryNeeded`
 - orphan shared-resource evidence with empty membership must only authorize post-classification `cleanupOnly` under the empty steady-state row; it must not split registry classification or final disposition
-- missing shared right or unreadable shared secret for a row that expects `ready` enters `frameworkRecoveryNeeded` before protected-domain access proceeds
-- user-cancelled or denied shared-right authorization remains a normal access outcome rather than an automatic framework-recovery state
+- missing root-secret Keychain record or unreadable root secret for a row that expects `ready` enters `frameworkRecoveryNeeded` before protected-domain access proceeds
+- user-cancelled or denied app-session authentication remains a normal access outcome rather than an automatic framework-recovery state
 - unreadable wrapped-DMK state enters only that domain's `recoveryNeeded`
 - corrupted envelope hard-fails on authentication or structural validation
 - interrupted migration does not destroy readable source state
 - `ProtectedDataRelockParticipant` failure enters `restartRequired`
-- shared-right deauthorize failure enters `restartRequired`
 - `ProtectedSettingsStore` reset requires explicit destructive confirmation
 - Contacts recovery remains import-based
 - anti-rollback is not implied by `current / previous / pending`
@@ -103,10 +107,13 @@ This draft proposal must map its validation buckets onto the repository's existi
 
 - registry authority, state-machine, consistency-matrix, and invariant checks belong to Swift unit coverage in `CypherAir-UnitTests` using `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 - startup recovery, relock orchestration, and route-handoff integration belong to macOS-local validation using `CypherAir-UnitTests`, with `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` added whenever launch, routing, or protected-content smoke coverage is part of the change
-- `LAPersistedRight` behavior, real LocalAuthentication prompt semantics, and device-only authorization guarantees belong to `CypherAir-DeviceTests` using `xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests -destination 'platform=iOS,name=<DEVICE_NAME>'`, plus explicit manual device validation whenever automation cannot prove platform prompt timing or system UX behavior
-- device tests for `LARightStore` must use test-only identifiers of the form `com.cypherair.tests.protected-data.<TestCase>.<UUID>`
-- device tests must never use the production shared-right identifier
-- device tests must perform per-identifier cleanup before and after each test and must not call `removeAllRightsWithCompletion()`
+- unit coverage must verify that pre-auth bootstrap never touches the root-secret store or any root-secret retrieval adapter
+- Keychain root-secret behavior, `kSecUseAuthenticationContext`, real LocalAuthentication prompt semantics, and device-only authorization guarantees belong to `CypherAir-DeviceTests` using `xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests -destination 'platform=iOS,name=<DEVICE_NAME>'`, plus explicit manual device validation whenever automation cannot prove platform prompt timing or system UX behavior
+- device coverage should verify that one authenticated `LAContext` can unlock the root-secret Keychain record without a second prompt
+- device tests for root-secret storage must use test-only service/account identifiers of the form `com.cypherair.tests.protected-data.<TestCase>.<UUID>`
+- device tests must never use the production root-secret identifier
+- device tests must perform per-identifier cleanup before and after each test
+- legacy `LAPersistedRight` / `LASecret` device coverage belongs only to migration tests if legacy state has already shipped or been provisioned locally
 - bootstrap outcome and access-gate coverage belong to Swift unit tests, including explicit assertions that `continuePendingMutation` is preserved and that post-bootstrap validation can distinguish authorization-required vs already-authorized vs framework-recovery paths
 - file-protection strength, container containment, fail-closed capability checks, and absence of fallback to broader storage locations belong to Swift unit coverage plus platform-targeted macOS-local verification, with manual verification retained for lock-state semantics that repository automation cannot prove
 - migration survivability, startup adoption, and no-silent-reset guarantees belong to Swift unit coverage in `CypherAir-UnitTests` plus targeted macOS-local integration validation, adding the `CypherAir-MacUITests` macOS smoke path when startup routing or user-visible recovery flows are part of the scenario
@@ -118,12 +125,12 @@ This proposal is only acceptable if an implementer can proceed without making hi
 At minimum, an implementer must be able to tell:
 
 - that the current private-key domain should remain semantically unchanged
-- that protected app data uses one shared app-data right plus per-domain DMKs
+- that protected app data uses one shared Keychain-protected root secret plus per-domain DMKs
 - that `ProtectedDataRegistry` is the only membership authority
 - that shared-resource lifecycle state and mutation execution phase are distinct concepts
 - that `AppSessionOrchestrator` is the app-wide session owner
 - that `ProtectedDataSessionCoordinator` is the app-data subsystem coordinator under that owner
-- that `LAPersistedRight` is the primary app-data authorization gate in v1
+- that Keychain / `SecAccessControl` / authenticated `LAContext` root-secret retrieval is the primary app-data authorization gate in v1
 - that app-data domains are recoverable rather than private-key-style invalidating
 - that framework-level and domain-level recovery are distinct
 - that startup recovery is registry-first and matrix-driven
@@ -139,7 +146,8 @@ Any implementation derived from this proposal should be reviewable against these
 
 - does it preserve the existing private-key domain without semantic drift?
 - does it introduce a reusable protected app-data substrate rather than a one-off vault?
-- does it treat one shared `LAPersistedRight` as the first gate for app-data unlock secret access?
+- does it treat one shared Keychain-protected root secret as the first gate for app-data unlock secret access?
+- does it use authenticated `LAContext` handoff through `kSecUseAuthenticationContext` rather than undocumented prompt coalescing?
 - does it avoid making `AuthenticationMode` the normative gate for future app-data authorization?
 - does it fully specify `ProtectedDataRegistry` as the only membership authority?
 - does it keep shared-resource lifecycle state distinct from mutation execution phase?

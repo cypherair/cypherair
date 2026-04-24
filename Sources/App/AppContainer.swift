@@ -91,7 +91,9 @@ final class AppContainer: @unchecked Sendable {
         let secureEnclave = HardwareSecureEnclave()
         let keychain = SystemKeychain()
         let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
-        let authenticationShieldCoordinator = AuthenticationShieldCoordinator()
+        let authenticationShieldCoordinator = AuthenticationShieldCoordinator(
+            traceStore: authLifecycleTraceStore
+        )
         let authPromptCoordinator = AuthenticationPromptCoordinator(
             shieldEventHandler: makeShieldEventHandler(
                 coordinator: authenticationShieldCoordinator
@@ -101,7 +103,8 @@ final class AppContainer: @unchecked Sendable {
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: authLifecycleTraceStore
         )
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
@@ -115,9 +118,10 @@ final class AppContainer: @unchecked Sendable {
             registryStore: protectedDataRegistryStore
         )
         let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
-            rightStoreClient: ProtectedDataRightStoreClient(),
+            legacyRightStoreClient: ProtectedDataRightStoreClient(),
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
@@ -135,8 +139,12 @@ final class AppContainer: @unchecked Sendable {
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { config.gracePeriod },
             requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
-            evaluateAppAuthentication: { reason in
-                try await authManager.evaluate(mode: config.authMode, reason: reason)
+            evaluateAppAuthenticationWithSource: { reason, source in
+                try await authManager.evaluateAppSession(
+                    policy: config.appSessionAuthenticationPolicy,
+                    reason: reason,
+                    source: source
+                )
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
@@ -218,7 +226,9 @@ final class AppContainer: @unchecked Sendable {
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
         let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
-        let authenticationShieldCoordinator = AuthenticationShieldCoordinator()
+        let authenticationShieldCoordinator = AuthenticationShieldCoordinator(
+            traceStore: authLifecycleTraceStore
+        )
         let authPromptCoordinator = AuthenticationPromptCoordinator(
             shieldEventHandler: makeShieldEventHandler(
                 coordinator: authenticationShieldCoordinator
@@ -234,7 +244,8 @@ final class AppContainer: @unchecked Sendable {
             secureEnclave: secureEnclave,
             keychain: keychain,
             defaults: defaults,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: authLifecycleTraceStore
         )
         let config = AppConfiguration(defaults: defaults)
         let engine = PgpEngine()
@@ -264,9 +275,11 @@ final class AppContainer: @unchecked Sendable {
             registryStore: protectedDataRegistryStore
         )
         let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
-            rightStoreClient: ProtectedDataRightStoreClient(),
+            rootSecretStore: MockProtectedDataRootSecretStore(),
+            legacyRightStoreClient: ProtectedDataRightStoreClient(),
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
@@ -284,8 +297,12 @@ final class AppContainer: @unchecked Sendable {
             shouldBypassPrivacyAuthentication: { !requiresManualAuthentication },
             gracePeriodProvider: { config.gracePeriod },
             requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
-            evaluateAppAuthentication: { reason in
-                try await authManager.evaluate(mode: config.authMode, reason: reason)
+            evaluateAppAuthenticationWithSource: { reason, source in
+                try await authManager.evaluateAppSession(
+                    policy: config.appSessionAuthenticationPolicy,
+                    reason: reason,
+                    source: source
+                )
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,

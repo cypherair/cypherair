@@ -109,11 +109,11 @@ final class SettingsScreenModelTests: XCTestCase {
         var receivedFingerprints: [String] = []
         var receivedHasBackup = false
 
-        let model = makeModel { newMode, fingerprints, hasBackup in
+        let model = makeModel(authModeSwitchAction: { newMode, fingerprints, hasBackup in
             receivedMode = newMode
             receivedFingerprints = fingerprints
             receivedHasBackup = hasBackup
-        }
+        })
 
         model.handleAuthModeSelection(.standard)
         let request = try XCTUnwrap(model.presentedAuthModeRequest)
@@ -135,9 +135,9 @@ final class SettingsScreenModelTests: XCTestCase {
     func test_modeSwitchFailure_surfacesErrorState() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
 
-        let model = makeModel { _, _, _ in
+        let model = makeModel(authModeSwitchAction: { _, _, _ in
             throw SettingsScreenModelTestError(message: "Switch failed")
-        }
+        })
 
         model.handleAuthModeSelection(.highSecurity)
         let request = try XCTUnwrap(model.presentedAuthModeRequest)
@@ -154,6 +154,40 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_appAccessPolicySelection_updatesConfigAfterSwitchAction() async {
+        var receivedPolicy: AppSessionAuthenticationPolicy?
+        let model = makeModel(appAccessPolicySwitchAction: { policy in
+            receivedPolicy = policy
+        })
+
+        model.handleAppAccessPolicySelection(.biometricsOnly)
+
+        await waitUntil("app access policy switch to finish") {
+            model.isSwitchingAppAccessPolicy == false
+        }
+
+        XCTAssertEqual(receivedPolicy, .biometricsOnly)
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .biometricsOnly)
+    }
+
+    @MainActor
+    func test_appAccessPolicySelection_failureSurfacesErrorAndKeepsConfig() async {
+        let model = makeModel(appAccessPolicySwitchAction: { _ in
+            throw SettingsScreenModelTestError(message: "App access switch failed")
+        })
+
+        model.handleAppAccessPolicySelection(.biometricsOnly)
+
+        await waitUntil("failed app access policy switch to finish") {
+            model.isSwitchingAppAccessPolicy == false
+        }
+
+        XCTAssertTrue(model.showSwitchError)
+        XCTAssertEqual(model.switchError, "App access switch failed")
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
+    }
+
+    @MainActor
     func test_staleRequestConfirm_executesItsCapturedMode() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
 
@@ -164,9 +198,9 @@ final class SettingsScreenModelTests: XCTestCase {
             capturedRequests.append(request)
         }
 
-        let model = makeModel(configuration: configuration) { newMode, _, _ in
+        let model = makeModel(configuration: configuration, authModeSwitchAction: { newMode, _, _ in
             receivedModes.append(newMode)
-        }
+        })
 
         model.handleAuthModeSelection(.highSecurity)
         let firstRequest = try XCTUnwrap(capturedRequests.first)
@@ -199,9 +233,9 @@ final class SettingsScreenModelTests: XCTestCase {
             capturedRequests.append(request)
         }
 
-        let model = makeModel(configuration: configuration) { newMode, _, _ in
+        let model = makeModel(configuration: configuration, authModeSwitchAction: { newMode, _, _ in
             receivedModes.append(newMode)
-        }
+        })
 
         model.handleAuthModeSelection(.highSecurity)
         let firstRequest = try XCTUnwrap(capturedRequests.first)
@@ -681,7 +715,8 @@ final class SettingsScreenModelTests: XCTestCase {
         configuration: SettingsView.Configuration = .default,
         iosPresentationController: IOSPresentationController? = nil,
         macPresentationController: MacPresentationController? = nil,
-        authModeSwitchAction: SettingsScreenModel.AuthModeSwitchAction? = nil
+        authModeSwitchAction: SettingsScreenModel.AuthModeSwitchAction? = nil,
+        appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? = nil
     ) -> SettingsScreenModel {
         SettingsScreenModel(
             config: config,
@@ -690,7 +725,8 @@ final class SettingsScreenModelTests: XCTestCase {
             iosPresentationController: iosPresentationController,
             macPresentationController: macPresentationController,
             configuration: configuration,
-            authModeSwitchAction: authModeSwitchAction
+            authModeSwitchAction: authModeSwitchAction,
+            appAccessPolicySwitchAction: appAccessPolicySwitchAction
         )
     }
 

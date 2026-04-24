@@ -153,14 +153,14 @@ The target persistence model is:
 
 - one logical Contacts protected domain inside the shared protected app-data framework
 - encrypted Contacts payload generations stored under the framework's protected-domain storage rules
-- one shared app-data authorization right as the normative session gate for protected app data
+- one shared Keychain-protected app-data root-secret gate as the normative session gate for protected app data
 - one Contacts domain master key persisted only through the shared framework wrapped-DMK model
 - no plaintext search indexes or derivative contact caches persisted outside the protected Contacts domain
 - Contacts product data becomes the source of truth only after migration completes
 
 Contacts does not own:
 
-- the shared app-data right or secret
+- the shared app-data root secret or derived wrapping root key
 - registry authority
 - wrapped-DMK lifecycle rules
 - shared relock policy
@@ -172,10 +172,10 @@ User-facing copy may still use shorthand such as "Contacts vault," but the techn
 The Contacts domain follows shared app-data session semantics:
 
 - `AppSessionOrchestrator` owns the app-wide session boundary
-- `ProtectedDataSessionCoordinator` owns shared app-data authorization under that boundary
+- `ProtectedDataSessionCoordinator` owns shared app-data root-secret retrieval under that boundary
 - `first real Contacts access` means the first route in the current app session that actually needs to open Contacts protected-domain contents, not process launch by itself
-- if launch/resume immediately continues into a Contacts-dependent route and the shared app-data session is inactive, that same orchestrated flow may authorize the shared right there
-- completing launch/resume authentication alone does not imply that the shared app-data session is already active
+- if launch/resume immediately continues into a Contacts-dependent route and the shared app-data session is inactive, that same orchestrated flow may pass the authenticated `LAContext` into root-secret retrieval there
+- completing launch/resume authentication alone does not imply that the shared app-data session is already active unless root-secret retrieval and wrapping-root-key derivation also succeed
 - when that first Contacts access occurs inside launch/resume routing, the user-facing flow remains one understandable unlock step rather than a later second Contacts-specific prompt
 - ordinary Contacts browsing, search, tag/list management, and recipient selection do not trigger a separate Contacts-specific routine prompt once the app-data session is active
 - a second or third protected domain in the same active app-data session must not trigger another prompt merely because Contacts is opened later
@@ -389,7 +389,7 @@ Decrypt is split into:
 - core content decryption
 - contacts-aware signer recognition and verification enrichment
 
-If the Contacts domain is locked because protected app-data access has not yet been authorized:
+If the Contacts domain is locked because shared app-data session activation has not yet succeeded:
 
 - content decryption may still complete
 - the signature / signer-recognition area must enter an explicit pending state
@@ -437,11 +437,11 @@ Required preconditions:
 - Phase 2 file-protection baseline is already implemented
 - Phase 3 first low-risk protected domain is already implemented
 
-Contacts adoption and migration occur on the first Contacts-required protected-domain access into the new Contacts architecture. That access may happen during launch or resume if the initial route immediately needs Contacts data, and the same orchestrated unlock flow may activate the shared app-data session there.
+Contacts adoption and migration occur on the first Contacts-required protected-domain access into the new Contacts architecture. That access may happen during launch or resume if the initial route immediately needs Contacts data, and the same orchestrated unlock flow may activate the shared app-data session there by reusing the authenticated `LAContext` for root-secret retrieval.
 
 Contacts migration must not be triggered merely because process launch or service initialization happened.
 
-Contacts migration uses the shared framework create/write path. It does not define separate Contacts-specific rules for shared-right provisioning, first-domain creation, or last-domain cleanup.
+Contacts migration uses the shared framework create/write path. It does not define separate Contacts-specific rules for root-secret provisioning, first-domain creation, or last-domain cleanup.
 
 ### 12.3 Quarantine And Deletion
 
@@ -469,7 +469,7 @@ The exact cryptographic packaging is a TDD concern, but product-level expectatio
 - the export requires a fresh authentication immediately before backup generation
 - the export requires a user passphrase and produces a passphrase-protected recovery artifact rather than raw local protected-domain files
 - the export is delivered through the system file export/share flow so the user chooses where the offline backup is stored
-- the export does not include the shared app-data secret, wrapped DMK records, registry state, or source-device authorization state
+- the export does not include the shared app-data root secret, wrapped DMK records, registry state, or source-device authorization state
 - the import restores Contacts state coherently
 - the import re-establishes local protected-domain state on the target installation rather than transporting source-device authorization material
 - recovery is not left as an implicit property of platform backup behavior alone
@@ -548,13 +548,13 @@ This initiative is product-complete only if all of the following are true:
 
 1. User cold-launches or resumes the app from a state that requires authentication.
 2. The first route immediately needs Contacts protected-domain data.
-3. `AppSessionOrchestrator` runs the user-visible unlock flow and hands off to shared app-data authorization for that first real Contacts access.
-4. Contacts opens without a later second Contacts-specific prompt.
+3. `AppSessionOrchestrator` runs the user-visible unlock flow and hands the authenticated `LAContext` to shared root-secret retrieval for that first real Contacts access.
+4. Contacts opens its protected-domain payload after the shared app-data session is active, without a later second Contacts-specific prompt.
 5. Later in the same active app-data session, opening recipient selection in `Encrypt` reuses that session.
 
 ### Scenario F: Use Contacts Within An Already Active App-Data Session
 
-1. Earlier in the current app session, the user already completed shared app-data authorization by accessing a protected domain.
+1. Earlier in the current app session, the user already activated the shared app-data session by accessing a protected domain.
 2. User opens `Contacts` and later opens recipient selection in `Encrypt`.
 3. The app does not show another Contacts-specific authentication prompt.
 4. If the grace period later expires, Contacts returns to an explicit locked state.
@@ -575,7 +575,7 @@ This initiative is product-complete only if all of the following are true:
 
 ### Scenario I: Protected App-Data Framework Recovery Blocks Contacts
 
-1. App starts and the shared protected app-data framework cannot safely determine or use the shared authorization resource.
+1. App starts and the shared protected app-data framework cannot safely determine or use the shared root-secret resource.
 2. `Contacts` does not bypass that framework state independently.
 3. The app presents a framework-level unavailable or recovery-required state.
 4. The app does not mislabel that condition as a Contacts empty-state or a Contacts-specific import-only recovery path.

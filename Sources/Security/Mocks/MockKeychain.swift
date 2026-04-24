@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 /// In-memory mock Keychain for testing.
@@ -134,4 +135,117 @@ enum MockKeychainError: Error {
     case duplicateItem
     case saveFailed
     case deleteFailed
+}
+
+/// In-memory root-secret store used by unit tests and UI-test containers.
+final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtocol, @unchecked Sendable {
+    struct StoredSecret {
+        var data: Data
+        var policy: AppSessionAuthenticationPolicy
+    }
+
+    private var storage: [String: StoredSecret] = [:]
+
+    private(set) var saveCallCount = 0
+    private(set) var loadCallCount = 0
+    private(set) var deleteCallCount = 0
+    private(set) var existsCallCount = 0
+    private(set) var reprotectCallCount = 0
+    private(set) var lastLoadedIdentifier: String?
+    private(set) var lastAuthenticationContext: LAContext?
+
+    var saveError: Error?
+    var loadError: Error?
+    var deleteError: Error?
+    var reprotectError: Error?
+    var throwOnDuplicate = true
+
+    func saveRootSecret(
+        _ secretData: Data,
+        identifier: String,
+        policy: AppSessionAuthenticationPolicy
+    ) throws {
+        saveCallCount += 1
+        if let saveError {
+            self.saveError = nil
+            throw saveError
+        }
+        if throwOnDuplicate && storage[identifier] != nil {
+            throw MockKeychainError.duplicateItem
+        }
+        storage[identifier] = StoredSecret(data: secretData, policy: policy)
+    }
+
+    func loadRootSecret(
+        identifier: String,
+        authenticationContext: LAContext
+    ) throws -> Data {
+        loadCallCount += 1
+        lastLoadedIdentifier = identifier
+        lastAuthenticationContext = authenticationContext
+        if let loadError {
+            self.loadError = nil
+            throw loadError
+        }
+        guard let storedSecret = storage[identifier] else {
+            throw KeychainError.itemNotFound
+        }
+        return storedSecret.data
+    }
+
+    func deleteRootSecret(identifier: String) throws {
+        deleteCallCount += 1
+        if let deleteError {
+            self.deleteError = nil
+            throw deleteError
+        }
+        guard storage.removeValue(forKey: identifier) != nil else {
+            throw KeychainError.itemNotFound
+        }
+    }
+
+    func rootSecretExists(identifier: String) -> Bool {
+        existsCallCount += 1
+        return storage[identifier] != nil
+    }
+
+    func reprotectRootSecret(
+        identifier: String,
+        from currentPolicy: AppSessionAuthenticationPolicy,
+        to newPolicy: AppSessionAuthenticationPolicy,
+        authenticationContext: LAContext
+    ) throws {
+        _ = currentPolicy
+        reprotectCallCount += 1
+        lastAuthenticationContext = authenticationContext
+        if let reprotectError {
+            self.reprotectError = nil
+            throw reprotectError
+        }
+        guard var storedSecret = storage[identifier] else {
+            throw KeychainError.itemNotFound
+        }
+        storedSecret.policy = newPolicy
+        storage[identifier] = storedSecret
+    }
+
+    func storedPolicy(identifier: String) -> AppSessionAuthenticationPolicy? {
+        storage[identifier]?.policy
+    }
+
+    func reset() {
+        storage.removeAll()
+        saveCallCount = 0
+        loadCallCount = 0
+        deleteCallCount = 0
+        existsCallCount = 0
+        reprotectCallCount = 0
+        lastLoadedIdentifier = nil
+        lastAuthenticationContext = nil
+        saveError = nil
+        loadError = nil
+        deleteError = nil
+        reprotectError = nil
+        throwOnDuplicate = true
+    }
 }

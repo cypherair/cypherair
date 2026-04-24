@@ -74,6 +74,7 @@ final class ProtectedSettingsHost {
     let mode: Mode
     private let openMainWindowAction: (() -> Void)?
     private let liveDependencies: LiveDependencies?
+    private let traceStore: AuthLifecycleTraceStore?
 
     private(set) var sectionState: SectionState
 
@@ -91,10 +92,12 @@ final class ProtectedSettingsHost {
         openDomainIfNeeded: @escaping @MainActor (_ wrappingRootKey: Data) async throws -> Void,
         updateClipboardNotice: @escaping @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void,
         recoverPendingMutation: @escaping @MainActor () async throws -> RecoveryOutcome,
-        resetDomain: @escaping @MainActor () async throws -> Void
+        resetDomain: @escaping @MainActor () async throws -> Void,
+        traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.mode = .mainWindowLive
         self.openMainWindowAction = nil
+        self.traceStore = traceStore
         self.liveDependencies = LiveDependencies(
             evaluateAccessGate: evaluateAccessGate,
             authorizeSharedRight: authorizeSharedRight,
@@ -113,11 +116,13 @@ final class ProtectedSettingsHost {
 
     init(
         mode: Mode,
-        openMainWindowAction: (() -> Void)? = nil
+        openMainWindowAction: (() -> Void)? = nil,
+        traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.mode = mode
         self.openMainWindowAction = openMainWindowAction
         self.liveDependencies = nil
+        self.traceStore = traceStore
         switch mode {
         case .mainWindowLive:
             self.sectionState = .locked
@@ -129,20 +134,38 @@ final class ProtectedSettingsHost {
     }
 
     func refreshSettingsSection() async {
+        traceHostEvent("protectedSettings.refresh.start")
         guard let liveDependencies else {
+            traceHostEvent("protectedSettings.refresh.finish", metadata: ["result": "noLiveDependencies"])
             return
         }
 
-        switch syncPreAuthorizationSectionState(liveDependencies) {
+        let preAuthorizationState = syncPreAuthorizationSectionState(liveDependencies)
+        traceHostEvent(
+            "protectedSettings.refresh.preAuthorization",
+            metadata: stateMetadata(liveDependencies, domainState: preAuthorizationState)
+        )
+        switch preAuthorizationState {
         case .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
+            traceHostEvent(
+                "protectedSettings.refresh.finish",
+                metadata: stateMetadata(liveDependencies, domainState: preAuthorizationState)
+                    .merging(["result": "blockedByDomainState"], uniquingKeysWith: { _, new in new })
+            )
             return
         case .unlocked:
+            traceHostEvent(
+                "protectedSettings.refresh.finish",
+                metadata: stateMetadata(liveDependencies, domainState: preAuthorizationState)
+                    .merging(["result": "alreadyUnlocked"], uniquingKeysWith: { _, new in new })
+            )
             return
         case .locked:
             break
         }
 
-        switch currentAccessGateDecision(liveDependencies) {
+        let decision = currentAccessGateDecision(liveDependencies)
+        switch decision {
         case .frameworkRecoveryNeeded:
             liveDependencies.syncPreAuthorizationState()
             syncSectionStateFromStore(liveDependencies)
@@ -158,16 +181,28 @@ final class ProtectedSettingsHost {
                 authorizationMode: .requireExistingAuthorization
             )
         }
+        traceHostEvent(
+            "protectedSettings.refresh.finish",
+            metadata: stateMetadata(liveDependencies)
+                .merging(["result": "gateEvaluated", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+        )
     }
 
     func unlockForSettings() async {
+        traceHostEvent("protectedSettings.unlock.start")
         guard let liveDependencies else {
+            traceHostEvent("protectedSettings.unlock.finish", metadata: ["result": "noLiveDependencies"])
             return
         }
 
-        _ = await openProtectedSettings(
+        let didOpen = await openProtectedSettings(
             using: liveDependencies,
             localizedReason: settingsLocalizedReason
+        )
+        traceHostEvent(
+            "protectedSettings.unlock.finish",
+            metadata: stateMetadata(liveDependencies)
+                .merging(["result": didOpen ? "opened" : "notOpened"], uniquingKeysWith: { _, new in new })
         )
     }
 
@@ -273,14 +308,26 @@ final class ProtectedSettingsHost {
     }
 
     func invalidateForContentClearGeneration(_ generation: Int) async {
-        _ = generation
+        traceHostEvent(
+            "protectedSettings.invalidateForContentClear.start",
+            metadata: ["generation": String(generation)]
+        )
         guard let liveDependencies else {
+            traceHostEvent(
+                "protectedSettings.invalidateForContentClear.finish",
+                metadata: ["result": "noLiveDependencies", "generation": String(generation)]
+            )
             return
         }
 
         await Task.yield()
         liveDependencies.syncPreAuthorizationState()
         syncSectionStateFromStore(liveDependencies)
+        traceHostEvent(
+            "protectedSettings.invalidateForContentClear.finish",
+            metadata: stateMetadata(liveDependencies)
+                .merging(["result": "synced", "generation": String(generation)], uniquingKeysWith: { _, new in new })
+        )
     }
 
     func openMainWindow() {
@@ -293,6 +340,11 @@ final class ProtectedSettingsHost {
         authorizationMode: AccessAuthorizationMode = .authorizeIfNeeded
     ) async -> Bool {
         sectionState = .loading
+        traceHostEvent(
+            "protectedSettings.open.start",
+            metadata: stateMetadata(liveDependencies)
+                .merging(["authorizationMode": authorizationModeTraceValue(authorizationMode)], uniquingKeysWith: { _, new in new })
+        )
         do {
             guard try await ensureProtectedSettingsAccess(
                 using: liveDependencies,
@@ -300,16 +352,36 @@ final class ProtectedSettingsHost {
                 authorizationMode: authorizationMode
             ) else {
                 syncSectionStateFromStore(liveDependencies)
+                traceHostEvent(
+                    "protectedSettings.open.finish",
+                    metadata: stateMetadata(liveDependencies)
+                        .merging(["result": "accessDenied"], uniquingKeysWith: { _, new in new })
+                )
                 return false
             }
 
             syncSectionStateFromStore(liveDependencies)
             if case .available = sectionState {
+                traceHostEvent(
+                    "protectedSettings.open.finish",
+                    metadata: stateMetadata(liveDependencies)
+                        .merging(["result": "available"], uniquingKeysWith: { _, new in new })
+                )
                 return true
             }
+            traceHostEvent(
+                "protectedSettings.open.finish",
+                metadata: stateMetadata(liveDependencies)
+                    .merging(["result": "openedButUnavailable"], uniquingKeysWith: { _, new in new })
+            )
             return false
         } catch {
             syncSectionStateFromStore(liveDependencies)
+            traceHostEvent(
+                "protectedSettings.open.finish",
+                metadata: stateMetadata(liveDependencies)
+                    .merging(traceErrorMetadata(error, extra: ["result": "error"]), uniquingKeysWith: { _, new in new })
+            )
             return false
         }
     }
@@ -319,57 +391,132 @@ final class ProtectedSettingsHost {
         localizedReason: String,
         authorizationMode: AccessAuthorizationMode = .authorizeIfNeeded
     ) async throws -> Bool {
-        switch syncPreAuthorizationSectionState(liveDependencies) {
+        traceHostEvent(
+            "protectedSettings.ensureAccess.start",
+            metadata: ["authorizationMode": authorizationModeTraceValue(authorizationMode)]
+        )
+        let preAuthorizationState = syncPreAuthorizationSectionState(liveDependencies)
+        traceHostEvent(
+            "protectedSettings.ensureAccess.preAuthorization",
+            metadata: stateMetadata(liveDependencies, domainState: preAuthorizationState)
+        )
+        switch preAuthorizationState {
         case .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
+            traceHostEvent(
+                "protectedSettings.ensureAccess.finish",
+                metadata: stateMetadata(liveDependencies, domainState: preAuthorizationState)
+                    .merging(["result": "blockedByDomainState"], uniquingKeysWith: { _, new in new })
+            )
             return false
         case .locked, .unlocked:
             break
         }
 
-        switch currentAccessGateDecision(liveDependencies) {
+        let decision = currentAccessGateDecision(liveDependencies)
+        switch decision {
         case .frameworkRecoveryNeeded:
             liveDependencies.syncPreAuthorizationState()
             sectionState = .frameworkUnavailable
+            traceHostEvent(
+                "protectedSettings.ensureAccess.finish",
+                metadata: stateMetadata(liveDependencies)
+                    .merging(["result": "frameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+            )
             return false
         case .pendingMutationRecoveryRequired:
             liveDependencies.syncPreAuthorizationState()
             syncSectionStateFromStore(liveDependencies)
+            traceHostEvent(
+                "protectedSettings.ensureAccess.finish",
+                metadata: stateMetadata(liveDependencies)
+                    .merging(["result": "pendingMutationRecoveryRequired", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+            )
             return false
         case .noProtectedDomainPresent:
             guard authorizationMode == .authorizeIfNeeded else {
                 sectionState = .locked
+                traceHostEvent(
+                    "protectedSettings.ensureAccess.finish",
+                    metadata: stateMetadata(liveDependencies)
+                        .merging(["result": "authorizationModeBlocked", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                )
                 return false
             }
-            try await liveDependencies.migrateLegacyClipboardNoticeIfNeeded()
+            traceHostEvent("protectedSettings.legacyMigration.start")
+            do {
+                try await liveDependencies.migrateLegacyClipboardNoticeIfNeeded()
+                traceHostEvent("protectedSettings.legacyMigration.finish", metadata: ["result": "success"])
+            } catch {
+                traceHostEvent(
+                    "protectedSettings.legacyMigration.finish",
+                    metadata: traceErrorMetadata(error, extra: ["result": "failed"])
+                )
+                throw error
+            }
+            traceHostEvent("protectedSettings.authorization.request", metadata: ["gateDecision": accessGateTraceValue(decision)])
             let authorizationResult = await liveDependencies.authorizeSharedRight(
                 localizedReason
+            )
+            traceHostEvent(
+                "protectedSettings.authorization.result",
+                metadata: ["outcome": authorizationOutcomeTraceValue(authorizationResult)]
             )
             switch authorizationResult {
             case .authorized:
                 break
             case .cancelledOrDenied:
                 sectionState = .locked
+                traceHostEvent(
+                    "protectedSettings.ensureAccess.finish",
+                    metadata: stateMetadata(liveDependencies)
+                        .merging(["result": "cancelledOrDenied", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                )
                 return false
             case .frameworkRecoveryNeeded:
                 sectionState = .frameworkUnavailable
+                traceHostEvent(
+                    "protectedSettings.ensureAccess.finish",
+                    metadata: stateMetadata(liveDependencies)
+                        .merging(["result": "authorizationFrameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                )
                 return false
             }
         case .authorizationRequired:
             guard authorizationMode == .authorizeIfNeeded else {
                 sectionState = .locked
+                traceHostEvent(
+                    "protectedSettings.ensureAccess.finish",
+                    metadata: stateMetadata(liveDependencies)
+                        .merging(["result": "authorizationModeBlocked", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                )
                 return false
             }
+            traceHostEvent("protectedSettings.authorization.request", metadata: ["gateDecision": accessGateTraceValue(decision)])
             let authorizationResult = await liveDependencies.authorizeSharedRight(
                 localizedReason
+            )
+            traceHostEvent(
+                "protectedSettings.authorization.result",
+                metadata: ["outcome": authorizationOutcomeTraceValue(authorizationResult)]
             )
             switch authorizationResult {
             case .authorized:
                 break
             case .cancelledOrDenied:
                 sectionState = .locked
+                traceHostEvent(
+                    "protectedSettings.ensureAccess.finish",
+                    metadata: stateMetadata(liveDependencies)
+                        .merging(["result": "cancelledOrDenied", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                )
                 return false
             case .frameworkRecoveryNeeded:
                 sectionState = .frameworkUnavailable
+                traceHostEvent(
+                    "protectedSettings.ensureAccess.finish",
+                    metadata: stateMetadata(liveDependencies)
+                        .merging(["result": "authorizationFrameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                )
                 return false
             }
         case .alreadyAuthorized:
@@ -377,7 +524,36 @@ final class ProtectedSettingsHost {
         }
 
         let wrappingRootKey = try liveDependencies.currentWrappingRootKey()
-        try await liveDependencies.openDomainIfNeeded(wrappingRootKey)
+        traceHostEvent(
+            "protectedSettings.openDomain.start",
+            metadata: ["gateDecision": accessGateTraceValue(decision)]
+        )
+        do {
+            try await liveDependencies.openDomainIfNeeded(wrappingRootKey)
+            traceHostEvent(
+                "protectedSettings.openDomain.finish",
+                metadata: stateMetadata(liveDependencies)
+                    .merging(["result": "success", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+            )
+        } catch {
+            traceHostEvent(
+                "protectedSettings.openDomain.finish",
+                metadata: stateMetadata(liveDependencies)
+                    .merging(
+                        traceErrorMetadata(
+                            error,
+                            extra: ["result": "failed", "gateDecision": accessGateTraceValue(decision)]
+                        ),
+                        uniquingKeysWith: { _, new in new }
+                    )
+            )
+            throw error
+        }
+        traceHostEvent(
+            "protectedSettings.ensureAccess.finish",
+            metadata: stateMetadata(liveDependencies)
+                .merging(["result": "success", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+        )
         return true
     }
 
@@ -385,6 +561,13 @@ final class ProtectedSettingsHost {
         _ liveDependencies: LiveDependencies
     ) -> AccessGateDecision {
         let decision = liveDependencies.evaluateAccessGate(!hasEvaluatedProtectedAccessGate)
+        traceHostEvent(
+            "protectedSettings.gate.decision",
+            metadata: [
+                "decision": accessGateTraceValue(decision),
+                "isFirstProtectedAccess": hasEvaluatedProtectedAccessGate ? "false" : "true"
+            ]
+        )
         hasEvaluatedProtectedAccessGate = true
         return decision
     }
@@ -406,6 +589,10 @@ final class ProtectedSettingsHost {
         case .frameworkUnavailable:
             sectionState = .frameworkUnavailable
         }
+        traceHostEvent(
+            "protectedSettings.sectionState.synced",
+            metadata: stateMetadata(liveDependencies)
+        )
     }
 
     @discardableResult
@@ -416,6 +603,122 @@ final class ProtectedSettingsHost {
         let domainState = liveDependencies.currentDomainState()
         syncSectionStateFromStore(liveDependencies)
         return domainState
+    }
+
+    private func traceHostEvent(
+        _ name: String,
+        metadata: [String: String] = [:]
+    ) {
+        traceStore?.record(
+            category: .operation,
+            name: name,
+            metadata: metadata.merging(["mode": modeTraceValue(mode)], uniquingKeysWith: { _, new in new })
+        )
+    }
+
+    private func stateMetadata(
+        _ liveDependencies: LiveDependencies,
+        domainState: DomainState? = nil
+    ) -> [String: String] {
+        [
+            "domainState": domainStateTraceValue(domainState ?? liveDependencies.currentDomainState()),
+            "sectionState": sectionStateTraceValue(sectionState)
+        ]
+    }
+
+    private func traceErrorMetadata(
+        _ error: Error,
+        extra: [String: String] = [:]
+    ) -> [String: String] {
+        var metadata = extra
+        metadata["errorType"] = String(describing: type(of: error))
+        return metadata
+    }
+
+    private func modeTraceValue(_ mode: Mode) -> String {
+        switch mode {
+        case .mainWindowLive:
+            "mainWindowLive"
+        case .settingsSceneProxy:
+            "settingsSceneProxy"
+        case .tutorialSandbox:
+            "tutorialSandbox"
+        }
+    }
+
+    private func authorizationModeTraceValue(_ mode: AccessAuthorizationMode) -> String {
+        switch mode {
+        case .authorizeIfNeeded:
+            "authorizeIfNeeded"
+        case .requireExistingAuthorization:
+            "requireExistingAuthorization"
+        }
+    }
+
+    private func accessGateTraceValue(_ decision: AccessGateDecision) -> String {
+        switch decision {
+        case .frameworkRecoveryNeeded:
+            "frameworkRecoveryNeeded"
+        case .pendingMutationRecoveryRequired:
+            "pendingMutationRecoveryRequired"
+        case .noProtectedDomainPresent:
+            "noProtectedDomainPresent"
+        case .authorizationRequired:
+            "authorizationRequired"
+        case .alreadyAuthorized:
+            "alreadyAuthorized"
+        }
+    }
+
+    private func authorizationOutcomeTraceValue(_ outcome: AuthorizationOutcome) -> String {
+        switch outcome {
+        case .authorized:
+            "authorized"
+        case .cancelledOrDenied:
+            "cancelledOrDenied"
+        case .frameworkRecoveryNeeded:
+            "frameworkRecoveryNeeded"
+        }
+    }
+
+    private func domainStateTraceValue(_ state: DomainState) -> String {
+        switch state {
+        case .locked:
+            "locked"
+        case .unlocked:
+            "unlocked"
+        case .recoveryNeeded:
+            "recoveryNeeded"
+        case .pendingRetryRequired:
+            "pendingRetryRequired"
+        case .pendingResetRequired:
+            "pendingResetRequired"
+        case .frameworkUnavailable:
+            "frameworkUnavailable"
+        }
+    }
+
+    private func sectionStateTraceValue(_ state: SectionState) -> String {
+        switch state {
+        case .loading:
+            "loading"
+        case .locked:
+            "locked"
+        case .available:
+            "available"
+        case .recoveryNeeded:
+            "recoveryNeeded"
+        case .pendingRetryRequired:
+            "pendingRetryRequired"
+        case .pendingResetRequired:
+            "pendingResetRequired"
+        case .frameworkUnavailable:
+            "frameworkUnavailable"
+        case .settingsSceneProxy:
+            "settingsSceneProxy"
+        case .tutorialSandbox:
+            "tutorialSandbox"
+        }
     }
 
     private var settingsLocalizedReason: String {

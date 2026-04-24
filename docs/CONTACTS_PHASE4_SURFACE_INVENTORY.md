@@ -52,6 +52,8 @@ This column only describes whether the Contacts domain itself must already be un
 - `conditional` — only the Contacts-dependent branch is gated
 - `bootstrap-only` — may inspect only early-readable framework metadata, never Contacts payload content
 
+In the target design, the shared protected-data session is activated by reading the Keychain-protected app-data root secret through an authenticated `LAContext`. A `yes` framework gate does not mean Contacts payloads may be opened during pre-auth startup; it means the surface must wait until the shared root-secret gate and any required Contacts domain unlock have succeeded.
+
 ### 2.4 Locked-State Target Behavior
 
 Locked-state behavior is frozen at the inventory level so later PRs do not reinterpret it ad hoc.
@@ -100,7 +102,7 @@ Allowed outcomes:
 | Surface | Current entrypoints | Type | Target unlock requirement | Framework gate | Locked-state target behavior | Planned PR | Notes |
 |---------|---------------------|------|---------------------------|----------------|------------------------------|------------|-------|
 | Contacts recovery export | future Contacts recovery action | recovery | yes | yes | Requires unlocked Contacts plus fresh authentication immediately before export | PR6 | Export serializes Contacts business data, not framework artifacts |
-| Contacts recovery import | future Contacts recovery import action | recovery | no | yes | Requires framework availability and app-session unlock; no routine second Contacts prompt beyond defined policy | PR6 | Covers replace-domain import and does not require a previously unlocked Contacts domain |
+| Contacts recovery import | future Contacts recovery import action | recovery | no | yes | Requires framework availability, app-session unlock, and root-secret availability; no routine second Contacts prompt beyond defined policy | PR6 | Covers replace-domain import and does not require a previously unlocked Contacts domain |
 | Empty-install restore | recovery import on installation with no protected domains | recovery | no | yes | Framework owns first-domain provisioning; Contacts does not special-case lifecycle | PR6 | Must bridge from empty steady-state / no protected domain present and does not require a pre-existing unlocked Contacts domain |
 | Certification projection reconciliation on unlock | Contacts unlock flow + reconciliation helper | recovery | yes | yes | Runs after unlock as needed; failures must not be misrepresented as empty Contacts state | PR5 | Separate from raw crypto verification |
 | Certification projection reconciliation on import | recovery import finalization | recovery | yes | yes | Rebuild projected state deterministically after import | PR5, PR6 | Import and reconciliation responsibilities meet here |
@@ -114,7 +116,7 @@ These repository behaviors remain important, but they are not ordinary Contacts 
 
 | Surface | Reason |
 |---------|--------|
-| Pre-auth registry bootstrap | May inspect only framework-readable metadata, never Contacts payload content |
+| Pre-auth registry bootstrap | May inspect only framework-readable metadata, never Contacts payload content or the root-secret Keychain item |
 | Public-key inspection before import commit | Examines incoming key bytes, not existing Contacts domain state |
 | Core decrypt and core signature verification | Remains meaningful without Contacts, though Contacts enrichment may be pending or blocked |
 
