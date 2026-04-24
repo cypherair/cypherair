@@ -520,9 +520,11 @@ final class CommonHelpersTests: XCTestCase {
             registryStore: protectedDataRegistryStore
         )
         let protectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator(
-            rightStoreClient: CypherAir.ProtectedDataRightStoreClient(),
+            rootSecretStore: CypherAir.MockProtectedDataRootSecretStore(),
+            legacyRightStoreClient: CypherAir.ProtectedDataRightStoreClient(),
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: CypherAir.ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
             authenticationPromptCoordinator: authPromptCoordinator
         )
         let protectedSettingsStore = ProtectedSettingsStore(
@@ -540,7 +542,10 @@ final class CommonHelpersTests: XCTestCase {
             gracePeriodProvider: { config.gracePeriod },
             requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthentication: { reason in
-                try await authManager.evaluate(mode: config.authMode, reason: reason)
+                try await authManager.evaluateAppSession(
+                    policy: config.appSessionAuthenticationPolicy,
+                    reason: reason
+                )
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator

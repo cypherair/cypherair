@@ -22,6 +22,13 @@ final class AppConfiguration {
     /// successful SE key re-wrapping.
     var authMode: AuthenticationMode
 
+    /// App launch/resume and App Data root-secret authentication policy.
+    var appSessionAuthenticationPolicy: AppSessionAuthenticationPolicy {
+        didSet {
+            defaults.set(appSessionAuthenticationPolicy.rawValue, forKey: Self.appSessionAuthenticationPolicyKey)
+        }
+    }
+
     /// Grace period in seconds before re-authentication is required.
     /// Valid values: 0, 60, 180, 300.
     var gracePeriod: Int {
@@ -84,6 +91,7 @@ final class AppConfiguration {
 
     static let encryptToSelfKey = "com.cypherair.preference.encryptToSelf"
     static let clipboardNoticeLegacyKey = "com.cypherair.preference.clipboardNotice"
+    static let appSessionAuthenticationPolicyKey = "com.cypherair.preference.appSessionAuthenticationPolicy"
     private static let requireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
     private static let onboardingCompleteKey = "com.cypherair.preference.onboardingComplete"
     private static let guidedTutorialCompletedVersionKey = "com.cypherair.preference.guidedTutorialCompletedVersion"
@@ -97,6 +105,11 @@ final class AppConfiguration {
         // Auth mode
         let modeString = defaults.string(forKey: AuthPreferences.authModeKey) ?? AuthenticationMode.standard.rawValue
         self.authMode = AuthenticationMode(rawValue: modeString) ?? .standard
+
+        let appSessionPolicyString = defaults.string(forKey: Self.appSessionAuthenticationPolicyKey)
+            ?? AppSessionAuthenticationPolicy.userPresence.rawValue
+        self.appSessionAuthenticationPolicy = AppSessionAuthenticationPolicy(rawValue: appSessionPolicyString)
+            ?? .userPresence
 
         // Grace period (default 180s = 3 minutes)
         let storedGrace = defaults.object(forKey: AuthPreferences.gracePeriodKey) as? Int

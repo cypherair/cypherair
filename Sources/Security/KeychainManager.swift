@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 /// Errors from Keychain operations.
-enum KeychainError: Error {
+enum KeychainError: Error, Equatable {
     /// The item was not found in the Keychain (errSecItemNotFound).
     case itemNotFound
     /// A duplicate item already exists (errSecDuplicateItem).
@@ -11,6 +11,8 @@ enum KeychainError: Error {
     case userCancelled
     /// Authentication failed (errSecAuthFailed).
     case authenticationFailed
+    /// UI interaction was required but the supplied context forbade it.
+    case interactionNotAllowed
     /// An unspecified Keychain error occurred.
     case unhandledError(OSStatus)
 }

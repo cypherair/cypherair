@@ -117,9 +117,10 @@ final class AppContainer: @unchecked Sendable {
             registryStore: protectedDataRegistryStore
         )
         let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
-            rightStoreClient: ProtectedDataRightStoreClient(),
+            legacyRightStoreClient: ProtectedDataRightStoreClient(),
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
@@ -138,7 +139,10 @@ final class AppContainer: @unchecked Sendable {
             gracePeriodProvider: { config.gracePeriod },
             requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthentication: { reason in
-                try await authManager.evaluate(mode: config.authMode, reason: reason)
+                try await authManager.evaluateAppSession(
+                    policy: config.appSessionAuthenticationPolicy,
+                    reason: reason
+                )
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
@@ -268,9 +272,11 @@ final class AppContainer: @unchecked Sendable {
             registryStore: protectedDataRegistryStore
         )
         let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
-            rightStoreClient: ProtectedDataRightStoreClient(),
+            rootSecretStore: MockProtectedDataRootSecretStore(),
+            legacyRightStoreClient: ProtectedDataRightStoreClient(),
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
@@ -289,7 +295,10 @@ final class AppContainer: @unchecked Sendable {
             gracePeriodProvider: { config.gracePeriod },
             requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthentication: { reason in
-                try await authManager.evaluate(mode: config.authMode, reason: reason)
+                try await authManager.evaluateAppSession(
+                    policy: config.appSessionAuthenticationPolicy,
+                    reason: reason
+                )
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,

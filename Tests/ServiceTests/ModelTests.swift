@@ -456,6 +456,22 @@ final class ModelTests: XCTestCase {
                        "Invalid gracePeriod should be clamped to the default (180)")
     }
 
+    func test_appConfiguration_appSessionPolicy_defaultsToUserPresence() {
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfiguration(defaults: defaults)
+
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
+    }
+
+    func test_appConfiguration_appSessionPolicy_persistsBiometricsOnly() {
+        let defaults = makeIsolatedDefaults()
+        let config = AppConfiguration(defaults: defaults)
+        config.appSessionAuthenticationPolicy = .biometricsOnly
+
+        let reloaded = AppConfiguration(defaults: defaults)
+        XCTAssertEqual(reloaded.appSessionAuthenticationPolicy, .biometricsOnly)
+    }
+
     func test_appConfiguration_guidedTutorial_defaultsToNeverCompleted() {
         let defaults = makeIsolatedDefaults()
         let config = AppConfiguration(defaults: defaults)
