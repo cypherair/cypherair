@@ -113,7 +113,6 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
   swift-unit-tests-hosted-preview:
-    continue-on-error: true
     needs: xcframework-package
     runs-on: macos-26
     steps:
@@ -146,6 +145,8 @@ jobs:
           rm -rf PgpMobile.xcframework
           ditto -x -k "$XCFRAMEWORK_ZIP" .
       - name: Run hosted macOS unit-test preview
+        id: hosted-swift-preview
+        continue-on-error: true
         run: |
           # Observational only until GitHub-hosted macOS reaches 26.4
           # or the repository adopts a self-hosted macOS runner.
@@ -154,3 +155,7 @@ jobs:
             -project CypherAir.xcodeproj \
             -testPlan CypherAir-UnitTests \
             -destination 'platform=macOS,arch=arm64'
+      - name: Report hosted Swift preview limitation
+        if: steps.hosted-swift-preview.outcome == 'failure'
+        run: |
+          echo "::warning::Hosted macOS Swift unit-test preview failed. This job is observational because GitHub-hosted macOS can lag CypherAir's deployment target; local macOS validation remains the source of truth until the hosted image catches up or a self-hosted runner is used."
