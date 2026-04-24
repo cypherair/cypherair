@@ -175,7 +175,8 @@ struct CypherAirApp: App {
                         )
                     }
                 )
-            }
+            },
+            traceStore: container.authLifecycleTraceStore
         )
 
         _launchConfiguration = State(initialValue: launchConfiguration)
@@ -416,35 +417,85 @@ struct CypherAirApp: App {
                 return
             }
 
-            if container.protectedDataSessionCoordinator.hasPersistedRootSecret() {
-                let authenticationPolicy = AppSessionAuthenticationPolicy
-                    .strictestPolicyForRootSecretReprotection(
-                        from: currentPolicy,
-                        to: newPolicy
+            var didTraceFinish = false
+            do {
+                if container.protectedDataSessionCoordinator.hasPersistedRootSecret() {
+                    let authenticationPolicy = AppSessionAuthenticationPolicy
+                        .strictestPolicyForRootSecretReprotection(
+                            from: currentPolicy,
+                            to: newPolicy
+                        )
+                    container.authLifecycleTraceStore?.record(
+                        category: .operation,
+                        name: "appAccessPolicy.switch.start",
+                        metadata: [
+                            "currentPolicy": currentPolicy.rawValue,
+                            "newPolicy": newPolicy.rawValue,
+                            "authPolicy": authenticationPolicy.rawValue,
+                            "hasRootSecret": "true"
+                        ]
                     )
-                let result = try await container.authManager.evaluateAppSession(
-                    policy: authenticationPolicy,
-                    reason: String(
-                        localized: "settings.appAccessPolicy.change.reason",
-                        defaultValue: "Authenticate to change App Access Protection."
+                    let result = try await container.authManager.evaluateAppSession(
+                        policy: authenticationPolicy,
+                        reason: String(
+                            localized: "settings.appAccessPolicy.change.reason",
+                            defaultValue: "Authenticate to change App Access Protection."
+                        )
                     )
-                )
-                guard result.isAuthenticated else {
-                    throw AuthenticationError.failed
-                }
-                defer {
-                    result.context?.invalidate()
-                }
+                    guard result.isAuthenticated else {
+                        throw AuthenticationError.failed
+                    }
+                    defer {
+                        result.context?.invalidate()
+                    }
 
-                try container.protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
-                    from: currentPolicy,
-                    to: newPolicy,
-                    authenticationContext: result.context
-                )
-            } else {
-                guard container.authManager.canEvaluate(appSessionPolicy: newPolicy) else {
-                    throw AuthenticationError.appAccessBiometricsUnavailable
+                    try container.protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
+                        from: currentPolicy,
+                        to: newPolicy,
+                        authenticationContext: result.context
+                    )
+                    container.authLifecycleTraceStore?.record(
+                        category: .operation,
+                        name: "appAccessPolicy.switch.finish",
+                        metadata: ["result": "success", "newPolicy": newPolicy.rawValue, "hasRootSecret": "true"]
+                    )
+                    didTraceFinish = true
+                } else {
+                    container.authLifecycleTraceStore?.record(
+                        category: .operation,
+                        name: "appAccessPolicy.switch.start",
+                        metadata: [
+                            "currentPolicy": currentPolicy.rawValue,
+                            "newPolicy": newPolicy.rawValue,
+                            "authPolicy": newPolicy.rawValue,
+                            "hasRootSecret": "false"
+                        ]
+                    )
+                    guard container.authManager.canEvaluate(appSessionPolicy: newPolicy) else {
+                        container.authLifecycleTraceStore?.record(
+                            category: .operation,
+                            name: "appAccessPolicy.switch.finish",
+                            metadata: ["result": "biometricsUnavailable", "newPolicy": newPolicy.rawValue, "hasRootSecret": "false"]
+                        )
+                        didTraceFinish = true
+                        throw AuthenticationError.appAccessBiometricsUnavailable
+                    }
+                    container.authLifecycleTraceStore?.record(
+                        category: .operation,
+                        name: "appAccessPolicy.switch.finish",
+                        metadata: ["result": "success", "newPolicy": newPolicy.rawValue, "hasRootSecret": "false"]
+                    )
+                    didTraceFinish = true
                 }
+            } catch {
+                if !didTraceFinish {
+                    container.authLifecycleTraceStore?.record(
+                        category: .operation,
+                        name: "appAccessPolicy.switch.finish",
+                        metadata: ["result": "error", "newPolicy": newPolicy.rawValue, "errorType": String(describing: type(of: error))]
+                    )
+                }
+                throw error
             }
         }
     }

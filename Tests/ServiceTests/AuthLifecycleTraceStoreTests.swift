@@ -13,6 +13,7 @@ private typealias TraceAuthenticationPromptCoordinator = CypherAir.Authenticatio
 private typealias TraceAuthLifecycleTraceStore = CypherAir.AuthLifecycleTraceStore
 private typealias TraceProtectedDataError = CypherAir.ProtectedDataError
 private typealias TracePrivacyScreenLifecycleGate = CypherAir.PrivacyScreenLifecycleGate
+private typealias TraceAuthenticationManager = CypherAir.AuthenticationManager
 
 private final class TraceLineSink: @unchecked Sendable {
     private let lock = NSLock()
@@ -80,6 +81,14 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         for _ in 0..<5 {
             await Task.yield()
         }
+        try? await Task.sleep(nanoseconds: 10_000_000)
+    }
+
+    private func makeIsolatedDefaults() -> (UserDefaults, String) {
+        let suiteName = "com.cypherair.tests.trace.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return (defaults, suiteName)
     }
 
     func test_traceStore_capsEntriesAtCapacity() {
@@ -218,8 +227,188 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertTrue(attemptedAuthentication)
         XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.handleResume.enter" }))
         XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.requestContentClear" }))
+        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.pendingContext.discard" && $0.metadata["reason"] == "contentClear" }))
+        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.pendingContext.store" && $0.metadata["reason"] == "resumeAuthenticated" }))
         XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.recordAuthentication" }))
         XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.handleResume.exit" }))
+    }
+
+    func test_authenticationManager_evaluateAppSessionBypass_recordsStartAndFinishTrace() async throws {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: "com.cypherair.preference.uiTestBypassAuthentication")
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let manager = TraceAuthenticationManager(
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            defaults: defaults,
+            traceStore: traceStore
+        )
+
+        let result = try await manager.evaluateAppSession(policy: .userPresence, reason: "Trace bypass")
+
+        XCTAssertTrue(result.isAuthenticated)
+        XCTAssertNil(result.context)
+        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "appSession.evaluate.start" && $0.metadata["policy"] == "userPresence" }))
+        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "appSession.evaluate.finish" && $0.metadata["result"] == "bypass" && $0.metadata["hasContext"] == "false" }))
+    }
+
+    func test_authenticationManager_switchModeSuccess_recordsPhaseTraceWithoutFingerprints() async throws {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let secureEnclave = MockSecureEnclave()
+        let keychain = MockKeychain()
+        let manager = TraceAuthenticationManager(
+            secureEnclave: secureEnclave,
+            keychain: keychain,
+            defaults: defaults,
+            traceStore: traceStore
+        )
+        let fingerprint = String(repeating: "a", count: 40)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let bundle = try secureEnclave.wrap(
+            privateKey: Data(repeating: 0x42, count: 32),
+            using: handle,
+            fingerprint: fingerprint
+        )
+        try KeyBundleStore(keychain: keychain).saveBundle(bundle, fingerprint: fingerprint)
+
+        try await manager.switchMode(
+            to: .highSecurity,
+            fingerprints: [fingerprint],
+            hasBackup: true,
+            authenticator: MockAuthenticator()
+        )
+
+        let names = traceStore.recentEntries.map(\.name)
+        XCTAssertTrue(names.contains("privateKeyProtection.switch.start"))
+        XCTAssertTrue(names.contains("privateKeyProtection.switch.auth.start"))
+        XCTAssertTrue(names.contains("privateKeyProtection.switch.phaseA.start"))
+        XCTAssertTrue(names.contains("privateKeyProtection.switch.phaseB.start"))
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "privateKeyProtection.switch.finish" && $0.metadata["result"] == "success"
+            }
+        )
+        let allMetadataValues = traceStore.recentEntries.flatMap { $0.metadata.values }
+        XCTAssertFalse(allMetadataValues.contains(fingerprint))
+    }
+
+    func test_authenticationManager_switchModeNoIdentities_recordsFailureTrace() async throws {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let manager = TraceAuthenticationManager(
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            defaults: defaults,
+            traceStore: traceStore
+        )
+
+        do {
+            try await manager.switchMode(
+                to: .highSecurity,
+                fingerprints: [],
+                hasBackup: true,
+                authenticator: MockAuthenticator()
+            )
+            XCTFail("Expected noIdentities")
+        } catch AuthenticationError.noIdentities {
+        } catch {
+            XCTFail("Expected noIdentities, got \(error)")
+        }
+
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "privateKeyProtection.switch.finish" && $0.metadata["result"] == "noIdentities"
+            }
+        )
+    }
+
+    func test_protectedDataSessionCoordinator_recordsRootSecretHandoffTrace() async {
+        let storageRoot = TraceProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("TraceRootSecretHandoff")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let rootSecretStore = MockProtectedDataRootSecretStore()
+        try? rootSecretStore.saveRootSecret(
+            Data(repeating: 0x41, count: 32),
+            identifier: "com.cypherair.tests.trace.root-secret",
+            policy: .userPresence
+        )
+        let coordinator = TraceProtectedDataSessionCoordinator(
+            rootSecretStore: rootSecretStore,
+            domainKeyManager: TraceProtectedDomainKeyManager(storageRoot: storageRoot),
+            sharedRightIdentifier: "com.cypherair.tests.trace.root-secret",
+            traceStore: traceStore
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.trace.root-secret",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["protected-settings": .active],
+            pendingMutation: nil
+        )
+        let context = LAContext()
+        defer { context.invalidate() }
+
+        let result = await coordinator.beginProtectedDataAuthorization(
+            registry: registry,
+            localizedReason: "Trace root secret handoff",
+            authenticationContext: context
+        )
+
+        XCTAssertEqual(result, .authorized)
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "protectedData.rootSecret.load.start"
+                    && $0.metadata["source"] == "handoff"
+                    && $0.metadata["interactionNotAllowed"] == "true"
+            }
+        )
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "protectedData.rootSecret.load.finish" && $0.metadata["result"] == "success"
+            }
+        )
+    }
+
+    func test_protectedSettingsHost_recordsRefreshGateAndOpenTrace() async {
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .alreadyAuthorized },
+            authorizeSharedRight: { _ in
+                XCTFail("Already-authorized refresh should not authorize again")
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0x11, count: 32) },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in domainState = .unlocked },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {},
+            traceStore: traceStore
+        )
+
+        await host.refreshSettingsSection()
+
+        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "protectedSettings.refresh.start" }))
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "protectedSettings.gate.decision" && $0.metadata["decision"] == "alreadyAuthorized"
+            }
+        )
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "protectedSettings.openDomain.finish" && $0.metadata["result"] == "success"
+            }
+        )
     }
 
     func test_privacyScreenLifecycleGate_recordsDecisionTagsWithoutChangingBehavior() {
