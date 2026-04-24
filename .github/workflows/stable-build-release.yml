@@ -264,11 +264,15 @@ jobs:
 
       - name: Generate artifact attestation
         if: env.CREATE_RELEASE == 'true'
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
+            ${{ env.SOURCE_BUNDLE }}
+            ${{ env.COMPLIANCE_MANIFEST }}
             ${{ env.XCFRAMEWORK_ZIP }}
+            ${{ env.XCFRAMEWORK_CHECKSUM }}
             ${{ env.ARM64E_MANIFEST }}
+            ${{ env.RELINK_KIT }}
 
       - name: Create immutable stable release
         if: env.CREATE_RELEASE == 'true'

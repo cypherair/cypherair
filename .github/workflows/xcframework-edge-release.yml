@@ -260,16 +260,17 @@ jobs:
           \`\`\`
           EOF
       - name: Generate artifact attestation
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
             ${{ env.XCFRAMEWORK_ZIP }}
+            ${{ env.XCFRAMEWORK_CHECKSUM }}
             ${{ env.ARM64E_MANIFEST }}
+            ${{ env.RELEASE_METADATA }}
       - name: Create edge release tag
         run: |
           set -euo pipefail
 
-          git fetch --tags --force origin
           if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
             echo "::error::Release tag already exists: $RELEASE_TAG"
             exit 1
