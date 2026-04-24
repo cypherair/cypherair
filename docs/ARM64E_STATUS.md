@@ -49,7 +49,7 @@ full dependency chain is usable by the app.
     stable commands such as `cargo +stable`
   - local Rust fork path: `/Users/tianren/coding/rust`
   - Rust experiment branch: `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`
-  - current branch head: `9a76bf1a7524`
+  - current branch head: `02240c72a377`
   - `stage1-arm64e-patch` is an optional local rustup-linked stage1 compiler,
     rebuilt from that Rust branch with host `std`/`proc_macro` plus the arm64e
     Darwin std payload; `./build-xcframework.sh --release` uses it when
@@ -59,6 +59,10 @@ full dependency chain is usable by the app.
   - the Rust fork now has an `arm64e Stage1 Prerelease` workflow that publishes
     `rust-arm64e-stage1-*` prereleases containing a minimal stage1 toolchain,
     checksums, provenance JSON, diagnostics, and artifact attestations
+  - latest verified stage1 prerelease:
+    `rust-arm64e-stage1-20260424T150813Z-02240c7-r24895825853-a1`; its
+    manifest declares `includedRustSrc: true` so GitHub-hosted app builds can
+    run `cargo -Zbuild-std` without relying on a runner-local Rust source tree
   - GitHub-hosted PR, nightly, edge, and stable release workflows force-download
     the Rust fork stage1 prerelease and record the resolved tag, commit, and
     checksums in `PgpMobile.arm64e-build-manifest.json`
