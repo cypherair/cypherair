@@ -10,13 +10,13 @@ This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding ag
 - Local experiment branch in this worktree: `codex/apple-arm64e-unified-experiment`
 - Remote repository: `cypherair/cypherair`
 - Remote experiment branch: `origin/codex/apple-arm64e-unified-experiment`
-- Current purpose: this worktree is the app-side integration branch for the Apple `arm64e` effort. The app-side adaptation is basically working here; the remaining work is keeping the experiment branch current with `main`, maintaining the dependency chain, and upstreaming the supporting forks, especially Rust.
+- Current purpose: this worktree is the app-side integration branch for the Apple `arm64e` effort. The app-side adaptation builds and passes the unit-test path with the patched toolchain; the remaining work is keeping the experiment branch current with `main`, maintaining the dependency chain, and upstreaming the supporting forks, especially Rust.
 - Detailed arm64e status belongs in [docs/ARM64E_STATUS.md](docs/ARM64E_STATUS.md). Keep that file current whenever the branch topology, carry chain, toolchain pin, or progress changes.
 
 ## Related Forks
 
-- Rust fork: `/Users/tianren/coding/rust` (`cypherair/rust`, experiment branch `codex/arm64e-darwin-ptrauth-spike`)
-- OpenSSL glue fork: `/Users/tianren/coding/openssl-src-rs` (`cypherair/openssl-src-rs`, carry branch `carry/apple-arm64e-openssl-fork`)
+- Rust fork: `/Users/tianren/coding/rust` (`cypherair/rust`, experiment branch `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`)
+- OpenSSL glue fork: `/Users/tianren/coding/openssl-src-rs` (`cypherair/openssl-src-rs`, carry branch `carry/apple-arm64e-openssl-fork`; CypherAir tracks this branch in `pgp-mobile/Cargo.toml`)
 - OpenSSL target-definition fork: `/Users/tianren/coding/openssl` (`cypherair/openssl`, carry branch `carry/apple-arm64e-targets`, prep branch `prep/apple-arm64e-targets`)
 - Related but currently unconfirmed arm64e role: `/Users/tianren/coding/rust-openssl` (`cypherair/rust-openssl`)
 

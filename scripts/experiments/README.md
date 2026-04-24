@@ -40,9 +40,9 @@ historical reference.
 
 The current experiment intentionally uses a layered downstream carry chain:
 
-- `pgp-mobile` pins a CypherAir `openssl-src-rs` fork commit on
+- `pgp-mobile` tracks the CypherAir `openssl-src-rs` fork branch
   `carry/apple-arm64e-openssl-fork`
-- that `openssl-src-rs` fork commit points at a CypherAir `openssl` fork commit
+- that `openssl-src-rs` fork branch points at a CypherAir `openssl` fork commit
   on `carry/apple-arm64e-targets`
 
 This is deliberate.
@@ -57,8 +57,8 @@ In other words:
 - do not assume the `openssl-src-rs` branch can be proposed upstream on its own
 - keep the OpenSSL fork branch and the `openssl-src-rs` fork branch named and
   commented as downstream carry branches
-- update the pinned commit in `pgp-mobile/Cargo.toml` only after the
-  corresponding fork commits exist
+- update `pgp-mobile/Cargo.toml`, `pgp-mobile/Cargo.lock`, and this status
+  documentation together when the carry chain changes
 
 ## Script
 
@@ -106,11 +106,12 @@ If the locally linked `stage1-arm64e-patch` toolchain or the packaged
    Set `profile = "compiler"`, `llvm.download-ci-llvm = true`, and
    `rust.download-rustc = false`.
    This file is local bootstrap state and is typically ignored, not committed.
-3. Rebuild the Rust stage1 sysroot:
+3. Rebuild the Rust stage1 compiler and arm64e Darwin std artifacts:
 
    ```bash
    cd /Users/tianren/coding/rust
-   python3 x.py build library -j$(sysctl -n hw.ncpu)
+   python3 x.py build compiler/rustc library/std --stage 1 \
+       --target arm64e-apple-darwin
    rustup toolchain link stage1-arm64e-patch \
        /Users/tianren/coding/rust/build/aarch64-apple-darwin/stage1
    rustc +stage1-arm64e-patch -vV

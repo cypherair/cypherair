@@ -122,13 +122,14 @@ Targets: `aarch64-apple-ios` (device) + `aarch64-apple-ios-sim` (Apple Silicon s
 The current release pipeline includes native visionOS support. `build-xcframework.sh` builds and validates the visionOS device and simulator archives, packages all Apple slices into `PgpMobile.xcframework`, and the Xcode project links that XCFramework. The native app path is probed with `xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS' CODE_SIGNING_ALLOWED=NO`.
 
 To keep vendored OpenSSL reproducible across the current Apple `arm64e`
-experiment chain, `pgp-mobile/Cargo.toml` pins `openssl-src` through
+experiment chain, `pgp-mobile/Cargo.toml` patches `openssl-src` through
 `[patch.crates-io]` to the CypherAir fork
-`https://github.com/cypherair/openssl-src-rs` at rev
-`36d52f499d71d90c8c4b89c53210cbdde34e0528`. That fork commit is part of the
-downstream `carry/apple-arm64e-openssl-fork` line and is expected to track the
-CypherAir OpenSSL fork branch `carry/apple-arm64e-targets`. A checked-in `git`
-+ exact `rev` pin remains necessary for the current experiment flow.
+`https://github.com/cypherair/openssl-src-rs` on branch
+`carry/apple-arm64e-openssl-fork`. That branch is expected to track the
+CypherAir OpenSSL fork branch `carry/apple-arm64e-targets`. `Cargo.toml`
+intentionally tracks the branch so local branch status/docs updates are not
+left behind; `pgp-mobile/Cargo.lock` records the resolved git commit for
+repeatable builds.
 
 The current deployment baseline for the app targets is `iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+`.
 
@@ -199,10 +200,10 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 4. Local Swift / FFI validation runs through `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 
 The current `openssl-src` override for the Apple `arm64e` experiment chain must
-remain reproducible: use the checked-in `git` + exact `rev` pin to the
-CypherAir `openssl-src-rs` fork, not a machine-local `path` dependency and not
-a floating branch reference. If the chain is changed in the future, update both
-`pgp-mobile/Cargo.toml` and the local arm64e status documentation together.
+remain explicit: use the checked-in CypherAir `openssl-src-rs` git branch plus
+the checked-in `Cargo.lock`, not a machine-local `path` dependency. If the
+carry chain changes in the future, update `pgp-mobile/Cargo.toml`,
+`pgp-mobile/Cargo.lock`, and the local arm64e status documentation together.
 
 See also [CLAUDE.md](../CLAUDE.md) Build Commands for the full pipeline with exact commands.
 
