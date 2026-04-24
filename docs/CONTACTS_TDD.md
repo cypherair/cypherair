@@ -29,7 +29,7 @@ This TDD does not redefine the shared protected app-data framework. The followin
 - domain envelope rules
 - wrapped-DMK persistence and transaction behavior
 - `ProtectedDataRegistry` semantics
-- shared session authorization and relock behavior
+- shared root-secret activation and relock behavior
 - framework-level recovery and `restartRequired`
 
 This document also does not redesign the separate certification feature. It assumes certification capability exists before Contacts implementation begins and defines how Contacts consumes its results.
@@ -373,9 +373,9 @@ Write sequence at the Contacts layer:
 
 Startup and recovery boundary:
 
-1. before app-data authorization, Contacts may consult only framework-readable bootstrap inputs such as registry state and minimal per-domain bootstrap metadata
-2. before app-data authorization, Contacts must not attempt to open domain payload generations
-3. after shared app-data authorization succeeds, the Contacts DMK may lazy-unlock and the framework may select an authoritative readable generation
+1. before shared app-data session activation, Contacts may consult only framework-readable bootstrap inputs such as registry state and minimal per-domain bootstrap metadata
+2. before shared app-data session activation, Contacts must not attempt to open domain payload generations
+3. after shared app-data session activation succeeds, the Contacts DMK may lazy-unlock and the framework may select an authoritative readable generation
 4. Contacts then validates schema and business invariants for the selected snapshot
 5. if no readable authoritative Contacts state exists, the Contacts domain enters `recoveryNeeded`
 
@@ -385,13 +385,13 @@ Contacts never silently creates a new empty domain because prior local state is 
 
 ### 8.1 Shared Authorization Dependency
 
-Contacts depends on the shared app-data authorization model defined by the framework.
+Contacts depends on the shared app-data root-secret activation model defined by the framework.
 
 Required rules:
 
-- Contacts uses the framework-owned shared app-data right as the normative session gate
+- Contacts uses the framework-owned shared Keychain root-secret gate as the normative session gate
 - Contacts depends on one Contacts domain DMK under that shared gate
-- Contacts never provisions or deletes the shared right or shared secret directly
+- Contacts never provisions or deletes the shared root secret or derived wrapping root key directly
 - Contacts never decides first-domain provisioning or last-domain cleanup itself
 - Contacts authorization policy does not derive from private-key `AuthenticationMode`
 
@@ -399,19 +399,19 @@ Required rules:
 
 `AppSessionOrchestrator` is the only app-wide session owner.
 
-`ProtectedDataSessionCoordinator` is the only owner of shared app-data authorization.
+`ProtectedDataSessionCoordinator` is the only owner of shared app-data root-secret retrieval.
 
 Contacts access follows this order:
 
 1. the app enters `AppSessionOrchestrator`
 2. if app session is not active, `AppSessionOrchestrator` completes app-level privacy unlock first
 3. `first real protected-domain access` means the first route in the current app session that actually needs protected-domain content, not process launch by itself
-4. on first real Contacts access, if the shared app-data session is inactive, the orchestrator asks `ProtectedDataSessionCoordinator` to authorize the shared right
-5. if launch/resume immediately continues into a Contacts-dependent route, that same orchestrated flow may authorize the shared right there rather than surfacing a later second Contacts-specific prompt
-6. after authorization succeeds, the Contacts domain DMK may lazy-unlock through framework-owned key management
+4. on first real Contacts access, if the shared app-data session is inactive, the orchestrator asks `ProtectedDataSessionCoordinator` to retrieve the shared root secret through an authenticated `LAContext`
+5. if launch/resume immediately continues into a Contacts-dependent route, that same orchestrated flow may reuse the launch/resume `LAContext` for root-secret retrieval rather than surfacing a later second Contacts-specific prompt
+6. after shared app-data session activation succeeds, the Contacts domain DMK may lazy-unlock through framework-owned key management
 7. `ContactService` opens the Contacts domain snapshot and derived in-memory indexes
 
-Completing launch/resume authentication alone does not imply that the shared app-data session is already active.
+Completing launch/resume authentication alone does not imply that the shared app-data session is already active unless root-secret retrieval and wrapping-root-key derivation also succeeded.
 
 Ordinary Contacts browsing, search, tag/list management, and recipient selection reuse the active shared app-data session and do not trigger a Contacts-specific second prompt.
 
@@ -429,8 +429,8 @@ On relock, Contacts must register a `ProtectedDataRelockParticipant` that clears
 The framework owns:
 
 - closing new protected-domain access
-- zeroizing the shared secret and unwrapped domain DMKs
-- deauthorizing the shared right
+- zeroizing the derived wrapping root key and unwrapped domain DMKs
+- discarding any session-local `LAContext` retained only for the unlock transaction
 - latching `restartRequired` on unsafe relock failure
 
 If the framework enters `restartRequired`, Contacts must treat that as `frameworkUnavailable` until restart and must not attempt an independent in-process recovery path.
@@ -539,7 +539,7 @@ Migration sequence:
 7. move legacy plaintext into quarantine state
 8. delete legacy plaintext only after the next successful Contacts domain open
 
-Contacts migration does not directly provision the shared app-data right or secret. It also does not infer first-domain or last-domain lifecycle from Contacts-local state.
+Contacts migration does not directly provision the shared app-data root secret. It also does not infer first-domain or last-domain lifecycle from Contacts-local state.
 
 ### 11.3 Quarantine
 
@@ -592,7 +592,7 @@ Export encryption requirements:
 - require a user passphrase for every export
 - derive the export encryption key with the app's canonical Argon2id backup profile
 - encrypt the export payload with `AES.GCM`
-- never export the shared app-data secret, Contacts wrapped-DMK record, `ProtectedDataRegistry` state, source-device authorization state, or other framework-owned recovery artifacts
+- never export the shared app-data root secret, Contacts wrapped-DMK record, `ProtectedDataRegistry` state, source-device authorization state, or other framework-owned recovery artifacts
 
 ### 12.2 Export Flow
 
@@ -687,8 +687,8 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 - decrypt completes plaintext while verification stays pending
 - verify requires unlock
 - unlock cancel/failure results in hard stop for verify
-- if launch/resume immediately enters Contacts-required protected access, the same orchestrated flow authorizes the shared app-data session before Contacts opens
-- launch/resume authentication alone is not treated as an already active app-data session unless shared-right authorization also completed
+- if launch/resume immediately enters Contacts-required protected access, the same orchestrated flow retrieves the shared root secret and activates the shared app-data session before Contacts opens
+- launch/resume authentication alone is not treated as an already active app-data session unless root-secret retrieval also completed
 - ordinary Contacts use within an already active app-data session does not trigger redundant prompts
 - if another protected domain already activated the shared session, opening Contacts does not prompt again
 - framework-level blocked state is surfaced distinctly from Contacts domain recovery
@@ -714,7 +714,7 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 - interrupted migration recovers deterministically
 - export/import restores Contacts state coherently
 - import with wrong passphrase fails gracefully
-- export/import never transports shared secret, wrapped-DMK record, registry state, or source-device authorization state
+- export/import never transports the shared root secret, wrapped-DMK record, registry state, or source-device authorization state
 - if target-install first-domain provisioning is required during import, the framework owns it
 
 ### 14.7 Search And Tags
@@ -729,5 +729,5 @@ This document does not define:
 
 - the internals of the certification feature
 - the final localized UI copy for passphrase education and recovery messaging
-- shared protected app-data framework internals such as registry invariants, wrapped-DMK transactions, shared-right lifecycle, or framework recovery classification
+- shared protected app-data framework internals such as registry invariants, wrapped-DMK transactions, root-secret lifecycle, or framework recovery classification
 - implementation details for unrelated canonical documents outside the Contacts initiative

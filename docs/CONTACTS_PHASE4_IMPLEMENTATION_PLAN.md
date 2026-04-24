@@ -36,12 +36,12 @@ The active Contacts and app-data documents already establish the correct target 
 - Contacts is a protected domain on the shared app-data framework
 - Contacts must be `import-recoverable`
 - `AppSessionOrchestrator` owns app-session sequencing
-- `ProtectedDataSessionCoordinator` owns shared app-data authorization
+- `ProtectedDataSessionCoordinator` owns shared app-data root-secret retrieval
 - Contacts must not invent a second vault architecture
 
 The repository, however, still has material current-state behavior that must be unwound before that target can land safely. The biggest gaps are not only storage-related:
 
-- startup still loads plaintext Contacts before protected-domain authorization
+- startup still loads plaintext Contacts before protected-domain root-secret activation and Contacts domain unlock
 - verification-capable services still use Contacts as direct cryptographic verification input
 - Contacts access and mutation entrypoints are scattered across app surfaces and service helpers
 - empty-install recovery import is required by the Contacts TDD but not yet represented in the current access-gate model
@@ -62,7 +62,7 @@ Current code still treats Contacts as startup-readable plaintext content:
 - `ContactService` persists `Documents/contacts/contact-metadata.json`
 - `ContactsView` still calls `loadContacts()` directly on `.task`
 
-This conflicts with the Contacts TDD rule that Contacts payload generations must not be opened before shared app-data authorization succeeds. Phase 4 therefore requires both storage migration and startup sequencing migration.
+This conflicts with the Contacts TDD rule that Contacts payload generations must not be opened before shared app-data root-secret retrieval succeeds and the Contacts domain DMK unlocks. Phase 4 therefore requires both storage migration and startup sequencing migration.
 
 ### 3.2 Verification Contract Delta
 
@@ -368,7 +368,8 @@ This section freezes the later implementation order.
 
 **Key Changes**
 
-- remove startup-time Contacts payload loading before authorization
+- remove startup-time Contacts payload loading before shared root-secret activation and Contacts domain unlock
+- ensure launch/resume may activate the shared app-data session through authenticated `LAContext` reuse without opening Contacts payload generations eagerly
 - gate Contacts list, detail, import commit, delete, manual verification, Encrypt recipient resolution, and certificate-signature entry through `ContactsAvailability`
 - gate certificate-signature verification-time candidate signer reads so `CertificateSignatureService` cannot consume Contacts-backed `candidateSigners` while the Contacts domain is locked
 - implement route-level locked / recovery-needed / framework-unavailable behavior
@@ -449,7 +450,7 @@ This section freezes the later implementation order.
 - export requires unlocked Contacts plus fresh authentication
 - import handles empty steady-state installations
 - import also handles replacing an existing Contacts domain
-- import requires framework availability plus app-session unlock, not a previously unlocked Contacts domain
+- import requires framework availability plus app-session unlock and root-secret availability, not a previously unlocked Contacts domain
 - post-import readability validation is mandatory
 
 **Not In Scope**
@@ -591,7 +592,7 @@ The later implementation PRs must collectively satisfy the following scenario se
 - export/import recovery works on installations with existing protected domains
 - export/import recovery works on empty steady-state installations
 - framework-owned first-domain provisioning is used when required
-- import requires framework availability plus app-session unlock, not a pre-existing unlocked Contacts domain
+- import requires framework availability plus app-session unlock and root-secret availability, not a pre-existing unlocked Contacts domain
 - replace-domain import remains explicit and deterministic
 
 ### 7.4 Migration And Cutover
