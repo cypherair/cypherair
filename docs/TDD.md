@@ -194,16 +194,18 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 
 ### 2.5 Build Pipeline
 
-1. `cargo build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim` / `aarch64-apple-darwin` / `aarch64-apple-visionos` / `aarch64-apple-visionos-sim`
-2. `./build-xcframework.sh --release` refreshes the release archives, generates UniFFI Swift bindings and headers, validates host-dylib cleanup, and produces the packaged `PgpMobile.xcframework` output
+1. `cargo +stable build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim` / `aarch64-apple-darwin` / `aarch64-apple-visionos` / `aarch64-apple-visionos-sim` refreshes ordinary stable `arm64` archives when you only need target-specific Rust outputs
+2. `./build-xcframework.sh --release` refreshes stable `arm64` and patched `arm64e` release archives, generates UniFFI Swift bindings and headers from an `arm64e-apple-darwin` host dylib, validates host-dylib cleanup, produces the packaged `PgpMobile.xcframework` output, and writes `PgpMobile.arm64e-build-manifest.json`
 3. The current Xcode project links `PgpMobile.xcframework` and imports the generated headers through `bindings/module.modulemap`
 4. Local Swift / FFI validation runs through `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 
 The current `openssl-src` override for the Apple `arm64e` experiment chain must
 remain explicit: use the checked-in CypherAir `openssl-src-rs` git branch plus
-the checked-in `Cargo.lock`, not a machine-local `path` dependency. If the
-carry chain changes in the future, update `pgp-mobile/Cargo.toml`,
-`pgp-mobile/Cargo.lock`, and the local arm64e status documentation together.
+the checked-in `Cargo.lock`, not a machine-local `path` dependency. Release
+automation records the resolved `openssl-src-rs` commit and OpenSSL submodule
+commit in `PgpMobile.arm64e-build-manifest.json`. If the carry chain changes in
+the future, update `pgp-mobile/Cargo.toml`, `pgp-mobile/Cargo.lock`, and the
+local arm64e status documentation together.
 
 See also [CLAUDE.md](../CLAUDE.md) Build Commands for the full pipeline with exact commands.
 

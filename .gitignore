@@ -21,6 +21,7 @@ Packages/
 
 # XCFramework (built artifact, not source)
 *.xcframework/
+PgpMobile.arm64e-build-manifest.json
 
 # Claude Code local worktrees (not project config)
 .claude/worktrees/

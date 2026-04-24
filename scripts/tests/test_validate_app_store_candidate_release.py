@@ -28,6 +28,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                     build_number="3",
                     repository_full_name="cypherair/cypherair",
                     require_stable_release=True,
+                    require_arm64e_release_manifest=False,
                 )
             self.assertEqual(validated_tag, release_tag)
 
@@ -43,6 +44,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         build_number="3",
                         repository_full_name="cypherair/cypherair",
                         require_stable_release=True,
+                        require_arm64e_release_manifest=False,
                     )
 
     def test_tracked_worktree_changes_fail(self) -> None:
@@ -58,6 +60,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         build_number="3",
                         repository_full_name="cypherair/cypherair",
                         require_stable_release=True,
+                        require_arm64e_release_manifest=False,
                     )
 
     def test_staged_changes_fail(self) -> None:
@@ -74,6 +77,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         build_number="3",
                         repository_full_name="cypherair/cypherair",
                         require_stable_release=True,
+                        require_arm64e_release_manifest=False,
                     )
 
     def test_untracked_files_do_not_block_candidate(self) -> None:
@@ -88,6 +92,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                     build_number="3",
                     repository_full_name="cypherair/cypherair",
                     require_stable_release=True,
+                    require_arm64e_release_manifest=False,
                 )
 
     def test_missing_release_fails(self) -> None:
@@ -102,6 +107,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         build_number="3",
                         repository_full_name="cypherair/cypherair",
                         require_stable_release=True,
+                        require_arm64e_release_manifest=False,
                     )
 
     def test_missing_origin_remote_is_reported_as_candidate_validation_error(self) -> None:
@@ -132,6 +138,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         build_number="3",
                         repository_full_name="cypherair/cypherair",
                         require_stable_release=True,
+                        require_arm64e_release_manifest=False,
                     )
 
     def test_head_mismatch_against_remote_tag_fails(self) -> None:
@@ -149,7 +156,48 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         build_number="3",
                         repository_full_name="cypherair/cypherair",
                         require_stable_release=True,
+                        require_arm64e_release_manifest=False,
                     )
+
+    def test_arm64e_release_manifest_is_required_when_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            create_annotated_stable_tag(repo_root)
+            with mock.patch.object(module, "stable_release_exists", return_value=True):
+                with mock.patch.object(
+                    module,
+                    "validate_stable_release_arm64e_manifest",
+                    side_effect=module.CandidateValidationError("missing arm64e manifest"),
+                ):
+                    with self.assertRaisesRegex(module.CandidateValidationError, "missing arm64e manifest"):
+                        module.validate_candidate_release(
+                            repo_root=repo_root,
+                            marketing_version="1.2.9",
+                            build_number="3",
+                            repository_full_name="cypherair/cypherair",
+                            require_stable_release=True,
+                            require_arm64e_release_manifest=True,
+                        )
+
+    def test_valid_arm64e_manifest_payload_passes(self) -> None:
+        payload = {
+            "dependencyChain": {
+                "opensslSrc": {"resolvedCommit": "be17d917"},
+                "openssl": {"submoduleCommit": "d228bf84"},
+            },
+            "rustStage1": {"releaseTag": "rust-arm64e-stage1-test"},
+            "xcframework": {
+                "requiredSlicesPresent": True,
+                "libraries": [
+                    {"supportedPlatform": "ios", "supportedPlatformVariant": "", "supportedArchitectures": ["arm64", "arm64e"]},
+                    {"supportedPlatform": "ios", "supportedPlatformVariant": "simulator", "supportedArchitectures": ["arm64"]},
+                    {"supportedPlatform": "macos", "supportedPlatformVariant": "", "supportedArchitectures": ["arm64", "arm64e"]},
+                    {"supportedPlatform": "xros", "supportedPlatformVariant": "", "supportedArchitectures": ["arm64", "arm64e"]},
+                    {"supportedPlatform": "xros", "supportedPlatformVariant": "simulator", "supportedArchitectures": ["arm64"]},
+                ],
+            },
+        }
+        module.validate_arm64e_manifest_payload(payload)
 
     def test_main_writes_candidate_release_metadata_on_success(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -163,6 +211,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                 github_repository="cypherair/cypherair",
                 output_metadata_file=output_path,
                 require_stable_release="YES",
+                require_arm64e_release_manifest="NO",
             )
 
             with mock.patch.object(module, "parse_args", return_value=args):
@@ -190,6 +239,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                 github_repository="cypherair/cypherair",
                 output_metadata_file=output_path,
                 require_stable_release="YES",
+                require_arm64e_release_manifest="NO",
             )
 
             with mock.patch.object(module, "parse_args", return_value=args):

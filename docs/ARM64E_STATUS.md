@@ -33,11 +33,12 @@ full dependency chain is usable by the app.
   generating UniFFI bindings from an `arm64e-apple-darwin` host dylib and by
   building explicit `arm64e` device archives before they are merged with the
   stable `arm64` device archives.
+- The build and release infrastructure now has a formal arm64e path:
+  `./build-xcframework.sh --release` is the official app-side entrypoint, and
+  it emits `PgpMobile.arm64e-build-manifest.json` alongside the XCFramework.
 - The remaining work is no longer "can CypherAir run with arm64e at all?".
-  The remaining work is:
-  - keeping this experiment branch current with the evolving `main` branch
-  - keeping the dependency chain explicit and reproducible
-  - upstreaming the supporting changes in the Rust and crypto forks
+  The remaining work is validating the new release automation end to end before
+  merging the app experiment branch into `main`, then continuing upstream work.
 
 ## Current Verified Chain
 
@@ -47,13 +48,20 @@ full dependency chain is usable by the app.
   - Rust experiment branch: `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`
   - current branch head: `9a76bf1a7524`
   - `stage1-arm64e-patch` is a local rustup-linked stage1 compiler, rebuilt
-    from that Rust branch; Cargo calls it through `RUSTC` while using nightly
-    Cargo as the driver for `-Zbuild-std` arm64e builds
+    from that Rust branch with host `std`/`proc_macro` plus the arm64e Darwin
+    std payload; Cargo calls it through `RUSTC` while using nightly Cargo as
+    the driver for `-Zbuild-std` arm64e builds
+  - the Rust fork now has an `arm64e Stage1 Prerelease` workflow that publishes
+    `rust-arm64e-stage1-*` prereleases containing a minimal stage1 toolchain,
+    checksums, provenance JSON, diagnostics, and artifact attestations
 - XCFramework packaging posture:
   - iOS/macOS/visionOS device artifacts are merged from stable `arm64` and
     experiment `arm64e` archives
   - iOS/visionOS simulator artifacts remain stable `arm64`
   - UniFFI bindgen continues to use an `arm64e-apple-darwin` host dylib
+  - app-side release workflows publish `PgpMobile.arm64e-build-manifest.json`
+    with Rust stage1 provenance, OpenSSL carry-chain commits, and verified
+    XCFramework slice metadata
 - OpenSSL source carry:
   - `pgp-mobile/Cargo.toml` patches `openssl-src` to `https://github.com/cypherair/openssl-src-rs`
   - tracked downstream branch line: `carry/apple-arm64e-openssl-fork`
@@ -65,6 +73,28 @@ full dependency chain is usable by the app.
   - intended downstream branch line: `carry/apple-arm64e-targets`
   - current carry branch head: `d228bf84e32e`
   - current `openssl-src-rs` submodule pointer: `d228bf84e32e`
+
+## Automation Posture
+
+- `cypherair/rust`:
+  - `arm64e-stage1-prerelease.yml` validates the integration branch, builds the
+    patched stage1 compiler, host `std`/`proc_macro`, and
+    `arm64e-apple-darwin` std, smoke-tests the packaged toolchain, and
+    publishes a prerelease asset for app CI.
+  - `arm64e-upstream-sync-prep.yml` performs manual upstream-sync dry-runs and
+    can open a refresh PR without force-pushing the integration branch.
+- `cypherair/cypherair`:
+  - PR, nightly, edge, and stable workflows call the official arm64e
+    `./build-xcframework.sh --release` path.
+  - edge and stable releases include `PgpMobile.arm64e-build-manifest.json`.
+  - stable compliance assets embed the arm64e manifest and the relink kit covers
+    both stable `arm64` and patched `arm64e` target archives.
+  - App Store candidate validation requires the stable release to include a
+    valid arm64e manifest before archiving is allowed.
+- `cypherair/openssl-src-rs`:
+  - `arm64e-carry-chain.yml` checks that the OpenSSL submodule URL, branch, and
+    pointer stay aligned with `cypherair/openssl:carry/apple-arm64e-targets`,
+    then packages and tests the crate.
 
 ## Branch Posture
 
@@ -119,3 +149,4 @@ Update this file whenever any of the following changes:
 - the role of `openssl`, `openssl-src-rs`, or `rust-openssl` in the chain
 - the app-side arm64e readiness status
 - the branch posture between `main` and `codex/apple-arm64e-unified-experiment`
+- the Rust stage1 prerelease workflow contract or arm64e release manifest shape

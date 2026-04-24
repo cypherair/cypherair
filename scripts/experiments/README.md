@@ -106,12 +106,13 @@ If the locally linked `stage1-arm64e-patch` toolchain or the packaged
    Set `profile = "compiler"`, `llvm.download-ci-llvm = true`, and
    `rust.download-rustc = false`.
    This file is local bootstrap state and is typically ignored, not committed.
-3. Rebuild the Rust stage1 compiler and arm64e Darwin std artifacts:
+3. Rebuild the Rust stage1 compiler, host std/proc_macro, and arm64e Darwin
+   std artifacts:
 
    ```bash
    cd /Users/tianren/coding/rust
-   python3 x.py build compiler/rustc library/std --stage 1 \
-       --target arm64e-apple-darwin
+   python3 x.py build compiler/rustc library/std library/proc_macro --stage 1 \
+       --target aarch64-apple-darwin,arm64e-apple-darwin
    rustup toolchain link stage1-arm64e-patch \
        /Users/tianren/coding/rust/build/aarch64-apple-darwin/stage1
    rustc +stage1-arm64e-patch -vV
@@ -122,11 +123,17 @@ If the locally linked `stage1-arm64e-patch` toolchain or the packaged
    ```bash
    cd /Users/tianren/coding/cypherair-apple-arm64e-unified-experiment
    CARGO_NET_GIT_FETCH_WITH_CLI=true \
-       scripts/experiments/build_apple_arm64e_xcframework.sh --release
+       ./build-xcframework.sh --release
    ```
 
    This produces dual device slices (`arm64` + `arm64e`) for iOS, macOS, and
-   visionOS, while simulator slices remain `arm64`.
+   visionOS, while simulator slices remain `arm64`, and writes
+   `PgpMobile.arm64e-build-manifest.json`.
+
+   The older `scripts/experiments/build_apple_arm64e_xcframework.sh` remains a
+   diagnostic/reproduction script for branch-local experiments. The repo-root
+   `./build-xcframework.sh --release` path is now the formal release build
+   entrypoint.
 
 5. The script now skips the negative stable baseline repro by default.
    Re-enable it only when you explicitly want that proof:

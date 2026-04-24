@@ -39,7 +39,8 @@ CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and 
 
 - Swift 6.2
 - SwiftUI with iOS 26 Liquid Glass conventions where applicable and native platform chrome elsewhere
-- Rust stable
+- Rust stable for normal targets, plus the CypherAir patched Rust stage1
+  toolchain for Apple `arm64e` slices
 - `sequoia-openpgp` 2.2.0 with `crypto-openssl`
 - UniFFI 0.31.x
 - CryptoKit + Security.framework
@@ -66,17 +67,18 @@ Start with `docs/ARCHITECTURE.md` and `docs/SECURITY.md` when working in unfamil
 
 ```bash
 # Rust builds
-cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
-cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
 
-# Full Rust + UniFFI + packaged-artifact sync
+# Full Rust + UniFFI + packaged-artifact sync. This now packages Apple
+# device slices as arm64 + arm64e and writes PgpMobile.arm64e-build-manifest.json.
 ./build-xcframework.sh --release
 
 # Rust tests
-cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 
 # macOS-local Swift unit + FFI validation
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
@@ -188,14 +190,14 @@ If the user asks to increment the build number, first read the current `CURRENT_
 - Add negative tests for failure paths, not only happy paths.
 - Secure Enclave / biometric tests must be guarded for real hardware availability.
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode uses for Swift/FFI tests.
-- If a Rust change can affect Swift-visible behavior, run `./build-xcframework.sh --release` before running `xcodebuild test`.
+- If a Rust change can affect Swift-visible behavior, run `./build-xcframework.sh --release` before running `xcodebuild test`. The script consumes the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease on GitHub Actions, or a local `stage1-arm64e-patch` rustup-linked toolchain when available.
 - See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
 - For route ownership, launch, tutorial-host, or macOS UI workflow changes, also run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted smoke subset.
 
 At minimum after meaningful code changes:
 
 ```bash
-cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
 ```

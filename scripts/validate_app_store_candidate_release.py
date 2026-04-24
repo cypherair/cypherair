@@ -8,12 +8,14 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 
 DEFAULT_REPOSITORY = "cypherair/cypherair"
+ARM64E_MANIFEST_ASSET_NAME = "PgpMobile.arm64e-build-manifest.json"
 
 
 class CandidateValidationError(RuntimeError):
@@ -32,6 +34,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--require-stable-release",
         default=os.environ.get("SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE", "NO"),
+    )
+    parser.add_argument(
+        "--require-arm64e-release-manifest",
+        default=os.environ.get("SOURCE_COMPLIANCE_REQUIRE_ARM64E_RELEASE_MANIFEST", "YES"),
     )
     return parser.parse_args()
 
@@ -166,12 +172,154 @@ def stable_release_exists(repository_full_name: str, release_tag: str) -> bool:
         ) from error
 
 
+def load_release_asset(repository_full_name: str, release_tag: str, asset_name: str) -> bytes:
+    if shutil.which("gh"):
+        auth_status = subprocess.run(
+            ["gh", "auth", "status"],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        if auth_status.returncode == 0:
+            with tempfile.TemporaryDirectory() as temp_dir_name:
+                temp_dir = Path(temp_dir_name)
+                download = subprocess.run(
+                    [
+                        "gh",
+                        "release",
+                        "download",
+                        release_tag,
+                        "-R",
+                        repository_full_name,
+                        "--pattern",
+                        asset_name,
+                        "--dir",
+                        str(temp_dir),
+                    ],
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                )
+                if download.returncode == 0:
+                    asset_path = temp_dir / asset_name
+                    if asset_path.exists():
+                        return asset_path.read_bytes()
+
+    api_url = f"https://api.github.com/repos/{repository_full_name}/releases/tags/{release_tag}"
+    request = urllib.request.Request(
+        api_url,
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "CypherAir"},
+    )
+    try:
+        with urllib.request.urlopen(request) as response:
+            release_payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        raise CandidateValidationError(
+            f"Unable to load GitHub stable release {release_tag}: HTTP {error.code}."
+        ) from error
+    except urllib.error.URLError as error:
+        raise CandidateValidationError(
+            f"Unable to load GitHub stable release {release_tag}: {error.reason}."
+        ) from error
+
+    for asset in release_payload.get("assets", []):
+        if asset.get("name") != asset_name:
+            continue
+        asset_url = asset.get("browser_download_url")
+        if not asset_url:
+            break
+        asset_request = urllib.request.Request(
+            asset_url,
+            headers={"Accept": "application/octet-stream", "User-Agent": "CypherAir"},
+        )
+        try:
+            with urllib.request.urlopen(asset_request) as response:
+                return response.read()
+        except urllib.error.HTTPError as error:
+            raise CandidateValidationError(
+                f"Unable to download stable release asset {asset_name}: HTTP {error.code}."
+            ) from error
+        except urllib.error.URLError as error:
+            raise CandidateValidationError(
+                f"Unable to download stable release asset {asset_name}: {error.reason}."
+            ) from error
+
+    raise CandidateValidationError(
+        f"Stable release {release_tag} is missing required asset {asset_name}."
+    )
+
+
+def validate_arm64e_manifest_payload(payload: dict[str, object]) -> None:
+    dependency_chain = payload.get("dependencyChain")
+    if not isinstance(dependency_chain, dict):
+        raise CandidateValidationError("arm64e manifest is missing dependencyChain.")
+
+    openssl_src = dependency_chain.get("opensslSrc")
+    openssl = dependency_chain.get("openssl")
+    if not isinstance(openssl_src, dict) or not openssl_src.get("resolvedCommit"):
+        raise CandidateValidationError("arm64e manifest is missing openssl-src resolved commit.")
+    if not isinstance(openssl, dict) or not openssl.get("submoduleCommit"):
+        raise CandidateValidationError("arm64e manifest is missing OpenSSL submodule commit.")
+
+    rust_stage1 = payload.get("rustStage1")
+    if not isinstance(rust_stage1, dict) or not rust_stage1.get("releaseTag"):
+        raise CandidateValidationError("arm64e manifest is missing Rust stage1 release tag.")
+
+    xcframework = payload.get("xcframework")
+    if not isinstance(xcframework, dict) or not xcframework.get("requiredSlicesPresent"):
+        raise CandidateValidationError("arm64e manifest does not declare required XCFramework slices.")
+
+    libraries = xcframework.get("libraries")
+    if not isinstance(libraries, list):
+        raise CandidateValidationError("arm64e manifest is missing XCFramework library entries.")
+
+    expected = {
+        ("ios", ""): ["arm64", "arm64e"],
+        ("ios", "simulator"): ["arm64"],
+        ("macos", ""): ["arm64", "arm64e"],
+        ("xros", ""): ["arm64", "arm64e"],
+        ("xros", "simulator"): ["arm64"],
+    }
+    seen = {}
+    for library in libraries:
+        if not isinstance(library, dict):
+            continue
+        key = (
+            str(library.get("supportedPlatform", "")),
+            str(library.get("supportedPlatformVariant", "")),
+        )
+        seen[key] = sorted(str(arch) for arch in library.get("supportedArchitectures", []))
+
+    for key, expected_archs in expected.items():
+        if seen.get(key) != sorted(expected_archs):
+            raise CandidateValidationError(
+                "arm64e manifest has wrong XCFramework architectures for "
+                f"{key[0]}/{key[1] or 'device'}: expected {expected_archs}, got {seen.get(key, [])}"
+            )
+
+
+def validate_stable_release_arm64e_manifest(
+    repository_full_name: str,
+    release_tag: str,
+) -> None:
+    raw_asset = load_release_asset(
+        repository_full_name,
+        release_tag,
+        ARM64E_MANIFEST_ASSET_NAME,
+    )
+    payload = json.loads(raw_asset.decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise CandidateValidationError("arm64e release manifest must contain a JSON object.")
+    validate_arm64e_manifest_payload(payload)
+
+
 def validate_candidate_release(
     repo_root: Path,
     marketing_version: str,
     build_number: str,
     repository_full_name: str,
     require_stable_release: bool,
+    require_arm64e_release_manifest: bool = True,
 ) -> str:
     if not require_stable_release:
         return derived_release_tag(marketing_version.strip(), build_number.strip())
@@ -201,6 +349,9 @@ def validate_candidate_release(
             f"Missing GitHub stable release {release_tag}. Publish the stable release before archiving an App Store candidate."
         )
 
+    if require_arm64e_release_manifest:
+        validate_stable_release_arm64e_manifest(repository_full_name, release_tag)
+
     local_head_sha = head_commit_sha(repo_root)
     remote_tag_sha = remote_tag_commit_sha(repo_root, release_tag)
     if local_head_sha != remote_tag_sha:
@@ -224,6 +375,9 @@ def main() -> None:
             build_number=args.build_number,
             repository_full_name=args.github_repository,
             require_stable_release=stable_release_required,
+            require_arm64e_release_manifest=requires_stable_release(
+                args.require_arm64e_release_manifest
+            ),
         )
         if stable_release_required and args.output_metadata_file is not None:
             write_candidate_release_metadata(

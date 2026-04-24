@@ -15,9 +15,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TARGETS = (
     "aarch64-apple-ios",
+    "arm64e-apple-ios",
     "aarch64-apple-ios-sim",
     "aarch64-apple-darwin",
+    "arm64e-apple-darwin",
     "aarch64-apple-visionos",
+    "arm64e-apple-visionos",
     "aarch64-apple-visionos-sim",
 )
 DEP_PATTERNS = (
@@ -43,6 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--build-number", required=True)
     parser.add_argument("--commit-sha", required=True)
     parser.add_argument("--xcframework-zip", type=Path, required=True)
+    parser.add_argument("--arm64e-manifest", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -83,6 +87,16 @@ def create_archive(source_dir: Path, output_path: Path) -> None:
         raise RuntimeError("failed to create relink kit archive")
 
 
+def rebuild_command_for_target(target: str) -> str:
+    if target.startswith("arm64e-"):
+        return (
+            "RUSTC=/path/to/stage1-arm64e-patch/bin/rustc "
+            f"cargo +nightly build --release -Zbuild-std --target {target} "
+            "--manifest-path pgp-mobile/Cargo.toml"
+        )
+    return f"cargo +stable build --release --target {target} --manifest-path pgp-mobile/Cargo.toml"
+
+
 def main() -> None:
     args = parse_args()
     xcframework_sha = sha256_for_path(args.xcframework_zip.resolve())
@@ -101,8 +115,16 @@ def main() -> None:
                 "fileName": args.xcframework_zip.name,
                 "sha256": xcframework_sha,
             },
+            "arm64eManifest": {},
             "targets": {},
         }
+
+        if args.arm64e_manifest is not None:
+            shutil.copy2(args.arm64e_manifest, root_dir / args.arm64e_manifest.name)
+            manifest["arm64eManifest"] = {
+                "fileName": args.arm64e_manifest.name,
+                "sha256": sha256_for_path(args.arm64e_manifest.resolve()),
+            }
 
         readme_lines = [
             "# PgpMobile Relink Kit",
@@ -111,11 +133,12 @@ def main() -> None:
             f"- Commit: `{args.commit_sha}`",
             f"- XCFramework zip: `{args.xcframework_zip.name}`",
             f"- XCFramework zip SHA256: `{xcframework_sha}`",
+            f"- arm64e manifest: `{args.arm64e_manifest.name if args.arm64e_manifest else 'not provided'}`",
             "",
             "This kit contains target-scoped build intermediates and notes for relink-focused",
             "review of the stable XCFramework channel. Rebuild the tagged source bundle and",
             "use `./build-xcframework.sh --release` as the canonical path to regenerate the",
-            "final XCFramework after modifying bundled dependencies.",
+            "final dual-slice Apple device XCFramework after modifying bundled dependencies.",
         ]
 
         for target in TARGETS:
@@ -147,7 +170,7 @@ def main() -> None:
                 "staticlib": staticlib_path.name if staticlib_path.exists() else "",
                 "deps": dep_files,
                 "opensslInputs": sorted(set(openssl_files)),
-                "rebuildCommand": f"cargo build --release --target {target} --manifest-path pgp-mobile/Cargo.toml",
+                "rebuildCommand": rebuild_command_for_target(target),
                 "xcframeworkCommand": "./build-xcframework.sh --release",
             }
             cast_targets = manifest["targets"]
