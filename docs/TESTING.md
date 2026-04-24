@@ -133,6 +133,13 @@ The repository also publishes unique edge XCFramework prereleases:
 - `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, rebuilds and validates the XCFramework, then publishes a unique `pgpmobile-edge-` prerelease for canonical `main` builds; non-main manual runs must use `pgpmobile-drill-*` prefixes
 - The arm64e XCFramework path consumes the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease on GitHub Actions. Stable `arm64` slices are still built with stable Rust, while `arm64e` slices use nightly Cargo with `RUSTC` pointing at the downloaded stage1 compiler.
 
+Toolchain contract:
+
+- `stable` means the official Rust stable channel, not a CypherAir release channel or Rust fork branch.
+- The repository root intentionally has no custom `rust-toolchain.toml` override. Use explicit `cargo +stable` / `rustc +stable` for ordinary Rust validation and metadata.
+- App-side Rust or UniFFI changes do not require waiting for a new GitHub Rust stage1 prerelease. Local full packaging uses a linked `stage1-arm64e-patch` toolchain when available, and GitHub-hosted release jobs force-download the latest attested Rust fork stage1 prerelease.
+- Only changes to the Rust compiler fork itself require rebuilding the local stage1 or publishing a new Rust fork stage1 prerelease before app-side arm64e packaging can consume the new compiler.
+
 ## 2.2 GitHub Actions Hosted macOS Limitation
 
 The repository workflows target `macos-26`, but GitHub's hosted runner image may still lag the app's minimum deployment target.
@@ -221,6 +228,8 @@ Recommended path:
 ```
 
 Prefer this path after Rust or UniFFI changes because it refreshes the stable `arm64` static archives, builds patched `arm64e` static archives with nightly Cargo plus explicit `RUSTC`, regenerates bindings from an `arm64e-apple-darwin` host dylib, recreates `PgpMobile.xcframework`, writes `PgpMobile.arm64e-build-manifest.json`, and enforces the dylib cleanup/validation that keeps Xcode linking deterministic.
+
+For local packaging, the script first uses `ARM64E_RUSTC` or `ARM64E_STAGE1_DIR` when supplied, then the locally linked `stage1-arm64e-patch` toolchain when present, and otherwise downloads the Rust fork prerelease. GitHub Actions sets `ARM64E_STAGE1_FORCE_DOWNLOAD=1` so prerelease and stable compliance artifacts never depend on runner-local toolchain state.
 
 If you must run the underlying bindgen step manually, run it from `pgp-mobile/`, not from the repo root:
 

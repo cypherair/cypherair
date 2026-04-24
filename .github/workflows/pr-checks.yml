@@ -26,8 +26,10 @@ jobs:
           rustup set profile minimal
           rustup toolchain install stable
           rustup default stable
-          rustc --version
-          cargo --version
+          # Keep ordinary Rust validation on the official stable channel.
+          # The arm64e stage1 compiler is resolved explicitly by build-xcframework.sh.
+          rustc +stable --version
+          cargo +stable --version
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: "pgp-mobile -> target"
@@ -66,8 +68,10 @@ jobs:
           rustup set profile minimal
           rustup toolchain install stable
           rustup default stable
-          rustc --version
-          cargo --version
+          # Keep ordinary Rust validation on the official stable channel.
+          # The arm64e stage1 compiler is resolved explicitly by build-xcframework.sh.
+          rustc +stable --version
+          cargo +stable --version
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: "pgp-mobile -> target"

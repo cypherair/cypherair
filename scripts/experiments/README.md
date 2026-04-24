@@ -5,17 +5,30 @@ This directory contains branch-local experiment helpers for CypherAir's Apple
 
 ## Toolchain
 
-This experiment branch is expected to use the locally linked Rust toolchain:
+The formal CypherAir build no longer uses a repo-wide `rust-toolchain.toml`
+override. Ordinary Rust validation should be explicit:
+
+```bash
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
+```
+
+The local arm64e path can still use the locally linked Rust toolchain:
 
 - `stage1-arm64e-patch`
 
-That toolchain currently comes from the local Rust fork checkout at:
+That optional toolchain currently comes from the local Rust fork checkout at:
 
 - `/Users/tianren/coding/rust`
 
-The branch-level `rust-toolchain.toml` points repo-root cargo/rustc invocations
-at that patched stage1 toolchain so local `pgp-mobile` validation uses the
-current upstream-prep stack by default. The active Rust integration branch is
+`./build-xcframework.sh --release` uses that local `stage1-arm64e-patch`
+toolchain when it is linked, so normal app-side or `pgp-mobile` changes can be
+rebuilt locally without waiting for a GitHub Rust compiler build. GitHub Actions
+release jobs set `ARM64E_STAGE1_FORCE_DOWNLOAD=1` and consume an attested
+`cypherair/rust` `rust-arm64e-stage1-*` prerelease instead, so prerelease and
+stable compliance artifacts are reproducible from remote provenance rather than
+developer-machine state.
+
+The active Rust integration branch is
 `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`, based on
 `upstream/main@9836b06b55f5`. It is the union of the three upstream-ready Rust
 PR branches, a small integration-only visionOS+ptrauth cross-check follow-up,
@@ -94,7 +107,10 @@ In other words:
 ## Local Recovery
 
 If the locally linked `stage1-arm64e-patch` toolchain or the packaged
-`PgpMobile.xcframework` is missing or broken, use this recovery flow.
+`PgpMobile.xcframework` is missing or broken, use this recovery flow. You only
+need to rebuild or republish stage1 after changing the Rust compiler fork
+itself; ordinary CypherAir app or `pgp-mobile` changes can reuse the existing
+local stage1 or the latest Rust fork prerelease.
 
 1. Restore the local Rust stage1 toolchain from
    `/Users/tianren/coding/rust` on branch

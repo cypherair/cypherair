@@ -24,8 +24,9 @@ full dependency chain is usable by the app.
 
 - The app-side Apple `arm64e` adaptation builds and passes the unit-test path
   in this worktree with the patched Rust stage1 toolchain.
-- The experiment branch contains branch-local build helpers, a patched Rust
-  toolchain pin, and a reproducible vendored OpenSSL carry chain.
+- The experiment branch contains branch-local build helpers, an explicit
+  patched Rust stage1 consumption path, and a reproducible vendored OpenSSL
+  carry chain.
 - Apple distribution rules require `arm64` whenever a shipped app bundle also
   contains `arm64e`, so the experiment output must now package dual device
   slices (`arm64` + `arm64e`) while keeping simulator slices on `arm64`.
@@ -42,18 +43,25 @@ full dependency chain is usable by the app.
 
 ## Current Verified Chain
 
-- Rust toolchain pin:
-  - `rust-toolchain.toml` points to `stage1-arm64e-patch`
+- Rust toolchain contract:
+  - the repo root intentionally has no `rust-toolchain.toml` custom override;
+    ordinary local development and CI validation use explicit Rust official
+    stable commands such as `cargo +stable`
   - local Rust fork path: `/Users/tianren/coding/rust`
   - Rust experiment branch: `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`
   - current branch head: `9a76bf1a7524`
-  - `stage1-arm64e-patch` is a local rustup-linked stage1 compiler, rebuilt
-    from that Rust branch with host `std`/`proc_macro` plus the arm64e Darwin
-    std payload; Cargo calls it through `RUSTC` while using nightly Cargo as
-    the driver for `-Zbuild-std` arm64e builds
+  - `stage1-arm64e-patch` is an optional local rustup-linked stage1 compiler,
+    rebuilt from that Rust branch with host `std`/`proc_macro` plus the arm64e
+    Darwin std payload; `./build-xcframework.sh --release` uses it when
+    available for fast local app-side rebuilds
+  - arm64e builds call the patched compiler through explicit `RUSTC` while
+    using nightly Cargo as the driver for `-Zbuild-std`
   - the Rust fork now has an `arm64e Stage1 Prerelease` workflow that publishes
     `rust-arm64e-stage1-*` prereleases containing a minimal stage1 toolchain,
     checksums, provenance JSON, diagnostics, and artifact attestations
+  - GitHub-hosted PR, nightly, edge, and stable release workflows force-download
+    the Rust fork stage1 prerelease and record the resolved tag, commit, and
+    checksums in `PgpMobile.arm64e-build-manifest.json`
 - XCFramework packaging posture:
   - iOS/macOS/visionOS device artifacts are merged from stable `arm64` and
     experiment `arm64e` archives
@@ -65,7 +73,7 @@ full dependency chain is usable by the app.
 - OpenSSL source carry:
   - `pgp-mobile/Cargo.toml` patches `openssl-src` to `https://github.com/cypherair/openssl-src-rs`
   - tracked downstream branch line: `carry/apple-arm64e-openssl-fork`
-  - current resolved branch head: `be17d917887a`
+  - current resolved branch head: `32b278bf9317`
   - `pgp-mobile/Cargo.lock` records the resolved git commit for repeatable
     local builds, while `Cargo.toml` intentionally tracks the carry branch
 - OpenSSL target-definition carry:
@@ -86,6 +94,8 @@ full dependency chain is usable by the app.
 - `cypherair/cypherair`:
   - PR, nightly, edge, and stable workflows call the official arm64e
     `./build-xcframework.sh --release` path.
+  - ordinary Rust validation and release metadata use explicit `+stable`
+    commands; arm64e never depends on a repo-wide rustup override.
   - edge and stable releases include `PgpMobile.arm64e-build-manifest.json`.
   - stable compliance assets embed the arm64e manifest and the relink kit covers
     both stable `arm64` and patched `arm64e` target archives.
@@ -143,7 +153,8 @@ Update this file whenever any of the following changes:
 
 - the local or remote experiment branch name
 - the ownership/worktree relationship with `/Users/tianren/coding/cypherair-main`
-- the `rust-toolchain.toml` arm64e toolchain pin
+- the explicit Rust stage1 toolchain contract, local linked toolchain name, or
+  remote stage1 prerelease consumption policy
 - the `pgp-mobile/Cargo.toml` `openssl-src` patch target, branch, or lockfile
   policy
 - the role of `openssl`, `openssl-src-rs`, or `rust-openssl` in the chain
