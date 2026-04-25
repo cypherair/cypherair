@@ -214,7 +214,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 
 ### GitHub Actions Note
 
-The repository workflows target `macos-26`, but GitHub-hosted runner images may temporarily lag the project's minimum deployment target. At the moment, hosted Swift CI can still fail before tests start because the runner image reports **macOS 26.3** while the project targets **macOS 26.4**. Local `xcodebuild test ... -destination 'platform=macOS'` remains the source of truth until the hosted image catches up or a self-hosted runner is used.
+The repository workflows target `macos-26`, but GitHub-hosted runner images may temporarily lag the project's minimum deployment target. At the moment, hosted Swift CI can still fail before tests start because the runner image reports **macOS 26.3** while the project targets **macOS 26.4**. This hosted Swift preview is intentionally blocking for release readiness, so the check may show a red X for the runner-image mismatch. Local `xcodebuild test ... -destination 'platform=macOS'` remains the source of truth until the hosted image catches up or a self-hosted runner is used.
 
 ## Agent Checklist
 

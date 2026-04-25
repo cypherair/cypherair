@@ -28,11 +28,13 @@ Snapshot date: 2026-04-24
   XCFramework slice metadata.
 - PR #222 run `24915498511` passed `rust-full-tests`, the formal
   `xcframework-package` build/probe path, and the hosted Swift preview job.
-  The hosted Swift preview remains observational because GitHub-hosted macOS can
-  lag the app's deployment target.
+  After the build-14 release-prep update, the hosted Swift preview is again a
+  blocking signal: if GitHub-hosted macOS lags the app's deployment target, the
+  PR check can show a red X until the runner image catches up or the workflow
+  moves to a self-hosted macOS runner.
 - Pre-merge release validation passed through edge drill run `24897042096` and
-  stable dry-run `24897042109`. After the merge, run the main-branch edge path
-  and stable dry-run again before removing the temporary migration checklist.
+  stable dry-run `24897042109`. Post-merge main validation also passed through
+  edge run `24916588574` and stable dry-run `24916629353`.
 
 ## Current Verified Chain
 
@@ -100,8 +102,10 @@ Snapshot date: 2026-04-24
     both stable `arm64` and patched `arm64e` target archives
   - App Store candidate validation requires the stable release to include a
     valid arm64e manifest before archiving is allowed
-  - hosted macOS Swift unit-test preview is warning-only/observational while
-    GitHub-hosted macOS can lag the app's deployment target
+  - hosted macOS Swift unit-test preview is blocking again for release
+    readiness, so a hosted runner image below the app deployment target will
+    fail visibly until GitHub updates the image or the workflow uses a
+    self-hosted macOS runner
 - `cypherair/openssl-src-rs`:
   - `arm64e-carry-chain.yml` checks that the OpenSSL submodule URL, branch, and
     pointer stay aligned with `cypherair/openssl:carry/apple-arm64e-targets`,
