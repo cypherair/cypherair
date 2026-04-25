@@ -117,15 +117,13 @@ There is currently no dedicated visionOS XCTest plan. Native visionOS validation
 
 ## 2.1 Current GitHub Actions Lanes
 
-The repository currently uses two validation tiers in GitHub Actions.
+The repository currently treats PR Checks as blocking release-readiness signal
+in GitHub Actions.
 
-**Blocking jobs** — must pass on pull requests and nightly validation:
+These jobs must pass on pull requests and nightly validation:
 
 - `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
 - `xcframework-package` checks the arm64e OpenSSL carry-chain freshness, runs `./build-xcframework.sh --release`, uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days, and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes
-
-**Observational jobs** — useful signal, but non-blocking while GitHub-hosted macOS remains below the project deployment target:
-
 - `swift-unit-tests-hosted-preview` downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests`
 
 The repository also publishes unique edge XCFramework prereleases:
@@ -153,7 +151,7 @@ Impact:
 
 - Rust CI remains valid.
 - The hosted Swift unit-test preview job can fail before test execution because the runner OS is older than the app/test deployment target.
-- The hosted Swift unit-test preview remains observational / non-blocking until GitHub's hosted image catches up or a self-hosted macOS runner is used.
+- The hosted Swift unit-test preview is intentionally blocking for release readiness, so this hosted image mismatch can show a red X until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 - Local macOS validation remains the source of truth until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 
 ## 2.3 Release Flows
