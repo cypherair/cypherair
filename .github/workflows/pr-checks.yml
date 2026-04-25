@@ -146,10 +146,9 @@ jobs:
           ditto -x -k "$XCFRAMEWORK_ZIP" .
       - name: Run hosted macOS unit-test preview
         run: |
-          # This is intentionally blocking again for release readiness.
-          # If GitHub-hosted macOS lags CypherAir's deployment target, this job
-          # will show a red X until the runner image catches up or the workflow
-          # moves to a self-hosted macOS runner.
+          # Run as a regular blocking PR check. If GitHub-hosted macOS lags the
+          # app deployment target, diagnose that from the xcodebuild error and
+          # local macOS validation.
           xcodebuild test \
             -scheme CypherAir \
             -project CypherAir.xcodeproj \

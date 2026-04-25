@@ -28,10 +28,6 @@ Snapshot date: 2026-04-24
   XCFramework slice metadata.
 - PR #222 run `24915498511` passed `rust-full-tests`, the formal
   `xcframework-package` build/probe path, and the hosted Swift preview job.
-  After the build-14 release-prep update, the hosted Swift preview is again a
-  blocking signal: if GitHub-hosted macOS lags the app's deployment target, the
-  PR check can show a red X until the runner image catches up or the workflow
-  moves to a self-hosted macOS runner.
 - Pre-merge release validation passed through edge drill run `24897042096` and
   stable dry-run `24897042109`. Post-merge main validation also passed through
   edge run `24916588574` and stable dry-run `24916629353`.
@@ -100,12 +96,13 @@ Snapshot date: 2026-04-24
   - edge and stable releases include `PgpMobile.arm64e-build-manifest.json`
   - stable compliance assets embed the arm64e manifest and the relink kit covers
     both stable `arm64` and patched `arm64e` target archives
+  - formal stable releases are tag-first: the stable tag must exist on the
+    intended `main` commit before the immutable GitHub release is published
   - App Store candidate validation requires the stable release to include a
     valid arm64e manifest before archiving is allowed
-  - hosted macOS Swift unit-test preview is blocking again for release
-    readiness, so a hosted runner image below the app deployment target will
-    fail visibly until GitHub updates the image or the workflow uses a
-    self-hosted macOS runner
+  - hosted macOS Swift unit-test preview runs as a regular blocking PR check;
+    diagnose hosted runner OS mismatches from the `xcodebuild` error and local
+    macOS validation
 - `cypherair/openssl-src-rs`:
   - `arm64e-carry-chain.yml` checks that the OpenSSL submodule URL, branch, and
     pointer stay aligned with `cypherair/openssl:carry/apple-arm64e-targets`,

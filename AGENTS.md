@@ -112,6 +112,13 @@ There is currently no dedicated visionOS XCTest test plan. Native visionOS valid
 
 For the full Rust artifact refresh, UniFFI/bindings sync, XCFramework linkage details, and Xcode validation workflow, see `docs/TESTING.md`.
 
+For formal stable releases and App Store candidate archives, read
+`docs/APP_RELEASE_PROCESS.md` before acting. Stable releases are tag-first:
+the `cypherair-vX.Y.Z-buildN` tag must exist on the intended `main` commit
+before the formal stable GitHub release is published, and the App Store
+candidate archive must be produced from a clean `main` checkout whose `HEAD`
+matches that remote stable tag commit.
+
 ## Non-Negotiable Constraints
 
 Never violate these:
@@ -214,7 +221,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 
 ### GitHub Actions Note
 
-The repository workflows target `macos-26`, but GitHub-hosted runner images may temporarily lag the project's minimum deployment target. At the moment, hosted Swift CI can still fail before tests start because the runner image reports **macOS 26.3** while the project targets **macOS 26.4**. This hosted Swift preview is intentionally blocking for release readiness, so the check may show a red X for the runner-image mismatch. Local `xcodebuild test ... -destination 'platform=macOS'` remains the source of truth until the hosted image catches up or a self-hosted runner is used.
+The repository workflows target `macos-26`, but GitHub-hosted runner images may temporarily lag the project's minimum deployment target. At the moment, hosted Swift CI can still fail before tests start because the runner image reports **macOS 26.3** while the project targets **macOS 26.4**. Local `xcodebuild test ... -destination 'platform=macOS'` remains the source of truth for that runner-image mismatch until the hosted image catches up or a self-hosted runner is used.
 
 ## Agent Checklist
 
@@ -238,6 +245,9 @@ After editing:
 - Before string replacement, verify match counts.
 - After revert operations, verify with `git diff`.
 - Build success is not enough; run tests.
+- Before any formal stable release or App Store candidate archive, follow
+  `docs/APP_RELEASE_PROCESS.md`. Do not rely on `workflow_dispatch` alone as a
+  substitute for creating the stable tag.
 - When merging pull requests for this repository, prefer a regular merge commit by default. Do not squash-merge or rebase-merge unless the user explicitly asks for it.
 - Conventional commit prefixes are preferred:
   `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
@@ -247,6 +257,8 @@ After editing:
 
 - `CLAUDE.md`
 - `docs/ARM64E_STATUS.md`
+- `docs/APP_RELEASE_PROCESS.md`
+- `docs/XCFRAMEWORK_RELEASES.md`
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY.md`
 - `docs/TESTING.md`
