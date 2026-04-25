@@ -46,9 +46,12 @@ canonical docs outrank this file.
   implementation lives in `scripts/build_apple_arm64e_xcframework.sh`.
 - Normal `arm64` slices build with the official Rust stable channel. `arm64e`
   slices build with nightly Cargo plus explicit `RUSTC=<stage1>/bin/rustc`.
-- Local full packaging may use a linked `stage1-arm64e-patch` toolchain when
-  available. GitHub release workflows force-download the attested
-  `cypherair/rust` `rust-arm64e-stage1-*` prerelease.
+- Local full packaging should force-download the attested `cypherair/rust`
+  `rust-arm64e-stage1-*` prerelease with
+  `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release`,
+  matching GitHub release workflows.
+  Linked local `stage1-arm64e-patch` toolchains are for deliberate Rust-fork
+  development and diagnostics.
 - `pgp-mobile/Cargo.toml` tracks `cypherair/openssl-src-rs` branch
   `carry/apple-arm64e-openssl-fork`; `pgp-mobile/Cargo.lock` records the
   resolved commit for repeatability.

@@ -42,12 +42,16 @@ Snapshot date: 2026-04-24
   - Rust integration branch:
     `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`
   - current Rust integration head: `02240c72a377`
-  - `stage1-arm64e-patch` is an optional local rustup-linked stage1 compiler,
-    rebuilt from that Rust branch with host `std`/`proc_macro` plus the arm64e
-    Darwin std payload
-  - local full packaging uses `ARM64E_RUSTC` or `ARM64E_STAGE1_DIR` when
-    supplied, then the locally linked `stage1-arm64e-patch` toolchain when
-    present, and otherwise downloads the Rust fork prerelease
+  - `stage1-arm64e-patch` is an optional local rustup-linked stage1 compiler
+    for Rust-fork development and diagnostics; it must include host
+    `std`/`proc_macro` plus the arm64e Darwin std payload to be usable for app
+    packaging
+  - local app-side full packaging should use
+    `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release`
+    so it consumes the same `cypherair/rust` stage1 prerelease path as GitHub
+    Actions instead of implicitly trusting local rustup-linked toolchain state
+  - `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, and `stage1-arm64e-patch` remain
+    supported only when deliberately testing a local compiler build
   - GitHub-hosted PR, nightly, edge, and stable release workflows force-download
     the Rust fork stage1 prerelease and record the resolved tag, commit, and
     checksums in `PgpMobile.arm64e-build-manifest.json`
