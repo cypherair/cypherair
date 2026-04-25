@@ -22,10 +22,9 @@ ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = ROOT / "pgp-mobile" / "Cargo.toml"
 RESOURCE_DIR = ROOT / "Sources" / "Resources" / "OpenSourceNotices"
 NOTICE_FILE = RESOURCE_DIR / "open_source_notices.json"
-APP_LICENSE_NOTICE_PATH = ROOT / "LICENSE"
 APP_LICENSE_TEXT_PATHS = [
-    ROOT / "LICENSES" / "GPL-3.0-or-later.txt",
-    ROOT / "LICENSES" / "MPL-2.0.txt",
+    ROOT / "LICENSE-GPL",
+    ROOT / "LICENSE-MPL",
 ]
 APP_REPOSITORY_URL = "https://github.com/cypherair/cypherair"
 REGISTRY_LICENSE_PATTERN = re.compile(r"(?i)^(license|copying|unlicense|copyright)([.-].+)?$")
@@ -336,9 +335,8 @@ def build_notice_manifest(packages: list[PackageRecord], license_sources: dict[s
             "isDirectDependency": False,
             "licenseSourceKind": "projectFile",
             "licenseSourceItems": [
-                "LICENSE",
-                "LICENSES/GPL-3.0-or-later.txt",
-                "LICENSES/MPL-2.0.txt",
+                "LICENSE-GPL",
+                "LICENSE-MPL",
             ],
         }
     ]

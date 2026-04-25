@@ -193,8 +193,21 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 
 ## License
 
-Unless otherwise noted, first-party CypherAir source code is licensed under **`GPL-3.0-or-later OR MPL-2.0`**.
+Unless otherwise noted, first-party CypherAir source code in this repository is
+made available under either of the following licenses, at your option:
+
+- GNU General Public License, version 3 or any later version
+- Mozilla Public License, version 2.0
+
+SPDX expression for first-party code: **`GPL-3.0-or-later OR MPL-2.0`**.
+
+Full license texts are provided in [LICENSE-GPL](LICENSE-GPL) and
+[LICENSE-MPL](LICENSE-MPL).
 
 The OpenPGP engine uses [Sequoia PGP](https://sequoia-pgp.org/) (`LGPL-2.0-or-later`).
+
+Third-party components remain under their own licenses. See the bundled notices
+and repository documentation for third-party license details and distribution
+compliance materials.
 
 Current stable app-build release ordering and exact source/compliance asset expectations are documented in [docs/APP_RELEASE_PROCESS.md](docs/APP_RELEASE_PROCESS.md) and [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md). The historical rollout record is preserved in [docs/archive/COMPLIANCE_REMEDIATION_PLAN.md](docs/archive/COMPLIANCE_REMEDIATION_PLAN.md).

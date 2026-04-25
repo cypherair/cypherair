@@ -42,9 +42,8 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
 
         let bundledLicense = try store.loadLicenseText(for: appNotice)
         XCTAssertEqual(appNotice.licenseFileResourceName, "CypherAir-DUAL-LICENSE.txt")
-        XCTAssertTrue(appNotice.licenseSourceItems.contains("LICENSE"))
-        XCTAssertTrue(appNotice.licenseSourceItems.contains("LICENSES/GPL-3.0-or-later.txt"))
-        XCTAssertTrue(appNotice.licenseSourceItems.contains("LICENSES/MPL-2.0.txt"))
+        XCTAssertTrue(appNotice.licenseSourceItems.contains("LICENSE-GPL"))
+        XCTAssertTrue(appNotice.licenseSourceItems.contains("LICENSE-MPL"))
         XCTAssertTrue(
             bundledLicense.contains("GNU GENERAL PUBLIC LICENSE")
                 || bundledLicense.contains("GNU General Public License")

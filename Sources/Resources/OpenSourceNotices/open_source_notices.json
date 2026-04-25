@@ -10,9 +10,8 @@
     "isDirectDependency": false,
     "licenseSourceKind": "projectFile",
     "licenseSourceItems": [
-      "LICENSE",
-      "LICENSES/GPL-3.0-or-later.txt",
-      "LICENSES/MPL-2.0.txt"
+      "LICENSE-GPL",
+      "LICENSE-MPL"
     ]
   },
   {

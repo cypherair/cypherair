@@ -1,4 +1,4 @@
-===== GPL-3.0-or-later.txt =====
+===== LICENSE-GPL =====
 
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
@@ -676,7 +676,7 @@ Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
 
 
-===== MPL-2.0.txt =====
+===== LICENSE-MPL =====
 
 Mozilla Public License Version 2.0
 ==================================
