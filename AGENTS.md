@@ -85,7 +85,8 @@ cargo +stable build --release --target aarch64-apple-visionos-sim --manifest-pat
 
 # Full Rust + UniFFI + packaged-artifact sync. This now packages Apple
 # device slices as arm64 + arm64e and writes PgpMobile.arm64e-build-manifest.json.
-./build-xcframework.sh --release
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
+    ./build-xcframework.sh --release
 
 # Rust tests
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
@@ -207,7 +208,7 @@ If the user asks to increment the build number, first read the current `CURRENT_
 - Add negative tests for failure paths, not only happy paths.
 - Secure Enclave / biometric tests must be guarded for real hardware availability.
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode uses for Swift/FFI tests.
-- If a Rust change can affect Swift-visible behavior, run `./build-xcframework.sh --release` before running `xcodebuild test`. The script consumes the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease on GitHub Actions, or a local `stage1-arm64e-patch` rustup-linked toolchain when available.
+- If a Rust change can affect Swift-visible behavior, run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` before running `xcodebuild test`. This matches GitHub Actions by consuming the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease instead of relying on local `stage1-arm64e-patch` state. Use `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, or a rustup-linked `stage1-arm64e-patch` only when deliberately testing a local Rust fork build.
 - See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
 - For route ownership, launch, tutorial-host, or macOS UI workflow changes, also run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted smoke subset.
 

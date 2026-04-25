@@ -52,7 +52,8 @@ cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile
 cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
 
 # Full Rust + UniFFI + packaged-artifact sync
-./build-xcframework.sh --release
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
+    ./build-xcframework.sh --release
 
 # Run Rust tests
 cargo test --manifest-path pgp-mobile/Cargo.toml
@@ -138,7 +139,7 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 - MIE: test on iPhone 17 or iPhone Air (A19/A19 Pro) with Hardware Memory Tagging diagnostics enabled.
 - Test plans: `CypherAir-UnitTests.xctestplan` (local macOS validation / simulator / CI), `CypherAir-DeviceTests.xctestplan` (physical device), `CypherAir-MacUITests.xctestplan` (targeted macOS UI smoke coverage for route, launch, settings, and tutorial flows).
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode uses for Swift/FFI tests.
-- If a Rust change can affect Swift-visible behavior, run `./build-xcframework.sh --release` before running `xcodebuild test`.
+- If a Rust change can affect Swift-visible behavior, run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` before running `xcodebuild test`. This matches GitHub Actions by consuming the latest `cypherair/rust` stage1 prerelease; use a local `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, or rustup-linked `stage1-arm64e-patch` only when deliberately testing a local Rust fork build.
 - See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
 - **GitHub Actions caveat:** the hosted `macos-26` runner image may still report macOS 26.3, which is older than the project's current 26.4 deployment target. When that happens, hosted Swift tests can fail before execution even though local macOS validation passes.
 - Full testing guide: @docs/TESTING.md
