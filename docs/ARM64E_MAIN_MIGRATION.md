@@ -24,11 +24,6 @@ canonical docs outrank this file.
   commit, `98e9e9fcdcc3760538b2b0e260a5daf52dc67c0e`.
 - 2026-04-24T23:29:08Z: Post-merge main worktree passed
   `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`.
-- 2026-04-24: Build 14 release-prep branch restored
-  `swift-unit-tests-hosted-preview` to blocking PR-check semantics after the
-  arm64e merge finished. Hosted macOS image lag can therefore show a red X
-  again until GitHub updates the runner image or the workflow uses a
-  self-hosted macOS runner.
 
 ## 1. Merge Facts
 
@@ -84,9 +79,7 @@ as complete:
 - PR #222 run `24915498511` passed `xcframework-package`, including
   `./build-xcframework.sh --release`, artifact upload, iOS probe, and visionOS
   probe.
-- PR #222 run `24915498511` passed the hosted Swift preview while it was
-  temporarily observational for the merge. The build-14 release-prep branch
-  restored that job to blocking semantics.
+- PR #222 run `24915498511` passed the hosted Swift preview.
 - Post-merge main worktree passed
   `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`.
 - Main post-merge `XCFramework Edge Release` run `24916588574` passed.
@@ -99,7 +92,11 @@ as complete:
     "cypherair-apple-arm64e-unified-experiment|Current purpose: this worktree|Update experiment-specific|remaining work is validating|needs validation prior to landing|prior to landing|experiment chain" \
     AGENTS.md docs scripts/experiments
   ```
-- First formal `Stable Build Release` with `create_release=true`
+- First formal `Stable Build Release`: create and push the
+  `cypherair-vX.Y.Z-buildN` stable tag on the intended `main` commit. The tag
+  push is the preferred formal publish trigger. A manual `workflow_dispatch`
+  publish with `create_release=true` also requires that stable tag to already
+  exist.
 - Download `PgpMobile.arm64e-build-manifest.json` from the generated release or dry-run artifact and confirm:
   - the Rust stage1 release tag and source commit are present
   - the OpenSSL carry-chain commits are present and fresh

@@ -11,12 +11,12 @@ on:
         required: true
         type: string
       source_ref:
-        description: Git ref to checkout for a dry run or manual publish
+        description: Git ref to checkout. For create_release=true, this should match the pushed stable tag commit.
         required: true
         default: main
         type: string
       create_release:
-        description: Create the immutable GitHub release instead of a dry run
+        description: Create the immutable GitHub release instead of a dry run. Requires the stable tag to already exist.
         required: true
         default: false
         type: boolean

@@ -151,7 +151,7 @@ Impact:
 
 - Rust CI remains valid.
 - The hosted Swift unit-test preview job can fail before test execution because the runner OS is older than the app/test deployment target.
-- The hosted Swift unit-test preview is intentionally blocking for release readiness, so this hosted image mismatch can show a red X until GitHub's hosted image catches up or a self-hosted macOS runner is used.
+- The hosted Swift unit-test preview runs as a regular blocking PR check. If it fails before tests start because of the runner OS, diagnose that as a hosted-image mismatch and confirm with local macOS validation.
 - Local macOS validation remains the source of truth until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 
 ## 2.3 Release Flows

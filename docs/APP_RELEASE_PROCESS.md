@@ -26,6 +26,11 @@ CypherAir's formal stable app-build release uses a unified GitHub release page.
 
 - Stable release tags use the format `cypherair-vX.Y.Z-buildN`.
 - Pushing a stable tag triggers the stable build release workflow; manual runs can dry-run the same contract without publishing the immutable release.
+- Formal publishing is tag-first. Create and push the stable tag on the
+  intended `main` commit; the tag push is the preferred trigger for the
+  immutable GitHub release. A manual `workflow_dispatch` run with
+  `create_release=true` still requires that stable tag to already exist because
+  the workflow publishes with `gh release create --verify-tag`.
 - The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
 - The stable workflow validates that the tag's marketing version and build number match `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` before assets are published.
 
@@ -120,6 +125,8 @@ This order is mandatory for App Store candidates:
 3. Commit and push the candidate commit to `main`.
 4. Create the stable tag:
    - `cypherair-vX.Y.Z-buildN`
+   - push the tag to `origin`; that tag push triggers the formal stable release
+     workflow
 5. Wait for the GitHub stable release workflow to complete successfully.
 6. Confirm the stable release page and required assets exist.
 7. Return to a clean `main` checkout whose `HEAD` exactly matches the stable tag commit.
