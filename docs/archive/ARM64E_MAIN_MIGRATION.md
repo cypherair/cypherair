@@ -1,16 +1,19 @@
 # Apple arm64e Main Migration Checklist
 
-> Status: Active migration checklist, temporary.
-> Purpose: Guide the documentation and release-infrastructure cleanup after merging the Apple `arm64e` integration branch into `main`.
-> Audience: Release owners, reviewers, and AI coding tools preparing or reviewing the `arm64e` mainline merge.
-> Source of truth: Current `main`, source branch `codex/apple-arm64e-unified-experiment`, the successful edge drill run `24897042096`, and the successful stable dry-run `24897042109`.
+> Status: Archived migration checklist, historical.
+> Purpose: Preserve the documentation and release-infrastructure cleanup record
+> after the Apple `arm64e` integration branch merged into `main`.
+> Audience: Release owners, reviewers, and AI coding tools researching the
+> completed `arm64e` mainline merge.
+> Source of truth: None. Current code, workflows, and canonical documentation
+> such as `docs/ARM64E_STATUS.md` outrank this archived file.
 > Last reviewed: 2026-04-24.
-> Update triggers: Any change to the planned `arm64e` merge scope, release workflow contract, Rust stage1 consumption path, OpenSSL carry chain, or post-merge documentation cleanup plan.
-> Removal trigger: Remove or archive this checklist after the `arm64e` integration lands on `main`, the main-branch edge drill and stable dry-run pass, and the permanent documentation is normalized.
+> Archived: 2026-04-26.
+> Update triggers: None, except archival note corrections.
 
-This is a temporary migration checklist. It does not replace the permanent
-current-state docs. After the merge, current code, workflows, and normalized
-canonical docs outrank this file.
+This was a temporary migration checklist. It does not replace the permanent
+current-state docs. Current code, workflows, and normalized canonical docs
+outrank this file.
 
 ## Migration Log
 

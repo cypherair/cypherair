@@ -23,7 +23,10 @@ This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding ag
 
 ## Related Forks
 
-- Rust fork: `/Users/tianren/coding/rust` (`cypherair/rust`, experiment branch `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`)
+- Rust fork: `/Users/tianren/coding/rust` (`cypherair/rust`, stage1 carry
+  branch `carry/cypherair-arm64e-toolchain`, integration branch
+  `integration/arm64e-upstream-prs`, upstream-prep branch
+  `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`)
 - OpenSSL glue fork: `/Users/tianren/coding/openssl-src-rs` (`cypherair/openssl-src-rs`, carry branch `carry/apple-arm64e-openssl-fork`; CypherAir tracks this branch in `pgp-mobile/Cargo.toml`)
 - OpenSSL target-definition fork: `/Users/tianren/coding/openssl` (`cypherair/openssl`, carry branch `carry/apple-arm64e-targets`, prep branch `prep/apple-arm64e-targets`)
 - Related but currently unconfirmed arm64e role: `/Users/tianren/coding/rust-openssl` (`cypherair/rust-openssl`)
@@ -31,9 +34,9 @@ This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding ag
 ## Documentation Scope
 
 - Update permanent documentation in the current `main` worktree.
-- Use [docs/ARM64E_MAIN_MIGRATION.md](docs/ARM64E_MAIN_MIGRATION.md) only as a
-  temporary checklist until post-merge edge and stable dry-run validation is
-  complete; normalized current-state docs outrank that checklist.
+- The post-merge `arm64e` migration checklist is archived at
+  [docs/archive/ARM64E_MAIN_MIGRATION.md](docs/archive/ARM64E_MAIN_MIGRATION.md);
+  current-state docs outrank archived material.
 
 ## Project Overview
 

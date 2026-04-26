@@ -1,6 +1,6 @@
 # CypherAir Apple arm64e Status
 
-Snapshot date: 2026-04-24
+Snapshot date: 2026-04-26
 
 ## Repo Identity
 
@@ -29,8 +29,13 @@ Snapshot date: 2026-04-24
 - PR #222 run `24915498511` passed `rust-full-tests`, the formal
   `xcframework-package` build/probe path, and the hosted Swift preview job.
 - Pre-merge release validation passed through edge drill run `24897042096` and
-  stable dry-run `24897042109`. Post-merge main validation also passed through
-  edge run `24916588574` and stable dry-run `24916629353`.
+  stable dry-run `24897042109`. Post-merge main validation passed through edge
+  run `24916588574` and stable dry-run `24916629353`.
+- Latest verified main edge release: run `24947988541`, release
+  `pgpmobile-edge-20260426T041453Z-af7fe03-r24947988541-a1`, commit
+  `af7fe033c5f4`.
+- Latest verified stable build release: run `24925168188`, release
+  `cypherair-v1.3.1-build3`, commit `2e99c7e9cd30`.
 
 ## Current Verified Chain
 
@@ -39,9 +44,13 @@ Snapshot date: 2026-04-24
     ordinary local development and CI validation use explicit Rust official
     stable commands such as `cargo +stable`
   - local Rust fork path: `/Users/tianren/coding/rust`
-  - Rust integration branch:
-    `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`
-  - current Rust integration head: `02240c72a377`
+  - Rust stage1 carry branch: `carry/cypherair-arm64e-toolchain`
+  - current Rust stage1 carry head: `ea0b2a66c4cc`
+  - Rust upstream-prep branch:
+    `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`
+  - current Rust upstream-prep head: `77e2e3639785`
+  - Rust downstream integration branch: `integration/arm64e-upstream-prs`
+  - current Rust downstream integration head: `a9d110acd4fc`
   - `stage1-arm64e-patch` is an optional local rustup-linked stage1 compiler
     for Rust-fork development and diagnostics; it must include host
     `std`/`proc_macro` plus the arm64e Darwin std payload to be usable for app
@@ -58,8 +67,12 @@ Snapshot date: 2026-04-24
   - arm64e builds call the patched compiler through explicit `RUSTC` while
     using nightly Cargo as the driver for `-Zbuild-std`
   - latest verified stage1 prerelease:
-    `rust-arm64e-stage1-20260424T150813Z-02240c7-r24895825853-a1`; its manifest
-    declares `includedRustSrc: true` so GitHub-hosted app builds can run
+    `rust-arm64e-stage1-20260425T235339Z-ea0b2a6-r24943370755-a1`
+  - latest verified stage1 source ref: `carry/cypherair-arm64e-toolchain`
+  - latest verified stage1 source commit: `ea0b2a66c4cc`
+  - latest verified stage1 workflow run: `24943370755`
+  - latest verified stage1 manifest declares `includedRustSrc: true` and
+    includes host `std`/`proc_macro`, so GitHub-hosted app builds can run
     `cargo -Zbuild-std` without relying on a runner-local Rust source tree
 - XCFramework packaging posture:
   - iOS/macOS/visionOS device artifacts are merged from stable `arm64` and
@@ -86,10 +99,10 @@ Snapshot date: 2026-04-24
 ## Automation Posture
 
 - `cypherair/rust`:
-  - `arm64e-stage1-prerelease.yml` validates the integration branch, builds the
-    patched stage1 compiler, host `std`/`proc_macro`, and
-    `arm64e-apple-darwin` std, smoke-tests the packaged toolchain, and publishes
-    a prerelease asset for app CI
+  - `arm64e-stage1-prerelease.yml` validates the stage1 carry branch, builds
+    the patched stage1 compiler, host `std`/`proc_macro`, and arm64e Apple std
+    payloads, smoke-tests the packaged toolchain, and publishes a prerelease
+    asset for app CI
   - `arm64e-upstream-sync-prep.yml` performs manual upstream-sync dry-runs and
     can open a refresh PR without force-pushing the integration branch
 - `cypherair/cypherair`:
@@ -119,8 +132,10 @@ Snapshot date: 2026-04-24
 - Rust fork:
   - `/Users/tianren/coding/rust`
   - remote `cypherair/rust`
-  - integration branch:
-    `codex/arm64e-upstream-ready-integration-2026-04-24-u9836b06`
+  - stage1 carry branch: `carry/cypherair-arm64e-toolchain`
+  - downstream integration branch: `integration/arm64e-upstream-prs`
+  - upstream-prep branch:
+    `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`
 - OpenSSL fork:
   - `/Users/tianren/coding/openssl`
   - remote `cypherair/openssl`
