@@ -15,6 +15,7 @@ final class AppContainer: @unchecked Sendable {
     let protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator
     let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     let protectedSettingsStore: ProtectedSettingsStore
+    let protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator
     let appSessionOrchestrator: AppSessionOrchestrator
     let engine: PgpEngine
     let keyManagement: KeyManagementService
@@ -44,6 +45,7 @@ final class AppContainer: @unchecked Sendable {
         protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         protectedSettingsStore: ProtectedSettingsStore,
+        protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator = .noOp,
         appSessionOrchestrator: AppSessionOrchestrator,
         engine: PgpEngine,
         keyManagement: KeyManagementService,
@@ -72,6 +74,7 @@ final class AppContainer: @unchecked Sendable {
         self.protectedDomainRecoveryCoordinator = protectedDomainRecoveryCoordinator
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.protectedSettingsStore = protectedSettingsStore
+        self.protectedDataPostUnlockCoordinator = protectedDataPostUnlockCoordinator
         self.appSessionOrchestrator = appSessionOrchestrator
         self.engine = engine
         self.keyManagement = keyManagement
@@ -141,6 +144,23 @@ final class AppContainer: @unchecked Sendable {
             domainKeyManager: protectedDomainKeyManager
         )
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
+        let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
+            currentRegistryProvider: {
+                try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
+            },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            domainOpeners: [
+                ProtectedDataPostUnlockDomainOpener(
+                    domainID: ProtectedSettingsStore.domainID,
+                    open: { wrappingRootKey in
+                        _ = try await protectedSettingsStore.openDomainIfNeeded(
+                            wrappingRootKey: wrappingRootKey
+                        )
+                    }
+                )
+            ],
+            traceStore: authLifecycleTraceStore
+        )
         let engine = PgpEngine()
         let keyManagement = KeyManagementService(
             engine: engine,
@@ -167,6 +187,14 @@ final class AppContainer: @unchecked Sendable {
             postAuthenticationHandler: { authenticationContext, source in
                 await keyManagement.migrateLegacyMetadataAfterAppAuthentication(
                     authenticationContext: authenticationContext,
+                    source: source
+                )
+                _ = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
+                    authenticationContext: authenticationContext,
+                    localizedReason: String(
+                        localized: "protectedData.postUnlock.reason",
+                        defaultValue: "Authenticate to unlock protected app data."
+                    ),
                     source: source
                 )
             },
@@ -234,6 +262,7 @@ final class AppContainer: @unchecked Sendable {
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             protectedSettingsStore: protectedSettingsStore,
+            protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,
@@ -327,6 +356,23 @@ final class AppContainer: @unchecked Sendable {
             domainKeyManager: protectedDomainKeyManager
         )
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
+        let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
+            currentRegistryProvider: {
+                try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
+            },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            domainOpeners: [
+                ProtectedDataPostUnlockDomainOpener(
+                    domainID: ProtectedSettingsStore.domainID,
+                    open: { wrappingRootKey in
+                        _ = try await protectedSettingsStore.openDomainIfNeeded(
+                            wrappingRootKey: wrappingRootKey
+                        )
+                    }
+                )
+            ],
+            traceStore: authLifecycleTraceStore
+        )
         let keyManagement = KeyManagementService(
             engine: engine,
             secureEnclave: secureEnclave,
@@ -352,6 +398,14 @@ final class AppContainer: @unchecked Sendable {
             postAuthenticationHandler: { authenticationContext, source in
                 await keyManagement.migrateLegacyMetadataAfterAppAuthentication(
                     authenticationContext: authenticationContext,
+                    source: source
+                )
+                _ = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
+                    authenticationContext: authenticationContext,
+                    localizedReason: String(
+                        localized: "protectedData.postUnlock.reason",
+                        defaultValue: "Authenticate to unlock protected app data."
+                    ),
                     source: source
                 )
             },
@@ -424,6 +478,7 @@ final class AppContainer: @unchecked Sendable {
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             protectedSettingsStore: protectedSettingsStore,
+            protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,

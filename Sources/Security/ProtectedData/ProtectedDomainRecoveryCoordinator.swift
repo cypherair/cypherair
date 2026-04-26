@@ -1,5 +1,13 @@
 import Foundation
+import LocalAuthentication
 import Security
+
+protocol ProtectedDomainRecoveryHandler: AnyObject, Sendable {
+    var protectedDataDomainID: ProtectedDataDomainID { get }
+
+    func continuePendingCreate(phase: CreateDomainPhase) async throws
+    func deleteDomainArtifactsForRecovery() throws
+}
 
 struct ProtectedDomainRecoveryCoordinator {
     private let registryStore: ProtectedDataRegistryStore
@@ -16,42 +24,215 @@ struct ProtectedDomainRecoveryCoordinator {
         try registryStore.loadRegistry()
     }
 
-    func recoverPendingSettingsMutation(
-        settingsStore: ProtectedSettingsStore,
+    func recoverPendingMutation(
+        handler: any ProtectedDomainRecoveryHandler,
         removeSharedRight: @escaping @Sendable (String) async throws -> Void
     ) async throws -> PendingRecoveryOutcome {
         let registry = try registryStore.loadRegistry()
         guard case let pendingMutation? = registry.pendingMutation,
-                pendingMutation.targetDomainID == ProtectedSettingsStore.domainID else {
+                pendingMutation.targetDomainID == handler.protectedDataDomainID else {
             return .frameworkRecoveryNeeded
         }
+        let sharedRightIdentifier = registry.sharedRightIdentifier
 
         return try await registryStore.recoverPendingMutation(
-            targetDomainID: ProtectedSettingsStore.domainID,
+            targetDomainID: handler.protectedDataDomainID,
             continueReadyCreate: { phase in
-                if phase == .membershipCommitted {
-                    return
-                }
-
-                // Accepted limitation: first-domain pending create stays reset-only
-                // and future ready-row create continuation is intentionally deferred
-                // until the framework grows a generic, domain-aware continuation path.
-                throw ProtectedDataError.invalidRegistry(
-                    "Ready-row pending create continuation is not implemented for ProtectedSettings."
-                )
+                try await handler.continuePendingCreate(phase: phase)
             },
             continueDelete: { _ in
                 _ = try await registryStore.completePendingDelete(
-                    domainID: ProtectedSettingsStore.domainID,
+                    domainID: handler.protectedDataDomainID,
                     deleteArtifacts: {
-                        try settingsStore.deleteDomainArtifactsForRecovery()
+                        try handler.deleteDomainArtifactsForRecovery()
                     },
                     cleanupSharedResourceIfNeeded: {
-                        try await removeSharedRight(registry.sharedRightIdentifier)
+                        try await removeSharedRight(sharedRightIdentifier)
                     }
                 )
             }
         )
+    }
+}
+
+struct ProtectedDataPostUnlockDomainOpener: Sendable {
+    let domainID: ProtectedDataDomainID
+    private let open: @Sendable (Data) async throws -> Void
+
+    init(
+        domainID: ProtectedDataDomainID,
+        open: @escaping @Sendable (Data) async throws -> Void
+    ) {
+        self.domainID = domainID
+        self.open = open
+    }
+
+    func openDomain(wrappingRootKey: Data) async throws {
+        try await open(wrappingRootKey)
+    }
+}
+
+enum ProtectedDataPostUnlockOutcome: Equatable, Sendable {
+    case opened([ProtectedDataDomainID])
+    case noAuthenticatedContext
+    case noRegisteredOpeners
+    case noProtectedDomainPresent
+    case noRegisteredDomainPresent
+    case pendingMutationRecoveryRequired
+    case frameworkRecoveryNeeded
+    case authorizationDenied
+    case domainOpenFailed(ProtectedDataDomainID)
+}
+
+struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
+    static let noOp = ProtectedDataPostUnlockCoordinator()
+
+    private let currentRegistryProvider: () throws -> ProtectedDataRegistry
+    private let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator?
+    private let domainOpeners: [ProtectedDataPostUnlockDomainOpener]
+    private let traceStore: AuthLifecycleTraceStore?
+
+    init(
+        currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry = {
+            throw ProtectedDataError.authorizingUnavailable
+        },
+        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator? = nil,
+        domainOpeners: [ProtectedDataPostUnlockDomainOpener] = [],
+        traceStore: AuthLifecycleTraceStore? = nil
+    ) {
+        self.currentRegistryProvider = currentRegistryProvider
+        self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
+        self.domainOpeners = domainOpeners
+        self.traceStore = traceStore
+    }
+
+    func openRegisteredDomains(
+        authenticationContext: LAContext?,
+        localizedReason: String,
+        source: String
+    ) async -> ProtectedDataPostUnlockOutcome {
+        guard !domainOpeners.isEmpty else {
+            return finish(.noRegisteredOpeners, source: source)
+        }
+        guard let authenticationContext else {
+            return finish(.noAuthenticatedContext, source: source)
+        }
+        guard let protectedDataSessionCoordinator else {
+            return finish(.frameworkRecoveryNeeded, source: source)
+        }
+
+        let registry: ProtectedDataRegistry
+        do {
+            registry = try currentRegistryProvider()
+        } catch {
+            return finish(.frameworkRecoveryNeeded, source: source, error: error)
+        }
+
+        switch registry.classifyRecoveryDisposition() {
+        case .frameworkRecoveryNeeded:
+            return finish(.frameworkRecoveryNeeded, source: source)
+        case .continuePendingMutation:
+            return finish(.pendingMutationRecoveryRequired, source: source)
+        case .resumeSteadyState:
+            break
+        }
+
+        guard !registry.committedMembership.isEmpty,
+              registry.sharedResourceLifecycleState == .ready else {
+            return finish(.noProtectedDomainPresent, source: source)
+        }
+
+        let committedOpeners = domainOpeners.filter {
+            registry.committedMembership[$0.domainID] != nil
+        }
+        guard !committedOpeners.isEmpty else {
+            return finish(.noRegisteredDomainPresent, source: source)
+        }
+
+        if protectedDataSessionCoordinator.frameworkState != .sessionAuthorized {
+            let authorizationResult = await protectedDataSessionCoordinator.beginProtectedDataAuthorization(
+                registry: registry,
+                localizedReason: localizedReason,
+                authenticationContext: authenticationContext,
+                allowLegacyMigration: false
+            )
+            switch authorizationResult {
+            case .authorized:
+                break
+            case .cancelledOrDenied:
+                return finish(.authorizationDenied, source: source)
+            case .frameworkRecoveryNeeded:
+                return finish(.frameworkRecoveryNeeded, source: source)
+            }
+        }
+
+        do {
+            var wrappingRootKey = try protectedDataSessionCoordinator.wrappingRootKeyData()
+            defer {
+                wrappingRootKey.protectedDataZeroize()
+            }
+
+            var openedDomainIDs: [ProtectedDataDomainID] = []
+            for opener in committedOpeners {
+                do {
+                    try await opener.openDomain(wrappingRootKey: wrappingRootKey)
+                    openedDomainIDs.append(opener.domainID)
+                } catch {
+                    return finish(
+                        .domainOpenFailed(opener.domainID),
+                        source: source,
+                        error: error
+                    )
+                }
+            }
+
+            return finish(.opened(openedDomainIDs), source: source)
+        } catch {
+            return finish(.frameworkRecoveryNeeded, source: source, error: error)
+        }
+    }
+
+    private func finish(
+        _ outcome: ProtectedDataPostUnlockOutcome,
+        source: String,
+        error: Error? = nil
+    ) -> ProtectedDataPostUnlockOutcome {
+        var metadata = [
+            "outcome": traceValue(for: outcome),
+            "source": source
+        ]
+        if let error {
+            metadata.merge(AuthTraceMetadata.errorMetadata(error), uniquingKeysWith: { _, new in new })
+        }
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.postUnlock.openDomains",
+            metadata: metadata
+        )
+        return outcome
+    }
+
+    private func traceValue(for outcome: ProtectedDataPostUnlockOutcome) -> String {
+        switch outcome {
+        case .opened(let domainIDs):
+            "opened:\(domainIDs.map(\.rawValue).joined(separator: ","))"
+        case .noAuthenticatedContext:
+            "noAuthenticatedContext"
+        case .noRegisteredOpeners:
+            "noRegisteredOpeners"
+        case .noProtectedDomainPresent:
+            "noProtectedDomainPresent"
+        case .noRegisteredDomainPresent:
+            "noRegisteredDomainPresent"
+        case .pendingMutationRecoveryRequired:
+            "pendingMutationRecoveryRequired"
+        case .frameworkRecoveryNeeded:
+            "frameworkRecoveryNeeded"
+        case .authorizationDenied:
+            "authorizationDenied"
+        case .domainOpenFailed(let domainID):
+            "domainOpenFailed:\(domainID.rawValue)"
+        }
     }
 }
 
@@ -482,6 +663,16 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         try deleteDomainArtifacts()
     }
 
+    func continuePendingCreate(phase: CreateDomainPhase) async throws {
+        if phase == .membershipCommitted {
+            return
+        }
+
+        throw ProtectedDataError.invalidRegistry(
+            "Ready-row pending create continuation is not implemented for ProtectedSettings."
+        )
+    }
+
     private func clearUnlockedState() {
         payload = nil
         unlockedGenerationIdentifier = nil
@@ -524,5 +715,11 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         }
 
         return data
+    }
+}
+
+extension ProtectedSettingsStore: ProtectedDomainRecoveryHandler {
+    var protectedDataDomainID: ProtectedDataDomainID {
+        Self.domainID
     }
 }

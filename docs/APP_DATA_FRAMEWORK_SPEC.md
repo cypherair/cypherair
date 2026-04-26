@@ -453,6 +453,8 @@ Expected initial integration points:
 - `AppContainer` for wiring the new services
 - `AppStartupCoordinator` for protected-domain startup recovery
 - app lock / resume flow through `AppSessionOrchestrator`
+- `ProtectedDataPostUnlockCoordinator` for opening registered committed domains after app privacy authentication
+- `ProtectedDomainRecoveryCoordinator` plus domain-specific handlers for pending mutation continuation and cleanup
 - future Contacts domain owner
 
 This still implies explicit startup-ordering work when a real protected domain is introduced. It is a narrow code ownership boundary, not a promise of zero initialization-flow changes.

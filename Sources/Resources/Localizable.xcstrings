@@ -8465,6 +8465,22 @@
         }
       }
     },
+    "protectedData.postUnlock.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to unlock protected app data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请验证身份以解锁受保护的应用数据。"
+          }
+        }
+      }
+    },
     "protectedSettings.unlock" : {
       "localizations" : {
         "en" : {

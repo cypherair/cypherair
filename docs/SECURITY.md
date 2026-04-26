@@ -121,6 +121,13 @@ v2 migration succeeds, registry state plus
 a ThisDeviceOnly Keychain `format-floor` marker must make later v1 raw
 root-secret payloads fail closed as downgrade/corruption.
 
+ProtectedData domain payloads must open only after the app privacy gate has
+produced an authenticated `LAContext` or an already-authorized ProtectedData
+session. The post-unlock domain coordinator may reuse that context for
+registered committed domains, but it must skip pending-mutation, missing
+context, and no-domain states without fetching the root secret or starting a
+second interactive prompt.
+
 ### Wrapping (on key generation or import)
 
 1. Generate `SecureEnclave.P256.KeyAgreement.PrivateKey()` with access control flags matching the current auth mode.

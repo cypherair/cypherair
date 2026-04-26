@@ -243,6 +243,8 @@ Current Phase 1 implementation status:
 - `AppSessionOrchestrator` owns grace-window timing, content-clear generation, and privacy-auth sequencing
 - `ProtectedSettingsStore` is the first protected-domain adopter, and settings refresh can auto-open it by consuming the current app-session `LAContext` handoff without presenting a second prompt
 - `continuePendingMutation` is now preserved as a distinct bootstrap outcome instead of being folded into steady state
+- `ProtectedDomainRecoveryCoordinator` now dispatches pending-mutation recovery through a domain handler, with `ProtectedSettingsStore` as the first registered handler
+- `ProtectedDataPostUnlockCoordinator` now runs after app privacy authentication and opens registered committed domains, currently `protected-settings`, by reusing the authenticated `LAContext`
 - shared root-secret usability is a post-bootstrap framework-gate concern, not a synchronous `init()` concern
 
 ## 4. Persisted-State Classification Inventory
@@ -339,7 +341,7 @@ Key metadata is also not a permanent private-key-material exception. The dedicat
 The inventory should advance in phases:
 
 - Phase A: maintain the complete inventory and explicit exception classes
-- Phase B: establish post-unlock domain orchestration so app privacy authentication can automatically open required protected domains without extra Face ID prompts
+- Phase B: extend the established post-unlock domain orchestration so app privacy authentication can automatically open additional required protected domains without extra Face ID prompts
 - Phase C: create the `private-key-control` domain, migrate `authMode` and the private-key `recoveryJournal`, and move rewrap / modify-expiry recovery detection out of pre-auth startup
 - Phase D: create the `key metadata` domain, migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account, and avoid empty-key-list flashes during unlock
 - Phase E: migrate ordinary protected-after-unlock settings, contacts, and self-test policy once their synchronous read paths have been removed or replaced

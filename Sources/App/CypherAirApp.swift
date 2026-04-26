@@ -194,8 +194,8 @@ struct CypherAirApp: App {
                 )
             },
             recoverPendingMutation: {
-                let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingSettingsMutation(
-                    settingsStore: container.protectedSettingsStore,
+                let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingMutation(
+                    handler: container.protectedSettingsStore,
                     removeSharedRight: { identifier in
                         try await container.protectedDataSessionCoordinator.removePersistedSharedRight(
                             identifier: identifier
