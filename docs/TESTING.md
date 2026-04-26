@@ -35,7 +35,7 @@ are not part of the standard GitHub workflows.
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
-**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, and fail-closed unsupported-volume handling. Uses protocol-based mocks for Keychain and SE.
+**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, key-metadata cold-load/migration, and protected-settings handoff-only auto-open behavior. Uses protocol-based mocks for Keychain and SE.
 
 ```bash
 # Practical local path used in this repository
@@ -59,7 +59,7 @@ These tests exist in the Swift test target but call through the UniFFI bindings 
 ### Layer 4: Device-Only Tests
 
 **Run on:** Physical iOS device only. Cannot run in simulator.
-**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and LocalAuthentication protected-data right behavior through `LARightStore` / `LAPersistedRight`.
+**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and protected-data root-secret Keychain behavior through authenticated `LAContext` handoff.
 
 ```bash
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
@@ -85,7 +85,7 @@ The workspace currently includes three Xcode Test Plans:
 
 Build-input audit tests such as `LocalizationCatalogTests` and the source-audit assertions in `TutorialSessionStoreTests` read a build-time `RepositoryAudit` snapshot bundled into `CypherAirTests.xctest`. This keeps the same static-audit semantics across macOS, iOS Simulator, and physical-device `CypherAir-UnitTests` runs.
 
-**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data right-store validation.
+**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data root-secret handoff validation.
 
 ProtectedData device-test isolation rules:
 
@@ -96,10 +96,13 @@ ProtectedData device-test isolation rules:
 
 ProtectedData Phase 1 unit-test expectations:
 
-- verify that pre-auth bootstrap never touches `LARightStore`
+- verify that pre-auth bootstrap never touches the root-secret store or legacy right-store adapter
+- verify that pre-auth key-metadata loading queries only the dedicated metadata account and does not touch private-key Keychain rows
 - verify that bootstrap can return framework recovery without a trusted registry object
 - verify that `.continuePendingMutation` is preserved as an explicit bootstrap outcome
 - verify that the access gate distinguishes authorization-required, already-authorized, pending-mutation-recovery, framework-recovery, and no-protected-domain states
+- verify that protected-settings refresh auto-opens with a valid handoff context and stays locked without starting interactive authorization when the handoff is absent or disappears
+- verify that Reset All Local Data deletes default-account and metadata-account CypherAir Keychain items, treats missing items as success, clears in-memory state, and validates a clean empty ProtectedData state
 
 ProtectedData Phase 2 file-protection expectations:
 
@@ -107,6 +110,7 @@ ProtectedData Phase 2 file-protection expectations:
 - verify that registry, bootstrap metadata, staged wrapped-DMK files, and committed wrapped-DMK files read back with explicit `NSFileProtectionComplete`
 - verify that protected-file promotion preserves explicit file protection on the committed path
 - verify that macOS ProtectedData bootstrap fails closed when the storage root is outside `Application Support` or when the volume-capability probe reports that file protection is unavailable
+- verify that fresh-install/reset validation uses the nearest existing parent for volume capability probing when `ProtectedData` does not yet exist, without creating the root during validation
 - keep lock-state readability semantics as manual/device validation; do not treat repository automation as proof of locked-device behavior
 
 **CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`.

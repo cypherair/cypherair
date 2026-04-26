@@ -327,6 +327,7 @@ Owns:
   - trusted empty steady-state registry
   - trusted loaded registry plus recovery disposition
   - framework-recovery with no trusted registry
+- fresh-install/reset storage-contract validation that treats a missing `ProtectedData` root as clean only when no protected-data artifacts remain
 
 ### `ProtectedDomainBootstrapStore.swift`
 
@@ -405,6 +406,8 @@ Phase 1 implementation note:
 - `CypherAirApp.init()` performs only synchronous pre-auth bootstrap through `AppStartupCoordinator`
 - the bootstrap may create an empty steady-state registry
 - no root-secret Keychain retrieval, legacy `LARightStore`, or legacy `LASecret` call is permitted from that path
+- if the `ProtectedData` root or base directory does not yet exist, storage capability checks use the nearest existing parent directory; ordinary validation must not create the root just to probe the volume
+- actual root and registry creation remains part of bootstrap/write execution and must apply and verify explicit `complete` file protection
 
 ### `ProtectedSettingsStore.swift`
 

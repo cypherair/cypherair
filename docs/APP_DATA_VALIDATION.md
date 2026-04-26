@@ -31,6 +31,7 @@ This document is a downstream review aid. It does not change the architecture or
 - shared-resource lifecycle state never doubles as mutation execution phase
 - `cleanupPending` appears only when committed membership is empty
 - directory enumeration never drives normal root-secret deletion
+- fresh-install/reset validation treats a missing `ProtectedData` root as clean only when no protected-data artifacts remain and the storage contract passes
 - a committed domain in domain-scoped `recoveryNeeded` still counts as a member
 - orphaned directories or wrapped-DMK artifacts do not implicitly become committed members
 
@@ -38,6 +39,7 @@ This document is a downstream review aid. It does not change the architecture or
 
 - one shared Keychain-protected root-secret record is the single normative app-data authorization boundary
 - root-secret retrieval uses `kSecUseAuthenticationContext` with an authenticated `LAContext`
+- handoff-only protected-settings auto-open must fail locked without displaying a second prompt if the authenticated `LAContext` is no longer available at consumption time
 - launch/resume authentication and root-secret retrieval use the dedicated `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`
 - the raw root secret is fetched only after app-session authentication succeeds
 - if launch/resume immediately enters a route that needs protected-domain content, that same orchestrated flow may activate the shared app-data session without surfacing a later second prompt
@@ -87,6 +89,7 @@ This document is a downstream review aid. It does not change the architecture or
 
 - wrong auth does not unlock the shared app-data session
 - pre-auth attempts must not fetch the root-secret Keychain item
+- pre-auth key-metadata loading must use only the dedicated non-sensitive metadata account and must not enumerate private-key Keychain rows
 - an unauthenticated `LAContext` does not release the root secret
 - an interaction-disallowed context that is not already authenticated fails without displaying a second prompt and does not release the root secret
 - invariant violation or unclassifiable registry row enters `frameworkRecoveryNeeded`
@@ -108,6 +111,7 @@ This draft proposal must map its validation buckets onto the repository's existi
 - registry authority, state-machine, consistency-matrix, and invariant checks belong to Swift unit coverage in `CypherAir-UnitTests` using `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 - startup recovery, relock orchestration, and route-handoff integration belong to macOS-local validation using `CypherAir-UnitTests`, with `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` added whenever launch, routing, or protected-content smoke coverage is part of the change
 - unit coverage must verify that pre-auth bootstrap never touches the root-secret store or any root-secret retrieval adapter
+- unit coverage must verify that metadata cold-load uses only the dedicated metadata account, and that authenticated legacy metadata migration is retried after app-session unlock without introducing a new prompt
 - Keychain root-secret behavior, `kSecUseAuthenticationContext`, real LocalAuthentication prompt semantics, and device-only authorization guarantees belong to `CypherAir-DeviceTests` using `xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests -destination 'platform=iOS,name=<DEVICE_NAME>'`, plus explicit manual device validation whenever automation cannot prove platform prompt timing or system UX behavior
 - device coverage should verify that one authenticated `LAContext` can unlock the root-secret Keychain record without a second prompt
 - device tests for root-secret storage must use test-only service/account identifiers of the form `com.cypherair.tests.protected-data.<TestCase>.<UUID>`
@@ -115,7 +119,8 @@ This draft proposal must map its validation buckets onto the repository's existi
 - device tests must perform per-identifier cleanup before and after each test
 - legacy `LAPersistedRight` / `LASecret` device coverage belongs only to migration tests if legacy state has already shipped or been provisioned locally
 - bootstrap outcome and access-gate coverage belong to Swift unit tests, including explicit assertions that `continuePendingMutation` is preserved and that post-bootstrap validation can distinguish authorization-required vs already-authorized vs framework-recovery paths
-- file-protection strength, container containment, fail-closed capability checks, and absence of fallback to broader storage locations belong to Swift unit coverage plus platform-targeted macOS-local verification, with manual verification retained for lock-state semantics that repository automation cannot prove
+- file-protection strength, container containment, fail-closed capability checks, empty-root parent probing, and absence of fallback to broader storage locations belong to Swift unit coverage plus platform-targeted macOS-local verification, with manual verification retained for lock-state semantics that repository automation cannot prove
+- Reset All Local Data coverage must prove default-account and metadata-account CypherAir Keychain deletion, missing-item success semantics, in-memory state clearing, and clean empty ProtectedData postconditions
 - migration survivability, startup adoption, and no-silent-reset guarantees belong to Swift unit coverage in `CypherAir-UnitTests` plus targeted macOS-local integration validation, adding the `CypherAir-MacUITests` macOS smoke path when startup routing or user-visible recovery flows are part of the scenario
 
 ## 3. Implementation Readiness Expectations

@@ -43,9 +43,10 @@ Generate (Profile A: Ed25519+X25519 v4 / Profile B: Ed448+X448 v6)
     │
     ├──→ SE Wrap (P-256 self-ECDH + HKDF + AES-GCM)
     │       │
-    │       └──→ Store in Keychain (3 items per identity + 1 metadata item)
+    │       └──→ Store private-key material in Keychain (3 protected items per identity)
     │
-    ├──→ Store PGPKeyIdentity metadata in Keychain (no SE auth, for cold-launch enumeration)
+    ├──→ Store PGPKeyIdentity metadata in dedicated Keychain metadata account
+    │       └──→ No SE auth; used for cold-launch enumeration only
     │
     ├──→ Auto-generate revocation certificate
     │       └──→ Prompt user to export separately
@@ -71,8 +72,11 @@ Revocation:
 
 Deletion:
     Double-confirm → Delete SE key from Keychain → Delete salt + sealed box
+    → Delete dedicated metadata entry
     → Key permanently inaccessible
 ```
+
+**Metadata storage note:** `PGPKeyIdentity` metadata is non-sensitive indexing data. It is stored under a dedicated Keychain account (`KeychainConstants.metadataAccount`) so cold launch can enumerate keys without touching private-key material or protected Keychain rows. Older metadata items that were stored under the default account are migrated only after app-session authentication succeeds, using the authenticated `LAContext` handoff; private-key blobs, salts, and sealed boxes remain in the protected private-key namespace.
 
 **Revocation storage/export note:** CypherAir stores revocation signatures internally as binary OpenPGP signature packets. Export converts those bytes to ASCII armor on demand. Imported keys now receive key-level revocation export capability as part of import. Older imported keys that predate this support lazily backfill the binary revocation at export time, then immediately zeroize the temporarily unwrapped secret certificate bytes after use.
 
