@@ -68,6 +68,11 @@ final class ContactService {
         }
     }
 
+    func resetInMemoryStateAfterLocalDataReset() {
+        contacts = []
+        verificationStates = [:]
+    }
+
     // MARK: - Add Contact
 
     /// Import a public key and add it as a contact.

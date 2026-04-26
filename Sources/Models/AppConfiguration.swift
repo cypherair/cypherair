@@ -181,6 +181,23 @@ final class AppConfiguration {
         guidedTutorialCompletedVersion = GuidedTutorialVersion.current
     }
 
+    func resetToFirstRunDefaults() {
+        authMode = .standard
+        appSessionAuthenticationPolicy = .userPresence
+        gracePeriod = AuthPreferences.defaultGracePeriod
+        encryptToSelf = true
+        requireAuthOnLaunch = true
+        hasCompletedOnboarding = false
+        guidedTutorialCompletedVersion = 0
+        colorTheme = .systemDefault
+        contentClearGeneration += 1
+        lastAuthenticationDate = nil
+
+        for key in Self.resetPersistentKeys {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     /// Available grace period options (in seconds).
     static let gracePeriodOptions: [(label: String, value: Int)] = [
         (String(localized: "grace.immediately", defaultValue: "Immediately"), 0),
@@ -188,4 +205,23 @@ final class AppConfiguration {
         (String(localized: "grace.3min", defaultValue: "3 minutes"), 180),
         (String(localized: "grace.5min", defaultValue: "5 minutes"), 300)
     ]
+
+    private static var resetPersistentKeys: [String] {
+        [
+            encryptToSelfKey,
+            clipboardNoticeLegacyKey,
+            appSessionAuthenticationPolicyKey,
+            requireAuthOnLaunchKey,
+            onboardingCompleteKey,
+            guidedTutorialCompletedVersionKey,
+            colorThemeKey,
+            AuthPreferences.authModeKey,
+            AuthPreferences.gracePeriodKey,
+            AuthPreferences.rewrapInProgressKey,
+            AuthPreferences.rewrapTargetModeKey,
+            AuthPreferences.modifyExpiryInProgressKey,
+            AuthPreferences.modifyExpiryFingerprintKey,
+            "com.cypherair.preference.uiTestBypassAuthentication"
+        ]
+    }
 }

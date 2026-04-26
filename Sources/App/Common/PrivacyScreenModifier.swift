@@ -41,6 +41,22 @@ struct PrivacyScreenModifier: ViewModifier {
                         }
                     }
                     .transition(.opacity)
+                    .onAppear {
+                        authLifecycleTraceStore?.record(
+                            category: .lifecycle,
+                            name: "privacy.overlay.visible",
+                            metadata: [
+                                "isAuthenticating": appSessionOrchestrator.isAuthenticating ? "true" : "false",
+                                "authFailed": appSessionOrchestrator.authFailed ? "true" : "false"
+                            ]
+                        )
+                    }
+                    .onDisappear {
+                        authLifecycleTraceStore?.record(
+                            category: .lifecycle,
+                            name: "privacy.overlay.hidden"
+                        )
+                    }
                 }
             }
             .animation(.easeInOut(duration: 0.15), value: appSessionOrchestrator.isPrivacyScreenBlurred)

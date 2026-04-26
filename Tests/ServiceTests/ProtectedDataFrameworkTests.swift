@@ -587,6 +587,19 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         )
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
+        let localDataResetService = LocalDataResetService(
+            keychain: keychain,
+            protectedDataStorageRoot: storageRoot,
+            contactsDirectory: contactsDirectory,
+            defaults: defaults,
+            defaultsDomainName: defaultsSuiteName,
+            config: config,
+            authManager: authManager,
+            keyManagement: keyManagement,
+            contactService: contactService,
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            appSessionOrchestrator: appSessionOrchestrator
+        )
         let container = AppAppContainer(
             authLifecycleTraceStore: nil,
             authenticationShieldCoordinator: CypherAir.AuthenticationShieldCoordinator(),
@@ -612,6 +625,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             certificateSignatureService: certificateSignatureService,
             qrService: qrService,
             selfTestService: selfTestService,
+            localDataResetService: localDataResetService,
             contactsDirectory: contactsDirectory,
             defaultsSuiteName: defaultsSuiteName
         )

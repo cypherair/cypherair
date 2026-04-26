@@ -254,6 +254,7 @@ struct CypherAirApp: App {
             .environment(container.authManager)
             .environment(container.keyManagement)
             .environment(container.selfTestService)
+            .environment(\.localDataResetService, container.localDataResetService)
             .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
             .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
             .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
@@ -297,6 +298,16 @@ struct CypherAirApp: App {
     private var mainWindowSceneContent: some View {
         ImportConfirmationSheetHost(coordinator: incomingURLImportCoordinator.importConfirmationCoordinator) {
             mainWindowContent
+                .onAppear {
+                    container.authLifecycleTraceStore?.record(
+                        category: .lifecycle,
+                        name: "mainWindow.content.appear",
+                        metadata: [
+                            "root": launchConfiguration.root.rawValue,
+                            "hasLoadWarning": loadError == nil ? "false" : "true"
+                        ]
+                    )
+                }
                 .privacyScreen()
                 .optionalTint(container.config.colorTheme.accentColor)
                 .environment(container.config)
@@ -310,6 +321,7 @@ struct CypherAirApp: App {
                 .environment(container.selfTestService)
                 .environment(container.authManager)
                 .environment(container.appSessionOrchestrator)
+                .environment(\.localDataResetService, container.localDataResetService)
                 .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
                 .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
                 .environment(\.protectedSettingsHost, protectedSettingsHost)
@@ -400,6 +412,22 @@ struct CypherAirApp: App {
             if let loadError {
                 Text(loadError)
             }
+        }
+        .onAppear {
+            if loadError != nil {
+                container.authLifecycleTraceStore?.record(
+                    category: .lifecycle,
+                    name: "loadWarning.presented",
+                    metadata: ["source": "initialState"]
+                )
+            }
+        }
+        .onChange(of: loadError != nil) { _, isPresented in
+            container.authLifecycleTraceStore?.record(
+                category: .lifecycle,
+                name: isPresented ? "loadWarning.presented" : "loadWarning.dismissed",
+                metadata: ["source": "stateChange"]
+            )
         }
         .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
         .authenticationShieldHost(

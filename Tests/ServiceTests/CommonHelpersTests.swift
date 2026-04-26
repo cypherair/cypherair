@@ -578,6 +578,19 @@ final class CommonHelpersTests: XCTestCase {
         )
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
+        let localDataResetService = LocalDataResetService(
+            keychain: mockKC,
+            protectedDataStorageRoot: protectedDataStorageRoot,
+            contactsDirectory: contactDirectory,
+            defaults: defaults,
+            defaultsDomainName: suiteName,
+            config: config,
+            authManager: authManager,
+            keyManagement: keyManagement,
+            contactService: contactService,
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            appSessionOrchestrator: appSessionOrchestrator
+        )
         let container = AppContainer(
             authLifecycleTraceStore: nil,
             authenticationShieldCoordinator: CypherAir.AuthenticationShieldCoordinator(),
@@ -603,6 +616,7 @@ final class CommonHelpersTests: XCTestCase {
             certificateSignatureService: certificateSignatureService,
             qrService: qrService,
             selfTestService: selfTestService,
+            localDataResetService: localDataResetService,
             contactsDirectory: contactDirectory,
             defaultsSuiteName: suiteName
         )
