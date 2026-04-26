@@ -89,9 +89,9 @@ final class AppSessionOrchestrator {
         )
     }
 
-    func resetAfterLocalDataReset() {
+    func resetAfterLocalDataReset(preserveAuthentication: Bool = false) {
         discardPendingAuthenticatedContext(reason: "localDataReset")
-        lastAuthenticationDate = nil
+        lastAuthenticationDate = preserveAuthentication ? Date() : nil
         isAuthenticating = false
         isPrivacyScreenBlurred = false
         authFailed = false
@@ -99,7 +99,10 @@ final class AppSessionOrchestrator {
         traceStore?.record(
             category: .session,
             name: "session.localDataReset",
-            metadata: ["contentClearGeneration": String(contentClearGeneration)]
+            metadata: [
+                "contentClearGeneration": String(contentClearGeneration),
+                "preservedAuthentication": preserveAuthentication ? "true" : "false"
+            ]
         )
     }
 
