@@ -708,6 +708,8 @@ For v1 review purposes, the concrete macOS contract is:
 - bootstrap metadata lives only in the same app-owned container boundary
 - no protected-domain payloads are stored in user-managed document locations by default
 - review and testing verify containment, ownership, and absence of fallback to broader storage locations
+- file-protection capability probing must tolerate a fresh install or Reset All Local Data state where `Application Support/ProtectedData` does not yet exist by probing the nearest existing parent directory
+- ordinary validation must not create the `ProtectedData` root; root/registry creation remains limited to the bootstrap or write path that also applies and verifies explicit file protection
 
 This is the v1 acceptance floor. Stronger macOS protection claims require later explicit design and validation.
 
@@ -889,6 +891,7 @@ The "missing registry" trigger has one narrow exception:
 
 - if the protected-data root does not exist, or exists but contains no protected-data artifacts, the implementation may synchronously bootstrap an empty steady-state registry instead of entering `frameworkRecoveryNeeded`
 - if the registry file is missing while any protected-data artifact already exists under the root, bootstrap is forbidden and the framework must enter `frameworkRecoveryNeeded`
+- reset validation of a missing protected-data root is clean only when no protected-data artifacts remain and the storage contract passes using the nearest existing parent for volume capability probing
 
 This trigger does not apply to the empty steady-state row (`0 / absent / none / n/a`): that row may still run post-classification orphan `cleanupOnly`, but its final recovery disposition remains `resumeSteadyState`.
 

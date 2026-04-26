@@ -223,21 +223,21 @@ This is especially important for future Contacts adoption, where cold-start load
 
 ### 3.5 Current-State Owner Map
 
-This migration guide documents the handoff points that the future single-owner session model must absorb. It does not redesign the current app.
+This migration guide documents the remaining handoff points around future protected-domain adoption. The app-wide session owner has already moved to `AppSessionOrchestrator`; future work should build on that owner instead of reintroducing view-local authentication state.
 
 | Concern | Current shipping owner(s) | Current behavior | Future handoff |
 |------|------------------|--------------|---------------------|
-| Launch authentication on cold start | `PrivacyScreenModifier` + `AuthenticationManager.evaluate(...)` | `onAppear` checks `requireAuthOnLaunch`, presents the privacy unlock prompt, and records success in `AppConfiguration` | Absorb launch sequencing into `AppSessionOrchestrator`, with protected-domain handoff through `ProtectedDataSessionCoordinator` when the initial route requires protected content |
-| Resume authentication after grace expiry | `PrivacyScreenModifier` + `AuthenticationManager.evaluate(...)` | scene-activation and resume routing blur the UI, re-authenticate after expiry, and unblock the app shell on success | Move resume sequencing and re-entry decisions under `AppSessionOrchestrator` |
-| Grace-window timing | `AppConfiguration` | `gracePeriod`, `lastAuthenticationDate`, and `isGracePeriodExpired` currently determine whether re-auth is required | Make `AppSessionOrchestrator` the only grace-window owner |
-| Content clearing on auth boundary | `AppConfiguration` + view observers | grace-expiry re-auth increments `contentClearGeneration` before authentication so decrypted UI state clears | Move relock-driven clearing into framework relock plus `ProtectedDataRelockParticipant` fan-out |
+| Launch authentication on cold start | `AppSessionOrchestrator` through `PrivacyScreenModifier` | The view modifier is a UI adapter; the orchestrator evaluates privacy unlock, records the reusable `LAContext`, and can hand it to ProtectedData authorization when a route needs protected content |
+| Resume authentication after grace expiry | `AppSessionOrchestrator` through scene-phase observation | Scene activation routes through the orchestrator, which owns suppression around system auth UI, content clearing, and reusable context storage |
+| Grace-window timing | `AppSessionOrchestrator` | The orchestrator owns last-authentication timing and grace-period expiry decisions |
+| Content clearing on auth boundary | `AppSessionOrchestrator` + relock participants | Grace-expiry re-auth increments `contentClearGeneration`; ProtectedData participants use relock hooks for domain-local cleanup |
 | Cold-start loading and temp cleanup | `AppStartupCoordinator` | cold start loads keys and Contacts, runs recovery checks, and cleans temporary files before any future protected app-data layer exists | Split startup into pre-auth bootstrap plus post-auth protected-domain unlock; future protected-domain loading must not happen merely from startup initialization |
 
 Current Phase 1 implementation status:
 
 - `AppStartupCoordinator.performPreAuthBootstrap(...)` now owns the synchronous pre-auth registry bootstrap/classification step
 - `AppSessionOrchestrator` owns grace-window timing, content-clear generation, and privacy-auth sequencing
-- `ProtectedDataSessionCoordinator` exists but is not triggered during ordinary startup because no real protected domain has landed yet
+- `ProtectedSettingsStore` is the first protected-domain adopter, and settings refresh can auto-open it by consuming the current app-session `LAContext` handoff without presenting a second prompt
 - `continuePendingMutation` is now preserved as a distinct bootstrap outcome instead of being folded into steady state
 - shared root-secret usability is a post-bootstrap framework-gate concern, not a synchronous `init()` concern
 
