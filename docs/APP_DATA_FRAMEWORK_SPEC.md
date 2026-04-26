@@ -189,6 +189,10 @@ The v1 persistence model for each protected app-data domain is:
 - the root-secret Keychain item uses this-device-only accessibility and the access-control flags selected by `AppSessionAuthenticationPolicy`
 - the planned v2 payload for that row is a Secure Enclave device-bound root-secret envelope rather than raw root-secret bytes
 - the ProtectedData SE device-binding key uses `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage` and does not add Face ID / Touch ID flags
+- the planned v2 envelope is a binary-plist `CAPDSEV2` record with fixed `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`
+- v2 envelope public keys use P-256 X9.63 representation; salt is 32 bytes, nonce is 12 bytes, tag is 16 bytes, and root-secret ciphertext is 32 bytes
+- HKDF sharedInfo and AES-GCM AAD bind the envelope version, algorithm, shared-right identifier, device-binding key identifier, SE public-key hash, public-key lengths, and root-secret length
+- v2 verification writes registry state plus a ThisDeviceOnly Keychain `format-floor` marker; if either says v2, later v1 raw root-secret payloads are downgrade/corruption and must fail closed
 - normal root-secret reads supply the authenticated `LAContext` with `kSecUseAuthenticationContext`
 - each domain DMK is persisted only as a `WrappedDomainMasterKeyRecord`
 - there is no v1 model where each domain owns its own independent authorization resource
@@ -278,6 +282,12 @@ The target launch/resume handoff is:
 5. If the Keychain payload is v2, the ProtectedData Secure Enclave device-binding key silently opens the root-secret envelope without adding a second user-authentication prompt.
 6. The raw root-secret bytes are used only to derive `AppDataWrappingRootKey`, then are zeroized.
 7. Domain DMKs remain lazy-unwrapped; activating the shared app-data session does not open every protected domain.
+
+When a legacy v1 raw root-secret payload is migrated to v2, the verified v2
+payload becomes the only normal authorization source. A one-restart v1 safety
+copy, if implemented, must live only in an explicit `legacy-cleanup` staging
+row, must never authorize access, and must be deleted after the next successful
+v2 open.
 
 If root-secret retrieval fails with an already authenticated context, the framework must not fall back to app-managed plaintext state or silently retry with a different authorization mechanism. User-cancelled or denied authentication remains a normal access outcome; a missing or unreadable root-secret record for a `ready` registry row is framework recovery.
 

@@ -281,6 +281,11 @@ a Secure Enclave device-bound root-secret envelope below it:
 - that SE key uses `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`
 - that SE key must not use `.userPresence`, `.biometryAny`, or `.devicePasscode`
 - SE failure after v2 migration is framework recovery/reset required, not a fallback to legacy raw-secret behavior
+- the target envelope format is a binary-plist `CAPDSEV2` payload with `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`
+- the target envelope stores P-256 SE and ephemeral public keys as X9.63 bytes, 32-byte HKDF salt, 12-byte AES-GCM nonce, 16-byte tag, and separate ciphertext
+- the target HKDF sharedInfo and AES-GCM AAD bind format version, algorithm ID, shared-right identifier, device-binding key identifier, SE public-key hash, public-key lengths, and root-secret length
+- the v2 design uses a software-ephemeral P-256 ECDH exchange with the persistent ProtectedData SE public key; it must not copy the private-key self-ECDH wrapping scheme
+- successful v2 verification must write registry state and a ThisDeviceOnly Keychain `format-floor` marker so later v1 raw payloads fail closed as downgrade/corruption
 
 Implementation rule:
 
@@ -298,6 +303,7 @@ Expected properties:
 - one successful authorization covers all protected app-data domains in the current session
 - source-device authorization state must not be exported as part of portable recovery
 - after v2 migration, copied Keychain payloads and ProtectedData files remain unusable without the original device's ProtectedData SE binding key
+- if a v1 safety copy is retained during migration, it may exist only as a `legacy-cleanup` staging row, must not be used as an authorization fallback, and must be deleted after the next successful v2 open
 
 ### 5.3 App-Data Access-Control Contract
 
@@ -675,6 +681,7 @@ The v1 wrapping profile is fixed:
 
 - fetch the root-secret Keychain item only after app-session authentication succeeds and an authenticated `LAContext` is available
 - for v2 payloads, open the SE device-bound root-secret envelope before deriving `AppDataWrappingRootKey`
+- reject v1 raw root-secret payloads whenever registry state or the ThisDeviceOnly Keychain `format-floor` marker indicates v2 migration has completed
 - derive `AppDataWrappingRootKey` with `HKDF-SHA256`
   - input key material: raw root-secret bytes
   - salt: `"CypherAir.AppData.WrapRoot.Salt.v1"`

@@ -41,6 +41,8 @@ This document is a downstream review aid. It does not change the architecture or
 - root-secret retrieval uses `kSecUseAuthenticationContext` with an authenticated `LAContext`
 - planned v2 root-secret payloads add a Secure Enclave device-bound envelope under that same boundary; this must not add a second Face ID / Touch ID prompt
 - planned v2 root-secret authorization fails closed if the SE device-binding key or envelope is missing, corrupted, or unavailable
+- planned v2 `CAPDSEV2` envelope validation fails closed for unsupported versions/algorithms, wrong public-key representation, wrong salt/nonce/tag/ciphertext lengths, HKDF sharedInfo mismatch, AAD mismatch, tampering, and downgrade from v2 markers to v1 raw payload
+- planned v2 migration writes both registry state and a ThisDeviceOnly Keychain `format-floor` marker; these markers are part of validation because they prevent accepting old root-secret payloads after migration
 - planned v2 AuthTrace records stage/version/status/error metadata only, never root secrets, ECDH shared secrets, HKDF output, private key dataRepresentation, or plaintext payloads
 - handoff-only protected-settings auto-open must fail locked without displaying a second prompt if the authenticated `LAContext` is no longer available at consumption time
 - launch/resume authentication and root-secret retrieval use the dedicated `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`
@@ -151,6 +153,8 @@ At minimum, an implementer must be able to tell:
 - that Keychain / `SecAccessControl` / authenticated `LAContext` root-secret retrieval remains the primary app-data authorization gate
 - that the planned Secure Enclave device-binding layer is an additional root-secret envelope factor, not a second user-authentication prompt or a replacement gate
 - that v2 ProtectedData fails closed if the SE device-binding key or envelope is missing, corrupted, or unavailable
+- that macOS `CypherAir-UnitTests` cover the v2 envelope and migration state machine through mock device-binding providers, while real Secure Enclave behavior remains limited to guarded DeviceTests
+- that any `legacy-cleanup` v1 safety row is deleted after the next successful v2 open and is never used as a fallback authorization source
 - that app-data domains are recoverable rather than private-key-style invalidating
 - that framework-level and domain-level recovery are distinct
 - that startup recovery is registry-first and matrix-driven
