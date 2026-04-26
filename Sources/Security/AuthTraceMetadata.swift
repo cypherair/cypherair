@@ -41,6 +41,17 @@ enum AuthTraceMetadata {
         return "unknown"
     }
 
+    static func keychainAccountKind(for account: String) -> String {
+        switch account {
+        case KeychainConstants.defaultAccount:
+            "default"
+        case KeychainConstants.metadataAccount:
+            "metadata"
+        default:
+            "unknown"
+        }
+    }
+
     static func statusMetadata(_ status: OSStatus, extra: [String: String] = [:]) -> [String: String] {
         var metadata = extra
         metadata["status"] = String(status)

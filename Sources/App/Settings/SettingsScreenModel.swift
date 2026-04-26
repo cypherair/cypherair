@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import SwiftUI
 
 @MainActor
@@ -304,6 +305,10 @@ final class SettingsScreenModel {
 
         Task {
             do {
+                var resetAuthenticationContext: LAContext?
+                defer {
+                    resetAuthenticationContext?.invalidate()
+                }
                 if authManager.canEvaluate(appSessionPolicy: appConfiguration.appSessionAuthenticationPolicy) {
                     let result = try await authManager.evaluateAppSession(
                         policy: appConfiguration.appSessionAuthenticationPolicy,
@@ -316,9 +321,12 @@ final class SettingsScreenModel {
                     guard result.isAuthenticated else {
                         throw AuthenticationError.failed
                     }
+                    resetAuthenticationContext = result.context
                 }
 
-                _ = try await localDataResetService.resetAllLocalData()
+                _ = try await localDataResetService.resetAllLocalData(
+                    authenticationContext: resetAuthenticationContext
+                )
                 localDataResetSucceeded = true
             } catch {
                 localDataResetErrorMessage = error.localizedDescription

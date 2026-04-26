@@ -9,6 +9,7 @@ final class AppSessionOrchestrator {
     private let gracePeriodProvider: () -> Int
     private let requireAuthOnLaunchProvider: () -> Bool
     private let evaluateAppAuthentication: (String, String) async throws -> AppSessionAuthenticationResult
+    private let postAuthenticationHandler: (LAContext?, String) async -> Void
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
 
@@ -27,6 +28,7 @@ final class AppSessionOrchestrator {
         gracePeriodProvider: @escaping () -> Int,
         requireAuthOnLaunchProvider: @escaping () -> Bool,
         evaluateAppAuthentication: @escaping (String) async throws -> AppSessionAuthenticationResult,
+        postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil
@@ -39,6 +41,7 @@ final class AppSessionOrchestrator {
             evaluateAppAuthenticationWithSource: { reason, _ in
                 try await evaluateAppAuthentication(reason)
             },
+            postAuthenticationHandler: postAuthenticationHandler,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
             traceStore: traceStore
@@ -51,6 +54,7 @@ final class AppSessionOrchestrator {
         gracePeriodProvider: @escaping () -> Int,
         requireAuthOnLaunchProvider: @escaping () -> Bool,
         evaluateAppAuthenticationWithSource: @escaping (String, String) async throws -> AppSessionAuthenticationResult,
+        postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil
@@ -60,6 +64,7 @@ final class AppSessionOrchestrator {
         self.gracePeriodProvider = gracePeriodProvider
         self.requireAuthOnLaunchProvider = requireAuthOnLaunchProvider
         self.evaluateAppAuthentication = evaluateAppAuthenticationWithSource
+        self.postAuthenticationHandler = postAuthenticationHandler
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
@@ -259,6 +264,10 @@ final class AppSessionOrchestrator {
                 if result.isAuthenticated {
                     replacePendingAuthenticatedContext(with: result.context, reason: "resumeAuthenticated")
                     recordAuthentication()
+                    await postAuthenticationHandler(
+                        borrowAuthenticatedContextForMetadataMigration(),
+                        source
+                    )
                     authFailed = false
                     isPrivacyScreenBlurred = false
                     traceStore?.record(
@@ -327,6 +336,18 @@ final class AppSessionOrchestrator {
             ]
         )
         return context
+    }
+
+    func borrowAuthenticatedContextForMetadataMigration() -> LAContext? {
+        traceStore?.record(
+            category: .session,
+            name: "session.borrowAuthenticatedContext",
+            metadata: [
+                "purpose": "metadataMigration",
+                "hasContext": pendingAuthenticatedContext == nil ? "false" : "true"
+            ]
+        )
+        return pendingAuthenticatedContext
     }
 
     func evaluateProtectedDataAccessGate(

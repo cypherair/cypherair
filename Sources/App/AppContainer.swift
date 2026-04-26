@@ -137,6 +137,16 @@ final class AppContainer: @unchecked Sendable {
             domainKeyManager: protectedDomainKeyManager
         )
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
+        let engine = PgpEngine()
+        let keyManagement = KeyManagementService(
+            engine: engine,
+            secureEnclave: secureEnclave,
+            keychain: keychain,
+            authenticator: authManager,
+            defaults: .standard,
+            authenticationPromptCoordinator: authPromptCoordinator,
+            authLifecycleTraceStore: authLifecycleTraceStore
+        )
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -151,20 +161,15 @@ final class AppContainer: @unchecked Sendable {
                     source: source
                 )
             },
+            postAuthenticationHandler: { authenticationContext, source in
+                await keyManagement.migrateLegacyMetadataAfterAppAuthentication(
+                    authenticationContext: authenticationContext,
+                    source: source
+                )
+            },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
-        )
-        let engine = PgpEngine()
-
-        let keyManagement = KeyManagementService(
-            engine: engine,
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            authenticator: authManager,
-            defaults: .standard,
-            authenticationPromptCoordinator: authPromptCoordinator,
-            authLifecycleTraceStore: authLifecycleTraceStore
         )
         let contactService = ContactService(engine: engine)
         let encryptionService = EncryptionService(
@@ -314,6 +319,15 @@ final class AppContainer: @unchecked Sendable {
             domainKeyManager: protectedDomainKeyManager
         )
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
+        let keyManagement = KeyManagementService(
+            engine: engine,
+            secureEnclave: secureEnclave,
+            keychain: keychain,
+            authenticator: authManager,
+            defaults: defaults,
+            authenticationPromptCoordinator: authPromptCoordinator,
+            authLifecycleTraceStore: authLifecycleTraceStore
+        )
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -328,19 +342,15 @@ final class AppContainer: @unchecked Sendable {
                     source: source
                 )
             },
+            postAuthenticationHandler: { authenticationContext, source in
+                await keyManagement.migrateLegacyMetadataAfterAppAuthentication(
+                    authenticationContext: authenticationContext,
+                    source: source
+                )
+            },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
-        )
-
-        let keyManagement = KeyManagementService(
-            engine: engine,
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            authenticator: authManager,
-            defaults: defaults,
-            authenticationPromptCoordinator: authPromptCoordinator,
-            authLifecycleTraceStore: authLifecycleTraceStore
         )
         let contactService = ContactService(
             engine: engine,

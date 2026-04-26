@@ -304,6 +304,20 @@ final class ProtectedDataSessionCoordinator {
         frameworkState = participantErrorOccurred ? .restartRequired : .sessionLocked
     }
 
+    func resetAfterLocalDataReset() {
+        if wrappingRootKey != nil {
+            wrappingRootKey?.protectedDataZeroize()
+            wrappingRootKey = nil
+        }
+        domainKeyManager.clearUnlockedDomainMasterKeys()
+        frameworkState = .sessionLocked
+        traceStore?.record(
+            category: .session,
+            name: "protectedData.session.localDataReset",
+            metadata: ["frameworkState": String(describing: frameworkState)]
+        )
+    }
+
     var hasActiveWrappingRootKey: Bool {
         wrappingRootKey != nil
     }

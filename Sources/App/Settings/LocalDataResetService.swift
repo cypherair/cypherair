@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import SwiftUI
 
 struct LocalDataResetSummary: Equatable {
@@ -65,42 +66,38 @@ final class LocalDataResetService {
         self.traceStore = traceStore
     }
 
-    func resetAllLocalData() async throws -> LocalDataResetSummary {
-        traceStore?.record(category: .operation, name: "localDataReset.start")
+    func resetAllLocalData(
+        authenticationContext: LAContext? = nil
+    ) async throws -> LocalDataResetSummary {
+        traceStore?.record(
+            category: .operation,
+            name: "localDataReset.start",
+            metadata: ["hasAuthenticationContext": authenticationContext == nil ? "false" : "true"]
+        )
         await protectedDataSessionCoordinator.relockCurrentSession()
 
         var failures: [String] = []
         var deletedKeychainItemCount = 0
         var removedDirectoryCount = 0
 
-        do {
-            let services = try keychain.listItems(
-                servicePrefix: KeychainConstants.prefix,
-                account: KeychainConstants.defaultAccount
-            )
-            for service in services {
-                do {
-                    try keychain.delete(service: service, account: KeychainConstants.defaultAccount)
-                    deletedKeychainItemCount += 1
-                } catch where Self.isItemNotFound(error) {
-                } catch {
-                    failures.append("keychain.\(AuthTraceMetadata.keychainServiceKind(for: service)).\(String(describing: type(of: error)))")
-                }
-            }
-        } catch {
-            failures.append("keychain.list.\(String(describing: type(of: error)))")
-        }
+        deletedKeychainItemCount += resetKeychainItems(
+            account: KeychainConstants.defaultAccount,
+            authenticationContext: authenticationContext,
+            failures: &failures
+        )
+        deletedKeychainItemCount += resetKeychainItems(
+            account: KeychainConstants.metadataAccount,
+            authenticationContext: authenticationContext,
+            failures: &failures
+        )
 
-        do {
-            try keychain.delete(
-                service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
-                account: KeychainConstants.defaultAccount
-            )
-            deletedKeychainItemCount += 1
-        } catch where Self.isItemNotFound(error) {
-        } catch {
-            failures.append("keychain.protectedDataRootSecret.\(String(describing: type(of: error)))")
-        }
+        deletedKeychainItemCount += deleteExactKeychainItem(
+            service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            account: KeychainConstants.defaultAccount,
+            authenticationContext: authenticationContext,
+            failureKey: "keychain.protectedDataRootSecret",
+            failures: &failures
+        )
 
         do {
             try await legacyRightStoreClient?.removeRight(
@@ -111,14 +108,11 @@ final class LocalDataResetService {
         }
 
         for directory in resetDirectories {
-            do {
-                if fileManager.fileExists(atPath: directory.path) {
-                    try fileManager.removeItem(at: directory)
-                    removedDirectoryCount += 1
-                }
-            } catch {
-                failures.append("directory.\(directory.lastPathComponent).\(String(describing: type(of: error)))")
-            }
+            removedDirectoryCount += removeDirectoryIfPresent(
+                directory,
+                failurePrefix: "directory",
+                failures: &failures
+            )
         }
 
         removeTemporaryResetTargets(&removedDirectoryCount, failures: &failures)
@@ -130,7 +124,9 @@ final class LocalDataResetService {
         authManager.clearCachedAuthenticationContextAfterLocalDataReset()
         keyManagement.resetInMemoryStateAfterLocalDataReset()
         contactService.resetInMemoryStateAfterLocalDataReset()
+        protectedDataSessionCoordinator.resetAfterLocalDataReset()
         appSessionOrchestrator.resetAfterLocalDataReset()
+        validateResetPostConditions(failures: &failures)
 
         guard failures.isEmpty else {
             traceStore?.record(
@@ -163,6 +159,166 @@ final class LocalDataResetService {
         ]
     }
 
+    private func resetKeychainItems(
+        account: String,
+        authenticationContext: LAContext?,
+        failures: inout [String]
+    ) -> Int {
+        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
+        traceStore?.record(
+            category: .operation,
+            name: "localDataReset.keychain.list.start",
+            metadata: ["accountKind": accountKind]
+        )
+        do {
+            let services = try keychain.listItems(
+                servicePrefix: KeychainConstants.prefix,
+                account: account,
+                authenticationContext: authenticationContext
+            )
+            traceStore?.record(
+                category: .operation,
+                name: "localDataReset.keychain.list.finish",
+                metadata: ["accountKind": accountKind, "result": "success", "count": String(services.count)]
+            )
+            var deletedCount = 0
+            for service in services {
+                deletedCount += deleteExactKeychainItem(
+                    service: service,
+                    account: account,
+                    authenticationContext: authenticationContext,
+                    failureKey: "keychain.\(accountKind).\(AuthTraceMetadata.keychainServiceKind(for: service))",
+                    failures: &failures
+                )
+            }
+            return deletedCount
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "localDataReset.keychain.list.finish",
+                metadata: AuthTraceMetadata.errorMetadata(
+                    error,
+                    extra: ["accountKind": accountKind, "result": "failed"]
+                )
+            )
+            failures.append("keychain.list.\(accountKind).\(String(describing: type(of: error)))")
+            return 0
+        }
+    }
+
+    private func deleteExactKeychainItem(
+        service: String,
+        account: String,
+        authenticationContext: LAContext?,
+        failureKey: String,
+        failures: inout [String]
+    ) -> Int {
+        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
+        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: service)
+        do {
+            try keychain.delete(
+                service: service,
+                account: account,
+                authenticationContext: authenticationContext
+            )
+            traceStore?.record(
+                category: .operation,
+                name: "localDataReset.keychain.delete.finish",
+                metadata: ["accountKind": accountKind, "serviceKind": serviceKind, "result": "success"]
+            )
+            return 1
+        } catch where Self.isItemNotFound(error) {
+            traceStore?.record(
+                category: .operation,
+                name: "localDataReset.keychain.delete.finish",
+                metadata: ["accountKind": accountKind, "serviceKind": serviceKind, "result": "missing"]
+            )
+            return 0
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "localDataReset.keychain.delete.finish",
+                metadata: AuthTraceMetadata.errorMetadata(
+                    error,
+                    extra: ["accountKind": accountKind, "serviceKind": serviceKind, "result": "failed"]
+                )
+            )
+            failures.append("\(failureKey).\(String(describing: type(of: error)))")
+            return 0
+        }
+    }
+
+    private func removeDirectoryIfPresent(
+        _ directory: URL,
+        failurePrefix: String,
+        failures: inout [String]
+    ) -> Int {
+        let existedBefore = fileManager.fileExists(atPath: directory.path)
+        traceStore?.record(
+            category: .operation,
+            name: "localDataReset.directory.remove.start",
+            metadata: ["name": directory.lastPathComponent, "existsBefore": existedBefore ? "true" : "false"]
+        )
+        do {
+            if existedBefore {
+                try fileManager.removeItem(at: directory)
+            }
+            let existsAfter = fileManager.fileExists(atPath: directory.path)
+            traceStore?.record(
+                category: .operation,
+                name: "localDataReset.directory.remove.finish",
+                metadata: [
+                    "name": directory.lastPathComponent,
+                    "result": existsAfter ? "remaining" : "removedOrMissing",
+                    "existsAfter": existsAfter ? "true" : "false"
+                ]
+            )
+            if existsAfter {
+                failures.append("\(failurePrefix).\(directory.lastPathComponent).remaining")
+            }
+            return existedBefore && !existsAfter ? 1 : 0
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "localDataReset.directory.remove.finish",
+                metadata: AuthTraceMetadata.errorMetadata(
+                    error,
+                    extra: ["name": directory.lastPathComponent, "result": "failed"]
+                )
+            )
+            failures.append("\(failurePrefix).\(directory.lastPathComponent).\(String(describing: type(of: error)))")
+            return 0
+        }
+    }
+
+    private func validateResetPostConditions(failures: inout [String]) {
+        do {
+            let hasProtectedArtifacts = try protectedDataStorageRoot.hasProtectedDataArtifacts()
+            let rootExists = fileManager.fileExists(atPath: protectedDataStorageRoot.rootURL.path)
+            traceStore?.record(
+                category: .operation,
+                name: "localDataReset.validation.finish",
+                metadata: [
+                    "result": hasProtectedArtifacts ? "artifactsRemaining" : "clean",
+                    "protectedDataRootExists": rootExists ? "true" : "false",
+                    "hasProtectedDataArtifacts": hasProtectedArtifacts ? "true" : "false",
+                    "keyCount": String(keyManagement.keys.count),
+                    "contactCount": String(contactService.contacts.count)
+                ]
+            )
+            if hasProtectedArtifacts {
+                failures.append("protectedData.artifactsRemaining")
+            }
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "localDataReset.validation.finish",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failed"])
+            )
+            failures.append("protectedData.validation.\(String(describing: type(of: error)))")
+        }
+    }
+
     private func removeTemporaryResetTargets(
         _ removedDirectoryCount: inout Int,
         failures: inout [String]
@@ -174,14 +330,11 @@ final class LocalDataResetService {
         ]
 
         for directory in fixedDirectories {
-            do {
-                if fileManager.fileExists(atPath: directory.path) {
-                    try fileManager.removeItem(at: directory)
-                    removedDirectoryCount += 1
-                }
-            } catch {
-                failures.append("temporary.\(directory.lastPathComponent).\(String(describing: type(of: error)))")
-            }
+            removedDirectoryCount += removeDirectoryIfPresent(
+                directory,
+                failurePrefix: "temporary",
+                failures: &failures
+            )
         }
 
         guard let contents = try? fileManager.contentsOfDirectory(

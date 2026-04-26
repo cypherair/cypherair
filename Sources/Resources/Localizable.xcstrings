@@ -417,6 +417,22 @@
         }
       }
     },
+    "app.loadWarning.legacyMetadataMigration" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some saved key metadata could not be migrated. Your private keys remain protected; restart CypherAir and unlock again to retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分已保存的密钥元数据无法迁移。你的私钥仍然受到保护；请重启 CypherAir 并再次解锁以重试。"
+          }
+        }
+      }
+    },
     "auth.switchMode.reason" : {
       "localizations" : {
         "en" : {

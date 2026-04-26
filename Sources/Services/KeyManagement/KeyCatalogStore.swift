@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 /// Owns in-memory key identity state and metadata persistence coordination.
 final class KeyCatalogStore {
@@ -16,6 +17,18 @@ final class KeyCatalogStore {
 
     func loadAll() throws {
         keys = try metadataStore.loadAll()
+    }
+
+    func migrateLegacyMetadataIfNeeded(
+        authenticationContext: LAContext?
+    ) throws -> KeyMetadataLegacyMigrationOutcome {
+        let outcome = try metadataStore.migrateLegacyMetadataIfNeeded(
+            authenticationContext: authenticationContext
+        )
+        if outcome.didChangeDedicatedMetadata {
+            keys = try metadataStore.loadAll()
+        }
+        return outcome
     }
 
     func containsKey(fingerprint: String) -> Bool {

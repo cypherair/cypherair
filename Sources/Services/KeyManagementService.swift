@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 /// Manages the full key lifecycle: generation, import, export, deletion, and default selection.
 /// Coordinates PgpEngine (Rust) for crypto operations and Security layer for SE wrapping/Keychain storage.
@@ -9,6 +10,7 @@ final class KeyManagementService {
 
     /// All key identities stored on this device.
     private(set) var keys: [PGPKeyIdentity] = []
+    private(set) var legacyMetadataMigrationLoadWarning: String?
 
     private let engine: PgpEngine
     private let catalogStore: KeyCatalogStore
@@ -17,6 +19,8 @@ final class KeyManagementService {
     private let exportService: KeyExportService
     private let selectiveRevocationService: SelectiveRevocationService
     private let mutationService: KeyMutationService
+    private let traceStore: AuthLifecycleTraceStore?
+    private var legacyMetadataMigrationCompletedInProcess = false
 
     init(
         engine: PgpEngine,
@@ -29,7 +33,7 @@ final class KeyManagementService {
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil
     ) {
         let bundleStore = KeyBundleStore(keychain: keychain)
-        let metadataStore = KeyMetadataStore(keychain: keychain)
+        let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
         let migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
         let catalogStore = KeyCatalogStore(metadataStore: metadataStore)
         let privateKeyAccessService = PrivateKeyAccessService(
@@ -69,6 +73,7 @@ final class KeyManagementService {
             catalogStore: catalogStore,
             privateKeyAccessService: privateKeyAccessService
         )
+        self.traceStore = authLifecycleTraceStore
     }
 
     // MARK: - Key Enumeration
@@ -80,8 +85,62 @@ final class KeyManagementService {
         syncKeys()
     }
 
+    func migrateLegacyMetadataAfterAppAuthentication(
+        authenticationContext: LAContext?,
+        source: String
+    ) async {
+        guard !legacyMetadataMigrationCompletedInProcess else {
+            traceStore?.record(
+                category: .operation,
+                name: "keyMetadata.legacyMigration.skip",
+                metadata: ["reason": "alreadyCompletedInProcess", "source": source]
+            )
+            return
+        }
+
+        do {
+            let outcome = try catalogStore.migrateLegacyMetadataIfNeeded(
+                authenticationContext: authenticationContext
+            )
+            syncKeys()
+            legacyMetadataMigrationCompletedInProcess = outcome.failedItemCount == 0
+            legacyMetadataMigrationLoadWarning = outcome.failedItemCount == 0 ? nil : Self.legacyMetadataMigrationWarningMessage()
+            traceStore?.record(
+                category: .operation,
+                name: "keyMetadata.legacyMigration.sessionUpdate",
+                metadata: [
+                    "source": source,
+                    "keyCount": String(keys.count),
+                    "legacyServiceCount": String(outcome.legacyServiceCount),
+                    "migratedCount": String(outcome.migratedCount),
+                    "failedItemCount": String(outcome.failedItemCount)
+                ]
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "keyMetadata.legacyMigration.error",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["source": source])
+            )
+            legacyMetadataMigrationLoadWarning = Self.legacyMetadataMigrationWarningMessage()
+        }
+    }
+
+    func clearLegacyMetadataMigrationLoadWarning() {
+        legacyMetadataMigrationLoadWarning = nil
+    }
+
     func resetInMemoryStateAfterLocalDataReset() {
         keys = []
+        legacyMetadataMigrationCompletedInProcess = false
+        legacyMetadataMigrationLoadWarning = nil
+    }
+
+    private static func legacyMetadataMigrationWarningMessage() -> String {
+        String(
+            localized: "app.loadWarning.legacyMetadataMigration",
+            defaultValue: "Some saved key metadata could not be migrated. Your private keys remain protected; restart CypherAir and unlock again to retry."
+        )
     }
 
     // MARK: - Key Generation
