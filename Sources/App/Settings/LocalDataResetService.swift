@@ -125,7 +125,9 @@ final class LocalDataResetService {
         keyManagement.resetInMemoryStateAfterLocalDataReset()
         contactService.resetInMemoryStateAfterLocalDataReset()
         protectedDataSessionCoordinator.resetAfterLocalDataReset()
-        appSessionOrchestrator.resetAfterLocalDataReset()
+        appSessionOrchestrator.resetAfterLocalDataReset(
+            preserveAuthentication: authenticationContext != nil
+        )
         validateResetPostConditions(failures: &failures)
 
         guard failures.isEmpty else {
@@ -313,9 +315,12 @@ final class LocalDataResetService {
             traceStore?.record(
                 category: .operation,
                 name: "localDataReset.validation.finish",
-                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failed"])
+                metadata: AuthTraceMetadata.errorMetadata(
+                    error,
+                    extra: ["result": "storageContractFailed"]
+                )
             )
-            failures.append("protectedData.validation.\(String(describing: type(of: error)))")
+            failures.append("protectedData.storageContract.\(Self.failureName(for: error))")
         }
     }
 
@@ -373,6 +378,14 @@ final class LocalDataResetService {
             }
         }
         return false
+    }
+
+    private static func failureName(for error: Error) -> String {
+        let nsError = error as NSError
+        let domain = nsError.domain
+            .replacingOccurrences(of: ".", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        return "\(domain).\(nsError.code)"
     }
 }
 

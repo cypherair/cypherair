@@ -111,11 +111,12 @@ final class AppContainer: @unchecked Sendable {
         )
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
-        let protectedDataStorageRoot = ProtectedDataStorageRoot()
+        let protectedDataStorageRoot = ProtectedDataStorageRoot(traceStore: authLifecycleTraceStore)
         let protectedDomainKeyManager = ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
         let protectedDataRegistryStore = ProtectedDataRegistryStore(
             storageRoot: protectedDataStorageRoot,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            traceStore: authLifecycleTraceStore
         )
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
             registryStore: protectedDataRegistryStore
@@ -292,12 +293,14 @@ final class AppContainer: @unchecked Sendable {
         )
         let protectedDataStorageRoot = ProtectedDataStorageRoot(
             baseDirectory: protectedDataBaseDirectory,
-            validationMode: .enforceAppSupportContainment
+            validationMode: .enforceAppSupportContainment,
+            traceStore: authLifecycleTraceStore
         )
         let protectedDomainKeyManager = ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
         let protectedDataRegistryStore = ProtectedDataRegistryStore(
             storageRoot: protectedDataStorageRoot,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            traceStore: authLifecycleTraceStore
         )
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
             registryStore: protectedDataRegistryStore

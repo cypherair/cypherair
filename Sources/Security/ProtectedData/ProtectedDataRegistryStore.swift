@@ -14,17 +14,46 @@ private actor ProtectedDataRegistryMutationGate {
 final class ProtectedDataRegistryStore: @unchecked Sendable {
     private let storageRoot: ProtectedDataStorageRoot
     private let sharedRightIdentifier: String
+    private let traceStore: AuthLifecycleTraceStore?
     private let mutationGate = ProtectedDataRegistryMutationGate()
 
     init(
         storageRoot: ProtectedDataStorageRoot,
-        sharedRightIdentifier: String
+        sharedRightIdentifier: String,
+        traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.storageRoot = storageRoot
         self.sharedRightIdentifier = sharedRightIdentifier
+        self.traceStore = traceStore
     }
 
     func performSynchronousBootstrap() throws -> ProtectedDataRegistryBootstrapResult {
+        traceStore?.record(
+            category: .lifecycle,
+            name: "protectedData.registryBootstrap.start"
+        )
+        do {
+            let result = try performSynchronousBootstrapImpl()
+            traceStore?.record(
+                category: .lifecycle,
+                name: "protectedData.registryBootstrap.finish",
+                metadata: ["result": "success"]
+            )
+            return result
+        } catch {
+            traceStore?.record(
+                category: .lifecycle,
+                name: "protectedData.registryBootstrap.finish",
+                metadata: AuthTraceMetadata.errorMetadata(
+                    error,
+                    extra: ["result": "failed", "stage": "registryBootstrap"]
+                )
+            )
+            throw error
+        }
+    }
+
+    private func performSynchronousBootstrapImpl() throws -> ProtectedDataRegistryBootstrapResult {
         try storageRoot.validatePersistentStorageContract()
 
         if try storageRoot.registryExists() {

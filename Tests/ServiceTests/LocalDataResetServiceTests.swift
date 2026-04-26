@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
@@ -68,5 +69,37 @@ final class LocalDataResetServiceTests: XCTestCase {
         XCTAssertTrue(traceNames.contains("localDataReset.start"))
         XCTAssertTrue(traceNames.contains("localDataReset.finish"))
         XCTAssertTrue(traceNames.contains("localDataReset.validation.finish"))
+    }
+
+    func test_resetAllLocalData_missingProtectedDataBaseValidatesCleanAndPreservesResetAuth() async throws {
+        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        defer {
+            try? FileManager.default.removeItem(
+                at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
+            )
+            if let contactsDirectory = container.contactsDirectory {
+                try? FileManager.default.removeItem(at: contactsDirectory)
+            }
+            if let defaultsSuiteName = container.defaultsSuiteName {
+                UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
+            }
+        }
+
+        let protectedDataBaseDirectory = container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
+        try? FileManager.default.removeItem(at: protectedDataBaseDirectory)
+
+        _ = try await container.localDataResetService.resetAllLocalData(
+            authenticationContext: LAContext()
+        )
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: container.protectedDataStorageRoot.rootURL.path))
+        XCTAssertNotNil(container.appSessionOrchestrator.lastAuthenticationDate)
+        let validationEntry = try XCTUnwrap(
+            container.authLifecycleTraceStore?.recentEntries.last {
+                $0.name == "localDataReset.validation.finish"
+            }
+        )
+        XCTAssertEqual(validationEntry.metadata["result"], "clean")
+        XCTAssertEqual(validationEntry.metadata["hasProtectedDataArtifacts"], "false")
     }
 }

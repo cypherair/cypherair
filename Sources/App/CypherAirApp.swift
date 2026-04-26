@@ -3,6 +3,25 @@ import SwiftUI
 import UIKit
 #endif
 
+struct LoadWarningPresentationState: Equatable {
+    let isShieldVisible: Bool
+    let isAuthenticating: Bool
+    let isPrivacyScreenBlurred: Bool
+    let hasAuthenticatedSession: Bool
+    let requiresAuthOnLaunch: Bool
+}
+
+enum LoadWarningPresentationGate {
+    static func canPresent(_ state: LoadWarningPresentationState) -> Bool {
+        guard !state.isShieldVisible,
+              !state.isAuthenticating,
+              !state.isPrivacyScreenBlurred else {
+            return false
+        }
+        return state.hasAuthenticatedSession || !state.requiresAuthOnLaunch
+    }
+}
+
 @main
 struct CypherAirApp: App {
     #if os(iOS)
@@ -15,6 +34,7 @@ struct CypherAirApp: App {
     @State private var container: AppContainer
 
     @State private var loadError: String?
+    @State private var pendingLoadError: String?
     @State private var startupSnapshot: AppStartupCoordinator.AppStartupBootstrapSnapshot
     @State private var protectedSettingsHost: ProtectedSettingsHost
     @State private var tutorialStore: TutorialSessionStore
@@ -205,7 +225,8 @@ struct CypherAirApp: App {
 
         _launchConfiguration = State(initialValue: launchConfiguration)
         _container = State(initialValue: container)
-        _loadError = State(initialValue: startupSnapshot.loadError)
+        _loadError = State(initialValue: nil)
+        _pendingLoadError = State(initialValue: startupSnapshot.loadError)
         _startupSnapshot = State(initialValue: startupSnapshot)
         _protectedSettingsHost = State(initialValue: protectedSettingsHost)
         _tutorialStore = State(initialValue: tutorialStore)
@@ -414,13 +435,7 @@ struct CypherAirApp: App {
             }
         }
         .onAppear {
-            if loadError != nil {
-                container.authLifecycleTraceStore?.record(
-                    category: .lifecycle,
-                    name: "loadWarning.presented",
-                    metadata: ["source": "initialState"]
-                )
-            }
+            presentPendingLoadWarningIfPossible(source: "initialState")
         }
         .onChange(of: loadError != nil) { _, isPresented in
             container.authLifecycleTraceStore?.record(
@@ -429,10 +444,14 @@ struct CypherAirApp: App {
                 metadata: ["source": "stateChange"]
             )
         }
+        .onChange(of: loadWarningPresentationState) { _, _ in
+            presentPendingLoadWarningIfPossible(source: "presentationStateChange")
+        }
         .onChange(of: container.keyManagement.legacyMetadataMigrationLoadWarning) { _, warning in
             guard let warning else { return }
-            loadError = warning
+            pendingLoadError = warning
             container.keyManagement.clearLegacyMetadataMigrationLoadWarning()
+            presentPendingLoadWarningIfPossible(source: "legacyMetadataMigration")
         }
         .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
         .authenticationShieldHost(
@@ -556,6 +575,39 @@ struct CypherAirApp: App {
                 throw error
             }
         }
+    }
+
+    private var loadWarningPresentationState: LoadWarningPresentationState {
+        LoadWarningPresentationState(
+            isShieldVisible: container.authenticationShieldCoordinator.isVisible,
+            isAuthenticating: container.appSessionOrchestrator.isAuthenticating,
+            isPrivacyScreenBlurred: container.appSessionOrchestrator.isPrivacyScreenBlurred,
+            hasAuthenticatedSession: container.appSessionOrchestrator.lastAuthenticationDate != nil,
+            requiresAuthOnLaunch: container.config.requireAuthOnLaunch
+        )
+    }
+
+    private func presentPendingLoadWarningIfPossible(source: String) {
+        guard loadError == nil, let pendingLoadError else { return }
+        let presentationState = loadWarningPresentationState
+        guard LoadWarningPresentationGate.canPresent(presentationState) else {
+            container.authLifecycleTraceStore?.record(
+                category: .lifecycle,
+                name: "loadWarning.pending",
+                metadata: [
+                    "source": source,
+                    "shieldVisible": presentationState.isShieldVisible ? "true" : "false",
+                    "isAuthenticating": presentationState.isAuthenticating ? "true" : "false",
+                    "privacyBlurred": presentationState.isPrivacyScreenBlurred ? "true" : "false",
+                    "hasAuthenticatedSession": presentationState.hasAuthenticatedSession ? "true" : "false",
+                    "requiresAuthOnLaunch": presentationState.requiresAuthOnLaunch ? "true" : "false"
+                ]
+            )
+            return
+        }
+
+        self.pendingLoadError = nil
+        loadError = pendingLoadError
     }
 
     #if os(iOS) || os(visionOS)

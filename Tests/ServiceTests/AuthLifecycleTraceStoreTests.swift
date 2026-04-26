@@ -214,6 +214,120 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertTrue(entries.contains { $0.name == "keychain.delete.finish" && $0.metadata["statusName"] == "success" })
     }
 
+    func test_errorMetadata_includesNSErrorDomainAndCode() {
+        let error = NSError(
+            domain: NSCocoaErrorDomain,
+            code: 260,
+            userInfo: [
+                NSLocalizedDescriptionKey: "The file could not be opened.",
+                NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: 2)
+            ]
+        )
+
+        let metadata = AuthTraceMetadata.errorMetadata(error)
+
+        XCTAssertEqual(metadata["errorDomain"], NSCocoaErrorDomain)
+        XCTAssertEqual(metadata["errorCode"], "260")
+        XCTAssertEqual(metadata["underlyingErrorDomain"], NSPOSIXErrorDomain)
+        XCTAssertEqual(metadata["underlyingErrorCode"], "2")
+        XCTAssertEqual(metadata["errorDescription"], "The file could not be opened.")
+    }
+
+    func test_protectedDataStorageRoot_recordsContractStagesForMissingBaseBootstrap() throws {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let applicationSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let baseDirectory = applicationSupportDirectory.appendingPathComponent(
+            "TraceProtectedDataMissingBase-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = TraceProtectedDataStorageRoot(
+            baseDirectory: baseDirectory,
+            validationMode: .enforceAppSupportContainment,
+            fileProtectionCapabilityProvider: { _ in true },
+            traceStore: store
+        )
+        let registryStore = ProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.trace.protected-data",
+            traceStore: store
+        )
+
+        _ = try registryStore.performSynchronousBootstrap()
+
+        let entries = store.recentEntries
+        XCTAssertTrue(entries.contains { $0.name == "protectedData.registryBootstrap.start" })
+        XCTAssertTrue(entries.contains { $0.name == "protectedData.registryBootstrap.finish" && $0.metadata["result"] == "success" })
+        XCTAssertTrue(entries.contains {
+            $0.name == "protectedData.storageContract"
+                && $0.metadata["stage"] == "containmentCheck"
+                && $0.metadata["result"] == "success"
+        })
+        XCTAssertTrue(entries.contains {
+            $0.name == "protectedData.storageContract"
+                && $0.metadata["stage"] == "protectionProbe"
+                && $0.metadata["result"] == "success"
+        })
+    }
+
+    func test_loadWarningPresentationGate_defersWhileAuthenticationPresentationIsActive() {
+        XCTAssertTrue(LoadWarningPresentationGate.canPresent(
+            LoadWarningPresentationState(
+                isShieldVisible: false,
+                isAuthenticating: false,
+                isPrivacyScreenBlurred: false,
+                hasAuthenticatedSession: true,
+                requiresAuthOnLaunch: true
+            )
+        ))
+        XCTAssertFalse(LoadWarningPresentationGate.canPresent(
+            LoadWarningPresentationState(
+                isShieldVisible: true,
+                isAuthenticating: false,
+                isPrivacyScreenBlurred: false,
+                hasAuthenticatedSession: true,
+                requiresAuthOnLaunch: true
+            )
+        ))
+        XCTAssertFalse(LoadWarningPresentationGate.canPresent(
+            LoadWarningPresentationState(
+                isShieldVisible: false,
+                isAuthenticating: true,
+                isPrivacyScreenBlurred: false,
+                hasAuthenticatedSession: true,
+                requiresAuthOnLaunch: true
+            )
+        ))
+        XCTAssertFalse(LoadWarningPresentationGate.canPresent(
+            LoadWarningPresentationState(
+                isShieldVisible: false,
+                isAuthenticating: false,
+                isPrivacyScreenBlurred: true,
+                hasAuthenticatedSession: true,
+                requiresAuthOnLaunch: true
+            )
+        ))
+        XCTAssertFalse(LoadWarningPresentationGate.canPresent(
+            LoadWarningPresentationState(
+                isShieldVisible: false,
+                isAuthenticating: false,
+                isPrivacyScreenBlurred: false,
+                hasAuthenticatedSession: false,
+                requiresAuthOnLaunch: true
+            )
+        ))
+        XCTAssertTrue(LoadWarningPresentationGate.canPresent(
+            LoadWarningPresentationState(
+                isShieldVisible: false,
+                isAuthenticating: false,
+                isPrivacyScreenBlurred: false,
+                hasAuthenticatedSession: false,
+                requiresAuthOnLaunch: false
+            )
+        ))
+    }
+
     func test_traceStore_recordsMonotonicRelativeTiming() {
         let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
 

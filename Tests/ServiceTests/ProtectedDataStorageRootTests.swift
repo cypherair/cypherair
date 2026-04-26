@@ -54,6 +54,42 @@ final class ProtectedDataStorageRootTests: XCTestCase {
         try assertCompleteFileProtection(at: storageRoot.registryURL)
     }
 
+    func test_registryBootstrap_missingProductionBaseDirectory_bootstrapsEmptySteadyState() throws {
+        let applicationSupportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let baseDirectory = applicationSupportDirectory.appendingPathComponent(
+            "ProtectedDataMissingBase-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? fileManager.removeItem(at: baseDirectory) }
+
+        XCTAssertFalse(fileManager.fileExists(atPath: baseDirectory.path))
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: baseDirectory,
+            validationMode: .enforceAppSupportContainment,
+            fileProtectionCapabilityProvider: { probeURL in
+                XCTAssertTrue(
+                    self.fileManager.fileExists(atPath: probeURL.path),
+                    "File-protection capability probing must use an existing path."
+                )
+                return true
+            }
+        )
+        let store = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.missing-base"
+        )
+
+        let result = try store.performSynchronousBootstrap()
+
+        guard case .emptySteadyState(_, let didBootstrap) = result.bootstrapOutcome else {
+            return XCTFail("Expected empty steady-state bootstrap, got \(result.bootstrapOutcome)")
+        }
+        XCTAssertTrue(didBootstrap)
+        XCTAssertEqual(result.frameworkState, .sessionLocked)
+        XCTAssertTrue(fileManager.fileExists(atPath: storageRoot.registryURL.path))
+        try assertCompleteFileProtection(at: storageRoot.registryURL)
+    }
+
     func test_bootstrapMetadataSave_writesMetadataWithCompleteFileProtection() throws {
         let baseDirectory = try makeApplicationSupportTestDirectory("ProtectedDataBootstrapMetadata")
         defer { try? fileManager.removeItem(at: baseDirectory) }
