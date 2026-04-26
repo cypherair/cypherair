@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>StringsTable</key>
+	<string>Acknowledgements</string>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Open Source</string>
+			<key>FooterText</key>
+			<string>CypherAir is built with open-source cryptography and tooling. Complete notices and license text are available inside the app under Settings, About, Source &amp; Compliance.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>CypherAir</string>
+			<key>Key</key>
+			<string>cypherair.acknowledgements.app</string>
+			<key>DefaultValue</key>
+			<string>GPL-3.0-or-later OR MPL-2.0</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>OpenPGP Engine</string>
+			<key>Key</key>
+			<string>cypherair.acknowledgements.openpgp</string>
+			<key>DefaultValue</key>
+			<string>Sequoia OpenPGP 2.2.0</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>Crypto Backend</string>
+			<key>Key</key>
+			<string>cypherair.acknowledgements.crypto</string>
+			<key>DefaultValue</key>
+			<string>OpenSSL 3.6.2 via openssl-src</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>Language Bridge</string>
+			<key>Key</key>
+			<string>cypherair.acknowledgements.bridge</string>
+			<key>DefaultValue</key>
+			<string>UniFFI 0.31.1</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>Toolchain</string>
+			<key>Key</key>
+			<string>cypherair.acknowledgements.toolchain</string>
+			<key>DefaultValue</key>
+			<string>Swift 6.2 and Rust</string>
+		</dict>
+	</array>
+</dict>
+</plist>

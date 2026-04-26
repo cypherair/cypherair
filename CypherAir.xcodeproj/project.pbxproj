@@ -12,6 +12,7 @@
 		CE0065262F676EBC008604AB /* AppIconC.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065242F676EBC008604AB /* AppIconC.icon */; };
 		CE0065272F676EBC008604AB /* AppIconA.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065222F676EBC008604AB /* AppIconA.icon */; };
 		CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE58C0002F96000000000001 /* PgpMobile.xcframework */; };
+		CE58C0072F96000000000001 /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = CE58C0062F96000000000001 /* Settings.bundle */; };
 		CEB560272F944C05004A1CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CEB560262F944C05004A1CA7 /* Assets.xcassets */; };
 		CEF297622F7612DF00DB6BF6 /* AppIconD.icon in Resources */ = {isa = PBXBuildFile; fileRef = CEF297612F7612DF00DB6BF6 /* AppIconD.icon */; };
 /* End PBXBuildFile section */
@@ -42,6 +43,7 @@
 		CE0065232F676EBC008604AB /* AppIconB.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconB.icon; sourceTree = "<group>"; };
 		CE0065242F676EBC008604AB /* AppIconC.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconC.icon; sourceTree = "<group>"; };
 		CE58C0002F96000000000001 /* PgpMobile.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = PgpMobile.xcframework; sourceTree = "<group>"; };
+		CE58C0062F96000000000001 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.plug-in; path = Settings.bundle; sourceTree = "<group>"; };
 		CE5F0F372F75EF3E007C896C /* CypherAir.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAir.entitlements; sourceTree = "<group>"; };
 		CE5F0F382F75EF45007C896C /* CypherAirMacOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAirMacOS.entitlements; sourceTree = "<group>"; };
 		CEB560262F944C05004A1CA7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -270,6 +272,7 @@
 				CE0065242F676EBC008604AB /* AppIconC.icon */,
 				CEF297612F7612DF00DB6BF6 /* AppIconD.icon */,
 				CE0065102F6502B4008604AB /* CypherAir-Info.plist */,
+				CE58C0062F96000000000001 /* Settings.bundle */,
 				CE96A5E62F825DBA006CADE2 /* Sources */,
 				CE96A4AD2F825DB6006CADE2 /* Tests */,
 				E10000022F90000100000001 /* UITests */,
@@ -299,6 +302,7 @@
 				C1FB1E6897EF4454B406EDAF /* Sources */,
 				CE58C0022F96000000000001 /* Frameworks */,
 				CE0065162F65232F008604AB /* Resources */,
+				CE58C0082F96000000000001 /* Sync Settings Bundle Version */,
 			);
 			buildRules = (
 			);
@@ -406,6 +410,7 @@
 				CE0065252F676EBC008604AB /* AppIconB.icon in Resources */,
 				CEF297622F7612DF00DB6BF6 /* AppIconD.icon in Resources */,
 				CEB560272F944C05004A1CA7 /* Assets.xcassets in Resources */,
+				CE58C0072F96000000000001 /* Settings.bundle in Resources */,
 				CE0065262F676EBC008604AB /* AppIconC.icon in Resources */,
 				CE0065272F676EBC008604AB /* AppIconA.icon in Resources */,
 				CE0065172F652334008604AB /* AppIcon.icon in Resources */,
@@ -488,6 +493,26 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -euo pipefail\n\nOUTPUT_PATH=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SourceComplianceInfo.json\"\nMETADATA_FILE=\"${TARGET_TEMP_DIR}/SourceComplianceOverrides.json\"\nmkdir -p \"$(dirname \"$OUTPUT_PATH\")\"\nCOMMIT_SHA=\"${SOURCE_COMPLIANCE_COMMIT_SHA:-}\"\nREQUIRE_STABLE_RELEASE=\"${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}\"\n\nset -- \\\n    --cargo-lock \"${SRCROOT}/pgp-mobile/Cargo.lock\" \\\n    --marketing-version \"${MARKETING_VERSION}\" \\\n    --build-number \"${CURRENT_PROJECT_VERSION}\" \\\n    --commit-sha \"${COMMIT_SHA}\" \\\n    --repository-url \"https://github.com/cypherair/cypherair\" \\\n    --stable-release-tag \"${SOURCE_COMPLIANCE_STABLE_RELEASE_TAG:-}\" \\\n    --stable-release-url \"${SOURCE_COMPLIANCE_STABLE_RELEASE_URL:-}\" \\\n    --require-stable-release \"${REQUIRE_STABLE_RELEASE}\" \\\n    --output \"$OUTPUT_PATH\"\n\nif [ -f \"$METADATA_FILE\" ]; then\n    set -- \"$@\" --metadata-file \"$METADATA_FILE\"\nfi\n\npython3 \"${SRCROOT}/scripts/generate_source_compliance_info.py\" \"$@\"\n";
+		};
+		CE58C0082F96000000000001 /* Sync Settings Bundle Version */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Settings.bundle/Root.plist",
+			);
+			name = "Sync Settings Bundle Version";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\nSETTINGS_ROOT=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Settings.bundle/Root.plist\"\nif [ ! -f \"$SETTINGS_ROOT\" ]; then\n    echo \"error: Settings.bundle Root.plist is missing from the built product.\"\n    exit 1\nfi\n\nVERSION_STRING=\"${MARKETING_VERSION} (${CURRENT_PROJECT_VERSION})\"\nexport SETTINGS_ROOT VERSION_STRING\npython3 - <<'PY_INNER'\nimport os\nimport plistlib\n\npath = os.environ[\"SETTINGS_ROOT\"]\nwith open(path, \"rb\") as file:\n    plist = plistlib.load(file)\n\nfor item in plist.get(\"PreferenceSpecifiers\", []):\n    if item.get(\"Key\") == \"cypherair.settings.version\":\n        item[\"DefaultValue\"] = os.environ[\"VERSION_STRING\"]\n        break\nelse:\n    raise SystemExit(\"cypherair.settings.version not found in Settings.bundle Root.plist\")\n\nwith open(path, \"wb\") as file:\n    plistlib.dump(plist, file)\nPY_INNER\n";
 		};
 		CE58C0052F96000000000001 /* Snapshot Repository Audit Inputs */ = {
 			isa = PBXShellScriptBuildPhase;

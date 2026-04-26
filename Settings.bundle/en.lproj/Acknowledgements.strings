@@ -1,0 +1,8 @@
+/* Localized strings for the CypherAir acknowledgements page in the system Settings app. */
+"Open Source" = "Open Source";
+"CypherAir is built with open-source cryptography and tooling. Complete notices and license text are available inside the app under Settings, About, Source & Compliance." = "CypherAir is built with open-source cryptography and tooling. Complete notices and license text are available inside the app under Settings, About, Source & Compliance.";
+"CypherAir" = "CypherAir";
+"OpenPGP Engine" = "OpenPGP Engine";
+"Crypto Backend" = "Crypto Backend";
+"Language Bridge" = "Language Bridge";
+"Toolchain" = "Toolchain";
