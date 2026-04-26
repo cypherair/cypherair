@@ -18,6 +18,11 @@ final class ProtectedSettingsHost {
         case frameworkRecoveryNeeded
     }
 
+    enum AuthorizationInteractionMode: Equatable {
+        case allowInteraction
+        case handoffOnly
+    }
+
     enum RecoveryOutcome: Equatable {
         case resumedToSteadyState
         case retryablePending
@@ -52,14 +57,16 @@ final class ProtectedSettingsHost {
         case tutorialSandbox
     }
 
-    private enum AccessAuthorizationMode {
+    private enum AccessAuthorizationMode: Equatable {
         case authorizeIfNeeded
         case requireExistingAuthorization
+        case handoffOnly
     }
 
     private struct LiveDependencies: @unchecked Sendable {
         let evaluateAccessGate: @MainActor (_ isFirstProtectedAccess: Bool) -> AccessGateDecision
-        let authorizeSharedRight: @MainActor (_ localizedReason: String) async -> AuthorizationOutcome
+        let hasAuthorizationHandoffContext: @MainActor () -> Bool
+        let authorizeSharedRight: @MainActor (_ localizedReason: String, _ interactionMode: AuthorizationInteractionMode) async -> AuthorizationOutcome
         let currentWrappingRootKey: @MainActor () throws -> Data
         let syncPreAuthorizationState: @MainActor () -> Void
         let currentDomainState: @MainActor () -> DomainState
@@ -83,7 +90,8 @@ final class ProtectedSettingsHost {
 
     init(
         evaluateAccessGate: @escaping @MainActor (_ isFirstProtectedAccess: Bool) -> AccessGateDecision,
-        authorizeSharedRight: @escaping @MainActor (_ localizedReason: String) async -> AuthorizationOutcome,
+        hasAuthorizationHandoffContext: @escaping @MainActor () -> Bool = { false },
+        authorizeSharedRight: @escaping @MainActor (_ localizedReason: String, _ interactionMode: AuthorizationInteractionMode) async -> AuthorizationOutcome,
         currentWrappingRootKey: @escaping @MainActor () throws -> Data,
         syncPreAuthorizationState: @escaping @MainActor () -> Void,
         currentDomainState: @escaping @MainActor () -> DomainState,
@@ -100,6 +108,7 @@ final class ProtectedSettingsHost {
         self.traceStore = traceStore
         self.liveDependencies = LiveDependencies(
             evaluateAccessGate: evaluateAccessGate,
+            hasAuthorizationHandoffContext: hasAuthorizationHandoffContext,
             authorizeSharedRight: authorizeSharedRight,
             currentWrappingRootKey: currentWrappingRootKey,
             syncPreAuthorizationState: syncPreAuthorizationState,
@@ -172,8 +181,47 @@ final class ProtectedSettingsHost {
         case .pendingMutationRecoveryRequired:
             liveDependencies.syncPreAuthorizationState()
             syncSectionStateFromStore(liveDependencies)
-        case .noProtectedDomainPresent, .authorizationRequired:
+        case .noProtectedDomainPresent:
             sectionState = .locked
+        case .authorizationRequired:
+            let hasHandoff = liveDependencies.hasAuthorizationHandoffContext()
+            if hasHandoff {
+                traceHostEvent(
+                    "protectedSettings.refresh.autoOpenHandoff",
+                    metadata: [
+                        "gateDecision": accessGateTraceValue(decision),
+                        "hasHandoff": "true",
+                        "result": "start"
+                    ]
+                )
+                let didOpen = await openProtectedSettings(
+                    using: liveDependencies,
+                    localizedReason: settingsLocalizedReason,
+                    authorizationMode: .handoffOnly
+                )
+                traceHostEvent(
+                    "protectedSettings.refresh.autoOpenHandoff",
+                    metadata: stateMetadata(liveDependencies)
+                        .merging(
+                            [
+                                "gateDecision": accessGateTraceValue(decision),
+                                "hasHandoff": "true",
+                                "result": didOpen ? "opened" : "notOpened"
+                            ],
+                            uniquingKeysWith: { _, new in new }
+                        )
+                )
+            } else {
+                sectionState = .locked
+                traceHostEvent(
+                    "protectedSettings.refresh.autoOpenHandoff",
+                    metadata: [
+                        "gateDecision": accessGateTraceValue(decision),
+                        "hasHandoff": "false",
+                        "result": "skipped"
+                    ]
+                )
+            }
         case .alreadyAuthorized:
             _ = await openProtectedSettings(
                 using: liveDependencies,
@@ -455,7 +503,8 @@ final class ProtectedSettingsHost {
             }
             traceHostEvent("protectedSettings.authorization.request", metadata: ["gateDecision": accessGateTraceValue(decision)])
             let authorizationResult = await liveDependencies.authorizeSharedRight(
-                localizedReason
+                localizedReason,
+                .allowInteraction
             )
             traceHostEvent(
                 "protectedSettings.authorization.result",
@@ -482,7 +531,38 @@ final class ProtectedSettingsHost {
                 return false
             }
         case .authorizationRequired:
-            guard authorizationMode == .authorizeIfNeeded else {
+            guard authorizationMode == .authorizeIfNeeded || authorizationMode == .handoffOnly else {
+                sectionState = .locked
+                traceHostEvent(
+                    "protectedSettings.ensureAccess.finish",
+                    metadata: stateMetadata(liveDependencies)
+                        .merging(["result": "authorizationModeBlocked", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                )
+                return false
+            }
+            let interactionMode: AuthorizationInteractionMode
+            switch authorizationMode {
+            case .authorizeIfNeeded:
+                interactionMode = .allowInteraction
+            case .handoffOnly:
+                guard liveDependencies.hasAuthorizationHandoffContext() else {
+                    sectionState = .locked
+                    traceHostEvent(
+                        "protectedSettings.ensureAccess.finish",
+                        metadata: stateMetadata(liveDependencies)
+                            .merging(
+                                [
+                                    "result": "handoffMissing",
+                                    "gateDecision": accessGateTraceValue(decision),
+                                    "hasHandoff": "false"
+                                ],
+                                uniquingKeysWith: { _, new in new }
+                            )
+                    )
+                    return false
+                }
+                interactionMode = .handoffOnly
+            case .requireExistingAuthorization:
                 sectionState = .locked
                 traceHostEvent(
                     "protectedSettings.ensureAccess.finish",
@@ -493,7 +573,8 @@ final class ProtectedSettingsHost {
             }
             traceHostEvent("protectedSettings.authorization.request", metadata: ["gateDecision": accessGateTraceValue(decision)])
             let authorizationResult = await liveDependencies.authorizeSharedRight(
-                localizedReason
+                localizedReason,
+                interactionMode
             )
             traceHostEvent(
                 "protectedSettings.authorization.result",
@@ -652,6 +733,8 @@ final class ProtectedSettingsHost {
             "authorizeIfNeeded"
         case .requireExistingAuthorization:
             "requireExistingAuthorization"
+        case .handoffOnly:
+            "handoffOnly"
         }
     }
 

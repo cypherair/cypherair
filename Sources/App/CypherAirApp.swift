@@ -120,11 +120,17 @@ struct CypherAirApp: App {
                     return .alreadyAuthorized
                 }
             },
-            authorizeSharedRight: { localizedReason in
+            hasAuthorizationHandoffContext: {
+                container.appSessionOrchestrator.hasProtectedDataAuthorizationHandoffContext
+            },
+            authorizeSharedRight: { localizedReason, interactionMode in
                 do {
                     let registry = try container.protectedDomainRecoveryCoordinator.loadCurrentRegistry()
                     let authenticationContext = container.appSessionOrchestrator
                         .consumeAuthenticatedContextForProtectedData()
+                    guard interactionMode == .allowInteraction || authenticationContext != nil else {
+                        return .cancelledOrDenied
+                    }
                     defer {
                         authenticationContext?.invalidate()
                     }

@@ -114,6 +114,10 @@ final class AppSessionOrchestrator {
         authenticationPromptCoordinator.operationPromptAttemptGeneration
     }
 
+    var hasProtectedDataAuthorizationHandoffContext: Bool {
+        pendingAuthenticatedContext != nil
+    }
+
     var isGracePeriodExpired: Bool {
         guard let lastAuthenticationDate else {
             return true

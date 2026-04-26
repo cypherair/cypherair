@@ -638,7 +638,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .alreadyAuthorized },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 XCTFail("Already-authorized refresh should not authorize again")
                 return .authorized
             },
