@@ -429,6 +429,11 @@ struct CypherAirApp: App {
                 metadata: ["source": "stateChange"]
             )
         }
+        .onChange(of: container.keyManagement.legacyMetadataMigrationLoadWarning) { _, warning in
+            guard let warning else { return }
+            loadError = warning
+            container.keyManagement.clearLegacyMetadataMigrationLoadWarning()
+        }
         .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
         .authenticationShieldHost(
             container.authenticationShieldCoordinator,

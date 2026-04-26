@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 /// Protocol for Keychain operations.
@@ -24,17 +25,17 @@ protocol KeychainManageable {
     ///   - account: The Keychain account identifier.
     /// - Returns: The stored data.
     /// - Throws: If the item is not found or access is denied.
-    func load(service: String, account: String) throws -> Data
+    func load(service: String, account: String, authenticationContext: LAContext?) throws -> Data
 
     /// Delete an item from the Keychain.
     ///
     /// - Parameters:
     ///   - service: The Keychain service identifier.
     ///   - account: The Keychain account identifier.
-    func delete(service: String, account: String) throws
+    func delete(service: String, account: String, authenticationContext: LAContext?) throws
 
     /// Check if an item exists in the Keychain without loading it.
-    func exists(service: String, account: String) -> Bool
+    func exists(service: String, account: String, authenticationContext: LAContext?) -> Bool
 
     /// List all service names matching a given prefix.
     /// Used for key enumeration on cold launch.
@@ -43,7 +44,25 @@ protocol KeychainManageable {
     ///   - servicePrefix: The prefix to filter by (e.g., "com.cypherair.v1.metadata.").
     ///   - account: The Keychain account identifier.
     /// - Returns: Array of full service names matching the prefix.
-    func listItems(servicePrefix: String, account: String) throws -> [String]
+    func listItems(servicePrefix: String, account: String, authenticationContext: LAContext?) throws -> [String]
+}
+
+extension KeychainManageable {
+    func load(service: String, account: String) throws -> Data {
+        try load(service: service, account: account, authenticationContext: nil)
+    }
+
+    func delete(service: String, account: String) throws {
+        try delete(service: service, account: account, authenticationContext: nil)
+    }
+
+    func exists(service: String, account: String) -> Bool {
+        exists(service: service, account: account, authenticationContext: nil)
+    }
+
+    func listItems(servicePrefix: String, account: String) throws -> [String] {
+        try listItems(servicePrefix: servicePrefix, account: account, authenticationContext: nil)
+    }
 }
 
 /// Keychain service name constants.
@@ -93,4 +112,7 @@ enum KeychainConstants {
 
     /// Default Keychain account identifier.
     static let defaultAccount = "com.cypherair"
+
+    /// Dedicated account for non-sensitive metadata cold-launch enumeration.
+    static let metadataAccount = "\(defaultAccount).metadata"
 }

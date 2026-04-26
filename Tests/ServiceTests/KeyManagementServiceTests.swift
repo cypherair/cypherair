@@ -143,7 +143,7 @@ final class KeyManagementServiceTests: XCTestCase {
     private func loadStoredIdentity(fingerprint: String) throws -> PGPKeyIdentity {
         let metadata = try mockKC.load(
             service: KeychainConstants.metadataService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount
+            account: KeychainConstants.metadataAccount
         )
         return try JSONDecoder().decode(PGPKeyIdentity.self, from: metadata)
     }
@@ -152,13 +152,13 @@ final class KeyManagementServiceTests: XCTestCase {
         let serviceName = KeychainConstants.metadataService(fingerprint: identity.fingerprint)
         try mockKC.delete(
             service: serviceName,
-            account: KeychainConstants.defaultAccount
+            account: KeychainConstants.metadataAccount
         )
         let data = try JSONEncoder().encode(identity)
         try mockKC.save(
             data,
             service: serviceName,
-            account: KeychainConstants.defaultAccount,
+            account: KeychainConstants.metadataAccount,
             accessControl: nil
         )
     }
@@ -168,7 +168,7 @@ final class KeyManagementServiceTests: XCTestCase {
         try mockKC.save(
             data,
             service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
-            account: KeychainConstants.defaultAccount,
+            account: KeychainConstants.metadataAccount,
             accessControl: nil
         )
     }
@@ -229,7 +229,7 @@ final class KeyManagementServiceTests: XCTestCase {
             account: KeychainConstants.defaultAccount))
         XCTAssertTrue(mockKC.exists(
             service: KeychainConstants.metadataService(fingerprint: fp),
-            account: KeychainConstants.defaultAccount))
+            account: KeychainConstants.metadataAccount))
     }
 
     func test_generateKey_profileA_returnsCorrectIdentity() async throws {
@@ -320,6 +320,105 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(newService.keys.first?.fingerprint, identity.fingerprint)
     }
 
+    func test_loadKeys_usesDedicatedMetadataAccountOnly() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        mockKC.resetCallHistory()
+
+        let newService = KeyManagementService(
+            engine: engine,
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            authenticator: mockAuth
+        )
+
+        try newService.loadKeys()
+
+        XCTAssertEqual(newService.keys.first?.fingerprint, identity.fingerprint)
+        XCTAssertTrue(mockKC.listItemsCalls.contains { call in
+            call.servicePrefix == KeychainConstants.metadataPrefix
+                && call.account == KeychainConstants.metadataAccount
+        })
+        XCTAssertFalse(mockKC.listItemsCalls.contains { call in
+            call.servicePrefix == KeychainConstants.metadataPrefix
+                && call.account == KeychainConstants.defaultAccount
+        })
+    }
+
+    func test_legacyMetadataMigration_afterAppAuthentication_movesMetadataToDedicatedAccount() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let serviceName = KeychainConstants.metadataService(fingerprint: identity.fingerprint)
+        let metadata = try mockKC.load(
+            service: serviceName,
+            account: KeychainConstants.metadataAccount
+        )
+        try mockKC.save(
+            metadata,
+            service: serviceName,
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        try mockKC.delete(service: serviceName, account: KeychainConstants.metadataAccount)
+
+        let freshService = KeyManagementService(
+            engine: engine,
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            authenticator: mockAuth
+        )
+        try freshService.loadKeys()
+        XCTAssertTrue(freshService.keys.isEmpty)
+
+        let context = LAContext()
+        await freshService.migrateLegacyMetadataAfterAppAuthentication(
+            authenticationContext: context,
+            source: "unitTest"
+        )
+
+        XCTAssertEqual(freshService.keys.map(\.fingerprint), [identity.fingerprint])
+        XCTAssertNil(freshService.legacyMetadataMigrationLoadWarning)
+        XCTAssertTrue(mockKC.exists(service: serviceName, account: KeychainConstants.metadataAccount))
+        XCTAssertFalse(mockKC.exists(service: serviceName, account: KeychainConstants.defaultAccount))
+        XCTAssertTrue(mockKC.listItemsCalls.contains { call in
+            call.account == KeychainConstants.defaultAccount && call.hasAuthenticationContext
+        })
+    }
+
+    func test_legacyMetadataMigration_listFailureDoesNotBlockCurrentSession() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let serviceName = KeychainConstants.metadataService(fingerprint: identity.fingerprint)
+        let metadata = try mockKC.load(
+            service: serviceName,
+            account: KeychainConstants.metadataAccount
+        )
+        try mockKC.save(
+            metadata,
+            service: serviceName,
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        try mockKC.delete(service: serviceName, account: KeychainConstants.metadataAccount)
+
+        let freshService = KeyManagementService(
+            engine: engine,
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            authenticator: mockAuth
+        )
+        mockKC.listItemsError = KeychainError.userCancelled
+
+        await freshService.migrateLegacyMetadataAfterAppAuthentication(
+            authenticationContext: LAContext(),
+            source: "unitTest"
+        )
+
+        XCTAssertTrue(freshService.keys.isEmpty)
+        XCTAssertNotNil(freshService.legacyMetadataMigrationLoadWarning)
+        freshService.clearLegacyMetadataMigrationLoadWarning()
+        XCTAssertNil(freshService.legacyMetadataMigrationLoadWarning)
+        XCTAssertTrue(mockKC.exists(service: serviceName, account: KeychainConstants.defaultAccount))
+        XCTAssertFalse(mockKC.exists(service: serviceName, account: KeychainConstants.metadataAccount))
+    }
+
     func test_loadKeys_corruptMetadata_skipsCorruptEntry() async throws {
         // Store valid metadata
         try await TestHelpers.generateProfileAKey(service: service)
@@ -329,7 +428,7 @@ final class KeyManagementServiceTests: XCTestCase {
         try mockKC.save(
             corruptData,
             service: KeychainConstants.metadataService(fingerprint: "deadbeef"),
-            account: KeychainConstants.defaultAccount,
+            account: KeychainConstants.metadataAccount,
             accessControl: nil
         )
 
@@ -415,6 +514,9 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertFalse(mockKC.exists(
             service: KeychainConstants.seKeyService(fingerprint: fp),
             account: KeychainConstants.defaultAccount))
+        XCTAssertFalse(mockKC.exists(
+            service: KeychainConstants.metadataService(fingerprint: fp),
+            account: KeychainConstants.metadataAccount))
     }
 
     func test_deleteKey_removesFromKeysArray() async throws {

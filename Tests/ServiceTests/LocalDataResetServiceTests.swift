@@ -23,6 +23,12 @@ final class LocalDataResetServiceTests: XCTestCase {
             accessControl: nil
         )
         try container.keychain.save(
+            Data([0x05]),
+            service: metadataService,
+            account: KeychainConstants.metadataAccount,
+            accessControl: nil
+        )
+        try container.keychain.save(
             Data([0x02]),
             service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             account: KeychainConstants.defaultAccount,
@@ -44,8 +50,9 @@ final class LocalDataResetServiceTests: XCTestCase {
 
         let summary = try await container.localDataResetService.resetAllLocalData()
 
-        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 2)
+        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 3)
         XCTAssertFalse(container.keychain.exists(service: metadataService, account: KeychainConstants.defaultAccount))
+        XCTAssertFalse(container.keychain.exists(service: metadataService, account: KeychainConstants.metadataAccount))
         XCTAssertFalse(container.keychain.exists(
             service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             account: KeychainConstants.defaultAccount
@@ -60,5 +67,6 @@ final class LocalDataResetServiceTests: XCTestCase {
         let traceNames = container.authLifecycleTraceStore?.recentEntries.map(\.name) ?? []
         XCTAssertTrue(traceNames.contains("localDataReset.start"))
         XCTAssertTrue(traceNames.contains("localDataReset.finish"))
+        XCTAssertTrue(traceNames.contains("localDataReset.validation.finish"))
     }
 }

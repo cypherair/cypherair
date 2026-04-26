@@ -21,8 +21,10 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
     private(set) var saveCallCount = 0
     private(set) var loadCallCount = 0
     private(set) var deleteCallCount = 0
+    private(set) var listItemsCallCount = 0
     private(set) var lastSavedService: String?
     private(set) var lastDeletedService: String?
+    private(set) var listItemsCalls: [(servicePrefix: String, account: String, hasAuthenticationContext: Bool)] = []
 
     /// If set, the next save operation will throw this error (one-shot).
     var saveError: Error?
@@ -30,6 +32,8 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
     var loadError: Error?
     /// If set, the next delete operation will throw this error (one-shot).
     var deleteError: Error?
+    /// If set, the next list operation will throw this error (one-shot).
+    var listItemsError: Error?
 
     /// If non-zero, the save at this call count (1-based) will throw `saveError ?? MockKeychainError.saveFailed`.
     /// Example: `failOnSaveNumber = 4` means the 4th save call will fail.
@@ -69,7 +73,8 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
         storage[key] = data
     }
 
-    func load(service: String, account: String) throws -> Data {
+    func load(service: String, account: String, authenticationContext: LAContext?) throws -> Data {
+        _ = authenticationContext
         if let error = loadError {
             loadError = nil
             throw error
@@ -82,7 +87,8 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
         return data
     }
 
-    func delete(service: String, account: String) throws {
+    func delete(service: String, account: String, authenticationContext: LAContext?) throws {
+        _ = authenticationContext
         deleteCallCount += 1
         if let error = deleteError {
             deleteError = nil
@@ -99,11 +105,24 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
         }
     }
 
-    func exists(service: String, account: String) -> Bool {
-        storage[storageKey(service: service, account: account)] != nil
+    func exists(service: String, account: String, authenticationContext: LAContext?) -> Bool {
+        _ = authenticationContext
+        return storage[storageKey(service: service, account: account)] != nil
     }
 
-    func listItems(servicePrefix: String, account: String) throws -> [String] {
+    func listItems(servicePrefix: String, account: String, authenticationContext: LAContext?) throws -> [String] {
+        listItemsCallCount += 1
+        listItemsCalls.append(
+            (
+                servicePrefix: servicePrefix,
+                account: account,
+                hasAuthenticationContext: authenticationContext != nil
+            )
+        )
+        if let error = listItemsError {
+            listItemsError = nil
+            throw error
+        }
         let suffix = ":\(account)"
         return storage.keys.compactMap { key in
             guard key.hasSuffix(suffix) else { return nil }
@@ -116,17 +135,24 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
     /// Reset all state for clean test setup.
     func reset() {
         storage.removeAll()
-        saveCallCount = 0
-        loadCallCount = 0
-        deleteCallCount = 0
-        lastSavedService = nil
-        lastDeletedService = nil
+        resetCallHistory()
         saveError = nil
         loadError = nil
         deleteError = nil
+        listItemsError = nil
         throwOnDuplicate = true
         failOnSaveNumber = 0
         failOnDeleteNumber = 0
+    }
+
+    func resetCallHistory() {
+        saveCallCount = 0
+        loadCallCount = 0
+        deleteCallCount = 0
+        listItemsCallCount = 0
+        lastSavedService = nil
+        lastDeletedService = nil
+        listItemsCalls.removeAll()
     }
 }
 

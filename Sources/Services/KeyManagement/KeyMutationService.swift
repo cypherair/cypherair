@@ -163,6 +163,17 @@ final class KeyMutationService {
                 deletionErrors.append(error)
             }
         }
+        do {
+            try keychain.delete(
+                service: KeychainConstants.metadataService(fingerprint: fingerprint),
+                account: KeychainConstants.metadataAccount
+            )
+        } catch {
+            guard !Self.isItemNotFound(error) else {
+                return deletionErrors
+            }
+            deletionErrors.append(error)
+        }
 
         return deletionErrors
     }
