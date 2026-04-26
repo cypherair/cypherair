@@ -7,7 +7,7 @@
 > **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific product direction.  
 > **Companion document:** [CONTACTS_TDD](CONTACTS_TDD.md)  
 > **Primary framework references:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)  
-> **Related documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Related documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Product Intent
 
@@ -431,15 +431,17 @@ Migration source remains the legacy plaintext contacts storage:
 
 Contacts migration belongs to the Contacts Protected Domain phase, currently Phase 8 of the AppData roadmap.
 
-Required preconditions:
+Current AppData progress is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md). Required roadmap gates before Contacts PR1-PR8 begin:
 
-- Phase 1 reusable protected app-data framework is already implemented
-- Phase 2 file-protection baseline is already implemented
-- Phase 3 first low-risk protected domain is already implemented
-- Phase 4 post-unlock multi-domain orchestration and framework hardening is already implemented
-- Phase 5 `private-key-control` domain is already implemented
-- Phase 6 `key metadata` domain is already implemented
-- Phase 7 non-Contacts protected-after-unlock domains and required local file/static-protection cleanup are already implemented
+- Phase 1 reusable protected app-data framework is implemented
+- Phase 2 file-protection baseline is implemented for ProtectedData storage
+- Phase 3 first low-risk protected domain has completed its narrow `protected-settings` / `clipboardNotice` scope
+- Phase 4 post-unlock multi-domain orchestration and framework hardening must be complete, including second-real-domain coverage and pending-create continuation hardening
+- Phase 5 `private-key-control` domain must be implemented
+- Phase 6 `key metadata` domain must be implemented
+- Phase 7 non-Contacts protected-after-unlock domains and required local file/static-protection cleanup must be implemented or explicitly resolved
+
+These bullets are Phase 8 gates, not a claim that all listed pending phases already ship.
 
 Contacts adoption and migration occur on the first Contacts-required protected-domain access into the new Contacts architecture. That access may happen during launch or resume if the initial route immediately needs Contacts data, and the same orchestrated unlock flow may activate the shared app-data session there by reusing the authenticated `LAContext` for root-secret retrieval.
 

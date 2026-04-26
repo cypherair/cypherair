@@ -5,7 +5,7 @@
 > **Purpose:** Define the validation matrix, review checks, and implementation-readiness criteria for the protected app-data proposal.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Primary authority:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture and security rules, and [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) for rollout intent.
-> **Companion documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md)
+> **Companion documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 > **Related documents:** [TESTING](TESTING.md) · [CONTACTS_TDD](CONTACTS_TDD.md)
 
 ## 1. Scope And Relationship
@@ -128,6 +128,7 @@ This draft proposal must map its validation buckets onto the repository's existi
 - Phase 4 post-unlock orchestration coverage must prove that app unlock can open registered committed domains with the authenticated `LAContext`, while missing context, no committed domain, or pending mutation states do not read the root secret; this coverage remains owned by AppData Phase 4 even when later Contacts work consumes it
 - file-protection strength, container containment, fail-closed capability checks, empty-root parent probing, and absence of fallback to broader storage locations belong to Swift unit coverage plus platform-targeted macOS-local verification, with manual verification retained for lock-state semantics that repository automation cannot prove
 - Reset All Local Data coverage must prove default-account and metadata-account CypherAir Keychain deletion, missing-item success semantics, in-memory state clearing, retired legacy preference cleanup such as `requireAuthOnLaunch`, and clean empty ProtectedData postconditions
+- Phase 3 protected-settings coverage currently proves only the narrow first-domain scope: `ProtectedSettingsStore`, `clipboardNotice`, legacy-key cleanup, relock cleanup, and handoff-only open behavior
 - protected-after-unlock setting migration must prove that pre-auth startup does not read protected payloads, does not fetch the root-secret Keychain item, and does not weaken or change the selected app-session authentication policy
 - the `appSessionAuthenticationPolicy` boot authentication profile must stay early-readable unless a future testable design provides a protected value plus boot cache without changing launch authentication strength
 - `private-key-control` migration tests must prove that `authMode` and private-key recovery journal data are unavailable pre-auth, that app unlock opens the domain through post-unlock orchestration without a second prompt, and that rewrap / modify-expiry recovery detection runs only after this domain opens
@@ -187,7 +188,7 @@ Any implementation derived from this proposal should be reviewable against these
 - does it define fail-closed relock semantics and `restartRequired` clearly?
 - does it keep bootstrap metadata minimal and non-sensitive?
 - does it harden file protection explicitly instead of relying on platform defaults?
-- does it classify all existing persisted app-owned state in app-data migration scope into a reviewed target class and migration-readiness state, while recording reviewed private-key-domain exclusions explicitly?
+- does it classify all existing persisted app-owned state in app-data migration scope into a reviewed target class, target phase or exception, current status, and migration-readiness state, while recording reviewed private-key-domain exclusions explicitly?
 - does it make Contacts a consumer of the framework rather than the owner of a separate architecture?
 - does it keep anti-rollback explicitly out of scope in v1 rather than implying freshness guarantees?
 
@@ -198,6 +199,7 @@ Before treating this proposal stack as implementation-ready:
 - `APP_DATA_PROTECTION_TDD.md` must stand alone as the architecture and security source for protected app data
 - `APP_DATA_FRAMEWORK_SPEC.md` must stand alone as the concrete framework mechanics reference
 - `APP_DATA_MIGRATION_GUIDE.md` must stand alone as the rollout and inventory reference
+- `APP_DATA_ROADMAP_STATUS.md` must stand alone as the current progress record
 - this validation guide must stand alone as the review and checklist reference
 - `APP_DATA_PROTECTION_PLAN.md` must remain concise and phase-oriented rather than duplicating the detailed specs
 - archived bridge documents must point readers to the right successor documents without adding a third architecture

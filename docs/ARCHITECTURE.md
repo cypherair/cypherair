@@ -125,7 +125,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K memory requirements before key import. 75% threshold prevents Jetsam termination. No-op for Profile A (Iterated+Salted S2K). |
 | `MemoryZeroingUtility` | Extensions on `Data` and `Array<UInt8>` for secure clearing |
 
-### ProtectedData Phase 1 Additions (`Sources/Security/ProtectedData/`)
+### ProtectedData Current Additions (`Sources/Security/ProtectedData/`)
 
 - `ProtectedDataStorageRoot.swift` — resolves `Application Support/ProtectedData/`, file-protection application, and registry/domain metadata paths
 - `ProtectedDataRegistry.swift` / `ProtectedDataRegistryStore.swift` — registry manifest, consistency validation, recovery classification, empty-registry bootstrap, and bootstrap outcome construction
@@ -137,16 +137,17 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `ProtectedDomainRecoveryCoordinator` / `ProtectedDomainRecoveryHandler` — generic pending-mutation recovery dispatch by `ProtectedDataDomainID`
 - `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry, currently registering `protected-settings`
 
-Current Phase 1 scope:
+Current ProtectedData scope:
 
 - the framework exists and is wired into startup/bootstrap and app-session ownership
-- `ProtectedSettingsStore` is the first protected-domain adopter for protected settings/control state
+- `ProtectedSettingsStore` is the first protected-domain adopter; current migrated payload scope is `clipboardNotice`
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open registered committed domains without a second prompt
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
+- AppData phase completion status is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 
 ### Models (`Sources/Models/`)
 
@@ -374,14 +375,14 @@ App Sandbox:
 ├── Application Support/
 │   └── ProtectedData/
 │       ├── ProtectedDataRegistry.plist
-│       └── protected-settings/   → Protected settings envelopes and domain bootstrap metadata
+│       └── protected-settings/   → Protected settings envelopes; currently clipboardNotice
 ├── Library/Preferences/
 │   └── (UserDefaults)
 │       ├── com.cypherair.preference.authMode              → "standard" | "highSecurity" (future private-key-control domain)
 │       ├── com.cypherair.preference.appSessionAuthenticationPolicy → App-session boot auth profile
 │       ├── com.cypherair.preference.gracePeriod            → Int (seconds): 0 / 60 / 180 / 300
 │       ├── com.cypherair.preference.encryptToSelf          → Bool (default true)
-│       ├── com.cypherair.preference.clipboardNotice        → Bool (default true)
+│       ├── com.cypherair.preference.clipboardNotice        → Legacy Bool used only for ProtectedSettingsStore migration cleanup
 │       ├── com.cypherair.preference.onboardingComplete     → Bool (default false)
 │       ├── com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
 │       ├── com.cypherair.preference.colorTheme             → String (ColorTheme rawValue, default "systemDefault")

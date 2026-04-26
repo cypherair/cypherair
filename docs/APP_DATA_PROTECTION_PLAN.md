@@ -6,6 +6,7 @@
 > **Audience:** Engineering, security review, QA, and AI coding tools.  
 > **Companion document:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)  
 > **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
+> **Current progress record:** [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 > **Related documents:** [SECURITY](SECURITY.md) · [ARCHITECTURE](ARCHITECTURE.md) · [TESTING](TESTING.md) · [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Intent
@@ -151,9 +152,9 @@ See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.2 and [APP
 
 ### Phase 3: First Low-Risk Real Domain
 
-Use a low-risk domain such as protected-after-unlock settings or recovery/control state as the first concrete adopter. This phase proves the shared root-secret activation / domain unlock / relock model without touching the private-key domain.
+Use a low-risk domain such as protected-after-unlock settings or recovery/control state as the first concrete adopter. In the current implementation, this phase is limited to `ProtectedSettingsStore` plus the migrated `clipboardNotice` setting; remaining ordinary settings stay in Phase 7.
 
-See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.3 and Section 5.
+See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.3 and Section 5, plus [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) for current progress.
 
 ### Phase 4: Post-Unlock Multi-Domain Orchestration And Framework Hardening
 
@@ -177,7 +178,7 @@ Migrate ordinary protected-after-unlock settings, self-test policy, and related 
 
 Migrate Contacts onto the shared protected app-data framework only after the earlier private-key-control, key-metadata, and non-Contacts protected-after-unlock work has been completed. Contacts must remain a domain-specific consumer of the shared framework, not a second independent vault architecture.
 
-See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts-internal PR sequence after the AppData Phase 4 framework-hardening prerequisite.
+See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts-internal PR sequence. AppData Phase 4 is a prerequisite, but Contacts PR1-PR8 remain Phase 8 work behind the Phase 5-7 gates.
 
 ### Phase 9: Future Persistent Domains
 
@@ -199,9 +200,9 @@ See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7
 
 ### 5.3 Persistent-State Classification Inventory
 
-Before any real protected domain lands, implementation planning must maintain a complete inventory of persisted app-owned state in app-data migration scope, with target class and migration readiness tracked explicitly and with reviewed private-key-domain exclusions called out explicitly.
+Implementation planning must maintain a complete inventory of persisted app-owned state in app-data migration scope, with target class, target phase or exception, current status, and migration readiness tracked explicitly and with reviewed private-key-domain exclusions called out explicitly.
 
-The detailed inventory table and first-domain readiness rules live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 4-5.
+The detailed inventory table and first-domain readiness rules live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 4-5. Current roadmap status lives in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
 
 ### 5.4 Startup Architecture Impact
 

@@ -262,7 +262,7 @@ This implementation plan references the inventory by behavior group rather than 
 
 ## 6. Prerequisites And Planned Contacts PR Sequence
 
-This section freezes the later implementation order and separates shared AppData prerequisites from Contacts-internal PRs.
+This section freezes the later implementation order and separates shared AppData prerequisites from Contacts-internal PRs. AppData Phase 4 is only a prerequisite; Contacts PR1-PR8 remain AppData Phase 8 work and do not begin until the Phase 5-7 roadmap gates are complete, unless the AppData roadmap is explicitly revised.
 
 ### 6.1 Prerequisite — AppData Phase 4 Framework Hardening
 
@@ -284,6 +284,7 @@ This section freezes the later implementation order and separates shared AppData
 - no Contacts schema or app-surface changes
 - no Contacts migration logic
 - no Contacts-internal PR coverage claim
+- no early Contacts schema-only prep before Phase 8
 
 **Validation**
 
@@ -626,6 +627,7 @@ This implementation-prep document is only complete if a later implementer can an
 
 - why Contacts protected-domain adoption needs more than a storage swap
 - why AppData Phase 4 framework hardening is a prerequisite rather than a Contacts-internal PR
+- why Contacts PR1-PR8 remain Phase 8 work behind the Phase 5-7 gates
 - what the Contacts schema skeleton may define before later behavior PRs
 - why verification contract refactor must happen before lifecycle wiring
 - which Contacts entrypoints are gated and which are only enrichment consumers
