@@ -361,7 +361,7 @@ final class SettingsScreenModelTests: XCTestCase {
         var authorizeCallCount = 0
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .authorizationRequired },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 authorizeCallCount += 1
                 return .authorized
             },
@@ -389,7 +389,7 @@ final class SettingsScreenModelTests: XCTestCase {
         var openDomainCallCount = 0
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .authorizationRequired },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 authorizeCallCount += 1
                 return .authorized
             },
@@ -414,11 +414,81 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_liveProtectedSettingsHost_authorizationRequired_refreshAutoOpensWithHandoff() async {
+        var authorizeCallCount = 0
+        var openDomainCallCount = 0
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .authorizationRequired },
+            hasAuthorizationHandoffContext: { true },
+            authorizeSharedRight: { _, interactionMode in
+                authorizeCallCount += 1
+                XCTAssertEqual(interactionMode, .handoffOnly)
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { domainState == .unlocked ? false : nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in
+                openDomainCallCount += 1
+                domainState = .unlocked
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.refreshSettingsSection()
+
+        XCTAssertEqual(authorizeCallCount, 1)
+        XCTAssertEqual(openDomainCallCount, 1)
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_authorizationRequired_handoffMissingBeforeAuthorizationStaysLocked() async {
+        var handoffCheckCount = 0
+        var authorizeCallCount = 0
+        var openDomainCallCount = 0
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .authorizationRequired },
+            hasAuthorizationHandoffContext: {
+                handoffCheckCount += 1
+                return handoffCheckCount == 1
+            },
+            authorizeSharedRight: { _, _ in
+                authorizeCallCount += 1
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
+            syncPreAuthorizationState: {},
+            currentDomainState: { .locked },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in
+                openDomainCallCount += 1
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.refreshSettingsSection()
+
+        XCTAssertEqual(handoffCheckCount, 2)
+        XCTAssertEqual(authorizeCallCount, 0)
+        XCTAssertEqual(openDomainCallCount, 0)
+        XCTAssertEqual(host.sectionState, .locked)
+    }
+
+    @MainActor
     func test_liveProtectedSettingsHost_noProtectedDomainPresent_refreshLeavesLockedState() async {
         var authorizeCallCount = 0
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .noProtectedDomainPresent },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 authorizeCallCount += 1
                 return .authorized
             },
@@ -448,7 +518,7 @@ final class SettingsScreenModelTests: XCTestCase {
         var clipboardNotice = false
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .alreadyAuthorized },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 XCTFail("Already-authorized refresh should not prompt again")
                 return .authorized
             },
@@ -476,7 +546,7 @@ final class SettingsScreenModelTests: XCTestCase {
     func test_liveProtectedSettingsHost_authorizationRequired_refreshCancellationLeavesLocked() async {
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .authorizationRequired },
-            authorizeSharedRight: { _ in .cancelledOrDenied },
+            authorizeSharedRight: { _, _ in .cancelledOrDenied },
             currentWrappingRootKey: { Data(repeating: 0xBB, count: 32) },
             syncPreAuthorizationState: {},
             currentDomainState: { .locked },
@@ -500,7 +570,7 @@ final class SettingsScreenModelTests: XCTestCase {
         var authorizeCallCount = 0
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .authorizationRequired },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 authorizeCallCount += 1
                 return .authorized
             },
@@ -531,7 +601,7 @@ final class SettingsScreenModelTests: XCTestCase {
         var clipboardNotice = false
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .authorizationRequired },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 authorizeCallCount += 1
                 return .authorized
             },
@@ -561,7 +631,7 @@ final class SettingsScreenModelTests: XCTestCase {
         var authorizeCallCount = 0
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .authorizationRequired },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 authorizeCallCount += 1
                 return .authorized
             },
@@ -591,7 +661,7 @@ final class SettingsScreenModelTests: XCTestCase {
         var openDomainCallCount = 0
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .alreadyAuthorized },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 authorizeCallCount += 1
                 return .authorized
             },
@@ -624,7 +694,7 @@ final class SettingsScreenModelTests: XCTestCase {
         var clipboardNotice = true
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .authorizationRequired },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 authorizeCallCount += 1
                 return .authorized
             },
@@ -659,7 +729,7 @@ final class SettingsScreenModelTests: XCTestCase {
         var authorizeCallCount = 0
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .authorizationRequired },
-            authorizeSharedRight: { _ in
+            authorizeSharedRight: { _, _ in
                 authorizeCallCount += 1
                 return .authorized
             },
@@ -688,7 +758,7 @@ final class SettingsScreenModelTests: XCTestCase {
         var clipboardNotice = false
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .alreadyAuthorized },
-            authorizeSharedRight: { _ in .authorized },
+            authorizeSharedRight: { _, _ in .authorized },
             currentWrappingRootKey: { Data() },
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
