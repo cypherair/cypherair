@@ -1,9 +1,9 @@
 # ProtectedData Secure Enclave Device-Binding Plan
 
-> Superseded implementation guide. The Secure Enclave device-binding layer is
-> now implemented; the permanent architecture/security/testing docs are the
-> source of truth. Keep this file only as a short-term implementation audit
-> record until it is archived.
+> Archived implementation guide. The Secure Enclave device-binding layer is now
+> implemented; the permanent architecture/security/testing docs are the source
+> of truth. This file is retained only as historical implementation audit
+> context.
 
 ## 1. Apple Documentation Baseline
 
