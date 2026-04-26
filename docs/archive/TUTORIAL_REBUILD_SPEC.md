@@ -1,10 +1,14 @@
 # Tutorial Rebuild Specification
 
-> Purpose: Define the target guided tutorial product for CypherAir across iPhone, iPad, and macOS.
-> Audience: Human developers, designers, product owners, and AI coding tools.
-> Status: Active roadmap spec. This document defines the intended tutorial end-state and is not a statement of current shipped behavior.
-> Companion documents: [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [LIQUID_GLASS](LIQUID_GLASS.md) · [TESTING](TESTING.md)
-> Spec posture: This document defines the target tutorial product, not a patch plan for the current implementation. It is written from the ideal end-state backward. The final tutorial may diverge materially from the current code wherever needed to satisfy CypherAir's privacy, offline, security, accessibility, and cross-platform product goals.
+> Status: Archived historical rebuild spec. This document records the target-state tutorial design that guided the rebuild work; it is no longer maintained as an active roadmap.
+> Archival reason: The guided tutorial's stable product, architecture, security, and testing contracts have been absorbed into the active main documents.
+> Current source of truth: [PRD](../PRD.md), [ARCHITECTURE](../ARCHITECTURE.md), [SECURITY](../SECURITY.md), and [TESTING](../TESTING.md) outrank this archived file whenever they disagree.
+> Audience: Historical reference for human developers, designers, product owners, and AI coding tools.
+> Original purpose: Define the target guided tutorial product for CypherAir across iPhone, iPad, and macOS.
+> Original status: Active roadmap spec.
+> Archive refresh: 2026-04-25.
+
+This archive is intentionally preserved as design context. Fine-grained rebuild expectations that were useful during implementation, especially around automation hooks and modal guidance ideals, should not be treated as standalone active requirements unless they are also present in the active main documents.
 
 ## 1. Product Intent
 

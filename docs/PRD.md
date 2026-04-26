@@ -93,16 +93,21 @@ For complete algorithm specifications, see [SECURITY.md](SECURITY.md) Section 1 
 
 ## 4. User Workflows
 
-### 4.1 Key Generation
+### 4.1 First Run, Guided Tutorial, And Key Generation
 
 ```
-Open App → Onboarding (3 pages) → "Generate My Key"
+Open App → Onboarding (3 pages) → tutorial decision page
+→ Start Guided Tutorial OR Skip Tutorial and Enter App
+→ If tutorial starts: isolated sandbox modules → explicit Finish → real app
+→ Real app → Keys → Generate Key
 → Select profile: Universal Compatible (default) / Advanced Security
 → Name (required) + email (optional, recommended) + expiry (default 2y)
 → Done → Prompt: back up private key & share public key
 ```
 
-- Revocation cert auto-generated. Onboarding re-viewable from Settings.
+- The guided tutorial is a sandboxed learning path, not a key-generation prerequisite. Tutorial keys, contacts, messages, settings, and outputs never read or write the real workspace.
+- First-run users can skip the tutorial without marking it complete. The tutorial can be replayed from Settings, and completion is recorded only when the user explicitly finishes from the tutorial completion surface.
+- Revocation cert auto-generated. Onboarding and the guided tutorial are re-viewable from Settings.
 - Profile cannot be changed after generation. To switch profile, generate a new key.
 
 ### 4.2 Public Key Exchange
@@ -341,7 +346,7 @@ Full details in [TDD](TDD.md). Key decisions:
 - [x] Signing/verification. Contact management. Backup & restore (Iterated+Salted / Argon2id).
 - [x] Device auth (Standard + High Security). SE wrapping.
 - [x] Compatibility check. Self-test (both profiles). File/URL registration. Clipboard notice.
-- [x] Privacy screen + re-auth + content lifecycle. Onboarding. Backup indicator.
+- [x] Privacy screen + re-auth + content lifecycle. Onboarding + guided tutorial. Backup indicator.
 - [x] English + Chinese. Zero permissions. Background tasks. Accessibility. MIE.
 
 ### 10.2 v1.1 — Completed

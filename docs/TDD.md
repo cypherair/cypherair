@@ -412,4 +412,4 @@ The Enhanced Security capability is additive and does not affect compatibility w
 - Verify no tag mismatch terminations occur (check Console.app and Xcode crash logs).
 - Test under Xcode Instruments "Memory Tag Violations" instrument if available.
 
-See also [SECURITY.md](SECURITY.md) Section 6 for additional MIE security analysis.
+See also [SECURITY.md](SECURITY.md) Section 7 for additional MIE security analysis.

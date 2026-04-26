@@ -190,7 +190,21 @@ When the user changes mode in Settings:
 | Standard | `.deviceOwnerAuthentication` | Passcode shown |
 | High Security | `.deviceOwnerAuthenticationWithBiometrics` | `context.localizedFallbackTitle = ""` (hidden) |
 
-## 5. Argon2id Parameters (Profile B Only)
+## 5. Guided Tutorial Sandbox Isolation
+
+The guided tutorial is allowed to run real app services and real OpenPGP operations only inside an isolated tutorial dependency graph. It must not read or mutate the user's real keys, contacts, settings, files, exports, or private-key security assets.
+
+Tutorial isolation boundaries:
+
+- `TutorialSandboxContainer` uses a unique `UserDefaults` suite and a temporary contacts directory instead of the app's real preferences and `Documents/contacts` storage.
+- Tutorial key management, encryption, decryption, signing, certificate, QR, and self-test services are constructed against tutorial-local storage and the same Rust engine API shape used by the real app.
+- Tutorial private-key protection uses mock Secure Enclave and mock Keychain primitives behind a real `AuthenticationManager` instance, so auth-mode behavior is exercised without touching real Secure Enclave-wrapped private keys or real Keychain rows.
+- `OutputInterceptionPolicy` and page-level configuration must block or intercept real file import/export, clipboard writes, share-sheet export, URL handoff, app icon changes, onboarding management actions, and other real-workspace side effects.
+- Tutorial completion state is the only tutorial fact that persists across app restarts. Tutorial keys, contacts, messages, settings, and unfinished module progress are ephemeral and are cleaned up when the tutorial is reset or finished.
+
+Changes to tutorial isolation, output interception, or tutorial security simulation must be reviewed with the same care as other auth and local-data boundaries. A tutorial regression must never weaken the app's zero-network, minimal-permission, no-secret-logging, or real-workspace isolation guarantees.
+
+## 6. Argon2id Parameters (Profile B Only)
 
 Used only for private key export (backup) and for importing/unlocking passphrase-protected private key files. **Not used for routine message decryption or signing** — those operations use the SE-unwrapped private key directly.
 
@@ -214,7 +228,7 @@ Before Argon2id derivation **when importing or unlocking a passphrase-protected 
 
 This prevents iOS Jetsam from killing the app. The 75% threshold provides a safety margin.
 
-## 6. Memory Integrity Enforcement (MIE)
+## 7. Memory Integrity Enforcement (MIE)
 
 ### What It Protects
 
@@ -255,9 +269,9 @@ The `openssl-src` crate compiles OpenSSL from C source. Any undiscovered buffer 
 
 The Enhanced Security capability is additive. It never breaks compatibility with older devices.
 
-## 7. Known Limitations
+## 8. Known Limitations
 
-### 7.1 Passphrase `String` Cannot Be Reliably Zeroized
+### 8.1 Passphrase `String` Cannot Be Reliably Zeroized
 
 **Scope:** Affects passphrase-based flows that originate in Swift `String`, specifically private key import/export and password-message encrypt/decrypt operations. It does **not** affect routine recipient-key decryption or signing, which use SE-unwrapped key bytes (`Data`) that are properly zeroized.
 
@@ -281,7 +295,7 @@ The Enhanced Security capability is additive. It never breaks compatibility with
 - `UnsafeMutableBufferPointer<UInt8>` with manual zeroing: Would require forking `SecureField` or building a custom UIKit text field, bypassing system-provided secure input. The security loss from a custom input field (no system-level screen recording protection, no secure text entry mode) would outweigh the benefit of zeroizable memory.
 - `Data`-based passphrase: UniFFI does not support `Data` ↔ `String` conversion at the FFI boundary without an intermediate `String` allocation, negating the benefit.
 
-## 8. AI Coding Red Lines
+## 9. AI Coding Red Lines
 
 The following files and functions are security-critical. Claude Code must **stop and describe proposed changes** before editing them. Do not make autonomous modifications.
 

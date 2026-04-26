@@ -88,7 +88,7 @@ For the full Rust artifact refresh, UniFFI/bindings sync, and Xcode validation w
 4. **No plaintext or private keys in logs.** Never `print()`, `os_log()`, or `NSLog()` any key material, passphrase, or decrypted content. Not even in DEBUG builds.
 5. **Memory zeroing.** All sensitive data (`Data` buffers containing keys, passphrases, plaintext) must be overwritten with zeros when no longer needed. Rust side: `zeroize` crate. Swift side: `resetBytes(in:)` on `Data`.
 6. **Secure random only.** Swift side: `SecRandomCopyBytes` or CryptoKit (which uses it internally). Rust side: `getrandom` crate (delegates to `SecRandomCopyBytes` on Apple platforms). No `arc4random`, no `Int.random`.
-7. **MIE enabled.** Enhanced Security capability with Hardware Memory Tagging must remain enabled. Never remove the entitlements. See @docs/SECURITY.md Section 6.
+7. **MIE enabled.** Enhanced Security capability with Hardware Memory Tagging must remain enabled. Never remove the entitlements. See @docs/SECURITY.md Section 7.
 8. **Profile-correct message format.** v4 recipient → SEIPDv1. v6 recipient → SEIPDv2. Mixed → SEIPDv1. Never send SEIPDv2 to a v4 key holder. See @docs/TDD.md Section 1.4.
 
 ## Security Boundaries — Ask Before Modifying
