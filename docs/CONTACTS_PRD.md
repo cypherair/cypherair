@@ -13,7 +13,7 @@
 
 CypherAir's current Contacts capability is sufficient for a small number of imported public keys, but it is not yet structured for real-world relationship management, recurring recipient workflows, or social-graph-sensitive privacy requirements.
 
-This document defines the product requirements for the next-generation Contacts capability. It describes the target Contacts experience after the shared protected app-data framework has already landed. In delivery order, Contacts adopts that framework in App Data Phase 4, after the reusable framework, file-protection baseline, and first low-risk domain have already been proven.
+This document defines the product requirements for the next-generation Contacts capability. It describes the target Contacts experience after the shared protected app-data framework and the earlier AppData domains have landed. In delivery order, Contacts adopts that framework in the Contacts Protected Domain phase, currently Phase 8 of the AppData roadmap.
 
 The Contacts enhancement initiative covers four user-facing capability areas:
 
@@ -429,13 +429,17 @@ Migration source remains the legacy plaintext contacts storage:
 
 ### 12.2 Migration Order And Policy
 
-Contacts migration belongs to App Data Phase 4.
+Contacts migration belongs to the Contacts Protected Domain phase, currently Phase 8 of the AppData roadmap.
 
 Required preconditions:
 
 - Phase 1 reusable protected app-data framework is already implemented
 - Phase 2 file-protection baseline is already implemented
 - Phase 3 first low-risk protected domain is already implemented
+- Phase 4 post-unlock multi-domain orchestration and framework hardening is already implemented
+- Phase 5 `private-key-control` domain is already implemented
+- Phase 6 `key metadata` domain is already implemented
+- Phase 7 non-Contacts protected-after-unlock domains and required local file/static-protection cleanup are already implemented
 
 Contacts adoption and migration occur on the first Contacts-required protected-domain access into the new Contacts architecture. That access may happen during launch or resume if the initial route immediately needs Contacts data, and the same orchestrated unlock flow may activate the shared app-data session there by reusing the authenticated `LAContext` for root-secret retrieval.
 

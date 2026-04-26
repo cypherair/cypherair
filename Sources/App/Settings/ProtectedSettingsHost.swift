@@ -369,12 +369,11 @@ final class ProtectedSettingsHost {
         }
 
         await Task.yield()
-        liveDependencies.syncPreAuthorizationState()
-        syncSectionStateFromStore(liveDependencies)
+        await refreshSettingsSection()
         traceHostEvent(
             "protectedSettings.invalidateForContentClear.finish",
             metadata: stateMetadata(liveDependencies)
-                .merging(["result": "synced", "generation": String(generation)], uniquingKeysWith: { _, new in new })
+                .merging(["result": "refreshed", "generation": String(generation)], uniquingKeysWith: { _, new in new })
         )
     }
 

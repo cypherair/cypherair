@@ -45,7 +45,7 @@ Goals:
 - define the v1 DMK persistence and wrapped-DMK model
 - define the initial persistent-state classification inventory
 
-This phase should land before Contacts migration so Contacts can depend on the shared framework instead of creating its own parallel architecture.
+This phase should land before any later protected-domain migration so future domains can depend on the shared framework instead of creating parallel architectures.
 
 ### 2.2 Phase 2: File-Protection Baseline
 
@@ -100,9 +100,51 @@ This first real domain must also declare its recovery contract up front:
 - they are not import-recoverable in v1
 - they must never silently reset on unreadable local state
 
-### 2.4 Phase 4: Contacts Vault On Shared Framework
+### 2.4 Phase 4: Post-Unlock Multi-Domain Orchestration And Framework Hardening
 
-Migrate Contacts to the shared protected app-data framework rather than letting Contacts become a one-off vault system.
+Extend post-unlock orchestration and harden the framework before additional source-of-truth domains depend on it.
+
+Goals:
+
+- allow app privacy authentication to open additional required protected domains through the current authenticated context without extra Face ID prompts
+- harden second-domain create/delete/recovery behavior
+- cover pending-mutation continuation and last-domain cleanup before later product domains depend on them
+- keep this phase focused on framework behavior rather than Contacts, private-key-control, or key-metadata source-of-truth migration
+
+### 2.5 Phase 5: Private-Key Control Domain
+
+Create the `private-key-control` ProtectedData domain.
+
+Goals:
+
+- migrate `authMode` into `private-key-control.settings.authMode`
+- migrate private-key rewrap / modify-expiry recovery state into `private-key-control.recoveryJournal`
+- move recovery detection out of pre-auth startup
+- preserve the existing private-key material domain without copying SE-wrapped private-key bundle rows into ProtectedData payloads
+
+### 2.6 Phase 6: Key Metadata Domain
+
+Create the `key metadata` ProtectedData domain.
+
+Goals:
+
+- migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account
+- open key metadata after app privacy authentication through post-unlock orchestration
+- avoid double authentication and empty-key-list flashes while preserving the private-key material boundary
+
+### 2.7 Phase 7: Non-Contacts Protected-After-Unlock Domains
+
+Migrate remaining non-Contacts protected-after-unlock app state once its synchronous read paths are removed or replaced.
+
+Candidate areas include:
+
+- additional ordinary settings not yet moved in Phase 3
+- self-test policy or diagnostics storage
+- temporary decrypted, streaming, export, and tutorial files that need explicit file-protection or cleanup coverage
+
+### 2.8 Phase 8: Contacts Protected Domain
+
+Migrate Contacts to the shared protected app-data framework after the earlier private-key-control, key-metadata, and non-Contacts protected-after-unlock phases.
 
 Goals:
 
@@ -111,15 +153,11 @@ Goals:
 - avoid duplicating domain key lifecycle, envelope handling, recovery logic, registry authority, and relock rules
 - keep Contacts explicitly `import-recoverable`
 
-### 2.5 Phase 5: Remaining Persistent Domains
+Contacts internal implementation sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md).
 
-Migrate remaining app-owned persistent domains in order of security value and implementation risk.
+### 2.9 Phase 9: Future Persistent Domains
 
-Candidate areas include:
-
-- additional settings or recovery state not yet moved in Phase 3
-- future local drafts or protected caches
-- future user-managed local data that should not remain plaintext at rest
+Migrate future app-owned persistent domains not covered by the current inventory in order of security value and implementation risk.
 
 ## 3. Startup Boundary And Adoption Sequencing
 
@@ -290,29 +328,29 @@ Initial classification baseline:
 | Item | Current location | Target class | Migration readiness | Notes |
 |------|------------------|--------------|---------------------|-------|
 | `appSessionAuthenticationPolicy` | `UserDefaults` | `early-readable boot exception` | n/a in v1 | Boot authentication profile; decides whether app launch/root-secret auth uses user-presence or biometrics-only policy |
-| `authMode` | `UserDefaults` | `private-key-control target` | no | Future `private-key-control.settings.authMode`; app unlock should automatically open this domain before private-key settings or recovery checks need it |
-| `gracePeriod` | `UserDefaults` | `protected-after-unlock` | no | Cold launch still authenticates without this value; future resume behavior can use the already-unlocked in-memory value and fail closed to immediate auth if unavailable |
-| `hasCompletedOnboarding` | `UserDefaults` | `protected-after-unlock` | no | Requires startup/routing refactor: show the locked shell first, then decide onboarding vs home after unlock |
-| `colorTheme` | `UserDefaults` | `protected-after-unlock` | no | Requires UI refactor: use system/default tint before unlock, then apply the user's theme after protected settings open |
+| `authMode` | `UserDefaults` | `private-key-control target` | no | Phase 5 target; future `private-key-control.settings.authMode`; app unlock should automatically open this domain before private-key settings or recovery checks need it |
+| `gracePeriod` | `UserDefaults` | `protected-after-unlock` | no | Phase 7 target; cold launch still authenticates without this value; future resume behavior can use the already-unlocked in-memory value and fail closed to immediate auth if unavailable |
+| `hasCompletedOnboarding` | `UserDefaults` | `protected-after-unlock` | no | Phase 7 target; requires startup/routing refactor: show the locked shell first, then decide onboarding vs home after unlock |
+| `colorTheme` | `UserDefaults` | `protected-after-unlock` | no | Phase 7 target; requires UI refactor: use system/default tint before unlock, then apply the user's theme after protected settings open |
 | `requireAuthOnLaunch` | Retired legacy `UserDefaults` key | `legacy cleanup-only` | cleanup only | Production launch authentication is always required; Reset removes this legacy key |
-| `encryptToSelf` | `UserDefaults` | `protected-after-unlock` | no | Current sync read path still exists in Encrypt flow |
+| `encryptToSelf` | `UserDefaults` | `protected-after-unlock` | no | Phase 7 target; current sync read path still exists in Encrypt flow |
 | `clipboardNotice` | `ProtectedSettingsStore`; legacy `UserDefaults` key for migration cleanup | `protected-after-unlock` | yes | First protected-settings adopter; legacy key is removed after migration |
-| `guidedTutorialCompletedVersion` | `UserDefaults` | `protected-after-unlock` | no | Current sync read path still exists in tutorial and Settings entry flows |
+| `guidedTutorialCompletedVersion` | `UserDefaults` | `protected-after-unlock` | no | Phase 7 target; current sync read path still exists in tutorial and Settings entry flows |
 | `uiTestBypassAuthentication` | Test-only `UserDefaults` key | `test-only exception` | n/a | Non-production bypass state; production code must not depend on it; Reset may delete stale production-suite residue |
-| `rewrapInProgress` | `UserDefaults` | `private-key-control target` | no | Future `private-key-control.recoveryJournal`; no pre-auth marker, and recovery detection should run only after app unlock opens the domain |
-| `rewrapTargetMode` | `UserDefaults` | `private-key-control target` | no | Future `private-key-control.recoveryJournal`; stores target mode details only after protected domain unlock |
-| `modifyExpiryInProgress` | `UserDefaults` | `private-key-control target` | no | Future `private-key-control.recoveryJournal`; no pre-auth marker, and recovery detection should run only after app unlock opens the domain |
-| `modifyExpiryFingerprint` | `UserDefaults` | `private-key-control target` | no | Future `private-key-control.recoveryJournal`; keeps the affected key fingerprint out of pre-auth UserDefaults |
+| `rewrapInProgress` | `UserDefaults` | `private-key-control target` | no | Phase 5 target; future `private-key-control.recoveryJournal`; no pre-auth marker, and recovery detection should run only after app unlock opens the domain |
+| `rewrapTargetMode` | `UserDefaults` | `private-key-control target` | no | Phase 5 target; future `private-key-control.recoveryJournal`; stores target mode details only after protected domain unlock |
+| `modifyExpiryInProgress` | `UserDefaults` | `private-key-control target` | no | Phase 5 target; future `private-key-control.recoveryJournal`; no pre-auth marker, and recovery detection should run only after app unlock opens the domain |
+| `modifyExpiryFingerprint` | `UserDefaults` | `private-key-control target` | no | Phase 5 target; future `private-key-control.recoveryJournal`; keeps the affected key fingerprint out of pre-auth UserDefaults |
 | Permanent SE-wrapped private-key bundle rows | Keychain default account | `private-key-material exception` | n/a | `se-key`, `salt`, and `sealed-key` rows remain under existing Secure Enclave / Keychain protection |
 | Pending SE-wrapped private-key bundle rows | Keychain default account | `private-key-material exception` | n/a | `pending-se-key`, `pending-salt`, and `pending-sealed-key` stay in the private-key material domain; protected recovery journals may reference them but must not store them |
-| `PGPKeyIdentity` metadata rows | Dedicated Keychain metadata account | `key-metadata-domain target` | no | Transitional cold-launch Keychain account; long-term target is a ProtectedData `key metadata` domain opened automatically after app unlock |
+| `PGPKeyIdentity` metadata rows | Dedicated Keychain metadata account | `key-metadata-domain target` | no | Phase 6 target; transitional cold-launch Keychain account; long-term target is a ProtectedData `key metadata` domain opened automatically after app unlock |
 | Shared app-data root secret | Keychain default account | `framework-bootstrap` | implemented with SE device binding | Keychain-protected root secret released only through authenticated `LAContext` handoff; v2 stores a Secure Enclave device-bound envelope rather than raw root-secret bytes |
 | `ProtectedDataRegistry` | `Application Support/ProtectedData/ProtectedDataRegistry.plist` | `framework-bootstrap` | framework prerequisite | Bootstrap authority for membership and shared-resource lifecycle |
 | Per-domain bootstrap metadata | `Application Support/ProtectedData/<domain>/bootstrap.plist` | `framework-bootstrap` | domain-specific | Read before app-data authorization by design; contains framework metadata, not protected payload plaintext |
 | Protected settings payload | `Application Support/ProtectedData/protected-settings/` | `protected-after-unlock` | implemented | Current `clipboardNotice` domain with encrypted generations and wrapped DMK metadata |
-| `Documents/contacts/*.gpg` | App sandbox documents | `protected-after-unlock` | no | Planned Contacts protected domain; includes imported public certificates used for encryption and verification enrichment |
-| `Documents/contacts/contact-metadata.json` | App sandbox documents | `protected-after-unlock` | no | Planned Contacts protected domain; stores verification-state manifest |
-| `Documents/self-test/` | App sandbox documents | `protected-after-unlock` or `ephemeral-with-cleanup` | no | Future decision: move reports into a protected diagnostics domain or make reports short-lived/export-only |
+| `Documents/contacts/*.gpg` | App sandbox documents | `protected-after-unlock` | no | Phase 8 target; planned Contacts protected domain; includes imported public certificates used for encryption and verification enrichment |
+| `Documents/contacts/contact-metadata.json` | App sandbox documents | `protected-after-unlock` | no | Phase 8 target; planned Contacts protected domain; stores verification-state manifest |
+| `Documents/self-test/` | App sandbox documents | `protected-after-unlock` or `ephemeral-with-cleanup` | no | Phase 7 target; decide whether to move reports into a protected diagnostics domain or make reports short-lived/export-only |
 | `tmp/decrypted/` | App temporary directory | `ephemeral-with-cleanup` | partial | Decrypted file previews; keep out of long-term domains but require cleanup and file-protection review |
 | `tmp/streaming/` | App temporary directory | `ephemeral-with-cleanup` | partial | Streaming encrypt/decrypt outputs; keep out of long-term domains but require cleanup and file-protection review |
 | `tmp/export-*` | App temporary directory | `ephemeral-with-cleanup` | partial | Temporary fileExporter handoff files; deleted by owner/reset cleanup where possible |
@@ -336,21 +374,21 @@ The `private-key-control` domain must be opened after app privacy authentication
 
 Key metadata is also not a permanent private-key-material exception. The dedicated Keychain metadata account is a transitional cold-launch index. The long-term target is a ProtectedData `key metadata` domain that opens after app unlock and loads `PGPKeyIdentity` state without touching private-key bundle rows.
 
-### 4.2 Phased Protection Roadmap
+### 4.2 Unified Protection Roadmap
 
-The inventory should advance in phases:
+The inventory follows the same numeric phase order as Section 2:
 
-- Phase A: maintain the complete inventory and explicit exception classes
-- Phase B: extend the established post-unlock domain orchestration so app privacy authentication can automatically open additional required protected domains without extra Face ID prompts
-- Phase C: create the `private-key-control` domain, migrate `authMode` and the private-key `recoveryJournal`, and move rewrap / modify-expiry recovery detection out of pre-auth startup
-- Phase D: create the `key metadata` domain, migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account, and avoid empty-key-list flashes during unlock
-- Phase E: migrate ordinary protected-after-unlock settings, contacts, and self-test policy once their synchronous read paths have been removed or replaced
-- Phase F: audit temporary decrypted, streaming, export, and tutorial files for explicit file protection and cleanup coverage
+- Phase 4: extend post-unlock orchestration and harden second-domain framework behavior before additional product domains depend on it
+- Phase 5: create the `private-key-control` domain, migrate `authMode` and the private-key `recoveryJournal`, and move rewrap / modify-expiry recovery detection out of pre-auth startup
+- Phase 6: create the `key metadata` domain, migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account, and avoid empty-key-list flashes during unlock
+- Phase 7: migrate non-Contacts ordinary protected-after-unlock settings, self-test policy, and local file/static-protection cleanup once synchronous read paths have been removed or replaced
+- Phase 8: migrate Contacts as a later independent protected domain on the shared framework
+- Phase 9: migrate future app-owned persistent domains not yet covered by the current inventory
 
-Known protected-settings UX follow-up:
+Protected-settings route requirement:
 
 - When the user is already on Settings, backgrounds the app, and returns through app privacy unlock, `contentClearGeneration` invalidation should non-interactively auto-open protected settings if the session is already authorized or a handoff context is available.
-- This follow-up must not add a new Face ID prompt; it only aligns the existing Settings instance with the auto-open behavior already used when entering Settings from another page.
+- This requirement must not add a new Face ID prompt; it only aligns the existing Settings instance with the auto-open behavior already used when entering Settings from another page.
 
 ## 5. Domain Migration Rules
 

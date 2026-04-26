@@ -524,9 +524,9 @@ Legacy source:
 
 ### 11.2 Migration Phases
 
-Contacts migration occurs only after the shared framework prerequisites from App Data Phases 1-3 are already satisfied.
+Contacts migration occurs only after the earlier AppData roadmap phases are already satisfied, including shared framework prerequisites, post-unlock multi-domain hardening, `private-key-control`, `key metadata`, and non-Contacts protected-after-unlock work.
 
-The cutover trigger is the first Contacts-required protected-domain access after that Phase 4 adoption point is reached. That access may occur during launch or resume if the initial route immediately needs Contacts data, but migration must not be triggered merely by process launch or service initialization.
+The cutover trigger is the first Contacts-required protected-domain access after the Contacts protected-domain adoption point is reached. That access may occur during launch or resume if the initial route immediately needs Contacts data, but migration must not be triggered merely by process launch or service initialization.
 
 Migration sequence:
 

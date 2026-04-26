@@ -880,7 +880,7 @@ Expected initial integration points:
 - `AppContainer` for wiring the new services
 - `AppStartupCoordinator` for protected-domain startup recovery
 - app lock / resume flow through `AppSessionOrchestrator`
-- future Contacts domain owner
+- future protected-domain owners, including Contacts
 
 This still implies explicit startup-ordering work when a real protected domain is introduced. It is a narrow code ownership boundary, not a promise of zero initialization-flow changes.
 
@@ -888,7 +888,7 @@ The expanded interface/file breakdown lives in [APP_DATA_FRAMEWORK_SPEC](APP_DAT
 
 ### 9.3 Contacts Relationship
 
-Contacts must later plug into this framework as a domain-specific consumer.
+Contacts must later plug into this framework as a domain-specific consumer after the earlier app-data phases have completed.
 
 Contacts is not allowed to become a second independent security architecture if this framework exists.
 
@@ -897,7 +897,7 @@ In practical terms:
 - Contacts owns person/key/tag/list semantics
 - the protected app-data framework owns registry authority, shared-session authority, wrapped-DMK lifecycle, envelope rules, generation recovery, and relock posture
 
-Contacts-specific adoption behavior now lives directly in [CONTACTS_PRD](CONTACTS_PRD.md), [CONTACTS_TDD](CONTACTS_TDD.md), and the rollout sequencing sections of [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md).
+Contacts-specific adoption behavior now lives directly in [CONTACTS_PRD](CONTACTS_PRD.md), [CONTACTS_TDD](CONTACTS_TDD.md), [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), and the rollout sequencing sections of [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md).
 
 ## 10. Migration Rules
 

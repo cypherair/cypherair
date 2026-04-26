@@ -155,17 +155,33 @@ Use a low-risk domain such as protected-after-unlock settings or recovery/contro
 
 See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.3 and Section 5.
 
-### Phase 4: Contacts Vault On Shared Framework
+### Phase 4: Post-Unlock Multi-Domain Orchestration And Framework Hardening
 
-Migrate Contacts onto the shared protected app-data framework rather than allowing Contacts to remain or become a separate architecture.
+Extend the established post-unlock orchestration so app privacy authentication can automatically open additional required protected domains without extra Face ID prompts. This phase also hardens second-domain create/delete/recovery behavior, pending-mutation continuation, and last-domain cleanup before later product domains depend on them.
 
-See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.4, [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 9.3, and Section 11.4.
+This phase does not migrate Contacts or any private-key-adjacent source of truth.
 
-### Phase 5: Remaining Persistent Domains
+### Phase 5: Private-Key Control Domain
 
-Migrate remaining app-owned persistent domains in order of security value and implementation risk after the framework and first-domain path have been proven.
+Create the `private-key-control` ProtectedData domain, migrate `authMode` and the private-key recovery journal, and move rewrap / modify-expiry recovery detection out of pre-auth startup without moving private-key material into ProtectedData.
 
-See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.5.
+### Phase 6: Key Metadata Domain
+
+Create the `key metadata` ProtectedData domain, migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account, and avoid empty-key-list flashes during unlock.
+
+### Phase 7: Non-Contacts Protected-After-Unlock Domains
+
+Migrate ordinary protected-after-unlock settings, self-test policy, and related local file/static-protection cleanup once their synchronous read paths have been removed or replaced.
+
+### Phase 8: Contacts Protected Domain
+
+Migrate Contacts onto the shared protected app-data framework only after the earlier private-key-control, key-metadata, and non-Contacts protected-after-unlock work has been completed. Contacts must remain a domain-specific consumer of the shared framework, not a second independent vault architecture.
+
+See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts PR sequence.
+
+### Phase 9: Future Persistent Domains
+
+Migrate future app-owned persistent domains that are not covered by the current inventory, in order of security value and implementation risk.
 
 ### 5.1 Startup Authentication Boundary
 

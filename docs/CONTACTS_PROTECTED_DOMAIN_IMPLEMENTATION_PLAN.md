@@ -1,22 +1,22 @@
-# Contacts Phase 4 Implementation Plan
+# Contacts Protected Domain Implementation Plan
 
-> **Version:** Draft v0.1  
-> **Status:** Draft implementation-prep plan. This document does not describe current shipped behavior.  
-> **Purpose:** Bridge the gap between the existing `APP_DATA_*` / `CONTACTS_*` proposal documents and the current repository state so Contacts Phase 4 can later be implemented through a stable, reviewable PR sequence.  
-> **Audience:** Engineering, security review, QA, and AI coding tools.  
-> **Companion document:** [CONTACTS_PHASE4_SURFACE_INVENTORY](CONTACTS_PHASE4_SURFACE_INVENTORY.md)  
-> **Primary authority:** [CONTACTS_TDD](CONTACTS_TDD.md) for Contacts design intent and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for shared protected app-data architecture.  
+> **Version:** Draft v0.1
+> **Status:** Draft implementation-prep plan. This document does not describe current shipped behavior.
+> **Purpose:** Bridge the gap between the existing `APP_DATA_*` / `CONTACTS_*` proposal documents and the current repository state so the deferred Contacts protected-domain work can later be implemented through a stable, reviewable PR sequence.
+> **Audience:** Engineering, security review, QA, and AI coding tools.
+> **Companion document:** [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+> **Primary authority:** [CONTACTS_TDD](CONTACTS_TDD.md) for Contacts design intent and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for shared protected app-data architecture.
 > **Related documents:** [CONTACTS_PRD](CONTACTS_PRD.md) · [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
 
 ## 1. Scope And Relationship
 
-This document is an implementation-prep companion for Contacts Phase 4. It exists because the repository has already landed parts of the shared protected app-data framework, while the active Contacts and app-data proposal documents still describe a future-state design rather than a current code migration path.
+This document is an implementation-prep companion for the deferred Contacts protected-domain phase. It exists because the repository has already landed parts of the shared protected app-data framework, while the active Contacts and app-data proposal documents still describe a future-state design rather than a current code migration path.
 
 This document specifies:
 
 - the current-state deltas that materially affect implementation planning
 - the implementation decisions that must be frozen before code work starts
-- the PR sequence and dependency order for Phase 4 Contacts adoption
+- the PR sequence and dependency order for Contacts protected-domain adoption
 - the validation and migration scenarios that each future PR must satisfy
 
 This document does not replace the existing formal specs.
@@ -62,7 +62,7 @@ Current code still treats Contacts as startup-readable plaintext content:
 - `ContactService` persists `Documents/contacts/contact-metadata.json`
 - `ContactsView` still calls `loadContacts()` directly on `.task`
 
-This conflicts with the Contacts TDD rule that Contacts payload generations must not be opened before shared app-data root-secret retrieval succeeds and the Contacts domain DMK unlocks. Phase 4 therefore requires both storage migration and startup sequencing migration.
+This conflicts with the Contacts TDD rule that Contacts payload generations must not be opened before shared app-data root-secret retrieval succeeds and the Contacts domain DMK unlocks. Contacts protected-domain adoption therefore requires both storage migration and startup sequencing migration.
 
 ### 3.2 Verification Contract Delta
 
@@ -77,7 +77,7 @@ Current tests also encode the old semantics:
 - when a signer is not present in Contacts or own keys, verification degrades to `.unknownSigner`
 - this behavior is currently asserted in decrypt and signing tests
 
-This means Phase 4 cannot be achieved by UI-layer locked-state handling alone. The service contract itself must be refactored first.
+This means Contacts protected-domain adoption cannot be achieved by UI-layer locked-state handling alone. The service contract itself must be refactored first.
 
 Because the current Rust/UniFFI layer only exposes signer fingerprint information when a provided verification key is already known, that refactor must include lower-level verification contract expansion rather than a Swift-only output reshaping.
 
@@ -93,15 +93,15 @@ Contacts access and mutation is not centralized in a single route boundary today
 - decrypt / verify signer identity enrichment
 - certificate-signature workflows
 
-Because these surfaces are distributed, Phase 4 requires an explicit inventory and PR-by-PR coverage checklist rather than relying on memory or a short prose summary.
+Because these surfaces are distributed, Contacts protected-domain adoption requires an explicit inventory and PR-by-PR coverage checklist rather than relying on memory or a short prose summary.
 
 ### 3.4 Recovery And Empty-Install Import Delta
 
 The Contacts TDD requires recovery import to work even when the target installation has no protected domains yet. In that case the framework, not Contacts, owns first-domain provisioning.
 
-Current access-gate behavior still maps empty steady-state protected-data bootstrap to `.noProtectedDomainPresent`. That is correct for ordinary route access, but it means Phase 4 must explicitly define how recovery import transitions from empty steady-state into framework-owned first-domain provisioning.
+Current access-gate behavior still maps empty steady-state protected-data bootstrap to `.noProtectedDomainPresent`. That is correct for ordinary route access, but it means Contacts protected-domain adoption must explicitly define how recovery import transitions from empty steady-state into framework-owned first-domain provisioning.
 
-This is not an optional extension scenario. It is a documented Phase 4 requirement.
+This is not an optional extension scenario. It is a documented Contacts protected-domain requirement.
 
 ### 3.5 Certification Projection Delta
 
@@ -137,7 +137,7 @@ Future verification-capable services must split:
   - surfacing manual verification and certification projection
   - mapping historical / preferred / additional keys to the same person record
 
-This separation is required for Phase 4 because Contacts can be locked while cryptographic verification remains meaningful.
+This separation is required for Contacts protected-domain adoption because Contacts can be locked while cryptographic verification remains meaningful.
 
 Core verification must not depend on Contacts having already supplied verification certificates or an unlocked Contacts domain.
 
@@ -189,7 +189,7 @@ But those remain behind the `ContactService` facade.
 
 ### 4.4 Contacts Snapshot Schema Freezes Early
 
-Before any migration or cutover PR, the Phase 4 implementation must freeze the first meaningful Contacts domain snapshot shape, including placeholders or initial fields for:
+Before any migration or cutover PR, the Contacts protected-domain implementation must freeze the first meaningful Contacts domain snapshot shape, including placeholders or initial fields for:
 
 - `ContactsDomainSnapshot`
 - `ContactIdentity`
@@ -205,7 +205,7 @@ This avoids a second schema turn after migration and projection work has already
 
 ### 4.5 Surface Inventory Is A Required Companion Artifact
 
-The companion [CONTACTS_PHASE4_SURFACE_INVENTORY](CONTACTS_PHASE4_SURFACE_INVENTORY.md) document is not optional background material.
+The companion [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) document is not optional background material.
 
 It is the required execution checklist for later implementation.
 
@@ -243,7 +243,7 @@ Empty-install restore is not deferred to migration or cutover.
 
 ## 5. Companion Inventory Document
 
-The companion [CONTACTS_PHASE4_SURFACE_INVENTORY](CONTACTS_PHASE4_SURFACE_INVENTORY.md) file records all Contacts-required access and mutation surfaces.
+The companion [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) file records all Contacts-required access and mutation surfaces.
 
 It is responsible for:
 
@@ -613,7 +613,7 @@ The later implementation PRs must collectively satisfy the following scenario se
 
 This implementation-prep document is only complete if a later implementer can answer all of the following without inventing new architecture:
 
-- why Phase 4 needs more than a storage swap
+- why Contacts protected-domain adoption needs more than a storage swap
 - why verification contract refactor must happen before lifecycle wiring
 - which Contacts entrypoints are gated and which are only enrichment consumers
 - where certification projection lands relative to migration and cutover
@@ -626,7 +626,7 @@ The companion inventory document must also be detailed enough that an implemente
 
 - This document prepares implementation. It does not authorize direct code changes by itself.
 - Existing `APP_DATA_*` and `CONTACTS_*` docs remain the architecture and product authorities.
-- Future implementation proceeds with conservative, smaller PRs rather than a single large Contacts Phase 4 rollout.
+- Future implementation proceeds with conservative, smaller PRs rather than a single large Contacts protected-domain rollout.
 - Verification contract refactor is a dedicated earlier PR.
 - Certification projection / reconciliation is a dedicated pre-cutover capability PR.
 - Empty-install restore is part of the recovery PR, not a late migration detail.

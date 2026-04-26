@@ -1,15 +1,15 @@
-# Contacts Phase 4 Surface Inventory
+# Contacts Protected Domain Surface Inventory
 
-> **Version:** Draft v0.1  
-> **Status:** Draft implementation-prep checklist. This document does not describe current shipped behavior.  
-> **Purpose:** Enumerate all Contacts-required access and mutation surfaces that must be accounted for during Contacts Phase 4 implementation.  
-> **Audience:** Engineering, QA, and AI coding tools.  
-> **Companion document:** [CONTACTS_PHASE4_IMPLEMENTATION_PLAN](CONTACTS_PHASE4_IMPLEMENTATION_PLAN.md)  
+> **Version:** Draft v0.1
+> **Status:** Draft implementation-prep checklist. This document does not describe current shipped behavior.
+> **Purpose:** Enumerate all Contacts-required access and mutation surfaces that must be accounted for during Contacts protected-domain implementation.
+> **Audience:** Engineering, QA, and AI coding tools.
+> **Companion document:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
 > **Primary design references:** [CONTACTS_TDD](CONTACTS_TDD.md) · [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)
 
 ## 1. Scope And Usage
 
-This document is the execution checklist for Contacts Phase 4.
+This document is the execution checklist for Contacts protected-domain adoption.
 
 It exists because current Contacts access is distributed across:
 

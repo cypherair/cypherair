@@ -124,8 +124,8 @@ This draft proposal must map its validation buckets onto the repository's existi
 - device tests must perform per-identifier cleanup before and after each test
 - legacy `LAPersistedRight` / `LASecret` device coverage belongs only to migration tests if legacy state has already shipped or been provisioned locally
 - bootstrap outcome and access-gate coverage belong to Swift unit tests, including explicit assertions that `continuePendingMutation` is preserved and that post-bootstrap validation can distinguish authorization-required vs already-authorized vs framework-recovery paths
-- domain recovery coverage must prove recovery dispatch is keyed by `ProtectedDataDomainID`, that mismatched handlers do not run, and that shared-resource cleanup for abandoned first-domain creates is derived from post-removal membership
-- post-unlock orchestration coverage must prove that app unlock can open registered committed domains with the authenticated `LAContext`, while missing context, no committed domain, or pending mutation states do not read the root secret
+- Phase 4 framework-hardening coverage must prove recovery dispatch is keyed by `ProtectedDataDomainID`, that mismatched handlers do not run, that second-domain create/delete/recovery paths are covered, and that shared-resource cleanup for abandoned first-domain creates is derived from post-removal membership
+- Phase 4 post-unlock orchestration coverage must prove that app unlock can open registered committed domains with the authenticated `LAContext`, while missing context, no committed domain, or pending mutation states do not read the root secret
 - file-protection strength, container containment, fail-closed capability checks, empty-root parent probing, and absence of fallback to broader storage locations belong to Swift unit coverage plus platform-targeted macOS-local verification, with manual verification retained for lock-state semantics that repository automation cannot prove
 - Reset All Local Data coverage must prove default-account and metadata-account CypherAir Keychain deletion, missing-item success semantics, in-memory state clearing, retired legacy preference cleanup such as `requireAuthOnLaunch`, and clean empty ProtectedData postconditions
 - protected-after-unlock setting migration must prove that pre-auth startup does not read protected payloads, does not fetch the root-secret Keychain item, and does not weaken or change the selected app-session authentication policy
@@ -134,7 +134,7 @@ This draft proposal must map its validation buckets onto the repository's existi
 - private-key bundle tests must prove that permanent and pending SE-wrapped private-key rows remain in the existing Keychain / Secure Enclave material domain and are not copied into ProtectedData payloads
 - key metadata migration tests must prove that `PGPKeyIdentity` data can load from the future `key metadata` domain after app unlock, that the transitional metadata Keychain account is cleaned only after verified migration, and that startup does not regress to a double-authentication flow or a visible empty-key-list flash
 - protected settings route tests must cover the already-on-Settings background/foreground path: after app privacy unlock, `contentClearGeneration` invalidation should non-interactively auto-open protected settings when the session is already authorized or handoff is available
-- Contacts migration tests must cover `Documents/contacts/*.gpg` and `Documents/contacts/contact-metadata.json` source preservation, protected-domain readability, and no-silent-reset failure behavior
+- Phase 8 Contacts migration tests must cover `Documents/contacts/*.gpg` and `Documents/contacts/contact-metadata.json` source preservation, protected-domain readability, and no-silent-reset failure behavior
 - self-test persistence tests must prove either protected diagnostics storage or short-lived/export-only cleanup semantics for `Documents/self-test`
 - temporary-file tests must cover `tmp/decrypted`, `tmp/streaming`, `tmp/export-*`, and tutorial sandbox cleanup, including relock/reset/startup cleanup where each surface applies
 - migration survivability, startup adoption, and no-silent-reset guarantees belong to Swift unit coverage in `CypherAir-UnitTests` plus targeted macOS-local integration validation, adding the `CypherAir-MacUITests` macOS smoke path when startup routing or user-visible recovery flows are part of the scenario
@@ -164,7 +164,7 @@ At minimum, an implementer must be able to tell:
 - that file protection must be explicit
 - that startup is split into pre-auth bootstrap and post-auth unlock phases
 - that the generation model does not promise anti-rollback semantics
-- that Contacts later depends on the framework rather than inventing its own vault base layer
+- that Contacts is a later independent protected domain that depends on the framework rather than inventing its own vault base layer
 
 ## 4. Review Questions For Future Implementation
 

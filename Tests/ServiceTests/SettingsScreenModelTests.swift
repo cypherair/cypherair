@@ -753,18 +753,25 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_liveProtectedSettingsHost_invalidateForContentClearGeneration_reloadsLockedState() async {
+    func test_liveProtectedSettingsHost_invalidateForContentClearGeneration_alreadyAuthorizedAutoOpens() async {
+        var openDomainCallCount = 0
         var domainState: CypherAir.ProtectedSettingsHost.DomainState = .unlocked
         var clipboardNotice = false
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .alreadyAuthorized },
-            authorizeSharedRight: { _, _ in .authorized },
-            currentWrappingRootKey: { Data() },
+            authorizeSharedRight: { _, _ in
+                XCTFail("Already-authorized invalidation should not prompt again")
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
-            currentClipboardNotice: { clipboardNotice },
+            currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
             migrateLegacyClipboardNoticeIfNeeded: {},
-            openDomainIfNeeded: { _ in },
+            openDomainIfNeeded: { _ in
+                openDomainCallCount += 1
+                domainState = .unlocked
+            },
             updateClipboardNotice: { _, _ in },
             recoverPendingMutation: { .retryablePending },
             resetDomain: {}
@@ -777,6 +784,86 @@ final class SettingsScreenModelTests: XCTestCase {
         clipboardNotice = true
         await host.invalidateForContentClearGeneration(1)
 
+        XCTAssertEqual(openDomainCallCount, 1)
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: true))
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_invalidateForContentClearGeneration_autoOpensWithHandoff() async {
+        var authorizeCallCount = 0
+        var openDomainCallCount = 0
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .unlocked
+        var clipboardNotice = false
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .authorizationRequired },
+            hasAuthorizationHandoffContext: { true },
+            authorizeSharedRight: { _, interactionMode in
+                authorizeCallCount += 1
+                XCTAssertEqual(interactionMode, .handoffOnly)
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in
+                openDomainCallCount += 1
+                domainState = .unlocked
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.refreshSettingsSection()
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
+
+        domainState = .locked
+        clipboardNotice = true
+        await host.invalidateForContentClearGeneration(1)
+
+        XCTAssertEqual(authorizeCallCount, 1)
+        XCTAssertEqual(openDomainCallCount, 1)
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: true))
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_invalidateForContentClearGeneration_handoffMissingStaysLocked() async {
+        var authorizeCallCount = 0
+        var openDomainCallCount = 0
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .unlocked
+        var clipboardNotice = false
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .authorizationRequired },
+            hasAuthorizationHandoffContext: { false },
+            authorizeSharedRight: { _, _ in
+                authorizeCallCount += 1
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in
+                openDomainCallCount += 1
+                domainState = .unlocked
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.refreshSettingsSection()
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
+
+        domainState = .locked
+        clipboardNotice = true
+        await host.invalidateForContentClearGeneration(1)
+
+        XCTAssertEqual(authorizeCallCount, 0)
+        XCTAssertEqual(openDomainCallCount, 0)
         XCTAssertEqual(host.sectionState, .locked)
     }
 
