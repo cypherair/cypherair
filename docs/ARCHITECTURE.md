@@ -365,7 +365,6 @@ App Sandbox:
 │       ├── com.cypherair.preference.gracePeriod            → Int (seconds): 0 / 60 / 180 / 300
 │       ├── com.cypherair.preference.encryptToSelf          → Bool (default true)
 │       ├── com.cypherair.preference.clipboardNotice        → Bool (default true)
-│       ├── com.cypherair.preference.requireAuthOnLaunch    → Bool (default true)
 │       ├── com.cypherair.preference.onboardingComplete     → Bool (default false)
 │       ├── com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
 │       ├── com.cypherair.preference.colorTheme             → String (ColorTheme rawValue, default "systemDefault")

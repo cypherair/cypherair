@@ -75,9 +75,13 @@ The following settings remain in the early-readable layer in v1 because they are
 
 - `authMode`
 - `gracePeriod`
-- `requireAuthOnLaunch`
 - `hasCompletedOnboarding`
 - `colorTheme`
+
+`requireAuthOnLaunch` is retired and must not be treated as an active
+bootstrap-critical setting. Production launch authentication is always required;
+test bypasses are controlled by non-persistent launch configuration, and Reset
+removes the legacy UserDefaults key if it exists.
 
 These settings are not eligible for `ProtectedSettingsStore` in Phase 3.
 
@@ -278,9 +282,9 @@ Initial classification baseline:
 |------|------------------|--------------|---------------------|-------|
 | `authMode` | `UserDefaults` | `early-readable` | n/a in v1 | Read before app-data authorization |
 | `gracePeriod` | `UserDefaults` | `early-readable` | n/a in v1 | Read before app-data authorization |
-| `requireAuthOnLaunch` | `UserDefaults` | `early-readable` | n/a in v1 | Read before app-data authorization |
 | `hasCompletedOnboarding` | `UserDefaults` | `early-readable` | n/a in v1 | Affects startup routing |
 | `colorTheme` | `UserDefaults` | `early-readable` | n/a in v1 | Affects early scene presentation |
+| `requireAuthOnLaunch` | Retired legacy `UserDefaults` key | `retired-cleanup-only` | cleanup only | Production launch authentication is always required; Reset removes this legacy key |
 | `encryptToSelf` | `UserDefaults` | `protected-after-unlock` | no | Current sync read path still exists in Encrypt flow |
 | `clipboardNotice` | `UserDefaults` | `protected-after-unlock` | no | Current sync read path still exists in clipboard UX flow |
 | `guidedTutorialCompletedVersion` | `UserDefaults` | `protected-after-unlock` | no | Current sync read path still exists in tutorial and Settings entry flows |

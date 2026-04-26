@@ -278,7 +278,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 isAuthenticating: false,
                 isPrivacyScreenBlurred: false,
                 hasAuthenticatedSession: true,
-                requiresAuthOnLaunch: true
+                allowsPreAuthenticationPresentation: false
             )
         ))
         XCTAssertFalse(LoadWarningPresentationGate.canPresent(
@@ -287,7 +287,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 isAuthenticating: false,
                 isPrivacyScreenBlurred: false,
                 hasAuthenticatedSession: true,
-                requiresAuthOnLaunch: true
+                allowsPreAuthenticationPresentation: false
             )
         ))
         XCTAssertFalse(LoadWarningPresentationGate.canPresent(
@@ -296,7 +296,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 isAuthenticating: true,
                 isPrivacyScreenBlurred: false,
                 hasAuthenticatedSession: true,
-                requiresAuthOnLaunch: true
+                allowsPreAuthenticationPresentation: false
             )
         ))
         XCTAssertFalse(LoadWarningPresentationGate.canPresent(
@@ -305,7 +305,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 isAuthenticating: false,
                 isPrivacyScreenBlurred: true,
                 hasAuthenticatedSession: true,
-                requiresAuthOnLaunch: true
+                allowsPreAuthenticationPresentation: false
             )
         ))
         XCTAssertFalse(LoadWarningPresentationGate.canPresent(
@@ -314,7 +314,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 isAuthenticating: false,
                 isPrivacyScreenBlurred: false,
                 hasAuthenticatedSession: false,
-                requiresAuthOnLaunch: true
+                allowsPreAuthenticationPresentation: false
             )
         ))
         XCTAssertTrue(LoadWarningPresentationGate.canPresent(
@@ -323,7 +323,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 isAuthenticating: false,
                 isPrivacyScreenBlurred: false,
                 hasAuthenticatedSession: false,
-                requiresAuthOnLaunch: false
+                allowsPreAuthenticationPresentation: true
             )
         ))
     }
@@ -421,7 +421,6 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 0 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator,

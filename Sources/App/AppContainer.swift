@@ -154,7 +154,6 @@ final class AppContainer: @unchecked Sendable {
             },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { config.gracePeriod },
-            requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthenticationWithSource: { reason, source in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
@@ -337,7 +336,6 @@ final class AppContainer: @unchecked Sendable {
             },
             shouldBypassPrivacyAuthentication: { !requiresManualAuthentication },
             gracePeriodProvider: { config.gracePeriod },
-            requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthenticationWithSource: { reason, source in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,

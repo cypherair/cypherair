@@ -120,7 +120,7 @@ This draft proposal must map its validation buckets onto the repository's existi
 - legacy `LAPersistedRight` / `LASecret` device coverage belongs only to migration tests if legacy state has already shipped or been provisioned locally
 - bootstrap outcome and access-gate coverage belong to Swift unit tests, including explicit assertions that `continuePendingMutation` is preserved and that post-bootstrap validation can distinguish authorization-required vs already-authorized vs framework-recovery paths
 - file-protection strength, container containment, fail-closed capability checks, empty-root parent probing, and absence of fallback to broader storage locations belong to Swift unit coverage plus platform-targeted macOS-local verification, with manual verification retained for lock-state semantics that repository automation cannot prove
-- Reset All Local Data coverage must prove default-account and metadata-account CypherAir Keychain deletion, missing-item success semantics, in-memory state clearing, and clean empty ProtectedData postconditions
+- Reset All Local Data coverage must prove default-account and metadata-account CypherAir Keychain deletion, missing-item success semantics, in-memory state clearing, retired legacy preference cleanup such as `requireAuthOnLaunch`, and clean empty ProtectedData postconditions
 - migration survivability, startup adoption, and no-silent-reset guarantees belong to Swift unit coverage in `CypherAir-UnitTests` plus targeted macOS-local integration validation, adding the `CypherAir-MacUITests` macOS smoke path when startup routing or user-visible recovery flows are part of the scenario
 
 ## 3. Implementation Readiness Expectations
