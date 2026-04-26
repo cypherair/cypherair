@@ -283,7 +283,7 @@ a Secure Enclave device-bound root-secret envelope below it:
 - SE failure after v2 migration is framework recovery/reset required, not a fallback to legacy raw-secret behavior
 - the envelope format is a binary-plist `CAPDSEV2` payload with `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`
 - the envelope stores P-256 SE and ephemeral public keys as X9.63 bytes, 32-byte HKDF salt, 12-byte AES-GCM nonce, 16-byte tag, and separate ciphertext
-- HKDF sharedInfo and AES-GCM AAD bind format version, algorithm ID, shared-right identifier, device-binding key identifier, SE public-key hash, public-key lengths, and root-secret length
+- HKDF sharedInfo and AES-GCM AAD bind format version, AAD version, algorithm ID, shared-right identifier, device-binding key identifier, SE public-key hash, ephemeral public-key hash, ephemeral public-key length, and root-secret length
 - the v2 design uses a software-ephemeral P-256 ECDH exchange with the persistent ProtectedData SE public key; it must not copy the private-key self-ECDH wrapping scheme
 - successful v2 verification must write registry state and a ThisDeviceOnly Keychain `format-floor` marker so later v1 raw payloads fail closed as downgrade/corruption
 

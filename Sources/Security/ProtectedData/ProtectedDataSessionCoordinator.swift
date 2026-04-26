@@ -164,6 +164,9 @@ final class ProtectedDataSessionCoordinator {
                     usesHandoffContext: usesHandoffContext
                 )
             }
+            defer {
+                rootSecretResult.secretData.protectedDataZeroize()
+            }
 
             if rootSecretResult.storageFormat == .envelopeV2 || rootSecretResult.didMigrate {
                 try await recordRootSecretEnvelopeMinimumVersion(

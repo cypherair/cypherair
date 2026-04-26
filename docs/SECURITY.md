@@ -115,7 +115,9 @@ The v2 root-secret envelope is a binary-plist `CAPDSEV2` payload with
 `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`. It uses a normal
 software-ephemeral P-256 ECDH exchange with the persistent ProtectedData SE
 public key; it must not reuse the existing private-key self-ECDH wrapping
-scheme as its security design. After v2 migration succeeds, registry state plus
+scheme as its security design. Its HKDF sharedInfo and AES-GCM AAD bind the
+AAD version plus hashes of both persistent SE and ephemeral public keys. After
+v2 migration succeeds, registry state plus
 a ThisDeviceOnly Keychain `format-floor` marker must make later v1 raw
 root-secret payloads fail closed as downgrade/corruption.
 

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import LocalAuthentication
 import Security
@@ -189,6 +190,21 @@ private actor AsyncBooleanFlag {
     }
 }
 
+private actor ThrowingRootSecretFloorRecorder {
+    private(set) var callCount = 0
+    private(set) var lastVersion: Int?
+
+    func record(_ version: Int) throws {
+        callCount += 1
+        lastVersion = version
+        throw ProtectedDataError.internalFailure("Injected root-secret envelope floor write failure.")
+    }
+
+    func snapshot() -> (callCount: Int, lastVersion: Int?) {
+        (callCount, lastVersion)
+    }
+}
+
 @MainActor
 final class ProtectedDataFrameworkTests: XCTestCase {
     private let envelopeTestSharedRight = "com.cypherair.tests.protected-data.envelope"
@@ -360,6 +376,8 @@ final class ProtectedDataFrameworkTests: XCTestCase {
 
         XCTAssertEqual(decoded.magic, ProtectedDataRootSecretEnvelope.magic)
         XCTAssertEqual(decoded.formatVersion, ProtectedDataRootSecretEnvelope.currentFormatVersion)
+        XCTAssertEqual(decoded.aadVersion, ProtectedDataRootSecretEnvelope.currentAADVersion)
+        XCTAssertEqual(ProtectedDataRootSecretEnvelope.currentAADVersion, 2)
         XCTAssertEqual(decoded.algorithmID, ProtectedDataRootSecretEnvelope.algorithmID)
         XCTAssertEqual(decoded.hkdfSalt.count, ProtectedDataRootSecretEnvelope.expectedSaltLength)
         XCTAssertEqual(decoded.nonce.count, ProtectedDataRootSecretEnvelope.expectedNonceLength)
@@ -390,6 +408,38 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 )
             )
         }
+    }
+
+    func test_rootSecretEnvelope_aadV2BindsEphemeralPublicKeyAndRejectsAADV1() throws {
+        let provider = MockProtectedDataDeviceBindingProvider()
+        let rootSecret = Data(repeating: 0x26, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
+        let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
+        let substituteEphemeralPublicKey = P256.KeyAgreement.PrivateKey().publicKey.x963Representation
+
+        let originalAAD = try ProtectedDataRootSecretEnvelopeCodec.rootSecretEnvelopeAAD(
+            sharedRightIdentifier: envelope.sharedRightIdentifier,
+            deviceBindingKeyIdentifier: envelope.deviceBindingKeyIdentifier,
+            deviceBindingPublicKeyX963: envelope.deviceBindingPublicKeyX963,
+            ephemeralPublicKeyX963: envelope.ephemeralPublicKeyX963,
+            rootSecretLength: envelope.ciphertext.count
+        )
+        let substitutedAAD = try ProtectedDataRootSecretEnvelopeCodec.rootSecretEnvelopeAAD(
+            sharedRightIdentifier: envelope.sharedRightIdentifier,
+            deviceBindingKeyIdentifier: envelope.deviceBindingKeyIdentifier,
+            deviceBindingPublicKeyX963: envelope.deviceBindingPublicKeyX963,
+            ephemeralPublicKeyX963: substituteEphemeralPublicKey,
+            rootSecretLength: envelope.ciphertext.count
+        )
+
+        XCTAssertNotEqual(originalAAD, substitutedAAD)
+
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        let aadV1Payload = try encoder.encode(replacing(envelope, aadVersion: 1))
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.decode(
+            aadV1Payload,
+            expectedSharedRightIdentifier: envelopeTestSharedRight
+        ))
     }
 
     func test_rootSecretEnvelope_rejectsMalformedContractAndUnsupportedFields() throws {
@@ -480,6 +530,41 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             migratedPayload,
             expectedSharedRightIdentifier: identifier
         ))
+    }
+
+    func test_rootSecretStore_legacyMigrationFloorWriteFailureThrowsAfterMigratingPayload() throws {
+        let account = "ProtectedDataFrameworkTests.\(#function).\(UUID().uuidString)"
+        let identifier = "\(envelopeTestSharedRight).migration-floor-failure.\(UUID().uuidString)"
+        let legacySecret = Data(repeating: 0x63, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
+        try insertLegacyRootSecret(legacySecret, identifier: identifier, account: account)
+        defer {
+            deleteRootSecretPayload(identifier: identifier, account: account)
+        }
+
+        let floorKeychain = MockKeychain()
+        try floorKeychain.save(
+            Data([0x91]),
+            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
+            account: account,
+            accessControl: nil
+        )
+        floorKeychain.failOnSaveNumber = 2
+        let floorStore = ProtectedDataRootSecretFormatFloorStore(keychain: floorKeychain, account: account)
+        let store = KeychainProtectedDataRootSecretStore(
+            account: account,
+            supportKeychain: floorKeychain,
+            deviceBindingProvider: MockProtectedDataDeviceBindingProvider(),
+            formatFloorStore: floorStore
+        )
+
+        XCTAssertThrowsError(try store.loadRootSecret(
+            identifier: identifier,
+            authenticationContext: LAContext(),
+            minimumEnvelopeVersion: nil
+        ))
+        XCTAssertNil(try floorStore.readMinimumEnvelopeVersion(sharedRightIdentifier: identifier))
+        let migratedPayload = try loadRootSecretPayload(identifier: identifier, account: account)
+        XCTAssertNotEqual(migratedPayload.count, ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
     }
 
     func test_rootSecretStore_rejectsLegacyDowngradeAfterFormatFloor() throws {
@@ -706,6 +791,47 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(coordinator.frameworkState, .sessionLocked)
         XCTAssertFalse(coordinator.hasActiveWrappingRootKey)
         XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
+    }
+
+    func test_sessionCoordinator_authorizationFloorRecordFailureReturnsRecoveryWithoutSessionKey() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataSessionFloorFailure")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
+            identifier: "com.cypherair.tests.protected-data.session-floor-failure",
+            secretData: Data(repeating: 0xA7, count: 32)
+        )
+        let floorRecorder = ThrowingRootSecretFloorRecorder()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: keyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.session-floor-failure",
+            recordRootSecretEnvelopeMinimumVersion: { version in
+                try await floorRecorder.record(version)
+            }
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.session-floor-failure",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["contacts": .active],
+            pendingMutation: nil
+        )
+
+        let authorizationResult = await coordinator.beginProtectedDataAuthorization(
+            registry: registry,
+            localizedReason: "ProtectedData unit test floor failure"
+        )
+        let floorSnapshot = await floorRecorder.snapshot()
+
+        XCTAssertEqual(authorizationResult, .frameworkRecoveryNeeded)
+        XCTAssertEqual(coordinator.frameworkState, .frameworkRecoveryNeeded)
+        XCTAssertFalse(coordinator.hasActiveWrappingRootKey)
+        XCTAssertEqual(floorSnapshot.callCount, 1)
+        XCTAssertEqual(floorSnapshot.lastVersion, ProtectedDataRootSecretEnvelope.currentFormatVersion)
     }
 
     func test_sessionCoordinator_authorizationUsesProvidedAppSessionContext() async throws {

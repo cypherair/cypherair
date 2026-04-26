@@ -149,11 +149,14 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
 
         switch status {
         case errSecSuccess:
-            guard let data = result as? Data else {
+            guard var payload = result as? Data else {
                 throw KeychainError.unhandledError(errSecInternalError)
             }
+            defer {
+                payload.protectedDataZeroize()
+            }
             return try openOrMigrateRootSecretPayload(
-                data,
+                &payload,
                 identifier: identifier,
                 authenticationContext: authenticationContext,
                 minimumEnvelopeVersion: minimumEnvelopeVersion
@@ -315,7 +318,7 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
     }
 
     private func openOrMigrateRootSecretPayload(
-        _ payload: Data,
+        _ payload: inout Data,
         identifier: String,
         authenticationContext: LAContext,
         minimumEnvelopeVersion: Int?
@@ -344,7 +347,7 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
                 throw ProtectedDataError.invalidEnvelope("Root-secret payload is legacy v1 after v2 format floor was established.")
             }
             return try migrateLegacyRawRootSecret(
-                payload,
+                &payload,
                 identifier: identifier,
                 authenticationContext: authenticationContext
             )
@@ -390,10 +393,13 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
     }
 
     private func migrateLegacyRawRootSecret(
-        _ legacySecret: Data,
+        _ legacySecret: inout Data,
         identifier: String,
         authenticationContext: LAContext
     ) throws -> ProtectedDataRootSecretLoadResult {
+        defer {
+            legacySecret.protectedDataZeroize()
+        }
         traceStore?.record(
             category: .operation,
             name: "protectedData.rootSecret.v2Migration.start",

@@ -83,7 +83,7 @@ Required fields:
 - `magic = CAPDSEV2`
 - `formatVersion = 2`
 - `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`
-- `aadVersion = 1`
+- `aadVersion = 2`
 - `sharedRightIdentifier`
 - `deviceBindingKeyIdentifier`
 - `deviceBindingPublicKeyX963`
@@ -115,7 +115,8 @@ HKDF and AAD:
 - `rootSecretEnvelopeSharedInfoV1` must include at least `magic`,
   `formatVersion`, `algorithmID`, `aadVersion`, `sharedRightIdentifier`,
   `deviceBindingKeyIdentifier`, `SHA256(deviceBindingPublicKeyX963)`,
-  `ephemeralPublicKeyX963.count`, and `ciphertext.count`.
+  `SHA256(ephemeralPublicKeyX963)`, `ephemeralPublicKeyX963.count`, and
+  `ciphertext.count`.
 - AES-GCM AAD must include the same version/algorithm/key-identity binding and
   field-length binding. Its purpose is to make field substitution, envelope
   confusion, and downgrade-shaped payloads fail authentication.
@@ -249,7 +250,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 - exact envelope field-length validation for salt, nonce, tag, public keys, and
   32-byte root-secret ciphertext
 - unsupported magic, envelope version, algorithm ID, and malformed AAD fail
-- HKDF sharedInfo mismatch fails
+- HKDF sharedInfo mismatch and ephemeral public-key hash binding fail
 - tampered ciphertext, tag, nonce, salt, device-binding public key, and
   ephemeral public key fail
 - legacy v1 raw root secret migrates to v2 after authorization

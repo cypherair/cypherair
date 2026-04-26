@@ -41,7 +41,7 @@ This document is a downstream review aid. It does not change the architecture or
 - root-secret retrieval uses `kSecUseAuthenticationContext` with an authenticated `LAContext`
 - v2 root-secret payloads add a Secure Enclave device-bound envelope under that same boundary; this must not add a second Face ID / Touch ID prompt
 - v2 root-secret authorization fails closed if the SE device-binding key or envelope is missing, corrupted, or unavailable
-- v2 `CAPDSEV2` envelope validation fails closed for unsupported versions/algorithms, wrong public-key representation, wrong salt/nonce/tag/ciphertext lengths, HKDF sharedInfo mismatch, AAD mismatch, tampering, and downgrade from v2 markers to v1 raw payload
+- v2 `CAPDSEV2` envelope validation fails closed for unsupported envelope/AAD versions, unsupported algorithms, wrong public-key representation, wrong salt/nonce/tag/ciphertext lengths, HKDF sharedInfo mismatch, AAD mismatch, ephemeral public-key binding mismatch, tampering, and downgrade from v2 markers to v1 raw payload
 - v2 migration writes both registry state and a ThisDeviceOnly Keychain `format-floor` marker; these markers are part of validation because they prevent accepting old root-secret payloads after migration
 - v2 AuthTrace records stage/version/status/error metadata only, never root secrets, ECDH shared secrets, HKDF output, private key dataRepresentation, or plaintext payloads
 - handoff-only protected-settings auto-open must fail locked without displaying a second prompt if the authenticated `LAContext` is no longer available at consumption time

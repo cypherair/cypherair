@@ -5,7 +5,7 @@ import Security
 struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
     static let magic = "CAPDSEV2"
     static let currentFormatVersion = 2
-    static let currentAADVersion = 1
+    static let currentAADVersion = 2
     static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v1"
     static let expectedRootSecretLength = 32
     static let expectedSaltLength = 32
@@ -267,6 +267,8 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         data.append(deviceBindingKeyData)
         let deviceBindingPublicKeyHash = SHA256.hash(data: deviceBindingPublicKeyX963)
         data.append(Data(deviceBindingPublicKeyHash))
+        let ephemeralPublicKeyHash = SHA256.hash(data: ephemeralPublicKeyX963)
+        data.append(Data(ephemeralPublicKeyHash))
         data.append(UInt16(ephemeralPublicKeyX963.count).bigEndianData)
         data.append(UInt16(rootSecretLength).bigEndianData)
         return data
