@@ -177,7 +177,7 @@ Migrate ordinary protected-after-unlock settings, self-test policy, and related 
 
 Migrate Contacts onto the shared protected app-data framework only after the earlier private-key-control, key-metadata, and non-Contacts protected-after-unlock work has been completed. Contacts must remain a domain-specific consumer of the shared framework, not a second independent vault architecture.
 
-See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts PR sequence.
+See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts-internal PR sequence after the AppData Phase 4 framework-hardening prerequisite.
 
 ### Phase 9: Future Persistent Domains
 

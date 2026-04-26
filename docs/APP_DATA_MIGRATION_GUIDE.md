@@ -153,7 +153,7 @@ Goals:
 - avoid duplicating domain key lifecycle, envelope handling, recovery logic, registry authority, and relock rules
 - keep Contacts explicitly `import-recoverable`
 
-Contacts internal implementation sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md).
+Contacts internal implementation sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md). That sequence starts after the AppData Phase 4 framework-hardening prerequisite; the Phase 4 prerequisite is not a Contacts-internal PR.
 
 ### 2.9 Phase 9: Future Persistent Domains
 

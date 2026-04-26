@@ -189,7 +189,7 @@ But those remain behind the `ContactService` facade.
 
 ### 4.4 Contacts Snapshot Schema Freezes Early
 
-Before any migration or cutover PR, the Contacts protected-domain implementation must freeze the first meaningful Contacts domain snapshot shape, including placeholders or initial fields for:
+Before any migration or cutover PR, the Contacts protected-domain implementation must freeze the first meaningful Contacts domain snapshot shape as a compatibility skeleton, including placeholders or initial fields for:
 
 - `ContactsDomainSnapshot`
 - `ContactIdentity`
@@ -202,6 +202,12 @@ Before any migration or cutover PR, the Contacts protected-domain implementation
 - certification reconciliation metadata
 
 This avoids a second schema turn after migration and projection work has already started.
+
+This early freeze is a schema and compatibility contract only. It may define fields, default values, encode/decode behavior, and compatibility projections, but it must not implement the later business semantics owned by dedicated PRs:
+
+- certification projection writes and reconciliation belong to the certification projection PR
+- merge, preferred-key, additional-key, and historical-key behavior belong to the person-centered model PR
+- search, tags, recipient-list management, and related UI finish belong to the final product-capability PR
 
 ### 4.5 Surface Inventory Is A Required Companion Artifact
 
@@ -221,7 +227,7 @@ Certification projection and reconciliation lands as its own pre-cutover capabil
 
 It is intentionally separated from:
 
-- the early schema / facade foundation PR
+- the early schema skeleton / facade PR
 - the later UI finishing PR
 
 This keeps the sequence stable:
@@ -250,21 +256,22 @@ It is responsible for:
 - classifying whether a surface is a read, mutation, recovery action, or optional Contacts enrichment
 - defining whether the surface requires Contacts unlocked, framework gate only, or no Contacts access
 - freezing the target locked-state behavior
-- assigning each surface to a future PR
+- assigning each surface to a future Contacts-internal PR
 
 This implementation plan references the inventory by behavior group rather than repeating every row inline.
 
-## 6. Planned PR Sequence
+## 6. Prerequisites And Planned Contacts PR Sequence
 
-This section freezes the later implementation order.
+This section freezes the later implementation order and separates shared AppData prerequisites from Contacts-internal PRs.
 
-### 6.1 PR1 — ProtectedData Framework Hardening For Second Real Domain
+### 6.1 Prerequisite — AppData Phase 4 Framework Hardening
 
 **Goals**
 
 - remove the documented pending-create / recovery limitations that block a second real protected domain
 - make second-domain recovery and last-domain cleanup reliable before Contacts depends on them
 - keep Contacts implementation from needing one-off framework exceptions
+- keep this work owned by AppData Phase 4 rather than the Contacts protected-domain PR sequence
 
 **Key Changes**
 
@@ -276,27 +283,28 @@ This section freezes the later implementation order.
 
 - no Contacts schema or app-surface changes
 - no Contacts migration logic
+- no Contacts-internal PR coverage claim
 
 **Validation**
 
 - protected-data unit coverage for second-domain create/delete/recovery
 - framework-level relock and `restartRequired` baseline assertions still pass
 
-### 6.2 PR2 — Contacts Domain Foundation And Snapshot Schema
+### 6.2 Contacts PR1 — Contacts Schema Skeleton And Compatibility Facade
 
 **Goals**
 
 - introduce the first concrete Contacts protected-domain foundation without cutting over any user-visible source of truth
-- freeze the initial Contacts snapshot schema and `ContactService` facade direction
+- freeze the initial Contacts snapshot schema skeleton and `ContactService` facade direction
 
 **Key Changes**
 
 - add `ContactsDomainSnapshot`
 - add `ContactIdentity`, `ContactKeyRecord`, and `RecipientList`
-- add `ContactsAvailability`
+- add the `ContactsAvailability` type shape
 - add a domain repository layer under `ContactService`
 - preserve a compatibility projection so existing UI and service consumers can still operate during the migration sequence
-- keep ordinary runtime reads on the legacy plaintext source during PR2-PR6; compatibility projection exists to preserve consumers, not to switch source of truth early
+- keep ordinary runtime reads on the legacy plaintext source through Contacts PR5; compatibility projection exists to preserve consumers, not to switch source of truth early
 - register Contacts as a `ProtectedDataRelockParticipant`
 - clear decrypted snapshot state, serialization scratch buffers, search index state, and signer-recognition state on relock
 
@@ -305,6 +313,9 @@ This section freezes the later implementation order.
 - no Contacts lifecycle gate wiring
 - no legacy plaintext cutover
 - no verification semantics change yet
+- no certification projection writes or reconciliation behavior
+- no merge, preferred-key, additional-key, or historical-key behavior
+- no search, tag, recipient-list management, or final Contacts UI behavior
 
 **Inventory Coverage**
 
@@ -316,7 +327,7 @@ This section freezes the later implementation order.
 - compatibility-projection tests
 - relock cleanup assertions for snapshot, scratch-buffer, search-index, and signer-recognition teardown
 
-### 6.3 PR3 — Verification Contract Refactor
+### 6.3 Contacts PR2 — Verification Contract Refactor
 
 **Goals**
 
@@ -359,7 +370,7 @@ This section freezes the later implementation order.
 - explicit regression tests for lower-level signer evidence being available without unlocked Contacts state when the engine can determine it
 - explicit regression tests for locked Contacts vs absent signer data
 
-### 6.4 PR4 — Contacts Lifecycle Wiring And Surface Gating
+### 6.4 Contacts PR3 — Contacts Lifecycle Wiring And Surface Gating
 
 **Goals**
 
@@ -401,7 +412,7 @@ This section freezes the later implementation order.
 - macOS route and UI smoke coverage
 - unit coverage for lock-state mapping across the gated surfaces
 
-### 6.5 PR5 — Certification Projection And Reconciliation Capability
+### 6.5 Contacts PR4 — Certification Projection And Reconciliation Capability
 
 **Goals**
 
@@ -431,7 +442,7 @@ This section freezes the later implementation order.
 - reconciliation trigger tests
 - regression tests confirming crypto workflow and Contacts projection are not collapsed into one state
 
-### 6.6 PR6 — Contacts Recovery Export / Import
+### 6.6 Contacts PR5 — Contacts Recovery Export / Import
 
 **Goals**
 
@@ -470,7 +481,7 @@ This section freezes the later implementation order.
 - empty-install restore
 - replace-domain import
 
-### 6.7 PR7 — Legacy Contacts Migration, Quarantine, And Cutover
+### 6.7 Contacts PR6 — Legacy Contacts Migration, Quarantine, And Cutover
 
 **Goals**
 
@@ -501,7 +512,7 @@ This section freezes the later implementation order.
 - quarantine inactivity for normal Contacts access
 - post-open deletion rules
 
-### 6.8 PR8 — Person-Centered Contacts Model And Multi-Key Behavior
+### 6.8 Contacts PR7 — Person-Centered Contacts Model And Multi-Key Behavior
 
 **Goals**
 
@@ -532,7 +543,7 @@ This section freezes the later implementation order.
 - preferred-key fallback rules
 - historical-key signer recognition
 
-### 6.9 PR9 — Search, Tags, Recipient Lists, And UI Finish
+### 6.9 Contacts PR8 — Search, Tags, Recipient Lists, And UI Finish
 
 **Goals**
 
@@ -614,6 +625,8 @@ The later implementation PRs must collectively satisfy the following scenario se
 This implementation-prep document is only complete if a later implementer can answer all of the following without inventing new architecture:
 
 - why Contacts protected-domain adoption needs more than a storage swap
+- why AppData Phase 4 framework hardening is a prerequisite rather than a Contacts-internal PR
+- what the Contacts schema skeleton may define before later behavior PRs
 - why verification contract refactor must happen before lifecycle wiring
 - which Contacts entrypoints are gated and which are only enrichment consumers
 - where certification projection lands relative to migration and cutover
