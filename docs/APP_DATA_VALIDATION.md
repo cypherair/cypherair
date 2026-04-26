@@ -39,6 +39,9 @@ This document is a downstream review aid. It does not change the architecture or
 
 - one shared Keychain-protected root-secret record is the single normative app-data authorization boundary
 - root-secret retrieval uses `kSecUseAuthenticationContext` with an authenticated `LAContext`
+- planned v2 root-secret payloads add a Secure Enclave device-bound envelope under that same boundary; this must not add a second Face ID / Touch ID prompt
+- planned v2 root-secret authorization fails closed if the SE device-binding key or envelope is missing, corrupted, or unavailable
+- planned v2 AuthTrace records stage/version/status/error metadata only, never root secrets, ECDH shared secrets, HKDF output, private key dataRepresentation, or plaintext payloads
 - handoff-only protected-settings auto-open must fail locked without displaying a second prompt if the authenticated `LAContext` is no longer available at consumption time
 - launch/resume authentication and root-secret retrieval use the dedicated `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`
 - the raw root secret is fetched only after app-session authentication succeeds
@@ -145,7 +148,9 @@ At minimum, an implementer must be able to tell:
 - that shared-resource lifecycle state and mutation execution phase are distinct concepts
 - that `AppSessionOrchestrator` is the app-wide session owner
 - that `ProtectedDataSessionCoordinator` is the app-data subsystem coordinator under that owner
-- that Keychain / `SecAccessControl` / authenticated `LAContext` root-secret retrieval is the primary app-data authorization gate in v1
+- that Keychain / `SecAccessControl` / authenticated `LAContext` root-secret retrieval remains the primary app-data authorization gate
+- that the planned Secure Enclave device-binding layer is an additional root-secret envelope factor, not a second user-authentication prompt or a replacement gate
+- that v2 ProtectedData fails closed if the SE device-binding key or envelope is missing, corrupted, or unavailable
 - that app-data domains are recoverable rather than private-key-style invalidating
 - that framework-level and domain-level recovery are distinct
 - that startup recovery is registry-first and matrix-driven

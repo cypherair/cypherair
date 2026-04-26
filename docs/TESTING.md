@@ -35,7 +35,7 @@ are not part of the standard GitHub workflows.
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
-**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, key-metadata cold-load/migration, and protected-settings handoff-only auto-open behavior. Uses protocol-based mocks for Keychain and SE.
+**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, key-metadata cold-load/migration, protected-settings handoff-only auto-open behavior, and the planned root-secret SE device-binding envelope through protocol-based mocks. Uses protocol-based mocks for Keychain and SE.
 
 ```bash
 # Practical local path used in this repository
@@ -59,7 +59,7 @@ These tests exist in the Swift test target but call through the UniFFI bindings 
 ### Layer 4: Device-Only Tests
 
 **Run on:** Physical iOS device only. Cannot run in simulator.
-**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and protected-data root-secret Keychain behavior through authenticated `LAContext` handoff.
+**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and protected-data root-secret Keychain behavior through authenticated `LAContext` handoff. The planned ProtectedData SE device-binding upgrade also needs device-only coverage proving that the v2 root-secret envelope opens on real Secure Enclave hardware without adding a second Face ID prompt, and that deleting the device-binding key makes v2 ProtectedData fail closed.
 
 ```bash
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \

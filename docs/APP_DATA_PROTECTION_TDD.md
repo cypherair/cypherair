@@ -262,7 +262,7 @@ Rationale:
 
 The current private-key design uses Secure Enclave indirect wrapping because OpenPGP private keys are not directly managed by the Secure Enclave.
 
-Protected app-data domains use a different primary model in v1:
+Protected app-data domains use a different primary model:
 
 - encrypted domain payloads remain app-managed on disk
 - one shared app-data root secret is stored as a Keychain item protected by `SecAccessControl`
@@ -272,11 +272,21 @@ Protected app-data domains use a different primary model in v1:
 
 This means the v1 app-data proposal still relies on Apple's system authorization boundary, but it uses the Keychain / `SecAccessControl` / `LAContext` path because that path has an explicit public API for reusing the same authenticated context across launch/resume authentication and the root-secret read.
 
+The planned v2 hardening keeps that same system authorization boundary and adds
+a Secure Enclave device-bound root-secret envelope below it:
+
+- the Keychain item still requires the app-session `LAContext`
+- the Keychain payload becomes a versioned envelope, not raw root-secret bytes
+- the envelope is opened by a ProtectedData-only P-256 Secure Enclave key
+- that SE key uses `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`
+- that SE key must not use `.userPresence`, `.biometryAny`, or `.devicePasscode`
+- SE failure after v2 migration is framework recovery/reset required, not a fallback to legacy raw-secret behavior
+
 Implementation rule:
 
 - treat one shared Keychain-protected root secret as the primary authorization gate for app-data unlock
 - release that root secret only through `kSecUseAuthenticationContext` with an authenticated `LAContext`
-- do not promise custom SE self-ECDH wrapping as the primary app-data design in v1
+- use Secure Enclave device binding only as an additional layer under that gate, never as a replacement for app-session authentication
 - treat any existing `LAPersistedRight` / `LASecret` implementation as superseded legacy state and a future migration source, not as the target normative gate
 - reuse lower-level primitives only where they support the domain model without replacing the primary system gate
 
@@ -287,6 +297,7 @@ Expected properties:
 - app code must not receive that secret before the system accepts the authenticated `LAContext`
 - one successful authorization covers all protected app-data domains in the current session
 - source-device authorization state must not be exported as part of portable recovery
+- after v2 migration, copied Keychain payloads and ProtectedData files remain unusable without the original device's ProtectedData SE binding key
 
 ### 5.3 App-Data Access-Control Contract
 
@@ -298,6 +309,7 @@ Required rules:
 
 - app-data domains use one shared Keychain-protected root secret as the primary app-data authorization gate in v1
 - the root-secret Keychain item uses `SecAccessControl` with a dedicated app-session authentication policy
+- the planned v2 root-secret payload is a Secure Enclave device-bound envelope, but that SE key must not be a second user-authentication source
 - the dedicated policy is represented as `AppSessionAuthenticationPolicy`, separate from the private-key `AuthenticationMode`
 - app-session authentication produces an `LAContext` that may be handed directly to root-secret retrieval
 - root-secret retrieval uses `kSecUseAuthenticationContext`
@@ -311,6 +323,7 @@ Required rules:
 - per-domain root-secret authorization is out of scope in v1
 - protected app-data domains must never rewrap merely because private-key auth mode changes
 - the system must not return the shared app-data root secret before the root-secret Keychain access succeeds with an authenticated `LAContext`
+- the system must not return the shared app-data root secret after v2 migration unless the SE device-binding envelope also opens successfully
 
 The purpose of this contract is to prevent the new layer from attaching itself to the private-key access-control source of truth.
 
@@ -643,7 +656,7 @@ The v1 persistence model for each protected app-data domain is:
 
 - domain payload generations are stored as encrypted envelopes on disk
 - the DMK is not stored in plaintext on disk
-- one shared app-data root secret is persisted as a Keychain item protected by `SecAccessControl`
+- one shared app-data root secret is persisted as a Keychain item protected by `SecAccessControl`; planned v2 stores it as an SE device-bound envelope inside that Keychain row
 - each domain DMK is persisted only as a `WrappedDomainMasterKeyRecord`
 - there is no v1 model where each domain owns its own independent authorization resource
 - there is no v1 single global DMK for all app-data domains
@@ -661,6 +674,7 @@ Required `WrappedDomainMasterKeyRecord` properties:
 The v1 wrapping profile is fixed:
 
 - fetch the root-secret Keychain item only after app-session authentication succeeds and an authenticated `LAContext` is available
+- for v2 payloads, open the SE device-bound root-secret envelope before deriving `AppDataWrappingRootKey`
 - derive `AppDataWrappingRootKey` with `HKDF-SHA256`
   - input key material: raw root-secret bytes
   - salt: `"CypherAir.AppData.WrapRoot.Salt.v1"`

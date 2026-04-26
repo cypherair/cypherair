@@ -187,6 +187,8 @@ The v1 persistence model for each protected app-data domain is:
 - the DMK is not stored in plaintext on disk
 - one shared app-data root secret is persisted as a Keychain item protected by `SecAccessControl`
 - the root-secret Keychain item uses this-device-only accessibility and the access-control flags selected by `AppSessionAuthenticationPolicy`
+- the planned v2 payload for that row is a Secure Enclave device-bound root-secret envelope rather than raw root-secret bytes
+- the ProtectedData SE device-binding key uses `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage` and does not add Face ID / Touch ID flags
 - normal root-secret reads supply the authenticated `LAContext` with `kSecUseAuthenticationContext`
 - each domain DMK is persisted only as a `WrappedDomainMasterKeyRecord`
 - there is no v1 model where each domain owns its own independent authorization resource
@@ -205,6 +207,7 @@ Required `WrappedDomainMasterKeyRecord` properties:
 The v1 `WrappedDomainMasterKeyRecord` implementation profile is fixed:
 
 - raw root-secret bytes are never used directly as the DMK wrapping key
+- v2 root-secret payloads must first open through the ProtectedData SE device-binding envelope; if that fails, authorization fails closed
 - derive `AppDataWrappingRootKey` first with `HKDF-SHA256`
   - salt: `"CypherAir.AppData.WrapRoot.Salt.v1"`
   - info: `"CypherAir.AppData.WrapRoot.Info.v1"`
@@ -272,8 +275,9 @@ The target launch/resume handoff is:
 2. `AppSessionOrchestrator` evaluates the dedicated `AppSessionAuthenticationPolicy` and receives an authenticated `LAContext`.
 3. If the initial route immediately requires protected-domain content, `AppSessionOrchestrator` passes that same `LAContext` to `ProtectedDataSessionCoordinator`.
 4. `ProtectedDataSessionCoordinator` reads the shared root-secret Keychain record with `kSecUseAuthenticationContext`.
-5. The raw root-secret bytes are used only to derive `AppDataWrappingRootKey`, then are zeroized.
-6. Domain DMKs remain lazy-unwrapped; activating the shared app-data session does not open every protected domain.
+5. If the Keychain payload is v2, the ProtectedData Secure Enclave device-binding key silently opens the root-secret envelope without adding a second user-authentication prompt.
+6. The raw root-secret bytes are used only to derive `AppDataWrappingRootKey`, then are zeroized.
+7. Domain DMKs remain lazy-unwrapped; activating the shared app-data session does not open every protected domain.
 
 If root-secret retrieval fails with an already authenticated context, the framework must not fall back to app-managed plaintext state or silently retry with a different authorization mechanism. User-cancelled or denied authentication remains a normal access outcome; a missing or unreadable root-secret record for a `ready` registry row is framework recovery.
 

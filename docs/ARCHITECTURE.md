@@ -116,6 +116,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, and auth-mode crash recovery |
 | `ProtectedDataSessionCoordinator` | Shared Keychain-protected root-secret retrieval through authenticated `LAContext`, wrapping-root-key derivation, relock, and `restartRequired` latching for protected app-data domains |
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, staged wrapped-DMK validation/promotion, and unlocked-domain-key zeroization |
+| ProtectedData device-binding layer | Planned Secure Enclave device-bound root-secret envelope layer. It adds a silent P-256 SE factor under the existing Keychain / `LAContext` app-data gate and does not replace app privacy authentication. |
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |
 | `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
@@ -131,11 +132,13 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `KeychainProtectedDataRootSecretStore.swift` — Keychain storage for the shared app-data root secret
 - `ProtectedDataRightStoreClient.swift` — legacy right-store migration/cleanup adapter, not the current authorization path
 - `ProtectedDomainBootstrapStore.swift` — file-side bootstrap metadata persistence
+- planned ProtectedData device-binding layer — Secure Enclave-backed device binding for the shared root-secret envelope. It uses `.privateKeyUsage` without user-presence or biometric flags so the only user authentication remains the existing Keychain / `LAContext` gate.
 
 Current Phase 1 scope:
 
 - the framework exists and is wired into startup/bootstrap and app-session ownership
 - `ProtectedSettingsStore` is the first protected-domain adopter for protected settings/control state
+- the next security-architecture step is upgrading the root-secret Keychain payload from legacy raw secret bytes to a versioned SE device-bound envelope while preserving the existing app-session authentication gate
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
 - Settings refresh can auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
 
@@ -350,7 +353,8 @@ Keychain (kSecClassGenericPassword, data-protection Keychain):
 │   ├── com.cypherair.v1.pending-se-key.<fingerprint> → Temporary mode-switch / expiry-recovery row
 │   ├── com.cypherair.v1.pending-salt.<fingerprint>   → Temporary mode-switch / expiry-recovery row
 │   ├── com.cypherair.v1.pending-sealed-key.<fingerprint>
-│   └── com.cypherair.protected-data.shared-right.v1  → Shared app-data root secret
+│   ├── com.cypherair.protected-data.shared-right.v1  → LA-gated shared app-data root-secret envelope
+│   └── com.cypherair.protected-data.device-binding-key.v1 → Planned ProtectedData SE device-binding key
 ├── Metadata account (`com.cypherair.metadata`):
 │   └── com.cypherair.v1.metadata.<fingerprint>       → PGPKeyIdentity JSON cold-launch index
 
@@ -389,6 +393,7 @@ App Sandbox:
 - `<fingerprint>` is the full key fingerprint in lowercase hexadecimal, no spaces or separators (e.g., `a1b2c3d4...`).
 - Metadata items use `metadata.` prefix under the dedicated metadata account and store `PGPKeyIdentity` as JSON. These items have no access control (no SE authentication required) and are the current transitional cold-launch index. The long-term target is a ProtectedData `key metadata` domain opened automatically after app unlock.
 - Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain; future ProtectedData recovery journals may reference these rows but must not store the bundle material.
+- The planned ProtectedData device-binding key is separate from private-key SE keys. It is a P-256 Secure Enclave key with `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no Face ID flags, and exists only to unwrap the app-data root-secret envelope after the existing Keychain / `LAContext` gate succeeds.
 - The long-term app-data goal is to move every CypherAir-owned local data surface behind ProtectedData after unlock unless it is a documented boot-authentication, private-key-material, framework-bootstrap, ephemeral-cleanup, test-only, legacy-cleanup, or out-of-app-custody exception.
 - Future post-unlock orchestration should open required domains such as `private-key-control`, `key metadata`, and protected settings by reusing the app privacy authentication context without extra Face ID prompts.
 

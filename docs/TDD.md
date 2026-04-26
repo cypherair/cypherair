@@ -304,6 +304,11 @@ com.cypherair.v1.metadata.<fingerprint>
 | Salt | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 | Encrypted private key | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 | Key metadata (PGPKeyIdentity JSON) | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None (no SE auth); transitional cold-launch index before future `key metadata` domain |
+| ProtectedData SE device-binding key (planned) | Keychain-backed SE key representation | `WhenPasscodeSetThisDeviceOnly` | `.privateKeyUsage` only; no Face ID flags |
+
+ProtectedData uses this planned device-binding key only to open the app-data
+root-secret envelope after the existing Keychain / `LAContext` gate succeeds.
+It is not part of the private-key bundle model and must fail closed if missing.
 
 ### 3.6 Security Properties
 
