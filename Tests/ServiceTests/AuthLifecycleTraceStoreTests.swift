@@ -140,6 +140,80 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertTrue(lines[0].contains("gate.active"))
     }
 
+    func test_promptCoordinator_recordsPromptErrorBeforeRethrowing() async {
+        enum ExpectedError: Error {
+            case failed
+        }
+
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let coordinator = TraceAuthenticationPromptCoordinator(traceStore: store)
+
+        do {
+            _ = try await coordinator.withPrivacyPrompt(source: "traceTest") {
+                throw ExpectedError.failed
+            }
+            XCTFail("Expected prompt operation to rethrow")
+        } catch ExpectedError.failed {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        let entries = store.recentEntries
+        XCTAssertTrue(entries.contains { $0.name == "prompt.begin" && $0.metadata["source"] == "traceTest" })
+        XCTAssertTrue(entries.contains { $0.name == "prompt.error" && $0.metadata["source"] == "traceTest" })
+        XCTAssertTrue(entries.contains { $0.name == "prompt.end" && $0.metadata["source"] == "traceTest" })
+    }
+
+    func test_startupCoordinator_recordsSegmentTrace() {
+        let container = AppContainer.makeUITest(authTraceEnabled: true)
+
+        _ = AppStartupCoordinator().performPreAuthBootstrap(using: container)
+
+        let names = container.authLifecycleTraceStore?.recentEntries.map(\.name) ?? []
+        XCTAssertTrue(names.contains("startup.protectedDataBootstrap.start"))
+        XCTAssertTrue(names.contains("startup.protectedDataBootstrap.finish"))
+        XCTAssertTrue(names.contains("startup.keys.load.start"))
+        XCTAssertTrue(names.contains("startup.keys.load.finish"))
+        XCTAssertTrue(names.contains("startup.rewrapRecovery.start"))
+        XCTAssertTrue(names.contains("startup.rewrapRecovery.finish"))
+        XCTAssertTrue(names.contains("startup.modifyExpiryRecovery.start"))
+        XCTAssertTrue(names.contains("startup.modifyExpiryRecovery.finish"))
+        XCTAssertTrue(names.contains("startup.contacts.load.start"))
+        XCTAssertTrue(names.contains("startup.contacts.load.finish"))
+        XCTAssertTrue(names.contains("startup.loadWarning.computed"))
+    }
+
+    func test_systemKeychain_recordsPassiveTraceWithoutChangingResults() throws {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let keychain = SystemKeychain(traceStore: store)
+        let service = "\(KeychainConstants.metadataPrefix)trace-\(UUID().uuidString)"
+        let account = "com.cypherair.tests.trace"
+
+        try? keychain.delete(service: service, account: account)
+
+        do {
+            try keychain.save(Data([0xCA, 0xFE]), service: service, account: account, accessControl: nil)
+        } catch {
+            throw XCTSkip("System Keychain is unavailable in this test environment: \(error)")
+        }
+        defer {
+            try? keychain.delete(service: service, account: account)
+        }
+
+        XCTAssertEqual(try keychain.load(service: service, account: account), Data([0xCA, 0xFE]))
+        XCTAssertTrue(keychain.exists(service: service, account: account))
+        XCTAssertTrue(try keychain.listItems(servicePrefix: KeychainConstants.metadataPrefix, account: account).contains(service))
+        try keychain.delete(service: service, account: account)
+        XCTAssertFalse(keychain.exists(service: service, account: account))
+
+        let entries = store.recentEntries
+        XCTAssertTrue(entries.contains { $0.name == "keychain.save.start" })
+        XCTAssertTrue(entries.contains { $0.name == "keychain.save.finish" && $0.metadata["statusName"] == "success" })
+        XCTAssertTrue(entries.contains { $0.name == "keychain.load.start" })
+        XCTAssertTrue(entries.contains { $0.name == "keychain.load.finish" && $0.metadata["statusName"] == "success" })
+        XCTAssertTrue(entries.contains { $0.name == "keychain.delete.finish" && $0.metadata["statusName"] == "success" })
+    }
+
     func test_traceStore_recordsMonotonicRelativeTiming() {
         let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
 

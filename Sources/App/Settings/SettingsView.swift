@@ -28,6 +28,7 @@ struct SettingsView: View {
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
     @Environment(\.appAccessPolicySwitchAction) private var appAccessPolicySwitchAction
+    @Environment(\.localDataResetService) private var localDataResetService
 
     let configuration: Configuration
 
@@ -43,6 +44,7 @@ struct SettingsView: View {
             iosPresentationController: iosPresentationController,
             macPresentationController: macPresentationController,
             appAccessPolicySwitchAction: appAccessPolicySwitchAction,
+            localDataResetService: localDataResetService,
             configuration: configuration
         )
     }
@@ -75,6 +77,7 @@ private struct SettingsScreenHostView: View {
         iosPresentationController: IOSPresentationController?,
         macPresentationController: MacPresentationController?,
         appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction?,
+        localDataResetService: LocalDataResetService?,
         configuration: SettingsView.Configuration
     ) {
         _model = State(
@@ -85,6 +88,7 @@ private struct SettingsScreenHostView: View {
                 iosPresentationController: iosPresentationController,
                 macPresentationController: macPresentationController,
                 configuration: configuration,
+                localDataResetService: localDataResetService,
                 appAccessPolicySwitchAction: appAccessPolicySwitchAction
             )
         )
@@ -156,6 +160,10 @@ private struct SettingsScreenHostView: View {
 
             if model.shouldShowProtectedSettingsSection {
                 protectedSettingsSection(model: model)
+            }
+
+            if model.shouldShowLocalDataResetSection {
+                localDataResetSection(model: model)
             }
 
             Section {
@@ -324,6 +332,53 @@ private struct SettingsScreenHostView: View {
                 )
             )
         }
+        .confirmationDialog(
+            String(localized: "settings.resetAll.title", defaultValue: "Reset All Local Data?"),
+            isPresented: Binding(
+                get: { model.showLocalDataResetWarning },
+                set: { if !$0 { model.dismissLocalDataResetWarning() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(
+                String(localized: "settings.resetAll.continue", defaultValue: "Continue"),
+                role: .destructive
+            ) {
+                model.continueLocalDataReset()
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) { }
+        } message: {
+            Text(
+                String(
+                    localized: "settings.resetAll.warning",
+                    defaultValue: "This permanently deletes CypherAir keys, contacts, protected preferences, app settings, and temporary files on this device."
+                )
+            )
+        }
+        .sheet(isPresented: Binding(
+            get: { model.showLocalDataResetPhraseSheet },
+            set: { if !$0 { model.dismissLocalDataResetPhraseSheet() } }
+        )) {
+            NavigationStack {
+                localDataResetPhraseView(model: model)
+            }
+            #if os(macOS)
+            .frame(minWidth: 500, idealWidth: 540, minHeight: 320, idealHeight: 360)
+            #endif
+        }
+        .alert(
+            model.localDataResetAlertTitle,
+            isPresented: Binding(
+                get: { model.showLocalDataResetResultAlert },
+                set: { if !$0 { model.dismissLocalDataResetResultAlert() } }
+            )
+        ) {
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                model.dismissLocalDataResetResultAlert()
+            }
+        } message: {
+            Text(model.localDataResetAlertMessage)
+        }
         #if !os(iOS)
         .sheet(isPresented: $model.showOnboarding) {
             OnboardingView(presentationContext: .inApp)
@@ -349,6 +404,68 @@ private struct SettingsScreenHostView: View {
                 .foregroundStyle(.tertiary)
         }
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func localDataResetSection(model: SettingsScreenModel) -> some View {
+        Section {
+            Button(role: .destructive) {
+                model.requestLocalDataReset()
+            } label: {
+                Label(
+                    String(localized: "settings.resetAll.action", defaultValue: "Reset All Local Data"),
+                    systemImage: "trash"
+                )
+            }
+            .disabled(model.isResettingLocalData)
+            .accessibilityIdentifier("settings.resetAll")
+        } header: {
+            Text(String(localized: "settings.dangerZone", defaultValue: "Danger Zone"))
+        } footer: {
+            Text(
+                String(
+                    localized: "settings.resetAll.footer",
+                    defaultValue: "Use this only when you want this device to behave like a fresh CypherAir install."
+                )
+            )
+        }
+    }
+
+    private func localDataResetPhraseView(model: SettingsScreenModel) -> some View {
+        @Bindable var model = model
+
+        return Form {
+            Section {
+                Text(
+                    String(
+                        localized: "settings.resetAll.phraseInstructions",
+                        defaultValue: "Type RESET to permanently delete all CypherAir data on this device."
+                    )
+                )
+                TextField(
+                    String(localized: "settings.resetAll.phrasePlaceholder", defaultValue: "Confirmation phrase"),
+                    text: $model.localDataResetConfirmationPhrase
+                )
+                .accessibilityIdentifier("settings.resetAll.phrase")
+            }
+        }
+        .navigationTitle(String(localized: "settings.resetAll.title", defaultValue: "Reset All Local Data?"))
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                    model.dismissLocalDataResetPhraseSheet()
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button(
+                    String(localized: "settings.resetAll.confirm", defaultValue: "Reset"),
+                    role: .destructive
+                ) {
+                    model.confirmLocalDataReset()
+                }
+                .disabled(!model.canConfirmLocalDataReset || model.isResettingLocalData)
+            }
+        }
     }
 
     @ViewBuilder

@@ -26,6 +26,7 @@ final class AppContainer: @unchecked Sendable {
     let certificateSignatureService: CertificateSignatureService
     let qrService: QRService
     let selfTestService: SelfTestService
+    let localDataResetService: LocalDataResetService
     let contactsDirectory: URL?
     let defaultsSuiteName: String?
 
@@ -54,6 +55,7 @@ final class AppContainer: @unchecked Sendable {
         certificateSignatureService: CertificateSignatureService,
         qrService: QRService,
         selfTestService: SelfTestService,
+        localDataResetService: LocalDataResetService,
         contactsDirectory: URL? = nil,
         defaultsSuiteName: String? = nil
     ) {
@@ -81,6 +83,7 @@ final class AppContainer: @unchecked Sendable {
         self.certificateSignatureService = certificateSignatureService
         self.qrService = qrService
         self.selfTestService = selfTestService
+        self.localDataResetService = localDataResetService
         self.contactsDirectory = contactsDirectory
         self.defaultsSuiteName = defaultsSuiteName
     }
@@ -88,9 +91,9 @@ final class AppContainer: @unchecked Sendable {
     static func makeDefault(
         authTraceEnabled: Bool = false
     ) -> AppContainer {
-        let secureEnclave = HardwareSecureEnclave()
-        let keychain = SystemKeychain()
         let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
+        let secureEnclave = HardwareSecureEnclave(traceStore: authLifecycleTraceStore)
+        let keychain = SystemKeychain(traceStore: authLifecycleTraceStore)
         let authenticationShieldCoordinator = AuthenticationShieldCoordinator(
             traceStore: authLifecycleTraceStore
         )
@@ -117,8 +120,10 @@ final class AppContainer: @unchecked Sendable {
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
             registryStore: protectedDataRegistryStore
         )
+        let protectedDataRightStoreClient = ProtectedDataRightStoreClient(traceStore: authLifecycleTraceStore)
         let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
-            legacyRightStoreClient: ProtectedDataRightStoreClient(),
+            rootSecretStore: KeychainProtectedDataRootSecretStore(traceStore: authLifecycleTraceStore),
+            legacyRightStoreClient: protectedDataRightStoreClient,
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
@@ -189,6 +194,23 @@ final class AppContainer: @unchecked Sendable {
         )
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
+        let contactsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("contacts", isDirectory: true)
+        let localDataResetService = LocalDataResetService(
+            keychain: keychain,
+            legacyRightStoreClient: protectedDataRightStoreClient,
+            protectedDataStorageRoot: protectedDataStorageRoot,
+            contactsDirectory: contactsDirectory,
+            defaults: defaults,
+            defaultsDomainName: Bundle.main.bundleIdentifier,
+            config: config,
+            authManager: authManager,
+            keyManagement: keyManagement,
+            contactService: contactService,
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            appSessionOrchestrator: appSessionOrchestrator,
+            traceStore: authLifecycleTraceStore
+        )
 
         return AppContainer(
             authLifecycleTraceStore: authLifecycleTraceStore,
@@ -214,7 +236,8 @@ final class AppContainer: @unchecked Sendable {
             signingService: signingService,
             certificateSignatureService: certificateSignatureService,
             qrService: qrService,
-            selfTestService: selfTestService
+            selfTestService: selfTestService,
+            localDataResetService: localDataResetService
         )
     }
 
@@ -274,9 +297,10 @@ final class AppContainer: @unchecked Sendable {
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
             registryStore: protectedDataRegistryStore
         )
+        let protectedDataRightStoreClient = ProtectedDataRightStoreClient(traceStore: authLifecycleTraceStore)
         let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
             rootSecretStore: MockProtectedDataRootSecretStore(),
-            legacyRightStoreClient: ProtectedDataRightStoreClient(),
+            legacyRightStoreClient: protectedDataRightStoreClient,
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
@@ -349,6 +373,21 @@ final class AppContainer: @unchecked Sendable {
         )
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
+        let localDataResetService = LocalDataResetService(
+            keychain: keychain,
+            legacyRightStoreClient: nil,
+            protectedDataStorageRoot: protectedDataStorageRoot,
+            contactsDirectory: contactsDirectory,
+            defaults: defaults,
+            defaultsDomainName: suiteName,
+            config: config,
+            authManager: authManager,
+            keyManagement: keyManagement,
+            contactService: contactService,
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            appSessionOrchestrator: appSessionOrchestrator,
+            traceStore: authLifecycleTraceStore
+        )
 
         if preloadContact {
             try? preloadUITestContact(engine: engine, contactService: contactService)
@@ -379,6 +418,7 @@ final class AppContainer: @unchecked Sendable {
             certificateSignatureService: certificateSignatureService,
             qrService: qrService,
             selfTestService: selfTestService,
+            localDataResetService: localDataResetService,
             contactsDirectory: contactsDirectory,
             defaultsSuiteName: suiteName
         )

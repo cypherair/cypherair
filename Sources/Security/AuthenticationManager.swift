@@ -107,6 +107,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
         return value
     }
 
+    func clearCachedAuthenticationContextAfterLocalDataReset() {
+        lastEvaluatedContext?.invalidate()
+        lastEvaluatedContext = nil
+    }
+
     // MARK: - Init
 
     init(

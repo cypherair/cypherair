@@ -80,6 +80,10 @@ final class KeyManagementService {
         syncKeys()
     }
 
+    func resetInMemoryStateAfterLocalDataReset() {
+        keys = []
+    }
+
     // MARK: - Key Generation
 
     /// Generate a new key pair with the specified profile.

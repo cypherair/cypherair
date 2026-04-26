@@ -84,6 +84,20 @@ final class AppSessionOrchestrator {
         )
     }
 
+    func resetAfterLocalDataReset() {
+        discardPendingAuthenticatedContext(reason: "localDataReset")
+        lastAuthenticationDate = nil
+        isAuthenticating = false
+        isPrivacyScreenBlurred = false
+        authFailed = false
+        contentClearGeneration += 1
+        traceStore?.record(
+            category: .session,
+            name: "session.localDataReset",
+            metadata: ["contentClearGeneration": String(contentClearGeneration)]
+        )
+    }
+
     var isOperationAuthenticationPromptInProgress: Bool {
         authenticationPromptCoordinator.isOperationPromptInProgress
     }

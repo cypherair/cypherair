@@ -17,6 +17,7 @@ final class SettingsScreenModel {
     private let macPresentationController: MacPresentationController?
     private let authModeSwitchAction: AuthModeSwitchAction
     private let appAccessPolicySwitchAction: AppAccessPolicySwitchAction
+    private let localDataResetService: LocalDataResetService?
 
     var pendingMode: AuthenticationMode?
     private var pendingModeRequestID: UUID?
@@ -28,6 +29,13 @@ final class SettingsScreenModel {
     var showOnboarding = false
     var showTutorialOnboarding = false
     var showProtectedSettingsResetConfirmation = false
+    var showLocalDataResetWarning = false
+    var showLocalDataResetPhraseSheet = false
+    var showLocalDataResetResultAlert = false
+    var localDataResetConfirmationPhrase = ""
+    var isResettingLocalData = false
+    private var localDataResetSucceeded = false
+    private var localDataResetErrorMessage: String?
 
     init(
         config: AppConfiguration,
@@ -36,6 +44,7 @@ final class SettingsScreenModel {
         iosPresentationController: IOSPresentationController?,
         macPresentationController: MacPresentationController?,
         configuration: SettingsView.Configuration,
+        localDataResetService: LocalDataResetService? = nil,
         authModeSwitchAction: AuthModeSwitchAction? = nil,
         appAccessPolicySwitchAction: AppAccessPolicySwitchAction? = nil
     ) {
@@ -46,6 +55,7 @@ final class SettingsScreenModel {
         self.keyManagement = keyManagement
         self.iosPresentationController = iosPresentationController
         self.macPresentationController = macPresentationController
+        self.localDataResetService = localDataResetService
         self.authModeSwitchAction = authModeSwitchAction ?? { newMode, fingerprints, hasBackup in
             try await authManager.switchMode(
                 to: newMode,
@@ -88,6 +98,34 @@ final class SettingsScreenModel {
         case .mainWindowLive, .settingsSceneProxy, .tutorialSandbox:
             true
         }
+    }
+
+    var shouldShowLocalDataResetSection: Bool {
+        localDataResetService != nil
+    }
+
+    var canConfirmLocalDataReset: Bool {
+        localDataResetConfirmationPhrase == "RESET"
+    }
+
+    var localDataResetAlertTitle: String {
+        if localDataResetSucceeded {
+            return String(localized: "settings.resetAll.success.title", defaultValue: "Reset Complete")
+        }
+        return String(localized: "settings.resetAll.error.title", defaultValue: "Reset Failed")
+    }
+
+    var localDataResetAlertMessage: String {
+        if localDataResetSucceeded {
+            return String(
+                localized: "settings.resetAll.success.message",
+                defaultValue: "CypherAir local data was reset. Restart the app to complete the fresh-start state."
+            )
+        }
+        return localDataResetErrorMessage ?? String(
+            localized: "settings.resetAll.error.message",
+            defaultValue: "CypherAir could not reset all local data."
+        )
     }
 
     var usesLocalModeSheet: Bool {
@@ -234,6 +272,68 @@ final class SettingsScreenModel {
 
     func dismissProtectedSettingsResetConfirmation() {
         showProtectedSettingsResetConfirmation = false
+    }
+
+    func requestLocalDataReset() {
+        guard localDataResetService != nil else { return }
+        showLocalDataResetWarning = true
+    }
+
+    func dismissLocalDataResetWarning() {
+        showLocalDataResetWarning = false
+    }
+
+    func continueLocalDataReset() {
+        showLocalDataResetWarning = false
+        localDataResetConfirmationPhrase = ""
+        showLocalDataResetPhraseSheet = true
+    }
+
+    func dismissLocalDataResetPhraseSheet() {
+        guard !isResettingLocalData else { return }
+        showLocalDataResetPhraseSheet = false
+        localDataResetConfirmationPhrase = ""
+    }
+
+    func confirmLocalDataReset() {
+        guard canConfirmLocalDataReset, let localDataResetService else { return }
+        showLocalDataResetPhraseSheet = false
+        isResettingLocalData = true
+        localDataResetSucceeded = false
+        localDataResetErrorMessage = nil
+
+        Task {
+            do {
+                if authManager.canEvaluate(appSessionPolicy: appConfiguration.appSessionAuthenticationPolicy) {
+                    let result = try await authManager.evaluateAppSession(
+                        policy: appConfiguration.appSessionAuthenticationPolicy,
+                        reason: String(
+                            localized: "settings.resetAll.authReason",
+                            defaultValue: "Authenticate to reset all CypherAir data on this device."
+                        ),
+                        source: "localDataReset"
+                    )
+                    guard result.isAuthenticated else {
+                        throw AuthenticationError.failed
+                    }
+                }
+
+                _ = try await localDataResetService.resetAllLocalData()
+                localDataResetSucceeded = true
+            } catch {
+                localDataResetErrorMessage = error.localizedDescription
+            }
+
+            isResettingLocalData = false
+            showLocalDataResetResultAlert = true
+            localDataResetConfirmationPhrase = ""
+        }
+    }
+
+    func dismissLocalDataResetResultAlert() {
+        showLocalDataResetResultAlert = false
+        localDataResetErrorMessage = nil
+        localDataResetSucceeded = false
     }
 
     func openProtectedSettingsInMainWindow() {

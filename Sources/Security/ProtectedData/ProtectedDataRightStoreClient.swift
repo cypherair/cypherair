@@ -31,9 +31,14 @@ protocol ProtectedDataRootSecretStoreProtocol: AnyObject {
 
 final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtocol {
     private let account: String
+    private let traceStore: AuthLifecycleTraceStore?
 
-    init(account: String = KeychainConstants.defaultAccount) {
+    init(
+        account: String = KeychainConstants.defaultAccount,
+        traceStore: AuthLifecycleTraceStore? = nil
+    ) {
         self.account = account
+        self.traceStore = traceStore
     }
 
     func saveRootSecret(
@@ -41,11 +46,24 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         identifier: String,
         policy: AppSessionAuthenticationPolicy
     ) throws {
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.save.start",
+            metadata: ["serviceKind": "protectedDataRootSecret", "policy": policy.rawValue]
+        )
         var query = baseQuery(identifier: identifier)
         query[kSecValueData as String] = secretData
         query[kSecAttrAccessControl as String] = try policy.createRootSecretAccessControl()
 
         let status = SecItemAdd(query as CFDictionary, nil)
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.save.finish",
+            metadata: AuthTraceMetadata.statusMetadata(
+                status,
+                extra: ["serviceKind": "protectedDataRootSecret", "policy": policy.rawValue]
+            )
+        )
         try handleMutationStatus(status)
     }
 
@@ -53,6 +71,14 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         identifier: String,
         authenticationContext: LAContext
     ) throws -> Data {
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.load.start",
+            metadata: [
+                "serviceKind": "protectedDataRootSecret",
+                "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
+            ]
+        )
         var query = baseQuery(identifier: identifier)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -60,6 +86,17 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.load.finish",
+            metadata: AuthTraceMetadata.statusMetadata(
+                status,
+                extra: [
+                    "serviceKind": "protectedDataRootSecret",
+                    "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
+                ]
+            )
+        )
 
         switch status {
         case errSecSuccess:
@@ -81,11 +118,29 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
     }
 
     func deleteRootSecret(identifier: String) throws {
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.delete.start",
+            metadata: ["serviceKind": "protectedDataRootSecret"]
+        )
         let status = SecItemDelete(baseQuery(identifier: identifier) as CFDictionary)
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.delete.finish",
+            metadata: AuthTraceMetadata.statusMetadata(
+                status,
+                extra: ["serviceKind": "protectedDataRootSecret"]
+            )
+        )
         try handleMutationStatus(status)
     }
 
     func rootSecretExists(identifier: String) -> Bool {
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.exists.start",
+            metadata: ["serviceKind": "protectedDataRootSecret", "interactionNotAllowed": "true"]
+        )
         let context = LAContext()
         context.interactionNotAllowed = true
 
@@ -95,9 +150,22 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         query[kSecUseAuthenticationContext as String] = context
 
         let status = SecItemCopyMatching(query as CFDictionary, nil)
-        return status == errSecSuccess
+        let exists = status == errSecSuccess
             || status == errSecInteractionNotAllowed
             || status == errSecAuthFailed
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.exists.finish",
+            metadata: AuthTraceMetadata.statusMetadata(
+                status,
+                extra: [
+                    "serviceKind": "protectedDataRootSecret",
+                    "interactionNotAllowed": "true",
+                    "exists": exists ? "true" : "false"
+                ]
+            )
+        )
+        return exists
     }
 
     func reprotectRootSecret(
@@ -107,6 +175,16 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         authenticationContext: LAContext
     ) throws {
         _ = currentPolicy
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.reprotect.start",
+            metadata: [
+                "serviceKind": "protectedDataRootSecret",
+                "currentPolicy": currentPolicy.rawValue,
+                "newPolicy": newPolicy.rawValue,
+                "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
+            ]
+        )
         var originalSecret = try loadRootSecret(
             identifier: identifier,
             authenticationContext: authenticationContext
@@ -122,6 +200,17 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         ]
 
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.reprotect.update",
+            metadata: AuthTraceMetadata.statusMetadata(
+                status,
+                extra: [
+                    "serviceKind": "protectedDataRootSecret",
+                    "newPolicy": newPolicy.rawValue
+                ]
+            )
+        )
         try handleMutationStatus(status)
 
         var verifiedSecret = try loadRootSecret(
@@ -133,6 +222,15 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         }
 
         guard verifiedSecret == originalSecret else {
+            traceStore?.record(
+                category: .operation,
+                name: "keychain.rootSecret.reprotect.finish",
+                metadata: [
+                    "serviceKind": "protectedDataRootSecret",
+                    "result": "verificationFailed",
+                    "newPolicy": newPolicy.rawValue
+                ]
+            )
             throw ProtectedDataError.internalFailure(
                 String(
                     localized: "error.protectedData.rootSecretVerification",
@@ -140,6 +238,15 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
                 )
             )
         }
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.rootSecret.reprotect.finish",
+            metadata: [
+                "serviceKind": "protectedDataRootSecret",
+                "result": "success",
+                "newPolicy": newPolicy.rawValue
+            ]
+        )
     }
 
     private func baseQuery(identifier: String) -> [String: Any] {
@@ -187,19 +294,70 @@ protocol ProtectedDataRightStoreClientProtocol: AnyObject {
 
 final class ProtectedDataRightStoreClient: ProtectedDataRightStoreClientProtocol {
     private let rightStore: LARightStore
+    private let traceStore: AuthLifecycleTraceStore?
 
-    init(rightStore: LARightStore = .shared) {
+    init(
+        rightStore: LARightStore = .shared,
+        traceStore: AuthLifecycleTraceStore? = nil
+    ) {
         self.rightStore = rightStore
+        self.traceStore = traceStore
     }
 
     func right(forIdentifier identifier: String) async throws -> any ProtectedDataPersistedRightHandle {
-        let right = try await rightStore.right(forIdentifier: identifier)
-        return LocalAuthenticationPersistedRightHandle(identifier: identifier, right: right)
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.legacyRight.right.start",
+            metadata: ["serviceKind": "legacyRight"]
+        )
+        do {
+            let right = try await rightStore.right(forIdentifier: identifier)
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.right.finish",
+                metadata: ["serviceKind": "legacyRight", "result": "success"]
+            )
+            return LocalAuthenticationPersistedRightHandle(
+                identifier: identifier,
+                right: right,
+                traceStore: traceStore
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.right.finish",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["serviceKind": "legacyRight", "result": "failed"])
+            )
+            throw error
+        }
     }
 
     func saveRight(_ right: LARight, identifier: String) async throws -> any ProtectedDataPersistedRightHandle {
-        let savedRight = try await rightStore.saveRight(right, identifier: identifier)
-        return LocalAuthenticationPersistedRightHandle(identifier: identifier, right: savedRight)
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.legacyRight.save.start",
+            metadata: ["serviceKind": "legacyRight", "secret": "false"]
+        )
+        do {
+            let savedRight = try await rightStore.saveRight(right, identifier: identifier)
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.save.finish",
+                metadata: ["serviceKind": "legacyRight", "secret": "false", "result": "success"]
+            )
+            return LocalAuthenticationPersistedRightHandle(
+                identifier: identifier,
+                right: savedRight,
+                traceStore: traceStore
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.save.finish",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["serviceKind": "legacyRight", "secret": "false", "result": "failed"])
+            )
+            throw error
+        }
     }
 
     func saveRight(
@@ -207,33 +365,130 @@ final class ProtectedDataRightStoreClient: ProtectedDataRightStoreClientProtocol
         identifier: String,
         secret: Data
     ) async throws -> any ProtectedDataPersistedRightHandle {
-        let savedRight = try await rightStore.saveRight(right, identifier: identifier, secret: secret)
-        return LocalAuthenticationPersistedRightHandle(identifier: identifier, right: savedRight)
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.legacyRight.save.start",
+            metadata: ["serviceKind": "legacyRight", "secret": "true"]
+        )
+        do {
+            let savedRight = try await rightStore.saveRight(right, identifier: identifier, secret: secret)
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.save.finish",
+                metadata: ["serviceKind": "legacyRight", "secret": "true", "result": "success"]
+            )
+            return LocalAuthenticationPersistedRightHandle(
+                identifier: identifier,
+                right: savedRight,
+                traceStore: traceStore
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.save.finish",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["serviceKind": "legacyRight", "secret": "true", "result": "failed"])
+            )
+            throw error
+        }
     }
 
     func removeRight(forIdentifier identifier: String) async throws {
-        try await rightStore.removeRight(forIdentifier: identifier)
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.legacyRight.remove.start",
+            metadata: ["serviceKind": "legacyRight"]
+        )
+        do {
+            try await rightStore.removeRight(forIdentifier: identifier)
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.remove.finish",
+                metadata: ["serviceKind": "legacyRight", "result": "success"]
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.remove.finish",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["serviceKind": "legacyRight", "result": "failed"])
+            )
+            throw error
+        }
     }
 }
 
 private final class LocalAuthenticationPersistedRightHandle: ProtectedDataPersistedRightHandle {
     let identifier: String
     private let right: LAPersistedRight
+    private let traceStore: AuthLifecycleTraceStore?
 
-    init(identifier: String, right: LAPersistedRight) {
+    init(
+        identifier: String,
+        right: LAPersistedRight,
+        traceStore: AuthLifecycleTraceStore? = nil
+    ) {
         self.identifier = identifier
         self.right = right
+        self.traceStore = traceStore
     }
 
     func authorize(localizedReason: String) async throws {
-        try await right.authorize(localizedReason: localizedReason)
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.legacyRight.authorize.start",
+            metadata: ["serviceKind": "legacyRight"]
+        )
+        do {
+            try await right.authorize(localizedReason: localizedReason)
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.authorize.finish",
+                metadata: ["serviceKind": "legacyRight", "result": "success"]
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.authorize.finish",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["serviceKind": "legacyRight", "result": "failed"])
+            )
+            throw error
+        }
     }
 
     func deauthorize() async {
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.legacyRight.deauthorize.start",
+            metadata: ["serviceKind": "legacyRight"]
+        )
         await right.deauthorize()
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.legacyRight.deauthorize.finish",
+            metadata: ["serviceKind": "legacyRight", "result": "success"]
+        )
     }
 
     func rawSecretData() async throws -> Data {
-        try await right.secret.rawData
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.legacyRight.rawSecretData.start",
+            metadata: ["serviceKind": "legacyRight"]
+        )
+        do {
+            let data = try await right.secret.rawData
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.rawSecretData.finish",
+                metadata: ["serviceKind": "legacyRight", "result": "success"]
+            )
+            return data
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.legacyRight.rawSecretData.finish",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["serviceKind": "legacyRight", "result": "failed"])
+            )
+            throw error
+        }
     }
 }

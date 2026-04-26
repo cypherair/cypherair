@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 /// Coordinates transient system-owned authentication prompts so app lifecycle
 /// handlers can distinguish them from real background/resume events.
@@ -98,6 +99,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             await shieldEventHandler?(.privacy, -1)
             return result
         } catch {
+            tracePromptError(context: context, error: error)
             endPrivacyPrompt(context)
             await shieldEventHandler?(.privacy, -1)
             throw error
@@ -126,6 +128,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             await shieldEventHandler?(.operation, -1)
             return result
         } catch {
+            tracePromptError(context: context, error: error)
             endOperationPrompt(context)
             await shieldEventHandler?(.operation, -1)
             throw error
@@ -201,6 +204,24 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             promptID: nextPromptID,
             source: source,
             kind: kind.traceValue
+        )
+    }
+
+    private func tracePromptError(context: PromptTraceContext, error: Error) {
+        var metadata = [
+            "promptID": String(context.promptID),
+            "source": context.source,
+            "kind": context.kind,
+            "errorType": String(describing: type(of: error))
+        ]
+        if let laError = error as? LAError {
+            metadata["laCode"] = String(laError.errorCode)
+            metadata["laCodeName"] = String(describing: laError.code)
+        }
+        traceStore?.record(
+            category: .prompt,
+            name: "prompt.error",
+            metadata: metadata
         )
     }
 
