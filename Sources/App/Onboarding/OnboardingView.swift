@@ -159,6 +159,7 @@ struct OnboardingPageThree: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .padding(.horizontal, 40)
+            .accessibilityIdentifier(TutorialAutomationContract.onboardingStartIdentifier)
 
             Button {
                 skipTutorial()
@@ -169,9 +170,11 @@ struct OnboardingPageThree: View {
             .buttonStyle(.bordered)
             .controlSize(.large)
             .padding(.horizontal, 40)
+            .accessibilityIdentifier(TutorialAutomationContract.onboardingSkipIdentifier)
 
             Spacer()
         }
+        .screenReady(TutorialAutomationContract.onboardingDecisionReadyMarker)
     }
 
     private func presentTutorial() {

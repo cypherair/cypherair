@@ -20,6 +20,7 @@ struct TutorialAuthModeConfirmationView: View {
                         Text(String(localized: "settings.mode.riskAck", defaultValue: "I understand that if biometrics become unavailable, I will lose access to my private keys"))
                             .font(.callout)
                     }
+                    .accessibilityIdentifier(TutorialAutomationContract.authModeRiskAcknowledgementIdentifier)
                 }
             }
 
@@ -30,9 +31,12 @@ struct TutorialAuthModeConfirmationView: View {
                 }
                 .disabled(request.requiresRiskAcknowledgement && !riskAcknowledged)
                 .frame(maxWidth: .infinity)
+                .accessibilityIdentifier(TutorialAutomationContract.authModeConfirmIdentifier)
+                .tutorialAnchor(.settingsModeConfirmButton)
             }
         }
         .navigationTitle(request.title)
+        .screenReady(TutorialAutomationContract.authModeConfirmationReadyMarker)
         #if canImport(UIKit)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -42,6 +46,7 @@ struct TutorialAuthModeConfirmationView: View {
                     tutorialStore.dismissModal()
                     request.onCancel()
                 }
+                .accessibilityIdentifier(TutorialAutomationContract.authModeCancelIdentifier)
             }
         }
     }
@@ -65,11 +70,13 @@ struct TutorialLeaveConfirmationView: View {
                     request.onContinue()
                 }
                 .frame(maxWidth: .infinity)
+                .accessibilityIdentifier(TutorialAutomationContract.leaveContinueIdentifier)
 
                 Button(String(localized: "guidedTutorial.leave.confirm", defaultValue: "Leave Tutorial"), role: .destructive) {
                     request.onLeave()
                 }
                 .frame(maxWidth: .infinity)
+                .accessibilityIdentifier(TutorialAutomationContract.leaveConfirmIdentifier)
             }
         }
         .navigationTitle(String(localized: "guidedTutorial.leave.title", defaultValue: "Leave Tutorial"))

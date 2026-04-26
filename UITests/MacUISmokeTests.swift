@@ -175,13 +175,102 @@ final class MacUISmokeTests: XCTestCase {
         XCTAssertFalse(element("contactdetail.certificateSignatures").isEnabled)
     }
 
+    func test_tutorial_firstRunOnboardingStart_launchesTutorial() throws {
+        launchFirstRunOnboarding()
+        navigateToTutorialDecisionPage()
+
+        element("onboarding.tutorial.start").tap()
+
+        waitForScreenReady("tutorial.hub.ready")
+    }
+
+    func test_tutorial_firstRunOnboardingSkip_entersMainApp() throws {
+        launchFirstRunOnboarding()
+        navigateToTutorialDecisionPage()
+
+        element("onboarding.tutorial.skip").tap()
+
+        waitForElementToDisappear("onboarding.tutorialDecision.ready")
+        XCTAssertTrue(element("main.ready").exists)
+        XCTAssertFalse(element("tutorial.ready").exists)
+    }
+
+    func test_tutorial_leaveConfirmation_continueAndLeaveFromSettingsLaunch() throws {
+        launchMain()
+        openSettingsTab()
+        element("settings.tutorial").tap()
+
+        waitForScreenReady("tutorial.hub.ready")
+        element("tutorial.primaryAction.toolbar").tap()
+        waitForScreenReady("tutorial.sandbox.ready")
+        element("tutorial.module.0.open").tap()
+        waitForScreenReady("tutorial.module.1.ready")
+
+        element("tutorial.return").tap()
+        waitForScreenReady("tutorial.hub.ready")
+        element("tutorial.close").tap()
+        waitForScreenReady("tutorial.leave.ready")
+        XCTAssertTrue(element("tutorial.modalGuidance").exists)
+
+        element("tutorial.leave.continue").tap()
+        waitForScreenReady("tutorial.hub.ready")
+
+        element("tutorial.close").tap()
+        waitForScreenReady("tutorial.leave.ready")
+        element("tutorial.leave.confirm").tap()
+        waitForElementToDisappear("tutorial.ready")
+        XCTAssertTrue(element("settings.ready").exists)
+    }
+
+    func test_tutorial_completionFinish_allowsSettingsReplay() throws {
+        launchMain(extraEnvironment: ["UITEST_TUTORIAL_COMPLETION": "1"])
+        openSettingsTab()
+        element("settings.tutorial").tap()
+
+        waitForScreenReady("tutorial.completion.ready")
+        element("tutorial.finish.toolbar").tap()
+        waitForElementToDisappear("tutorial.completion.ready")
+
+        element("settings.tutorial").tap()
+        waitForScreenReady("tutorial.hub.ready")
+        XCTAssertTrue(element("tutorial.primaryAction").exists)
+    }
+
+    func test_tutorial_authModeConfirmation_exposesGuidanceAndActions() throws {
+        launchTutorial(
+            task: "enableHighSecurity",
+            extraEnvironment: ["UITEST_TUTORIAL_AUTHMODE_CONFIRMATION": "1"]
+        )
+
+        waitForScreenReady("tutorial.authMode.ready")
+        XCTAssertTrue(element("tutorial.modalGuidance").exists)
+        XCTAssertTrue(element("tutorial.authMode.riskAcknowledgement").exists)
+        XCTAssertFalse(element("tutorial.authMode.confirm").isEnabled)
+
+        element("tutorial.authMode.riskAcknowledgement").tap()
+        waitForElementEnabled(element("tutorial.authMode.confirm"))
+        XCTAssertTrue(element("tutorial.authMode.cancel").exists)
+    }
+
     // MARK: - Launch Helpers
 
-    private func launchMain(preloadContact: Bool = false) {
+    private func launchMain(
+        preloadContact: Bool = false,
+        extraEnvironment: [String: String] = [:]
+    ) {
         app.launchEnvironment["UITEST_ROOT"] = "main"
         app.launchEnvironment["UITEST_SKIP_ONBOARDING"] = "1"
         app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
         app.launchEnvironment["UITEST_PRELOAD_CONTACT"] = preloadContact ? "1" : "0"
+        apply(extraEnvironment: extraEnvironment)
+        prepareLaunchIgnoringSavedState()
+        app.launch()
+        waitForLaunchReadiness(rootReadyID: "main.ready")
+    }
+
+    private func launchFirstRunOnboarding() {
+        app.launchEnvironment["UITEST_ROOT"] = "main"
+        app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
         prepareLaunchIgnoringSavedState()
         app.launch()
         waitForLaunchReadiness(rootReadyID: "main.ready")
@@ -191,25 +280,40 @@ final class MacUISmokeTests: XCTestCase {
         launchSettings(openAuthModeConfirmation: false)
     }
 
-    private func launchSettings(openAuthModeConfirmation: Bool) {
+    private func launchSettings(
+        openAuthModeConfirmation: Bool,
+        extraEnvironment: [String: String] = [:]
+    ) {
         app.launchEnvironment["UITEST_ROOT"] = "settings"
         app.launchEnvironment["UITEST_SKIP_ONBOARDING"] = "1"
         app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
         app.launchEnvironment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] = openAuthModeConfirmation ? "1" : "0"
+        apply(extraEnvironment: extraEnvironment)
         prepareLaunchIgnoringSavedState()
         app.launch()
         waitForLaunchReadiness(rootReadyID: "settings.ready")
     }
 
-    private func launchTutorial(task: String, preloadedContactDetail: Bool = false) {
+    private func launchTutorial(
+        task: String,
+        preloadedContactDetail: Bool = false,
+        extraEnvironment: [String: String] = [:]
+    ) {
         app.launchEnvironment["UITEST_ROOT"] = "tutorial"
         app.launchEnvironment["UITEST_SKIP_ONBOARDING"] = "1"
         app.launchEnvironment["UITEST_TUTORIAL_TASK"] = task
         app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
         app.launchEnvironment["UITEST_TUTORIAL_CONTACT_DETAIL"] = preloadedContactDetail ? "1" : "0"
+        apply(extraEnvironment: extraEnvironment)
         prepareLaunchIgnoringSavedState()
         app.launch()
         waitForLaunchReadiness(rootReadyID: "tutorial.ready")
+    }
+
+    private func apply(extraEnvironment: [String: String]) {
+        for (key, value) in extraEnvironment {
+            app.launchEnvironment[key] = value
+        }
     }
 
     private func prepareLaunchIgnoringSavedState() {
@@ -217,6 +321,28 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     // MARK: - Flow Helpers
+
+    private func navigateToTutorialDecisionPage() {
+        if element("onboarding.tutorialDecision.ready").waitForExistence(timeout: 1) {
+            return
+        }
+
+        for _ in 0..<2 where !element("onboarding.tutorialDecision.ready").exists {
+            XCTAssertTrue(app.buttons["Next"].waitForExistence(timeout: 5))
+            app.buttons["Next"].tap()
+        }
+
+        waitForScreenReady("onboarding.tutorialDecision.ready")
+    }
+
+    private func openSettingsTab() {
+        if element("settings.ready").exists {
+            return
+        }
+
+        element("sidebar.settings").tap()
+        waitForScreenReady("settings.ready")
+    }
 
     private func generateKey() {
         XCTAssertTrue(element("home.generate").waitForExistence(timeout: 10))
@@ -278,6 +404,20 @@ final class MacUISmokeTests: XCTestCase {
         XCTAssertTrue(
             element(identifier).waitForExistence(timeout: timeout),
             "Expected ready marker \(identifier) to appear."
+        )
+    }
+
+    private func waitForElementToDisappear(
+        _ identifier: String,
+        timeout: TimeInterval = 10
+    ) {
+        let target = element(identifier)
+        let predicate = NSPredicate(format: "exists == false")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: target)
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [expectation], timeout: timeout),
+            .completed,
+            "Expected element \(identifier) to disappear."
         )
     }
 
