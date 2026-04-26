@@ -331,34 +331,60 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
     ) async throws -> ProtectedDataRegistry {
         try await mutationGate.run { [self] in
             var registry = try loadRegistry()
-            guard case let .createDomain(targetDomainID, _)? = registry.pendingMutation,
+            guard case let .createDomain(targetDomainID, phase)? = registry.pendingMutation,
                     targetDomainID == domainID else {
                 throw ProtectedDataError.invalidRegistry(
                     "Pending create for domain \(domainID.rawValue) is missing."
                 )
             }
 
-            try await deleteArtifacts()
+            if phase == .membershipCommitted {
+                registry.pendingMutation = .deleteDomain(targetDomainID: domainID, phase: .journaled)
+                try saveRegistry(registry)
 
-            // Known limitation: this cleanup decision is based on the committed
-            // membership before removing the target domain from the registry.
-            // If a first-domain create reached `.membershipCommitted` and then
-            // aborts here, `committedMembership` still contains the target, so
-            // shared-resource cleanup may be skipped even though removing the
-            // target would leave membership empty. That can leave the registry
-            // describing `absent` while an external persisted shared right still
-            // exists. We currently accept this corner case; a future fix must
-            // decide cleanup from the post-removal membership and must not
-            // swallow shared-resource cleanup failures.
-            let requiresSharedResourceCleanup = registry.committedMembership.isEmpty
-            if requiresSharedResourceCleanup {
-                do {
+                try await deleteArtifacts()
+                registry = try loadRegistry()
+                registry.pendingMutation = .deleteDomain(
+                    targetDomainID: domainID,
+                    phase: .artifactsDeleted
+                )
+                try saveRegistry(registry)
+
+                registry.committedMembership.removeValue(forKey: domainID)
+                let requiresSharedCleanup = registry.committedMembership.isEmpty
+                registry.sharedResourceLifecycleState = requiresSharedCleanup ? .cleanupPending : .ready
+                registry.pendingMutation = .deleteDomain(
+                    targetDomainID: domainID,
+                    phase: .membershipRemoved
+                )
+                try saveRegistry(registry)
+
+                if requiresSharedCleanup {
+                    registry.pendingMutation = .deleteDomain(
+                        targetDomainID: domainID,
+                        phase: .sharedResourceCleanupStarted
+                    )
+                    try saveRegistry(registry)
+
                     try await cleanupSharedResourceIfNeeded()
-                } catch {
-                    // Best-effort cleanup here keeps reset idempotent when the right
-                    // was never provisioned or was already removed.
+                    registry = try loadRegistry()
+                    registry.sharedResourceLifecycleState = .absent
                 }
+
+                registry.pendingMutation = nil
+                try saveRegistry(registry)
+                return registry
             }
+
+            var membershipAfterRemoval = registry.committedMembership
+            membershipAfterRemoval.removeValue(forKey: domainID)
+            let requiresSharedResourceCleanup = membershipAfterRemoval.isEmpty
+                && createPhaseMayHaveProvisionedSharedResource(phase)
+            if requiresSharedResourceCleanup {
+                try await cleanupSharedResourceIfNeeded()
+            }
+
+            try await deleteArtifacts()
 
             registry = try loadRegistry()
             registry.committedMembership.removeValue(forKey: domainID)
@@ -469,6 +495,15 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
             return .retryablePending
         case nil:
             return .resumedToSteadyState
+        }
+    }
+
+    private func createPhaseMayHaveProvisionedSharedResource(_ phase: CreateDomainPhase) -> Bool {
+        switch phase {
+        case .journaled:
+            return false
+        case .sharedResourceProvisioned, .artifactsStaged, .validated, .membershipCommitted:
+            return true
         }
     }
 }

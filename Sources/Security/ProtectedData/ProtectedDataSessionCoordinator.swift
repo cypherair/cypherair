@@ -102,7 +102,8 @@ final class ProtectedDataSessionCoordinator {
     func beginProtectedDataAuthorization(
         registry: ProtectedDataRegistry,
         localizedReason: String,
-        authenticationContext: LAContext? = nil
+        authenticationContext: LAContext? = nil,
+        allowLegacyMigration: Bool = true
     ) async -> ProtectedDataAuthorizationResult {
         traceStore?.record(
             category: .operation,
@@ -157,6 +158,14 @@ final class ProtectedDataSessionCoordinator {
                     minimumEnvelopeVersion: registry.rootSecretEnvelopeMinimumVersion
                 )
             } catch let error as KeychainError where error == .itemNotFound {
+                guard allowLegacyMigration else {
+                    traceStore?.record(
+                        category: .operation,
+                        name: "protectedSettings.authorization.finish",
+                        metadata: ["result": "cancelledOrDenied", "reason": "legacyMigrationDeferred"]
+                    )
+                    return .cancelledOrDenied
+                }
                 rootSecretResult = try await migrateLegacySharedRightIfNeeded(
                     registry: registry,
                     localizedReason: localizedReason,

@@ -134,6 +134,8 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `ProtectedDataRootSecretEnvelope.swift` — binary-plist `CAPDSEV2` codec, HKDF/AAD binding data, and AES-GCM open/seal validation
 - `ProtectedDataRightStoreClient.swift` — legacy right-store migration/cleanup adapter, not the current authorization path
 - `ProtectedDomainBootstrapStore.swift` — file-side bootstrap metadata persistence
+- `ProtectedDomainRecoveryCoordinator` / `ProtectedDomainRecoveryHandler` — generic pending-mutation recovery dispatch by `ProtectedDataDomainID`
+- `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry, currently registering `protected-settings`
 
 Current Phase 1 scope:
 
@@ -143,7 +145,8 @@ Current Phase 1 scope:
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
-- Settings refresh can auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
+- app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open registered committed domains without a second prompt
+- Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
 
 ### Models (`Sources/Models/`)
 

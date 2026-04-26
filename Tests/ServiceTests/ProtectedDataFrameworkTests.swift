@@ -16,9 +16,14 @@ private typealias AppProtectedDataRelockParticipant = CypherAir.ProtectedDataRel
 private typealias AppProtectedDataRightStoreClientProtocol = CypherAir.ProtectedDataRightStoreClientProtocol
 private typealias AppProtectedDataRightIdentifiers = CypherAir.ProtectedDataRightIdentifiers
 private typealias AppProtectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator
+private typealias AppProtectedDataPostUnlockCoordinator = CypherAir.ProtectedDataPostUnlockCoordinator
+private typealias AppProtectedDataPostUnlockDomainOpener = CypherAir.ProtectedDataPostUnlockDomainOpener
+private typealias AppProtectedDataPostUnlockOutcome = CypherAir.ProtectedDataPostUnlockOutcome
 private typealias AppProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
 private typealias AppProtectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager
+private typealias AppProtectedDomainRecoveryHandler = CypherAir.ProtectedDomainRecoveryHandler
 private typealias AppProtectedDomainRecoveryCoordinator = CypherAir.ProtectedDomainRecoveryCoordinator
+private typealias AppMockProtectedDataRootSecretStore = CypherAir.MockProtectedDataRootSecretStore
 private typealias AppPrivacyScreenLifecycleGate = CypherAir.PrivacyScreenLifecycleGate
 private typealias AppPendingRecoveryOutcome = CypherAir.PendingRecoveryOutcome
 private typealias AppWrappedDomainMasterKeyRecord = CypherAir.WrappedDomainMasterKeyRecord
@@ -187,6 +192,24 @@ private actor AsyncBooleanFlag {
 
     func currentValue() -> Bool {
         value
+    }
+}
+
+private final class MockProtectedDomainRecoveryHandler: AppProtectedDomainRecoveryHandler, @unchecked Sendable {
+    let protectedDataDomainID: ProtectedDataDomainID
+    private(set) var continuedCreatePhases: [CreateDomainPhase] = []
+    private(set) var deleteArtifactsCallCount = 0
+
+    init(domainID: ProtectedDataDomainID) {
+        self.protectedDataDomainID = domainID
+    }
+
+    func continuePendingCreate(phase: CreateDomainPhase) async throws {
+        continuedCreatePhases.append(phase)
+    }
+
+    func deleteDomainArtifactsForRecovery() throws {
+        deleteArtifactsCallCount += 1
     }
 }
 
@@ -1687,6 +1710,196 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(decision, .frameworkRecoveryNeeded)
     }
 
+    func test_postUnlockCoordinator_opensCommittedRegisteredDomainWithHandoffContext() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockOpen"))
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
+            identifier: "com.cypherair.tests.protected-data.post-unlock.open",
+            secretData: Data(repeating: 0xCA, count: 32)
+        )
+        let sessionCoordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.open"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.open",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
+            pendingMutation: nil
+        )
+        let openCalled = AsyncBooleanFlag()
+        let coordinator = AppProtectedDataPostUnlockCoordinator(
+            currentRegistryProvider: { registry },
+            protectedDataSessionCoordinator: sessionCoordinator,
+            domainOpeners: [
+                AppProtectedDataPostUnlockDomainOpener(
+                    domainID: CypherAir.ProtectedSettingsStore.domainID,
+                    open: { wrappingRootKey in
+                        XCTAssertEqual(wrappingRootKey.count, 32)
+                        await openCalled.setTrue()
+                    }
+                )
+            ]
+        )
+        let handoffContext = LAContext()
+        defer { handoffContext.invalidate() }
+
+        let outcome = await coordinator.openRegisteredDomains(
+            authenticationContext: handoffContext,
+            localizedReason: "Open protected domains",
+            source: "unitTest"
+        )
+
+        XCTAssertEqual(outcome, .opened([CypherAir.ProtectedSettingsStore.domainID]))
+        let didOpen = await openCalled.currentValue()
+        XCTAssertTrue(didOpen)
+        XCTAssertEqual(sessionCoordinator.frameworkState, .sessionAuthorized)
+        XCTAssertTrue(rightStoreClient.lastAuthenticationContext === handoffContext)
+        XCTAssertTrue(handoffContext.interactionNotAllowed)
+    }
+
+    func test_postUnlockCoordinator_withoutContextDoesNotAuthorize() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockNoContext"))
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let sessionCoordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: AppProtectedDomainKeyManager(storageRoot: storageRoot),
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.no-context"
+        )
+        let coordinator = AppProtectedDataPostUnlockCoordinator(
+            currentRegistryProvider: {
+                XCTFail("Registry should not load without an authenticated context.")
+                return ProtectedDataRegistry.emptySteadyState(sharedRightIdentifier: "unused")
+            },
+            protectedDataSessionCoordinator: sessionCoordinator,
+            domainOpeners: [
+                AppProtectedDataPostUnlockDomainOpener(
+                    domainID: CypherAir.ProtectedSettingsStore.domainID,
+                    open: { _ in XCTFail("Domain should not open without an authenticated context.") }
+                )
+            ]
+        )
+
+        let outcome = await coordinator.openRegisteredDomains(
+            authenticationContext: nil,
+            localizedReason: "Open protected domains",
+            source: "unitTest"
+        )
+
+        XCTAssertEqual(outcome, .noAuthenticatedContext)
+        XCTAssertEqual(rightStoreClient.rightLookupCallCount, 0)
+        XCTAssertEqual(sessionCoordinator.frameworkState, .sessionLocked)
+    }
+
+    func test_postUnlockCoordinator_pendingMutationDoesNotOpenDomain() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockPending"))
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let sessionCoordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: AppProtectedDomainKeyManager(storageRoot: storageRoot),
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.pending"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.pending",
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
+                phase: .journaled
+            )
+        )
+        let openCalled = AsyncBooleanFlag()
+        let coordinator = AppProtectedDataPostUnlockCoordinator(
+            currentRegistryProvider: { registry },
+            protectedDataSessionCoordinator: sessionCoordinator,
+            domainOpeners: [
+                AppProtectedDataPostUnlockDomainOpener(
+                    domainID: CypherAir.ProtectedSettingsStore.domainID,
+                    open: { _ in await openCalled.setTrue() }
+                )
+            ]
+        )
+        let handoffContext = LAContext()
+        defer { handoffContext.invalidate() }
+
+        let outcome = await coordinator.openRegisteredDomains(
+            authenticationContext: handoffContext,
+            localizedReason: "Open protected domains",
+            source: "unitTest"
+        )
+
+        XCTAssertEqual(outcome, .pendingMutationRecoveryRequired)
+        let didOpen = await openCalled.currentValue()
+        XCTAssertFalse(didOpen)
+        XCTAssertEqual(rightStoreClient.rightLookupCallCount, 0)
+        XCTAssertEqual(sessionCoordinator.frameworkState, .sessionLocked)
+    }
+
+    func test_postUnlockCoordinator_defersLegacyMigrationWithoutSecondPrompt() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockLegacy"))
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let legacyRightStoreClient = MockProtectedDataRightStoreClient()
+        let legacyRight = MockProtectedDataPersistedRightHandle(
+            identifier: "com.cypherair.tests.protected-data.post-unlock.legacy",
+            secretData: Data(repeating: 0xC9, count: 32)
+        )
+        legacyRightStoreClient.persistedRightHandle = legacyRight
+        let rootSecretStore = AppMockProtectedDataRootSecretStore()
+        let sessionCoordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rootSecretStore,
+            legacyRightStoreClient: legacyRightStoreClient,
+            domainKeyManager: AppProtectedDomainKeyManager(storageRoot: storageRoot),
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.legacy"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.legacy",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
+            pendingMutation: nil
+        )
+        let openCalled = AsyncBooleanFlag()
+        let coordinator = AppProtectedDataPostUnlockCoordinator(
+            currentRegistryProvider: { registry },
+            protectedDataSessionCoordinator: sessionCoordinator,
+            domainOpeners: [
+                AppProtectedDataPostUnlockDomainOpener(
+                    domainID: CypherAir.ProtectedSettingsStore.domainID,
+                    open: { _ in await openCalled.setTrue() }
+                )
+            ]
+        )
+        let handoffContext = LAContext()
+        defer { handoffContext.invalidate() }
+
+        let outcome = await coordinator.openRegisteredDomains(
+            authenticationContext: handoffContext,
+            localizedReason: "Open protected domains",
+            source: "unitTest"
+        )
+
+        XCTAssertEqual(outcome, .authorizationDenied)
+        XCTAssertEqual(rootSecretStore.loadCallCount, 1)
+        XCTAssertTrue(rootSecretStore.lastAuthenticationContext === handoffContext)
+        XCTAssertTrue(handoffContext.interactionNotAllowed)
+        XCTAssertEqual(legacyRightStoreClient.rightLookupCallCount, 0)
+        XCTAssertEqual(legacyRight.authorizeCallCount, 0)
+        let didOpen = await openCalled.currentValue()
+        XCTAssertFalse(didOpen)
+        XCTAssertEqual(sessionCoordinator.frameworkState, .sessionLocked)
+    }
+
     func test_authorization_missingRight_returnsFrameworkRecoveryNeeded() async throws {
         let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAuthorizationMissingRight"))
         let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
@@ -1807,6 +2020,81 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(outcome, AppPendingRecoveryOutcome.resetRequired)
     }
 
+    func test_recoveryCoordinator_dispatchesPendingDeleteToDomainHandler() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataGenericRecoveryDelete")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let domainID: ProtectedDataDomainID = "generic-domain"
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.generic-recovery"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.generic-recovery",
+            sharedResourceLifecycleState: .cleanupPending,
+            committedMembership: [:],
+            pendingMutation: .deleteDomain(
+                targetDomainID: domainID,
+                phase: .membershipRemoved
+            )
+        )
+        try registryStore.saveRegistry(registry)
+
+        let handler = MockProtectedDomainRecoveryHandler(domainID: domainID)
+        let cleanupCalled = AsyncBooleanFlag()
+        let recoveryCoordinator = AppProtectedDomainRecoveryCoordinator(registryStore: registryStore)
+
+        let outcome = try await recoveryCoordinator.recoverPendingMutation(
+            handler: handler,
+            removeSharedRight: { identifier in
+                XCTAssertEqual(identifier, registry.sharedRightIdentifier)
+                await cleanupCalled.setTrue()
+            }
+        )
+
+        XCTAssertEqual(outcome, .resumedToSteadyState)
+        XCTAssertEqual(handler.deleteArtifactsCallCount, 1)
+        let didCleanup = await cleanupCalled.currentValue()
+        XCTAssertTrue(didCleanup)
+        XCTAssertNil(try registryStore.loadRegistry().pendingMutation)
+    }
+
+    func test_recoveryCoordinator_targetMismatchReturnsFrameworkRecoveryNeeded() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataGenericRecoveryMismatch")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.generic-recovery-mismatch"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.generic-recovery-mismatch",
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: "other-domain",
+                phase: .journaled
+            )
+        )
+        try registryStore.saveRegistry(registry)
+
+        let handler = MockProtectedDomainRecoveryHandler(domainID: "generic-domain")
+        let recoveryCoordinator = AppProtectedDomainRecoveryCoordinator(registryStore: registryStore)
+
+        let outcome = try await recoveryCoordinator.recoverPendingMutation(
+            handler: handler,
+            removeSharedRight: { _ in }
+        )
+
+        XCTAssertEqual(outcome, .frameworkRecoveryNeeded)
+        XCTAssertEqual(handler.deleteArtifactsCallCount, 0)
+        XCTAssertTrue(handler.continuedCreatePhases.isEmpty)
+    }
+
     func test_abandonPendingCreate_clearsPendingMutationAndArtifacts() async throws {
         let baseDirectory = makeTemporaryDirectory("ProtectedDataAbandonPendingCreate")
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
@@ -1869,6 +2157,231 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 )
             )
         )
+    }
+
+    func test_abandonPendingCreate_membershipCommittedLastDomainCleansSharedResource() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataAbandonCommittedCreate")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-committed-create"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-committed-create",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
+            pendingMutation: .createDomain(
+                targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
+                phase: .membershipCommitted
+            )
+        )
+        try registryStore.saveRegistry(registry)
+
+        let cleanupCalled = AsyncBooleanFlag()
+        _ = try await registryStore.abandonPendingCreate(
+            domainID: CypherAir.ProtectedSettingsStore.domainID,
+            deleteArtifacts: {},
+            cleanupSharedResourceIfNeeded: {
+                await cleanupCalled.setTrue()
+            }
+        )
+
+        let clearedRegistry = try registryStore.loadRegistry()
+        XCTAssertNil(clearedRegistry.pendingMutation)
+        XCTAssertTrue(clearedRegistry.committedMembership.isEmpty)
+        XCTAssertEqual(clearedRegistry.sharedResourceLifecycleState, .absent)
+        let didCleanup = await cleanupCalled.currentValue()
+        XCTAssertTrue(didCleanup)
+    }
+
+    func test_abandonPendingCreate_cleanupFailureLeavesPendingMutation() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataAbandonCleanupFailure")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let defaultsSuiteName = "com.cypherair.tests.protected-data.abandon-cleanup-failure.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-cleanup-failure"
+        )
+        let settingsStore = CypherAir.ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-cleanup-failure",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
+            pendingMutation: .createDomain(
+                targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
+                phase: .membershipCommitted
+            )
+        )
+        try registryStore.saveRegistry(registry)
+        try storageRoot.ensureDomainDirectoryExists(for: CypherAir.ProtectedSettingsStore.domainID)
+        let currentEnvelopeURL = storageRoot.domainEnvelopeURL(
+            for: CypherAir.ProtectedSettingsStore.domainID,
+            slot: .current
+        )
+        try storageRoot.writeProtectedData(Data("current".utf8), to: currentEnvelopeURL)
+
+        do {
+            _ = try await registryStore.abandonPendingCreate(
+                domainID: CypherAir.ProtectedSettingsStore.domainID,
+                deleteArtifacts: {
+                    try settingsStore.deleteDomainArtifactsForRecovery()
+                },
+                cleanupSharedResourceIfNeeded: {
+                    throw ProtectedDataError.internalFailure("Injected cleanup failure.")
+                }
+            )
+            XCTFail("Expected shared-resource cleanup failure to fail closed.")
+        } catch ProtectedDataError.internalFailure {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        let retainedRegistry = try registryStore.loadRegistry()
+        XCTAssertEqual(
+            retainedRegistry.pendingMutation,
+            .deleteDomain(
+                targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
+                phase: .sharedResourceCleanupStarted
+            )
+        )
+        XCTAssertEqual(retainedRegistry.sharedResourceLifecycleState, .cleanupPending)
+        XCTAssertTrue(retainedRegistry.committedMembership.isEmpty)
+        XCTAssertFalse(try storageRoot.managedItemExists(at: currentEnvelopeURL))
+
+        let cleanupCalled = AsyncBooleanFlag()
+        _ = try await registryStore.completePendingDelete(
+            domainID: CypherAir.ProtectedSettingsStore.domainID,
+            deleteArtifacts: {
+                try settingsStore.deleteDomainArtifactsForRecovery()
+            },
+            cleanupSharedResourceIfNeeded: {
+                await cleanupCalled.setTrue()
+            }
+        )
+
+        let clearedRegistry = try registryStore.loadRegistry()
+        XCTAssertNil(clearedRegistry.pendingMutation)
+        XCTAssertEqual(clearedRegistry.sharedResourceLifecycleState, .absent)
+        XCTAssertTrue(clearedRegistry.committedMembership.isEmpty)
+        let didCleanup = await cleanupCalled.currentValue()
+        XCTAssertTrue(didCleanup)
+    }
+
+    func test_abandonPendingCreate_preMembershipCleanupFailurePreservesArtifacts() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataAbandonPreMembershipCleanupFailure")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let defaultsSuiteName = "com.cypherair.tests.protected-data.abandon-pre-membership-cleanup-failure.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-pre-membership-cleanup-failure"
+        )
+        let settingsStore = CypherAir.ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-pre-membership-cleanup-failure",
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
+                phase: .artifactsStaged
+            )
+        )
+        try registryStore.saveRegistry(registry)
+        try storageRoot.ensureDomainDirectoryExists(for: CypherAir.ProtectedSettingsStore.domainID)
+        let pendingEnvelopeURL = storageRoot.domainEnvelopeURL(
+            for: CypherAir.ProtectedSettingsStore.domainID,
+            slot: .pending
+        )
+        try storageRoot.writeProtectedData(Data("pending".utf8), to: pendingEnvelopeURL)
+        let deleteCalled = AsyncBooleanFlag()
+
+        do {
+            _ = try await registryStore.abandonPendingCreate(
+                domainID: CypherAir.ProtectedSettingsStore.domainID,
+                deleteArtifacts: {
+                    await deleteCalled.setTrue()
+                    try settingsStore.deleteDomainArtifactsForRecovery()
+                },
+                cleanupSharedResourceIfNeeded: {
+                    throw ProtectedDataError.internalFailure("Injected cleanup failure.")
+                }
+            )
+            XCTFail("Expected shared-resource cleanup failure to fail closed.")
+        } catch ProtectedDataError.internalFailure {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        let retainedRegistry = try registryStore.loadRegistry()
+        XCTAssertEqual(retainedRegistry.pendingMutation, registry.pendingMutation)
+        XCTAssertEqual(retainedRegistry.sharedResourceLifecycleState, .absent)
+        XCTAssertTrue(retainedRegistry.committedMembership.isEmpty)
+        XCTAssertTrue(try storageRoot.managedItemExists(at: pendingEnvelopeURL))
+        let didDelete = await deleteCalled.currentValue()
+        XCTAssertFalse(didDelete)
+    }
+
+    func test_abandonPendingCreate_journaledFirstDomainDoesNotRequireSharedCleanup() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataAbandonJournaledCreate")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-journaled-create"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-journaled-create",
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
+                phase: .journaled
+            )
+        )
+        try registryStore.saveRegistry(registry)
+
+        let cleanupCalled = AsyncBooleanFlag()
+        _ = try await registryStore.abandonPendingCreate(
+            domainID: CypherAir.ProtectedSettingsStore.domainID,
+            deleteArtifacts: {},
+            cleanupSharedResourceIfNeeded: {
+                await cleanupCalled.setTrue()
+            }
+        )
+
+        let clearedRegistry = try registryStore.loadRegistry()
+        XCTAssertNil(clearedRegistry.pendingMutation)
+        XCTAssertEqual(clearedRegistry.sharedResourceLifecycleState, .absent)
+        let didCleanup = await cleanupCalled.currentValue()
+        XCTAssertFalse(didCleanup)
     }
 
     func test_completePendingDelete_clearsCleanupPendingAndPendingMutation() async throws {
