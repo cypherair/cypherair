@@ -431,14 +431,32 @@ This separation is required so:
 - one owner controls grace-window and launch/resume sequencing
 - per-domain unlock remains lazy and isolated
 
-### 5.9 Bootstrap-Critical Settings Whitelist
+### 5.9 Bootstrap-Critical Settings And Deferred Migration
 
-The following settings are bootstrap-critical in v1 because current startup or pre-unlock behavior depends on them before protected domains unlock:
+The long-term goal is to protect app-owned settings after unlock unless a setting is required to select the unlock mechanism itself. In v1, current startup and pre-unlock behavior still depends on several settings before protected domains unlock, but they are not all permanent exceptions.
 
-- `authMode`
-- `gracePeriod`
-- `hasCompletedOnboarding`
-- `colorTheme`
+Permanent v1 boot exception:
+
+- `appSessionAuthenticationPolicy`: the boot authentication profile that decides whether app launch and app-data root-secret authorization use user-presence or biometrics-only policy. It stays early-readable unless a future design introduces a separately reviewed protected value plus boot cache.
+
+Future private-key control domain:
+
+- `authMode`: private-key protection mode for Secure Enclave / Keychain private-key operations. It should move into a dedicated `private-key-control.settings.authMode` ProtectedData domain section, not into ordinary protected settings.
+- `rewrapInProgress`, `rewrapTargetMode`, `modifyExpiryInProgress`, and `modifyExpiryFingerprint`: private-key operation recovery state. These should move into `private-key-control.recoveryJournal`; pre-auth startup must not keep a recovery marker, and recovery detection should run after app unlock opens this domain.
+
+Private-key material exception:
+
+- Permanent and pending SE-wrapped private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain. The `private-key-control` recovery journal may reference these rows, but must not store the wrapped private-key bundle material.
+
+Future key metadata domain:
+
+- `PGPKeyIdentity` metadata currently lives in a dedicated Keychain metadata account to avoid cold-launch private-key Keychain enumeration. The long-term target is a ProtectedData `key metadata` domain that app unlock opens automatically before the home key list is shown.
+
+Deferred protected-after-unlock targets:
+
+- `gracePeriod`: cold launch does not need this value to decide whether authentication is required; future resume handling can use the already-unlocked in-memory value and fail closed to immediate authentication when unavailable.
+- `hasCompletedOnboarding`: requires a startup/routing refactor that shows the locked shell first and decides onboarding vs home after app unlock.
+- `colorTheme`: should not be a permanent startup dependency; future pre-auth UI can use system/default tint and apply the user's theme after protected settings open.
 
 `requireAuthOnLaunch` is a retired legacy preference key. Production launch
 authentication is always required; test and diagnostic bypasses must use
@@ -447,10 +465,13 @@ UserDefaults key if present.
 
 Rules:
 
-- these keys remain in the early-readable layer in v1
-- the first `ProtectedSettingsStore` adopter must not migrate them
-- protected settings must not rely on a shadow copy to recreate early boot behavior
-- any future migration of a bootstrap-critical setting requires a separately documented two-phase startup design
+- only the boot authentication profile is a current long-term early-readable app-setting exception
+- private-key control state moves only through a dedicated `private-key-control` design; it must not be mixed into ordinary protected settings
+- private-key bundle material remains in the current Keychain / Secure Enclave domain
+- key metadata migration requires a post-unlock loading design that avoids double authentication and empty key-list flashes
+- deferred settings remain early-readable in v1 only until their startup or routing dependency is removed
+- protected settings must not rely on hidden shadow copies to recreate early boot behavior
+- any future migration of a startup-influencing setting requires a documented two-phase startup design and tests proving startup authentication strength is unchanged
 
 The detailed rollout and inventory handling for these settings live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 2.3, 3.1, and 4.
 

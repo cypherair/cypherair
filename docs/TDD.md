@@ -303,7 +303,7 @@ com.cypherair.v1.metadata.<fingerprint>
 | SE key `dataRepresentation` | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | Per auth mode |
 | Salt | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 | Encrypted private key | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
-| Key metadata (PGPKeyIdentity JSON) | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None (no SE auth) |
+| Key metadata (PGPKeyIdentity JSON) | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None (no SE auth); transitional cold-launch index before future `key metadata` domain |
 
 ### 3.6 Security Properties
 
@@ -350,23 +350,31 @@ Generate: `CIQRCodeGenerator`. Decode from photo: PHPicker + CoreImage `CIDetect
 ## 6. Storage Architecture
 
 ```
-Keychain: SE key + salt + sealed-key + metadata per identity (both profiles)
+Keychain default account: SE key + salt + sealed-key + pending private-key recovery rows
+Keychain metadata account: `PGPKeyIdentity` cold-launch metadata index
+Keychain protected-data row: shared app-data root secret
+/Application Support/ProtectedData/: registry, protected-settings domain, domain bootstrap metadata
 /Documents/: contacts/ (public keys + `contact-metadata.json`), self-test/
 /Library/Preferences/ (UserDefaults):
-  com.cypherair.preference.authMode              → "standard" | "highSecurity"
+  com.cypherair.preference.authMode              → "standard" | "highSecurity" (future private-key-control domain)
+  com.cypherair.preference.appSessionAuthenticationPolicy → boot auth profile
   com.cypherair.preference.gracePeriod           → Int (0/60/180/300)
   com.cypherair.preference.encryptToSelf         → Bool (default true)
   com.cypherair.preference.clipboardNotice       → Bool (default true)
   com.cypherair.preference.onboardingComplete    → Bool (default false)
   com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
   com.cypherair.preference.colorTheme            → String (ColorTheme rawValue, default "systemDefault")
-  com.cypherair.internal.rewrapInProgress        → Bool (crash recovery)
-  com.cypherair.internal.rewrapTargetMode        → String (target auth mode during re-wrap)
-  com.cypherair.internal.modifyExpiryInProgress  → Bool (crash recovery flag)
-  com.cypherair.internal.modifyExpiryFingerprint → String (key fingerprint during expiry modification)
+  com.cypherair.internal.rewrapInProgress        → Bool (future private-key-control.recoveryJournal)
+  com.cypherair.internal.rewrapTargetMode        → String (future private-key-control.recoveryJournal)
+  com.cypherair.internal.modifyExpiryInProgress  → Bool (future private-key-control.recoveryJournal)
+  com.cypherair.internal.modifyExpiryFingerprint → String (future private-key-control.recoveryJournal)
 /tmp/decrypted/: ephemeral file previews
 /tmp/streaming/: temporary streaming encrypt/decrypt outputs
+/tmp/export-*: temporary fileExporter handoff files
+/tmp/CypherAirGuidedTutorial-*: tutorial contacts sandbox
 ```
+
+Protected app-data planning covers all CypherAir-owned local data, not only preferences. Current permanent exceptions are limited to the app-session boot authentication profile, private-key material rows protected by Keychain / Secure Enclave, ProtectedData framework bootstrap metadata, test-only or legacy-cleanup state, short-lived temporary files with cleanup requirements, and user-exported files after they leave the app-controlled sandbox. Private-key control state and key metadata are future post-unlock ProtectedData domain targets.
 
 ---
 

@@ -342,46 +342,55 @@ These pairs must be updated together. A change to one without the other will cau
 ## 5. Storage Layout
 
 ```
-Keychain (kSecClassGenericPassword, WhenUnlockedThisDeviceOnly):
-├── Per identity (fingerprint = lowercase hex, no spaces/separators):
-│   ├── com.cypherair.v1.se-key.<fingerprint>        → SE key dataRepresentation
+Keychain (kSecClassGenericPassword, data-protection Keychain):
+├── Default account (`com.cypherair`):
+│   ├── com.cypherair.v1.se-key.<fingerprint>         → SE key dataRepresentation
 │   ├── com.cypherair.v1.salt.<fingerprint>           → Random HKDF salt
 │   ├── com.cypherair.v1.sealed-key.<fingerprint>     → AES-GCM sealed private key
-│   └── com.cypherair.v1.metadata.<fingerprint>       → PGPKeyIdentity JSON (Codable, no SE auth needed)
-│
-├── During mode switch / modify-expiry recovery (temporary, deleted after successful promotion or stale cleanup):
-│   ├── com.cypherair.v1.pending-se-key.<fingerprint>
-│   ├── com.cypherair.v1.pending-salt.<fingerprint>
-│   └── com.cypherair.v1.pending-sealed-key.<fingerprint>
+│   ├── com.cypherair.v1.pending-se-key.<fingerprint> → Temporary mode-switch / expiry-recovery row
+│   ├── com.cypherair.v1.pending-salt.<fingerprint>   → Temporary mode-switch / expiry-recovery row
+│   ├── com.cypherair.v1.pending-sealed-key.<fingerprint>
+│   └── com.cypherair.protected-data.shared-right.v1  → Shared app-data root secret
+├── Metadata account (`com.cypherair.metadata`):
+│   └── com.cypherair.v1.metadata.<fingerprint>       → PGPKeyIdentity JSON cold-launch index
 
 App Sandbox:
 ├── Documents/
 │   ├── contacts/                → Public key files (.gpg binary)
 │   │   └── contact-metadata.json → Verification-state manifest for stored contacts
 │   └── self-test/               → Self-test reports
+├── Application Support/
+│   └── ProtectedData/
+│       ├── ProtectedDataRegistry.plist
+│       └── protected-settings/   → Protected settings envelopes and domain bootstrap metadata
 ├── Library/Preferences/
 │   └── (UserDefaults)
-│       ├── com.cypherair.preference.authMode              → "standard" | "highSecurity"
+│       ├── com.cypherair.preference.authMode              → "standard" | "highSecurity" (future private-key-control domain)
+│       ├── com.cypherair.preference.appSessionAuthenticationPolicy → App-session boot auth profile
 │       ├── com.cypherair.preference.gracePeriod            → Int (seconds): 0 / 60 / 180 / 300
 │       ├── com.cypherair.preference.encryptToSelf          → Bool (default true)
 │       ├── com.cypherair.preference.clipboardNotice        → Bool (default true)
 │       ├── com.cypherair.preference.onboardingComplete     → Bool (default false)
 │       ├── com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
 │       ├── com.cypherair.preference.colorTheme             → String (ColorTheme rawValue, default "systemDefault")
-│       ├── com.cypherair.internal.rewrapInProgress         → Bool (crash recovery flag)
-│       ├── com.cypherair.internal.rewrapTargetMode         → String (target auth mode during re-wrap)
-│       ├── com.cypherair.internal.modifyExpiryInProgress   → Bool (crash recovery flag)
-│       └── com.cypherair.internal.modifyExpiryFingerprint  → String (key fingerprint during expiry modification)
+│       ├── com.cypherair.internal.rewrapInProgress         → Bool (future private-key-control.recoveryJournal)
+│       ├── com.cypherair.internal.rewrapTargetMode         → String (future private-key-control.recoveryJournal)
+│       ├── com.cypherair.internal.modifyExpiryInProgress   → Bool (future private-key-control.recoveryJournal)
+│       └── com.cypherair.internal.modifyExpiryFingerprint  → String (future private-key-control.recoveryJournal)
 └── tmp/
     ├── decrypted/               → Decrypted file previews (deleted on view exit + app launch)
-    └── streaming/               → Temporary streaming encrypt/decrypt outputs (deleted on app launch)
+    ├── streaming/               → Temporary streaming encrypt/decrypt outputs (deleted on app launch)
+    ├── export-*                 → Temporary fileExporter handoff files
+    └── CypherAirGuidedTutorial-* → Tutorial contacts sandbox
 ```
 
 **Keychain key naming conventions:**
 - All keys prefixed with `com.cypherair.v1.` — the `v1` segment enables future data migration if the wrapping scheme changes.
 - `<fingerprint>` is the full key fingerprint in lowercase hexadecimal, no spaces or separators (e.g., `a1b2c3d4...`).
-- Metadata items use `metadata.` prefix and store `PGPKeyIdentity` as JSON. These items have no access control (no SE authentication required) and are used for cold-launch key enumeration via `KeyManagementService.loadKeys()`.
-- Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Crash recovery prefers any complete bundle over a partial bundle and leaves retry flags set if recovery fails for a retryable reason.
+- Metadata items use `metadata.` prefix under the dedicated metadata account and store `PGPKeyIdentity` as JSON. These items have no access control (no SE authentication required) and are the current transitional cold-launch index. The long-term target is a ProtectedData `key metadata` domain opened automatically after app unlock.
+- Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain; future ProtectedData recovery journals may reference these rows but must not store the bundle material.
+- The long-term app-data goal is to move every CypherAir-owned local data surface behind ProtectedData after unlock unless it is a documented boot-authentication, private-key-material, framework-bootstrap, ephemeral-cleanup, test-only, legacy-cleanup, or out-of-app-custody exception.
+- Future post-unlock orchestration should open required domains such as `private-key-control`, `key metadata`, and protected settings by reusing the app privacy authentication context without extra Face ID prompts.
 
 ## 6. Memory Integrity Enforcement
 
