@@ -1,4 +1,5 @@
 import LocalAuthentication
+import CryptoKit
 import XCTest
 @testable import CypherAir
 
@@ -9,6 +10,8 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
+        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
+        cleanupSupportKeychainItems()
         rootSecretStore = KeychainProtectedDataRootSecretStore(
             account: "DeviceProtectedDataRootSecretStoreTests"
         )
@@ -16,6 +19,7 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
 
     override func tearDown() async throws {
         try cleanupTrackedRootSecrets()
+        cleanupSupportKeychainItems()
         rootSecretStore = nil
         try await super.tearDown()
     }
@@ -34,7 +38,8 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         XCTAssertThrowsError(
             try rootSecretStore.loadRootSecret(
                 identifier: identifier,
-                authenticationContext: lockedContext
+                authenticationContext: lockedContext,
+                minimumEnvelopeVersion: nil
             )
         ) { error in
             guard let keychainError = error as? KeychainError else {
@@ -58,15 +63,19 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         )
         authenticatedContext.interactionNotAllowed = true
 
-        var loadedSecret = try rootSecretStore.loadRootSecret(
+        let loadResult = try rootSecretStore.loadRootSecret(
             identifier: identifier,
-            authenticationContext: authenticatedContext
+            authenticationContext: authenticatedContext,
+            minimumEnvelopeVersion: nil
         )
+        var loadedSecret = loadResult.secretData
         defer {
             loadedSecret.protectedDataZeroize()
             authenticatedContext.invalidate()
         }
 
+        XCTAssertEqual(loadResult.storageFormat, .envelopeV2)
+        XCTAssertFalse(loadResult.didMigrate)
         XCTAssertEqual(loadedSecret, secret)
     }
 
@@ -89,16 +98,52 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         )
         authenticatedContext.interactionNotAllowed = true
 
-        var loadedSecret = try rootSecretStore.loadRootSecret(
+        let loadResult = try rootSecretStore.loadRootSecret(
             identifier: identifier,
-            authenticationContext: authenticatedContext
+            authenticationContext: authenticatedContext,
+            minimumEnvelopeVersion: nil
         )
+        var loadedSecret = loadResult.secretData
         defer {
             loadedSecret.protectedDataZeroize()
             authenticatedContext.invalidate()
         }
 
+        XCTAssertEqual(loadResult.storageFormat, .envelopeV2)
+        XCTAssertFalse(loadResult.didMigrate)
         XCTAssertEqual(loadedSecret, secret)
+    }
+
+    func test_missingDeviceBindingKeyAfterV2Save_failsClosed() async throws {
+        let identifier = try makeTestRootSecretIdentifier(functionName: #function)
+        let secret = Data(repeating: 0xD7, count: 32)
+        try rootSecretStore.saveRootSecret(secret, identifier: identifier, policy: .userPresence)
+
+        let authenticatedContext = try await authenticateContext(
+            policy: .deviceOwnerAuthentication,
+            reason: "Authenticate to validate CypherAir protected app data access."
+        )
+        authenticatedContext.interactionNotAllowed = true
+        defer {
+            authenticatedContext.invalidate()
+        }
+
+        var initialSecret = try rootSecretStore.loadRootSecret(
+            identifier: identifier,
+            authenticationContext: authenticatedContext,
+            minimumEnvelopeVersion: nil
+        ).secretData
+        initialSecret.protectedDataZeroize()
+
+        cleanupSupportKeychainItems()
+
+        XCTAssertThrowsError(
+            try rootSecretStore.loadRootSecret(
+                identifier: identifier,
+                authenticationContext: authenticatedContext,
+                minimumEnvelopeVersion: nil
+            )
+        )
     }
 
     private func authenticateContext(policy: LAPolicy, reason: String) async throws -> LAContext {
@@ -139,6 +184,21 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         }
 
         trackedIdentifiers.removeAll()
+    }
+
+    private func cleanupSupportKeychainItems() {
+        let keychain = SystemKeychain()
+        for service in [
+            KeychainConstants.protectedDataDeviceBindingKeyService,
+            KeychainConstants.protectedDataRootSecretFormatFloorService,
+            KeychainConstants.protectedDataRootSecretLegacyCleanupService
+        ] {
+            try? keychain.delete(
+                service: service,
+                account: "DeviceProtectedDataRootSecretStoreTests",
+                authenticationContext: nil
+            )
+        }
     }
 
     private func settleAuthenticationSession() async throws {

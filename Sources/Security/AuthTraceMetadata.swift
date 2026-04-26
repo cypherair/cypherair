@@ -7,6 +7,15 @@ enum AuthTraceMetadata {
         if service.hasPrefix(KeychainConstants.metadataPrefix) {
             return "metadata"
         }
+        if service == KeychainConstants.protectedDataDeviceBindingKeyService {
+            return "protectedDataDeviceBindingKey"
+        }
+        if service == KeychainConstants.protectedDataRootSecretFormatFloorService {
+            return "protectedDataRootSecretFormatFloor"
+        }
+        if service == KeychainConstants.protectedDataRootSecretLegacyCleanupService {
+            return "protectedDataRootSecretLegacyCleanup"
+        }
         if service.hasPrefix("\(KeychainConstants.prefix).pending-se-key.") {
             return "pendingSeKey"
         }

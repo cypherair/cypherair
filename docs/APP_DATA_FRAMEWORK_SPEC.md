@@ -187,9 +187,9 @@ The v1 persistence model for each protected app-data domain is:
 - the DMK is not stored in plaintext on disk
 - one shared app-data root secret is persisted as a Keychain item protected by `SecAccessControl`
 - the root-secret Keychain item uses this-device-only accessibility and the access-control flags selected by `AppSessionAuthenticationPolicy`
-- the planned v2 payload for that row is a Secure Enclave device-bound root-secret envelope rather than raw root-secret bytes
+- the v2 payload for that row is a Secure Enclave device-bound root-secret envelope rather than raw root-secret bytes
 - the ProtectedData SE device-binding key uses `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage` and does not add Face ID / Touch ID flags
-- the planned v2 envelope is a binary-plist `CAPDSEV2` record with fixed `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`
+- the v2 envelope is a binary-plist `CAPDSEV2` record with fixed `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`
 - v2 envelope public keys use P-256 X9.63 representation; salt is 32 bytes, nonce is 12 bytes, tag is 16 bytes, and root-secret ciphertext is 32 bytes
 - HKDF sharedInfo and AES-GCM AAD bind the envelope version, algorithm, shared-right identifier, device-binding key identifier, SE public-key hash, public-key lengths, and root-secret length
 - v2 verification writes registry state plus a ThisDeviceOnly Keychain `format-floor` marker; if either says v2, later v1 raw root-secret payloads are downgrade/corruption and must fail closed

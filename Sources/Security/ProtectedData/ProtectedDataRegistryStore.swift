@@ -120,6 +120,25 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
         try storageRoot.writeProtectedData(data, to: storageRoot.registryURL)
     }
 
+    @discardableResult
+    func recordRootSecretEnvelopeMinimumVersion(_ version: Int) async throws -> ProtectedDataRegistry {
+        try await mutationGate.run { [self] in
+            var registry = try loadRegistry()
+            if let currentVersion = registry.rootSecretEnvelopeMinimumVersion,
+               currentVersion >= version {
+                return registry
+            }
+            registry.rootSecretEnvelopeMinimumVersion = version
+            try saveRegistry(registry)
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.registry.rootSecretEnvelopeFloor",
+                metadata: ["minimumEnvelopeVersion": String(version), "result": "recorded"]
+            )
+            return registry
+        }
+    }
+
     func performCreateDomainTransaction(
         domainID: ProtectedDataDomainID,
         initialCommittedState: ProtectedDataCommittedDomainState = .active,

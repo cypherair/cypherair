@@ -1,5 +1,6 @@
 import Foundation
 import LocalAuthentication
+import Security
 import XCTest
 @testable import CypherAir
 
@@ -116,8 +117,10 @@ private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStor
 
     func loadRootSecret(
         identifier: String,
-        authenticationContext: LAContext
-    ) throws -> Data {
+        authenticationContext: LAContext,
+        minimumEnvelopeVersion: Int?
+    ) throws -> ProtectedDataRootSecretLoadResult {
+        _ = minimumEnvelopeVersion
         lastAuthenticationContext = authenticationContext
         rightLookupCallCount += 1
         guard let persistedRightHandle else {
@@ -126,7 +129,11 @@ private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStor
         if let authorizeError = persistedRightHandle.authorizeError {
             throw authorizeError
         }
-        return try persistedRightHandle.rootSecretData()
+        return ProtectedDataRootSecretLoadResult(
+            secretData: try persistedRightHandle.rootSecretData(),
+            storageFormat: .envelopeV2,
+            didMigrate: false
+        )
     }
 
     func deleteRootSecret(identifier: String) throws {
@@ -184,11 +191,331 @@ private actor AsyncBooleanFlag {
 
 @MainActor
 final class ProtectedDataFrameworkTests: XCTestCase {
+    private let envelopeTestSharedRight = "com.cypherair.tests.protected-data.envelope"
+
     private func makeTemporaryDirectory(_ prefix: String) -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private func replacing(
+        _ envelope: ProtectedDataRootSecretEnvelope,
+        magic: String? = nil,
+        formatVersion: Int? = nil,
+        algorithmID: String? = nil,
+        aadVersion: Int? = nil,
+        sharedRightIdentifier: String? = nil,
+        deviceBindingKeyIdentifier: String? = nil,
+        deviceBindingPublicKeyX963: Data? = nil,
+        ephemeralPublicKeyX963: Data? = nil,
+        hkdfSalt: Data? = nil,
+        nonce: Data? = nil,
+        ciphertext: Data? = nil,
+        tag: Data? = nil
+    ) -> ProtectedDataRootSecretEnvelope {
+        ProtectedDataRootSecretEnvelope(
+            magic: magic ?? envelope.magic,
+            formatVersion: formatVersion ?? envelope.formatVersion,
+            algorithmID: algorithmID ?? envelope.algorithmID,
+            aadVersion: aadVersion ?? envelope.aadVersion,
+            sharedRightIdentifier: sharedRightIdentifier ?? envelope.sharedRightIdentifier,
+            deviceBindingKeyIdentifier: deviceBindingKeyIdentifier ?? envelope.deviceBindingKeyIdentifier,
+            deviceBindingPublicKeyX963: deviceBindingPublicKeyX963 ?? envelope.deviceBindingPublicKeyX963,
+            ephemeralPublicKeyX963: ephemeralPublicKeyX963 ?? envelope.ephemeralPublicKeyX963,
+            hkdfSalt: hkdfSalt ?? envelope.hkdfSalt,
+            nonce: nonce ?? envelope.nonce,
+            ciphertext: ciphertext ?? envelope.ciphertext,
+            tag: tag ?? envelope.tag
+        )
+    }
+
+    private func flippedFirstByte(_ data: Data) -> Data {
+        var copy = data
+        if !copy.isEmpty {
+            copy[copy.startIndex] ^= 0xFF
+        }
+        return copy
+    }
+
+    private func encodedEnvelopeWithUnsupportedField(
+        from envelope: ProtectedDataRootSecretEnvelope
+    ) throws -> Data {
+        let dictionary: [String: Any] = [
+            "magic": envelope.magic,
+            "formatVersion": envelope.formatVersion,
+            "algorithmID": envelope.algorithmID,
+            "aadVersion": envelope.aadVersion,
+            "sharedRightIdentifier": envelope.sharedRightIdentifier,
+            "deviceBindingKeyIdentifier": envelope.deviceBindingKeyIdentifier,
+            "deviceBindingPublicKeyX963": envelope.deviceBindingPublicKeyX963,
+            "ephemeralPublicKeyX963": envelope.ephemeralPublicKeyX963,
+            "hkdfSalt": envelope.hkdfSalt,
+            "nonce": envelope.nonce,
+            "ciphertext": envelope.ciphertext,
+            "tag": envelope.tag,
+            "unsupported": Data([0x00])
+        ]
+        return try PropertyListSerialization.data(
+            fromPropertyList: dictionary,
+            format: .binary,
+            options: 0
+        )
+    }
+
+    private func insertLegacyRootSecret(
+        _ payload: Data,
+        identifier: String,
+        account: String
+    ) throws {
+        deleteRootSecretPayload(identifier: identifier, account: account)
+        var query = rootSecretQuery(identifier: identifier, account: account)
+        query[kSecValueData as String] = payload
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        try handleKeychainStatus(SecItemAdd(query as CFDictionary, nil))
+    }
+
+    private func replaceRootSecretPayload(
+        _ payload: Data,
+        identifier: String,
+        account: String
+    ) throws {
+        try handleKeychainStatus(
+            SecItemUpdate(
+                rootSecretQuery(identifier: identifier, account: account) as CFDictionary,
+                [kSecValueData as String: payload] as CFDictionary
+            )
+        )
+    }
+
+    private func loadRootSecretPayload(
+        identifier: String,
+        account: String
+    ) throws -> Data {
+        var query = rootSecretQuery(identifier: identifier, account: account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: AnyObject?
+        try handleKeychainStatus(SecItemCopyMatching(query as CFDictionary, &result))
+        guard let data = result as? Data else {
+            throw KeychainError.unhandledError(errSecInternalError)
+        }
+        return data
+    }
+
+    private func deleteRootSecretPayload(identifier: String, account: String) {
+        let status = SecItemDelete(rootSecretQuery(identifier: identifier, account: account) as CFDictionary)
+        XCTAssertTrue(
+            status == errSecSuccess || status == errSecItemNotFound,
+            "Unexpected Keychain delete status \(status)"
+        )
+    }
+
+    private func rootSecretQuery(identifier: String, account: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: identifier,
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+    }
+
+    private func handleKeychainStatus(_ status: OSStatus) throws {
+        switch status {
+        case errSecSuccess:
+            return
+        case errSecItemNotFound:
+            throw KeychainError.itemNotFound
+        case errSecDuplicateItem:
+            throw KeychainError.duplicateItem
+        case errSecUserCanceled:
+            throw KeychainError.userCancelled
+        case errSecAuthFailed:
+            throw KeychainError.authenticationFailed
+        case errSecInteractionNotAllowed:
+            throw KeychainError.interactionNotAllowed
+        default:
+            throw KeychainError.unhandledError(status)
+        }
+    }
+
+    func test_rootSecretEnvelope_roundTripsWithMockDeviceBindingProvider() throws {
+        let provider = MockProtectedDataDeviceBindingProvider()
+        let rootSecret = Data(repeating: 0x42, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
+        let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
+        let encoded = try ProtectedDataRootSecretEnvelopeCodec.encode(envelope)
+        let decoded = try ProtectedDataRootSecretEnvelopeCodec.decode(
+            encoded,
+            expectedSharedRightIdentifier: envelopeTestSharedRight
+        )
+
+        var openedSecret = try provider.openRootSecret(
+            envelope: decoded,
+            expectedSharedRightIdentifier: envelopeTestSharedRight
+        )
+        defer {
+            openedSecret.protectedDataZeroize()
+        }
+
+        XCTAssertEqual(decoded.magic, ProtectedDataRootSecretEnvelope.magic)
+        XCTAssertEqual(decoded.formatVersion, ProtectedDataRootSecretEnvelope.currentFormatVersion)
+        XCTAssertEqual(decoded.algorithmID, ProtectedDataRootSecretEnvelope.algorithmID)
+        XCTAssertEqual(decoded.hkdfSalt.count, ProtectedDataRootSecretEnvelope.expectedSaltLength)
+        XCTAssertEqual(decoded.nonce.count, ProtectedDataRootSecretEnvelope.expectedNonceLength)
+        XCTAssertEqual(decoded.tag.count, ProtectedDataRootSecretEnvelope.expectedAuthenticationTagLength)
+        XCTAssertEqual(decoded.ciphertext.count, ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
+        XCTAssertEqual(openedSecret, rootSecret)
+    }
+
+    func test_rootSecretEnvelope_rejectsTamperedAuthenticatedFields() throws {
+        let provider = MockProtectedDataDeviceBindingProvider()
+        let rootSecret = Data(repeating: 0x24, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
+        let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
+
+        let tamperedEnvelopes = [
+            replacing(envelope, hkdfSalt: flippedFirstByte(envelope.hkdfSalt)),
+            replacing(envelope, nonce: flippedFirstByte(envelope.nonce)),
+            replacing(envelope, ciphertext: flippedFirstByte(envelope.ciphertext)),
+            replacing(envelope, tag: flippedFirstByte(envelope.tag)),
+            replacing(envelope, deviceBindingPublicKeyX963: flippedFirstByte(envelope.deviceBindingPublicKeyX963)),
+            replacing(envelope, ephemeralPublicKeyX963: flippedFirstByte(envelope.ephemeralPublicKeyX963))
+        ]
+
+        for tamperedEnvelope in tamperedEnvelopes {
+            XCTAssertThrowsError(
+                try provider.openRootSecret(
+                    envelope: tamperedEnvelope,
+                    expectedSharedRightIdentifier: envelopeTestSharedRight
+                )
+            )
+        }
+    }
+
+    func test_rootSecretEnvelope_rejectsMalformedContractAndUnsupportedFields() throws {
+        let provider = MockProtectedDataDeviceBindingProvider()
+        let rootSecret = Data(repeating: 0x35, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
+        let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
+
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, magic: "CAPDSEV1")))
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, formatVersion: 1)))
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, algorithmID: "other")))
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, hkdfSalt: Data(repeating: 0x00, count: 31))))
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, nonce: Data(repeating: 0x00, count: 11))))
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, tag: Data(repeating: 0x00, count: 15))))
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, ciphertext: Data(repeating: 0x00, count: 31))))
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.decode(
+            try encodedEnvelopeWithUnsupportedField(from: envelope),
+            expectedSharedRightIdentifier: envelopeTestSharedRight
+        ))
+    }
+
+    func test_rootSecretEnvelope_rejectsWrongSharedRightIdentifier() throws {
+        let provider = MockProtectedDataDeviceBindingProvider()
+        let rootSecret = Data(repeating: 0x53, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
+        let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
+
+        XCTAssertThrowsError(
+            try ProtectedDataRootSecretEnvelopeCodec.decode(
+                try ProtectedDataRootSecretEnvelopeCodec.encode(envelope),
+                expectedSharedRightIdentifier: "\(envelopeTestSharedRight).wrong"
+            )
+        )
+        XCTAssertThrowsError(
+            try provider.openRootSecret(
+                envelope: envelope,
+                expectedSharedRightIdentifier: "\(envelopeTestSharedRight).wrong"
+            )
+        )
+    }
+
+    func test_rootSecretStore_migratesLegacyRawPayloadAndWritesFormatFloor() throws {
+        let account = "ProtectedDataFrameworkTests.\(#function).\(UUID().uuidString)"
+        let identifier = "\(envelopeTestSharedRight).migration.\(UUID().uuidString)"
+        let legacySecret = Data(repeating: 0x61, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
+        try insertLegacyRootSecret(legacySecret, identifier: identifier, account: account)
+        defer {
+            deleteRootSecretPayload(identifier: identifier, account: account)
+        }
+
+        let floorKeychain = MockKeychain()
+        try floorKeychain.save(
+            Data([0x91]),
+            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
+            account: account,
+            accessControl: nil
+        )
+        let floorStore = ProtectedDataRootSecretFormatFloorStore(keychain: floorKeychain, account: account)
+        let store = KeychainProtectedDataRootSecretStore(
+            account: account,
+            supportKeychain: floorKeychain,
+            deviceBindingProvider: MockProtectedDataDeviceBindingProvider(),
+            formatFloorStore: floorStore
+        )
+
+        var result = try store.loadRootSecret(
+            identifier: identifier,
+            authenticationContext: LAContext(),
+            minimumEnvelopeVersion: nil
+        )
+        defer {
+            result.secretData.protectedDataZeroize()
+        }
+
+        XCTAssertEqual(result.secretData, legacySecret)
+        XCTAssertEqual(result.storageFormat, .envelopeV2)
+        XCTAssertTrue(result.didMigrate)
+        XCTAssertEqual(
+            try floorStore.readMinimumEnvelopeVersion(sharedRightIdentifier: identifier),
+            ProtectedDataRootSecretEnvelope.currentFormatVersion
+        )
+        XCTAssertFalse(floorKeychain.exists(
+            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
+            account: account
+        ))
+
+        let migratedPayload = try loadRootSecretPayload(identifier: identifier, account: account)
+        XCTAssertNotEqual(migratedPayload.count, ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
+        XCTAssertNoThrow(try ProtectedDataRootSecretEnvelopeCodec.decode(
+            migratedPayload,
+            expectedSharedRightIdentifier: identifier
+        ))
+    }
+
+    func test_rootSecretStore_rejectsLegacyDowngradeAfterFormatFloor() throws {
+        let account = "ProtectedDataFrameworkTests.\(#function).\(UUID().uuidString)"
+        let identifier = "\(envelopeTestSharedRight).downgrade.\(UUID().uuidString)"
+        let legacySecret = Data(repeating: 0x72, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
+        try insertLegacyRootSecret(legacySecret, identifier: identifier, account: account)
+        defer {
+            deleteRootSecretPayload(identifier: identifier, account: account)
+        }
+
+        let floorKeychain = MockKeychain()
+        let floorStore = ProtectedDataRootSecretFormatFloorStore(keychain: floorKeychain, account: account)
+        let store = KeychainProtectedDataRootSecretStore(
+            account: account,
+            supportKeychain: floorKeychain,
+            deviceBindingProvider: MockProtectedDataDeviceBindingProvider(),
+            formatFloorStore: floorStore
+        )
+
+        var migratedResult = try store.loadRootSecret(
+            identifier: identifier,
+            authenticationContext: LAContext(),
+            minimumEnvelopeVersion: nil
+        )
+        migratedResult.secretData.protectedDataZeroize()
+
+        try replaceRootSecretPayload(legacySecret, identifier: identifier, account: account)
+
+        XCTAssertThrowsError(
+            try store.loadRootSecret(
+                identifier: identifier,
+                authenticationContext: LAContext(),
+                minimumEnvelopeVersion: nil
+            )
+        )
     }
 
     func test_registryBootstrap_withoutRootOrArtifacts_bootstrapsEmptySteadyState() throws {

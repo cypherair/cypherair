@@ -8,6 +8,7 @@ final class ProtectedDataSessionCoordinator {
     private let domainKeyManager: ProtectedDomainKeyManager
     private let rootSecretIdentifier: String
     private let appSessionPolicyProvider: () -> AppSessionAuthenticationPolicy
+    private let recordRootSecretEnvelopeMinimumVersion: @Sendable (Int) async throws -> Void
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
 
@@ -22,6 +23,7 @@ final class ProtectedDataSessionCoordinator {
         domainKeyManager: ProtectedDomainKeyManager,
         sharedRightIdentifier: String,
         appSessionPolicyProvider: @escaping () -> AppSessionAuthenticationPolicy = { .userPresence },
+        recordRootSecretEnvelopeMinimumVersion: @escaping @Sendable (Int) async throws -> Void = { _ in },
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
@@ -30,6 +32,7 @@ final class ProtectedDataSessionCoordinator {
         self.domainKeyManager = domainKeyManager
         self.rootSecretIdentifier = sharedRightIdentifier
         self.appSessionPolicyProvider = appSessionPolicyProvider
+        self.recordRootSecretEnvelopeMinimumVersion = recordRootSecretEnvelopeMinimumVersion
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
     }
@@ -46,6 +49,9 @@ final class ProtectedDataSessionCoordinator {
                 secretData,
                 identifier: rootSecretIdentifier,
                 policy: policy
+            )
+            try await recordRootSecretEnvelopeMinimumVersion(
+                ProtectedDataRootSecretEnvelope.currentFormatVersion
             )
             traceStore?.record(
                 category: .operation,
@@ -142,15 +148,16 @@ final class ProtectedDataSessionCoordinator {
         )
 
         do {
-            var rawSecret: Data
+            var rootSecretResult: ProtectedDataRootSecretLoadResult
             do {
-                rawSecret = try await loadRootSecret(
+                rootSecretResult = try await loadRootSecret(
                     identifier: registry.sharedRightIdentifier,
                     authenticationContext: context,
-                    usesHandoffContext: usesHandoffContext
+                    usesHandoffContext: usesHandoffContext,
+                    minimumEnvelopeVersion: registry.rootSecretEnvelopeMinimumVersion
                 )
             } catch let error as KeychainError where error == .itemNotFound {
-                rawSecret = try await migrateLegacySharedRightIfNeeded(
+                rootSecretResult = try await migrateLegacySharedRightIfNeeded(
                     registry: registry,
                     localizedReason: localizedReason,
                     authenticationContext: context,
@@ -158,7 +165,14 @@ final class ProtectedDataSessionCoordinator {
                 )
             }
 
-            let derivedWrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rawSecret)
+            if rootSecretResult.storageFormat == .envelopeV2 || rootSecretResult.didMigrate {
+                try await recordRootSecretEnvelopeMinimumVersion(
+                    ProtectedDataRootSecretEnvelope.currentFormatVersion
+                )
+            }
+            let derivedWrappingRootKey = try domainKeyManager.deriveWrappingRootKey(
+                from: &rootSecretResult.secretData
+            )
 
             if wrappingRootKey != nil {
                 wrappingRootKey?.protectedDataZeroize()
@@ -325,11 +339,13 @@ final class ProtectedDataSessionCoordinator {
     private func loadRootSecret(
         identifier: String,
         authenticationContext: LAContext,
-        usesHandoffContext: Bool
-    ) async throws -> Data {
+        usesHandoffContext: Bool,
+        minimumEnvelopeVersion: Int?
+    ) async throws -> ProtectedDataRootSecretLoadResult {
         let metadata = [
             "source": usesHandoffContext ? "handoff" : "interactive",
-            "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
+            "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false",
+            "minimumEnvelopeVersion": minimumEnvelopeVersion.map(String.init) ?? "none"
         ]
         traceStore?.record(
             category: .operation,
@@ -340,12 +356,20 @@ final class ProtectedDataSessionCoordinator {
             do {
                 let secret = try rootSecretStore.loadRootSecret(
                     identifier: identifier,
-                    authenticationContext: authenticationContext
+                    authenticationContext: authenticationContext,
+                    minimumEnvelopeVersion: minimumEnvelopeVersion
                 )
                 traceStore?.record(
                     category: .operation,
                     name: "protectedData.rootSecret.load.finish",
-                    metadata: metadata.merging(["result": "success"], uniquingKeysWith: { _, new in new })
+                    metadata: metadata.merging(
+                        [
+                            "result": "success",
+                            "storageFormat": secret.storageFormat.rawValue,
+                            "didMigrate": secret.didMigrate ? "true" : "false"
+                        ],
+                        uniquingKeysWith: { _, new in new }
+                    )
                 )
                 return secret
             } catch {
@@ -364,13 +388,21 @@ final class ProtectedDataSessionCoordinator {
             ) {
                 try rootSecretStore.loadRootSecret(
                     identifier: identifier,
-                    authenticationContext: authenticationContext
+                    authenticationContext: authenticationContext,
+                    minimumEnvelopeVersion: minimumEnvelopeVersion
                 )
             }
             traceStore?.record(
                 category: .operation,
                 name: "protectedData.rootSecret.load.finish",
-                metadata: metadata.merging(["result": "success"], uniquingKeysWith: { _, new in new })
+                metadata: metadata.merging(
+                    [
+                        "result": "success",
+                        "storageFormat": secret.storageFormat.rawValue,
+                        "didMigrate": secret.didMigrate ? "true" : "false"
+                    ],
+                    uniquingKeysWith: { _, new in new }
+                )
             )
             return secret
         } catch {
@@ -388,7 +420,7 @@ final class ProtectedDataSessionCoordinator {
         localizedReason: String,
         authenticationContext: LAContext,
         usesHandoffContext: Bool
-    ) async throws -> Data {
+    ) async throws -> ProtectedDataRootSecretLoadResult {
         guard let legacyRightStoreClient else {
             traceStore?.record(
                 category: .operation,
@@ -453,13 +485,14 @@ final class ProtectedDataSessionCoordinator {
                 policy: appSessionPolicyProvider()
             )
 
-            var verifiedSecret = try await loadRootSecret(
+            var verifiedResult = try await loadRootSecret(
                 identifier: registry.sharedRightIdentifier,
                 authenticationContext: authenticationContext,
-                usesHandoffContext: usesHandoffContext
+                usesHandoffContext: usesHandoffContext,
+                minimumEnvelopeVersion: registry.rootSecretEnvelopeMinimumVersion
             )
-            guard verifiedSecret == legacySecret else {
-                verifiedSecret.protectedDataZeroize()
+            guard verifiedResult.secretData == legacySecret else {
+                verifiedResult.secretData.protectedDataZeroize()
                 throw ProtectedDataError.internalFailure(
                     String(
                         localized: "error.protectedData.rootSecretMigrationVerification",
@@ -484,7 +517,7 @@ final class ProtectedDataSessionCoordinator {
                 name: "protectedData.rootSecret.legacyMigration.finish",
                 metadata: ["result": "success"]
             )
-            return verifiedSecret
+            return verifiedResult
         } catch {
             await legacyRight.deauthorize()
             traceStore?.record(

@@ -204,8 +204,10 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
 
     func loadRootSecret(
         identifier: String,
-        authenticationContext: LAContext
-    ) throws -> Data {
+        authenticationContext: LAContext,
+        minimumEnvelopeVersion: Int?
+    ) throws -> ProtectedDataRootSecretLoadResult {
+        _ = minimumEnvelopeVersion
         loadCallCount += 1
         lastLoadedIdentifier = identifier
         lastAuthenticationContext = authenticationContext
@@ -216,7 +218,11 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
         guard let storedSecret = storage[identifier] else {
             throw KeychainError.itemNotFound
         }
-        return storedSecret.data
+        return ProtectedDataRootSecretLoadResult(
+            secretData: storedSecret.data,
+            storageFormat: .envelopeV2,
+            didMigrate: false
+        )
     }
 
     func deleteRootSecret(identifier: String) throws {

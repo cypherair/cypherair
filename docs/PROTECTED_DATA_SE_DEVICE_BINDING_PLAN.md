@@ -1,8 +1,9 @@
 # ProtectedData Secure Enclave Device-Binding Plan
 
-> Temporary implementation guide. Archive or delete this file after the
-> Secure Enclave device-binding layer is implemented and the permanent
-> architecture/security/testing docs become the source of truth.
+> Superseded implementation guide. The Secure Enclave device-binding layer is
+> now implemented; the permanent architecture/security/testing docs are the
+> source of truth. Keep this file only as a short-term implementation audit
+> record until it is archived.
 
 ## 1. Apple Documentation Baseline
 
@@ -42,7 +43,7 @@ ProtectedData v1 currently uses one shared app-data root secret stored in the
 data-protection Keychain and released only after app-session authentication via
 `LAContext` / `kSecUseAuthenticationContext`.
 
-The v2 target keeps that authentication gate and adds a second device-bound
+The v2 implementation keeps that authentication gate and adds a second device-bound
 factor:
 
 ```text
@@ -173,7 +174,7 @@ Downgrade prevention:
   floor during restore-style rollback.
 
 There must be no production fallback that decrypts ProtectedData without the
-Secure Enclave once the device-binding layer is introduced. This is the point of
+Secure Enclave after the device-binding layer is introduced. This is the point of
 the new layer, and a fallback would defeat the threat model.
 
 Data-loss semantics must be explicit:

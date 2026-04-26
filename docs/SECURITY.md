@@ -96,10 +96,10 @@ The Secure Enclave supports only P-256. Private keys (Ed25519, X25519, Ed448, or
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be
-conflated with private-key bundle wrapping. The planned ProtectedData v2 upgrade
-keeps the current Keychain / `SecAccessControl` / authenticated `LAContext`
-gate, but changes the root-secret Keychain payload from raw root-secret bytes
-to a Secure Enclave device-bound envelope.
+conflated with private-key bundle wrapping. The current ProtectedData v2 model
+keeps the Keychain / `SecAccessControl` / authenticated `LAContext` gate, but
+stores the root-secret Keychain payload as a Secure Enclave device-bound
+envelope instead of raw root-secret bytes.
 
 The device-binding key is a ProtectedData-only P-256 Secure Enclave key with
 `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` and `.privateKeyUsage`. It
@@ -111,7 +111,7 @@ device-binding key is missing or unusable, ProtectedData must fail closed and
 require framework recovery/reset; there is no production fallback that opens v2
 ProtectedData without the SE factor.
 
-The planned v2 root-secret envelope is a binary-plist `CAPDSEV2` payload with
+The v2 root-secret envelope is a binary-plist `CAPDSEV2` payload with
 `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`. It uses a normal
 software-ephemeral P-256 ECDH exchange with the persistent ProtectedData SE
 public key; it must not reuse the existing private-key self-ECDH wrapping
@@ -332,7 +332,7 @@ The following files and functions are security-critical. Claude Code must **stop
 | `Sources/Security/SecureEnclaveManager.swift` | SE wrapping/unwrapping logic. Error = keys lost or insecure. |
 | `Sources/Security/KeychainManager.swift` | Access control flags. Wrong flags = wrong auth behavior. |
 | `Sources/Security/AuthenticationManager.swift` | Mode switching re-wrap. Error = keys permanently lost. |
-| `Sources/Security/ProtectedData/` | App-data root-secret authorization, planned SE device-binding envelope, domain master-key wrapping, reset semantics. Error = protected app data lost or opened under the wrong gate. |
+| `Sources/Security/ProtectedData/` | App-data root-secret authorization, SE device-binding envelope, domain master-key wrapping, reset semantics. Error = protected app data lost or opened under the wrong gate. |
 | `Sources/Security/MemoryZeroingUtility.swift` | Removing a zeroize call = key material leaks. |
 | `Sources/Extensions/Data+Zeroing.swift` | Contains `@_optimize(none)` zeroing barrier. Weakening = compiler may eliminate all memory zeroing app-wide. |
 | `Sources/Services/DecryptionService.swift` | Phase 1/Phase 2 auth boundary. Skipping Phase 2 auth check = biometric bypass. |
