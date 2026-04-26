@@ -1,0 +1,6 @@
+/* Localized strings for the main CypherAir page in the system Settings app. */
+"About CypherAir" = "关于 CypherAir";
+"Fully offline OpenPGP encryption. Zero network access. Minimal permissions." = "完全离线的 OpenPGP 加密。零网络访问。最小权限。";
+"Version" = "版本";
+"License" = "许可证";
+"Acknowledgements" = "致谢";
