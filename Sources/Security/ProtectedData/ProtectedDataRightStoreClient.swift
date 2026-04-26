@@ -6,6 +6,17 @@ enum ProtectedDataRightIdentifiers {
     static let productionSharedRightIdentifier = "com.cypherair.protected-data.shared-right.v1"
 }
 
+enum ProtectedDataRootSecretStorageFormat: String, Equatable, Sendable {
+    case legacyV1Raw
+    case envelopeV2
+}
+
+struct ProtectedDataRootSecretLoadResult: Equatable, Sendable {
+    var secretData: Data
+    let storageFormat: ProtectedDataRootSecretStorageFormat
+    let didMigrate: Bool
+}
+
 protocol ProtectedDataRootSecretStoreProtocol: AnyObject {
     func saveRootSecret(
         _ secretData: Data,
@@ -15,8 +26,9 @@ protocol ProtectedDataRootSecretStoreProtocol: AnyObject {
 
     func loadRootSecret(
         identifier: String,
-        authenticationContext: LAContext
-    ) throws -> Data
+        authenticationContext: LAContext,
+        minimumEnvelopeVersion: Int?
+    ) throws -> ProtectedDataRootSecretLoadResult
 
     func deleteRootSecret(identifier: String) throws
     func rootSecretExists(identifier: String) -> Bool
@@ -31,13 +43,31 @@ protocol ProtectedDataRootSecretStoreProtocol: AnyObject {
 
 final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtocol {
     private let account: String
+    private let supportKeychain: any KeychainManageable
+    private let deviceBindingProvider: any ProtectedDataDeviceBindingProvider
+    private let formatFloorStore: ProtectedDataRootSecretFormatFloorStore
     private let traceStore: AuthLifecycleTraceStore?
 
     init(
         account: String = KeychainConstants.defaultAccount,
+        supportKeychain: (any KeychainManageable)? = nil,
+        deviceBindingProvider: (any ProtectedDataDeviceBindingProvider)? = nil,
+        formatFloorStore: ProtectedDataRootSecretFormatFloorStore? = nil,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.account = account
+        let supportKeychain = supportKeychain ?? SystemKeychain(traceStore: traceStore)
+        self.supportKeychain = supportKeychain
+        self.deviceBindingProvider = deviceBindingProvider ?? HardwareProtectedDataDeviceBindingProvider(
+            keychain: supportKeychain,
+            account: account,
+            traceStore: traceStore
+        )
+        self.formatFloorStore = formatFloorStore ?? ProtectedDataRootSecretFormatFloorStore(
+            keychain: supportKeychain,
+            account: account,
+            traceStore: traceStore
+        )
         self.traceStore = traceStore
     }
 
@@ -46,13 +76,22 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         identifier: String,
         policy: AppSessionAuthenticationPolicy
     ) throws {
+        let envelope = try deviceBindingProvider.sealRootSecret(
+            secretData,
+            sharedRightIdentifier: identifier
+        )
+        let encodedEnvelope = try ProtectedDataRootSecretEnvelopeCodec.encode(envelope)
         traceStore?.record(
             category: .operation,
             name: "keychain.rootSecret.save.start",
-            metadata: ["serviceKind": "protectedDataRootSecret", "policy": policy.rawValue]
+            metadata: [
+                "serviceKind": "protectedDataRootSecret",
+                "policy": policy.rawValue,
+                "envelopeVersion": String(ProtectedDataRootSecretEnvelope.currentFormatVersion)
+            ]
         )
         var query = baseQuery(identifier: identifier)
-        query[kSecValueData as String] = secretData
+        query[kSecValueData as String] = encodedEnvelope
         query[kSecAttrAccessControl as String] = try policy.createRootSecretAccessControl()
 
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -61,22 +100,32 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
             name: "keychain.rootSecret.save.finish",
             metadata: AuthTraceMetadata.statusMetadata(
                 status,
-                extra: ["serviceKind": "protectedDataRootSecret", "policy": policy.rawValue]
+                extra: [
+                    "serviceKind": "protectedDataRootSecret",
+                    "policy": policy.rawValue,
+                    "envelopeVersion": String(ProtectedDataRootSecretEnvelope.currentFormatVersion)
+                ]
             )
         )
         try handleMutationStatus(status)
+        try formatFloorStore.writeMinimumEnvelopeVersion(
+            ProtectedDataRootSecretEnvelope.currentFormatVersion,
+            sharedRightIdentifier: identifier
+        )
     }
 
     func loadRootSecret(
         identifier: String,
-        authenticationContext: LAContext
-    ) throws -> Data {
+        authenticationContext: LAContext,
+        minimumEnvelopeVersion: Int?
+    ) throws -> ProtectedDataRootSecretLoadResult {
         traceStore?.record(
             category: .operation,
             name: "keychain.rootSecret.load.start",
             metadata: [
                 "serviceKind": "protectedDataRootSecret",
-                "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
+                "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false",
+                "registryMinimumEnvelopeVersion": minimumEnvelopeVersion.map(String.init) ?? "none"
             ]
         )
         var query = baseQuery(identifier: identifier)
@@ -100,10 +149,18 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
 
         switch status {
         case errSecSuccess:
-            guard let data = result as? Data else {
+            guard var payload = result as? Data else {
                 throw KeychainError.unhandledError(errSecInternalError)
             }
-            return data
+            defer {
+                payload.protectedDataZeroize()
+            }
+            return try openOrMigrateRootSecretPayload(
+                &payload,
+                identifier: identifier,
+                authenticationContext: authenticationContext,
+                minimumEnvelopeVersion: minimumEnvelopeVersion
+            )
         case errSecItemNotFound:
             throw KeychainError.itemNotFound
         case errSecUserCanceled:
@@ -185,12 +242,13 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
                 "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
             ]
         )
-        var originalSecret = try loadRootSecret(
+        var originalResult = try loadRootSecret(
             identifier: identifier,
-            authenticationContext: authenticationContext
+            authenticationContext: authenticationContext,
+            minimumEnvelopeVersion: nil
         )
         defer {
-            originalSecret.protectedDataZeroize()
+            originalResult.secretData.protectedDataZeroize()
         }
 
         var query = baseQuery(identifier: identifier)
@@ -213,15 +271,16 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         )
         try handleMutationStatus(status)
 
-        var verifiedSecret = try loadRootSecret(
+        var verifiedResult = try loadRootSecret(
             identifier: identifier,
-            authenticationContext: authenticationContext
+            authenticationContext: authenticationContext,
+            minimumEnvelopeVersion: nil
         )
         defer {
-            verifiedSecret.protectedDataZeroize()
+            verifiedResult.secretData.protectedDataZeroize()
         }
 
-        guard verifiedSecret == originalSecret else {
+        guard verifiedResult.secretData == originalResult.secretData else {
             traceStore?.record(
                 category: .operation,
                 name: "keychain.rootSecret.reprotect.finish",
@@ -258,6 +317,202 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         ]
     }
 
+    private func openOrMigrateRootSecretPayload(
+        _ payload: inout Data,
+        identifier: String,
+        authenticationContext: LAContext,
+        minimumEnvelopeVersion: Int?
+    ) throws -> ProtectedDataRootSecretLoadResult {
+        let keychainMinimumVersion = try formatFloorStore.readMinimumEnvelopeVersion(
+            sharedRightIdentifier: identifier
+        )
+        let effectiveMinimumVersion = max(minimumEnvelopeVersion ?? 0, keychainMinimumVersion ?? 0)
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.rootSecret.payload.start",
+            metadata: [
+                "registryMinimumEnvelopeVersion": minimumEnvelopeVersion.map(String.init) ?? "none",
+                "keychainMinimumEnvelopeVersion": keychainMinimumVersion.map(String.init) ?? "none",
+                "effectiveMinimumEnvelopeVersion": String(effectiveMinimumVersion)
+            ]
+        )
+
+        if payload.count == ProtectedDataRootSecretEnvelope.expectedRootSecretLength {
+            guard effectiveMinimumVersion < ProtectedDataRootSecretEnvelope.currentFormatVersion else {
+                traceStore?.record(
+                    category: .operation,
+                    name: "protectedData.rootSecret.payload.finish",
+                    metadata: ["result": "downgradeDetected", "storageFormat": "legacyV1Raw"]
+                )
+                throw ProtectedDataError.invalidEnvelope("Root-secret payload is legacy v1 after v2 format floor was established.")
+            }
+            return try migrateLegacyRawRootSecret(
+                &payload,
+                identifier: identifier,
+                authenticationContext: authenticationContext
+            )
+        }
+
+        do {
+            let envelope = try ProtectedDataRootSecretEnvelopeCodec.decode(
+                payload,
+                expectedSharedRightIdentifier: identifier
+            )
+            var rootSecret = try deviceBindingProvider.openRootSecret(
+                envelope: envelope,
+                expectedSharedRightIdentifier: identifier
+            )
+            do {
+                try formatFloorStore.writeMinimumEnvelopeVersion(
+                    ProtectedDataRootSecretEnvelope.currentFormatVersion,
+                    sharedRightIdentifier: identifier
+                )
+                try deleteLegacyCleanupMarkerIfPresent(authenticationContext: authenticationContext)
+            } catch {
+                rootSecret.protectedDataZeroize()
+                throw error
+            }
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.payload.finish",
+                metadata: ["result": "success", "storageFormat": "envelopeV2", "didMigrate": "false"]
+            )
+            return ProtectedDataRootSecretLoadResult(
+                secretData: rootSecret,
+                storageFormat: .envelopeV2,
+                didMigrate: false
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.payload.finish",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failed"])
+            )
+            throw error
+        }
+    }
+
+    private func migrateLegacyRawRootSecret(
+        _ legacySecret: inout Data,
+        identifier: String,
+        authenticationContext: LAContext
+    ) throws -> ProtectedDataRootSecretLoadResult {
+        defer {
+            legacySecret.protectedDataZeroize()
+        }
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.rootSecret.v2Migration.start",
+            metadata: ["storageFormat": "legacyV1Raw"]
+        )
+        do {
+            let envelope = try deviceBindingProvider.sealRootSecret(
+                legacySecret,
+                sharedRightIdentifier: identifier
+            )
+            let encodedEnvelope = try ProtectedDataRootSecretEnvelopeCodec.encode(envelope)
+            var updateQuery = baseQuery(identifier: identifier)
+            updateQuery[kSecUseAuthenticationContext as String] = authenticationContext
+            let updateStatus = SecItemUpdate(
+                updateQuery as CFDictionary,
+                [kSecValueData as String: encodedEnvelope] as CFDictionary
+            )
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.v2Migration.update",
+                metadata: AuthTraceMetadata.statusMetadata(updateStatus, extra: ["envelopeVersion": "2"])
+            )
+            try handleMutationStatus(updateStatus)
+
+            var verifiedPayload = try loadRootSecretPayload(
+                identifier: identifier,
+                authenticationContext: authenticationContext
+            )
+            defer {
+                verifiedPayload.protectedDataZeroize()
+            }
+            let verifiedEnvelope = try ProtectedDataRootSecretEnvelopeCodec.decode(
+                verifiedPayload,
+                expectedSharedRightIdentifier: identifier
+            )
+            var verifiedSecret = try deviceBindingProvider.openRootSecret(
+                envelope: verifiedEnvelope,
+                expectedSharedRightIdentifier: identifier
+            )
+            guard verifiedSecret == legacySecret else {
+                verifiedSecret.protectedDataZeroize()
+                throw ProtectedDataError.internalFailure(
+                    String(
+                        localized: "error.protectedData.rootSecretMigrationVerification",
+                        defaultValue: "The protected app data root secret could not be verified after migration."
+                    )
+                )
+            }
+            do {
+                try formatFloorStore.writeMinimumEnvelopeVersion(
+                    ProtectedDataRootSecretEnvelope.currentFormatVersion,
+                    sharedRightIdentifier: identifier
+                )
+                try deleteLegacyCleanupMarkerIfPresent(authenticationContext: authenticationContext)
+            } catch {
+                verifiedSecret.protectedDataZeroize()
+                throw error
+            }
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.v2Migration.finish",
+                metadata: ["result": "success", "envelopeVersion": "2"]
+            )
+            return ProtectedDataRootSecretLoadResult(
+                secretData: verifiedSecret,
+                storageFormat: .envelopeV2,
+                didMigrate: true
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.v2Migration.finish",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failed"])
+            )
+            throw error
+        }
+    }
+
+    private func loadRootSecretPayload(
+        identifier: String,
+        authenticationContext: LAContext
+    ) throws -> Data {
+        var query = baseQuery(identifier: identifier)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        query[kSecUseAuthenticationContext as String] = authenticationContext
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        try handleLoadStatus(status)
+        guard let data = result as? Data else {
+            throw KeychainError.unhandledError(errSecInternalError)
+        }
+        return data
+    }
+
+    private func handleLoadStatus(_ status: OSStatus) throws {
+        switch status {
+        case errSecSuccess:
+            return
+        case errSecItemNotFound:
+            throw KeychainError.itemNotFound
+        case errSecUserCanceled:
+            throw KeychainError.userCancelled
+        case errSecAuthFailed:
+            throw KeychainError.authenticationFailed
+        case errSecInteractionNotAllowed:
+            throw KeychainError.interactionNotAllowed
+        default:
+            throw KeychainError.unhandledError(status)
+        }
+    }
+
     private func handleMutationStatus(_ status: OSStatus) throws {
         switch status {
         case errSecSuccess:
@@ -275,6 +530,53 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         default:
             throw KeychainError.unhandledError(status)
         }
+    }
+
+    private func deleteLegacyCleanupMarkerIfPresent(authenticationContext: LAContext) throws {
+        traceStore?.record(
+            category: .operation,
+            name: "protectedData.rootSecret.legacyCleanup.delete.start"
+        )
+        do {
+            try supportKeychain.delete(
+                service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
+                account: account,
+                authenticationContext: authenticationContext
+            )
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.legacyCleanup.delete.finish",
+                metadata: ["result": "deleted"]
+            )
+        } catch where Self.isItemNotFound(error) {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.legacyCleanup.delete.finish",
+                metadata: ["result": "missing"]
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "protectedData.rootSecret.legacyCleanup.delete.finish",
+                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failed"])
+            )
+            throw error
+        }
+    }
+
+    private static func isItemNotFound(_ error: Error) -> Bool {
+        if let keychainError = error as? KeychainError {
+            return keychainError == .itemNotFound
+        }
+        if let mockKeychainError = error as? MockKeychainError {
+            switch mockKeychainError {
+            case .itemNotFound:
+                return true
+            case .duplicateItem, .saveFailed, .deleteFailed:
+                return false
+            }
+        }
+        return false
     }
 }
 

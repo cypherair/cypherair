@@ -35,6 +35,24 @@ final class LocalDataResetServiceTests: XCTestCase {
             account: KeychainConstants.defaultAccount,
             accessControl: nil
         )
+        try container.keychain.save(
+            Data([0x06]),
+            service: KeychainConstants.protectedDataDeviceBindingKeyService,
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        try container.keychain.save(
+            Data([0x07]),
+            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        try container.keychain.save(
+            Data([0x08]),
+            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
 
         try container.protectedDataStorageRoot.ensureRootDirectoryExists()
         let protectedMarker = container.protectedDataStorageRoot.rootURL
@@ -51,11 +69,23 @@ final class LocalDataResetServiceTests: XCTestCase {
 
         let summary = try await container.localDataResetService.resetAllLocalData()
 
-        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 3)
+        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 6)
         XCTAssertFalse(container.keychain.exists(service: metadataService, account: KeychainConstants.defaultAccount))
         XCTAssertFalse(container.keychain.exists(service: metadataService, account: KeychainConstants.metadataAccount))
         XCTAssertFalse(container.keychain.exists(
             service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            account: KeychainConstants.defaultAccount
+        ))
+        XCTAssertFalse(container.keychain.exists(
+            service: KeychainConstants.protectedDataDeviceBindingKeyService,
+            account: KeychainConstants.defaultAccount
+        ))
+        XCTAssertFalse(container.keychain.exists(
+            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
+            account: KeychainConstants.defaultAccount
+        ))
+        XCTAssertFalse(container.keychain.exists(
+            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
             account: KeychainConstants.defaultAccount
         ))
         XCTAssertFalse(FileManager.default.fileExists(atPath: container.protectedDataStorageRoot.rootURL.path))

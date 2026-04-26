@@ -98,6 +98,27 @@ final class LocalDataResetService {
             failureKey: "keychain.protectedDataRootSecret",
             failures: &failures
         )
+        deletedKeychainItemCount += deleteExactKeychainItem(
+            service: KeychainConstants.protectedDataDeviceBindingKeyService,
+            account: KeychainConstants.defaultAccount,
+            authenticationContext: authenticationContext,
+            failureKey: "keychain.protectedDataDeviceBindingKey",
+            failures: &failures
+        )
+        deletedKeychainItemCount += deleteExactKeychainItem(
+            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
+            account: KeychainConstants.defaultAccount,
+            authenticationContext: authenticationContext,
+            failureKey: "keychain.protectedDataRootSecretFormatFloor",
+            failures: &failures
+        )
+        deletedKeychainItemCount += deleteExactKeychainItem(
+            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
+            account: KeychainConstants.defaultAccount,
+            authenticationContext: authenticationContext,
+            failureKey: "keychain.protectedDataRootSecretLegacyCleanup",
+            failures: &failures
+        )
 
         do {
             try await legacyRightStoreClient?.removeRight(
@@ -297,6 +318,21 @@ final class LocalDataResetService {
         do {
             let hasProtectedArtifacts = try protectedDataStorageRoot.hasProtectedDataArtifacts()
             let rootExists = fileManager.fileExists(atPath: protectedDataStorageRoot.rootURL.path)
+            let hasDeviceBindingKey = keychain.exists(
+                service: KeychainConstants.protectedDataDeviceBindingKeyService,
+                account: KeychainConstants.defaultAccount,
+                authenticationContext: nil
+            )
+            let hasFormatFloor = keychain.exists(
+                service: KeychainConstants.protectedDataRootSecretFormatFloorService,
+                account: KeychainConstants.defaultAccount,
+                authenticationContext: nil
+            )
+            let hasLegacyCleanup = keychain.exists(
+                service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
+                account: KeychainConstants.defaultAccount,
+                authenticationContext: nil
+            )
             traceStore?.record(
                 category: .operation,
                 name: "localDataReset.validation.finish",
@@ -304,12 +340,24 @@ final class LocalDataResetService {
                     "result": hasProtectedArtifacts ? "artifactsRemaining" : "clean",
                     "protectedDataRootExists": rootExists ? "true" : "false",
                     "hasProtectedDataArtifacts": hasProtectedArtifacts ? "true" : "false",
+                    "hasDeviceBindingKey": hasDeviceBindingKey ? "true" : "false",
+                    "hasFormatFloor": hasFormatFloor ? "true" : "false",
+                    "hasLegacyCleanup": hasLegacyCleanup ? "true" : "false",
                     "keyCount": String(keyManagement.keys.count),
                     "contactCount": String(contactService.contacts.count)
                 ]
             )
             if hasProtectedArtifacts {
                 failures.append("protectedData.artifactsRemaining")
+            }
+            if hasDeviceBindingKey {
+                failures.append("keychain.protectedDataDeviceBindingKey.remaining")
+            }
+            if hasFormatFloor {
+                failures.append("keychain.protectedDataRootSecretFormatFloor.remaining")
+            }
+            if hasLegacyCleanup {
+                failures.append("keychain.protectedDataRootSecretLegacyCleanup.remaining")
             }
         } catch {
             traceStore?.record(

@@ -128,6 +128,9 @@ final class AppContainer: @unchecked Sendable {
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
+            recordRootSecretEnvelopeMinimumVersion: { version in
+                try await protectedDataRegistryStore.recordRootSecretEnvelopeMinimumVersion(version)
+            },
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
@@ -311,6 +314,9 @@ final class AppContainer: @unchecked Sendable {
             domainKeyManager: protectedDomainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
+            recordRootSecretEnvelopeMinimumVersion: { version in
+                try await protectedDataRegistryStore.recordRootSecretEnvelopeMinimumVersion(version)
+            },
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )

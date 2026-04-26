@@ -272,7 +272,7 @@ Protected app-data domains use a different primary model:
 
 This means the v1 app-data proposal still relies on Apple's system authorization boundary, but it uses the Keychain / `SecAccessControl` / `LAContext` path because that path has an explicit public API for reusing the same authenticated context across launch/resume authentication and the root-secret read.
 
-The planned v2 hardening keeps that same system authorization boundary and adds
+The v2 hardening keeps that same system authorization boundary and adds
 a Secure Enclave device-bound root-secret envelope below it:
 
 - the Keychain item still requires the app-session `LAContext`
@@ -281,9 +281,9 @@ a Secure Enclave device-bound root-secret envelope below it:
 - that SE key uses `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`
 - that SE key must not use `.userPresence`, `.biometryAny`, or `.devicePasscode`
 - SE failure after v2 migration is framework recovery/reset required, not a fallback to legacy raw-secret behavior
-- the target envelope format is a binary-plist `CAPDSEV2` payload with `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`
-- the target envelope stores P-256 SE and ephemeral public keys as X9.63 bytes, 32-byte HKDF salt, 12-byte AES-GCM nonce, 16-byte tag, and separate ciphertext
-- the target HKDF sharedInfo and AES-GCM AAD bind format version, algorithm ID, shared-right identifier, device-binding key identifier, SE public-key hash, public-key lengths, and root-secret length
+- the envelope format is a binary-plist `CAPDSEV2` payload with `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`
+- the envelope stores P-256 SE and ephemeral public keys as X9.63 bytes, 32-byte HKDF salt, 12-byte AES-GCM nonce, 16-byte tag, and separate ciphertext
+- HKDF sharedInfo and AES-GCM AAD bind format version, AAD version, algorithm ID, shared-right identifier, device-binding key identifier, SE public-key hash, ephemeral public-key hash, ephemeral public-key length, and root-secret length
 - the v2 design uses a software-ephemeral P-256 ECDH exchange with the persistent ProtectedData SE public key; it must not copy the private-key self-ECDH wrapping scheme
 - successful v2 verification must write registry state and a ThisDeviceOnly Keychain `format-floor` marker so later v1 raw payloads fail closed as downgrade/corruption
 
@@ -313,9 +313,9 @@ This policy is a normative requirement, not an implementation detail left for la
 
 Required rules:
 
-- app-data domains use one shared Keychain-protected root secret as the primary app-data authorization gate in v1
+- app-data domains use one shared Keychain-protected root secret as the primary app-data authorization gate
 - the root-secret Keychain item uses `SecAccessControl` with a dedicated app-session authentication policy
-- the planned v2 root-secret payload is a Secure Enclave device-bound envelope, but that SE key must not be a second user-authentication source
+- the v2 root-secret payload is a Secure Enclave device-bound envelope, but that SE key must not be a second user-authentication source
 - the dedicated policy is represented as `AppSessionAuthenticationPolicy`, separate from the private-key `AuthenticationMode`
 - app-session authentication produces an `LAContext` that may be handed directly to root-secret retrieval
 - root-secret retrieval uses `kSecUseAuthenticationContext`
@@ -369,7 +369,7 @@ The detailed registry manifest, invariants, transaction rules, and consistency m
 
 ### 5.5 AppSessionOrchestrator And ProtectedDataSessionCoordinator
 
-The target architecture uses two layers:
+The current architecture uses two layers:
 
 - `AppSessionOrchestrator`
 - `ProtectedDataSessionCoordinator`
@@ -658,11 +658,11 @@ The detailed manifest fields, invariants, transaction rules, consistency matrix,
 
 ### 6.5 Wrapped-DMK Persistence Model
 
-The v1 persistence model for each protected app-data domain is:
+The persistence model for each protected app-data domain is:
 
 - domain payload generations are stored as encrypted envelopes on disk
 - the DMK is not stored in plaintext on disk
-- one shared app-data root secret is persisted as a Keychain item protected by `SecAccessControl`; planned v2 stores it as an SE device-bound envelope inside that Keychain row
+- one shared app-data root secret is persisted as a Keychain item protected by `SecAccessControl`; v2 stores it as an SE device-bound envelope inside that Keychain row
 - each domain DMK is persisted only as a `WrappedDomainMasterKeyRecord`
 - there is no v1 model where each domain owns its own independent authorization resource
 - there is no v1 single global DMK for all app-data domains
