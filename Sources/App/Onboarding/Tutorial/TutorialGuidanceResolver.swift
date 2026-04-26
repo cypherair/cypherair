@@ -175,6 +175,25 @@ struct TutorialGuidanceResolver {
         }
     }
 
+    func modalGuidance(
+        session: TutorialSessionState,
+        navigation _: TutorialNavigationState,
+        sizeClass _: UserInterfaceSizeClass?,
+        selectedTab _: AppShellTab,
+        modal: TutorialModal
+    ) -> TutorialGuidancePayload? {
+        guard let module = modalModule(for: session) else { return nil }
+
+        return TutorialGuidancePayload(
+            module: module,
+            state: .inProgress,
+            title: module.title,
+            body: modalBody(for: modal),
+            realAppLocation: module.realAppLocation,
+            target: modalTarget(for: modal)
+        )
+    }
+
     private func payload(
         _ module: TutorialModuleID,
         body: String,
@@ -188,6 +207,35 @@ struct TutorialGuidanceResolver {
             realAppLocation: module.realAppLocation,
             target: target
         )
+    }
+
+    private func modalModule(for session: TutorialSessionState) -> TutorialModuleID? {
+        session.activeModule
+            ?? session.nextIncompleteModule
+            ?? (session.hasCompletedAllModules ? .enableHighSecurity : nil)
+    }
+
+    private func modalBody(for modal: TutorialModal) -> String {
+        switch modal {
+        case .importConfirmation:
+            String(localized: "guidedTutorial.contacts.form", defaultValue: "Confirm Bob's key details and add the contact.")
+        case .authModeConfirmation:
+            String(localized: "guidedTutorial.settings.auth", defaultValue: "Switch the authentication mode to High Security and confirm the warning.")
+        case .leaveConfirmation:
+            String(
+                localized: "guidedTutorial.leave.body",
+                defaultValue: "Leave the guided tutorial now? Your progress will stay available until this app run ends, but the tutorial will close."
+            )
+        }
+    }
+
+    private func modalTarget(for modal: TutorialModal) -> TutorialAnchorID? {
+        switch modal {
+        case .authModeConfirmation:
+            .settingsModeConfirmButton
+        case .importConfirmation, .leaveConfirmation:
+            nil
+        }
     }
 
     private func completionPayload(_ module: TutorialModuleID) -> TutorialGuidancePayload {

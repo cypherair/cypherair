@@ -642,6 +642,86 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNil(payload)
     }
 
+    func test_tutorialGuidanceResolver_importModal_returnsModalGuidance() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.markCompletedForTesting(.createDemoIdentity)
+        await store.openModule(.addDemoContact)
+        store.presentImportConfirmation(makeImportConfirmationRequest())
+        let modal = try XCTUnwrap(store.activeModal)
+
+        let payload = TutorialGuidanceResolver().modalGuidance(
+            session: store.session,
+            navigation: store.navigation,
+            sizeClass: .regular,
+            selectedTab: store.selectedTab,
+            modal: modal
+        )
+
+        XCTAssertEqual(payload?.module, .addDemoContact)
+        XCTAssertEqual(payload?.title, TutorialModuleID.addDemoContact.title)
+        XCTAssertEqual(
+            payload?.body,
+            String(localized: "guidedTutorial.contacts.form", defaultValue: "Confirm Bob's key details and add the contact.")
+        )
+        XCTAssertNil(payload?.target)
+    }
+
+    func test_tutorialGuidanceResolver_authModal_returnsModalGuidanceWithConfirmTarget() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        for module in TutorialModuleID.allCases where module.rawValue < TutorialModuleID.enableHighSecurity.rawValue {
+            store.markCompletedForTesting(module)
+        }
+        await store.openModule(.enableHighSecurity)
+        store.presentAuthModeConfirmation(
+            SettingsAuthModeRequestBuilder.makeLaunchPreviewRequest()
+        )
+        let modal = try XCTUnwrap(store.activeModal)
+
+        let payload = TutorialGuidanceResolver().modalGuidance(
+            session: store.session,
+            navigation: store.navigation,
+            sizeClass: .regular,
+            selectedTab: store.selectedTab,
+            modal: modal
+        )
+
+        XCTAssertEqual(payload?.module, .enableHighSecurity)
+        XCTAssertEqual(payload?.title, TutorialModuleID.enableHighSecurity.title)
+        XCTAssertEqual(
+            payload?.body,
+            String(localized: "guidedTutorial.settings.auth", defaultValue: "Switch the authentication mode to High Security and confirm the warning.")
+        )
+        XCTAssertEqual(payload?.target, .settingsModeConfirmButton)
+    }
+
+    func test_tutorialGuidanceResolver_leaveModal_returnsModalGuidance() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.presentLeaveConfirmation(onLeave: { })
+        let modal = try XCTUnwrap(store.activeModal)
+
+        let payload = TutorialGuidanceResolver().modalGuidance(
+            session: store.session,
+            navigation: store.navigation,
+            sizeClass: .compact,
+            selectedTab: store.selectedTab,
+            modal: modal
+        )
+
+        XCTAssertEqual(payload?.module, .createDemoIdentity)
+        XCTAssertEqual(payload?.title, TutorialModuleID.createDemoIdentity.title)
+        XCTAssertEqual(
+            payload?.body,
+            String(
+                localized: "guidedTutorial.leave.body",
+                defaultValue: "Leave the guided tutorial now? Your progress will stay available until this app run ends, but the tutorial will close."
+            )
+        )
+        XCTAssertNil(payload?.target)
+    }
+
     func test_toolViews_removeModeAllowlistAndAppearResetPatterns() throws {
         let files = [
             "Sources/App/Encrypt/EncryptView.swift",
@@ -895,6 +975,29 @@ final class TutorialSessionStoreTests: XCTestCase {
         await store.openModule(.sandbox)
         store.confirmSandboxAcknowledgement()
         await Task.yield()
+    }
+
+    private func makeImportConfirmationRequest() -> ImportConfirmationRequest {
+        ImportConfirmationRequest(
+            keyData: Data("demo-key".utf8),
+            keyInfo: KeyInfo(
+                fingerprint: String(repeating: "a", count: 40),
+                keyVersion: 4,
+                userId: "Bob Demo <bob@example.invalid>",
+                hasEncryptionSubkey: true,
+                isRevoked: false,
+                isExpired: false,
+                profile: .universal,
+                primaryAlgo: "Ed25519",
+                subkeyAlgo: "X25519",
+                expiryTimestamp: nil
+            ),
+            profile: .universal,
+            allowsUnverifiedImport: true,
+            onImportVerified: {},
+            onImportUnverified: {},
+            onCancel: {}
+        )
     }
 
     private func loadRepositoryAuditSource(_ relativePath: String) throws -> String {

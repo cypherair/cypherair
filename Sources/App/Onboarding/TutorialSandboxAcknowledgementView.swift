@@ -76,6 +76,7 @@ struct TutorialSandboxAcknowledgementView: View {
                     Button(String(localized: "guidedTutorial.returnToOverview", defaultValue: "Return to Tutorial Overview")) {
                         tutorialStore.returnToOverview()
                     }
+                    .accessibilityIdentifier(TutorialAutomationContract.returnToOverviewIdentifier)
                 }
             }
             .screenReady(TutorialAutomationContract.sandboxAcknowledgementReadyMarker)

@@ -70,6 +70,7 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
             }
             .buttonStyle(.bordered)
             .tint(.orange)
+            .accessibilityIdentifier(TutorialAutomationContract.returnToOverviewIdentifier)
 
             Spacer()
         }
@@ -102,17 +103,20 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
                     tutorialStore.handlePrimaryCompletionPromptAction()
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier(TutorialAutomationContract.completionPromptPrimaryIdentifier)
 
                 Button(String(localized: "guidedTutorial.keepExploring", defaultValue: "Keep Exploring")) {
                     tutorialStore.dismissCompletionPrompt()
                 }
                 .buttonStyle(.bordered)
+                .accessibilityIdentifier(TutorialAutomationContract.completionPromptKeepExploringIdentifier)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .tutorialBannerChrome()
+        .accessibilityIdentifier(TutorialAutomationContract.completionPromptIdentifier)
     }
 
     private func regularCompletionPrompt(for module: TutorialModuleID) -> some View {
@@ -129,16 +133,19 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
                     tutorialStore.handlePrimaryCompletionPromptAction()
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier(TutorialAutomationContract.completionPromptPrimaryIdentifier)
 
                 Button(String(localized: "guidedTutorial.keepExploring", defaultValue: "Keep Exploring")) {
                     tutorialStore.dismissCompletionPrompt()
                 }
                 .buttonStyle(.bordered)
+                .accessibilityIdentifier(TutorialAutomationContract.completionPromptKeepExploringIdentifier)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .tutorialCardChrome(.overlay)
+        .accessibilityIdentifier(TutorialAutomationContract.completionPromptIdentifier)
     }
 
     private func primaryPromptButtonTitle(for module: TutorialModuleID) -> String {

@@ -78,6 +78,7 @@ struct TutorialShellTabsView: View {
                         tutorialStore.setInspectorPresented(true)
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityIdentifier(TutorialAutomationContract.showGuidanceIdentifier)
                     .padding(16)
                 }
             }
@@ -174,6 +175,7 @@ struct TutorialShellTabsView: View {
             }
             .buttonStyle(.bordered)
             .tint(.orange)
+            .accessibilityIdentifier(TutorialAutomationContract.returnToOverviewIdentifier)
 
             Spacer(minLength: 0)
         }

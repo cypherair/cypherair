@@ -4,6 +4,7 @@ struct TutorialView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(AppConfiguration.self) private var config
     @Environment(TutorialSessionStore.self) private var tutorialStore
 
@@ -41,6 +42,12 @@ struct TutorialView: View {
                 tutorialStore.configurePersistence(appConfiguration: config)
                 tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
                 #if DEBUG
+                if tutorialStore.prepareUITestCompletionSurfaceIfRequested() {
+                    return
+                }
+                if await tutorialStore.prepareUITestAuthModeConfirmationIfRequested() {
+                    return
+                }
                 if await tutorialStore.prepareUITestContactDetailSurfaceIfRequested() {
                     return
                 }
@@ -81,7 +88,20 @@ struct TutorialView: View {
                     Button(String(localized: "common.close", defaultValue: "Close")) {
                         closeTutorial()
                     }
+                    .accessibilityIdentifier(TutorialAutomationContract.closeIdentifier)
                 }
+                #if os(macOS)
+                ToolbarItem(placement: .confirmationAction) {
+                    if let primaryActionTitle {
+                        Button(primaryActionTitle) {
+                            Task {
+                                await handlePrimaryHeroAction()
+                            }
+                        }
+                        .accessibilityIdentifier(TutorialAutomationContract.primaryToolbarActionIdentifier)
+                    }
+                }
+                #endif
             }
             .screenReady(TutorialAutomationContract.hubReadyMarker)
         }
@@ -122,7 +142,7 @@ struct TutorialView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("tutorial.primaryAction")
+                    .accessibilityIdentifier(TutorialAutomationContract.primaryActionIdentifier)
                 }
 
                 if tutorialStore.session.hasStartedSession {
@@ -130,6 +150,7 @@ struct TutorialView: View {
                         tutorialStore.resetTutorial()
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityIdentifier(TutorialAutomationContract.resetIdentifier)
                 }
             }
         }
@@ -223,6 +244,7 @@ struct TutorialView: View {
                             finishTutorial()
                         }
                         .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier(TutorialAutomationContract.finishIdentifier)
                     }
                     .padding(20)
                     .tutorialCardChrome(.hero)
@@ -254,7 +276,16 @@ struct TutorialView: View {
                     Button(String(localized: "common.close", defaultValue: "Close")) {
                         closeTutorial()
                     }
+                    .accessibilityIdentifier(TutorialAutomationContract.closeIdentifier)
                 }
+                #if os(macOS)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(completionPrimaryActionTitle) {
+                        finishTutorial()
+                    }
+                    .accessibilityIdentifier(TutorialAutomationContract.finishToolbarIdentifier)
+                }
+                #endif
             }
             .screenReady(TutorialAutomationContract.completionReadyMarker)
         }
@@ -349,28 +380,32 @@ struct TutorialView: View {
     private func modalView(for modal: TutorialModal) -> some View {
         switch modal {
         case .importConfirmation(let request):
-            ImportConfirmView(
-                keyInfo: request.keyInfo,
-                detectedProfile: request.profile,
-                onImportVerified: {
-                    let action = request.onImportVerified
-                    tutorialStore.dismissModal()
-                    action()
-                },
-                onImportUnverified: request.allowsUnverifiedImport ? {
-                    let action = request.onImportUnverified
-                    tutorialStore.dismissModal()
-                    action()
-                } : nil,
-                onCancel: {
-                    let action = request.onCancel
-                    tutorialStore.dismissModal()
-                    action()
-                }
-            )
+            TutorialModalGuidanceHost(guidance: modalGuidance(for: modal)) {
+                ImportConfirmView(
+                    keyInfo: request.keyInfo,
+                    detectedProfile: request.profile,
+                    onImportVerified: {
+                        let action = request.onImportVerified
+                        tutorialStore.dismissModal()
+                        action()
+                    },
+                    onImportUnverified: request.allowsUnverifiedImport ? {
+                        let action = request.onImportUnverified
+                        tutorialStore.dismissModal()
+                        action()
+                    } : nil,
+                    onCancel: {
+                        let action = request.onCancel
+                        tutorialStore.dismissModal()
+                        action()
+                    }
+                )
+            }
         case .authModeConfirmation(let request):
-            NavigationStack {
-                TutorialAuthModeConfirmationView(request: request)
+            TutorialModalGuidanceHost(guidance: modalGuidance(for: modal)) {
+                NavigationStack {
+                    TutorialAuthModeConfirmationView(request: request)
+                }
             }
             #if os(macOS)
             .frame(minWidth: 500, idealWidth: 540, minHeight: 360, idealHeight: 420)
@@ -379,8 +414,10 @@ struct TutorialView: View {
             .presentationDetents([.medium, .large])
             #endif
         case .leaveConfirmation(let request):
-            NavigationStack {
-                TutorialLeaveConfirmationView(request: request)
+            TutorialModalGuidanceHost(guidance: modalGuidance(for: modal)) {
+                NavigationStack {
+                    TutorialLeaveConfirmationView(request: request)
+                }
             }
             #if os(macOS)
             .frame(minWidth: 480, idealWidth: 520, minHeight: 260, idealHeight: 320)
@@ -389,5 +426,63 @@ struct TutorialView: View {
             .presentationDetents([.medium])
             #endif
         }
+    }
+
+    private func modalGuidance(for modal: TutorialModal) -> TutorialGuidancePayload? {
+        TutorialGuidanceResolver().modalGuidance(
+            session: tutorialStore.session,
+            navigation: tutorialStore.navigation,
+            sizeClass: sizeClass,
+            selectedTab: tutorialStore.selectedTab,
+            modal: modal
+        )
+    }
+}
+
+private struct TutorialModalGuidanceHost<Content: View>: View {
+    let guidance: TutorialGuidancePayload?
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let guidance {
+                    TutorialModalGuidanceView(guidance: guidance)
+                }
+            }
+    }
+}
+
+private struct TutorialModalGuidanceView: View {
+    let guidance: TutorialGuidancePayload
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(
+                String(localized: "guidedTutorial.sandbox.badge", defaultValue: "Tutorial Sandbox"),
+                systemImage: "testtube.2"
+            )
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.orange)
+
+            Text(guidance.title)
+                .font(.headline)
+
+            if let location = guidance.realAppLocation {
+                Text(location)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(guidance.body)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.bar)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(TutorialAutomationContract.modalGuidanceIdentifier)
     }
 }

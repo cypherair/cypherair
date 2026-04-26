@@ -12,6 +12,10 @@ final class TutorialSessionStore {
     private(set) var navigation = TutorialNavigationState()
     private(set) var errorMessage: String?
     private(set) var isTutorialPresentationActive = false
+    #if DEBUG
+    private var didPrepareUITestCompletionSurface = false
+    private var didPrepareUITestAuthModeConfirmation = false
+    #endif
 
     var selectedTab: AppShellTab { navigation.selectedTab }
     var routePath: [AppRoute] { navigation.path(for: navigation.selectedTab) }
@@ -389,6 +393,51 @@ final class TutorialSessionStore {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    func prepareUITestCompletionSurfaceIfRequested(
+        processInfo: ProcessInfo = .processInfo
+    ) -> Bool {
+        guard processInfo.environment["UITEST_TUTORIAL_COMPLETION"] == "1",
+              !didPrepareUITestCompletionSurface else {
+            return false
+        }
+
+        didPrepareUITestCompletionSurface = true
+        ensureSession()
+        for module in TutorialModuleID.allCases {
+            markCompletedForTesting(module)
+        }
+        session.pendingCompletionPromptModule = nil
+        showCompletionView()
+        return true
+    }
+
+    func prepareUITestAuthModeConfirmationIfRequested(
+        processInfo: ProcessInfo = .processInfo
+    ) async -> Bool {
+        guard processInfo.environment["UITEST_TUTORIAL_AUTHMODE_CONFIRMATION"] == "1",
+              !didPrepareUITestAuthModeConfirmation else {
+            return false
+        }
+
+        didPrepareUITestAuthModeConfirmation = true
+        ensureSession()
+        for module in TutorialModuleID.allCases where module.rawValue < TutorialModuleID.enableHighSecurity.rawValue {
+            markCompletedForTesting(module)
+        }
+        await openModule(.enableHighSecurity)
+        presentAuthModeConfirmation(
+            SettingsAuthModeRequestBuilder.makeRequest(
+                for: .highSecurity,
+                hasBackup: false,
+                onConfirm: { [weak self] in
+                    self?.noteHighSecurityEnabled(.highSecurity)
+                },
+                onCancel: {}
+            )
+        )
+        return true
     }
     #endif
 

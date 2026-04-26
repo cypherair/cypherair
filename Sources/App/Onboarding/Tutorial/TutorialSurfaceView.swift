@@ -66,6 +66,7 @@ struct TutorialInlineHeaderView: View {
         }
         .buttonStyle(.bordered)
         .tint(.orange)
+        .accessibilityIdentifier(TutorialAutomationContract.returnToOverviewIdentifier)
         .accessibilityHint(
             String(localized: "guidedTutorial.returnToOverview.hint", defaultValue: "Return to the guided tutorial overview.")
         )
