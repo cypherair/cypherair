@@ -48,13 +48,6 @@ final class AppConfiguration {
         }
     }
 
-    /// Whether to require device authentication on cold launch (default true).
-    var requireAuthOnLaunch: Bool {
-        didSet {
-            defaults.set(requireAuthOnLaunch, forKey: Self.requireAuthOnLaunchKey)
-        }
-    }
-
     /// Whether the user has completed onboarding.
     var hasCompletedOnboarding: Bool {
         didSet {
@@ -92,7 +85,7 @@ final class AppConfiguration {
     static let encryptToSelfKey = "com.cypherair.preference.encryptToSelf"
     static let clipboardNoticeLegacyKey = "com.cypherair.preference.clipboardNotice"
     static let appSessionAuthenticationPolicyKey = "com.cypherair.preference.appSessionAuthenticationPolicy"
-    private static let requireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
+    private static let legacyRequireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
     private static let onboardingCompleteKey = "com.cypherair.preference.onboardingComplete"
     private static let guidedTutorialCompletedVersionKey = "com.cypherair.preference.guidedTutorialCompletedVersion"
     private static let colorThemeKey = "com.cypherair.preference.colorTheme"
@@ -120,13 +113,6 @@ final class AppConfiguration {
             self.encryptToSelf = defaults.bool(forKey: Self.encryptToSelfKey)
         } else {
             self.encryptToSelf = true
-        }
-
-        // Require auth on launch (default true)
-        if defaults.object(forKey: Self.requireAuthOnLaunchKey) != nil {
-            self.requireAuthOnLaunch = defaults.bool(forKey: Self.requireAuthOnLaunchKey)
-        } else {
-            self.requireAuthOnLaunch = true
         }
 
         // Onboarding
@@ -186,7 +172,6 @@ final class AppConfiguration {
         appSessionAuthenticationPolicy = .userPresence
         gracePeriod = AuthPreferences.defaultGracePeriod
         encryptToSelf = true
-        requireAuthOnLaunch = true
         hasCompletedOnboarding = false
         guidedTutorialCompletedVersion = 0
         colorTheme = .systemDefault
@@ -211,7 +196,7 @@ final class AppConfiguration {
             encryptToSelfKey,
             clipboardNoticeLegacyKey,
             appSessionAuthenticationPolicyKey,
-            requireAuthOnLaunchKey,
+            legacyRequireAuthOnLaunchKey,
             onboardingCompleteKey,
             guidedTutorialCompletedVersionKey,
             colorThemeKey,

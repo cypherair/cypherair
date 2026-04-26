@@ -540,7 +540,6 @@ final class CommonHelpersTests: XCTestCase {
             },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { config.gracePeriod },
-            requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthentication: { reason in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,

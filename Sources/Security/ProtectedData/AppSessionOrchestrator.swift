@@ -7,7 +7,6 @@ final class AppSessionOrchestrator {
     private let currentRegistryProvider: () throws -> ProtectedDataRegistry
     private let shouldBypassPrivacyAuthentication: () -> Bool
     private let gracePeriodProvider: () -> Int
-    private let requireAuthOnLaunchProvider: () -> Bool
     private let evaluateAppAuthentication: (String, String) async throws -> AppSessionAuthenticationResult
     private let postAuthenticationHandler: (LAContext?, String) async -> Void
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
@@ -26,7 +25,6 @@ final class AppSessionOrchestrator {
         currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry,
         shouldBypassPrivacyAuthentication: @escaping () -> Bool = { false },
         gracePeriodProvider: @escaping () -> Int,
-        requireAuthOnLaunchProvider: @escaping () -> Bool,
         evaluateAppAuthentication: @escaping (String) async throws -> AppSessionAuthenticationResult,
         postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
@@ -37,7 +35,6 @@ final class AppSessionOrchestrator {
             currentRegistryProvider: currentRegistryProvider,
             shouldBypassPrivacyAuthentication: shouldBypassPrivacyAuthentication,
             gracePeriodProvider: gracePeriodProvider,
-            requireAuthOnLaunchProvider: requireAuthOnLaunchProvider,
             evaluateAppAuthenticationWithSource: { reason, _ in
                 try await evaluateAppAuthentication(reason)
             },
@@ -52,7 +49,6 @@ final class AppSessionOrchestrator {
         currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry,
         shouldBypassPrivacyAuthentication: @escaping () -> Bool = { false },
         gracePeriodProvider: @escaping () -> Int,
-        requireAuthOnLaunchProvider: @escaping () -> Bool,
         evaluateAppAuthenticationWithSource: @escaping (String, String) async throws -> AppSessionAuthenticationResult,
         postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
@@ -62,7 +58,6 @@ final class AppSessionOrchestrator {
         self.currentRegistryProvider = currentRegistryProvider
         self.shouldBypassPrivacyAuthentication = shouldBypassPrivacyAuthentication
         self.gracePeriodProvider = gracePeriodProvider
-        self.requireAuthOnLaunchProvider = requireAuthOnLaunchProvider
         self.evaluateAppAuthentication = evaluateAppAuthenticationWithSource
         self.postAuthenticationHandler = postAuthenticationHandler
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
@@ -152,15 +147,6 @@ final class AppSessionOrchestrator {
                 category: .session,
                 name: "session.handleInitialAppearance.exit",
                 metadata: ["reason": "bypass", "source": source]
-            )
-            return false
-        }
-
-        guard requireAuthOnLaunchProvider() else {
-            traceStore?.record(
-                category: .session,
-                name: "session.handleInitialAppearance.exit",
-                metadata: ["reason": "launchAuthDisabled", "source": source]
             )
             return false
         }

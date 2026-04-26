@@ -472,6 +472,16 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(reloaded.appSessionAuthenticationPolicy, .biometricsOnly)
     }
 
+    func test_appConfiguration_resetRemovesLegacyRequireAuthOnLaunchKey() {
+        let defaults = makeIsolatedDefaults()
+        defaults.set(false, forKey: "com.cypherair.preference.requireAuthOnLaunch")
+        let config = AppConfiguration(defaults: defaults)
+
+        config.resetToFirstRunDefaults()
+
+        XCTAssertNil(defaults.object(forKey: "com.cypherair.preference.requireAuthOnLaunch"))
+    }
+
     func test_appConfiguration_guidedTutorial_defaultsToNeverCompleted() {
         let defaults = makeIsolatedDefaults()
         let config = AppConfiguration(defaults: defaults)

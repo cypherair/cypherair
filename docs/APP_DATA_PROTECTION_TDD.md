@@ -437,9 +437,13 @@ The following settings are bootstrap-critical in v1 because current startup or p
 
 - `authMode`
 - `gracePeriod`
-- `requireAuthOnLaunch`
 - `hasCompletedOnboarding`
 - `colorTheme`
+
+`requireAuthOnLaunch` is a retired legacy preference key. Production launch
+authentication is always required; test and diagnostic bypasses must use
+non-persistent launch configuration, and Reset/cleanup must delete the legacy
+UserDefaults key if present.
 
 Rules:
 

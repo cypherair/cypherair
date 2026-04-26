@@ -8,7 +8,7 @@ struct LoadWarningPresentationState: Equatable {
     let isAuthenticating: Bool
     let isPrivacyScreenBlurred: Bool
     let hasAuthenticatedSession: Bool
-    let requiresAuthOnLaunch: Bool
+    let allowsPreAuthenticationPresentation: Bool
 }
 
 enum LoadWarningPresentationGate {
@@ -18,7 +18,7 @@ enum LoadWarningPresentationGate {
               !state.isPrivacyScreenBlurred else {
             return false
         }
-        return state.hasAuthenticatedSession || !state.requiresAuthOnLaunch
+        return state.hasAuthenticatedSession || state.allowsPreAuthenticationPresentation
     }
 }
 
@@ -65,7 +65,6 @@ struct CypherAirApp: App {
             )
         }
         if launchConfiguration.isUITestMode && !launchConfiguration.requiresManualAuthentication {
-            container.config.requireAuthOnLaunch = false
             container.appSessionOrchestrator.recordAuthentication()
         }
         if launchConfiguration.shouldSkipOnboarding {
@@ -589,7 +588,8 @@ struct CypherAirApp: App {
             isAuthenticating: container.appSessionOrchestrator.isAuthenticating,
             isPrivacyScreenBlurred: container.appSessionOrchestrator.isPrivacyScreenBlurred,
             hasAuthenticatedSession: container.appSessionOrchestrator.lastAuthenticationDate != nil,
-            requiresAuthOnLaunch: container.config.requireAuthOnLaunch
+            allowsPreAuthenticationPresentation: launchConfiguration.isUITestMode
+                && !launchConfiguration.requiresManualAuthentication
         )
     }
 
@@ -606,7 +606,7 @@ struct CypherAirApp: App {
                     "isAuthenticating": presentationState.isAuthenticating ? "true" : "false",
                     "privacyBlurred": presentationState.isPrivacyScreenBlurred ? "true" : "false",
                     "hasAuthenticatedSession": presentationState.hasAuthenticatedSession ? "true" : "false",
-                    "requiresAuthOnLaunch": presentationState.requiresAuthOnLaunch ? "true" : "false"
+                    "allowsPreAuthenticationPresentation": presentationState.allowsPreAuthenticationPresentation ? "true" : "false"
                 ]
             )
             return

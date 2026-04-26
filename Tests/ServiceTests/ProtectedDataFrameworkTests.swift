@@ -541,7 +541,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { config.gracePeriod },
-            requireAuthOnLaunchProvider: { config.requireAuthOnLaunch },
             evaluateAppAuthentication: { reason in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
@@ -643,6 +642,94 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(protectedDataSessionCoordinator.frameworkState, AppProtectedDataFrameworkState.sessionLocked)
     }
 
+    func test_handleInitialAppearance_nonBypassAlwaysAuthenticates() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataInitialAppearance")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.initial-appearance",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let relockParticipant = MockProtectedDataRelockParticipant()
+        coordinator.registerRelockParticipant(relockParticipant)
+        let didEvaluateAuthentication = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 180 },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return .authenticated(context: nil)
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        let attemptedAuthentication = await orchestrator.handleInitialAppearance(
+            localizedReason: "Initial appearance should authenticate"
+        )
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
+
+        XCTAssertTrue(attemptedAuthentication)
+        XCTAssertTrue(didEvaluate)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 1)
+        XCTAssertEqual(relockParticipant.relockCallCount, 1)
+        XCTAssertNotNil(orchestrator.lastAuthenticationDate)
+        XCTAssertFalse(orchestrator.authFailed)
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    func test_handleInitialAppearance_uiTestBypassSkipsAuthentication() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataInitialAppearanceBypass")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.initial-appearance-bypass",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let didEvaluateAuthentication = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { true },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return .authenticated(context: nil)
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        let attemptedAuthentication = await orchestrator.handleInitialAppearance(
+            localizedReason: "UI test bypass should skip authentication"
+        )
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
+
+        XCTAssertFalse(attemptedAuthentication)
+        XCTAssertFalse(didEvaluate)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 0)
+        XCTAssertNil(orchestrator.lastAuthenticationDate)
+        XCTAssertFalse(orchestrator.authFailed)
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
     func test_handleResume_externalAuthenticationPromptInProgress_skipsRelockAndAuthentication() async throws {
         let storageRoot = AppProtectedDataStorageRoot(
             baseDirectory: makeTemporaryDirectory("ProtectedDataResumeSuppression")
@@ -667,7 +754,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 0 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in
                 await didEvaluateAuthentication.setTrue()
                 return .authenticated(context: nil)
@@ -710,7 +796,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
@@ -748,7 +833,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 0 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in
                 await didEvaluateAuthentication.setTrue()
                 return .authenticated(context: nil)
@@ -815,7 +899,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
@@ -851,7 +934,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 0 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in .authenticated(context: handoffContext) },
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
@@ -896,7 +978,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 0 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in
                 await didEvaluateAuthentication.setTrue()
                 return .authenticated(context: nil)
@@ -936,7 +1017,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             currentRegistryProvider: { throw ProtectedDataError.invalidRegistry("Should not be called") },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
@@ -966,7 +1046,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             currentRegistryProvider: { throw ProtectedDataError.invalidRegistry("Should not be called") },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
@@ -1000,7 +1079,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             currentRegistryProvider: { throw ProtectedDataError.invalidRegistry("Should not be called") },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
@@ -1053,7 +1131,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             currentRegistryProvider: { registry },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
@@ -1097,7 +1174,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             currentRegistryProvider: { registry },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
@@ -1146,7 +1222,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             currentRegistryProvider: { registry },
             shouldBypassPrivacyAuthentication: { false },
             gracePeriodProvider: { 180 },
-            requireAuthOnLaunchProvider: { true },
             evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
