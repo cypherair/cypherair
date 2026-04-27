@@ -40,7 +40,7 @@ Follow the [Swift API Design Guidelines](https://www.swift.org/documentation/api
 
 ### State Management
 
-Use the Xcode 26 / Swift 6.2 state management model:
+Use the Xcode 26.4.1 / Apple Swift 6.3.1 state management model:
 
 | Old Pattern | New Pattern | Usage |
 |------------|------------|-------|
@@ -103,7 +103,7 @@ CypherAir targets iOS 26.4+, iPadOS 26.4+, macOS 26.4+, and visionOS 26.4+. Full
 
 ## 3. Concurrency
 
-Swift 6.2 defaults to main-actor isolation for new Xcode 26 projects (SE-0466).
+Apple Swift 6.3.1 defaults to main-actor isolation for new Xcode 26 projects (SE-0466). The project build setting `SWIFT_VERSION = 6.0` selects the Swift 6 language mode and is not the compiler release number.
 
 - `@MainActor` is implicit for views and view models. Do not annotate explicitly unless needed for clarity.
 - Use `@concurrent` to opt into the cooperative thread pool for CPU-intensive work (Argon2id key import/export, file encryption progress).
@@ -119,9 +119,9 @@ func encryptFile(data: Data, recipients: [PublicKey]) async throws -> Data {
 }
 ```
 
-### UniFFI Generated Code and Swift 6.2 Concurrency
+### UniFFI Generated Code and Swift 6.3.1 Concurrency
 
-UniFFI-generated Swift bindings may not fully conform to Swift 6.2's strict concurrency model. If the generated `pgp_mobile.swift` file produces `Sendable` or actor-isolation warnings:
+UniFFI-generated Swift bindings may not fully conform to Swift 6.3.1's strict concurrency model. If the generated `pgp_mobile.swift` file produces `Sendable` or actor-isolation warnings:
 
 1. Add `@preconcurrency import PgpMobile` at call sites that import the generated module.
 2. If warnings persist, set `SWIFT_STRICT_CONCURRENCY = targeted` (not `complete`) for the generated bindings file only via per-file build settings, or wrap the generated types in `@unchecked Sendable` conformances in an extension file (not in the generated file itself — it will be overwritten on regeneration).

@@ -2,15 +2,156 @@ from __future__ import annotations
 
 import json
 import os
+import plistlib
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-from support import REPO_ROOT
+from support import REPO_ROOT, load_script_module
 
 
 class XcodeBuildPhaseScriptTests(unittest.TestCase):
+    def test_settings_bundle_phase_generates_acknowledgements_from_manifest(self) -> None:
+        module = load_script_module("sync_settings_bundle", "scripts/sync_settings_bundle.py")
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_root = Path(temp_dir_name)
+            srcroot = temp_root / "repo"
+            settings_src = srcroot / "Settings.bundle"
+            notices_dir = srcroot / "Sources/Resources/OpenSourceNotices"
+            target_build_dir = temp_root / "build"
+            resources_dir = "CypherAir.app/Contents/Resources"
+            settings_dst = target_build_dir / resources_dir / "Settings.bundle"
+
+            (settings_src / "en.lproj").mkdir(parents=True)
+            (settings_src / "zh-Hans.lproj").mkdir(parents=True)
+            notices_dir.mkdir(parents=True)
+            (srcroot / "scripts").mkdir(parents=True)
+            (srcroot / "scripts/sync_settings_bundle.py").symlink_to(
+                REPO_ROOT / "scripts/sync_settings_bundle.py"
+            )
+
+            with (settings_src / "Root.plist").open("wb") as file:
+                plistlib.dump(
+                    {
+                        "StringsTable": "Root",
+                        "PreferenceSpecifiers": [
+                            {"Type": "PSGroupSpecifier", "Title": "About CypherAir"},
+                            {
+                                "Type": "PSTitleValueSpecifier",
+                                "Title": "Version",
+                                "Key": "cypherair.settings.version",
+                                "DefaultValue": "Unspecified",
+                            },
+                        ],
+                    },
+                    file,
+                )
+            for locale in ("en.lproj", "zh-Hans.lproj"):
+                (settings_src / locale / "Root.strings").write_text('"Version" = "Version";\n', encoding="utf-8")
+                (settings_src / locale / "Acknowledgements.strings").write_text(
+                    '"Open Source" = "Open Source";\n',
+                    encoding="utf-8",
+                )
+
+            (notices_dir / "open_source_notices.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "id": "cypherair",
+                            "displayName": "CypherAir",
+                            "version": "Unspecified",
+                            "licenseName": "GPL-3.0-or-later OR MPL-2.0",
+                            "kind": "app",
+                            "isDirectDependency": False,
+                        },
+                        {
+                            "id": "sequoia-openpgp@2.2.0",
+                            "displayName": "sequoia-openpgp",
+                            "version": "2.2.0",
+                            "licenseName": "LGPL-2.0-or-later",
+                            "kind": "thirdParty",
+                            "isDirectDependency": True,
+                        },
+                        {
+                            "id": "openssl@0.10.77",
+                            "displayName": "openssl",
+                            "version": "0.10.77",
+                            "licenseName": "Apache-2.0",
+                            "kind": "thirdParty",
+                            "isDirectDependency": True,
+                        },
+                        {
+                            "id": "openssl-src@300.6.0+3.6.2",
+                            "displayName": "openssl-src",
+                            "version": "300.6.0+3.6.2",
+                            "licenseName": "MIT/Apache-2.0",
+                            "kind": "thirdParty",
+                            "isDirectDependency": False,
+                        },
+                        {
+                            "id": "uniffi@0.31.1",
+                            "displayName": "uniffi",
+                            "version": "0.31.1",
+                            "licenseName": "MPL-2.0",
+                            "kind": "thirdParty",
+                            "isDirectDependency": True,
+                        },
+                        {
+                            "id": "transitive-only@1.0.0",
+                            "displayName": "transitive-only",
+                            "version": "1.0.0",
+                            "licenseName": "MIT",
+                            "kind": "thirdParty",
+                            "isDirectDependency": False,
+                        },
+                    ],
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "SRCROOT": str(srcroot),
+                    "TARGET_BUILD_DIR": str(target_build_dir),
+                    "UNLOCALIZED_RESOURCES_FOLDER_PATH": resources_dir,
+                    "MARKETING_VERSION": "1.3.5",
+                    "CURRENT_PROJECT_VERSION": "7",
+                }
+            )
+
+            subprocess.run(
+                ["python3", str(srcroot / "scripts/sync_settings_bundle.py")],
+                check=True,
+                env=env,
+                text=True,
+                capture_output=True,
+            )
+
+            root_plist = plistlib.loads((settings_dst / "Root.plist").read_bytes())
+            version_item = next(
+                item for item in root_plist["PreferenceSpecifiers"]
+                if item.get("Key") == "cypherair.settings.version"
+            )
+            self.assertEqual(version_item["DefaultValue"], "1.3.5 (7)")
+
+            acknowledgements = plistlib.loads((settings_dst / "Acknowledgements.plist").read_bytes())
+            values_by_title = {
+                item.get("Title"): item.get("DefaultValue")
+                for item in acknowledgements["PreferenceSpecifiers"]
+                if item.get("Type") == "PSTitleValueSpecifier"
+            }
+            self.assertEqual(values_by_title["CypherAir"], "GPL-3.0-or-later OR MPL-2.0")
+            self.assertEqual(values_by_title["Sequoia OpenPGP"], "2.2.0 / LGPL-2.0-or-later")
+            self.assertEqual(values_by_title["OpenSSL Rust Bindings"], "0.10.77 / Apache-2.0")
+            self.assertEqual(values_by_title["OpenSSL Source"], "300.6.0+3.6.2 / MIT/Apache-2.0")
+            self.assertEqual(values_by_title["UniFFI"], "0.31.1 / MPL-2.0")
+            self.assertIn("Apple Swift", module.toolchain_summary(swift_version="", rust_version=""))
+            self.assertNotIn("transitive-only", values_by_title)
+
     def test_repository_audit_snapshot_removes_stale_files_before_copying_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             temp_root = Path(temp_dir_name)

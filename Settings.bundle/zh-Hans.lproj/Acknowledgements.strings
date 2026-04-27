@@ -2,7 +2,11 @@
 "Open Source" = "开源";
 "CypherAir is built with open-source cryptography and tooling. Complete notices and license text are available inside the app under Settings, About, Source & Compliance." = "CypherAir 基于开源密码学和工具链构建。完整声明和许可证文本可在应用内的“设置”、“关于”、“源代码与合规”中查看。";
 "CypherAir" = "CypherAir";
-"OpenPGP Engine" = "OpenPGP 引擎";
-"Crypto Backend" = "加密后端";
-"Language Bridge" = "语言桥接";
+"base64" = "base64";
+"OpenSSL Rust Bindings" = "OpenSSL Rust 绑定";
+"OpenSSL Source" = "OpenSSL 源码";
+"Sequoia OpenPGP" = "Sequoia OpenPGP";
+"thiserror" = "thiserror";
+"UniFFI" = "UniFFI";
+"zeroize" = "zeroize";
 "Toolchain" = "工具链";

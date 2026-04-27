@@ -533,12 +533,13 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/Settings.bundle/Acknowledgements.plist",
 				"$(SRCROOT)/Settings.bundle/Root.plist",
 				"$(SRCROOT)/Settings.bundle/en.lproj/Acknowledgements.strings",
 				"$(SRCROOT)/Settings.bundle/en.lproj/Root.strings",
 				"$(SRCROOT)/Settings.bundle/zh-Hans.lproj/Acknowledgements.strings",
 				"$(SRCROOT)/Settings.bundle/zh-Hans.lproj/Root.strings",
+				"$(SRCROOT)/Sources/Resources/OpenSourceNotices/open_source_notices.json",
+				"$(SRCROOT)/scripts/sync_settings_bundle.py",
 			);
 			name = "Sync Settings Bundle Version";
 			outputFileListPaths = (
@@ -554,7 +555,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\n\nSETTINGS_SRC=\"${SRCROOT}/Settings.bundle\"\nSETTINGS_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Settings.bundle\"\nSETTINGS_ROOT=\"${SETTINGS_DST}/Root.plist\"\nif [ ! -f \"${SETTINGS_SRC}/Root.plist\" ]; then\n    echo \"error: Settings.bundle Root.plist is missing from the source tree.\"\n    exit 1\nfi\n\nmkdir -p \"${SETTINGS_DST}/en.lproj\" \"${SETTINGS_DST}/zh-Hans.lproj\"\ncp \"${SETTINGS_SRC}/Acknowledgements.plist\" \"${SETTINGS_DST}/Acknowledgements.plist\"\ncp \"${SETTINGS_SRC}/Root.plist\" \"${SETTINGS_ROOT}\"\ncp \"${SETTINGS_SRC}/en.lproj/Acknowledgements.strings\" \"${SETTINGS_DST}/en.lproj/Acknowledgements.strings\"\ncp \"${SETTINGS_SRC}/en.lproj/Root.strings\" \"${SETTINGS_DST}/en.lproj/Root.strings\"\ncp \"${SETTINGS_SRC}/zh-Hans.lproj/Acknowledgements.strings\" \"${SETTINGS_DST}/zh-Hans.lproj/Acknowledgements.strings\"\ncp \"${SETTINGS_SRC}/zh-Hans.lproj/Root.strings\" \"${SETTINGS_DST}/zh-Hans.lproj/Root.strings\"\n\nVERSION_STRING=\"${MARKETING_VERSION} (${CURRENT_PROJECT_VERSION})\"\nexport SETTINGS_ROOT VERSION_STRING\npython3 - <<'PY_INNER'\nimport os\nimport plistlib\n\npath = os.environ[\"SETTINGS_ROOT\"]\nwith open(path, \"rb\") as file:\n    plist = plistlib.load(file)\n\nfor item in plist.get(\"PreferenceSpecifiers\", []):\n    if item.get(\"Key\") == \"cypherair.settings.version\":\n        item[\"DefaultValue\"] = os.environ[\"VERSION_STRING\"]\n        break\nelse:\n    raise SystemExit(\"cypherair.settings.version not found in Settings.bundle Root.plist\")\n\nwith open(path, \"wb\") as file:\n    plistlib.dump(plist, file)\nPY_INNER\n";
+			shellScript = "python3 \"${SRCROOT}/scripts/sync_settings_bundle.py\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
