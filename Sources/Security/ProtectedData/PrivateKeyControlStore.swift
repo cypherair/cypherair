@@ -62,7 +62,8 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
 
     func bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
         authenticationContext: LAContext?,
-        persistSharedRight: @escaping @Sendable (Data) async throws -> Void
+        persistSharedRight: @escaping @Sendable (Data) async throws -> Void,
+        firstDomainSharedRightCleaner: ProtectedDataFirstDomainSharedRightCleaner? = nil
     ) async throws -> Bool {
         let registry = try registryStore.loadRegistry()
         if registry.committedMembership[Self.domainID] != nil {
@@ -84,6 +85,21 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
         guard authenticationContext != nil else {
             privateKeyControlState = .locked
             return false
+        }
+        if let firstDomainSharedRightCleaner {
+            do {
+                let cleanupOutcome = try await firstDomainSharedRightCleaner.cleanupOrphanedSharedRightIfSafe(
+                    registry: registry,
+                    source: Self.domainID.rawValue
+                )
+                if cleanupOutcome == .blockedByArtifacts {
+                    privateKeyControlState = .recoveryNeeded
+                    throw PrivateKeyControlError.recoveryNeeded
+                }
+            } catch {
+                privateKeyControlState = .recoveryNeeded
+                throw error
+            }
         }
 
         let initialPayload = try legacyInitialPayload()

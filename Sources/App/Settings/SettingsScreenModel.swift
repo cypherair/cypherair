@@ -19,6 +19,7 @@ final class SettingsScreenModel {
     private let authModeSwitchAction: AuthModeSwitchAction
     private let appAccessPolicySwitchAction: AppAccessPolicySwitchAction
     private let localDataResetService: LocalDataResetService?
+    private let localDataResetRestartCoordinator: LocalDataResetRestartCoordinator?
 
     var pendingMode: AuthenticationMode?
     private var pendingModeRequestID: UUID?
@@ -46,6 +47,7 @@ final class SettingsScreenModel {
         macPresentationController: MacPresentationController?,
         configuration: SettingsView.Configuration,
         localDataResetService: LocalDataResetService? = nil,
+        localDataResetRestartCoordinator: LocalDataResetRestartCoordinator? = nil,
         authModeSwitchAction: AuthModeSwitchAction? = nil,
         appAccessPolicySwitchAction: AppAccessPolicySwitchAction? = nil
     ) {
@@ -57,6 +59,7 @@ final class SettingsScreenModel {
         self.iosPresentationController = iosPresentationController
         self.macPresentationController = macPresentationController
         self.localDataResetService = localDataResetService
+        self.localDataResetRestartCoordinator = localDataResetRestartCoordinator
         self.authModeSwitchAction = authModeSwitchAction ?? { newMode, fingerprints, hasBackup in
             try await authManager.switchMode(
                 to: newMode,
@@ -353,16 +356,18 @@ final class SettingsScreenModel {
                     resetAuthenticationContext = result.context
                 }
 
-                _ = try await localDataResetService.resetAllLocalData(
+                let summary = try await localDataResetService.resetAllLocalData(
                     authenticationContext: resetAuthenticationContext
                 )
                 localDataResetSucceeded = true
+                localDataResetRestartCoordinator?.markRestartRequired(summary: summary)
             } catch {
                 localDataResetErrorMessage = error.localizedDescription
             }
 
             isResettingLocalData = false
-            showLocalDataResetResultAlert = true
+            showLocalDataResetResultAlert = localDataResetErrorMessage != nil
+                || localDataResetRestartCoordinator == nil
             localDataResetConfirmationPhrase = ""
         }
     }

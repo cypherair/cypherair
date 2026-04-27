@@ -143,6 +143,16 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
+        let firstDomainSharedRightCleaner = ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: protectedDataStorageRoot,
+            hasPersistedSharedRight: { identifier in
+                protectedDataSessionCoordinator.hasPersistedRootSecret(identifier: identifier)
+            },
+            removePersistedSharedRight: { identifier in
+                try await protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
+            },
+            traceStore: authLifecycleTraceStore
+        )
         let privateKeyControlStore = PrivateKeyControlStore(
             defaults: defaults,
             storageRoot: protectedDataStorageRoot,
@@ -246,7 +256,8 @@ final class AppContainer: @unchecked Sendable {
                         authenticationContext: authenticationContext,
                         persistSharedRight: { secret in
                             try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
-                        }
+                        },
+                        firstDomainSharedRightCleaner: firstDomainSharedRightCleaner
                     )
                 } catch {
                     config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
@@ -318,6 +329,9 @@ final class AppContainer: @unchecked Sendable {
             contactService: contactService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
+            protectedDataRootSecretExists: {
+                protectedDataSessionCoordinator.hasPersistedRootSecret()
+            },
             traceStore: authLifecycleTraceStore
         )
 
@@ -424,6 +438,16 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
+        let firstDomainSharedRightCleaner = ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: protectedDataStorageRoot,
+            hasPersistedSharedRight: { identifier in
+                protectedDataSessionCoordinator.hasPersistedRootSecret(identifier: identifier)
+            },
+            removePersistedSharedRight: { identifier in
+                try await protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
+            },
+            traceStore: authLifecycleTraceStore
+        )
         let privateKeyControlStore = PrivateKeyControlStore(
             defaults: defaults,
             storageRoot: protectedDataStorageRoot,
@@ -528,7 +552,8 @@ final class AppContainer: @unchecked Sendable {
                         authenticationContext: authenticationContext,
                         persistSharedRight: { secret in
                             try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
-                        }
+                        },
+                        firstDomainSharedRightCleaner: firstDomainSharedRightCleaner
                     )
                 } catch {
                     config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
@@ -601,6 +626,9 @@ final class AppContainer: @unchecked Sendable {
             contactService: contactService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
+            protectedDataRootSecretExists: {
+                protectedDataSessionCoordinator.hasPersistedRootSecret()
+            },
             traceStore: authLifecycleTraceStore
         )
 
