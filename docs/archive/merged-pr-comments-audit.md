@@ -1,3 +1,6 @@
+> Archive note: the issues captured in this audit have been fixed. This
+> document is retained in `docs/archive/` for historical reference.
+
 # Merged PR Comments Audit
 
 - Repository: `cypherair/cypherair`
