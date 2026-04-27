@@ -118,10 +118,10 @@ For the full Rust artifact refresh, UniFFI/bindings sync, XCFramework linkage de
 
 For formal stable releases and App Store candidate archives, read
 `docs/APP_RELEASE_PROCESS.md` before acting. Stable releases are tag-first:
-the `cypherair-vX.Y.Z-buildN` tag must exist on the intended `main` commit
-before the formal stable GitHub release is published, and the App Store
-candidate archive must be produced from a clean `main` checkout whose `HEAD`
-matches that remote stable tag commit.
+the `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>` tag must
+exist on the intended `main` commit before the formal stable GitHub release is
+published, and the App Store candidate archive must be produced from a clean
+`main` checkout whose `HEAD` matches that remote stable tag commit.
 
 ## Non-Negotiable Constraints
 
@@ -193,6 +193,10 @@ Mode switching requires re-wrapping all Secure Enclave protected keys.
 ## Release Metadata / Build Numbers
 
 Treat Xcode release metadata as user-owned state. Do not proactively modify `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION`.
+
+Read release metadata from the project file or Xcode build settings. Do not
+invent, formula-generate, increment, or reset build numbers on the user's
+behalf.
 
 If `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION` has changed in any way, treat those changes as user edits and include them in the scope of the work being submitted. Do not revert the user's changes.
 

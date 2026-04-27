@@ -4,7 +4,7 @@
 > Purpose: Document the current release flows for CypherAir app builds and the stable build contract that backs formal App Store candidate archives.
 > Audience: Human developers, release owners, and AI coding tools.
 > Source of truth: `CypherAir` and `CypherAir AppStore Candidate` scheme behavior, `SourceComplianceInfo.json` build integration, and `.github/workflows/stable-build-release.yml`.
-> Last reviewed: 2026-04-24.
+> Last reviewed: 2026-04-27.
 > Update triggers: stable tag rules, stable asset names, `Source & Compliance` archive metadata, App Store candidate gating, or release-ordering changes.
 > Scope: App build release flow and the exact stable GitHub release contract used by the app. `XCFramework` channel discovery and verification remain in [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md).
 
@@ -24,7 +24,9 @@ These modes are intentionally different.
 
 CypherAir's formal stable app-build release uses a unified GitHub release page.
 
-- Stable release tags use the format `cypherair-vX.Y.Z-buildN`.
+- Stable release tags use the format
+  `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>`, using the
+  exact Xcode project build setting values.
 - Stable release tags must be SSH-signed annotated tags. Do not publish
   lightweight or unsigned stable tags.
 - Pushing a stable tag triggers the stable build release workflow; manual runs can dry-run the same contract without publishing the immutable release.
@@ -35,6 +37,9 @@ CypherAir's formal stable app-build release uses a unified GitHub release page.
   the workflow publishes with `gh release create --verify-tag`.
 - The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
 - The stable workflow validates that the tag's marketing version and build number match `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` before assets are published.
+- Release owners choose and set the Xcode release metadata in the project. The
+  release scripts read those values; they do not invent, increment, reset, or
+  formula-generate `CURRENT_PROJECT_VERSION`.
 
 Every published stable build release must include these assets:
 
@@ -52,14 +57,33 @@ Stable build binding and immutability rules:
 - App Store candidate archives must embed the exact stable release tag, stable release URL, and commit SHA in `SourceComplianceInfo.json`.
 - Stable assets are immutable once published. If the asset set is wrong, fix it with a new build number, new stable tag, and new release rather than replacing assets in place.
 
+Version and build-number rules:
+
+- `MARKETING_VERSION` maps to `CFBundleShortVersionString`; it is the app
+  version shown to users.
+- `CURRENT_PROJECT_VERSION` maps to `CFBundleVersion`; it identifies the exact
+  build uploaded or archived.
+- For macOS App Store uploads, `CURRENT_PROJECT_VERSION` / `CFBundleVersion`
+  must be higher than the highest macOS build previously uploaded for the app,
+  even when `MARKETING_VERSION` has increased.
+- The project does not require a fixed formula for `CURRENT_PROJECT_VERSION`.
+  Use the final value recorded in the Xcode project when creating the stable
+  tag and App Store candidate archive.
+
 Stable tag signing requirements:
 
 - Use Git SSH signing for stable tags. Configure `gpg.format=ssh` and
   `user.signingkey` to an SSH public key trusted for release signing before
   creating the tag.
 - Create stable tags with `git tag -s -m "<tag>" <tag> <main-commit>` so the
-  tag is annotated and signed. For example:
-  `git -c gpg.format=ssh tag -s -m "cypherair-vX.Y.Z-buildN" cypherair-vX.Y.Z-buildN <main-commit>`.
+  tag is annotated and signed. For example, after choosing the final project
+  values:
+
+  ```bash
+  TAG="cypherair-v1.3.6-build13601"
+  MAIN_COMMIT="$(git rev-parse main)"
+  git -c gpg.format=ssh tag -s -m "$TAG" "$TAG" "$MAIN_COMMIT"
+  ```
 - Verify the tag signature locally with `git tag -v <tag>` before pushing it.
 
 ## 3. Internal / Experimental TestFlight
@@ -86,7 +110,7 @@ Use the standard shared scheme:
 
 ### Typical Flow
 
-1. Update code and version/build metadata as needed.
+1. Update code and Xcode project version/build metadata as needed.
 2. Run the relevant local validation.
 3. Archive from the standard `CypherAir` scheme.
 4. Upload to TestFlight for internal or experimental use.
@@ -121,7 +145,8 @@ The candidate archive path performs an automatic pre-archive validation:
 
 - confirms the current branch is `main`
 - confirms the tracked worktree and index are clean
-- derives `cypherair-vX.Y.Z-buildN` from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`
+- derives `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>` from
+  `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`
 - checks that `gh release view <tag> -R cypherair/cypherair` succeeds
 - downloads and validates `PgpMobile.arm64e-build-manifest.json`
 - resolves the remote stable tag commit from `origin`
@@ -133,10 +158,12 @@ The candidate archive path performs an automatic pre-archive validation:
 This order is mandatory for App Store candidates:
 
 1. Finish the intended candidate code changes.
-2. Update the version and build number.
+2. Update the Xcode project version and build number. For macOS App Store
+   candidates, confirm `CURRENT_PROJECT_VERSION` is higher than the highest
+   macOS build previously uploaded for the app.
 3. Commit and push the candidate commit to `main`.
 4. Create the SSH-signed stable tag:
-   - `cypherair-vX.Y.Z-buildN`
+   - `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>`
    - annotated and SSH-signed; lightweight and unsigned tags are not allowed
    - push the tag to `origin`; that tag push triggers the formal stable release
      workflow
@@ -155,6 +182,8 @@ Before uploading the App Store candidate to TestFlight, confirm:
 - the branch is `main`
 - the tracked worktree and index are clean
 - the version/build pair is final
+- the macOS App Store build number is higher than any previously uploaded
+  macOS build for the app
 - the stable tag matches the app version/build
 - the GitHub stable release completed successfully
 - the release page includes the expected stable assets:

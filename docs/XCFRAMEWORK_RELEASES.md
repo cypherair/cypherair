@@ -4,7 +4,7 @@
 > Purpose: Describe the current edge, drill, and stable `PgpMobile.xcframework` release channels, including discovery, verification, and the stable channel's relationship to the unified app-build release page.
 > Audience: Human developers and automation that consume prebuilt `PgpMobile.xcframework` assets.
 > Source of truth: `.github/workflows/xcframework-edge-release.yml`, `.github/workflows/stable-build-release.yml`, and published GitHub releases.
-> Last reviewed: 2026-04-24.
+> Last reviewed: 2026-04-27.
 > Update triggers: channel naming/routing, asset names, verification commands, stable asset contract, or relink-kit semantics.
 
 ## 1. Release Channels
@@ -60,7 +60,9 @@ This is intentional: a single app marketing version can have multiple Xcode buil
 
 CypherAir publishes stable XCFramework assets through the same unified stable GitHub release page used by formal app builds.
 
-- Stable release tags use the app-build format `cypherair-vX.Y.Z-buildN`.
+- Stable release tags use the app-build format defined in
+  [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md):
+  `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>`.
 - The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
 - Stable releases publish these assets together:
   `CypherAir-source-bundle.tar.zst`,
@@ -141,7 +143,7 @@ Drill releases are verified using the exact ref-pinned command rendered in that 
 Stable releases are retrieved by their exact app-build tag:
 
 ```bash
-TAG="cypherair-vX.Y.Z-buildN"
+TAG="cypherair-v1.3.6-build13601" # replace with the exact stable tag
 
 gh release download "$TAG" \
     --repo cypherair/cypherair \
