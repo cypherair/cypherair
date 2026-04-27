@@ -92,10 +92,7 @@ final class ProtectedDataSessionCoordinator {
         if let legacyRightStoreClient {
             try? await legacyRightStoreClient.removeRight(forIdentifier: identifier)
         }
-        if wrappingRootKey != nil {
-            wrappingRootKey?.protectedDataZeroize()
-            wrappingRootKey = nil
-        }
+        clearSessionSecrets()
         frameworkState = .sessionLocked
     }
 
@@ -159,6 +156,7 @@ final class ProtectedDataSessionCoordinator {
                 )
             } catch let error as KeychainError where error == .itemNotFound {
                 guard allowLegacyMigration else {
+                    clearSessionSecrets()
                     traceStore?.record(
                         category: .operation,
                         name: "protectedSettings.authorization.finish",
@@ -186,9 +184,7 @@ final class ProtectedDataSessionCoordinator {
                 from: &rootSecretResult.secretData
             )
 
-            if wrappingRootKey != nil {
-                wrappingRootKey?.protectedDataZeroize()
-            }
+            clearSessionSecrets()
             wrappingRootKey = derivedWrappingRootKey
             frameworkState = .sessionAuthorized
             traceStore?.record(
@@ -198,10 +194,7 @@ final class ProtectedDataSessionCoordinator {
             )
             return .authorized
         } catch {
-            if wrappingRootKey != nil {
-                wrappingRootKey?.protectedDataZeroize()
-                wrappingRootKey = nil
-            }
+            clearSessionSecrets()
             if isAuthorizationCancellationOrDenial(error) {
                 traceStore?.record(
                     category: .operation,
@@ -321,27 +314,27 @@ final class ProtectedDataSessionCoordinator {
             }
         }
 
-        if wrappingRootKey != nil {
-            wrappingRootKey?.protectedDataZeroize()
-            wrappingRootKey = nil
-        }
-        domainKeyManager.clearUnlockedDomainMasterKeys()
+        clearSessionSecrets()
 
         frameworkState = participantErrorOccurred ? .restartRequired : .sessionLocked
     }
 
     func resetAfterLocalDataReset() {
-        if wrappingRootKey != nil {
-            wrappingRootKey?.protectedDataZeroize()
-            wrappingRootKey = nil
-        }
-        domainKeyManager.clearUnlockedDomainMasterKeys()
+        clearSessionSecrets()
         frameworkState = .sessionLocked
         traceStore?.record(
             category: .session,
             name: "protectedData.session.localDataReset",
             metadata: ["frameworkState": String(describing: frameworkState)]
         )
+    }
+
+    private func clearSessionSecrets() {
+        if wrappingRootKey != nil {
+            wrappingRootKey?.protectedDataZeroize()
+            wrappingRootKey = nil
+        }
+        domainKeyManager.clearUnlockedDomainMasterKeys()
     }
 
     var hasActiveWrappingRootKey: Bool {

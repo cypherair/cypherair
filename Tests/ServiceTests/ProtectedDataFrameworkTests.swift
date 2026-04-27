@@ -829,6 +829,97 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
     }
 
+    func test_sessionCoordinator_removePersistedSharedRightClearsWrappingRootKeyAndUnlockedDomainKeys() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataSessionRemoveSharedRight")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let identifier = "com.cypherair.tests.protected-data.session-remove-shared-right"
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
+            identifier: identifier,
+            secretData: Data(repeating: 0xA1, count: 32)
+        )
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: keyManager,
+            sharedRightIdentifier: identifier
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: identifier,
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["contacts": .active],
+            pendingMutation: nil
+        )
+        let authorizationResult = await coordinator.beginProtectedDataAuthorization(
+            registry: registry,
+            localizedReason: "ProtectedData unit test authorization"
+        )
+        keyManager.cacheUnlockedDomainMasterKey(Data(repeating: 0xC1, count: 32), for: "contacts")
+
+        XCTAssertEqual(authorizationResult, .authorized)
+        XCTAssertTrue(coordinator.hasActiveWrappingRootKey)
+        XCTAssertTrue(keyManager.hasUnlockedDomainMasterKeys)
+
+        try await coordinator.removePersistedSharedRight(identifier: identifier)
+
+        XCTAssertEqual(coordinator.frameworkState, .sessionLocked)
+        XCTAssertFalse(coordinator.hasActiveWrappingRootKey)
+        XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
+        XCTAssertFalse(coordinator.hasPersistedRootSecret(identifier: identifier))
+        XCTAssertEqual(rightStoreClient.removeCallCount, 1)
+        XCTAssertEqual(rightStoreClient.lastRemovedIdentifier, identifier)
+    }
+
+    func test_sessionCoordinator_reauthorizationClearsUnlockedDomainKeys() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataSessionReauthorization")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let identifier = "com.cypherair.tests.protected-data.session-reauthorization"
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
+            identifier: identifier,
+            secretData: Data(repeating: 0xA2, count: 32)
+        )
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: keyManager,
+            sharedRightIdentifier: identifier
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: identifier,
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["contacts": .active],
+            pendingMutation: nil
+        )
+        let firstAuthorizationResult = await coordinator.beginProtectedDataAuthorization(
+            registry: registry,
+            localizedReason: "ProtectedData unit test first authorization"
+        )
+        keyManager.cacheUnlockedDomainMasterKey(Data(repeating: 0xC2, count: 32), for: "contacts")
+        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
+            identifier: identifier,
+            secretData: Data(repeating: 0xA3, count: 32)
+        )
+
+        let secondAuthorizationResult = await coordinator.beginProtectedDataAuthorization(
+            registry: registry,
+            localizedReason: "ProtectedData unit test second authorization"
+        )
+
+        XCTAssertEqual(firstAuthorizationResult, .authorized)
+        XCTAssertEqual(secondAuthorizationResult, .authorized)
+        XCTAssertEqual(coordinator.frameworkState, .sessionAuthorized)
+        XCTAssertTrue(coordinator.hasActiveWrappingRootKey)
+        XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
+        XCTAssertEqual(rightStoreClient.rightLookupCallCount, 2)
+    }
+
     func test_sessionCoordinator_authorizationFloorRecordFailureReturnsRecoveryWithoutSessionKey() async throws {
         let baseDirectory = makeTemporaryDirectory("ProtectedDataSessionFloorFailure")
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
@@ -2151,6 +2242,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             committedMembership: ["contacts": .active],
             pendingMutation: nil
         )
+        keyManager.cacheUnlockedDomainMasterKey(Data(repeating: 0xD1, count: 32), for: "contacts")
 
         let result = await coordinator.beginProtectedDataAuthorization(
             registry: registry,
@@ -2159,6 +2251,37 @@ final class ProtectedDataFrameworkTests: XCTestCase {
 
         XCTAssertEqual(result, .frameworkRecoveryNeeded)
         XCTAssertEqual(coordinator.frameworkState, .frameworkRecoveryNeeded)
+        XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
+    }
+
+    func test_authorization_legacyMigrationDeferredClearsUnlockedDomainKeys() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAuthorizationDeferredMigration"))
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: keyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.deferred-migration"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.deferred-migration",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["contacts": .active],
+            pendingMutation: nil
+        )
+        keyManager.cacheUnlockedDomainMasterKey(Data(repeating: 0xD3, count: 32), for: "contacts")
+
+        let result = await coordinator.beginProtectedDataAuthorization(
+            registry: registry,
+            localizedReason: "Authorize protected data",
+            allowLegacyMigration: false
+        )
+
+        XCTAssertEqual(result, .cancelledOrDenied)
+        XCTAssertEqual(coordinator.frameworkState, .sessionLocked)
+        XCTAssertFalse(coordinator.hasActiveWrappingRootKey)
+        XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
     }
 
     func test_authorization_secretUnreadable_returnsFrameworkRecoveryNeededAndDeauthorizes() async throws {
@@ -2183,6 +2306,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             committedMembership: ["contacts": .active],
             pendingMutation: nil
         )
+        keyManager.cacheUnlockedDomainMasterKey(Data(repeating: 0xD2, count: 32), for: "contacts")
 
         let result = await coordinator.beginProtectedDataAuthorization(
             registry: registry,
@@ -2192,6 +2316,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(result, .frameworkRecoveryNeeded)
         XCTAssertEqual(coordinator.frameworkState, .frameworkRecoveryNeeded)
         XCTAssertFalse(coordinator.hasActiveWrappingRootKey)
+        XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
     }
 
     func test_authorization_userCancelled_returnsCancelledOrDenied() async throws {
