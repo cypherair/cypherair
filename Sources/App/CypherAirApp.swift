@@ -493,6 +493,12 @@ struct CypherAirApp: App {
             container.keyManagement.clearLegacyMetadataMigrationLoadWarning()
             presentPendingLoadWarningIfPossible(source: "legacyMetadataMigration")
         }
+        .onChange(of: container.config.postUnlockRecoveryLoadWarning) { _, warning in
+            guard let warning else { return }
+            pendingLoadError = warning
+            container.config.clearPostUnlockRecoveryLoadWarning()
+            presentPendingLoadWarningIfPossible(source: "postUnlockRecovery")
+        }
         .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
         .authenticationShieldHost(
             container.authenticationShieldCoordinator,

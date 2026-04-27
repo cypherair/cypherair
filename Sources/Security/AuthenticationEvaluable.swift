@@ -146,14 +146,51 @@ struct ModifyExpiryRecoveryEntry: Codable, Equatable, Sendable {
     var fingerprint: String?
 }
 
+enum PrivateKeyControlRewrapPhase: String, Codable, Equatable, Sendable {
+    case preparing
+    case commitRequired
+}
+
 struct PrivateKeyControlRecoveryJournal: Codable, Equatable, Sendable {
     var rewrapTargetMode: AuthenticationMode?
+    var rewrapPhase: PrivateKeyControlRewrapPhase?
     var modifyExpiry: ModifyExpiryRecoveryEntry?
+
+    init(
+        rewrapTargetMode: AuthenticationMode? = nil,
+        rewrapPhase: PrivateKeyControlRewrapPhase? = nil,
+        modifyExpiry: ModifyExpiryRecoveryEntry? = nil
+    ) {
+        self.rewrapTargetMode = rewrapTargetMode
+        self.rewrapPhase = rewrapTargetMode == nil ? nil : (rewrapPhase ?? .preparing)
+        self.modifyExpiry = modifyExpiry
+    }
 
     static let empty = PrivateKeyControlRecoveryJournal(
         rewrapTargetMode: nil,
+        rewrapPhase: nil,
         modifyExpiry: nil
     )
+
+    private enum CodingKeys: String, CodingKey {
+        case rewrapTargetMode
+        case rewrapPhase
+        case modifyExpiry
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let rewrapTargetMode = try container.decodeIfPresent(AuthenticationMode.self, forKey: .rewrapTargetMode)
+        let decodedRewrapPhase = try container.decodeIfPresent(
+            PrivateKeyControlRewrapPhase.self,
+            forKey: .rewrapPhase
+        )
+        self.init(
+            rewrapTargetMode: rewrapTargetMode,
+            rewrapPhase: decodedRewrapPhase,
+            modifyExpiry: try container.decodeIfPresent(ModifyExpiryRecoveryEntry.self, forKey: .modifyExpiry)
+        )
+    }
 }
 
 enum PrivateKeyControlError: Error, LocalizedError, Equatable {
@@ -194,6 +231,7 @@ protocol PrivateKeyControlStoreProtocol: AnyObject, Sendable {
     func requireUnlockedAuthMode() throws -> AuthenticationMode
     func recoveryJournal() throws -> PrivateKeyControlRecoveryJournal
     func beginRewrap(targetMode: AuthenticationMode) throws
+    func markRewrapCommitRequired() throws
     func completeRewrap(targetMode: AuthenticationMode) throws
     func clearRewrapJournal() throws
     func beginModifyExpiry(fingerprint: String) throws
@@ -249,17 +287,28 @@ final class InMemoryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unc
     func beginRewrap(targetMode: AuthenticationMode) throws {
         _ = try requireUnlockedAuthMode()
         journal.rewrapTargetMode = targetMode
+        journal.rewrapPhase = .preparing
+    }
+
+    func markRewrapCommitRequired() throws {
+        _ = try requireUnlockedAuthMode()
+        guard journal.rewrapTargetMode != nil else {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        journal.rewrapPhase = .commitRequired
     }
 
     func completeRewrap(targetMode: AuthenticationMode) throws {
         _ = try requireUnlockedAuthMode()
         mode = targetMode
         journal.rewrapTargetMode = nil
+        journal.rewrapPhase = nil
     }
 
     func clearRewrapJournal() throws {
         _ = try requireUnlockedAuthMode()
         journal.rewrapTargetMode = nil
+        journal.rewrapPhase = nil
     }
 
     func beginModifyExpiry(fingerprint: String) throws {

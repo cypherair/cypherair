@@ -257,6 +257,16 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
     func beginRewrap(targetMode: AuthenticationMode) throws {
         try updatePayload { payload in
             payload.recoveryJournal.rewrapTargetMode = targetMode
+            payload.recoveryJournal.rewrapPhase = .preparing
+        }
+    }
+
+    func markRewrapCommitRequired() throws {
+        try updatePayload { payload in
+            guard payload.recoveryJournal.rewrapTargetMode != nil else {
+                throw PrivateKeyControlError.recoveryNeeded
+            }
+            payload.recoveryJournal.rewrapPhase = .commitRequired
         }
     }
 
@@ -264,12 +274,14 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
         try updatePayload { payload in
             payload.settings.authMode = targetMode
             payload.recoveryJournal.rewrapTargetMode = nil
+            payload.recoveryJournal.rewrapPhase = nil
         }
     }
 
     func clearRewrapJournal() throws {
         try updatePayload { payload in
             payload.recoveryJournal.rewrapTargetMode = nil
+            payload.recoveryJournal.rewrapPhase = nil
         }
     }
 
@@ -564,6 +576,7 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             settings: Payload.Settings(authMode: authMode),
             recoveryJournal: PrivateKeyControlRecoveryJournal(
                 rewrapTargetMode: rewrapTargetMode,
+                rewrapPhase: rewrapTargetMode == nil ? nil : .preparing,
                 modifyExpiry: modifyExpiryEntry
             )
         )

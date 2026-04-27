@@ -677,6 +677,10 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     namespace: .pending
                 )
             }
+
+            // From this point forward Phase B may delete permanent items, so the
+            // target mode must survive even if the final protected write fails.
+            try privateKeyControlStore.markRewrapCommitRequired()
             traceStore?.record(
                 category: .operation,
                 name: "privateKeyProtection.switch.phaseA.finish",
@@ -821,14 +825,17 @@ final class AuthenticationManager: AuthenticationEvaluable {
             effectiveSummary = recoverySummary
         }
 
-        // Persist target mode only when promotion fully succeeded and no
-        // unrecoverable / retryable states remain. If that protected write fails,
-        // keep the journal so the next post-unlock recovery can retry.
-        if effectiveSummary.shouldUpdateAuthMode {
+        // Persist target mode when recovery promoted pending bundles, or when a
+        // prior run already crossed the Phase B commit point and only the final
+        // protected payload write remains.
+        let shouldCompleteRewrap = effectiveSummary.shouldUpdateAuthMode
+            || (journal.rewrapPhase == .commitRequired && effectiveSummary.isNoActionSafeOnly)
+
+        if shouldCompleteRewrap {
             do {
                 try privateKeyControlStore.completeRewrap(targetMode: targetMode)
             } catch {
-                return effectiveSummary
+                return effectiveSummary.appendingRetryableFailure()
             }
         } else if effectiveSummary.shouldClearRecoveryFlag {
             try? privateKeyControlStore.clearRewrapJournal()

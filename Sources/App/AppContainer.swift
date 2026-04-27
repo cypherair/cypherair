@@ -264,12 +264,12 @@ final class AppContainer: @unchecked Sendable {
                     source: source
                 )
                 config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
-                if privateKeyControlStore.privateKeyControlState.isUnlocked {
-                    _ = authManager.checkAndRecoverFromInterruptedRewrap(
-                        fingerprints: keyManagement.keys.map(\.fingerprint)
-                    )
-                    _ = keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
-                }
+                Self.recoverPrivateKeyControlJournalsAfterPostUnlock(
+                    authManager: authManager,
+                    keyManagement: keyManagement,
+                    config: config,
+                    privateKeyControlStore: privateKeyControlStore
+                )
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
@@ -546,12 +546,12 @@ final class AppContainer: @unchecked Sendable {
                     source: source
                 )
                 config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
-                if privateKeyControlStore.privateKeyControlState.isUnlocked {
-                    _ = authManager.checkAndRecoverFromInterruptedRewrap(
-                        fingerprints: keyManagement.keys.map(\.fingerprint)
-                    )
-                    _ = keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
-                }
+                Self.recoverPrivateKeyControlJournalsAfterPostUnlock(
+                    authManager: authManager,
+                    keyManagement: keyManagement,
+                    config: config,
+                    privateKeyControlStore: privateKeyControlStore
+                )
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
@@ -667,5 +667,42 @@ final class AppContainer: @unchecked Sendable {
             profile: .universal
         )
         _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+    }
+
+    static func recoverPrivateKeyControlJournalsAfterPostUnlock(
+        authManager: AuthenticationManager,
+        keyManagement: KeyManagementService,
+        config: AppConfiguration,
+        privateKeyControlStore: PrivateKeyControlStore
+    ) {
+        guard privateKeyControlStore.privateKeyControlState.isUnlocked else {
+            return
+        }
+
+        let rewrapSummary = authManager.checkAndRecoverFromInterruptedRewrap(
+            fingerprints: keyManagement.keys.map(\.fingerprint)
+        )
+        let modifyExpiryOutcome = keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
+        if let warning = postUnlockRecoveryLoadWarning(
+            rewrapSummary: rewrapSummary,
+            modifyExpiryOutcome: modifyExpiryOutcome
+        ) {
+            config.postUnlockRecoveryLoadWarning = warning
+        }
+    }
+
+    static func postUnlockRecoveryLoadWarning(
+        rewrapSummary: KeyMigrationRecoverySummary?,
+        modifyExpiryOutcome: KeyMigrationRecoveryOutcome?
+    ) -> String? {
+        var diagnostics: [String] = []
+        for diagnostic in rewrapSummary?.startupDiagnostics ?? [] where !diagnostics.contains(diagnostic) {
+            diagnostics.append(diagnostic)
+        }
+        if let diagnostic = modifyExpiryOutcome?.startupDiagnostic,
+           !diagnostics.contains(diagnostic) {
+            diagnostics.append(diagnostic)
+        }
+        return diagnostics.isEmpty ? nil : diagnostics.joined(separator: "\n")
     }
 }

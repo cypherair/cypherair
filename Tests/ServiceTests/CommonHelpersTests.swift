@@ -52,6 +52,87 @@ private enum CommonHelpersTestError: Error {
     case delayedFailure
 }
 
+private final class FailingCompleteRewrapPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unchecked Sendable {
+    private var mode: AuthenticationMode?
+    private var journal: PrivateKeyControlRecoveryJournal
+    var failNextCompleteRewrap = false
+
+    init(
+        mode: AuthenticationMode?,
+        journal: PrivateKeyControlRecoveryJournal
+    ) {
+        self.mode = mode
+        self.journal = journal
+    }
+
+    var privateKeyControlState: PrivateKeyControlState {
+        guard let mode else {
+            return .locked
+        }
+        return .unlocked(mode)
+    }
+
+    func requireUnlockedAuthMode() throws -> AuthenticationMode {
+        guard let mode else {
+            throw PrivateKeyControlError.locked
+        }
+        return mode
+    }
+
+    func recoveryJournal() throws -> PrivateKeyControlRecoveryJournal {
+        _ = try requireUnlockedAuthMode()
+        return journal
+    }
+
+    func beginRewrap(targetMode: AuthenticationMode) throws {
+        _ = try requireUnlockedAuthMode()
+        journal.rewrapTargetMode = targetMode
+        journal.rewrapPhase = .preparing
+    }
+
+    func markRewrapCommitRequired() throws {
+        _ = try requireUnlockedAuthMode()
+        guard journal.rewrapTargetMode != nil else {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        journal.rewrapPhase = .commitRequired
+    }
+
+    func completeRewrap(targetMode: AuthenticationMode) throws {
+        _ = try requireUnlockedAuthMode()
+        if failNextCompleteRewrap {
+            failNextCompleteRewrap = false
+            throw CommonHelpersTestError.delayedFailure
+        }
+        mode = targetMode
+        journal.rewrapTargetMode = nil
+        journal.rewrapPhase = nil
+    }
+
+    func clearRewrapJournal() throws {
+        _ = try requireUnlockedAuthMode()
+        journal.rewrapTargetMode = nil
+        journal.rewrapPhase = nil
+    }
+
+    func beginModifyExpiry(fingerprint: String) throws {
+        _ = try requireUnlockedAuthMode()
+        journal.modifyExpiry = ModifyExpiryRecoveryEntry(fingerprint: fingerprint)
+    }
+
+    func clearModifyExpiryJournal() throws {
+        _ = try requireUnlockedAuthMode()
+        journal.modifyExpiry = nil
+    }
+
+    func clearModifyExpiryJournalIfMatches(fingerprint: String) throws {
+        _ = try requireUnlockedAuthMode()
+        if journal.modifyExpiry?.fingerprint == fingerprint {
+            journal.modifyExpiry = nil
+        }
+    }
+}
+
 @MainActor
 final class CommonHelpersTests: XCTestCase {
     func test_securityScopedFileAccess_failure_stopsPreviouslyStartedResources() async {
@@ -418,6 +499,178 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertNotNil(merged)
         XCTAssertFalse(merged?.contains("fingerprint") == true)
         XCTAssertFalse(merged?.contains("89abcdef") == true)
+    }
+
+    func test_rewrapRecovery_commitRequiredNoPending_retriesTargetModePersistence() throws {
+        let keychain = MockKeychain()
+        let fingerprint = "commit-required-\(UUID().uuidString)"
+        try savePermanentRecoveryBundle(in: keychain, fingerprint: fingerprint)
+
+        let privateKeyControlStore = FailingCompleteRewrapPrivateKeyControlStore(
+            mode: .standard,
+            journal: PrivateKeyControlRecoveryJournal(
+                rewrapTargetMode: .highSecurity,
+                rewrapPhase: .commitRequired
+            )
+        )
+        privateKeyControlStore.failNextCompleteRewrap = true
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        let firstSummary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(firstSummary?.outcomes, [.noActionSafe, .retryableFailure])
+        XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapTargetMode, .highSecurity)
+        XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapPhase, .commitRequired)
+        XCTAssertEqual(authManager.currentMode, .standard)
+        XCTAssertFalse(firstSummary?.startupDiagnostics.isEmpty ?? true)
+
+        let secondSummary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(secondSummary?.outcomes, [.noActionSafe])
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapPhase)
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
+    }
+
+    func test_rewrapRecovery_preparingNoPending_clearsJournalWithoutChangingMode() throws {
+        let keychain = MockKeychain()
+        let fingerprint = "preparing-\(UUID().uuidString)"
+        try savePermanentRecoveryBundle(in: keychain, fingerprint: fingerprint)
+
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(summary?.outcomes, [.noActionSafe])
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapPhase)
+        XCTAssertEqual(authManager.currentMode, .standard)
+    }
+
+    func test_rewrapRecovery_commitRequiredOldAndPending_cleansPendingKeepsOldMode() throws {
+        let keychain = MockKeychain()
+        let fingerprint = "commit-clean-\(UUID().uuidString)"
+        try savePermanentRecoveryBundle(in: keychain, fingerprint: fingerprint)
+        try savePendingRecoveryBundle(in: keychain, fingerprint: fingerprint)
+
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
+        try privateKeyControlStore.markRewrapCommitRequired()
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(summary?.outcomes, [.cleanedPendingSafe])
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapPhase)
+        XCTAssertEqual(authManager.currentMode, .standard)
+        XCTAssertTrue(keychain.exists(
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount
+        ))
+        XCTAssertFalse(keychain.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount
+        ))
+    }
+
+    func test_postUnlockRecoveryWarningBuilder_surfacesOnlyUnsafeOutcomes() {
+        let retryableWarning = AppContainer.postUnlockRecoveryLoadWarning(
+            rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.noActionSafe, .retryableFailure]),
+            modifyExpiryOutcome: nil
+        )
+        XCTAssertNotNil(retryableWarning)
+        XCTAssertTrue(retryableWarning?.contains("retry") == true)
+
+        let duplicateWarning = AppContainer.postUnlockRecoveryLoadWarning(
+            rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.retryableFailure]),
+            modifyExpiryOutcome: .retryableFailure
+        )
+        XCTAssertEqual(duplicateWarning?.components(separatedBy: "\n").count, 1)
+
+        let unrecoverableWarning = AppContainer.postUnlockRecoveryLoadWarning(
+            rewrapSummary: nil,
+            modifyExpiryOutcome: .unrecoverable
+        )
+        XCTAssertNotNil(unrecoverableWarning)
+        XCTAssertTrue(unrecoverableWarning?.contains("Restore from backup") == true)
+
+        XCTAssertNil(AppContainer.postUnlockRecoveryLoadWarning(
+            rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.noActionSafe, .cleanedPendingSafe]),
+            modifyExpiryOutcome: .cleanedPendingSafe
+        ))
+    }
+
+    private func makeRecoveryAuthenticationManager(
+        keychain: MockKeychain,
+        privateKeyControlStore: any PrivateKeyControlStoreProtocol
+    ) -> AuthenticationManager {
+        AuthenticationManager(
+            secureEnclave: MockSecureEnclave(),
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+    }
+
+    private func savePermanentRecoveryBundle(
+        in keychain: MockKeychain,
+        fingerprint: String
+    ) throws {
+        let account = KeychainConstants.defaultAccount
+        try keychain.save(
+            Data("permanent-se-key".utf8),
+            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try keychain.save(
+            Data("permanent-salt".utf8),
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try keychain.save(
+            Data("permanent-sealed".utf8),
+            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+    }
+
+    private func savePendingRecoveryBundle(
+        in keychain: MockKeychain,
+        fingerprint: String
+    ) throws {
+        let account = KeychainConstants.defaultAccount
+        try keychain.save(
+            Data("pending-se-key".utf8),
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try keychain.save(
+            Data("pending-salt".utf8),
+            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+        try keychain.save(
+            Data("pending-sealed".utf8),
+            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
     }
 
     func test_appStartupCoordinator_deletedKeyDoesNotRestoreInterruptedModifyExpiryBundle() async throws {
