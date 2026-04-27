@@ -54,6 +54,10 @@ def stable_release_url(repository_full_name: str, release_tag: str) -> str:
     return f"https://github.com/{repository_full_name}/releases/tag/{release_tag}"
 
 
+def canonical_repository_url(repository_full_name: str) -> str:
+    return f"https://github.com/{repository_full_name}.git"
+
+
 def write_candidate_release_metadata(
     output_path: Path,
     *,
@@ -97,13 +101,13 @@ def head_commit_sha(repo_root: Path) -> str:
     return run_git(repo_root, "rev-parse", "HEAD").stdout.strip()
 
 
-def remote_tag_commit_sha(repo_root: Path, release_tag: str, remote_name: str = "origin") -> str:
+def remote_tag_commit_sha(repo_root: Path, release_tag: str, repository_url: str) -> str:
     try:
         completed = run_git(
             repo_root,
             "ls-remote",
             "--tags",
-            remote_name,
+            repository_url,
             f"refs/tags/{release_tag}",
             f"refs/tags/{release_tag}^{{}}",
         )
@@ -111,7 +115,7 @@ def remote_tag_commit_sha(repo_root: Path, release_tag: str, remote_name: str = 
         detail = error.stderr.strip()
         detail_suffix = f" Git reported: {detail}" if detail else ""
         raise CandidateValidationError(
-            f"Unable to resolve stable tag {release_tag} from remote {remote_name}.{detail_suffix}"
+            f"Unable to resolve stable tag {release_tag} from canonical repository {repository_url}.{detail_suffix}"
         ) from error
 
     direct_sha = ""
@@ -129,7 +133,7 @@ def remote_tag_commit_sha(repo_root: Path, release_tag: str, remote_name: str = 
     resolved_sha = peeled_sha or direct_sha
     if not resolved_sha:
         raise CandidateValidationError(
-            f"Stable tag {release_tag} was not found on remote {remote_name}."
+            f"Stable tag {release_tag} was not found on canonical repository {repository_url}."
         )
     return resolved_sha
 
@@ -353,7 +357,11 @@ def validate_candidate_release(
         validate_stable_release_arm64e_manifest(repository_full_name, release_tag)
 
     local_head_sha = head_commit_sha(repo_root)
-    remote_tag_sha = remote_tag_commit_sha(repo_root, release_tag)
+    remote_tag_sha = remote_tag_commit_sha(
+        repo_root,
+        release_tag,
+        canonical_repository_url(repository_full_name),
+    )
     if local_head_sha != remote_tag_sha:
         raise CandidateValidationError(
             "App Store candidate archives must match the remote stable tag commit.\n"

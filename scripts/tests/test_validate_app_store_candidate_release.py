@@ -19,17 +19,18 @@ module = load_script_module(
 class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
     def test_clean_main_repo_matching_remote_tag_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
             release_tag = create_annotated_stable_tag(repo_root)
             with mock.patch.object(module, "stable_release_exists", return_value=True):
-                validated_tag = module.validate_candidate_release(
-                    repo_root=repo_root,
-                    marketing_version="1.2.9",
-                    build_number="3",
-                    repository_full_name="cypherair/cypherair",
-                    require_stable_release=True,
-                    require_arm64e_release_manifest=False,
-                )
+                with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                    validated_tag = module.validate_candidate_release(
+                        repo_root=repo_root,
+                        marketing_version="1.2.9",
+                        build_number="3",
+                        repository_full_name="cypherair/cypherair",
+                        require_stable_release=True,
+                        require_arm64e_release_manifest=False,
+                    )
             self.assertEqual(validated_tag, release_tag)
 
     def test_non_main_branch_fails(self) -> None:
@@ -82,18 +83,19 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_untracked_files_do_not_block_candidate(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             (repo_root / "notes.txt").write_text("scratch\n", encoding="utf-8")
             with mock.patch.object(module, "stable_release_exists", return_value=True):
-                module.validate_candidate_release(
-                    repo_root=repo_root,
-                    marketing_version="1.2.9",
-                    build_number="3",
-                    repository_full_name="cypherair/cypherair",
-                    require_stable_release=True,
-                    require_arm64e_release_manifest=False,
-                )
+                with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                    module.validate_candidate_release(
+                        repo_root=repo_root,
+                        marketing_version="1.2.9",
+                        build_number="3",
+                        repository_full_name="cypherair/cypherair",
+                        require_stable_release=True,
+                        require_arm64e_release_manifest=False,
+                    )
 
     def test_missing_release_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -110,29 +112,30 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         require_arm64e_release_manifest=False,
                     )
 
-    def test_missing_origin_remote_is_reported_as_candidate_validation_error(self) -> None:
+    def test_fork_origin_tag_mismatch_does_not_override_canonical_stable_tag(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             temp_root = Path(temp_dir_name)
-            repo_root = temp_root / "repo"
-            upstream_root = temp_root / "upstream.git"
+            repo_root, canonical_remote = init_repo_with_remote(temp_root)
+            release_tag = create_annotated_stable_tag(repo_root)
+            fork_remote = temp_root / "fork.git"
+            fork_work = temp_root / "fork-work"
 
-            run(["git", "init", "--bare", str(upstream_root)])
-            run(["git", "init", "-b", "main", str(repo_root)])
-            run(["git", "config", "user.name", "Codex Tests"], cwd=repo_root)
-            run(["git", "config", "user.email", "codex-tests@example.com"], cwd=repo_root)
-
-            tracked_file = repo_root / "tracked.txt"
-            tracked_file.write_text("base\n", encoding="utf-8")
-            run(["git", "add", "tracked.txt"], cwd=repo_root)
-            run(["git", "commit", "-m", "Initial commit"], cwd=repo_root)
-            run(["git", "remote", "add", "upstream", str(upstream_root)], cwd=repo_root)
+            run(["git", "init", "--bare", str(fork_remote)])
+            run(["git", "init", "-b", "main", str(fork_work)])
+            run(["git", "config", "user.name", "Codex Tests"], cwd=fork_work)
+            run(["git", "config", "user.email", "codex-tests@example.com"], cwd=fork_work)
+            (fork_work / "tracked.txt").write_text("fork\n", encoding="utf-8")
+            run(["git", "add", "tracked.txt"], cwd=fork_work)
+            run(["git", "commit", "-m", "Fork commit"], cwd=fork_work)
+            run(["git", "tag", "-a", release_tag, "-m", "fork tag"], cwd=fork_work)
+            run(["git", "remote", "add", "origin", str(fork_remote)], cwd=fork_work)
+            run(["git", "push", "-u", "origin", "main"], cwd=fork_work)
+            run(["git", "push", "origin", release_tag], cwd=fork_work)
+            run(["git", "remote", "set-url", "origin", str(fork_remote)], cwd=repo_root)
 
             with mock.patch.object(module, "stable_release_exists", return_value=True):
-                with self.assertRaisesRegex(
-                    module.CandidateValidationError,
-                    r"Unable to resolve stable tag .* remote origin",
-                ):
-                    module.validate_candidate_release(
+                with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                    validated_tag = module.validate_candidate_release(
                         repo_root=repo_root,
                         marketing_version="1.2.9",
                         build_number="3",
@@ -140,24 +143,46 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                         require_stable_release=True,
                         require_arm64e_release_manifest=False,
                     )
+            self.assertEqual(validated_tag, release_tag)
 
     def test_head_mismatch_against_remote_tag_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root)
             (repo_root / "tracked.txt").write_text("new commit\n", encoding="utf-8")
             run(["git", "add", "tracked.txt"], cwd=repo_root)
             run(["git", "commit", "-m", "Advance head"], cwd=repo_root)
             with mock.patch.object(module, "stable_release_exists", return_value=True):
-                with self.assertRaisesRegex(module.CandidateValidationError, "must match the remote stable tag commit"):
-                    module.validate_candidate_release(
-                        repo_root=repo_root,
-                        marketing_version="1.2.9",
-                        build_number="3",
-                        repository_full_name="cypherair/cypherair",
-                        require_stable_release=True,
-                        require_arm64e_release_manifest=False,
-                    )
+                with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                    with self.assertRaisesRegex(module.CandidateValidationError, "must match the remote stable tag commit"):
+                        module.validate_candidate_release(
+                            repo_root=repo_root,
+                            marketing_version="1.2.9",
+                            build_number="3",
+                            repository_full_name="cypherair/cypherair",
+                            require_stable_release=True,
+                            require_arm64e_release_manifest=False,
+                        )
+
+    def test_missing_canonical_stable_tag_fails_even_when_origin_has_tag(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_root = Path(temp_dir_name)
+            repo_root, _ = init_repo_with_remote(temp_root)
+            create_annotated_stable_tag(repo_root)
+            canonical_remote = temp_root / "canonical-without-tag.git"
+            run(["git", "init", "--bare", str(canonical_remote)])
+
+            with mock.patch.object(module, "stable_release_exists", return_value=True):
+                with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                    with self.assertRaisesRegex(module.CandidateValidationError, "was not found on canonical repository"):
+                        module.validate_candidate_release(
+                            repo_root=repo_root,
+                            marketing_version="1.2.9",
+                            build_number="3",
+                            repository_full_name="cypherair/cypherair",
+                            require_stable_release=True,
+                            require_arm64e_release_manifest=False,
+                        )
 
     def test_arm64e_release_manifest_is_required_when_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -201,7 +226,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
     def test_main_writes_candidate_release_metadata_on_success(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
-            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
             create_annotated_stable_tag(repo_root, build_number="4")
             output_path = Path(temp_dir_name) / "SourceComplianceOverrides.json"
             args = argparse.Namespace(
@@ -216,7 +241,8 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
 
             with mock.patch.object(module, "parse_args", return_value=args):
                 with mock.patch.object(module, "stable_release_exists", return_value=True):
-                    module.main()
+                    with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                        module.main()
 
             self.assertEqual(
                 json.loads(output_path.read_text(encoding="utf-8")),
