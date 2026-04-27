@@ -142,6 +142,7 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
     func performCreateDomainTransaction(
         domainID: ProtectedDataDomainID,
         initialCommittedState: ProtectedDataCommittedDomainState = .active,
+        validateBeforeJournal: @escaping @Sendable (ProtectedDataRegistry) throws -> Void = { _ in },
         provisionSharedResourceIfNeeded: @escaping @Sendable () async throws -> Void,
         stageArtifacts: @escaping @Sendable () async throws -> Void,
         validateArtifacts: @escaping @Sendable () async throws -> Void
@@ -149,6 +150,7 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
         try await mutationGate.run { [self] in
             var registry = try loadRegistry()
             try assertMutationPreconditions(registry: registry, targetDomainID: domainID, operation: "create")
+            try validateBeforeJournal(registry)
             let isFirstCommittedDomain = registry.committedMembership.isEmpty
 
             registry.pendingMutation = .createDomain(targetDomainID: domainID, phase: .journaled)
@@ -193,6 +195,87 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
             registry.pendingMutation = nil
             try saveRegistry(registry)
             return registry
+        }
+    }
+
+    func completePendingCreate(
+        domainID: ProtectedDataDomainID,
+        initialCommittedState: ProtectedDataCommittedDomainState = .active,
+        stageArtifacts: @escaping @Sendable () async throws -> Void,
+        validateArtifacts: @escaping @Sendable () async throws -> Void
+    ) async throws -> ProtectedDataRegistry {
+        try await mutationGate.run { [self] in
+            var registry = try loadRegistry()
+            guard case let .createDomain(targetDomainID, phase)? = registry.pendingMutation,
+                    targetDomainID == domainID else {
+                throw ProtectedDataError.invalidRegistry(
+                    "Pending create for domain \(domainID.rawValue) is missing."
+                )
+            }
+
+            if registry.committedMembership.isEmpty && registry.sharedResourceLifecycleState == .absent {
+                throw ProtectedDataError.invalidRegistry(
+                    "First-domain pending create for \(domainID.rawValue) cannot continue without resetting."
+                )
+            }
+
+            guard registry.sharedResourceLifecycleState == .ready else {
+                throw ProtectedDataError.invalidRegistry(
+                    "Pending create for \(domainID.rawValue) requires a ready shared resource."
+                )
+            }
+
+            var currentPhase = phase
+            switch currentPhase {
+            case .journaled, .sharedResourceProvisioned:
+                try await stageArtifacts()
+                registry = try loadRegistry()
+                registry.pendingMutation = .createDomain(
+                    targetDomainID: domainID,
+                    phase: .artifactsStaged
+                )
+                try saveRegistry(registry)
+                currentPhase = .artifactsStaged
+            case .artifactsStaged, .validated, .membershipCommitted:
+                break
+            }
+
+            if currentPhase == .artifactsStaged {
+                try await validateArtifacts()
+                registry = try loadRegistry()
+                registry.pendingMutation = .createDomain(
+                    targetDomainID: domainID,
+                    phase: .validated
+                )
+                try saveRegistry(registry)
+                currentPhase = .validated
+            }
+
+            if currentPhase == .validated {
+                registry = try loadRegistry()
+                registry.committedMembership[domainID] = initialCommittedState
+                registry.sharedResourceLifecycleState = .ready
+                registry.pendingMutation = .createDomain(
+                    targetDomainID: domainID,
+                    phase: .membershipCommitted
+                )
+                try saveRegistry(registry)
+                currentPhase = .membershipCommitted
+            }
+
+            if currentPhase == .membershipCommitted {
+                registry = try loadRegistry()
+                guard registry.committedMembership[domainID] != nil else {
+                    throw ProtectedDataError.invalidRegistry(
+                        "Pending create membershipCommitted requires \(domainID.rawValue) to be committed."
+                    )
+                }
+                registry.sharedResourceLifecycleState = .ready
+                registry.pendingMutation = nil
+                try saveRegistry(registry)
+            }
+
+            return try loadRegistry()
         }
     }
 
@@ -287,8 +370,8 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
 
             switch pendingMutation {
             case .createDomain(_, let phase):
-                // Accepted limitation: first-domain pending create rows stay reset-only
-                // because ordinary shared-right authorization is valid only in `ready`.
+                // First-domain pending create rows stay reset-only because ordinary
+                // shared-root authorization is valid only after the registry is ready.
                 if registry.committedMembership.isEmpty && registry.sharedResourceLifecycleState == .absent {
                     return .resetRequired
                 }

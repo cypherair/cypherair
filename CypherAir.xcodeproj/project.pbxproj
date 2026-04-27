@@ -12,7 +12,6 @@
 		CE0065262F676EBC008604AB /* AppIconC.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065242F676EBC008604AB /* AppIconC.icon */; };
 		CE0065272F676EBC008604AB /* AppIconA.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065222F676EBC008604AB /* AppIconA.icon */; };
 		CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE58C0002F96000000000001 /* PgpMobile.xcframework */; };
-		CE58C0072F96000000000001 /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = CE58C0062F96000000000001 /* Settings.bundle */; };
 		CEB560272F944C05004A1CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CEB560262F944C05004A1CA7 /* Assets.xcassets */; };
 		CEF297622F7612DF00DB6BF6 /* AppIconD.icon in Resources */ = {isa = PBXBuildFile; fileRef = CEF297612F7612DF00DB6BF6 /* AppIconD.icon */; };
 /* End PBXBuildFile section */
@@ -43,7 +42,7 @@
 		CE0065232F676EBC008604AB /* AppIconB.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconB.icon; sourceTree = "<group>"; };
 		CE0065242F676EBC008604AB /* AppIconC.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconC.icon; sourceTree = "<group>"; };
 		CE58C0002F96000000000001 /* PgpMobile.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = PgpMobile.xcframework; sourceTree = "<group>"; };
-		CE58C0062F96000000000001 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.plug-in; path = Settings.bundle; sourceTree = "<group>"; };
+		CE58C0062F96000000000001 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
 		CE5F0F372F75EF3E007C896C /* CypherAir.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAir.entitlements; sourceTree = "<group>"; };
 		CE5F0F382F75EF45007C896C /* CypherAirMacOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAirMacOS.entitlements; sourceTree = "<group>"; };
 		CEB560262F944C05004A1CA7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -188,6 +187,7 @@
 				Security/ProtectedData/AppSessionOrchestrator.swift,
 				Security/ProtectedData/ProtectedDataDeviceBinding.swift,
 				Security/ProtectedData/ProtectedDataDomain.swift,
+				Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift,
 				Security/ProtectedData/ProtectedDataRegistry.swift,
 				Security/ProtectedData/ProtectedDataRegistryStore.swift,
 				Security/ProtectedData/ProtectedDataRelockParticipant.swift,
@@ -410,7 +410,6 @@
 				CE0065252F676EBC008604AB /* AppIconB.icon in Resources */,
 				CEF297622F7612DF00DB6BF6 /* AppIconD.icon in Resources */,
 				CEB560272F944C05004A1CA7 /* Assets.xcassets in Resources */,
-				CE58C0072F96000000000001 /* Settings.bundle in Resources */,
 				CE0065262F676EBC008604AB /* AppIconC.icon in Resources */,
 				CE0065272F676EBC008604AB /* AppIconA.icon in Resources */,
 				CE0065172F652334008604AB /* AppIcon.icon in Resources */,
@@ -440,18 +439,20 @@
 			files = (
 			);
 			inputFileListPaths = (
+				"$(SRCROOT)/Tests/FixtureResources.xcfilelist",
 			);
 			inputPaths = (
-				"$(SRCROOT)/Tests/Fixtures",
+				"$(SRCROOT)/Tests/FixtureResources.xcfilelist",
 			);
 			outputFileListPaths = (
+				"$(SRCROOT)/Tests/FixtureResources.outputs.xcfilelist",
 			);
 			outputPaths = (
 				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Fixtures",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "FIXTURE_SRC=\"${SRCROOT}/Tests/Fixtures\"\nFIXTURE_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Fixtures\"\nmkdir -p \"$FIXTURE_DST\"\nfor ext in asc gpg sig txt; do\n    for f in \"$FIXTURE_SRC\"/*.\"$ext\"; do\n        [ -f \"$f\" ] && cp \"$f\" \"$FIXTURE_DST/\"\n    done\ndone\n";
+			shellScript = "set -eu\n\nFIXTURE_LIST=\"${SRCROOT}/Tests/FixtureResources.xcfilelist\"\nFIXTURE_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Fixtures\"\nmkdir -p \"$FIXTURE_DST\"\n\nresolve_fixture_path() {\n    case \"$1\" in\n        \"\\$(SRCROOT)\"/*)\n            printf '%s/%s\\n' \"$SRCROOT\" \"${1#\"\\$(SRCROOT)/\"}\"\n            ;;\n        *)\n            printf '%s\\n' \"$1\"\n            ;;\n    esac\n}\n\ncopied=0\ncopy_fixture() {\n    fixture=\"$(resolve_fixture_path \"$1\")\"\n    case \"$fixture\" in\n        *.asc|*.gpg|*.sig|*.txt)\n            cp \"$fixture\" \"$FIXTURE_DST/\"\n            copied=$((copied + 1))\n            ;;\n    esac\n}\n\nindex=0\nwhile [ \"$index\" -lt \"${SCRIPT_INPUT_FILE_COUNT:-0}\" ]; do\n    eval \"input_path=\\${SCRIPT_INPUT_FILE_$index}\"\n    copy_fixture \"$input_path\"\n    index=$((index + 1))\ndone\n\nif [ \"$copied\" -eq 0 ]; then\n    while IFS= read -r input_path; do\n        [ -n \"$input_path\" ] && copy_fixture \"$input_path\"\n    done < \"$FIXTURE_LIST\"\nfi\n";
 		};
 		CE58C0032F96000000000001 /* Check PgpMobile XCFramework */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -462,6 +463,7 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"$(SRCROOT)/PgpMobile.xcframework/Info.plist",
 			);
 			name = "Check PgpMobile XCFramework";
 			outputFileListPaths = (
@@ -483,6 +485,8 @@
 				"$(SRCROOT)/scripts/generate_source_compliance_info.py",
 				"$(SRCROOT)/pgp-mobile/Cargo.lock",
 				"$(TARGET_TEMP_DIR)/SourceComplianceOverrides.json",
+				"$(SRCROOT)/.git/HEAD",
+				"$(SRCROOT)/.git/logs/HEAD",
 			);
 			name = "Generate Source Compliance Info";
 			outputFileListPaths = (
@@ -492,7 +496,30 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\n\nOUTPUT_PATH=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SourceComplianceInfo.json\"\nMETADATA_FILE=\"${TARGET_TEMP_DIR}/SourceComplianceOverrides.json\"\nmkdir -p \"$(dirname \"$OUTPUT_PATH\")\"\nCOMMIT_SHA=\"${SOURCE_COMPLIANCE_COMMIT_SHA:-}\"\nREQUIRE_STABLE_RELEASE=\"${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}\"\n\nset -- \\\n    --cargo-lock \"${SRCROOT}/pgp-mobile/Cargo.lock\" \\\n    --marketing-version \"${MARKETING_VERSION}\" \\\n    --build-number \"${CURRENT_PROJECT_VERSION}\" \\\n    --commit-sha \"${COMMIT_SHA}\" \\\n    --repository-url \"https://github.com/cypherair/cypherair\" \\\n    --stable-release-tag \"${SOURCE_COMPLIANCE_STABLE_RELEASE_TAG:-}\" \\\n    --stable-release-url \"${SOURCE_COMPLIANCE_STABLE_RELEASE_URL:-}\" \\\n    --require-stable-release \"${REQUIRE_STABLE_RELEASE}\" \\\n    --output \"$OUTPUT_PATH\"\n\nif [ -f \"$METADATA_FILE\" ]; then\n    set -- \"$@\" --metadata-file \"$METADATA_FILE\"\nfi\n\npython3 \"${SRCROOT}/scripts/generate_source_compliance_info.py\" \"$@\"\n";
+			shellScript = "set -euo pipefail\n\nOUTPUT_PATH=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SourceComplianceInfo.json\"\nMETADATA_FILE=\"${TARGET_TEMP_DIR}/SourceComplianceOverrides.json\"\nmkdir -p \"$(dirname \"$OUTPUT_PATH\")\"\nCOMMIT_SHA=\"${SOURCE_COMPLIANCE_COMMIT_SHA:-}\"\nREQUIRE_STABLE_RELEASE=\"${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}\"\n\ncase \"$REQUIRE_STABLE_RELEASE\" in\n    YES|yes|TRUE|true|1)\n        if [ -z \"$COMMIT_SHA\" ]; then\n            GIT_HEAD_FILE=\"${SRCROOT}/.git/HEAD\"\n            GIT_HEAD_LOG_FILE=\"${SRCROOT}/.git/logs/HEAD\"\n            if [ -f \"$GIT_HEAD_FILE\" ]; then\n                HEAD_VALUE=\"$(sed -n '1p' \"$GIT_HEAD_FILE\")\"\n                if printf '%s\\n' \"$HEAD_VALUE\" | grep -Eq '^[0-9a-fA-F]{40}$'; then\n                    COMMIT_SHA=\"$HEAD_VALUE\"\n                elif [ -f \"$GIT_HEAD_LOG_FILE\" ]; then\n                    COMMIT_SHA=\"$(awk 'NF >= 2 { sha=$2 } END { print sha }' \"$GIT_HEAD_LOG_FILE\")\"\n                fi\n            fi\n            if ! printf '%s\\n' \"$COMMIT_SHA\" | grep -Eq '^[0-9a-fA-F]{40}$'; then\n                echo \"error: stable-required build must resolve an exact git commit SHA from SOURCE_COMPLIANCE_COMMIT_SHA or sandbox-declared git metadata.\"\n                exit 1\n            fi\n        fi\n        ;;\nesac\n\nset -- \\\n    --cargo-lock \"${SRCROOT}/pgp-mobile/Cargo.lock\" \\\n    --marketing-version \"${MARKETING_VERSION}\" \\\n    --build-number \"${CURRENT_PROJECT_VERSION}\" \\\n    --commit-sha \"${COMMIT_SHA}\" \\\n    --repository-url \"https://github.com/cypherair/cypherair\" \\\n    --stable-release-tag \"${SOURCE_COMPLIANCE_STABLE_RELEASE_TAG:-}\" \\\n    --stable-release-url \"${SOURCE_COMPLIANCE_STABLE_RELEASE_URL:-}\" \\\n    --require-stable-release \"${REQUIRE_STABLE_RELEASE}\" \\\n    --output \"$OUTPUT_PATH\"\n\nif [ -f \"$METADATA_FILE\" ]; then\n    set -- \"$@\" --metadata-file \"$METADATA_FILE\"\nfi\n\npython3 \"${SRCROOT}/scripts/generate_source_compliance_info.py\" \"$@\"\n";
+		};
+		CE58C0052F96000000000001 /* Snapshot Repository Audit Inputs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"$(SRCROOT)/Tests/RepositoryAuditInputs.xcfilelist",
+			);
+			inputPaths = (
+				"$(SRCROOT)/Tests/RepositoryAuditInputs.xcfilelist",
+			);
+			name = "Snapshot Repository Audit Inputs";
+			outputFileListPaths = (
+				"$(SRCROOT)/Tests/RepositoryAuditOutputs.xcfilelist",
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\n\nSNAPSHOT_LIST=\"${SRCROOT}/Tests/RepositoryAuditInputs.xcfilelist\"\nSNAPSHOT_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RepositoryAudit\"\nmkdir -p \"$SNAPSHOT_DST/Sources\"\n\nresolve_snapshot_path() {\n    case \"$1\" in\n        \"\\$(SRCROOT)\"/*)\n            printf '%s/%s\\n' \"$SRCROOT\" \"${1#\"\\$(SRCROOT)/\"}\"\n            ;;\n        *)\n            printf '%s\\n' \"$1\"\n            ;;\n    esac\n}\n\ncopied=0\ncopy_snapshot_input() {\n    input_path=\"$(resolve_snapshot_path \"$1\")\"\n    case \"$input_path\" in\n        \"$SRCROOT\"/Sources/*)\n            relative_path=\"${input_path#\"$SRCROOT\"/}\"\n            output_path=\"$SNAPSHOT_DST/$relative_path\"\n            mkdir -p \"$(dirname \"$output_path\")\"\n            cp \"$input_path\" \"$output_path\"\n            copied=$((copied + 1))\n            ;;\n    esac\n}\n\nindex=0\nwhile [ \"$index\" -lt \"${SCRIPT_INPUT_FILE_COUNT:-0}\" ]; do\n    eval \"input_path=\\${SCRIPT_INPUT_FILE_$index}\"\n    copy_snapshot_input \"$input_path\"\n    index=$((index + 1))\ndone\n\nif [ \"$copied\" -eq 0 ]; then\n    while IFS= read -r input_path; do\n        [ -n \"$input_path\" ] && copy_snapshot_input \"$input_path\"\n    done < \"$SNAPSHOT_LIST\"\nfi\n\n[ -f \"$SNAPSHOT_DST/Sources/App/Encrypt/EncryptView.swift\" ]\n[ -f \"$SNAPSHOT_DST/Sources/Resources/Localizable.xcstrings\" ]\n[ -f \"$SNAPSHOT_DST/Sources/Resources/InfoPlist.xcstrings\" ]\n";
 		};
 		CE58C0082F96000000000001 /* Sync Settings Bundle Version */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -503,37 +530,28 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"$(SRCROOT)/Settings.bundle/Acknowledgements.plist",
 				"$(SRCROOT)/Settings.bundle/Root.plist",
+				"$(SRCROOT)/Settings.bundle/en.lproj/Acknowledgements.strings",
+				"$(SRCROOT)/Settings.bundle/en.lproj/Root.strings",
+				"$(SRCROOT)/Settings.bundle/zh-Hans.lproj/Acknowledgements.strings",
+				"$(SRCROOT)/Settings.bundle/zh-Hans.lproj/Root.strings",
 			);
 			name = "Sync Settings Bundle Version";
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Settings.bundle",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Settings.bundle/Acknowledgements.plist",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Settings.bundle/Root.plist",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Settings.bundle/en.lproj/Acknowledgements.strings",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Settings.bundle/en.lproj/Root.strings",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Settings.bundle/zh-Hans.lproj/Acknowledgements.strings",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Settings.bundle/zh-Hans.lproj/Root.strings",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\n\nSETTINGS_ROOT=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Settings.bundle/Root.plist\"\nif [ ! -f \"$SETTINGS_ROOT\" ]; then\n    echo \"error: Settings.bundle Root.plist is missing from the built product.\"\n    exit 1\nfi\n\nVERSION_STRING=\"${MARKETING_VERSION} (${CURRENT_PROJECT_VERSION})\"\nexport SETTINGS_ROOT VERSION_STRING\npython3 - <<'PY_INNER'\nimport os\nimport plistlib\n\npath = os.environ[\"SETTINGS_ROOT\"]\nwith open(path, \"rb\") as file:\n    plist = plistlib.load(file)\n\nfor item in plist.get(\"PreferenceSpecifiers\", []):\n    if item.get(\"Key\") == \"cypherair.settings.version\":\n        item[\"DefaultValue\"] = os.environ[\"VERSION_STRING\"]\n        break\nelse:\n    raise SystemExit(\"cypherair.settings.version not found in Settings.bundle Root.plist\")\n\nwith open(path, \"wb\") as file:\n    plistlib.dump(plist, file)\nPY_INNER\n";
-		};
-		CE58C0052F96000000000001 /* Snapshot Repository Audit Inputs */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/Sources",
-			);
-			name = "Snapshot Repository Audit Inputs";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -eu\n\nSNAPSHOT_SRC=\"${SRCROOT}/Sources\"\nSNAPSHOT_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RepositoryAudit\"\n\nrm -rf \"$SNAPSHOT_DST\"\nmkdir -p \"$SNAPSHOT_DST\"\n\nrsync -a \\\n    --prune-empty-dirs \\\n    --include '*/' \\\n    --include '*.swift' \\\n    --include 'Resources/Localizable.xcstrings' \\\n    --include 'Resources/InfoPlist.xcstrings' \\\n    --exclude '*' \\\n    \"$SNAPSHOT_SRC/\" \"$SNAPSHOT_DST/Sources/\"\n\n[ -f \"$SNAPSHOT_DST/Sources/App/Encrypt/EncryptView.swift\" ]\n[ -f \"$SNAPSHOT_DST/Sources/Resources/Localizable.xcstrings\" ]\n[ -f \"$SNAPSHOT_DST/Sources/Resources/InfoPlist.xcstrings\" ]\n";
+			shellScript = "set -euo pipefail\n\nSETTINGS_SRC=\"${SRCROOT}/Settings.bundle\"\nSETTINGS_DST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Settings.bundle\"\nSETTINGS_ROOT=\"${SETTINGS_DST}/Root.plist\"\nif [ ! -f \"${SETTINGS_SRC}/Root.plist\" ]; then\n    echo \"error: Settings.bundle Root.plist is missing from the source tree.\"\n    exit 1\nfi\n\nmkdir -p \"${SETTINGS_DST}/en.lproj\" \"${SETTINGS_DST}/zh-Hans.lproj\"\ncp \"${SETTINGS_SRC}/Acknowledgements.plist\" \"${SETTINGS_DST}/Acknowledgements.plist\"\ncp \"${SETTINGS_SRC}/Root.plist\" \"${SETTINGS_ROOT}\"\ncp \"${SETTINGS_SRC}/en.lproj/Acknowledgements.strings\" \"${SETTINGS_DST}/en.lproj/Acknowledgements.strings\"\ncp \"${SETTINGS_SRC}/en.lproj/Root.strings\" \"${SETTINGS_DST}/en.lproj/Root.strings\"\ncp \"${SETTINGS_SRC}/zh-Hans.lproj/Acknowledgements.strings\" \"${SETTINGS_DST}/zh-Hans.lproj/Acknowledgements.strings\"\ncp \"${SETTINGS_SRC}/zh-Hans.lproj/Root.strings\" \"${SETTINGS_DST}/zh-Hans.lproj/Root.strings\"\n\nVERSION_STRING=\"${MARKETING_VERSION} (${CURRENT_PROJECT_VERSION})\"\nexport SETTINGS_ROOT VERSION_STRING\npython3 - <<'PY_INNER'\nimport os\nimport plistlib\n\npath = os.environ[\"SETTINGS_ROOT\"]\nwith open(path, \"rb\") as file:\n    plist = plistlib.load(file)\n\nfor item in plist.get(\"PreferenceSpecifiers\", []):\n    if item.get(\"Key\") == \"cypherair.settings.version\":\n        item[\"DefaultValue\"] = os.environ[\"VERSION_STRING\"]\n        break\nelse:\n    raise SystemExit(\"cypherair.settings.version not found in Settings.bundle Root.plist\")\n\nwith open(path, \"wb\") as file:\n    plistlib.dump(plist, file)\nPY_INNER\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -579,7 +597,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
@@ -614,7 +632,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1090,7 +1108,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",

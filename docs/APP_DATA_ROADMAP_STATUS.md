@@ -1,6 +1,6 @@
 # AppData Roadmap Status
 
-> **Last reviewed:** 2026-04-26
+> **Last reviewed:** 2026-04-27
 > **Status:** Current progress record for the AppData protection roadmap.
 > **Scope:** Documents code-backed progress for AppData Phase 1-9 and the persistent-state inventory. This file does not change roadmap order or authorize implementation work by itself.
 > **Related documents:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
@@ -12,7 +12,7 @@
 | Phase 1 | Protected App-Data Framework | Implemented | `ProtectedDataRegistry`, registry bootstrap/classification, root-secret authorization, app-session access gate, relock, and recovery dispatch are implemented and covered by `ProtectedDataFrameworkTests`. |
 | Phase 2 | File-Protection Baseline | Implemented for ProtectedData storage | `ProtectedDataStorageRoot` applies and verifies `.complete` file protection for registry, bootstrap metadata, scratch writes, and wrapped-DMK files. Coverage lives in `ProtectedDataStorageRootTests`. |
 | Phase 3 | First Low-Risk Real Domain | Implemented narrowly | The first real domain is `protected-settings`; the only migrated setting is `clipboardNotice`. Other ordinary settings remain outside this phase and are tracked as Phase 7 targets. |
-| Phase 4 | Post-Unlock Multi-Domain Orchestration And Framework Hardening | Partial | Post-unlock handoff exists and can open registered committed domains with the app-authenticated `LAContext`. Remaining work includes a second real production domain, second-domain create/delete/recovery coverage, and pending-create continuation hardening. |
+| Phase 4 | Post-Unlock Multi-Domain Orchestration And Framework Hardening | Implemented | Production wiring registers `protected-settings` plus the framework-owned `protected-framework-sentinel` domain. Post-unlock handoff can create/open the sentinel as a second domain after settings is committed, generic recovery dispatch is keyed by `ProtectedDataDomainID`, and second-domain create/delete/recovery plus pending-create continuation coverage live in `ProtectedDataFrameworkTests`. |
 | Phase 5 | Private-Key Control Domain | Pending | `authMode` and private-key recovery flags remain in `UserDefaults`; this phase must create `private-key-control` before moving them. |
 | Phase 6 | Key Metadata Domain | Pending | `PGPKeyIdentity` metadata remains in the transitional Keychain metadata account. |
 | Phase 7 | Non-Contacts Protected-After-Unlock Domains | Pending / partial by surface | Ordinary settings other than `clipboardNotice`, self-test state, and temporary/export/tutorial cleanup or file-protection work remain here unless explicitly classified as an exception. |
@@ -31,20 +31,22 @@ Phase 3 does not mean all settings have moved. The remaining ordinary settings a
 
 ## 3. Phase 4 Boundary
 
-Phase 4 has working post-unlock orchestration, but it is not complete.
+Phase 4 is complete for framework hardening. It proves the ProtectedData substrate can operate more than one committed production domain before later product-domain migrations begin.
 
 Implemented:
 
-- `ProtectedDataPostUnlockCoordinator` opens registered committed domains after app privacy authentication.
-- Production wiring currently registers `protected-settings`.
-- Unit coverage proves committed-domain open, missing-context skip, pending-mutation skip, and legacy-migration deferral behavior.
+- `ProtectedDataPostUnlockCoordinator` opens registered committed domains after app privacy authentication and can run a registered domain's noninteractive `ensureCommittedIfNeeded` hook inside the same authenticated handoff.
+- Production and UI-test wiring register both `protected-settings` and `protected-framework-sentinel`.
+- The sentinel is framework-owned, non-user, and non-telemetry; it records only a schema version plus a fixed purpose marker.
+- The sentinel is created only when another ProtectedData domain is already committed and the shared resource is `.ready`; it never creates the first protected domain on a clean install.
+- Recovery accepts a handler list and dispatches by `ProtectedDataDomainID`; mismatched or missing handlers stay in framework recovery.
+- Non-first-domain pending creates can resume from `journaled`, `artifactsStaged`, `validated`, or clear `membershipCommitted`.
+- First-domain pre-membership pending create remains an explicit reset-required framework policy.
+- Unit coverage proves committed multi-domain post-unlock open, missing-context / empty-registry / pending-mutation no-root-secret paths, second-domain create/delete/recovery, last-domain cleanup, and recovery dispatch behavior.
 
-Remaining:
+Remaining product migrations:
 
-- prove a second real domain can be created, opened, deleted, and recovered without framework-specific assumptions
-- remove or replace first-domain pending-create reset-only limitations
-- add explicit tests for second-domain create/delete/recovery and last-domain cleanup behavior
-- keep this framework-hardening work outside the Contacts-internal PR sequence
+- `private-key-control`, `key metadata`, ordinary settings, contacts, and other protected-after-unlock surfaces remain Phase 5-8 work.
 
 ## 4. Inventory Status Rule
 

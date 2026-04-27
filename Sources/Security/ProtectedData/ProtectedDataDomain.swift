@@ -154,6 +154,13 @@ extension Data {
     }
 }
 
+func protectedDataValidateSnapshotAndZeroizeDomainMasterKey<Snapshot>(
+    _ openSnapshot: () throws -> (Snapshot, Data)
+) throws {
+    var (_, domainMasterKey) = try openSnapshot()
+    domainMasterKey.protectedDataZeroize()
+}
+
 struct SensitiveBytes: Sendable {
     private var storage: ContiguousArray<UInt8>
 
