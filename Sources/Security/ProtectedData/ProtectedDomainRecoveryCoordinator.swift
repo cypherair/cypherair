@@ -369,6 +369,27 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         (try? registryStore.loadRegistry().committedMembership[Self.domainID] != nil) ?? false
     }
 
+    func migrationAuthorizationRequirement() -> ProtectedDataMutationAuthorizationRequirement {
+        do {
+            let registry = try registryStore.loadRegistry()
+            if registry.committedMembership[Self.domainID] != nil {
+                return .notRequired
+            }
+            guard registry.classifyRecoveryDisposition() == .resumeSteadyState else {
+                return .frameworkRecoveryNeeded
+            }
+            guard !registry.committedMembership.isEmpty else {
+                return registry.sharedResourceLifecycleState == .absent ? .notRequired : .frameworkRecoveryNeeded
+            }
+            guard registry.sharedResourceLifecycleState == .ready else {
+                return .frameworkRecoveryNeeded
+            }
+            return .wrappingRootKeyRequired
+        } catch {
+            return .frameworkRecoveryNeeded
+        }
+    }
+
     func syncPreAuthorizationState() {
         do {
             let registry = try registryStore.loadRegistry()

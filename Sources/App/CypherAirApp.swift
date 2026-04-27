@@ -139,6 +139,9 @@ struct CypherAirApp: App {
                 container.appSessionOrchestrator.hasProtectedDataAuthorizationHandoffContext
             },
             authorizeSharedRight: { localizedReason, interactionMode in
+                if container.protectedDataSessionCoordinator.frameworkState == .sessionAuthorized {
+                    return .authorized
+                }
                 do {
                     let registry = try container.protectedDomainRecoveryCoordinator.loadCurrentRegistry()
                     let authenticationContext = container.appSessionOrchestrator
@@ -190,6 +193,11 @@ struct CypherAirApp: App {
             },
             currentClipboardNotice: {
                 container.protectedSettingsStore.clipboardNotice
+            },
+            migrationAuthorizationRequirement: {
+                Self.protectedSettingsMutationRequirement(
+                    container.protectedSettingsStore.migrationAuthorizationRequirement()
+                )
             },
             migrateLegacyClipboardNoticeIfNeeded: {
                 try await container.protectedSettingsStore.migrateLegacyClipboardNoticeIfNeeded(
