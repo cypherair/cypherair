@@ -50,7 +50,7 @@ CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and 
 
 ## Tech Stack
 
-- Swift 6.2
+- Apple Swift 6.3.1 (`SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release)
 - SwiftUI with iOS 26 Liquid Glass conventions where applicable and native platform chrome elsewhere
 - Rust stable for normal targets, plus the CypherAir patched Rust stage1
   toolchain for Apple `arm64e` slices

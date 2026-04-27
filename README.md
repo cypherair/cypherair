@@ -45,11 +45,11 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 | Layer | Technology |
 |-------|------------|
 | Platform | iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+, minimum 8 GB RAM |
-| Language | Swift 6.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere), UIKit for system pickers |
+| Language | Apple Swift 6.3.1, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere), UIKit for system pickers |
 | OpenPGP Engine | Sequoia PGP 2.2.0 (Rust), `crypto-openssl` backend (vendored) |
 | FFI Bridge | Mozilla UniFFI 0.31.x; Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap` |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |
-| Build | Xcode 26, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim` |
+| Build | Xcode 26.4.1, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`; `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release |
 | Localization | English + Simplified Chinese (.xcstrings) |
 
 ## Architecture
@@ -97,7 +97,7 @@ Recent refactors focused on maintainability and safety without changing the app'
 
 ### Prerequisites
 
-- macOS (Apple Silicon) with Xcode 26
+- macOS (Apple Silicon) with Xcode 26.4.1
 - Rust stable (latest) with targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin aarch64-apple-visionos aarch64-apple-visionos-sim`
 
 ### Commands

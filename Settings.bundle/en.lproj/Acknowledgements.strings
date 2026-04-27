@@ -2,7 +2,11 @@
 "Open Source" = "Open Source";
 "CypherAir is built with open-source cryptography and tooling. Complete notices and license text are available inside the app under Settings, About, Source & Compliance." = "CypherAir is built with open-source cryptography and tooling. Complete notices and license text are available inside the app under Settings, About, Source & Compliance.";
 "CypherAir" = "CypherAir";
-"OpenPGP Engine" = "OpenPGP Engine";
-"Crypto Backend" = "Crypto Backend";
-"Language Bridge" = "Language Bridge";
+"base64" = "base64";
+"OpenSSL Rust Bindings" = "OpenSSL Rust Bindings";
+"OpenSSL Source" = "OpenSSL Source";
+"Sequoia OpenPGP" = "Sequoia OpenPGP";
+"thiserror" = "thiserror";
+"UniFFI" = "UniFFI";
+"zeroize" = "zeroize";
 "Toolchain" = "Toolchain";
