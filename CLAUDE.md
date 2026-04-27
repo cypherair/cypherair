@@ -123,6 +123,12 @@ Profile selected at key generation, immutable. Multiple keys of different profil
 
 Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.md Section 4.
 
+## Release Metadata / Build Numbers
+
+Treat Xcode release metadata as user-owned state. Do not proactively modify `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION`.
+
+If `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION` has changed in any way, treat those changes as user edits and include them in the scope of the work being submitted. Do not revert the user's changes.
+
 ## Code Style (Summary)
 
 - Swift API Design Guidelines. `guard let` over force-unwrap. `async/await` over Combine.

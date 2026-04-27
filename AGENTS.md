@@ -192,9 +192,9 @@ Mode switching requires re-wrapping all Secure Enclave protected keys.
 
 ## Release Metadata / Build Numbers
 
-Treat Xcode release metadata as user-owned state. Do not modify, normalize, revert, or lower `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION` unless the user explicitly asks for a version or build-number change.
+Treat Xcode release metadata as user-owned state. Do not proactively modify `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION`.
 
-If the user asks to increment the build number, first read the current `CURRENT_PROJECT_VERSION`, then increment it by 1 unless the user specifies an exact value. Never decrease `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION`. If these fields already have uncommitted changes, treat them as user edits; do not revert, overwrite, or reinterpret them unless the user explicitly asks.
+If `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION` has changed in any way, treat those changes as user edits and include them in the scope of the work being submitted. Do not revert the user's changes.
 
 ## Coding Conventions
 
