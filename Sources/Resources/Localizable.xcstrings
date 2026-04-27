@@ -4401,6 +4401,22 @@
         }
       }
     },
+    "guidedTutorial.settings.restricted.localDataReset" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tutorial sandbox cannot reset real CypherAir data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "教程沙盒不能重置真实的 CypherAir 数据。"
+          }
+        }
+      }
+    },
     "guidedTutorial.settings.restricted.navigation" : {
       "localizations" : {
         "en" : {

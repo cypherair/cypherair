@@ -356,6 +356,61 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_localDataReset_defaultConfigurationWithService_showsEnabledSectionAndRequestWarning() {
+        let resetContainer = AppContainer.makeUITest()
+        defer { cleanup(resetContainer) }
+
+        let model = makeModel(localDataResetService: resetContainer.localDataResetService)
+
+        XCTAssertTrue(model.shouldShowLocalDataResetSection)
+        XCTAssertTrue(model.isLocalDataResetControlEnabled)
+        XCTAssertEqual(
+            model.localDataResetFooter,
+            String(
+                localized: "settings.resetAll.footer",
+                defaultValue: "Use this only when you want this device to behave like a fresh CypherAir install."
+            )
+        )
+
+        model.requestLocalDataReset()
+
+        XCTAssertTrue(model.showLocalDataResetWarning)
+    }
+
+    @MainActor
+    func test_localDataReset_defaultConfigurationWithoutService_hidesSection() {
+        let model = makeModel()
+
+        XCTAssertFalse(model.shouldShowLocalDataResetSection)
+        XCTAssertFalse(model.isLocalDataResetControlEnabled)
+    }
+
+    @MainActor
+    func test_localDataReset_tutorialConfigurationWithService_showsDisabledSectionAndBlocksRequest() {
+        let resetContainer = AppContainer.makeUITest()
+        defer { cleanup(resetContainer) }
+        let store = TutorialSessionStore()
+        let model = makeModel(
+            configuration: store.configurationFactory.settingsConfiguration(),
+            localDataResetService: resetContainer.localDataResetService
+        )
+
+        XCTAssertTrue(model.shouldShowLocalDataResetSection)
+        XCTAssertFalse(model.isLocalDataResetControlEnabled)
+        XCTAssertEqual(
+            model.localDataResetFooter,
+            String(
+                localized: "guidedTutorial.settings.restricted.localDataReset",
+                defaultValue: "The tutorial sandbox cannot reset real CypherAir data."
+            )
+        )
+
+        model.requestLocalDataReset()
+
+        XCTAssertFalse(model.showLocalDataResetWarning)
+    }
+
+    @MainActor
     func test_liveProtectedSettingsHost_authorizationRequired_preservesRecoveryNeededOnRefresh() async {
         var domainState: CypherAir.ProtectedSettingsHost.DomainState = .recoveryNeeded
         var authorizeCallCount = 0
@@ -872,6 +927,7 @@ final class SettingsScreenModelTests: XCTestCase {
         configuration: SettingsView.Configuration = .default,
         iosPresentationController: IOSPresentationController? = nil,
         macPresentationController: MacPresentationController? = nil,
+        localDataResetService: LocalDataResetService? = nil,
         authModeSwitchAction: SettingsScreenModel.AuthModeSwitchAction? = nil,
         appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? = nil
     ) -> SettingsScreenModel {
@@ -882,9 +938,22 @@ final class SettingsScreenModelTests: XCTestCase {
             iosPresentationController: iosPresentationController,
             macPresentationController: macPresentationController,
             configuration: configuration,
+            localDataResetService: localDataResetService,
             authModeSwitchAction: authModeSwitchAction,
             appAccessPolicySwitchAction: appAccessPolicySwitchAction
         )
+    }
+
+    private func cleanup(_ container: AppContainer) {
+        try? FileManager.default.removeItem(
+            at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
+        )
+        if let contactsDirectory = container.contactsDirectory {
+            try? FileManager.default.removeItem(at: contactsDirectory)
+        }
+        if let defaultsSuiteName = container.defaultsSuiteName {
+            UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
+        }
     }
 
     @MainActor

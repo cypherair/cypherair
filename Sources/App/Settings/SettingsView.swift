@@ -9,6 +9,11 @@ struct SettingsView: View {
             case tutorialSandbox
         }
 
+        enum LocalDataResetAvailability {
+            case enabled
+            case disabled(footer: String)
+        }
+
         var onAuthModeConfirmationRequested: (@MainActor (AuthModeChangeConfirmationRequest) -> Void)?
         var isOnboardingEntryEnabled = true
         var isGuidedTutorialEntryEnabled = true
@@ -16,6 +21,7 @@ struct SettingsView: View {
         var isAppIconEntryEnabled = true
         var navigationEducationFooter: String?
         var appearanceEducationFooter: String?
+        var localDataResetAvailability: LocalDataResetAvailability = .enabled
         var protectedSettingsHostMode: ProtectedSettingsHostMode = .mainWindowLive
         var protectedSettingsHost: ProtectedSettingsHost?
 
@@ -417,17 +423,12 @@ private struct SettingsScreenHostView: View {
                     systemImage: "trash"
                 )
             }
-            .disabled(model.isResettingLocalData)
+            .disabled(!model.isLocalDataResetControlEnabled)
             .accessibilityIdentifier("settings.resetAll")
         } header: {
             Text(String(localized: "settings.dangerZone", defaultValue: "Danger Zone"))
         } footer: {
-            Text(
-                String(
-                    localized: "settings.resetAll.footer",
-                    defaultValue: "Use this only when you want this device to behave like a fresh CypherAir install."
-                )
-            )
+            Text(model.localDataResetFooter)
         }
     }
 

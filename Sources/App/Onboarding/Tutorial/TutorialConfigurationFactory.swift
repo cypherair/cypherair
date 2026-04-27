@@ -186,6 +186,12 @@ struct TutorialConfigurationFactory {
         )
         configuration.protectedSettingsHostMode = .tutorialSandbox
         configuration.protectedSettingsHost = ProtectedSettingsHost(mode: .tutorialSandbox)
+        configuration.localDataResetAvailability = .disabled(
+            footer: String(
+                localized: "guidedTutorial.settings.restricted.localDataReset",
+                defaultValue: "The tutorial sandbox cannot reset real CypherAir data."
+            )
+        )
         return configuration
     }
 

@@ -102,7 +102,28 @@ final class SettingsScreenModel {
     }
 
     var shouldShowLocalDataResetSection: Bool {
-        localDataResetService != nil
+        switch configuration.localDataResetAvailability {
+        case .enabled:
+            localDataResetService != nil
+        case .disabled:
+            true
+        }
+    }
+
+    var isLocalDataResetControlEnabled: Bool {
+        isLocalDataResetAvailable && localDataResetService != nil && !isResettingLocalData
+    }
+
+    var localDataResetFooter: String {
+        switch configuration.localDataResetAvailability {
+        case .enabled:
+            String(
+                localized: "settings.resetAll.footer",
+                defaultValue: "Use this only when you want this device to behave like a fresh CypherAir install."
+            )
+        case .disabled(let footer):
+            footer
+        }
     }
 
     var canConfirmLocalDataReset: Bool {
@@ -276,7 +297,7 @@ final class SettingsScreenModel {
     }
 
     func requestLocalDataReset() {
-        guard localDataResetService != nil else { return }
+        guard isLocalDataResetControlEnabled else { return }
         showLocalDataResetWarning = true
     }
 
@@ -285,6 +306,7 @@ final class SettingsScreenModel {
     }
 
     func continueLocalDataReset() {
+        guard isLocalDataResetControlEnabled else { return }
         showLocalDataResetWarning = false
         localDataResetConfirmationPhrase = ""
         showLocalDataResetPhraseSheet = true
@@ -297,7 +319,9 @@ final class SettingsScreenModel {
     }
 
     func confirmLocalDataReset() {
-        guard canConfirmLocalDataReset, let localDataResetService else { return }
+        guard isLocalDataResetControlEnabled,
+              canConfirmLocalDataReset,
+              let localDataResetService else { return }
         showLocalDataResetPhraseSheet = false
         isResettingLocalData = true
         localDataResetSucceeded = false
@@ -350,6 +374,15 @@ final class SettingsScreenModel {
 
     private var hasBackup: Bool {
         keyManagement.keys.contains(where: \.isBackedUp)
+    }
+
+    private var isLocalDataResetAvailable: Bool {
+        switch configuration.localDataResetAvailability {
+        case .enabled:
+            true
+        case .disabled:
+            false
+        }
     }
 
     private var fallbackProtectedSettingsSectionState: ProtectedSettingsHost.SectionState {
