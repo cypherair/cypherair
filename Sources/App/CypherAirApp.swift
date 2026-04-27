@@ -765,6 +765,7 @@ struct CypherAirApp: App {
             )
                 .environment(container.config)
                 .environment(tutorialStore)
+                .environment(container.appSessionOrchestrator)
                 .environment(\.iosPresentationController, iosPresentationControllerValue)
         }
     }
