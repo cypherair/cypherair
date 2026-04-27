@@ -185,10 +185,10 @@
 				Security/Mocks/MockMemoryInfo.swift,
 				Security/Mocks/MockSecureEnclave.swift,
 				Security/ProtectedData/AppSessionOrchestrator.swift,
+				Security/ProtectedData/PrivateKeyControlStore.swift,
 				Security/ProtectedData/ProtectedDataDeviceBinding.swift,
 				Security/ProtectedData/ProtectedDataDomain.swift,
 				Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift,
-				Security/ProtectedData/PrivateKeyControlStore.swift,
 				Security/ProtectedData/ProtectedDataRegistry.swift,
 				Security/ProtectedData/ProtectedDataRegistryStore.swift,
 				Security/ProtectedData/ProtectedDataRelockParticipant.swift,
@@ -713,7 +713,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.3.5;
+				MARKETING_VERSION = 1.3.6;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -938,7 +938,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.3.5;
+				MARKETING_VERSION = 1.3.6;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -1083,7 +1083,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.3.5;
+				MARKETING_VERSION = 1.3.6;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
