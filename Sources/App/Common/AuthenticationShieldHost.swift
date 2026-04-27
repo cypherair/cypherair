@@ -375,13 +375,17 @@ private struct AuthenticationShieldHostModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
+        let coordinator = coordinator
+        let presentationState = coordinator?.presentationState
+
         let base = ZStack {
             content
 
             if let coordinator,
-               let presentationState = coordinator.presentationState {
+               let presentationState {
                 AuthenticationShieldView(presentationState: presentationState)
                     .zIndex(10)
+                    .transition(.asymmetric(insertion: .identity, removal: .opacity))
                     .onAppear {
                         coordinator.noteRenderVisible(presentationState)
                     }
@@ -390,6 +394,10 @@ private struct AuthenticationShieldHostModifier: ViewModifier {
                     }
             }
         }
+        .animation(
+            presentationState == nil ? .easeOut(duration: AuthenticationShieldAnimation.overlayDismissalDuration) : nil,
+            value: presentationState
+        )
 
         if handlesLifecycleEvents {
             lifecycleAwareBody(base)
@@ -433,6 +441,8 @@ private struct AuthenticationShieldView: View {
     let presentationState: AuthenticationShieldPresentationState
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var cardIsPresented = false
+    @State private var accentSweepIsActive = false
 
     var body: some View {
         ZStack {
@@ -440,41 +450,15 @@ private struct AuthenticationShieldView: View {
                 .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
 
-            VStack(spacing: 18) {
-                Image(systemName: iconName)
-                    .font(.system(size: 38, weight: .medium))
-                    .foregroundStyle(.primary)
-                    .if(!reduceMotion) { view in
-                        view.symbolEffect(.pulse, options: .repeating)
-                    }
-
-                VStack(spacing: 6) {
-                    Text(String(localized: "authShield.title", defaultValue: "Authenticating…"))
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-
-                    Text(String(localized: "authShield.subtitle", defaultValue: "Secure content is temporarily hidden"))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-
-                ProgressView()
-                    .tint(.primary)
-            }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 24)
-            .frame(maxWidth: 320)
-            .background(
-                .regularMaterial,
-                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            AuthenticationShieldCard(
+                iconName: iconName,
+                isPendingDismissal: presentationState.isPendingDismissal,
+                reduceMotion: reduceMotion,
+                cardIsPresented: cardIsPresented,
+                accentSweepIsActive: accentSweepIsActive
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.08), radius: 18, y: 8)
             .padding(24)
+            .allowsHitTesting(!presentationState.isPendingDismissal)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
                 String(localized: "authShield.a11y.label", defaultValue: "Authentication in progress")
@@ -483,15 +467,206 @@ private struct AuthenticationShieldView: View {
                 String(localized: "authShield.a11y.value", defaultValue: "Secure content is hidden")
             )
         }
+        .onAppear {
+            prepareEntranceAnimation()
+        }
+        .onChange(of: presentationState.isPendingDismissal) { _, _ in
+            updateCardPresentation()
+        }
+        .onChange(of: reduceMotion) { _, _ in
+            prepareEntranceAnimation()
+        }
     }
 
     private var iconName: String {
         #if os(macOS)
         "touchid"
+        #elseif os(visionOS)
+        "opticid"
         #else
         "faceid"
         #endif
     }
+
+    private func prepareEntranceAnimation() {
+        accentSweepIsActive = false
+
+        guard !reduceMotion else {
+            cardIsPresented = !presentationState.isPendingDismissal
+            return
+        }
+
+        cardIsPresented = false
+        updateCardPresentation()
+
+        guard !presentationState.isPendingDismissal else {
+            return
+        }
+        withAnimation(.linear(duration: AuthenticationShieldAnimation.accentSweepDuration).repeatForever(autoreverses: false)) {
+            accentSweepIsActive = true
+        }
+    }
+
+    private func updateCardPresentation() {
+        let shouldPresentCard = !presentationState.isPendingDismissal
+
+        guard !reduceMotion else {
+            cardIsPresented = shouldPresentCard
+            return
+        }
+
+        let animation: Animation = shouldPresentCard
+            ? .spring(
+                response: AuthenticationShieldAnimation.cardEntranceResponse,
+                dampingFraction: AuthenticationShieldAnimation.cardEntranceDamping
+            )
+            : .easeOut(duration: AuthenticationShieldAnimation.cardDismissalDuration)
+
+        withAnimation(animation) {
+            cardIsPresented = shouldPresentCard
+        }
+    }
+}
+
+private struct AuthenticationShieldCard: View {
+    let iconName: String
+    let isPendingDismissal: Bool
+    let reduceMotion: Bool
+    let cardIsPresented: Bool
+    let accentSweepIsActive: Bool
+
+    private var isActivelyAuthenticating: Bool {
+        cardIsPresented && !isPendingDismissal
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            AuthenticationShieldIcon(
+                iconName: iconName,
+                isActivelyAuthenticating: isActivelyAuthenticating,
+                reduceMotion: reduceMotion,
+                accentSweepIsActive: accentSweepIsActive
+            )
+
+            VStack(spacing: 6) {
+                Text(String(localized: "authShield.title", defaultValue: "Authenticating…"))
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Text(String(localized: "authShield.subtitle", defaultValue: "Secure content is temporarily hidden"))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            ProgressView()
+                .tint(.primary)
+                .opacity(isPendingDismissal ? 0.4 : 1)
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 24)
+        .frame(maxWidth: 320)
+        .background(
+            .regularMaterial,
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+        )
+        .overlay {
+            AuthenticationShieldCardStroke(
+                isActivelyAuthenticating: isActivelyAuthenticating,
+                reduceMotion: reduceMotion,
+                accentSweepIsActive: accentSweepIsActive
+            )
+        }
+        .shadow(color: Color.black.opacity(0.08), radius: 18, y: 8)
+        .opacity(cardIsPresented ? 1 : 0)
+        .scaleEffect(cardIsPresented ? 1 : 0.97)
+        .blur(radius: reduceMotion || cardIsPresented ? 0 : 3)
+    }
+}
+
+private struct AuthenticationShieldIcon: View {
+    let iconName: String
+    let isActivelyAuthenticating: Bool
+    let reduceMotion: Bool
+    let accentSweepIsActive: Bool
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(.thinMaterial)
+                .frame(width: 78, height: 78)
+                .overlay {
+                    Circle()
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                }
+
+            if isActivelyAuthenticating && !reduceMotion {
+                Circle()
+                    .trim(from: 0.08, to: 0.34)
+                    .stroke(
+                        AngularGradient(
+                            colors: [
+                                Color.accentColor.opacity(0),
+                                Color.accentColor.opacity(0.55),
+                                Color.primary.opacity(0.18),
+                                Color.accentColor.opacity(0)
+                            ],
+                            center: .center
+                        ),
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                    )
+                    .frame(width: 78, height: 78)
+                    .rotationEffect(.degrees(accentSweepIsActive ? 360 : 0))
+            }
+
+            Image(systemName: iconName)
+                .font(.system(size: 38, weight: .medium))
+                .foregroundStyle(.primary)
+                .if(isActivelyAuthenticating && !reduceMotion) { view in
+                    view.symbolEffect(.pulse, options: .repeating)
+                }
+        }
+    }
+}
+
+private struct AuthenticationShieldCardStroke: View {
+    let isActivelyAuthenticating: Bool
+    let reduceMotion: Bool
+    let accentSweepIsActive: Bool
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+
+        ZStack {
+            shape
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+
+            if isActivelyAuthenticating && !reduceMotion {
+                shape
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.accentColor.opacity(0.34),
+                                Color.primary.opacity(0.1),
+                                Color.accentColor.opacity(0.04)
+                            ],
+                            startPoint: accentSweepIsActive ? .topLeading : .bottomTrailing,
+                            endPoint: accentSweepIsActive ? .bottomTrailing : .topLeading
+                        ),
+                        lineWidth: 1.2
+                    )
+                    .opacity(0.85)
+            }
+        }
+    }
+}
+
+private enum AuthenticationShieldAnimation {
+    static let cardEntranceResponse = 0.34
+    static let cardEntranceDamping = 0.84
+    static let cardDismissalDuration = 0.22
+    static let overlayDismissalDuration = 0.26
+    static let accentSweepDuration = 2.4
 }
 
 extension View {
