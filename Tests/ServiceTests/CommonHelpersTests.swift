@@ -76,11 +76,18 @@ private final class FailingCompleteRewrapPrivateKeyControlStore: PrivateKeyContr
         guard let mode else {
             throw PrivateKeyControlError.locked
         }
+        if journal.rewrapPhase == .commitRequired,
+           let targetMode = journal.rewrapTargetMode,
+           targetMode != mode {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
         return mode
     }
 
     func recoveryJournal() throws -> PrivateKeyControlRecoveryJournal {
-        _ = try requireUnlockedAuthMode()
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
         return journal
     }
 
@@ -99,9 +106,14 @@ private final class FailingCompleteRewrapPrivateKeyControlStore: PrivateKeyContr
     }
 
     func completeRewrap(targetMode: AuthenticationMode) throws {
-        _ = try requireUnlockedAuthMode()
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
         if failNextCompleteRewrap {
             failNextCompleteRewrap = false
+            mode = targetMode
+            journal.rewrapTargetMode = targetMode
+            journal.rewrapPhase = .commitRequired
             throw CommonHelpersTestError.delayedFailure
         }
         mode = targetMode
@@ -524,8 +536,52 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertEqual(firstSummary?.outcomes, [.noActionSafe, .retryableFailure])
         XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapTargetMode, .highSecurity)
         XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapPhase, .commitRequired)
-        XCTAssertEqual(authManager.currentMode, .standard)
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
         XCTAssertFalse(firstSummary?.startupDiagnostics.isEmpty ?? true)
+
+        let secondSummary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(secondSummary?.outcomes, [.noActionSafe])
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapPhase)
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
+    }
+
+    func test_rewrapRecovery_preparingPendingOnlyCommitFailureKeepsCommitJournal() throws {
+        let keychain = MockKeychain()
+        let fingerprint = "preparing-pending-\(UUID().uuidString)"
+        try savePendingRecoveryBundle(in: keychain, fingerprint: fingerprint)
+
+        let privateKeyControlStore = FailingCompleteRewrapPrivateKeyControlStore(
+            mode: .standard,
+            journal: PrivateKeyControlRecoveryJournal(
+                rewrapTargetMode: .highSecurity,
+                rewrapPhase: .preparing
+            )
+        )
+        privateKeyControlStore.failNextCompleteRewrap = true
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        let firstSummary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(firstSummary?.outcomes, [.promotedPendingSafe, .retryableFailure])
+        XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapTargetMode, .highSecurity)
+        XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapPhase, .commitRequired)
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
+        XCTAssertEqual(
+            try keychain.load(
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            ),
+            Data("pending-se-key".utf8)
+        )
+        XCTAssertFalse(keychain.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount
+        ))
 
         let secondSummary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
@@ -678,7 +734,10 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertEqual(summary?.outcomes, [.retryableFailure])
         XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapTargetMode, .highSecurity)
         XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapPhase, .commitRequired)
-        XCTAssertEqual(authManager.currentMode, .standard)
+        XCTAssertNil(authManager.currentMode)
+        XCTAssertThrowsError(try privateKeyControlStore.beginModifyExpiry(fingerprint: "blocked-\(fingerprint)")) { error in
+            XCTAssertEqual(error as? PrivateKeyControlError, .recoveryNeeded)
+        }
         XCTAssertEqual(
             try keychain.load(
                 service: KeychainConstants.seKeyService(fingerprint: fingerprint),
@@ -808,7 +867,7 @@ final class CommonHelpersTests: XCTestCase {
             privateKeyControlStore: privateKeyControlStore
         )
 
-        XCTAssertEqual(config.authModeIfUnlocked, .standard)
+        XCTAssertEqual(config.authModeIfUnlocked, .highSecurity)
         XCTAssertTrue(config.postUnlockRecoveryLoadWarning?.contains("retry") == true)
         XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapTargetMode, .highSecurity)
     }

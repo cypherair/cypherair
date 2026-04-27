@@ -432,6 +432,11 @@ final class SettingsScreenModel {
                 try await authModeSwitchAction(newMode, fingerprints, hasBackup)
                 appConfiguration.privateKeyControlState = .unlocked(newMode)
             } catch {
+                if let currentMode = authManager.currentMode {
+                    appConfiguration.privateKeyControlState = .unlocked(currentMode)
+                } else {
+                    appConfiguration.privateKeyControlState = .recoveryNeeded
+                }
                 switchError = error.localizedDescription
                 showSwitchError = true
             }

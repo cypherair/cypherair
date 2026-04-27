@@ -61,6 +61,98 @@ private final class PromptObservingSecureEnclave: SecureEnclaveManageable {
     }
 }
 
+private enum KeyManagementPrivateKeyControlTestError: Error {
+    case delayedFailure
+}
+
+private final class FailingModifyExpiryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unchecked Sendable {
+    private var mode: AuthenticationMode?
+    private var journal = PrivateKeyControlRecoveryJournal.empty
+    var failNextBeginModifyExpiry = false
+    var failNextClearModifyExpiry = false
+
+    init(mode: AuthenticationMode? = .standard) {
+        self.mode = mode
+    }
+
+    var privateKeyControlState: PrivateKeyControlState {
+        guard let mode else {
+            return .locked
+        }
+        return .unlocked(mode)
+    }
+
+    func requireUnlockedAuthMode() throws -> AuthenticationMode {
+        guard let mode else {
+            throw PrivateKeyControlError.locked
+        }
+        if journal.rewrapPhase == .commitRequired,
+           let targetMode = journal.rewrapTargetMode,
+           targetMode != mode {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        return mode
+    }
+
+    func recoveryJournal() throws -> PrivateKeyControlRecoveryJournal {
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
+        return journal
+    }
+
+    func beginRewrap(targetMode: AuthenticationMode) throws {
+        _ = try requireUnlockedAuthMode()
+        journal.rewrapTargetMode = targetMode
+        journal.rewrapPhase = .preparing
+    }
+
+    func markRewrapCommitRequired() throws {
+        _ = try requireUnlockedAuthMode()
+        journal.rewrapPhase = .commitRequired
+    }
+
+    func completeRewrap(targetMode: AuthenticationMode) throws {
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
+        mode = targetMode
+        journal.rewrapTargetMode = nil
+        journal.rewrapPhase = nil
+    }
+
+    func clearRewrapJournal() throws {
+        _ = try requireUnlockedAuthMode()
+        journal.rewrapTargetMode = nil
+        journal.rewrapPhase = nil
+    }
+
+    func beginModifyExpiry(fingerprint: String) throws {
+        _ = try requireUnlockedAuthMode()
+        if failNextBeginModifyExpiry {
+            failNextBeginModifyExpiry = false
+            throw KeyManagementPrivateKeyControlTestError.delayedFailure
+        }
+        journal.modifyExpiry = ModifyExpiryRecoveryEntry(fingerprint: fingerprint)
+    }
+
+    func clearModifyExpiryJournal() throws {
+        _ = try requireUnlockedAuthMode()
+        if failNextClearModifyExpiry {
+            failNextClearModifyExpiry = false
+            throw KeyManagementPrivateKeyControlTestError.delayedFailure
+        }
+        journal.modifyExpiry = nil
+    }
+
+    func clearModifyExpiryJournalIfMatches(fingerprint: String) throws {
+        _ = try requireUnlockedAuthMode()
+        if journal.modifyExpiry?.fingerprint == fingerprint {
+            journal.modifyExpiry = nil
+        }
+    }
+}
+
 /// Tests for KeyManagementService — full key lifecycle with mock SE/Keychain/Auth.
 final class KeyManagementServiceTests: XCTestCase {
 
@@ -152,7 +244,14 @@ final class KeyManagementServiceTests: XCTestCase {
     }
 
     private func loadStoredIdentity(fingerprint: String) throws -> PGPKeyIdentity {
-        let metadata = try mockKC.load(
+        try loadStoredIdentity(fingerprint: fingerprint, keychain: mockKC)
+    }
+
+    private func loadStoredIdentity(
+        fingerprint: String,
+        keychain: MockKeychain
+    ) throws -> PGPKeyIdentity {
+        let metadata = try keychain.load(
             service: KeychainConstants.metadataService(fingerprint: fingerprint),
             account: KeychainConstants.metadataAccount
         )
@@ -904,6 +1003,98 @@ final class KeyManagementServiceTests: XCTestCase {
         )
 
         XCTAssertNil(try recoveryJournal().modifyExpiry)
+    }
+
+    func test_modifyExpiry_beginJournalFailureCleansPendingBundle() async throws {
+        let failingStore = FailingModifyExpiryPrivateKeyControlStore()
+        failingStore.failNextBeginModifyExpiry = true
+        let stack = TestHelpers.makeKeyManagement(
+            engine: engine,
+            privateKeyControlStore: failingStore
+        )
+        let localService = stack.service
+        let localKeychain = stack.mockKC
+        let identity = try await TestHelpers.generateProfileAKey(service: localService, name: "Begin Journal Failure")
+        let account = KeychainConstants.defaultAccount
+
+        do {
+            _ = try await localService.modifyExpiry(
+                fingerprint: identity.fingerprint,
+                newExpirySeconds: 31_536_000,
+                authMode: .standard
+            )
+            XCTFail("Expected beginModifyExpiry failure to be surfaced.")
+        } catch KeyManagementPrivateKeyControlTestError.delayedFailure {
+        } catch {
+            XCTFail("Expected delayedFailure, got \(error)")
+        }
+
+        XCTAssertTrue(localKeychain.exists(
+            service: KeychainConstants.seKeyService(fingerprint: identity.fingerprint),
+            account: account
+        ))
+        XCTAssertTrue(localKeychain.exists(
+            service: KeychainConstants.saltService(fingerprint: identity.fingerprint),
+            account: account
+        ))
+        XCTAssertTrue(localKeychain.exists(
+            service: KeychainConstants.sealedKeyService(fingerprint: identity.fingerprint),
+            account: account
+        ))
+        XCTAssertFalse(localKeychain.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: identity.fingerprint),
+            account: account
+        ))
+        XCTAssertFalse(localKeychain.exists(
+            service: KeychainConstants.pendingSaltService(fingerprint: identity.fingerprint),
+            account: account
+        ))
+        XCTAssertFalse(localKeychain.exists(
+            service: KeychainConstants.pendingSealedKeyService(fingerprint: identity.fingerprint),
+            account: account
+        ))
+        XCTAssertNil(try failingStore.recoveryJournal().modifyExpiry)
+    }
+
+    func test_modifyExpiry_clearJournalFailureKeepsUpdatedMetadataAndJournal() async throws {
+        let failingStore = FailingModifyExpiryPrivateKeyControlStore()
+        failingStore.failNextClearModifyExpiry = true
+        let stack = TestHelpers.makeKeyManagement(
+            engine: engine,
+            privateKeyControlStore: failingStore
+        )
+        let localService = stack.service
+        let localKeychain = stack.mockKC
+        let identity = try await TestHelpers.generateProfileAKey(service: localService, name: "Clear Journal Failure")
+        let originalStoredIdentity = try loadStoredIdentity(
+            fingerprint: identity.fingerprint,
+            keychain: localKeychain
+        )
+
+        do {
+            _ = try await localService.modifyExpiry(
+                fingerprint: identity.fingerprint,
+                newExpirySeconds: 31_536_000,
+                authMode: .standard
+            )
+            XCTFail("Expected clearModifyExpiryJournal failure to be surfaced.")
+        } catch KeyManagementPrivateKeyControlTestError.delayedFailure {
+        } catch {
+            XCTFail("Expected delayedFailure, got \(error)")
+        }
+
+        let updatedStoredIdentity = try loadStoredIdentity(
+            fingerprint: identity.fingerprint,
+            keychain: localKeychain
+        )
+        XCTAssertNotEqual(updatedStoredIdentity.expiryDate, originalStoredIdentity.expiryDate)
+        XCTAssertEqual(localService.keys.first?.expiryDate, updatedStoredIdentity.expiryDate)
+        XCTAssertEqual(localService.keys.first?.publicKeyData, updatedStoredIdentity.publicKeyData)
+        XCTAssertEqual(try failingStore.recoveryJournal().modifyExpiry?.fingerprint, identity.fingerprint)
+        XCTAssertFalse(localKeychain.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: identity.fingerprint),
+            account: KeychainConstants.defaultAccount
+        ))
     }
 
     // MARK: - Modify Expiry Crash Recovery

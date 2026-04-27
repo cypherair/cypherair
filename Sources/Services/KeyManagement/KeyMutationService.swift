@@ -98,7 +98,12 @@ final class KeyMutationService {
             throw error
         }
 
-        try privateKeyControlStore.beginModifyExpiry(fingerprint: fingerprint)
+        do {
+            try privateKeyControlStore.beginModifyExpiry(fingerprint: fingerprint)
+        } catch {
+            bundleStore.cleanupPendingBundle(fingerprint: fingerprint)
+            throw error
+        }
 
         do {
             try bundleStore.deleteBundle(fingerprint: fingerprint)
@@ -112,8 +117,6 @@ final class KeyMutationService {
             throw error
         }
 
-        try privateKeyControlStore.clearModifyExpiryJournal()
-
         var updated = existingIdentity
         updated.isExpired = result.keyInfo.isExpired
         updated.publicKeyData = result.publicKeyData
@@ -122,6 +125,7 @@ final class KeyMutationService {
         }
 
         try catalogStore.updateExpiry(updated)
+        try privateKeyControlStore.clearModifyExpiryJournal()
         return updated
     }
 

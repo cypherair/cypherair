@@ -159,6 +159,30 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_modeSwitchFailureMarksRecoveryWhenCurrentModeUnavailable() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+
+        let model = makeModel(authModeSwitchAction: { [self] newMode, _, _ in
+            try privateKeyControlStore.beginRewrap(targetMode: newMode)
+            try privateKeyControlStore.markRewrapCommitRequired()
+            throw SettingsScreenModelTestError(message: "Switch failed after commit")
+        })
+
+        model.handleAuthModeSelection(.highSecurity)
+        let request = try XCTUnwrap(model.presentedAuthModeRequest)
+        request.onConfirm()
+
+        await waitUntil("failed committed mode switch to finish") {
+            model.isSwitching == false
+        }
+
+        XCTAssertTrue(model.showSwitchError)
+        XCTAssertEqual(model.switchError, "Switch failed after commit")
+        XCTAssertEqual(config.privateKeyControlState, .recoveryNeeded)
+        XCTAssertNil(model.pendingMode)
+    }
+
+    @MainActor
     func test_appAccessPolicySelection_updatesConfigAfterSwitchAction() async {
         var receivedPolicy: AppSessionAuthenticationPolicy?
         let model = makeModel(appAccessPolicySwitchAction: { policy in

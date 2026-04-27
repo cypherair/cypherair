@@ -327,12 +327,13 @@ final class KeyManagementService {
         fingerprint: String,
         newExpirySeconds: UInt64?
     ) async throws -> PGPKeyIdentity {
-        let updated = try await mutationService.modifyExpiry(
+        defer {
+            syncKeys()
+        }
+        return try await mutationService.modifyExpiry(
             fingerprint: fingerprint,
             newExpirySeconds: newExpirySeconds
         )
-        syncKeys()
-        return updated
     }
 
     /// Modify the expiration time of an existing certificate.
@@ -353,13 +354,14 @@ final class KeyManagementService {
         newExpirySeconds: UInt64?,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
-        let updated = try await mutationService.modifyExpiry(
+        defer {
+            syncKeys()
+        }
+        return try await mutationService.modifyExpiry(
             fingerprint: fingerprint,
             newExpirySeconds: newExpirySeconds,
             authMode: authMode
         )
-        syncKeys()
-        return updated
     }
 
     // MARK: - Key Deletion

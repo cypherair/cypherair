@@ -271,6 +271,11 @@ final class InMemoryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unc
         guard let mode else {
             throw PrivateKeyControlError.locked
         }
+        if journal.rewrapPhase == .commitRequired,
+           let targetMode = journal.rewrapTargetMode,
+           targetMode != mode {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
         return mode
     }
 
@@ -299,14 +304,24 @@ final class InMemoryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unc
     }
 
     func completeRewrap(targetMode: AuthenticationMode) throws {
-        _ = try requireUnlockedAuthMode()
+        if isRecoveryNeeded {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
         mode = targetMode
         journal.rewrapTargetMode = nil
         journal.rewrapPhase = nil
     }
 
     func clearRewrapJournal() throws {
-        _ = try requireUnlockedAuthMode()
+        if isRecoveryNeeded {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
         journal.rewrapTargetMode = nil
         journal.rewrapPhase = nil
     }
@@ -317,12 +332,22 @@ final class InMemoryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unc
     }
 
     func clearModifyExpiryJournal() throws {
-        _ = try requireUnlockedAuthMode()
+        if isRecoveryNeeded {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
         journal.modifyExpiry = nil
     }
 
     func clearModifyExpiryJournalIfMatches(fingerprint: String) throws {
-        _ = try requireUnlockedAuthMode()
+        if isRecoveryNeeded {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
         guard journal.modifyExpiry?.fingerprint == fingerprint else {
             return
         }

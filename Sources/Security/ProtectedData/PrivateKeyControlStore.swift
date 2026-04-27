@@ -227,11 +227,17 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
 
     func requireUnlockedAuthMode() throws -> AuthenticationMode {
         guard case .unlocked(let mode) = privateKeyControlState,
-              payload?.settings.authMode == mode else {
+              let payload,
+              payload.settings.authMode == mode else {
             if privateKeyControlState == .recoveryNeeded {
                 throw PrivateKeyControlError.recoveryNeeded
             }
             throw PrivateKeyControlError.locked
+        }
+        if payload.recoveryJournal.rewrapPhase == .commitRequired,
+           let targetMode = payload.recoveryJournal.rewrapTargetMode,
+           targetMode != mode {
+            throw PrivateKeyControlError.recoveryNeeded
         }
         return mode
     }
@@ -255,6 +261,7 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
     }
 
     func beginRewrap(targetMode: AuthenticationMode) throws {
+        _ = try requireUnlockedAuthMode()
         try updatePayload { payload in
             payload.recoveryJournal.rewrapTargetMode = targetMode
             payload.recoveryJournal.rewrapPhase = .preparing
@@ -262,6 +269,7 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
     }
 
     func markRewrapCommitRequired() throws {
+        _ = try requireUnlockedAuthMode()
         try updatePayload { payload in
             guard payload.recoveryJournal.rewrapTargetMode != nil else {
                 throw PrivateKeyControlError.recoveryNeeded
@@ -271,10 +279,36 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
     }
 
     func completeRewrap(targetMode: AuthenticationMode) throws {
-        try updatePayload { payload in
-            payload.settings.authMode = targetMode
-            payload.recoveryJournal.rewrapTargetMode = nil
-            payload.recoveryJournal.rewrapPhase = nil
+        guard var updatedPayload = payload,
+              privateKeyControlState.isUnlocked else {
+            if privateKeyControlState == .recoveryNeeded {
+                throw PrivateKeyControlError.recoveryNeeded
+            }
+            throw PrivateKeyControlError.locked
+        }
+
+        let previousPayload = updatedPayload
+        updatedPayload.settings.authMode = targetMode
+        updatedPayload.recoveryJournal.rewrapTargetMode = nil
+        updatedPayload.recoveryJournal.rewrapPhase = nil
+
+        if memoryOnlySeededForTesting {
+            payload = updatedPayload
+            unlockedGenerationIdentifier = max(unlockedGenerationIdentifier ?? 0, 0) + 1
+            privateKeyControlState = .unlocked(targetMode)
+            return
+        }
+
+        do {
+            try persistUpdatedPayload(updatedPayload)
+        } catch {
+            var inMemoryPayload = previousPayload
+            inMemoryPayload.settings.authMode = targetMode
+            inMemoryPayload.recoveryJournal.rewrapTargetMode = targetMode
+            inMemoryPayload.recoveryJournal.rewrapPhase = .commitRequired
+            payload = inMemoryPayload
+            privateKeyControlState = .unlocked(targetMode)
+            throw error
         }
     }
 
@@ -286,6 +320,7 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
     }
 
     func beginModifyExpiry(fingerprint: String) throws {
+        _ = try requireUnlockedAuthMode()
         try updatePayload { payload in
             payload.recoveryJournal.modifyExpiry = ModifyExpiryRecoveryEntry(fingerprint: fingerprint)
         }
@@ -368,6 +403,10 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             return
         }
 
+        try persistUpdatedPayload(updatedPayload)
+    }
+
+    private func persistUpdatedPayload(_ updatedPayload: Payload) throws {
         var domainMasterKey = try activeDomainMasterKey()
         defer {
             domainMasterKey.protectedDataZeroize()
