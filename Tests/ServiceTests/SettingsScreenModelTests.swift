@@ -808,6 +808,153 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_liveProtectedSettingsHost_resetAuthorizesBeforeResetWhenWrappingKeyRequired() async {
+        var events: [String] = []
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .pendingResetRequired
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
+            authorizeSharedRight: { _, interactionMode in
+                events.append("authorize")
+                XCTAssertEqual(interactionMode, .allowInteraction)
+                return .authorized
+            },
+            currentWrappingRootKey: {
+                events.append("wrappingKey")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetAuthorizationRequirement: {
+                events.append("requirement")
+                return .wrappingRootKeyRequired
+            },
+            resetDomain: {
+                events.append("reset")
+                domainState = .pendingResetRequired
+            }
+        )
+
+        await host.resetProtectedSettingsDomain()
+
+        XCTAssertEqual(events, ["requirement", "authorize", "wrappingKey", "reset"])
+        XCTAssertEqual(host.sectionState, .pendingResetRequired)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_resetCancellationDoesNotReset() async {
+        var events: [String] = []
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
+            authorizeSharedRight: { _, _ in
+                events.append("authorize")
+                return .cancelledOrDenied
+            },
+            currentWrappingRootKey: {
+                XCTFail("Cancelled reset should not read the wrapping key.")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { .pendingResetRequired },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetAuthorizationRequirement: {
+                events.append("requirement")
+                return .wrappingRootKeyRequired
+            },
+            resetDomain: {
+                XCTFail("Cancelled reset must not delete protected settings.")
+            }
+        )
+
+        await host.resetProtectedSettingsDomain()
+
+        XCTAssertEqual(events, ["requirement", "authorize"])
+        XCTAssertEqual(host.sectionState, .pendingResetRequired)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_firstDomainResetDoesNotRequireAuthorization() async {
+        var events: [String] = []
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .pendingResetRequired
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
+            authorizeSharedRight: { _, _ in
+                XCTFail("First-domain reset should not force protected-data authorization.")
+                return .authorized
+            },
+            currentWrappingRootKey: {
+                XCTFail("First-domain reset should not read the wrapping key.")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetAuthorizationRequirement: {
+                events.append("requirement")
+                return .notRequired
+            },
+            resetDomain: {
+                events.append("reset")
+                domainState = .pendingResetRequired
+            }
+        )
+
+        await host.resetProtectedSettingsDomain()
+
+        XCTAssertEqual(events, ["requirement", "reset"])
+        XCTAssertEqual(host.sectionState, .pendingResetRequired)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_retryAuthorizesBeforeRecoveringWhenWrappingKeyRequired() async {
+        var events: [String] = []
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
+            authorizeSharedRight: { _, interactionMode in
+                events.append("authorize")
+                XCTAssertEqual(interactionMode, .allowInteraction)
+                return .authorized
+            },
+            currentWrappingRootKey: {
+                events.append("wrappingKey")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { .pendingRetryRequired },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            pendingRecoveryAuthorizationRequirement: {
+                events.append("requirement")
+                return .wrappingRootKeyRequired
+            },
+            recoverPendingMutation: {
+                events.append("recover")
+                return .retryablePending
+            },
+            resetDomain: {}
+        )
+
+        await host.retryPendingRecovery()
+
+        XCTAssertEqual(events, ["requirement", "authorize", "wrappingKey", "recover"])
+        XCTAssertEqual(host.sectionState, .pendingRetryRequired)
+    }
+
+    @MainActor
     func test_liveProtectedSettingsHost_invalidateForContentClearGeneration_alreadyAuthorizedAutoOpens() async {
         var openDomainCallCount = 0
         var domainState: CypherAir.ProtectedSettingsHost.DomainState = .unlocked

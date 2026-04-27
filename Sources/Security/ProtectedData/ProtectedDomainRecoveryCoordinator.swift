@@ -24,6 +24,38 @@ struct ProtectedDomainRecoveryCoordinator {
         try registryStore.loadRegistry()
     }
 
+    func pendingRecoveryAuthorizationRequirement() -> ProtectedDataMutationAuthorizationRequirement {
+        do {
+            let registry = try registryStore.loadRegistry()
+            guard registry.classifyRecoveryDisposition() != .frameworkRecoveryNeeded else {
+                return .frameworkRecoveryNeeded
+            }
+            guard case let pendingMutation? = registry.pendingMutation else {
+                return .notRequired
+            }
+
+            switch pendingMutation {
+            case .createDomain(_, let phase):
+                switch phase {
+                case .journaled, .sharedResourceProvisioned, .artifactsStaged, .validated:
+                    if registry.committedMembership.isEmpty && registry.sharedResourceLifecycleState == .absent {
+                        return .notRequired
+                    }
+                    guard registry.sharedResourceLifecycleState == .ready else {
+                        return .frameworkRecoveryNeeded
+                    }
+                    return .wrappingRootKeyRequired
+                case .membershipCommitted:
+                    return .notRequired
+                }
+            case .deleteDomain:
+                return .notRequired
+            }
+        } catch {
+            return .frameworkRecoveryNeeded
+        }
+    }
+
     func recoverPendingMutation(
         handler: any ProtectedDomainRecoveryHandler,
         removeSharedRight: @escaping @Sendable (String) async throws -> Void
@@ -538,6 +570,8 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         removeSharedRight: @escaping @Sendable (String) async throws -> Void,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) async throws {
+        try preflightResetAuthorizationIfNeeded(currentWrappingRootKey: currentWrappingRootKey)
+
         if let registry = try? registryStore.loadRegistry() {
             if case let pendingMutation? = registry.pendingMutation,
                pendingMutation.targetDomainID == Self.domainID {
@@ -583,6 +617,24 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             persistSharedRight: persistSharedRight,
             currentWrappingRootKey: currentWrappingRootKey
         )
+    }
+
+    func resetAuthorizationRequirement() -> ProtectedDataMutationAuthorizationRequirement {
+        do {
+            let registry = try registryStore.loadRegistry()
+            guard registry.classifyRecoveryDisposition() != .frameworkRecoveryNeeded else {
+                return .frameworkRecoveryNeeded
+            }
+            guard resetWillRecreateIntoExistingSharedResource(registry) else {
+                return .notRequired
+            }
+            guard registry.sharedResourceLifecycleState == .ready else {
+                return .frameworkRecoveryNeeded
+            }
+            return .wrappingRootKeyRequired
+        } catch {
+            return .frameworkRecoveryNeeded
+        }
     }
 
     func relockProtectedData() async throws {
@@ -764,6 +816,26 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         try deleteDomainArtifacts()
     }
 
+    private func preflightResetAuthorizationIfNeeded(
+        currentWrappingRootKey: (() throws -> Data)? = nil
+    ) throws {
+        switch resetAuthorizationRequirement() {
+        case .notRequired:
+            return
+        case .frameworkRecoveryNeeded:
+            throw ProtectedDataError.invalidRegistry(
+                "Protected settings reset requires framework recovery."
+            )
+        case .wrappingRootKeyRequired:
+            let wrappingRootKeyProvider = currentWrappingRootKey ?? self.currentWrappingRootKey
+            guard let wrappingRootKeyProvider else {
+                throw ProtectedDataError.authorizingUnavailable
+            }
+            var wrappingRootKey = try wrappingRootKeyProvider()
+            wrappingRootKey.protectedDataZeroize()
+        }
+    }
+
     func continuePendingCreate(phase: CreateDomainPhase) async throws {
         if phase == .membershipCommitted {
             return
@@ -794,6 +866,24 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                 }
             }
         )
+    }
+
+    private func resetWillRecreateIntoExistingSharedResource(
+        _ registry: ProtectedDataRegistry
+    ) -> Bool {
+        var membershipAfterReset = registry.committedMembership
+        switch registry.pendingMutation {
+        case .some(let pendingMutation) where pendingMutation.targetDomainID == Self.domainID:
+            membershipAfterReset.removeValue(forKey: Self.domainID)
+        case .some:
+            return false
+        case nil:
+            if registry.committedMembership[Self.domainID] != nil {
+                membershipAfterReset.removeValue(forKey: Self.domainID)
+            }
+        }
+
+        return !membershipAfterReset.isEmpty
     }
 
     private func clearUnlockedState() {

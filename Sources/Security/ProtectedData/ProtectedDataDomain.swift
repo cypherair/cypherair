@@ -64,6 +64,12 @@ enum ProtectedDataAuthorizationResult: Equatable, Sendable {
     case frameworkRecoveryNeeded
 }
 
+enum ProtectedDataMutationAuthorizationRequirement: Equatable, Sendable {
+    case notRequired
+    case wrappingRootKeyRequired
+    case frameworkRecoveryNeeded
+}
+
 enum PendingRecoveryOutcome: Equatable, Sendable {
     case resumedToSteadyState
     case retryablePending
