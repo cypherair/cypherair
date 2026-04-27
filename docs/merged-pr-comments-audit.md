@@ -15,12 +15,13 @@
 
 Note: this fast scan counts PR conversation comments and inline pull-request review comments, including inline replies. It does not count review submissions that have no inline comment.
 
-Triage note: the detail section below omits four substantive inline review
+Triage note: the detail section below omits six substantive inline review
 comments that were already resolved or determined non-actionable during manual
-review: #227 local reset in tutorial sandbox, #214 Xcode 26.4 fallback path,
-#180 macOS file-protection requirements, and #71 empty license search results.
-The raw counts above and `docs/merged-pr-comments-audit.json` still include the
-full original scan.
+review: #238 protected settings reset preflight, #238 sentinel pending-mutation
+authorization, #227 local reset in tutorial sandbox, #214 Xcode 26.4 fallback
+path, #180 macOS file-protection requirements, and #71 empty license search
+results. The raw counts above and `docs/merged-pr-comments-audit.json` still
+include the full original scan.
 
 Noise-trimming note: the PR list and detail section below also omit 25
 conversation comments whose only content was the Codex code-review usage-limit
@@ -42,8 +43,6 @@ notice.
 
 ### [#238 [codex] Implement AppData Phase 4 orchestration](https://github.com/cypherair/cypherair/pull/238)
 
-- `chatgpt-codex-connector[bot]` inline on `Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swift:585` at `2026-04-27T00:29:05Z`: ** Preflight wrapping-key before deleting protected settings** This reset flow now deletes the `protected-settings` domain and only then calls `migrateLegacyClipboardNoticeIfNeede... ([comment](https://github.com/cypherair/cypherair/pull/238#discussion_r3144419157))
-- `chatgpt-codex-connector[bot]` inline on `Sources/App/CypherAirApp.swift:204` at `2026-04-27T00:29:05Z`: ** Authorize before retrying sentinel pending-mutation recovery** Pending-mutation recovery is now dispatched to the sentinel handler here, but this closure still performs recover... ([comment](https://github.com/cypherair/cypherair/pull/238#discussion_r3144419158))
 - `chatgpt-codex-connector[bot]` inline on `CypherAir.xcodeproj/project.pbxproj:522` at `2026-04-27T01:20:46Z`: ** Clear RepositoryAudit snapshot before copying inputs** This script no longer deletes `$(TARGET_BUILD_DIR)/.../RepositoryAudit` before copying listed files, so removed/renamed s... ([comment](https://github.com/cypherair/cypherair/pull/238#discussion_r3144497804))
 - `chatgpt-codex-connector[bot]` inline on `CypherAir.xcodeproj/project.pbxproj:499` at `2026-04-27T01:20:46Z`: ** Use metadata commit SHA before enforcing git fallback** In stable-release mode, this precheck fails the build when `SOURCE_COMPLIANCE_COMMIT_SHA` is empty and `.git/HEAD` / `.g... ([comment](https://github.com/cypherair/cypherair/pull/238#discussion_r3144497806))
 
