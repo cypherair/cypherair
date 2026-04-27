@@ -944,6 +944,12 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertFalse(configuration.isAppIconEntryEnabled)
         XCTAssertNotNil(configuration.navigationEducationFooter)
         XCTAssertNotNil(configuration.appearanceEducationFooter)
+        switch configuration.localDataResetAvailability {
+        case .enabled:
+            XCTFail("Tutorial settings should disable real local data reset")
+        case .disabled(let footer):
+            XCTAssertFalse(footer.isEmpty)
+        }
     }
 
     func test_tutorialShellDefinitionsBuilder_regularIOS_matchesFullAppTabSet() {

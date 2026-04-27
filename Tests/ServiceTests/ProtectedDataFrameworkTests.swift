@@ -196,6 +196,18 @@ private actor AsyncBooleanFlag {
     }
 }
 
+private actor AsyncDataBox {
+    private var value = Data()
+
+    func set(_ data: Data) {
+        value = data
+    }
+
+    func data() -> Data {
+        value
+    }
+}
+
 private final class MockProtectedDomainRecoveryHandler: AppProtectedDomainRecoveryHandler, @unchecked Sendable {
     let protectedDataDomainID: ProtectedDataDomainID
     private(set) var continuedCreatePhases: [CreateDomainPhase] = []
@@ -1444,6 +1456,51 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         handoffContext.invalidate()
     }
 
+    func test_appAccessPolicyChange_discardsPendingProtectedDataHandoffContext() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataPolicyChangeHandoff")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let handoffContext = LAContext()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.policy-change-handoff",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in .authenticated(context: handoffContext) },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        defer {
+            if orchestrator.hasProtectedDataAuthorizationHandoffContext {
+                handoffContext.invalidate()
+            }
+        }
+
+        let attemptedAuthentication = await orchestrator.handleResume(
+            localizedReason: "Successful privacy unlock stores handoff before policy change"
+        )
+
+        XCTAssertTrue(attemptedAuthentication)
+        XCTAssertTrue(orchestrator.hasProtectedDataAuthorizationHandoffContext)
+
+        orchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
+
+        XCTAssertFalse(orchestrator.hasProtectedDataAuthorizationHandoffContext)
+        XCTAssertNil(orchestrator.consumeAuthenticatedContextForProtectedData())
+    }
+
     func test_handleResume_afterBackgroundFollowingOperationPrompt_treatsReturnAsRealResume() async {
         let storageRoot = AppProtectedDataStorageRoot(
             baseDirectory: makeTemporaryDirectory("ProtectedDataResumeAfterBackground")
@@ -2178,6 +2235,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             storageRoot: storageRoot,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.pending-create"
         )
+        let recoveryCoordinator = AppProtectedDomainRecoveryCoordinator(registryStore: registryStore)
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.pending-create",
@@ -2189,6 +2247,8 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             )
         )
         try registryStore.saveRegistry(registry)
+
+        XCTAssertEqual(recoveryCoordinator.pendingRecoveryAuthorizationRequirement(), .notRequired)
 
         let outcome = try await registryStore.recoverPendingMutation(
             targetDomainID: CypherAir.ProtectedSettingsStore.domainID,
@@ -2347,6 +2407,11 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         try registryStore.saveRegistry(registry)
         let recoveryCoordinator = AppProtectedDomainRecoveryCoordinator(registryStore: registryStore)
 
+        XCTAssertEqual(
+            recoveryCoordinator.pendingRecoveryAuthorizationRequirement(),
+            .wrappingRootKeyRequired
+        )
+
         let outcome = try await recoveryCoordinator.recoverPendingMutation(
             handlers: [
                 mismatchedHandler,
@@ -2432,6 +2497,143 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertNil(afterLastDomainDelete.pendingMutation)
         let didRunLastDomainCleanup = await lastDomainCleanupCalled.currentValue()
         XCTAssertTrue(didRunLastDomainCleanup)
+    }
+
+    func test_protectedSettingsResetRequiresWrappingKeyBeforeDeletingWhenSentinelRemains() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataSettingsResetPreflight")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let defaultsSuiteName = "com.cypherair.tests.protected-data.settings-reset-preflight.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.settings-reset-preflight"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let settingsStore = CypherAir.ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: keyManager
+        )
+        let capturedSharedSecret = AsyncDataBox()
+        try await settingsStore.migrateLegacyClipboardNoticeIfNeeded(
+            persistSharedRight: { secret in
+                await capturedSharedSecret.set(secret)
+            }
+        )
+        var rootSecret = await capturedSharedSecret.data()
+        let wrappingRootKey = try keyManager.deriveWrappingRootKey(from: &rootSecret)
+        rootSecret.protectedDataZeroize()
+
+        let sentinelStore = AppProtectedDataFrameworkSentinelStore(
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: keyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+        try await sentinelStore.ensureCommittedIfNeeded(wrappingRootKey: wrappingRootKey)
+        let currentEnvelopeURL = storageRoot.domainEnvelopeURL(
+            for: CypherAir.ProtectedSettingsStore.domainID,
+            slot: .current
+        )
+
+        XCTAssertEqual(settingsStore.resetAuthorizationRequirement(), .wrappingRootKeyRequired)
+        do {
+            try await settingsStore.resetDomain(
+                persistSharedRight: { _ in
+                    XCTFail("Second-domain settings reset must not create a new shared root.")
+                },
+                removeSharedRight: { _ in
+                    XCTFail("Second-domain settings reset must not remove the shared root.")
+                },
+                currentWrappingRootKey: {
+                    throw ProtectedDataError.missingWrappingRootKey
+                }
+            )
+            XCTFail("Expected reset to fail before deleting settings without a wrapping key.")
+        } catch ProtectedDataError.missingWrappingRootKey {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        let retainedRegistry = try registryStore.loadRegistry()
+        XCTAssertEqual(retainedRegistry.committedMembership[CypherAir.ProtectedSettingsStore.domainID], .active)
+        XCTAssertEqual(retainedRegistry.committedMembership[AppProtectedDataFrameworkSentinelStore.domainID], .active)
+        XCTAssertNil(retainedRegistry.pendingMutation)
+        XCTAssertTrue(try storageRoot.managedItemExists(at: currentEnvelopeURL))
+    }
+
+    func test_protectedSettingsResetRecreatesWithWrappingKeyWhenSentinelRemains() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataSettingsResetWithKey")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let defaultsSuiteName = "com.cypherair.tests.protected-data.settings-reset-with-key.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.settings-reset-with-key"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let settingsStore = CypherAir.ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: keyManager,
+            currentWrappingRootKey: {
+                throw ProtectedDataError.missingWrappingRootKey
+            }
+        )
+        let capturedSharedSecret = AsyncDataBox()
+        try await settingsStore.migrateLegacyClipboardNoticeIfNeeded(
+            persistSharedRight: { secret in
+                await capturedSharedSecret.set(secret)
+            }
+        )
+        var rootSecret = await capturedSharedSecret.data()
+        let wrappingRootKey = try keyManager.deriveWrappingRootKey(from: &rootSecret)
+        rootSecret.protectedDataZeroize()
+
+        let sentinelStore = AppProtectedDataFrameworkSentinelStore(
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: keyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+        try await sentinelStore.ensureCommittedIfNeeded(wrappingRootKey: wrappingRootKey)
+
+        try await settingsStore.resetDomain(
+            persistSharedRight: { _ in
+                XCTFail("Second-domain settings reset must not create a new shared root.")
+            },
+            removeSharedRight: { _ in
+                XCTFail("Second-domain settings reset must not remove the shared root.")
+            },
+            currentWrappingRootKey: {
+                wrappingRootKey
+            }
+        )
+
+        let resetRegistry = try registryStore.loadRegistry()
+        XCTAssertEqual(resetRegistry.committedMembership[CypherAir.ProtectedSettingsStore.domainID], .active)
+        XCTAssertEqual(resetRegistry.committedMembership[AppProtectedDataFrameworkSentinelStore.domainID], .active)
+        XCTAssertNil(resetRegistry.pendingMutation)
+        XCTAssertTrue(try storageRoot.managedItemExists(
+            at: storageRoot.domainEnvelopeURL(
+                for: CypherAir.ProtectedSettingsStore.domainID,
+                slot: .current
+            )
+        ))
     }
 
     func test_abandonPendingCreate_clearsPendingMutationAndArtifacts() async throws {

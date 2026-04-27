@@ -30,6 +30,12 @@ final class ProtectedSettingsHost {
         case frameworkRecoveryNeeded
     }
 
+    enum MutationAuthorizationRequirement: Equatable {
+        case notRequired
+        case wrappingRootKeyRequired
+        case frameworkRecoveryNeeded
+    }
+
     enum DomainState: Equatable {
         case locked
         case unlocked
@@ -74,7 +80,9 @@ final class ProtectedSettingsHost {
         let migrateLegacyClipboardNoticeIfNeeded: @MainActor () async throws -> Void
         let openDomainIfNeeded: @MainActor (_ wrappingRootKey: Data) async throws -> Void
         let updateClipboardNotice: @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void
+        let pendingRecoveryAuthorizationRequirement: @MainActor () -> MutationAuthorizationRequirement
         let recoverPendingMutation: @MainActor () async throws -> RecoveryOutcome
+        let resetAuthorizationRequirement: @MainActor () -> MutationAuthorizationRequirement
         let resetDomain: @MainActor () async throws -> Void
     }
 
@@ -99,7 +107,9 @@ final class ProtectedSettingsHost {
         migrateLegacyClipboardNoticeIfNeeded: @escaping @MainActor () async throws -> Void,
         openDomainIfNeeded: @escaping @MainActor (_ wrappingRootKey: Data) async throws -> Void,
         updateClipboardNotice: @escaping @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void,
+        pendingRecoveryAuthorizationRequirement: @escaping @MainActor () -> MutationAuthorizationRequirement = { .notRequired },
         recoverPendingMutation: @escaping @MainActor () async throws -> RecoveryOutcome,
+        resetAuthorizationRequirement: @escaping @MainActor () -> MutationAuthorizationRequirement = { .notRequired },
         resetDomain: @escaping @MainActor () async throws -> Void,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
@@ -117,7 +127,9 @@ final class ProtectedSettingsHost {
             migrateLegacyClipboardNoticeIfNeeded: migrateLegacyClipboardNoticeIfNeeded,
             openDomainIfNeeded: openDomainIfNeeded,
             updateClipboardNotice: updateClipboardNotice,
+            pendingRecoveryAuthorizationRequirement: pendingRecoveryAuthorizationRequirement,
             recoverPendingMutation: recoverPendingMutation,
+            resetAuthorizationRequirement: resetAuthorizationRequirement,
             resetDomain: resetDomain
         )
         self.sectionState = .locked
@@ -287,6 +299,15 @@ final class ProtectedSettingsHost {
 
         sectionState = .loading
         do {
+            guard try await authorizeMutationIfNeeded(
+                using: liveDependencies,
+                requirement: liveDependencies.pendingRecoveryAuthorizationRequirement(),
+                localizedReason: settingsLocalizedReason,
+                operation: "pendingRecovery"
+            ) else {
+                return
+            }
+
             let outcome = try await liveDependencies.recoverPendingMutation()
             switch outcome {
             case .resumedToSteadyState:
@@ -313,6 +334,15 @@ final class ProtectedSettingsHost {
 
         sectionState = .loading
         do {
+            guard try await authorizeMutationIfNeeded(
+                using: liveDependencies,
+                requirement: liveDependencies.resetAuthorizationRequirement(),
+                localizedReason: settingsLocalizedReason,
+                operation: "reset"
+            ) else {
+                return
+            }
+
             try await liveDependencies.resetDomain()
 
             let didOpen = await openProtectedSettings(
@@ -430,6 +460,76 @@ final class ProtectedSettingsHost {
                     .merging(traceErrorMetadata(error, extra: ["result": "error"]), uniquingKeysWith: { _, new in new })
             )
             return false
+        }
+    }
+
+    private func authorizeMutationIfNeeded(
+        using liveDependencies: LiveDependencies,
+        requirement: MutationAuthorizationRequirement,
+        localizedReason: String,
+        operation: String
+    ) async throws -> Bool {
+        traceHostEvent(
+            "protectedSettings.mutationAuthorization.start",
+            metadata: [
+                "operation": operation,
+                "requirement": mutationAuthorizationRequirementTraceValue(requirement)
+            ]
+        )
+
+        switch requirement {
+        case .notRequired:
+            traceHostEvent(
+                "protectedSettings.mutationAuthorization.finish",
+                metadata: ["operation": operation, "result": "notRequired"]
+            )
+            return true
+        case .frameworkRecoveryNeeded:
+            liveDependencies.syncPreAuthorizationState()
+            sectionState = .frameworkUnavailable
+            traceHostEvent(
+                "protectedSettings.mutationAuthorization.finish",
+                metadata: ["operation": operation, "result": "frameworkRecoveryNeeded"]
+            )
+            return false
+        case .wrappingRootKeyRequired:
+            let authorizationResult = await liveDependencies.authorizeSharedRight(
+                localizedReason,
+                .allowInteraction
+            )
+            traceHostEvent(
+                "protectedSettings.mutationAuthorization.result",
+                metadata: [
+                    "operation": operation,
+                    "outcome": authorizationOutcomeTraceValue(authorizationResult)
+                ]
+            )
+            switch authorizationResult {
+            case .authorized:
+                var wrappingRootKey = try liveDependencies.currentWrappingRootKey()
+                wrappingRootKey.resetBytes(in: 0..<wrappingRootKey.count)
+                traceHostEvent(
+                    "protectedSettings.mutationAuthorization.finish",
+                    metadata: ["operation": operation, "result": "authorized"]
+                )
+                return true
+            case .cancelledOrDenied:
+                liveDependencies.syncPreAuthorizationState()
+                syncSectionStateFromStore(liveDependencies)
+                traceHostEvent(
+                    "protectedSettings.mutationAuthorization.finish",
+                    metadata: ["operation": operation, "result": "cancelledOrDenied"]
+                )
+                return false
+            case .frameworkRecoveryNeeded:
+                liveDependencies.syncPreAuthorizationState()
+                sectionState = .frameworkUnavailable
+                traceHostEvent(
+                    "protectedSettings.mutationAuthorization.finish",
+                    metadata: ["operation": operation, "result": "frameworkRecoveryNeeded"]
+                )
+                return false
+            }
         }
     }
 
@@ -758,6 +858,19 @@ final class ProtectedSettingsHost {
             "authorized"
         case .cancelledOrDenied:
             "cancelledOrDenied"
+        case .frameworkRecoveryNeeded:
+            "frameworkRecoveryNeeded"
+        }
+    }
+
+    private func mutationAuthorizationRequirementTraceValue(
+        _ requirement: MutationAuthorizationRequirement
+    ) -> String {
+        switch requirement {
+        case .notRequired:
+            "notRequired"
+        case .wrappingRootKeyRequired:
+            "wrappingRootKeyRequired"
         case .frameworkRecoveryNeeded:
             "frameworkRecoveryNeeded"
         }

@@ -356,6 +356,61 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_localDataReset_defaultConfigurationWithService_showsEnabledSectionAndRequestWarning() {
+        let resetContainer = AppContainer.makeUITest()
+        defer { cleanup(resetContainer) }
+
+        let model = makeModel(localDataResetService: resetContainer.localDataResetService)
+
+        XCTAssertTrue(model.shouldShowLocalDataResetSection)
+        XCTAssertTrue(model.isLocalDataResetControlEnabled)
+        XCTAssertEqual(
+            model.localDataResetFooter,
+            String(
+                localized: "settings.resetAll.footer",
+                defaultValue: "Use this only when you want this device to behave like a fresh CypherAir install."
+            )
+        )
+
+        model.requestLocalDataReset()
+
+        XCTAssertTrue(model.showLocalDataResetWarning)
+    }
+
+    @MainActor
+    func test_localDataReset_defaultConfigurationWithoutService_hidesSection() {
+        let model = makeModel()
+
+        XCTAssertFalse(model.shouldShowLocalDataResetSection)
+        XCTAssertFalse(model.isLocalDataResetControlEnabled)
+    }
+
+    @MainActor
+    func test_localDataReset_tutorialConfigurationWithService_showsDisabledSectionAndBlocksRequest() {
+        let resetContainer = AppContainer.makeUITest()
+        defer { cleanup(resetContainer) }
+        let store = TutorialSessionStore()
+        let model = makeModel(
+            configuration: store.configurationFactory.settingsConfiguration(),
+            localDataResetService: resetContainer.localDataResetService
+        )
+
+        XCTAssertTrue(model.shouldShowLocalDataResetSection)
+        XCTAssertFalse(model.isLocalDataResetControlEnabled)
+        XCTAssertEqual(
+            model.localDataResetFooter,
+            String(
+                localized: "guidedTutorial.settings.restricted.localDataReset",
+                defaultValue: "The tutorial sandbox cannot reset real CypherAir data."
+            )
+        )
+
+        model.requestLocalDataReset()
+
+        XCTAssertFalse(model.showLocalDataResetWarning)
+    }
+
+    @MainActor
     func test_liveProtectedSettingsHost_authorizationRequired_preservesRecoveryNeededOnRefresh() async {
         var domainState: CypherAir.ProtectedSettingsHost.DomainState = .recoveryNeeded
         var authorizeCallCount = 0
@@ -753,6 +808,153 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_liveProtectedSettingsHost_resetAuthorizesBeforeResetWhenWrappingKeyRequired() async {
+        var events: [String] = []
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .pendingResetRequired
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
+            authorizeSharedRight: { _, interactionMode in
+                events.append("authorize")
+                XCTAssertEqual(interactionMode, .allowInteraction)
+                return .authorized
+            },
+            currentWrappingRootKey: {
+                events.append("wrappingKey")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetAuthorizationRequirement: {
+                events.append("requirement")
+                return .wrappingRootKeyRequired
+            },
+            resetDomain: {
+                events.append("reset")
+                domainState = .pendingResetRequired
+            }
+        )
+
+        await host.resetProtectedSettingsDomain()
+
+        XCTAssertEqual(events, ["requirement", "authorize", "wrappingKey", "reset"])
+        XCTAssertEqual(host.sectionState, .pendingResetRequired)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_resetCancellationDoesNotReset() async {
+        var events: [String] = []
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
+            authorizeSharedRight: { _, _ in
+                events.append("authorize")
+                return .cancelledOrDenied
+            },
+            currentWrappingRootKey: {
+                XCTFail("Cancelled reset should not read the wrapping key.")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { .pendingResetRequired },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetAuthorizationRequirement: {
+                events.append("requirement")
+                return .wrappingRootKeyRequired
+            },
+            resetDomain: {
+                XCTFail("Cancelled reset must not delete protected settings.")
+            }
+        )
+
+        await host.resetProtectedSettingsDomain()
+
+        XCTAssertEqual(events, ["requirement", "authorize"])
+        XCTAssertEqual(host.sectionState, .pendingResetRequired)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_firstDomainResetDoesNotRequireAuthorization() async {
+        var events: [String] = []
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .pendingResetRequired
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
+            authorizeSharedRight: { _, _ in
+                XCTFail("First-domain reset should not force protected-data authorization.")
+                return .authorized
+            },
+            currentWrappingRootKey: {
+                XCTFail("First-domain reset should not read the wrapping key.")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetAuthorizationRequirement: {
+                events.append("requirement")
+                return .notRequired
+            },
+            resetDomain: {
+                events.append("reset")
+                domainState = .pendingResetRequired
+            }
+        )
+
+        await host.resetProtectedSettingsDomain()
+
+        XCTAssertEqual(events, ["requirement", "reset"])
+        XCTAssertEqual(host.sectionState, .pendingResetRequired)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_retryAuthorizesBeforeRecoveringWhenWrappingKeyRequired() async {
+        var events: [String] = []
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
+            authorizeSharedRight: { _, interactionMode in
+                events.append("authorize")
+                XCTAssertEqual(interactionMode, .allowInteraction)
+                return .authorized
+            },
+            currentWrappingRootKey: {
+                events.append("wrappingKey")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { .pendingRetryRequired },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            pendingRecoveryAuthorizationRequirement: {
+                events.append("requirement")
+                return .wrappingRootKeyRequired
+            },
+            recoverPendingMutation: {
+                events.append("recover")
+                return .retryablePending
+            },
+            resetDomain: {}
+        )
+
+        await host.retryPendingRecovery()
+
+        XCTAssertEqual(events, ["requirement", "authorize", "wrappingKey", "recover"])
+        XCTAssertEqual(host.sectionState, .pendingRetryRequired)
+    }
+
+    @MainActor
     func test_liveProtectedSettingsHost_invalidateForContentClearGeneration_alreadyAuthorizedAutoOpens() async {
         var openDomainCallCount = 0
         var domainState: CypherAir.ProtectedSettingsHost.DomainState = .unlocked
@@ -872,6 +1074,7 @@ final class SettingsScreenModelTests: XCTestCase {
         configuration: SettingsView.Configuration = .default,
         iosPresentationController: IOSPresentationController? = nil,
         macPresentationController: MacPresentationController? = nil,
+        localDataResetService: LocalDataResetService? = nil,
         authModeSwitchAction: SettingsScreenModel.AuthModeSwitchAction? = nil,
         appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? = nil
     ) -> SettingsScreenModel {
@@ -882,9 +1085,22 @@ final class SettingsScreenModelTests: XCTestCase {
             iosPresentationController: iosPresentationController,
             macPresentationController: macPresentationController,
             configuration: configuration,
+            localDataResetService: localDataResetService,
             authModeSwitchAction: authModeSwitchAction,
             appAccessPolicySwitchAction: appAccessPolicySwitchAction
         )
+    }
+
+    private func cleanup(_ container: AppContainer) {
+        try? FileManager.default.removeItem(
+            at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
+        )
+        if let contactsDirectory = container.contactsDirectory {
+            try? FileManager.default.removeItem(at: contactsDirectory)
+        }
+        if let defaultsSuiteName = container.defaultsSuiteName {
+            UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
+        }
     }
 
     @MainActor

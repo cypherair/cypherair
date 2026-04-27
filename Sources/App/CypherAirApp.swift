@@ -196,6 +196,11 @@ struct CypherAirApp: App {
                     wrappingRootKey: wrappingRootKey
                 )
             },
+            pendingRecoveryAuthorizationRequirement: {
+                Self.protectedSettingsMutationRequirement(
+                    container.protectedDomainRecoveryCoordinator.pendingRecoveryAuthorizationRequirement()
+                )
+            },
             recoverPendingMutation: {
                 let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingMutation(
                     handlers: [
@@ -218,6 +223,11 @@ struct CypherAirApp: App {
                 case .frameworkRecoveryNeeded:
                     return .frameworkRecoveryNeeded
                 }
+            },
+            resetAuthorizationRequirement: {
+                Self.protectedSettingsMutationRequirement(
+                    container.protectedSettingsStore.resetAuthorizationRequirement()
+                )
             },
             resetDomain: {
                 try await container.protectedSettingsStore.resetDomain(
@@ -245,6 +255,19 @@ struct CypherAirApp: App {
         _protectedSettingsHost = State(initialValue: protectedSettingsHost)
         _tutorialStore = State(initialValue: tutorialStore)
         _incomingURLImportCoordinator = State(initialValue: incomingURLImportCoordinator)
+    }
+
+    private static func protectedSettingsMutationRequirement(
+        _ requirement: ProtectedDataMutationAuthorizationRequirement
+    ) -> ProtectedSettingsHost.MutationAuthorizationRequirement {
+        switch requirement {
+        case .notRequired:
+            .notRequired
+        case .wrappingRootKeyRequired:
+            .wrappingRootKeyRequired
+        case .frameworkRecoveryNeeded:
+            .frameworkRecoveryNeeded
+        }
     }
 
     // MARK: - Scene
@@ -545,6 +568,7 @@ struct CypherAirApp: App {
                         to: newPolicy,
                         authenticationContext: result.context
                     )
+                    container.appSessionOrchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
                     container.authLifecycleTraceStore?.record(
                         category: .operation,
                         name: "appAccessPolicy.switch.finish",
@@ -571,6 +595,7 @@ struct CypherAirApp: App {
                         didTraceFinish = true
                         throw AuthenticationError.appAccessBiometricsUnavailable
                     }
+                    container.appSessionOrchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
                     container.authLifecycleTraceStore?.record(
                         category: .operation,
                         name: "appAccessPolicy.switch.finish",
