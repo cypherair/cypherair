@@ -442,7 +442,7 @@ private struct AuthenticationShieldView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var cardIsPresented = false
-    @State private var accentSweepIsActive = false
+    @State private var breathingGlowIsActive = false
 
     var body: some View {
         ZStack {
@@ -455,7 +455,7 @@ private struct AuthenticationShieldView: View {
                 isPendingDismissal: presentationState.isPendingDismissal,
                 reduceMotion: reduceMotion,
                 cardIsPresented: cardIsPresented,
-                accentSweepIsActive: accentSweepIsActive
+                breathingGlowIsActive: breathingGlowIsActive
             )
             .padding(24)
             .allowsHitTesting(!presentationState.isPendingDismissal)
@@ -471,7 +471,7 @@ private struct AuthenticationShieldView: View {
             prepareEntranceAnimation()
         }
         .onChange(of: presentationState.isPendingDismissal) { _, _ in
-            updateCardPresentation()
+            updateBreathingGlow()
         }
         .onChange(of: reduceMotion) { _, _ in
             prepareEntranceAnimation()
@@ -489,41 +489,51 @@ private struct AuthenticationShieldView: View {
     }
 
     private func prepareEntranceAnimation() {
-        accentSweepIsActive = false
+        breathingGlowIsActive = false
 
         guard !reduceMotion else {
-            cardIsPresented = !presentationState.isPendingDismissal
+            cardIsPresented = true
             return
         }
 
         cardIsPresented = false
         updateCardPresentation()
-
-        guard !presentationState.isPendingDismissal else {
-            return
-        }
-        withAnimation(.linear(duration: AuthenticationShieldAnimation.accentSweepDuration).repeatForever(autoreverses: false)) {
-            accentSweepIsActive = true
-        }
+        updateBreathingGlow()
     }
 
     private func updateCardPresentation() {
-        let shouldPresentCard = !presentationState.isPendingDismissal
-
         guard !reduceMotion else {
-            cardIsPresented = shouldPresentCard
+            cardIsPresented = true
             return
         }
 
-        let animation: Animation = shouldPresentCard
-            ? .spring(
+        withAnimation(
+            .spring(
                 response: AuthenticationShieldAnimation.cardEntranceResponse,
                 dampingFraction: AuthenticationShieldAnimation.cardEntranceDamping
             )
-            : .easeOut(duration: AuthenticationShieldAnimation.cardDismissalDuration)
+        ) {
+            cardIsPresented = true
+        }
+    }
 
-        withAnimation(animation) {
-            cardIsPresented = shouldPresentCard
+    private func updateBreathingGlow() {
+        guard !reduceMotion else {
+            breathingGlowIsActive = false
+            return
+        }
+
+        if presentationState.isPendingDismissal {
+            withAnimation(.easeOut(duration: AuthenticationShieldAnimation.breathingGlowSettleDuration)) {
+                breathingGlowIsActive = false
+            }
+        } else {
+            withAnimation(
+                .easeInOut(duration: AuthenticationShieldAnimation.breathingGlowDuration)
+                    .repeatForever(autoreverses: true)
+            ) {
+                breathingGlowIsActive = true
+            }
         }
     }
 }
@@ -533,7 +543,7 @@ private struct AuthenticationShieldCard: View {
     let isPendingDismissal: Bool
     let reduceMotion: Bool
     let cardIsPresented: Bool
-    let accentSweepIsActive: Bool
+    let breathingGlowIsActive: Bool
 
     private var isActivelyAuthenticating: Bool {
         cardIsPresented && !isPendingDismissal
@@ -545,7 +555,7 @@ private struct AuthenticationShieldCard: View {
                 iconName: iconName,
                 isActivelyAuthenticating: isActivelyAuthenticating,
                 reduceMotion: reduceMotion,
-                accentSweepIsActive: accentSweepIsActive
+                breathingGlowIsActive: breathingGlowIsActive
             )
 
             VStack(spacing: 6) {
@@ -574,9 +584,14 @@ private struct AuthenticationShieldCard: View {
             AuthenticationShieldCardStroke(
                 isActivelyAuthenticating: isActivelyAuthenticating,
                 reduceMotion: reduceMotion,
-                accentSweepIsActive: accentSweepIsActive
+                breathingGlowIsActive: breathingGlowIsActive
             )
         }
+        .shadow(
+            color: Color.accentColor.opacity(isActivelyAuthenticating && !reduceMotion ? 0.12 : 0),
+            radius: breathingGlowIsActive ? 24 : 12,
+            y: 8
+        )
         .shadow(color: Color.black.opacity(0.08), radius: 18, y: 8)
         .opacity(cardIsPresented ? 1 : 0)
         .scaleEffect(cardIsPresented ? 1 : 0.97)
@@ -588,10 +603,38 @@ private struct AuthenticationShieldIcon: View {
     let iconName: String
     let isActivelyAuthenticating: Bool
     let reduceMotion: Bool
-    let accentSweepIsActive: Bool
+    let breathingGlowIsActive: Bool
+
+    private var glowScale: CGFloat {
+        breathingGlowIsActive ? 1.08 : 0.96
+    }
+
+    private var glowOpacity: Double {
+        if reduceMotion {
+            return isActivelyAuthenticating ? 0.24 : 0.12
+        }
+        return breathingGlowIsActive ? 0.34 : 0.16
+    }
 
     var body: some View {
         ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.accentColor.opacity(glowOpacity),
+                            Color.accentColor.opacity(glowOpacity * 0.34),
+                            Color.accentColor.opacity(0)
+                        ],
+                        center: .center,
+                        startRadius: 12,
+                        endRadius: 52
+                    )
+                )
+                .frame(width: 104, height: 104)
+                .scaleEffect(reduceMotion ? 1 : glowScale)
+                .opacity(isActivelyAuthenticating || reduceMotion ? 1 : 0.34)
+
             Circle()
                 .fill(.thinMaterial)
                 .frame(width: 78, height: 78)
@@ -599,25 +642,10 @@ private struct AuthenticationShieldIcon: View {
                     Circle()
                         .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                 }
-
-            if isActivelyAuthenticating && !reduceMotion {
-                Circle()
-                    .trim(from: 0.08, to: 0.34)
-                    .stroke(
-                        AngularGradient(
-                            colors: [
-                                Color.accentColor.opacity(0),
-                                Color.accentColor.opacity(0.55),
-                                Color.primary.opacity(0.18),
-                                Color.accentColor.opacity(0)
-                            ],
-                            center: .center
-                        ),
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round)
-                    )
-                    .frame(width: 78, height: 78)
-                    .rotationEffect(.degrees(accentSweepIsActive ? 360 : 0))
-            }
+                .shadow(
+                    color: Color.accentColor.opacity(glowOpacity * 0.54),
+                    radius: breathingGlowIsActive && !reduceMotion ? 16 : 8
+                )
 
             Image(systemName: iconName)
                 .font(.system(size: 38, weight: .medium))
@@ -632,7 +660,17 @@ private struct AuthenticationShieldIcon: View {
 private struct AuthenticationShieldCardStroke: View {
     let isActivelyAuthenticating: Bool
     let reduceMotion: Bool
-    let accentSweepIsActive: Bool
+    let breathingGlowIsActive: Bool
+
+    private var glowOpacity: Double {
+        guard isActivelyAuthenticating else {
+            return reduceMotion ? 0.08 : 0
+        }
+        guard !reduceMotion else {
+            return 0.18
+        }
+        return breathingGlowIsActive ? 0.26 : 0.12
+    }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -641,21 +679,25 @@ private struct AuthenticationShieldCardStroke: View {
             shape
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
 
-            if isActivelyAuthenticating && !reduceMotion {
+            if glowOpacity > 0 {
                 shape
                     .stroke(
-                        LinearGradient(
+                        RadialGradient(
                             colors: [
-                                Color.accentColor.opacity(0.34),
-                                Color.primary.opacity(0.1),
-                                Color.accentColor.opacity(0.04)
+                                Color.accentColor.opacity(glowOpacity),
+                                Color.accentColor.opacity(glowOpacity * 0.48),
+                                Color.accentColor.opacity(0)
                             ],
-                            startPoint: accentSweepIsActive ? .topLeading : .bottomTrailing,
-                            endPoint: accentSweepIsActive ? .bottomTrailing : .topLeading
+                            center: .center,
+                            startRadius: 48,
+                            endRadius: 220
                         ),
                         lineWidth: 1.2
                     )
-                    .opacity(0.85)
+                    .shadow(
+                        color: Color.accentColor.opacity(glowOpacity),
+                        radius: breathingGlowIsActive && !reduceMotion ? 16 : 8
+                    )
             }
         }
     }
@@ -664,9 +706,9 @@ private struct AuthenticationShieldCardStroke: View {
 private enum AuthenticationShieldAnimation {
     static let cardEntranceResponse = 0.34
     static let cardEntranceDamping = 0.84
-    static let cardDismissalDuration = 0.22
     static let overlayDismissalDuration = 0.26
-    static let accentSweepDuration = 2.4
+    static let breathingGlowDuration = 1.8
+    static let breathingGlowSettleDuration = 0.24
 }
 
 extension View {
