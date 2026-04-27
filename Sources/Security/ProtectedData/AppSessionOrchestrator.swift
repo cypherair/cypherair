@@ -113,6 +113,10 @@ final class AppSessionOrchestrator {
         pendingAuthenticatedContext != nil
     }
 
+    func discardProtectedDataAuthorizationHandoffContextForPolicyChange() {
+        discardPendingAuthenticatedContext(reason: "appAccessPolicyChange")
+    }
+
     var isGracePeriodExpired: Bool {
         guard let lastAuthenticationDate else {
             return true

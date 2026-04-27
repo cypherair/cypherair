@@ -1444,6 +1444,51 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         handoffContext.invalidate()
     }
 
+    func test_appAccessPolicyChange_discardsPendingProtectedDataHandoffContext() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataPolicyChangeHandoff")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let handoffContext = LAContext()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.policy-change-handoff",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in .authenticated(context: handoffContext) },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        defer {
+            if orchestrator.hasProtectedDataAuthorizationHandoffContext {
+                handoffContext.invalidate()
+            }
+        }
+
+        let attemptedAuthentication = await orchestrator.handleResume(
+            localizedReason: "Successful privacy unlock stores handoff before policy change"
+        )
+
+        XCTAssertTrue(attemptedAuthentication)
+        XCTAssertTrue(orchestrator.hasProtectedDataAuthorizationHandoffContext)
+
+        orchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
+
+        XCTAssertFalse(orchestrator.hasProtectedDataAuthorizationHandoffContext)
+        XCTAssertNil(orchestrator.consumeAuthenticatedContextForProtectedData())
+    }
+
     func test_handleResume_afterBackgroundFollowingOperationPrompt_treatsReturnAsRealResume() async {
         let storageRoot = AppProtectedDataStorageRoot(
             baseDirectory: makeTemporaryDirectory("ProtectedDataResumeAfterBackground")

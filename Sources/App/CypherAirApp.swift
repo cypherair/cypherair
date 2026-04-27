@@ -545,6 +545,7 @@ struct CypherAirApp: App {
                         to: newPolicy,
                         authenticationContext: result.context
                     )
+                    container.appSessionOrchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
                     container.authLifecycleTraceStore?.record(
                         category: .operation,
                         name: "appAccessPolicy.switch.finish",
@@ -571,6 +572,7 @@ struct CypherAirApp: App {
                         didTraceFinish = true
                         throw AuthenticationError.appAccessBiometricsUnavailable
                     }
+                    container.appSessionOrchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
                     container.authLifecycleTraceStore?.record(
                         category: .operation,
                         name: "appAccessPolicy.switch.finish",
