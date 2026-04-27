@@ -132,9 +132,10 @@ private struct SettingsScreenHostView: View {
                 Picker(
                     String(localized: "settings.authMode", defaultValue: "Private Key Protection"),
                     selection: Binding(
-                        get: { appConfiguration.authMode },
+                        get: { appConfiguration.authModeIfUnlocked ?? .standard },
                         set: { newMode in
-                            guard newMode != appConfiguration.authMode else { return }
+                            guard let currentMode = appConfiguration.authModeIfUnlocked,
+                                  newMode != currentMode else { return }
                             model.handleAuthModeSelection(newMode)
                         }
                     )
@@ -146,7 +147,7 @@ private struct SettingsScreenHostView: View {
                 }
                 .accessibilityIdentifier("settings.authMode")
                 .tutorialAnchor(.settingsAuthModePicker)
-                .disabled(model.isSwitching)
+                .disabled(model.isSwitching || appConfiguration.authModeIfUnlocked == nil)
 
                 Picker(
                     String(localized: "settings.gracePeriod", defaultValue: "Re-authentication"),

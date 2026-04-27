@@ -21,7 +21,6 @@ struct KeyGenerationView: View {
     }
 
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appRouteNavigator) private var routeNavigator
 
@@ -184,7 +183,6 @@ struct KeyGenerationView: View {
         let expiryDate = Calendar.current.date(byAdding: .month, value: expiryMonths, to: Date()) ?? Date()
         let expirySeconds = UInt64(max(0, expiryDate.timeIntervalSinceNow))
         let service = keyManagement
-        let authMode = config.authMode
 
         Task {
             do {
@@ -192,8 +190,7 @@ struct KeyGenerationView: View {
                     name: trimmedName,
                     email: trimmedEmail.isEmpty ? nil : trimmedEmail,
                     expirySeconds: expirySeconds,
-                    profile: profile,
-                    authMode: authMode
+                    profile: profile
                 )
                 configuration.onGenerated?(identity)
 

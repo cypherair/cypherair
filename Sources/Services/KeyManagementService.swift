@@ -19,6 +19,7 @@ final class KeyManagementService {
     private let exportService: KeyExportService
     private let selectiveRevocationService: SelectiveRevocationService
     private let mutationService: KeyMutationService
+    private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
     private let traceStore: AuthLifecycleTraceStore?
     private var legacyMetadataMigrationCompletedInProcess = false
 
@@ -30,6 +31,7 @@ final class KeyManagementService {
         memoryInfo: any MemoryInfoProvidable = SystemMemoryInfo(),
         defaults: UserDefaults = .standard,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
+        privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil
     ) {
         let bundleStore = KeyBundleStore(keychain: keychain)
@@ -42,10 +44,12 @@ final class KeyManagementService {
             authenticationPromptCoordinator: authenticationPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
+        let effectivePrivateKeyControlStore = privateKeyControlStore
 
         self.engine = engine
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
+        self.privateKeyControlStore = effectivePrivateKeyControlStore
         self.provisioningService = KeyProvisioningService(
             engine: engine,
             secureEnclave: secureEnclave,
@@ -71,7 +75,8 @@ final class KeyManagementService {
             bundleStore: bundleStore,
             migrationCoordinator: migrationCoordinator,
             catalogStore: catalogStore,
-            privateKeyAccessService: privateKeyAccessService
+            privateKeyAccessService: privateKeyAccessService,
+            privateKeyControlStore: effectivePrivateKeyControlStore
         )
         self.traceStore = authLifecycleTraceStore
     }
@@ -148,6 +153,26 @@ final class KeyManagementService {
     /// Generate a new key pair with the specified profile.
     /// The private key is immediately SE-wrapped and stored in Keychain.
     ///
+    /// Uses the unlocked private-key control domain for the SE access-control mode.
+    func generateKey(
+        name: String,
+        email: String?,
+        expirySeconds: UInt64?,
+        profile: KeyProfile
+    ) async throws -> PGPKeyIdentity {
+        let authMode = try privateKeyControlStore.requireUnlockedAuthMode()
+        return try await generateKey(
+            name: name,
+            email: email,
+            expirySeconds: expirySeconds,
+            profile: profile,
+            authMode: authMode
+        )
+    }
+
+    /// Generate a new key pair with the specified profile.
+    /// The private key is immediately SE-wrapped and stored in Keychain.
+    ///
     /// - Parameters:
     ///   - name: User's name (required).
     ///   - email: User's email (optional).
@@ -174,6 +199,22 @@ final class KeyManagementService {
     }
 
     // MARK: - Key Import
+
+    /// Import a passphrase-protected secret key.
+    /// Validates Argon2id memory requirements before import.
+    ///
+    /// Uses the unlocked private-key control domain for the SE access-control mode.
+    func importKey(
+        armoredData: Data,
+        passphrase: String
+    ) async throws -> PGPKeyIdentity {
+        let authMode = try privateKeyControlStore.requireUnlockedAuthMode()
+        return try await importKey(
+            armoredData: armoredData,
+            passphrase: passphrase,
+            authMode: authMode
+        )
+    }
 
     /// Import a passphrase-protected secret key.
     /// Validates Argon2id memory requirements before import.
@@ -277,6 +318,22 @@ final class KeyManagementService {
     }
 
     // MARK: - Key Expiry Modification
+
+    /// Modify the expiration time of an existing certificate.
+    /// Requires device authentication to access the SE-wrapped private key.
+    ///
+    /// Uses the unlocked private-key control domain for the SE access-control mode.
+    func modifyExpiry(
+        fingerprint: String,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPKeyIdentity {
+        let updated = try await mutationService.modifyExpiry(
+            fingerprint: fingerprint,
+            newExpirySeconds: newExpirySeconds
+        )
+        syncKeys()
+        return updated
+    }
 
     /// Modify the expiration time of an existing certificate.
     /// Requires device authentication to access the SE-wrapped private key.

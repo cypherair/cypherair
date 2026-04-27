@@ -2,7 +2,7 @@ import Foundation
 import LocalAuthentication
 
 @Observable
-final class ProtectedDataSessionCoordinator {
+final class ProtectedDataSessionCoordinator: @unchecked Sendable {
     private let rootSecretStore: any ProtectedDataRootSecretStoreProtocol
     private let legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)?
     private let domainKeyManager: ProtectedDomainKeyManager

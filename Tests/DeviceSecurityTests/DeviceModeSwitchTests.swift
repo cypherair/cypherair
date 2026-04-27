@@ -10,7 +10,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
     func test_switchMode_noIdentities_throwsNoIdentities() async throws {
         let mockAuth = MockAuthenticator()
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain
         )
@@ -31,9 +31,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test") }
 
-        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
             defaults: testDefaults
@@ -58,8 +56,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test") }
-        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-
         // 1. Initial wrap under Standard mode (no access control for test simplicity).
         // This keeps the test non-interactive and focused on migration mechanics only.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
@@ -76,21 +72,18 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         try await Task.sleep(for: .seconds(2))
 
         let mockAuth = MockAuthenticator()
-        let authManager = AuthenticationManager(
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: testDefaults
+            defaults: testDefaults,
+            privateKeyControlStore: privateKeyControlStore
         )
         try await authManager.switchMode(to: .highSecurity, fingerprints: [fingerprint], hasBackup: true, authenticator: mockAuth)
 
-        // 3. Verify: mode persisted.
-        XCTAssertEqual(
-            testDefaults.string(forKey: AuthPreferences.authModeKey),
-            AuthenticationMode.highSecurity.rawValue
-        )
-
-        // 4. Verify: rewrap flag cleared.
-        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        // 3. Verify: protected mode updated and rewrap journal cleared.
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
 
         // 5. Verify: can still unwrap the key with new items.
         let newSEKeyData = try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
@@ -118,8 +111,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         let testDefaults = UserDefaults(suiteName: "com.cypherair.device.manual.stdtohs")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.device.manual.stdtohs") }
-        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-
         let initialBundle = try createWrappedBundle(
             privateKey: fakePrivateKey,
             fingerprint: fingerprint,
@@ -127,10 +118,12 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         )
         try storePermanentBundle(initialBundle, fingerprint: fingerprint)
 
-        let authManager = AuthenticationManager(
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: testDefaults
+            defaults: testDefaults,
+            privateKeyControlStore: privateKeyControlStore
         )
 
         // Brief pause to let any prior SE authentication session settle,
@@ -144,11 +137,8 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
             authenticator: authManager
         )
 
-        XCTAssertEqual(
-            testDefaults.string(forKey: AuthPreferences.authModeKey),
-            AuthenticationMode.highSecurity.rawValue
-        )
-        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
 
         try await waitForAuthenticationSessionToSettle()
 
@@ -201,8 +191,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test.rollback")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.rollback") }
-        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-
         let fp1 = uniqueFingerprint()
         let fp2 = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
@@ -228,10 +216,12 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         // This means fp1's 3 pending items succeed, but fp2's first pending save fails.
         mockKeychain.failOnSaveNumber = 10
 
-        let authManager = AuthenticationManager(
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let authManager = makeAuthenticationManager(
             secureEnclave: mockSE,
             keychain: mockKeychain,
-            defaults: testDefaults
+            defaults: testDefaults,
+            privateKeyControlStore: privateKeyControlStore
         )
 
         // Attempt mode switch — should fail and roll back.
@@ -264,14 +254,9 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         XCTAssertFalse(mockKeychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp2), account: account),
                        "Pending items for fp2 must be cleaned up after rollback")
 
-        // Verify: rewrap flag is cleared.
-        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey),
-                       "rewrapInProgress flag must be cleared after rollback")
-
-        // Verify: mode did NOT change.
-        XCTAssertEqual(testDefaults.string(forKey: AuthPreferences.authModeKey),
-                       AuthenticationMode.standard.rawValue,
-                       "Mode must remain standard after failed switch")
+        // Verify: protected rewrap journal cleared and mode did NOT change.
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
+        XCTAssertEqual(authManager.currentMode, .standard, "Mode must remain standard after failed switch")
     }
 
     /// Verifies that switchMode fails when the authenticator rejects the user.
@@ -283,8 +268,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test.authfail")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.authfail") }
-        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-
         let fp = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
 
@@ -295,10 +278,12 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         try mockKeychain.save(bundle.salt, service: KeychainConstants.saltService(fingerprint: fp), account: account, accessControl: nil)
         try mockKeychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account, accessControl: nil)
 
-        let authManager = AuthenticationManager(
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let authManager = makeAuthenticationManager(
             secureEnclave: mockSE,
             keychain: mockKeychain,
-            defaults: testDefaults
+            defaults: testDefaults,
+            privateKeyControlStore: privateKeyControlStore
         )
 
         // Authentication should fail, so switchMode should throw before touching any keys.
@@ -314,13 +299,12 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
             // Expected — authentication failed before any Keychain modification.
         }
 
-        // Verify: original keys untouched, no pending items, no rewrap flag.
+        // Verify: original keys untouched, no pending items, no protected rewrap journal.
         XCTAssertTrue(mockKeychain.exists(service: KeychainConstants.seKeyService(fingerprint: fp), account: account),
                       "Original key must be untouched when auth fails")
         XCTAssertFalse(mockKeychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp), account: account),
                        "No pending items should exist when auth fails")
-        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey),
-                       "rewrapInProgress flag must not be set when auth fails")
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
     }
 
     // MARK: - High Security → Standard Reverse Mode Switch (Device)
@@ -337,8 +321,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test.hs2std")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.hs2std") }
-        testDefaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.authModeKey)
-
         // 1. Initial wrap under High Security mode.
         // No initial ACL so this test stays focused on migration mechanics.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
@@ -354,21 +336,18 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         try await Task.sleep(for: .seconds(2))
 
         let mockAuth = MockAuthenticator()
-        let authManager = AuthenticationManager(
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .highSecurity)
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: testDefaults
+            defaults: testDefaults,
+            privateKeyControlStore: privateKeyControlStore
         )
         try await authManager.switchMode(to: .standard, fingerprints: [fingerprint], hasBackup: true, authenticator: mockAuth)
 
-        // 3. Verify: mode persisted as standard.
-        XCTAssertEqual(
-            testDefaults.string(forKey: AuthPreferences.authModeKey),
-            AuthenticationMode.standard.rawValue
-        )
-
-        // 4. Verify: rewrap flag cleared.
-        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        // 3. Verify: protected mode persisted as standard and rewrap journal cleared.
+        XCTAssertEqual(authManager.currentMode, .standard)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
 
         // 5. Verify: can still unwrap the key.
         let newSEKeyData = try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
@@ -394,8 +373,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         let testDefaults = UserDefaults(suiteName: "com.cypherair.device.manual.hs2std")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.device.manual.hs2std") }
-        testDefaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.authModeKey)
-
         let initialBundle = try createWrappedBundle(
             privateKey: fakePrivateKey,
             fingerprint: fingerprint,
@@ -403,10 +380,12 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         )
         try storePermanentBundle(initialBundle, fingerprint: fingerprint)
 
-        let authManager = AuthenticationManager(
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .highSecurity)
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: testDefaults
+            defaults: testDefaults,
+            privateKeyControlStore: privateKeyControlStore
         )
 
         // Brief pause to let any prior SE authentication session settle,
@@ -420,11 +399,8 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
             authenticator: authManager
         )
 
-        XCTAssertEqual(
-            testDefaults.string(forKey: AuthPreferences.authModeKey),
-            AuthenticationMode.standard.rawValue
-        )
-        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertEqual(authManager.currentMode, .standard)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
 
         try await waitForAuthenticationSessionToSettle()
 
@@ -475,8 +451,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test.12keys")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.12keys") }
-        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-
         let account = KeychainConstants.defaultAccount
         var fingerprints: [String] = []
         var originalKeys: [String: Data] = [:]
@@ -497,17 +471,18 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         }
 
         // Switch mode Standard → High Security
-        let authManager = AuthenticationManager(
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let authManager = makeAuthenticationManager(
             secureEnclave: mockSE,
             keychain: mockKeychain,
-            defaults: testDefaults
+            defaults: testDefaults,
+            privateKeyControlStore: privateKeyControlStore
         )
         try await authManager.switchMode(to: .highSecurity, fingerprints: fingerprints, hasBackup: true, authenticator: mockAuth)
 
-        // Verify: mode persisted
-        XCTAssertEqual(testDefaults.string(forKey: AuthPreferences.authModeKey),
-                       AuthenticationMode.highSecurity.rawValue)
-        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        // Verify: protected mode persisted and rewrap journal cleared.
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
 
         // Verify: all 12 keys are accessible after re-wrap
         for fp in fingerprints {
@@ -533,8 +508,6 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test.12fail")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.12fail") }
-        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-
         let account = KeychainConstants.defaultAccount
         var fingerprints: [String] = []
         var originalBundles: [String: WrappedKeyBundle] = [:]
@@ -559,10 +532,12 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         // Fail on save 58 = first pending item of key #8.
         mockKeychain.failOnSaveNumber = 58
 
-        let authManager = AuthenticationManager(
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let authManager = makeAuthenticationManager(
             secureEnclave: mockSE,
             keychain: mockKeychain,
-            defaults: testDefaults
+            defaults: testDefaults,
+            privateKeyControlStore: privateKeyControlStore
         )
 
         // Attempt mode switch — should fail and roll back
@@ -595,9 +570,8 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
                            "Pending items for \(fp) must be cleaned up after rollback")
         }
 
-        // Verify: rewrap flag cleared, mode unchanged
-        XCTAssertFalse(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
-        XCTAssertEqual(testDefaults.string(forKey: AuthPreferences.authModeKey),
-                       AuthenticationMode.standard.rawValue)
+        // Verify: protected rewrap journal cleared, mode unchanged.
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
+        XCTAssertEqual(authManager.currentMode, .standard)
     }
 }

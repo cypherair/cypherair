@@ -10,6 +10,7 @@ final class KeyMutationService {
     private let migrationCoordinator: KeyMigrationCoordinator
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
+    private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
 
     init(
         engine: PgpEngine,
@@ -19,7 +20,8 @@ final class KeyMutationService {
         bundleStore: KeyBundleStore,
         migrationCoordinator: KeyMigrationCoordinator,
         catalogStore: KeyCatalogStore,
-        privateKeyAccessService: PrivateKeyAccessService
+        privateKeyAccessService: PrivateKeyAccessService,
+        privateKeyControlStore: any PrivateKeyControlStoreProtocol
     ) {
         self.engine = engine
         self.secureEnclave = secureEnclave
@@ -29,6 +31,19 @@ final class KeyMutationService {
         self.migrationCoordinator = migrationCoordinator
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
+        self.privateKeyControlStore = privateKeyControlStore
+    }
+
+    func modifyExpiry(
+        fingerprint: String,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPKeyIdentity {
+        let authMode = try privateKeyControlStore.requireUnlockedAuthMode()
+        return try await modifyExpiry(
+            fingerprint: fingerprint,
+            newExpirySeconds: newExpirySeconds,
+            authMode: authMode
+        )
     }
 
     func modifyExpiry(
@@ -83,8 +98,7 @@ final class KeyMutationService {
             throw error
         }
 
-        defaults.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        defaults.set(fingerprint, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        try privateKeyControlStore.beginModifyExpiry(fingerprint: fingerprint)
 
         do {
             try bundleStore.deleteBundle(fingerprint: fingerprint)
@@ -98,8 +112,7 @@ final class KeyMutationService {
             throw error
         }
 
-        defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        try privateKeyControlStore.clearModifyExpiryJournal()
 
         var updated = existingIdentity
         updated.isExpired = result.keyInfo.isExpired
@@ -129,22 +142,20 @@ final class KeyMutationService {
     }
 
     func checkAndRecoverFromInterruptedModifyExpiry() -> KeyMigrationRecoveryOutcome? {
-        guard defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey) else {
+        guard let entry = try? privateKeyControlStore.recoveryJournal().modifyExpiry else {
             return nil
         }
 
-        guard let fingerprint = defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey),
+        guard let fingerprint = entry.fingerprint,
               !fingerprint.isEmpty else {
-            defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
-            defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+            try? privateKeyControlStore.clearModifyExpiryJournal()
             return .unrecoverable
         }
 
         let recoveryOutcome = migrationCoordinator.recoverInterruptedMigration(for: fingerprint)
 
         if recoveryOutcome.shouldClearRecoveryFlag {
-            defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
-            defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+            try? privateKeyControlStore.clearModifyExpiryJournal()
         }
 
         return recoveryOutcome
@@ -191,16 +202,10 @@ final class KeyMutationService {
     }
 
     private func clearRecoveryStateIfNeeded(afterDeleting fingerprint: String) {
-        if defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey),
-           defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey) == fingerprint {
-            defaults.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
-            defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
-        }
+        try? privateKeyControlStore.clearModifyExpiryJournalIfMatches(fingerprint: fingerprint)
 
-        if defaults.bool(forKey: AuthPreferences.rewrapInProgressKey),
-           catalogStore.keys.isEmpty {
-            defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
-            defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
+        if catalogStore.keys.isEmpty {
+            try? privateKeyControlStore.clearRewrapJournal()
         }
     }
 

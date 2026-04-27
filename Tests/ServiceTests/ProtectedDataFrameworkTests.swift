@@ -20,6 +20,7 @@ private typealias AppProtectedDataPostUnlockCoordinator = CypherAir.ProtectedDat
 private typealias AppProtectedDataPostUnlockDomainOpener = CypherAir.ProtectedDataPostUnlockDomainOpener
 private typealias AppProtectedDataPostUnlockOutcome = CypherAir.ProtectedDataPostUnlockOutcome
 private typealias AppProtectedDataFrameworkSentinelStore = CypherAir.ProtectedDataFrameworkSentinelStore
+private typealias AppPrivateKeyControlStore = CypherAir.PrivateKeyControlStore
 private typealias AppProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
 private typealias AppProtectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager
 private typealias AppProtectedDomainRecoveryHandler = CypherAir.ProtectedDomainRecoveryHandler
@@ -1125,6 +1126,17 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
+        let privateKeyControlStore = AppPrivateKeyControlStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
+        )
+        authManager.configurePrivateKeyControlStore(privateKeyControlStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let appSessionOrchestrator = AppAppSessionOrchestrator(
@@ -1148,7 +1160,8 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             keychain: keychain,
             authenticator: authManager,
             defaults: defaults,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            privateKeyControlStore: privateKeyControlStore
         )
         let contactService = ContactService(engine: engine, contactsDirectory: contactsDirectory)
         let encryptionService = EncryptionService(
@@ -1204,6 +1217,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             protectedDomainKeyManager: domainKeyManager,
             protectedDomainRecoveryCoordinator: recoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            privateKeyControlStore: privateKeyControlStore,
             protectedSettingsStore: protectedSettingsStore,
             protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             appSessionOrchestrator: appSessionOrchestrator,
@@ -2244,6 +2258,129 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(rootSecretStore.rightLookupCallCount, 1)
         XCTAssertTrue(rootSecretStore.lastAuthenticationContext === handoffContext)
         XCTAssertTrue(handoffContext.interactionNotAllowed)
+    }
+
+    func test_privateKeyControl_emptyRegistryRequiresHandoffContext() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("PrivateKeyControlNoHandoff"))
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.private-key-control.no-handoff"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        let defaultsSuiteName = "com.cypherair.tests.private-key-control.no-handoff.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+        defaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.authModeKey)
+        let store = AppPrivateKeyControlStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        )
+
+        let created = try await store.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
+            authenticationContext: nil,
+            persistSharedRight: { _ in XCTFail("Root secret must not be persisted without a handoff context") }
+        )
+
+        XCTAssertFalse(created)
+        XCTAssertNil(try registryStore.loadRegistry().committedMembership[AppPrivateKeyControlStore.domainID])
+        XCTAssertEqual(defaults.string(forKey: AuthPreferences.authModeKey), AuthenticationMode.highSecurity.rawValue)
+        XCTAssertEqual(store.privateKeyControlState, .locked)
+    }
+
+    func test_privateKeyControl_emptyRegistryCreatesFirstDomainAndMigratesLegacyJournal() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("PrivateKeyControlFirstDomain"))
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.private-key-control.first"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let defaultsSuiteName = "com.cypherair.tests.private-key-control.first.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+        defaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.authModeKey)
+        defaults.set(true, forKey: AuthPreferences.rewrapInProgressKey)
+        defaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+        defaults.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
+        defaults.set("abc123", forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        let store = AppPrivateKeyControlStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager
+        )
+        let handoffContext = LAContext()
+        defer { handoffContext.invalidate() }
+        let persistedSecretBox = AsyncDataBox()
+
+        let created = try await store.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
+            authenticationContext: handoffContext,
+            persistSharedRight: { secret in await persistedSecretBox.set(secret) }
+        )
+
+        XCTAssertTrue(created)
+        XCTAssertEqual(try registryStore.loadRegistry().committedMembership[AppPrivateKeyControlStore.domainID], .active)
+        XCTAssertNil(defaults.string(forKey: AuthPreferences.authModeKey))
+        XCTAssertFalse(defaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertNil(defaults.string(forKey: AuthPreferences.rewrapTargetModeKey))
+        XCTAssertFalse(defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+        XCTAssertNil(defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey))
+
+        var rootSecret = await persistedSecretBox.data()
+        XCTAssertFalse(rootSecret.isEmpty)
+        let wrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rootSecret)
+        rootSecret.protectedDataZeroize()
+        let payload = try await store.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
+
+        XCTAssertEqual(payload.settings.authMode, .highSecurity)
+        XCTAssertEqual(payload.recoveryJournal.rewrapTargetMode, .standard)
+        XCTAssertEqual(payload.recoveryJournal.modifyExpiry?.fingerprint, "abc123")
+        XCTAssertEqual(try store.requireUnlockedAuthMode(), .highSecurity)
+    }
+
+    func test_privateKeyControl_pendingMutationFailsClosed() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("PrivateKeyControlPending"))
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.private-key-control.pending"
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.private-key-control.pending",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
+            pendingMutation: .createDomain(
+                targetDomainID: AppProtectedDataFrameworkSentinelStore.domainID,
+                phase: .journaled
+            )
+        )
+        try registryStore.saveRegistry(registry)
+        let defaultsSuiteName = "com.cypherair.tests.private-key-control.pending.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+        let store = AppPrivateKeyControlStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        )
+
+        do {
+            try await store.ensureCommittedIfNeeded(wrappingRootKey: Data(repeating: 0xC1, count: 32))
+            XCTFail("Expected pending mutation to block private-key-control creation.")
+        } catch PrivateKeyControlError.recoveryNeeded {
+        } catch {
+            XCTFail("Expected recoveryNeeded, got \(error)")
+        }
+        XCTAssertEqual(store.privateKeyControlState, .recoveryNeeded)
     }
 
     func test_frameworkSentinel_doesNotCreateFirstDomainFromEmptyRegistry() async throws {

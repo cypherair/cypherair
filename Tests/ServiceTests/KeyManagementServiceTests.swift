@@ -69,11 +69,16 @@ final class KeyManagementServiceTests: XCTestCase {
     private var mockSE: MockSecureEnclave!
     private var mockKC: MockKeychain!
     private var mockAuth: MockAuthenticator!
+    private var privateKeyControlStore: InMemoryPrivateKeyControlStore!
 
     override func setUp() {
         super.setUp()
         engine = PgpEngine()
-        let result = TestHelpers.makeKeyManagement(engine: engine)
+        privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let result = TestHelpers.makeKeyManagement(
+            engine: engine,
+            privateKeyControlStore: privateKeyControlStore
+        )
         service = result.service
         mockSE = result.mockSE
         mockKC = result.mockKC
@@ -92,6 +97,7 @@ final class KeyManagementServiceTests: XCTestCase {
         mockSE = nil
         mockKC = nil
         mockAuth = nil
+        privateKeyControlStore = nil
         engine = nil
         super.tearDown()
     }
@@ -136,8 +142,13 @@ final class KeyManagementServiceTests: XCTestCase {
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
-            authenticator: mockAuth
+            authenticator: mockAuth,
+            privateKeyControlStore: privateKeyControlStore
         )
+    }
+
+    private func recoveryJournal() throws -> PrivateKeyControlRecoveryJournal {
+        try privateKeyControlStore.recoveryJournal()
     }
 
     private func loadStoredIdentity(fingerprint: String) throws -> PGPKeyIdentity {
@@ -312,7 +323,8 @@ final class KeyManagementServiceTests: XCTestCase {
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
-            authenticator: mockAuth
+            authenticator: mockAuth,
+            privateKeyControlStore: privateKeyControlStore
         )
 
         try newService.loadKeys()
@@ -328,7 +340,8 @@ final class KeyManagementServiceTests: XCTestCase {
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
-            authenticator: mockAuth
+            authenticator: mockAuth,
+            privateKeyControlStore: privateKeyControlStore
         )
 
         try newService.loadKeys()
@@ -363,7 +376,8 @@ final class KeyManagementServiceTests: XCTestCase {
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
-            authenticator: mockAuth
+            authenticator: mockAuth,
+            privateKeyControlStore: privateKeyControlStore
         )
         try freshService.loadKeys()
         XCTAssertTrue(freshService.keys.isEmpty)
@@ -402,7 +416,8 @@ final class KeyManagementServiceTests: XCTestCase {
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
-            authenticator: mockAuth
+            authenticator: mockAuth,
+            privateKeyControlStore: privateKeyControlStore
         )
         mockKC.listItemsError = KeychainError.userCancelled
 
@@ -437,7 +452,8 @@ final class KeyManagementServiceTests: XCTestCase {
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
-            authenticator: mockAuth
+            authenticator: mockAuth,
+            privateKeyControlStore: privateKeyControlStore
         )
         try newService.loadKeys()
 
@@ -584,13 +600,11 @@ final class KeyManagementServiceTests: XCTestCase {
         let fp = identity.fingerprint
 
         try copyPermanentBundleToPending(fingerprint: fp)
-        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
 
         try service.deleteKey(fingerprint: fp)
 
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
-        XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey))
+        XCTAssertNil(try recoveryJournal().modifyExpiry)
         XCTAssertNil(service.checkAndRecoverFromInterruptedModifyExpiry())
         XCTAssertFalse(mockKC.exists(
             service: KeychainConstants.seKeyService(fingerprint: fp),
@@ -604,13 +618,11 @@ final class KeyManagementServiceTests: XCTestCase {
         let identity = try await TestHelpers.generateProfileAKey(service: service)
 
         try copyPermanentBundleToPending(fingerprint: identity.fingerprint)
-        UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
-        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
 
         try service.deleteKey(fingerprint: identity.fingerprint)
 
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey))
-        XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.rewrapTargetModeKey))
+        XCTAssertNil(try recoveryJournal().rewrapTargetMode)
     }
 
     func test_deleteKey_interruptedRewrap_withOtherKeysPreservesGlobalRecoveryState() async throws {
@@ -618,16 +630,11 @@ final class KeyManagementServiceTests: XCTestCase {
         let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
 
         try copyPermanentBundleToPending(fingerprint: first.fingerprint)
-        UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
-        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
 
         try service.deleteKey(fingerprint: first.fingerprint)
 
-        XCTAssertTrue(UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey))
-        XCTAssertEqual(
-            UserDefaults.standard.string(forKey: AuthPreferences.rewrapTargetModeKey),
-            AuthenticationMode.highSecurity.rawValue
-        )
+        XCTAssertEqual(try recoveryJournal().rewrapTargetMode, .highSecurity)
         XCTAssertEqual(service.keys.map(\.fingerprint), [second.fingerprint])
         XCTAssertFalse(mockKC.exists(
             service: KeychainConstants.pendingSeKeyService(fingerprint: first.fingerprint),
@@ -657,7 +664,8 @@ final class KeyManagementServiceTests: XCTestCase {
             secureEnclave: observingSecureEnclave,
             keychain: mockKC,
             authenticator: mockAuth,
-            authenticationPromptCoordinator: coordinator
+            authenticationPromptCoordinator: coordinator,
+            privateKeyControlStore: privateKeyControlStore
         )
         let identity = try await TestHelpers.generateProfileAKey(service: promptAwareService)
 
@@ -792,7 +800,8 @@ final class KeyManagementServiceTests: XCTestCase {
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
-            authenticator: mockAuth
+            authenticator: mockAuth,
+            privateKeyControlStore: privateKeyControlStore
         )
         try freshService.loadKeys()
 
@@ -886,8 +895,7 @@ final class KeyManagementServiceTests: XCTestCase {
     func test_modifyExpiry_setsAndClearsCrashRecoveryFlag() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Flag Test")
 
-        // Verify flags are not set before operation
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+        XCTAssertNil(try recoveryJournal().modifyExpiry)
 
         _ = try await service.modifyExpiry(
             fingerprint: identity.fingerprint,
@@ -895,11 +903,7 @@ final class KeyManagementServiceTests: XCTestCase {
             authMode: .standard
         )
 
-        // After successful completion, flags should be cleared
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey),
-                       "In-progress flag should be cleared after successful modifyExpiry")
-        XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey),
-                     "Fingerprint flag should be cleared after successful modifyExpiry")
+        XCTAssertNil(try recoveryJournal().modifyExpiry)
     }
 
     // MARK: - Modify Expiry Crash Recovery
@@ -909,10 +913,9 @@ final class KeyManagementServiceTests: XCTestCase {
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
-        // Simulate interrupted modifyExpiry: set flags and store pending items
+        // Simulate interrupted modifyExpiry: write protected journal and store pending items
         // while old permanent items still exist.
-        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
 
         let dummyData = Data("pending-data".utf8)
         try mockKC.save(dummyData, service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
@@ -925,12 +928,8 @@ final class KeyManagementServiceTests: XCTestCase {
         // Run recovery
         let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
 
-        // Verify: flags cleared
         XCTAssertEqual(outcome, .cleanedPendingSafe)
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey),
-                       "In-progress flag should be cleared after recovery")
-        XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey),
-                     "Fingerprint flag should be cleared after recovery")
+        XCTAssertNil(try recoveryJournal().modifyExpiry)
 
         // Verify: pending items deleted
         XCTAssertFalse(mockKC.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
@@ -976,16 +975,13 @@ final class KeyManagementServiceTests: XCTestCase {
         try mockKC.delete(service: KeychainConstants.saltService(fingerprint: fp), account: account)
         try mockKC.delete(service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
 
-        // Set crash recovery flags
-        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
 
         // Run recovery
         let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
 
-        // Verify: flags cleared
         XCTAssertEqual(outcome, .promotedPendingSafe)
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+        XCTAssertNil(try recoveryJournal().modifyExpiry)
 
         // Verify: permanent items restored from pending
         XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp),
@@ -1004,9 +1000,7 @@ final class KeyManagementServiceTests: XCTestCase {
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
-        // Ensure no crash recovery flag is set
-        UserDefaults.standard.set(false, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        try privateKeyControlStore.clearModifyExpiryJournal()
 
         let saveCountBefore = mockKC.saveCallCount
         let deleteCountBefore = mockKC.deleteCallCount
@@ -1048,13 +1042,12 @@ final class KeyManagementServiceTests: XCTestCase {
         try mockKC.delete(service: KeychainConstants.saltService(fingerprint: fp), account: account)
         try mockKC.delete(service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
 
-        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
 
         let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
 
         XCTAssertEqual(outcome, .promotedPendingSafe)
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+        XCTAssertNil(try recoveryJournal().modifyExpiry)
         XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp), account: account))
         XCTAssertTrue(mockKC.exists(service: KeychainConstants.saltService(fingerprint: fp), account: account))
         XCTAssertTrue(mockKC.exists(service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account))
@@ -1076,17 +1069,12 @@ final class KeyManagementServiceTests: XCTestCase {
         try mockKC.delete(service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
         mockKC.failOnSaveNumber = mockKC.saveCallCount + 1
 
-        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
 
         let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
 
         XCTAssertEqual(outcome, .retryableFailure)
-        XCTAssertTrue(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
-        XCTAssertEqual(
-            UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey),
-            fp
-        )
+        XCTAssertEqual(try recoveryJournal().modifyExpiry?.fingerprint, fp)
         XCTAssertTrue(mockKC.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp), account: account))
     }
 
@@ -1099,14 +1087,12 @@ final class KeyManagementServiceTests: XCTestCase {
         try mockKC.save(Data([0xAA]), service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
                         account: account, accessControl: nil)
 
-        UserDefaults.standard.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.set(fp, forKey: AuthPreferences.modifyExpiryFingerprintKey)
+        try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
 
         let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
 
         XCTAssertEqual(outcome, .unrecoverable)
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
-        XCTAssertNil(UserDefaults.standard.string(forKey: AuthPreferences.modifyExpiryFingerprintKey))
+        XCTAssertNil(try recoveryJournal().modifyExpiry)
     }
 
     // MARK: - Delete Key Default Persistence
@@ -1127,7 +1113,8 @@ final class KeyManagementServiceTests: XCTestCase {
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
-            authenticator: mockAuth
+            authenticator: mockAuth,
+            privateKeyControlStore: privateKeyControlStore
         )
         try freshService.loadKeys()
 

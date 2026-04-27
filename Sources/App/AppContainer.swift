@@ -14,6 +14,7 @@ final class AppContainer: @unchecked Sendable {
     let protectedDomainKeyManager: ProtectedDomainKeyManager
     let protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator
     let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
+    let privateKeyControlStore: PrivateKeyControlStore
     let protectedSettingsStore: ProtectedSettingsStore
     let protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore
     let protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator
@@ -45,6 +46,7 @@ final class AppContainer: @unchecked Sendable {
         protectedDomainKeyManager: ProtectedDomainKeyManager,
         protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
+        privateKeyControlStore: PrivateKeyControlStore,
         protectedSettingsStore: ProtectedSettingsStore,
         protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore,
         protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator = .noOp,
@@ -75,6 +77,7 @@ final class AppContainer: @unchecked Sendable {
         self.protectedDomainKeyManager = protectedDomainKeyManager
         self.protectedDomainRecoveryCoordinator = protectedDomainRecoveryCoordinator
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
+        self.privateKeyControlStore = privateKeyControlStore
         self.protectedSettingsStore = protectedSettingsStore
         self.protectedDataFrameworkSentinelStore = protectedDataFrameworkSentinelStore
         self.protectedDataPostUnlockCoordinator = protectedDataPostUnlockCoordinator
@@ -140,6 +143,15 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
+        let privateKeyControlStore = PrivateKeyControlStore(
+            defaults: defaults,
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
+        )
         let protectedSettingsStore = ProtectedSettingsStore(
             defaults: defaults,
             storageRoot: protectedDataStorageRoot,
@@ -157,6 +169,8 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
+        authManager.configurePrivateKeyControlStore(privateKeyControlStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
@@ -165,6 +179,19 @@ final class AppContainer: @unchecked Sendable {
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             domainOpeners: [
+                ProtectedDataPostUnlockDomainOpener(
+                    domainID: PrivateKeyControlStore.domainID,
+                    ensureCommittedIfNeeded: { wrappingRootKey in
+                        try await privateKeyControlStore.ensureCommittedIfNeeded(
+                            wrappingRootKey: wrappingRootKey
+                        )
+                    },
+                    open: { wrappingRootKey in
+                        _ = try await privateKeyControlStore.openDomainIfNeeded(
+                            wrappingRootKey: wrappingRootKey
+                        )
+                    }
+                ),
                 ProtectedDataPostUnlockDomainOpener(
                     domainID: ProtectedSettingsStore.domainID,
                     open: { wrappingRootKey in
@@ -197,6 +224,7 @@ final class AppContainer: @unchecked Sendable {
             authenticator: authManager,
             defaults: .standard,
             authenticationPromptCoordinator: authPromptCoordinator,
+            privateKeyControlStore: privateKeyControlStore,
             authLifecycleTraceStore: authLifecycleTraceStore
         )
         let appSessionOrchestrator = AppSessionOrchestrator(
@@ -213,6 +241,16 @@ final class AppContainer: @unchecked Sendable {
                 )
             },
             postAuthenticationHandler: { authenticationContext, source in
+                do {
+                    _ = try await privateKeyControlStore.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
+                        authenticationContext: authenticationContext,
+                        persistSharedRight: { secret in
+                            try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
+                        }
+                    )
+                } catch {
+                    config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
+                }
                 await keyManagement.migrateLegacyMetadataAfterAppAuthentication(
                     authenticationContext: authenticationContext,
                     source: source
@@ -225,6 +263,13 @@ final class AppContainer: @unchecked Sendable {
                     ),
                     source: source
                 )
+                config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
+                if privateKeyControlStore.privateKeyControlState.isUnlocked {
+                    _ = authManager.checkAndRecoverFromInterruptedRewrap(
+                        fingerprints: keyManagement.keys.map(\.fingerprint)
+                    )
+                    _ = keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
+                }
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
@@ -289,6 +334,7 @@ final class AppContainer: @unchecked Sendable {
             protectedDomainKeyManager: protectedDomainKeyManager,
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            privateKeyControlStore: privateKeyControlStore,
             protectedSettingsStore: protectedSettingsStore,
             protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,
@@ -378,6 +424,17 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
+        let privateKeyControlStore = PrivateKeyControlStore(
+            defaults: defaults,
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
+        )
+        privateKeyControlStore.seedUnlockedForTesting(.standard)
+        config.privateKeyControlState = .unlocked(.standard)
         let protectedSettingsStore = ProtectedSettingsStore(
             defaults: defaults,
             storageRoot: protectedDataStorageRoot,
@@ -395,6 +452,8 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
+        authManager.configurePrivateKeyControlStore(privateKeyControlStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
@@ -403,6 +462,19 @@ final class AppContainer: @unchecked Sendable {
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             domainOpeners: [
+                ProtectedDataPostUnlockDomainOpener(
+                    domainID: PrivateKeyControlStore.domainID,
+                    ensureCommittedIfNeeded: { wrappingRootKey in
+                        try await privateKeyControlStore.ensureCommittedIfNeeded(
+                            wrappingRootKey: wrappingRootKey
+                        )
+                    },
+                    open: { wrappingRootKey in
+                        _ = try await privateKeyControlStore.openDomainIfNeeded(
+                            wrappingRootKey: wrappingRootKey
+                        )
+                    }
+                ),
                 ProtectedDataPostUnlockDomainOpener(
                     domainID: ProtectedSettingsStore.domainID,
                     open: { wrappingRootKey in
@@ -434,6 +506,7 @@ final class AppContainer: @unchecked Sendable {
             authenticator: authManager,
             defaults: defaults,
             authenticationPromptCoordinator: authPromptCoordinator,
+            privateKeyControlStore: privateKeyControlStore,
             authLifecycleTraceStore: authLifecycleTraceStore
         )
         let appSessionOrchestrator = AppSessionOrchestrator(
@@ -450,6 +523,16 @@ final class AppContainer: @unchecked Sendable {
                 )
             },
             postAuthenticationHandler: { authenticationContext, source in
+                do {
+                    _ = try await privateKeyControlStore.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
+                        authenticationContext: authenticationContext,
+                        persistSharedRight: { secret in
+                            try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
+                        }
+                    )
+                } catch {
+                    config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
+                }
                 await keyManagement.migrateLegacyMetadataAfterAppAuthentication(
                     authenticationContext: authenticationContext,
                     source: source
@@ -462,6 +545,13 @@ final class AppContainer: @unchecked Sendable {
                     ),
                     source: source
                 )
+                config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
+                if privateKeyControlStore.privateKeyControlState.isUnlocked {
+                    _ = authManager.checkAndRecoverFromInterruptedRewrap(
+                        fingerprints: keyManagement.keys.map(\.fingerprint)
+                    )
+                    _ = keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
+                }
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
@@ -531,6 +621,7 @@ final class AppContainer: @unchecked Sendable {
             protectedDomainKeyManager: protectedDomainKeyManager,
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            privateKeyControlStore: privateKeyControlStore,
             protectedSettingsStore: protectedSettingsStore,
             protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,

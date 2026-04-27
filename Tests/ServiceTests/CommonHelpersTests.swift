@@ -29,7 +29,8 @@ private actor RunnerCallCounter {
     }
 }
 
-private actor OperationGate {
+@MainActor
+private final class OperationGate {
     private var continuations: [Int: CheckedContinuation<Void, Never>] = [:]
 
     func suspend(operationID: Int) async {
@@ -275,7 +276,7 @@ final class CommonHelpersTests: XCTestCase {
 
         await waitUntil("operation to suspend before cancellation") {
             guard controller.isRunning, controller.progress != nil else { return false }
-            return await gate.isSuspended(operationID: 1)
+            return gate.isSuspended(operationID: 1)
         }
 
         controller.cancel()
@@ -284,7 +285,7 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertTrue(controller.isCancelling)
         XCTAssertNotNil(controller.progress)
 
-        await gate.resume(operationID: 1)
+        gate.resume(operationID: 1)
 
         await waitUntil("controller to finish cancelling") {
             controller.isRunning == false
@@ -309,7 +310,7 @@ final class CommonHelpersTests: XCTestCase {
 
         await waitUntil("first operation to suspend") {
             guard controller.isRunning, controller.progress != nil else { return false }
-            return await gate.isSuspended(operationID: 1)
+            return gate.isSuspended(operationID: 1)
         }
 
         controller.cancel()
@@ -322,11 +323,11 @@ final class CommonHelpersTests: XCTestCase {
 
         await waitUntil("replacement operation to suspend") {
             guard controller.isRunning, !controller.isCancelling else { return false }
-            return await gate.isSuspended(operationID: 2)
+            return gate.isSuspended(operationID: 2)
         }
 
         let replacementProgress = controller.progress
-        await gate.resume(operationID: 1)
+        gate.resume(operationID: 1)
         await Task.yield()
         await Task.yield()
 
@@ -334,7 +335,7 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertFalse(controller.isCancelling)
         XCTAssertTrue(controller.progress === replacementProgress)
 
-        await gate.resume(operationID: 2)
+        gate.resume(operationID: 2)
         await waitUntil("replacement operation to finish") {
             controller.isRunning == false
         }
@@ -356,7 +357,7 @@ final class CommonHelpersTests: XCTestCase {
 
         await waitUntil("first operation to suspend") {
             guard controller.isRunning else { return false }
-            return await gate.isSuspended(operationID: 1)
+            return gate.isSuspended(operationID: 1)
         }
 
         controller.cancel()
@@ -368,17 +369,17 @@ final class CommonHelpersTests: XCTestCase {
 
         await waitUntil("replacement operation to suspend") {
             guard controller.isRunning, !controller.isCancelling else { return false }
-            return await gate.isSuspended(operationID: 2)
+            return gate.isSuspended(operationID: 2)
         }
 
-        await gate.resume(operationID: 1)
+        gate.resume(operationID: 1)
         await Task.yield()
         await Task.yield()
 
         XCTAssertFalse(controller.isShowingError)
         XCTAssertNil(controller.error)
 
-        await gate.resume(operationID: 2)
+        gate.resume(operationID: 2)
         await waitUntil("replacement operation to finish") {
             controller.isRunning == false
         }
@@ -433,12 +434,15 @@ final class CommonHelpersTests: XCTestCase {
             keychain: mockKC,
             defaults: defaults
         )
+        let setupPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        setupAuthManager.configurePrivateKeyControlStore(setupPrivateKeyControlStore)
         let setupKeyManagement = KeyManagementService(
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: setupAuthManager,
-            defaults: defaults
+            defaults: defaults,
+            privateKeyControlStore: setupPrivateKeyControlStore
         )
 
         let identity = try await setupKeyManagement.generateKey(
@@ -495,13 +499,16 @@ final class CommonHelpersTests: XCTestCase {
             defaults: defaults,
             authenticationPromptCoordinator: authPromptCoordinator
         )
+        let keyManagementPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        authManager.configurePrivateKeyControlStore(keyManagementPrivateKeyControlStore)
         let keyManagement = KeyManagementService(
             engine: engine,
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: authManager,
             defaults: defaults,
-            authenticationPromptCoordinator: authPromptCoordinator
+            authenticationPromptCoordinator: authPromptCoordinator,
+            privateKeyControlStore: keyManagementPrivateKeyControlStore
         )
         let config = AppConfiguration(defaults: defaults)
         let contactDirectory = FileManager.default.temporaryDirectory
@@ -544,6 +551,17 @@ final class CommonHelpersTests: XCTestCase {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
+        let privateKeyControlStore = PrivateKeyControlStore(
+            defaults: defaults,
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
+        )
+        authManager.configurePrivateKeyControlStore(privateKeyControlStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let appSessionOrchestrator = CypherAir.AppSessionOrchestrator(
@@ -615,6 +633,7 @@ final class CommonHelpersTests: XCTestCase {
             protectedDomainKeyManager: protectedDomainKeyManager,
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            privateKeyControlStore: privateKeyControlStore,
             protectedSettingsStore: protectedSettingsStore,
             protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             appSessionOrchestrator: appSessionOrchestrator,
@@ -637,8 +656,8 @@ final class CommonHelpersTests: XCTestCase {
 
         XCTAssertNil(result.loadError)
         XCTAssertTrue(keyManagement.keys.isEmpty)
-        XCTAssertFalse(defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
-        XCTAssertNil(defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey))
+        XCTAssertTrue(defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
+        XCTAssertEqual(defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey), fingerprint)
         XCTAssertFalse(mockKC.exists(
             service: KeychainConstants.seKeyService(fingerprint: fingerprint),
             account: account
@@ -748,7 +767,7 @@ final class CommonHelpersTests: XCTestCase {
             if await condition() {
                 return
             }
-            await Task.yield()
+            try? await Task.sleep(nanoseconds: 1_000_000)
         }
         XCTFail("Timed out waiting for \(description)")
     }

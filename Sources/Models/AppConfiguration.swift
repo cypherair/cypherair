@@ -16,11 +16,13 @@ enum GuidedTutorialCompletionState: Equatable {
 final class AppConfiguration {
     private let defaults: UserDefaults
 
-    /// Current authentication mode.
-    /// Note: UserDefaults persistence is handled by AuthenticationManager.switchMode()
-    /// and crash recovery — not by didSet — to ensure the write occurs only after
-    /// successful SE key re-wrapping.
-    var authMode: AuthenticationMode
+    /// Private-key control state. The mode is available only after the
+    /// `private-key-control` ProtectedData domain opens.
+    var privateKeyControlState: PrivateKeyControlState = .locked
+
+    var authModeIfUnlocked: AuthenticationMode? {
+        privateKeyControlState.authMode
+    }
 
     /// App launch/resume and App Data root-secret authentication policy.
     var appSessionAuthenticationPolicy: AppSessionAuthenticationPolicy {
@@ -95,10 +97,6 @@ final class AppConfiguration {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        // Auth mode
-        let modeString = defaults.string(forKey: AuthPreferences.authModeKey) ?? AuthenticationMode.standard.rawValue
-        self.authMode = AuthenticationMode(rawValue: modeString) ?? .standard
-
         let appSessionPolicyString = defaults.string(forKey: Self.appSessionAuthenticationPolicyKey)
             ?? AppSessionAuthenticationPolicy.userPresence.rawValue
         self.appSessionAuthenticationPolicy = AppSessionAuthenticationPolicy(rawValue: appSessionPolicyString)
@@ -168,7 +166,7 @@ final class AppConfiguration {
     }
 
     func resetToFirstRunDefaults() {
-        authMode = .standard
+        privateKeyControlState = .locked
         appSessionAuthenticationPolicy = .userPresence
         gracePeriod = AuthPreferences.defaultGracePeriod
         encryptToSelf = true

@@ -12,6 +12,7 @@ final class SettingsScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
     private var config: AppConfiguration!
     private var authManager: AuthenticationManager!
+    private var privateKeyControlStore: InMemoryPrivateKeyControlStore!
     private var defaultsSuiteName: String!
 
     override func setUp() {
@@ -21,11 +22,14 @@ final class SettingsScreenModelTests: XCTestCase {
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         config = AppConfiguration(defaults: defaults)
+        config.privateKeyControlState = .unlocked(.standard)
         authManager = AuthenticationManager(
             secureEnclave: stack.mockSE,
             keychain: stack.mockKC,
             defaults: defaults
         )
+        privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        authManager.configurePrivateKeyControlStore(privateKeyControlStore)
     }
 
     override func tearDown() {
@@ -37,6 +41,7 @@ final class SettingsScreenModelTests: XCTestCase {
         stack = nil
         config = nil
         authManager = nil
+        privateKeyControlStore = nil
         defaultsSuiteName = nil
         super.tearDown()
     }
@@ -103,7 +108,7 @@ final class SettingsScreenModelTests: XCTestCase {
     @MainActor
     func test_confirmedModeSwitch_updatesConfigAndClearsPendingState() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
-        config.authMode = .highSecurity
+        config.privateKeyControlState = .unlocked(.highSecurity)
 
         var receivedMode: AuthenticationMode?
         var receivedFingerprints: [String] = []
@@ -126,7 +131,7 @@ final class SettingsScreenModelTests: XCTestCase {
         XCTAssertEqual(receivedMode, .standard)
         XCTAssertEqual(receivedFingerprints, stack.keyManagement.keys.map(\.fingerprint))
         XCTAssertFalse(receivedHasBackup)
-        XCTAssertEqual(config.authMode, .standard)
+        XCTAssertEqual(config.authModeIfUnlocked, .standard)
         XCTAssertNil(model.pendingMode)
         XCTAssertNil(model.presentedAuthModeRequest)
     }
@@ -149,7 +154,7 @@ final class SettingsScreenModelTests: XCTestCase {
 
         XCTAssertTrue(model.showSwitchError)
         XCTAssertEqual(model.switchError, "Switch failed")
-        XCTAssertEqual(config.authMode, .standard)
+        XCTAssertEqual(config.authModeIfUnlocked, .standard)
         XCTAssertNil(model.pendingMode)
     }
 
@@ -205,7 +210,7 @@ final class SettingsScreenModelTests: XCTestCase {
         model.handleAuthModeSelection(.highSecurity)
         let firstRequest = try XCTUnwrap(capturedRequests.first)
 
-        config.authMode = .highSecurity
+        config.privateKeyControlState = .unlocked(.highSecurity)
         model.handleAuthModeSelection(.standard)
 
         XCTAssertEqual(capturedRequests.count, 2)
@@ -218,7 +223,7 @@ final class SettingsScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(receivedModes, [.highSecurity])
-        XCTAssertEqual(config.authMode, .highSecurity)
+        XCTAssertEqual(config.authModeIfUnlocked, .highSecurity)
         XCTAssertEqual(model.pendingMode, .standard)
     }
 
@@ -240,7 +245,7 @@ final class SettingsScreenModelTests: XCTestCase {
         model.handleAuthModeSelection(.highSecurity)
         let firstRequest = try XCTUnwrap(capturedRequests.first)
 
-        config.authMode = .highSecurity
+        config.privateKeyControlState = .unlocked(.highSecurity)
         model.handleAuthModeSelection(.standard)
         let secondRequest = try XCTUnwrap(capturedRequests.last)
 
@@ -255,7 +260,7 @@ final class SettingsScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(receivedModes, [.standard])
-        XCTAssertEqual(config.authMode, .standard)
+        XCTAssertEqual(config.authModeIfUnlocked, .standard)
         XCTAssertNil(model.pendingMode)
     }
 

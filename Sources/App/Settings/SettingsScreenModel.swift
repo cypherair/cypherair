@@ -163,7 +163,12 @@ final class SettingsScreenModel {
     }
 
     func handleAuthModeSelection(_ newMode: AuthenticationMode) {
-        guard newMode != appConfiguration.authMode else {
+        guard let currentMode = appConfiguration.authModeIfUnlocked else {
+            switchError = PrivateKeyControlError.locked.localizedDescription
+            showSwitchError = true
+            return
+        }
+        guard newMode != currentMode else {
             return
         }
 
@@ -425,7 +430,7 @@ final class SettingsScreenModel {
         Task {
             do {
                 try await authModeSwitchAction(newMode, fingerprints, hasBackup)
-                appConfiguration.authMode = newMode
+                appConfiguration.privateKeyControlState = .unlocked(newMode)
             } catch {
                 switchError = error.localizedDescription
                 showSwitchError = true

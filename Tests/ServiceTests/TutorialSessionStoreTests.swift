@@ -203,7 +203,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             hasBackup: true,
             authenticator: container.mockAuthenticator
         )
-        container.config.authMode = .highSecurity
+        container.config.privateKeyControlState = .unlocked(.highSecurity)
         store.noteHighSecurityEnabled(.highSecurity)
         XCTAssertTrue(store.isCompleted(.enableHighSecurity))
         XCTAssertEqual(store.session.artifacts.authMode, .highSecurity)

@@ -22,7 +22,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         )
         try storePermanentBundle(bundle, fingerprint: fingerprint)
 
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
             defaults: defaults
@@ -66,7 +66,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
     // MARK: - C7.1: Authentication Manager — Access Control
 
     func test_createAccessControl_standard_succeeds() throws {
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain
         )
@@ -76,7 +76,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
     }
 
     func test_createAccessControl_highSecurity_succeeds() throws {
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain
         )
@@ -85,7 +85,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
     }
 
     func test_canEvaluate_standard_returnsTrue() {
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain
         )
@@ -94,7 +94,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
     }
 
     func test_canEvaluate_highSecurity_matchesBiometricsAvailability() {
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain
         )
@@ -107,7 +107,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
     }
 
     func test_isBiometricsAvailable_onFaceIDDevice_returnsTrue() {
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain
         )
@@ -149,22 +149,22 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         )
     }
 
-    // MARK: - C7.2: Authentication Manager — Mode Preference Persistence
+    // MARK: - C7.2: Authentication Manager — Private-Key Control State
 
-    func test_currentMode_defaultIsStandard() {
+    func test_currentMode_withoutPrivateKeyControlStore_isNil() {
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test")!
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
             defaults: testDefaults
         )
-        XCTAssertEqual(authManager.currentMode, .standard, "Default mode must be standard")
+        XCTAssertNil(authManager.currentMode, "Locked private-key control must not expose a default mode")
         testDefaults.removePersistentDomain(forName: "com.cypherair.test")
     }
 
     func test_gracePeriod_defaultIs180() {
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test")!
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
             defaults: testDefaults
@@ -190,23 +190,20 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         try keychain.save(Data("pending-salt".utf8), service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
         try keychain.save(Data("pending-sealed".utf8), service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
 
-        // Set the crash recovery flag and simulate switching from standard → highSecurity.
-        UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
-        UserDefaults.standard.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+        // Set the protected recovery journal and simulate switching from standard -> highSecurity.
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
 
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
-            keychain: keychain
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
         )
         let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
-        // Verify: flag cleared.
+        // Verify: protected journal cleared.
         XCTAssertEqual(summary?.outcomes, [.cleanedPendingSafe])
-        XCTAssertFalse(
-            UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey),
-            "rewrapInProgress flag must be cleared"
-        )
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
 
         // Verify: old items still intact.
         let loadedOld = try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
@@ -238,20 +235,20 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         try keychain.save(pendingSalt, service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
         try keychain.save(pendingSealed, service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
 
-        // Simulate switching from standard → highSecurity.
-        UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
-        UserDefaults.standard.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+        // Simulate switching from standard -> highSecurity.
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
 
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
-            keychain: keychain
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
         )
         let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
-        // Verify: flag cleared.
+        // Verify: protected journal cleared.
         XCTAssertEqual(summary?.outcomes, [.promotedPendingSafe])
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
 
         // Verify: items promoted to permanent names.
         let loadedSEKey = try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
@@ -283,7 +280,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
 
         UserDefaults.standard.removeObject(forKey: AuthPreferences.rewrapInProgressKey)
 
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain
         )
@@ -308,18 +305,18 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         try keychain.save(pendingSalt, service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
         try keychain.save(pendingSealed, service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
 
-        UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
-        UserDefaults.standard.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
 
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
-            keychain: keychain
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
         )
         let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
         XCTAssertEqual(summary?.outcomes, [.promotedPendingSafe])
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
         XCTAssertEqual(
             try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account),
             pendingSEKey
@@ -342,18 +339,18 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         try? keychain.save(Data("partial-old".utf8), service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
         try? keychain.save(Data("partial-pending".utf8), service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
 
-        UserDefaults.standard.set(true, forKey: AuthPreferences.rewrapInProgressKey)
-        UserDefaults.standard.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-        UserDefaults.standard.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        try? privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
 
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
-            keychain: keychain
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
         )
         let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
         XCTAssertEqual(summary?.outcomes, [.unrecoverable])
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertNil((try? privateKeyControlStore.recoveryJournal())?.rewrapTargetMode)
         XCTAssertEqual(authManager.currentMode, .standard)
     }
 
@@ -372,19 +369,19 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
 
         mockKeychain.failOnSaveNumber = mockKeychain.saveCallCount + 1
 
-        testDefaults.set(true, forKey: AuthPreferences.rewrapInProgressKey)
-        testDefaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.authModeKey)
-        testDefaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        try? privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
 
-        let authManager = AuthenticationManager(
+        let authManager = makeAuthenticationManager(
             secureEnclave: mockSecureEnclave,
             keychain: mockKeychain,
-            defaults: testDefaults
+            defaults: testDefaults,
+            privateKeyControlStore: privateKeyControlStore
         )
         let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
         XCTAssertEqual(summary?.outcomes, [.retryableFailure])
-        XCTAssertTrue(testDefaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
+        XCTAssertEqual((try? privateKeyControlStore.recoveryJournal())?.rewrapTargetMode, .highSecurity)
         XCTAssertEqual(authManager.currentMode, .standard)
         XCTAssertTrue(mockKeychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
     }

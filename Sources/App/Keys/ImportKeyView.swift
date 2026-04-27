@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 /// Import a private key from file, paste, or QR photo.
 struct ImportKeyView: View {
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
 
     @State private var armoredText = ""
@@ -166,13 +165,11 @@ struct ImportKeyView: View {
         let service = keyManagement
         let data = importedKeyData ?? Data(armoredText.utf8)
         let pass = passphrase
-        let authMode = config.authMode
         Task {
             do {
                 _ = try await service.importKey(
                     armoredData: data,
-                    passphrase: pass,
-                    authMode: authMode
+                    passphrase: pass
                 )
                 // Clear sensitive state before dismiss.
                 // Note: Swift String cannot be reliably zeroized (SECURITY.md §7.1),
