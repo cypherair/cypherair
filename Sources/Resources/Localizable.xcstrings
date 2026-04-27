@@ -3362,6 +3362,7 @@
       }
     },
     "error.privateKeyControl.missingStore" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

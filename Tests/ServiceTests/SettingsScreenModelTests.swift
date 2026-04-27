@@ -656,6 +656,88 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_liveProtectedSettingsHost_noProtectedDomainPresent_authorizesBeforeSecondDomainMigration() async {
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
+        var events: [String] = []
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .noProtectedDomainPresent },
+            authorizeSharedRight: { _, interactionMode in
+                events.append("authorize")
+                XCTAssertEqual(interactionMode, .allowInteraction)
+                return .authorized
+            },
+            currentWrappingRootKey: {
+                events.append("wrappingRootKey")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { domainState == .unlocked ? true : nil },
+            migrationAuthorizationRequirement: { .wrappingRootKeyRequired },
+            migrateLegacyClipboardNoticeIfNeeded: {
+                events.append("migrate")
+                domainState = .locked
+            },
+            openDomainIfNeeded: { _ in
+                events.append("open")
+                domainState = .unlocked
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.unlockForSettings()
+
+        XCTAssertEqual(
+            events,
+            ["authorize", "wrappingRootKey", "migrate", "wrappingRootKey", "open"]
+        )
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: true))
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_authorizationRequired_createsSettingsDomainBeforeOpening() async {
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
+        var didAuthorize = false
+        var events: [String] = []
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .authorizationRequired },
+            authorizeSharedRight: { _, interactionMode in
+                events.append("authorize")
+                didAuthorize = true
+                XCTAssertEqual(interactionMode, .allowInteraction)
+                return .authorized
+            },
+            currentWrappingRootKey: {
+                events.append("wrappingRootKey")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { domainState == .unlocked ? false : nil },
+            migrationAuthorizationRequirement: { .wrappingRootKeyRequired },
+            migrateLegacyClipboardNoticeIfNeeded: {
+                XCTAssertTrue(didAuthorize)
+                events.append("migrate")
+                domainState = .locked
+            },
+            openDomainIfNeeded: { _ in
+                events.append("open")
+                domainState = .unlocked
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.unlockForSettings()
+
+        XCTAssertEqual(events, ["authorize", "migrate", "wrappingRootKey", "open"])
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
+    }
+
+    @MainActor
     func test_liveProtectedSettingsHost_noProtectedDomainPresent_migrationFailureDoesNotReturnLocked() async {
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .noProtectedDomainPresent },

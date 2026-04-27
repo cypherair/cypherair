@@ -77,6 +77,7 @@ final class ProtectedSettingsHost {
         let syncPreAuthorizationState: @MainActor () -> Void
         let currentDomainState: @MainActor () -> DomainState
         let currentClipboardNotice: @MainActor () -> Bool?
+        let migrationAuthorizationRequirement: @MainActor () -> MutationAuthorizationRequirement
         let migrateLegacyClipboardNoticeIfNeeded: @MainActor () async throws -> Void
         let openDomainIfNeeded: @MainActor (_ wrappingRootKey: Data) async throws -> Void
         let updateClipboardNotice: @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void
@@ -104,6 +105,7 @@ final class ProtectedSettingsHost {
         syncPreAuthorizationState: @escaping @MainActor () -> Void,
         currentDomainState: @escaping @MainActor () -> DomainState,
         currentClipboardNotice: @escaping @MainActor () -> Bool?,
+        migrationAuthorizationRequirement: @escaping @MainActor () -> MutationAuthorizationRequirement = { .notRequired },
         migrateLegacyClipboardNoticeIfNeeded: @escaping @MainActor () async throws -> Void,
         openDomainIfNeeded: @escaping @MainActor (_ wrappingRootKey: Data) async throws -> Void,
         updateClipboardNotice: @escaping @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void,
@@ -124,6 +126,7 @@ final class ProtectedSettingsHost {
             syncPreAuthorizationState: syncPreAuthorizationState,
             currentDomainState: currentDomainState,
             currentClipboardNotice: currentClipboardNotice,
+            migrationAuthorizationRequirement: migrationAuthorizationRequirement,
             migrateLegacyClipboardNoticeIfNeeded: migrateLegacyClipboardNoticeIfNeeded,
             openDomainIfNeeded: openDomainIfNeeded,
             updateClipboardNotice: updateClipboardNotice,
@@ -554,6 +557,44 @@ final class ProtectedSettingsHost {
         }
     }
 
+    private func migrateLegacyClipboardNoticeIfNeeded(
+        using liveDependencies: LiveDependencies,
+        gateDecision: AccessGateDecision,
+        preauthorized: Bool
+    ) async throws {
+        traceHostEvent(
+            "protectedSettings.legacyMigration.start",
+            metadata: [
+                "gateDecision": accessGateTraceValue(gateDecision),
+                "preauthorized": preauthorized ? "true" : "false"
+            ]
+        )
+        do {
+            try await liveDependencies.migrateLegacyClipboardNoticeIfNeeded()
+            traceHostEvent(
+                "protectedSettings.legacyMigration.finish",
+                metadata: [
+                    "result": "success",
+                    "gateDecision": accessGateTraceValue(gateDecision),
+                    "preauthorized": preauthorized ? "true" : "false"
+                ]
+            )
+        } catch {
+            traceHostEvent(
+                "protectedSettings.legacyMigration.finish",
+                metadata: traceErrorMetadata(
+                    error,
+                    extra: [
+                        "result": "failed",
+                        "gateDecision": accessGateTraceValue(gateDecision),
+                        "preauthorized": preauthorized ? "true" : "false"
+                    ]
+                )
+            )
+            throw error
+        }
+    }
+
     private func ensureProtectedSettingsAccess(
         using liveDependencies: LiveDependencies,
         localizedReason: String,
@@ -610,45 +651,71 @@ final class ProtectedSettingsHost {
                 )
                 return false
             }
-            traceHostEvent("protectedSettings.legacyMigration.start")
-            do {
-                try await liveDependencies.migrateLegacyClipboardNoticeIfNeeded()
-                traceHostEvent("protectedSettings.legacyMigration.finish", metadata: ["result": "success"])
-            } catch {
-                traceHostEvent(
-                    "protectedSettings.legacyMigration.finish",
-                    metadata: traceErrorMetadata(error, extra: ["result": "failed"])
-                )
-                throw error
-            }
-            traceHostEvent("protectedSettings.authorization.request", metadata: ["gateDecision": accessGateTraceValue(decision)])
-            let authorizationResult = await liveDependencies.authorizeSharedRight(
-                localizedReason,
-                .allowInteraction
-            )
-            traceHostEvent(
-                "protectedSettings.authorization.result",
-                metadata: ["outcome": authorizationOutcomeTraceValue(authorizationResult)]
-            )
-            switch authorizationResult {
-            case .authorized:
-                break
-            case .cancelledOrDenied:
-                sectionState = .locked
-                traceHostEvent(
-                    "protectedSettings.ensureAccess.finish",
-                    metadata: stateMetadata(liveDependencies)
-                        .merging(["result": "cancelledOrDenied", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                )
-                return false
+            let migrationRequirement = liveDependencies.migrationAuthorizationRequirement()
+            let didPreauthorizeMigration: Bool
+            switch migrationRequirement {
+            case .notRequired:
+                didPreauthorizeMigration = false
+            case .wrappingRootKeyRequired:
+                guard try await authorizeMutationIfNeeded(
+                    using: liveDependencies,
+                    requirement: migrationRequirement,
+                    localizedReason: localizedReason,
+                    operation: "legacyMigration"
+                ) else {
+                    traceHostEvent(
+                        "protectedSettings.ensureAccess.finish",
+                        metadata: stateMetadata(liveDependencies)
+                            .merging(["result": "migrationAuthorizationBlocked", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                    )
+                    return false
+                }
+                didPreauthorizeMigration = true
             case .frameworkRecoveryNeeded:
+                liveDependencies.syncPreAuthorizationState()
                 sectionState = .frameworkUnavailable
                 traceHostEvent(
                     "protectedSettings.ensureAccess.finish",
                     metadata: stateMetadata(liveDependencies)
-                        .merging(["result": "authorizationFrameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                        .merging(["result": "migrationFrameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
                 )
                 return false
+            }
+            try await migrateLegacyClipboardNoticeIfNeeded(
+                using: liveDependencies,
+                gateDecision: decision,
+                preauthorized: didPreauthorizeMigration
+            )
+            if !didPreauthorizeMigration {
+                traceHostEvent("protectedSettings.authorization.request", metadata: ["gateDecision": accessGateTraceValue(decision)])
+                let authorizationResult = await liveDependencies.authorizeSharedRight(
+                    localizedReason,
+                    .allowInteraction
+                )
+                traceHostEvent(
+                    "protectedSettings.authorization.result",
+                    metadata: ["outcome": authorizationOutcomeTraceValue(authorizationResult)]
+                )
+                switch authorizationResult {
+                case .authorized:
+                    break
+                case .cancelledOrDenied:
+                    sectionState = .locked
+                    traceHostEvent(
+                        "protectedSettings.ensureAccess.finish",
+                        metadata: stateMetadata(liveDependencies)
+                            .merging(["result": "cancelledOrDenied", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                    )
+                    return false
+                case .frameworkRecoveryNeeded:
+                    sectionState = .frameworkUnavailable
+                    traceHostEvent(
+                        "protectedSettings.ensureAccess.finish",
+                        metadata: stateMetadata(liveDependencies)
+                            .merging(["result": "authorizationFrameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                    )
+                    return false
+                }
             }
         case .authorizationRequired:
             guard authorizationMode == .authorizeIfNeeded || authorizationMode == .handoffOnly else {
@@ -702,7 +769,11 @@ final class ProtectedSettingsHost {
             )
             switch authorizationResult {
             case .authorized:
-                break
+                try await migrateLegacyClipboardNoticeIfNeeded(
+                    using: liveDependencies,
+                    gateDecision: decision,
+                    preauthorized: true
+                )
             case .cancelledOrDenied:
                 sectionState = .locked
                 traceHostEvent(
@@ -721,7 +792,11 @@ final class ProtectedSettingsHost {
                 return false
             }
         case .alreadyAuthorized:
-            break
+            try await migrateLegacyClipboardNoticeIfNeeded(
+                using: liveDependencies,
+                gateDecision: decision,
+                preauthorized: true
+            )
         }
 
         let wrappingRootKey = try liveDependencies.currentWrappingRootKey()

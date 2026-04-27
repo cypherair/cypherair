@@ -2344,6 +2344,109 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(try store.requireUnlockedAuthMode(), .highSecurity)
     }
 
+    func test_realComponents_privateKeyControlFirstLeavesSettingsMigrationNeedingAuthorizedSessionAfterRestart() async throws {
+        guard SecureEnclave.isAvailable else {
+            throw XCTSkip("Secure Enclave is required for the real ProtectedData root-secret store.")
+        }
+
+        let baseDirectory = makeTemporaryDirectory("RealProtectedDataPrivateKeyControlFirst")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+        let account = "com.cypherair.tests.real-components.\(UUID().uuidString)"
+        let sharedRightIdentifier = "com.cypherair.tests.real-components.shared-right.\(UUID().uuidString)"
+        let systemKeychain = SystemKeychain()
+        let formatFloorStore = ProtectedDataRootSecretFormatFloorStore(
+            keychain: systemKeychain,
+            account: account
+        )
+        let deviceBindingProvider = HardwareProtectedDataDeviceBindingProvider(
+            keychain: systemKeychain,
+            account: account
+        )
+        let rootSecretStore = KeychainProtectedDataRootSecretStore(
+            account: account,
+            supportKeychain: systemKeychain,
+            deviceBindingProvider: deviceBindingProvider,
+            formatFloorStore: formatFloorStore
+        )
+        defer {
+            try? rootSecretStore.deleteRootSecret(identifier: sharedRightIdentifier)
+            try? formatFloorStore.deleteMarker()
+            try? systemKeychain.delete(
+                service: KeychainConstants.protectedDataDeviceBindingKeyService,
+                account: account,
+                authenticationContext: nil
+            )
+        }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: sharedRightIdentifier
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+
+        let defaultsSuiteName = "com.cypherair.tests.real-components.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+        let privateKeyControlStore = AppPrivateKeyControlStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager
+        )
+        let initialSessionCoordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rootSecretStore,
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: sharedRightIdentifier
+        )
+        let handoffContext = LAContext()
+        defer { handoffContext.invalidate() }
+
+        let created = try await privateKeyControlStore.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
+            authenticationContext: handoffContext,
+            persistSharedRight: { secret in
+                try await initialSessionCoordinator.persistSharedRight(secretData: secret)
+            }
+        )
+
+        XCTAssertTrue(created)
+        XCTAssertTrue(initialSessionCoordinator.hasPersistedRootSecret(identifier: sharedRightIdentifier))
+        XCTAssertEqual(
+            try registryStore.loadRegistry().committedMembership[AppPrivateKeyControlStore.domainID],
+            .active
+        )
+
+        let restartedSessionCoordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rootSecretStore,
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: sharedRightIdentifier
+        )
+        let settingsStore = CypherAir.ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            currentWrappingRootKey: {
+                try restartedSessionCoordinator.wrappingRootKeyData()
+            }
+        )
+
+        XCTAssertEqual(settingsStore.migrationAuthorizationRequirement(), .wrappingRootKeyRequired)
+        do {
+            try await settingsStore.migrateLegacyClipboardNoticeIfNeeded(
+                persistSharedRight: { _ in
+                    XCTFail("A second ProtectedData domain must reuse the existing shared root.")
+                }
+            )
+            XCTFail("Expected migration to require an authorized wrapping root key after restart.")
+        } catch ProtectedDataError.missingWrappingRootKey {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
     func test_privateKeyControl_pendingMutationFailsClosed() async throws {
         let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("PrivateKeyControlPending"))
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
@@ -2912,6 +3015,56 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(retainedRegistry.committedMembership[AppProtectedDataFrameworkSentinelStore.domainID], .active)
         XCTAssertNil(retainedRegistry.pendingMutation)
         XCTAssertTrue(try storageRoot.managedItemExists(at: currentEnvelopeURL))
+    }
+
+    func test_protectedSettingsMigrationAuthorizationRequirementReflectsRegistryShape() throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedSettingsMigrationRequirement")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let defaultsSuiteName = "com.cypherair.tests.protected-settings-migration-requirement.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-settings-migration-requirement"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        let settingsStore = CypherAir.ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        )
+
+        XCTAssertEqual(settingsStore.migrationAuthorizationRequirement(), .notRequired)
+
+        let privateKeyControlOnlyRegistry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-settings-migration-requirement",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: [AppPrivateKeyControlStore.domainID: .active],
+            pendingMutation: nil
+        )
+        try registryStore.saveRegistry(privateKeyControlOnlyRegistry)
+
+        XCTAssertEqual(settingsStore.migrationAuthorizationRequirement(), .wrappingRootKeyRequired)
+
+        let pendingRegistry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-settings-migration-requirement",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: [AppPrivateKeyControlStore.domainID: .active],
+            pendingMutation: .createDomain(
+                targetDomainID: AppProtectedDataFrameworkSentinelStore.domainID,
+                phase: .journaled
+            )
+        )
+        try registryStore.saveRegistry(pendingRegistry)
+
+        XCTAssertEqual(settingsStore.migrationAuthorizationRequirement(), .frameworkRecoveryNeeded)
     }
 
     func test_protectedSettingsResetRecreatesWithWrappingKeyWhenSentinelRemains() async throws {
