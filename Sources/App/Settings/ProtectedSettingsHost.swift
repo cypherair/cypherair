@@ -407,6 +407,27 @@ final class ProtectedSettingsHost {
         )
     }
 
+    func refreshAfterAppAuthenticationGeneration(_ generation: Int) async {
+        traceHostEvent(
+            "protectedSettings.postAuthenticationRefresh.start",
+            metadata: ["generation": String(generation)]
+        )
+        guard let liveDependencies else {
+            traceHostEvent(
+                "protectedSettings.postAuthenticationRefresh.finish",
+                metadata: ["result": "noLiveDependencies", "generation": String(generation)]
+            )
+            return
+        }
+
+        await refreshSettingsSection()
+        traceHostEvent(
+            "protectedSettings.postAuthenticationRefresh.finish",
+            metadata: stateMetadata(liveDependencies)
+                .merging(["result": "refreshed", "generation": String(generation)], uniquingKeysWith: { _, new in new })
+        )
+    }
+
     func openMainWindow() {
         openMainWindowAction?()
     }

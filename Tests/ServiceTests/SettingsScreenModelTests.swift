@@ -1064,9 +1064,55 @@ final class SettingsScreenModelTests: XCTestCase {
         clipboardNotice = true
         await host.invalidateForContentClearGeneration(1)
 
+        // Content clear can be an intermediate state before post-auth refresh
+        // re-syncs the section with the reopened protected settings domain.
         XCTAssertEqual(authorizeCallCount, 0)
         XCTAssertEqual(openDomainCallCount, 0)
         XCTAssertEqual(host.sectionState, .locked)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_postAuthenticationRefreshClearsStaleLockedSectionState() async {
+        var authorizeCallCount = 0
+        var openDomainCallCount = 0
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .unlocked
+        var clipboardNotice = false
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .authorizationRequired },
+            hasAuthorizationHandoffContext: { false },
+            authorizeSharedRight: { _, _ in
+                authorizeCallCount += 1
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in
+                openDomainCallCount += 1
+                domainState = .unlocked
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.refreshSettingsSection()
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
+
+        domainState = .locked
+        clipboardNotice = true
+        await host.invalidateForContentClearGeneration(1)
+
+        XCTAssertEqual(host.sectionState, .locked)
+
+        domainState = .unlocked
+        await host.refreshAfterAppAuthenticationGeneration(1)
+
+        XCTAssertEqual(authorizeCallCount, 0)
+        XCTAssertEqual(openDomainCallCount, 0)
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: true))
     }
 
     @MainActor
