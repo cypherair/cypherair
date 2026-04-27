@@ -15,12 +15,14 @@
 
 Note: this fast scan counts PR conversation comments and inline pull-request review comments, including inline replies. It does not count review submissions that have no inline comment.
 
-Triage note: the detail section below omits four substantive inline review
+Triage note: the detail section below omits eight substantive inline review
 comments that were already resolved or determined non-actionable during manual
-review: #227 local reset in tutorial sandbox, #214 Xcode 26.4 fallback path,
-#180 macOS file-protection requirements, and #71 empty license search results.
-The raw counts above and `docs/merged-pr-comments-audit.json` still include the
-full original scan.
+review: #238 protected settings reset preflight, #238 sentinel pending-mutation
+authorization, #227 local reset in tutorial sandbox, #219 app access policy
+handoff context invalidation, #214 Xcode 26.4 fallback path, #203 recovery
+candidate domain-master-key copies, #180 macOS file-protection requirements,
+and #71 empty license search results. The raw counts above and
+`docs/merged-pr-comments-audit.json` still include the full original scan.
 
 Noise-trimming note: the PR list and detail section below also omit 25
 conversation comments whose only content was the Codex code-review usage-limit
@@ -42,8 +44,6 @@ notice.
 
 ### [#238 [codex] Implement AppData Phase 4 orchestration](https://github.com/cypherair/cypherair/pull/238)
 
-- `chatgpt-codex-connector[bot]` inline on `Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swift:585` at `2026-04-27T00:29:05Z`: ** Preflight wrapping-key before deleting protected settings** This reset flow now deletes the `protected-settings` domain and only then calls `migrateLegacyClipboardNoticeIfNeede... ([comment](https://github.com/cypherair/cypherair/pull/238#discussion_r3144419157))
-- `chatgpt-codex-connector[bot]` inline on `Sources/App/CypherAirApp.swift:204` at `2026-04-27T00:29:05Z`: ** Authorize before retrying sentinel pending-mutation recovery** Pending-mutation recovery is now dispatched to the sentinel handler here, but this closure still performs recover... ([comment](https://github.com/cypherair/cypherair/pull/238#discussion_r3144419158))
 - `chatgpt-codex-connector[bot]` inline on `CypherAir.xcodeproj/project.pbxproj:522` at `2026-04-27T01:20:46Z`: ** Clear RepositoryAudit snapshot before copying inputs** This script no longer deletes `$(TARGET_BUILD_DIR)/.../RepositoryAudit` before copying listed files, so removed/renamed s... ([comment](https://github.com/cypherair/cypherair/pull/238#discussion_r3144497804))
 - `chatgpt-codex-connector[bot]` inline on `CypherAir.xcodeproj/project.pbxproj:499` at `2026-04-27T01:20:46Z`: ** Use metadata commit SHA before enforcing git fallback** In stable-release mode, this precheck fails the build when `SOURCE_COMPLIANCE_COMMIT_SHA` is empty and `.git/HEAD` / `.g... ([comment](https://github.com/cypherair/cypherair/pull/238#discussion_r3144497806))
 
@@ -52,14 +52,9 @@ notice.
 - `chatgpt-codex-connector[bot]` inline on `scripts/arm64e_release_metadata.py:123` at `2026-04-24T22:03:29Z`: ** Skip remote freshness checks when freshness level is off** `collect_dependency_chain` performs remote lookups unconditionally, so `--freshness-level off` still runs `git ls-rem... ([comment](https://github.com/cypherair/cypherair/pull/222#discussion_r3140525143))
 - `chatgpt-codex-connector[bot]` inline on `scripts/build_apple_arm64e_xcframework.sh:41` at `2026-04-24T23:02:06Z`: ** Guard manifest restore against stale backup files** The EXIT trap restores `Cargo.toml` whenever `pgp-mobile/Cargo.toml.bak.apple-arm64e-build` exists, even if this invocation... ([comment](https://github.com/cypherair/cypherair/pull/222#discussion_r3140702253))
 
-### [#219 [codex] feat: unify app data authentication](https://github.com/cypherair/cypherair/pull/219)
-
-- `chatgpt-codex-connector[bot]` inline on `Sources/App/CypherAirApp.swift:443` at `2026-04-24T02:08:14Z`: ** Invalidate cached auth context after changing app access policy** After reprotecting the persisted root secret, this path leaves any previously cached app-session `LAContext` i... ([comment](https://github.com/cypherair/cypherair/pull/219#discussion_r3135060327))
-
 ### [#203 [codex] Add protected clipboard settings](https://github.com/cypherair/cypherair/pull/203)
 
 - `chatgpt-codex-connector[bot]` inline on `Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift:42` at `2026-04-22T09:21:18Z`: ** Clear unlocked domain keys when removing shared right** When the shared right is removed, this method clears only `wrappingRootKey` and leaves `ProtectedDomainKeyManager`’s unl... ([comment](https://github.com/cypherair/cypherair/pull/203#discussion_r3122904720))
-- `chatgpt-codex-connector[bot]` inline on `Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swift:353` at `2026-04-22T09:21:18Z`: ** Avoid copying domain master key into each recovery candidate** Each candidate snapshot stores `Data(domainMasterKey)`, but only the original `domainMasterKey` buffer is zeroize... ([comment](https://github.com/cypherair/cypherair/pull/203#discussion_r3122904727))
 
 ### [#176 [codex] Harden source provenance validation](https://github.com/cypherair/cypherair/pull/176)
 

@@ -25,6 +25,8 @@ ARM64E_STAGE1_DIR="${ARM64E_STAGE1_DIR:-}"
 ARM64E_RUSTC="${ARM64E_RUSTC:-}"
 ARM64E_RUST_STAGE1_MANIFEST="${ARM64E_RUST_STAGE1_MANIFEST:-}"
 ARM64E_DEPENDENCY_FRESHNESS_LEVEL="${ARM64E_DEPENDENCY_FRESHNESS_LEVEL:-warn}"
+MANIFEST_BACKUP="$MANIFEST.bak.apple-arm64e-build"
+MANIFEST_BACKUP_CREATED=0
 
 BUILD_MODE="${1:---release}"
 if [ "$BUILD_MODE" = "--debug" ]; then
@@ -36,11 +38,15 @@ else
 fi
 
 cleanup_manifest_backup() {
-    if [ -f "$MANIFEST.bak.apple-arm64e-build" ]; then
-        mv "$MANIFEST.bak.apple-arm64e-build" "$MANIFEST" 2>/dev/null || true
+    if [ "$MANIFEST_BACKUP_CREATED" = "1" ] && [ -f "$MANIFEST_BACKUP" ]; then
+        mv "$MANIFEST_BACKUP" "$MANIFEST" 2>/dev/null || true
     fi
 }
 trap cleanup_manifest_backup EXIT INT TERM
+
+if [ -f "$MANIFEST_BACKUP" ]; then
+    echo "warning: stale manifest backup exists and will not be restored unless this run recreates it: $MANIFEST_BACKUP" >&2
+fi
 
 log_step() {
     echo
@@ -267,7 +273,8 @@ generate_bindings() {
     rm -rf "$GENERATED_BINDINGS_DIR"
     mkdir -p "$GENERATED_BINDINGS_DIR"
 
-    cp "$MANIFEST" "$MANIFEST.bak.apple-arm64e-build"
+    cp "$MANIFEST" "$MANIFEST_BACKUP"
+    MANIFEST_BACKUP_CREATED=1
     perl -0pi -e 's/crate-type = \["lib", "staticlib"\]/crate-type = ["lib", "staticlib", "cdylib"]/g' "$MANIFEST"
 
     env \
@@ -275,7 +282,8 @@ generate_bindings() {
         RUSTC="$ARM64E_RUSTC" \
         cargo +"$NIGHTLY_TOOLCHAIN" build --locked -Zbuild-std "${CARGO_FLAGS[@]}" --target arm64e-apple-darwin --manifest-path "$MANIFEST"
 
-    mv "$MANIFEST.bak.apple-arm64e-build" "$MANIFEST"
+    mv "$MANIFEST_BACKUP" "$MANIFEST"
+    MANIFEST_BACKUP_CREATED=0
 
     local host_dylib="$CARGO_TARGET_DIR/arm64e-apple-darwin/$BUILD_DIR/libpgp_mobile.dylib"
     if [ ! -f "$host_dylib" ]; then

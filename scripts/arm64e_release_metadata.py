@@ -117,6 +117,26 @@ def openssl_submodule_pointer(openssl_src_repository: str, openssl_src_commit: s
 
 def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dict[str, object]:
     openssl_src = parse_openssl_src_lock(cargo_lock_path)
+    if freshness_level == "off":
+        openssl_src["remoteBranchHead"] = None
+        openssl_src["isFresh"] = None
+        return {
+            "opensslSrc": openssl_src,
+            "openssl": {
+                "repository": DEFAULT_OPENSSL_REPO,
+                "branch": DEFAULT_OPENSSL_BRANCH,
+                "submoduleCommit": None,
+                "remoteBranchHead": None,
+                "isFresh": None,
+            },
+            "freshness": {
+                "level": freshness_level,
+                "lookupPerformed": False,
+                "isFresh": None,
+                "messages": [],
+            },
+        }
+
     openssl_src["remoteBranchHead"] = remote_branch_head(
         openssl_src["repository"],
         openssl_src["branch"],
@@ -164,6 +184,7 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
         "openssl": openssl,
         "freshness": {
             "level": freshness_level,
+            "lookupPerformed": True,
             "isFresh": not stale_messages,
             "messages": stale_messages,
         },
