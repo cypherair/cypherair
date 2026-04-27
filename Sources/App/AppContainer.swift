@@ -673,7 +673,7 @@ final class AppContainer: @unchecked Sendable {
         authManager: AuthenticationManager,
         keyManagement: KeyManagementService,
         config: AppConfiguration,
-        privateKeyControlStore: PrivateKeyControlStore
+        privateKeyControlStore: any PrivateKeyControlStoreProtocol
     ) {
         guard privateKeyControlStore.privateKeyControlState.isUnlocked else {
             return
@@ -683,6 +683,7 @@ final class AppContainer: @unchecked Sendable {
             fingerprints: keyManagement.keys.map(\.fingerprint)
         )
         let modifyExpiryOutcome = keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
+        config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
         if let warning = postUnlockRecoveryLoadWarning(
             rewrapSummary: rewrapSummary,
             modifyExpiryOutcome: modifyExpiryOutcome

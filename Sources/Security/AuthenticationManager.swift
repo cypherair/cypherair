@@ -795,13 +795,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
     ///
     /// Call this from the app's initialization path (e.g., `CypherAirApp.init`).
     ///
-    /// Recovery logic:
-    /// - Temporary items exist + old items exist: interrupted before deletion.
-    ///   Delete temporary items. Original keys remain intact.
-    /// - Old items missing + temporary items exist: interrupted after old deletion
-    ///   but before rename. Promote temporary items to permanent names with
-    ///   correct access control flags, and update the persisted auth mode.
-    /// - Neither exists: catastrophic. Clear flag. User must restore from backup.
+    /// Recovery is phase-aware:
+    /// - preparing: old + pending rolls back to the old mode by deleting pending.
+    /// - commitRequired: complete pending bundles are treated as target-mode
+    ///   authoritative data and are promoted/replaced before the target mode is
+    ///   persisted.
     func checkAndRecoverFromInterruptedRewrap(
         fingerprints: [String]
     ) -> KeyMigrationRecoverySummary? {
@@ -811,25 +809,26 @@ final class AuthenticationManager: AuthenticationEvaluable {
             return nil
         }
 
-        let recoverySummary = migrationCoordinator.recoverInterruptedMigrations(
-            for: fingerprints,
-            seKeyAccessControl: nil
-        )
-
         // If the metadata set is empty but a recovery flag was present, we cannot
         // identify which bundles need recovery. Treat that as unrecoverable.
         let effectiveSummary: KeyMigrationRecoverySummary
         if fingerprints.isEmpty {
             effectiveSummary = KeyMigrationRecoverySummary(outcomes: [.unrecoverable])
         } else {
-            effectiveSummary = recoverySummary
+            effectiveSummary = recoverInterruptedRewrapMigrations(
+                for: fingerprints,
+                phase: journal.rewrapPhase
+            )
         }
 
-        // Persist target mode when recovery promoted pending bundles, or when a
-        // prior run already crossed the Phase B commit point and only the final
-        // protected payload write remains.
-        let shouldCompleteRewrap = effectiveSummary.shouldUpdateAuthMode
-            || (journal.rewrapPhase == .commitRequired && effectiveSummary.isNoActionSafeOnly)
+        // Persist target mode only when the selected phase strategy proves all
+        // recoverable bundles are aligned with the target ACL.
+        let shouldCompleteRewrap: Bool
+        if journal.rewrapPhase == .commitRequired {
+            shouldCompleteRewrap = effectiveSummary.isRewrapTargetCommitSafe
+        } else {
+            shouldCompleteRewrap = effectiveSummary.shouldUpdateAuthMode
+        }
 
         if shouldCompleteRewrap {
             do {
@@ -842,6 +841,67 @@ final class AuthenticationManager: AuthenticationEvaluable {
         }
 
         return effectiveSummary
+    }
+
+    private func recoverInterruptedRewrapMigrations(
+        for fingerprints: [String],
+        phase: PrivateKeyControlRewrapPhase?
+    ) -> KeyMigrationRecoverySummary {
+        guard phase == .commitRequired else {
+            return migrationCoordinator.recoverInterruptedMigrations(
+                for: fingerprints,
+                seKeyAccessControl: nil
+            )
+        }
+
+        return KeyMigrationRecoverySummary(
+            outcomes: fingerprints.map(recoverCommitRequiredRewrapMigration)
+        )
+    }
+
+    private func recoverCommitRequiredRewrapMigration(
+        for fingerprint: String
+    ) -> KeyMigrationRecoveryOutcome {
+        let permanentState = bundleStore.bundleState(
+            fingerprint: fingerprint,
+            namespace: .permanent
+        )
+        let pendingState = bundleStore.bundleState(
+            fingerprint: fingerprint,
+            namespace: .pending
+        )
+
+        switch (permanentState, pendingState) {
+        case (.complete, .missing):
+            return .noActionSafe
+        case (.complete, .complete), (.partial, .complete):
+            do {
+                try bundleStore.replacePermanentWithPending(
+                    fingerprint: fingerprint,
+                    seKeyAccessControl: nil
+                )
+                return .promotedPendingSafe
+            } catch {
+                return .retryableFailure
+            }
+        case (.missing, .complete):
+            do {
+                try bundleStore.promotePendingToPermanent(
+                    fingerprint: fingerprint,
+                    seKeyAccessControl: nil
+                )
+                return .promotedPendingSafe
+            } catch {
+                return .retryableFailure
+            }
+        case (.complete, .partial):
+            return .retryableFailure
+        case (.partial, .missing),
+             (.partial, .partial),
+             (.missing, .partial),
+             (.missing, .missing):
+            return .unrecoverable
+        }
     }
 
 }

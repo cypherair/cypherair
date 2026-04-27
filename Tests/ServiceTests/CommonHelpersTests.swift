@@ -555,9 +555,41 @@ final class CommonHelpersTests: XCTestCase {
         XCTAssertEqual(authManager.currentMode, .standard)
     }
 
-    func test_rewrapRecovery_commitRequiredOldAndPending_cleansPendingKeepsOldMode() throws {
+    func test_rewrapRecovery_preparingOldAndPending_cleansPendingKeepsOldMode() throws {
         let keychain = MockKeychain()
-        let fingerprint = "commit-clean-\(UUID().uuidString)"
+        let fingerprint = "preparing-clean-\(UUID().uuidString)"
+        try savePermanentRecoveryBundle(in: keychain, fingerprint: fingerprint)
+        try savePendingRecoveryBundle(in: keychain, fingerprint: fingerprint)
+
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(summary?.outcomes, [.cleanedPendingSafe])
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapPhase)
+        XCTAssertEqual(authManager.currentMode, .standard)
+        XCTAssertEqual(
+            try keychain.load(
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            ),
+            Data("permanent-se-key".utf8)
+        )
+        XCTAssertFalse(keychain.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount
+        ))
+    }
+
+    func test_rewrapRecovery_commitRequiredOldAndPending_replacesPermanentWithPending() throws {
+        let keychain = MockKeychain()
+        let fingerprint = "commit-replace-\(UUID().uuidString)"
         try savePermanentRecoveryBundle(in: keychain, fingerprint: fingerprint)
         try savePendingRecoveryBundle(in: keychain, fingerprint: fingerprint)
 
@@ -571,15 +603,90 @@ final class CommonHelpersTests: XCTestCase {
 
         let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
-        XCTAssertEqual(summary?.outcomes, [.cleanedPendingSafe])
+        XCTAssertEqual(summary?.outcomes, [.promotedPendingSafe])
         XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
         XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapPhase)
-        XCTAssertEqual(authManager.currentMode, .standard)
-        XCTAssertTrue(keychain.exists(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
+        XCTAssertEqual(
+            try keychain.load(
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            ),
+            Data("pending-se-key".utf8)
+        )
+        XCTAssertFalse(keychain.exists(
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
             account: KeychainConstants.defaultAccount
         ))
-        XCTAssertFalse(keychain.exists(
+    }
+
+    func test_rewrapRecovery_commitRequiredMixedPhaseB_promotesAllTargetBundles() throws {
+        let keychain = MockKeychain()
+        let pendingOnlyFingerprint = "commit-pending-\(UUID().uuidString)"
+        let oldAndPendingFingerprint = "commit-mixed-\(UUID().uuidString)"
+        try savePendingRecoveryBundle(in: keychain, fingerprint: pendingOnlyFingerprint)
+        try savePermanentRecoveryBundle(in: keychain, fingerprint: oldAndPendingFingerprint)
+        try savePendingRecoveryBundle(in: keychain, fingerprint: oldAndPendingFingerprint)
+
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
+        try privateKeyControlStore.markRewrapCommitRequired()
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(
+            fingerprints: [pendingOnlyFingerprint, oldAndPendingFingerprint]
+        )
+
+        XCTAssertEqual(summary?.outcomes, [.promotedPendingSafe, .promotedPendingSafe])
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapPhase)
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
+        for fingerprint in [pendingOnlyFingerprint, oldAndPendingFingerprint] {
+            XCTAssertEqual(
+                try keychain.load(
+                    service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                    account: KeychainConstants.defaultAccount
+                ),
+                Data("pending-se-key".utf8)
+            )
+            XCTAssertFalse(keychain.exists(
+                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            ))
+        }
+    }
+
+    func test_rewrapRecovery_commitRequiredPartialPending_keepsJournalAndFailsClosed() throws {
+        let keychain = MockKeychain()
+        let fingerprint = "commit-partial-\(UUID().uuidString)"
+        try savePermanentRecoveryBundle(in: keychain, fingerprint: fingerprint)
+        try savePartialPendingRecoveryBundle(in: keychain, fingerprint: fingerprint)
+
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
+        try privateKeyControlStore.markRewrapCommitRequired()
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
+
+        XCTAssertEqual(summary?.outcomes, [.retryableFailure])
+        XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapTargetMode, .highSecurity)
+        XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapPhase, .commitRequired)
+        XCTAssertEqual(authManager.currentMode, .standard)
+        XCTAssertEqual(
+            try keychain.load(
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: KeychainConstants.defaultAccount
+            ),
+            Data("permanent-se-key".utf8)
+        )
+        XCTAssertTrue(keychain.exists(
             service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
             account: KeychainConstants.defaultAccount
         ))
@@ -610,6 +717,100 @@ final class CommonHelpersTests: XCTestCase {
             rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.noActionSafe, .cleanedPendingSafe]),
             modifyExpiryOutcome: .cleanedPendingSafe
         ))
+    }
+
+    func test_postUnlockRecovery_resyncsConfigAfterRewrapCompletes() async throws {
+        let suiteName = "com.cypherair.postUnlockSync.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychain()
+        let secureEnclave = MockSecureEnclave()
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+        let keyManagement = KeyManagementService(
+            engine: PgpEngine(),
+            secureEnclave: secureEnclave,
+            keychain: keychain,
+            authenticator: authManager,
+            defaults: defaults,
+            privateKeyControlStore: privateKeyControlStore
+        )
+        _ = try await keyManagement.generateKey(
+            name: "Post Unlock",
+            email: "post-unlock@example.invalid",
+            expirySeconds: nil,
+            profile: .universal,
+            authMode: .standard
+        )
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
+        try privateKeyControlStore.markRewrapCommitRequired()
+
+        let config = AppConfiguration(defaults: defaults)
+        config.privateKeyControlState = .unlocked(.standard)
+
+        AppContainer.recoverPrivateKeyControlJournalsAfterPostUnlock(
+            authManager: authManager,
+            keyManagement: keyManagement,
+            config: config,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        XCTAssertEqual(config.authModeIfUnlocked, .highSecurity)
+        XCTAssertNil(config.postUnlockRecoveryLoadWarning)
+    }
+
+    func test_postUnlockRecovery_warningPathStillResyncsConfig() async throws {
+        let suiteName = "com.cypherair.postUnlockWarningSync.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let keychain = MockKeychain()
+        let privateKeyControlStore = FailingCompleteRewrapPrivateKeyControlStore(
+            mode: .standard,
+            journal: .empty
+        )
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+        let keyManagement = KeyManagementService(
+            engine: PgpEngine(),
+            secureEnclave: MockSecureEnclave(),
+            keychain: keychain,
+            authenticator: authManager,
+            defaults: defaults,
+            privateKeyControlStore: privateKeyControlStore
+        )
+        _ = try await keyManagement.generateKey(
+            name: "Post Unlock Warning",
+            email: "post-unlock-warning@example.invalid",
+            expirySeconds: nil,
+            profile: .universal,
+            authMode: .standard
+        )
+        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
+        try privateKeyControlStore.markRewrapCommitRequired()
+        privateKeyControlStore.failNextCompleteRewrap = true
+
+        let config = AppConfiguration(defaults: defaults)
+        config.privateKeyControlState = .unlocked(.highSecurity)
+
+        AppContainer.recoverPrivateKeyControlJournalsAfterPostUnlock(
+            authManager: authManager,
+            keyManagement: keyManagement,
+            config: config,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        XCTAssertEqual(config.authModeIfUnlocked, .standard)
+        XCTAssertTrue(config.postUnlockRecoveryLoadWarning?.contains("retry") == true)
+        XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapTargetMode, .highSecurity)
     }
 
     private func makeRecoveryAuthenticationManager(
@@ -669,6 +870,18 @@ final class CommonHelpersTests: XCTestCase {
             Data("pending-sealed".utf8),
             service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
             account: account,
+            accessControl: nil
+        )
+    }
+
+    private func savePartialPendingRecoveryBundle(
+        in keychain: MockKeychain,
+        fingerprint: String
+    ) throws {
+        try keychain.save(
+            Data("partial-pending-se-key".utf8),
+            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount,
             accessControl: nil
         )
     }

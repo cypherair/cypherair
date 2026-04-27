@@ -58,6 +58,12 @@ struct KeyMigrationRecoverySummary: Equatable {
         !outcomes.isEmpty && outcomes.allSatisfy { $0 == .noActionSafe }
     }
 
+    var isRewrapTargetCommitSafe: Bool {
+        !outcomes.isEmpty && outcomes.allSatisfy {
+            $0 == .noActionSafe || $0 == .promotedPendingSafe
+        }
+    }
+
     func appendingRetryableFailure() -> KeyMigrationRecoverySummary {
         guard !outcomes.contains(.retryableFailure) else {
             return self
