@@ -91,34 +91,6 @@ struct AppStartupCoordinator {
             errors.append(error.localizedDescription)
         }
 
-        traceStore?.record(category: .lifecycle, name: "startup.rewrapRecovery.start")
-        let authRecovery = container.authManager.checkAndRecoverFromInterruptedRewrap(
-            fingerprints: container.keyManagement.keys.map(\.fingerprint)
-        )
-        traceStore?.record(
-            category: .lifecycle,
-            name: "startup.rewrapRecovery.finish",
-            metadata: [
-                "result": authRecovery == nil ? "none" : authRecovery!.shouldClearRecoveryFlag ? "recovered" : "needsAttention",
-                "diagnosticCount": String(authRecovery?.startupDiagnostics.count ?? 0)
-            ]
-        )
-        recoveryDiagnostics.append(contentsOf: authRecovery?.startupDiagnostics ?? [])
-
-        traceStore?.record(category: .lifecycle, name: "startup.modifyExpiryRecovery.start")
-        let modifyExpiryRecovery = container.keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
-        traceStore?.record(
-            category: .lifecycle,
-            name: "startup.modifyExpiryRecovery.finish",
-            metadata: [
-                "result": modifyExpiryRecovery == nil ? "none" : modifyExpiryRecovery!.shouldClearRecoveryFlag ? "recovered" : "needsAttention",
-                "hasDiagnostic": modifyExpiryRecovery?.startupDiagnostic == nil ? "false" : "true"
-            ]
-        )
-        if let diagnostic = modifyExpiryRecovery?.startupDiagnostic {
-            recoveryDiagnostics.append(diagnostic)
-        }
-
         traceStore?.record(category: .lifecycle, name: "startup.contacts.load.start")
         do {
             try container.contactService.loadContacts()

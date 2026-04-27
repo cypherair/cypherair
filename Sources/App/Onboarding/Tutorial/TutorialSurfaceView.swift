@@ -213,8 +213,8 @@ struct TutorialSettingsTaskView: View {
     var body: some View {
         TutorialTaskHostView(module: .enableHighSecurity) {
             SettingsView(configuration: tutorialStore.configurationFactory.settingsConfiguration())
-                .onChange(of: config.authMode) { _, newMode in
-                    if newMode == .highSecurity {
+                .onChange(of: config.authModeIfUnlocked) { _, newMode in
+                    if let newMode, newMode == .highSecurity {
                         tutorialStore.noteHighSecurityEnabled(newMode)
                     }
                 }

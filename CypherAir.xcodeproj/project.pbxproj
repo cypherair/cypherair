@@ -188,6 +188,7 @@
 				Security/ProtectedData/ProtectedDataDeviceBinding.swift,
 				Security/ProtectedData/ProtectedDataDomain.swift,
 				Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift,
+				Security/ProtectedData/PrivateKeyControlStore.swift,
 				Security/ProtectedData/ProtectedDataRegistry.swift,
 				Security/ProtectedData/ProtectedDataRegistryStore.swift,
 				Security/ProtectedData/ProtectedDataRelockParticipant.swift,

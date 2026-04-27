@@ -76,7 +76,7 @@ struct AppSessionAuthenticationResult {
 
 /// Authentication mode for the app.
 /// Determines the SecAccessControl flags used for SE key wrapping.
-enum AuthenticationMode: String {
+enum AuthenticationMode: String, Codable, Sendable {
     /// Face ID / Touch ID with device passcode fallback.
     /// Flags: [.privateKeyUsage, .biometryAny, .or, .devicePasscode]
     case standard
@@ -122,6 +122,236 @@ enum AuthenticationMode: String {
         }
 
         return accessControl
+    }
+}
+
+enum PrivateKeyControlState: Equatable, Sendable {
+    case locked
+    case unlocked(AuthenticationMode)
+    case recoveryNeeded
+
+    var authMode: AuthenticationMode? {
+        guard case .unlocked(let mode) = self else {
+            return nil
+        }
+        return mode
+    }
+
+    var isUnlocked: Bool {
+        authMode != nil
+    }
+}
+
+struct ModifyExpiryRecoveryEntry: Codable, Equatable, Sendable {
+    var fingerprint: String?
+}
+
+enum PrivateKeyControlRewrapPhase: String, Codable, Equatable, Sendable {
+    case preparing
+    case commitRequired
+}
+
+struct PrivateKeyControlRecoveryJournal: Codable, Equatable, Sendable {
+    var rewrapTargetMode: AuthenticationMode?
+    var rewrapPhase: PrivateKeyControlRewrapPhase?
+    var modifyExpiry: ModifyExpiryRecoveryEntry?
+
+    init(
+        rewrapTargetMode: AuthenticationMode? = nil,
+        rewrapPhase: PrivateKeyControlRewrapPhase? = nil,
+        modifyExpiry: ModifyExpiryRecoveryEntry? = nil
+    ) {
+        self.rewrapTargetMode = rewrapTargetMode
+        self.rewrapPhase = rewrapTargetMode == nil ? nil : (rewrapPhase ?? .preparing)
+        self.modifyExpiry = modifyExpiry
+    }
+
+    static let empty = PrivateKeyControlRecoveryJournal(
+        rewrapTargetMode: nil,
+        rewrapPhase: nil,
+        modifyExpiry: nil
+    )
+
+    private enum CodingKeys: String, CodingKey {
+        case rewrapTargetMode
+        case rewrapPhase
+        case modifyExpiry
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let rewrapTargetMode = try container.decodeIfPresent(AuthenticationMode.self, forKey: .rewrapTargetMode)
+        let decodedRewrapPhase = try container.decodeIfPresent(
+            PrivateKeyControlRewrapPhase.self,
+            forKey: .rewrapPhase
+        )
+        self.init(
+            rewrapTargetMode: rewrapTargetMode,
+            rewrapPhase: decodedRewrapPhase,
+            modifyExpiry: try container.decodeIfPresent(ModifyExpiryRecoveryEntry.self, forKey: .modifyExpiry)
+        )
+    }
+}
+
+enum PrivateKeyControlError: Error, LocalizedError, Equatable {
+    case locked
+    case recoveryNeeded
+    case missingStore
+    case invalidLegacyAuthMode(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .locked:
+            String(
+                localized: "error.privateKeyControl.locked",
+                defaultValue: "Private key protection settings are locked. Unlock CypherAir and try again."
+            )
+        case .recoveryNeeded:
+            String(
+                localized: "error.privateKeyControl.recoveryNeeded",
+                defaultValue: "Private key protection settings need recovery before private-key operations can continue."
+            )
+        case .missingStore:
+            String(
+                localized: "error.privateKeyControl.unavailable",
+                defaultValue: "Private key protection settings are unavailable."
+            )
+        case .invalidLegacyAuthMode:
+            String(
+                localized: "error.privateKeyControl.invalidLegacyAuthMode",
+                defaultValue: "Saved private key protection settings are invalid and need recovery."
+            )
+        }
+    }
+}
+
+protocol PrivateKeyControlStoreProtocol: AnyObject, Sendable {
+    var privateKeyControlState: PrivateKeyControlState { get }
+
+    func requireUnlockedAuthMode() throws -> AuthenticationMode
+    func recoveryJournal() throws -> PrivateKeyControlRecoveryJournal
+    func beginRewrap(targetMode: AuthenticationMode) throws
+    func markRewrapCommitRequired() throws
+    func completeRewrap(targetMode: AuthenticationMode) throws
+    func clearRewrapJournal() throws
+    func beginModifyExpiry(fingerprint: String) throws
+    func clearModifyExpiryJournal() throws
+    func clearModifyExpiryJournalIfMatches(fingerprint: String) throws
+}
+
+final class InMemoryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unchecked Sendable {
+    private var mode: AuthenticationMode?
+    private var journal: PrivateKeyControlRecoveryJournal
+    private var isRecoveryNeeded: Bool
+
+    init(
+        mode: AuthenticationMode? = nil,
+        journal: PrivateKeyControlRecoveryJournal = .empty,
+        isRecoveryNeeded: Bool = false
+    ) {
+        self.mode = mode
+        self.journal = journal
+        self.isRecoveryNeeded = isRecoveryNeeded
+    }
+
+    var privateKeyControlState: PrivateKeyControlState {
+        if isRecoveryNeeded {
+            return .recoveryNeeded
+        }
+        guard let mode else {
+            return .locked
+        }
+        return .unlocked(mode)
+    }
+
+    func requireUnlockedAuthMode() throws -> AuthenticationMode {
+        if isRecoveryNeeded {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        guard let mode else {
+            throw PrivateKeyControlError.locked
+        }
+        if journal.rewrapPhase == .commitRequired,
+           let targetMode = journal.rewrapTargetMode,
+           targetMode != mode {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        return mode
+    }
+
+    func recoveryJournal() throws -> PrivateKeyControlRecoveryJournal {
+        if isRecoveryNeeded {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
+        return journal
+    }
+
+    func beginRewrap(targetMode: AuthenticationMode) throws {
+        _ = try requireUnlockedAuthMode()
+        journal.rewrapTargetMode = targetMode
+        journal.rewrapPhase = .preparing
+    }
+
+    func markRewrapCommitRequired() throws {
+        _ = try requireUnlockedAuthMode()
+        guard journal.rewrapTargetMode != nil else {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        journal.rewrapPhase = .commitRequired
+    }
+
+    func completeRewrap(targetMode: AuthenticationMode) throws {
+        if isRecoveryNeeded {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
+        mode = targetMode
+        journal.rewrapTargetMode = nil
+        journal.rewrapPhase = nil
+    }
+
+    func clearRewrapJournal() throws {
+        if isRecoveryNeeded {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
+        journal.rewrapTargetMode = nil
+        journal.rewrapPhase = nil
+    }
+
+    func beginModifyExpiry(fingerprint: String) throws {
+        _ = try requireUnlockedAuthMode()
+        journal.modifyExpiry = ModifyExpiryRecoveryEntry(fingerprint: fingerprint)
+    }
+
+    func clearModifyExpiryJournal() throws {
+        if isRecoveryNeeded {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
+        journal.modifyExpiry = nil
+    }
+
+    func clearModifyExpiryJournalIfMatches(fingerprint: String) throws {
+        if isRecoveryNeeded {
+            throw PrivateKeyControlError.recoveryNeeded
+        }
+        guard mode != nil else {
+            throw PrivateKeyControlError.locked
+        }
+        guard journal.modifyExpiry?.fingerprint == fingerprint else {
+            return
+        }
+        journal.modifyExpiry = nil
     }
 }
 

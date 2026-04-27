@@ -12,11 +12,13 @@ enum TestHelpers {
     /// Returns the service and all three mocks for verification.
     static func makeKeyManagement(
         engine: PgpEngine = PgpEngine(),
-        memoryInfo: (any MemoryInfoProvidable)? = nil
+        memoryInfo: (any MemoryInfoProvidable)? = nil,
+        privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil
     ) -> (service: KeyManagementService, mockSE: MockSecureEnclave, mockKC: MockKeychain, mockAuth: MockAuthenticator) {
         let mockSE = MockSecureEnclave()
         let mockKC = MockKeychain()
         let mockAuth = MockAuthenticator()
+        let privateKeyControlStore = privateKeyControlStore ?? InMemoryPrivateKeyControlStore(mode: .standard)
 
         let service: KeyManagementService
         if let memInfo = memoryInfo {
@@ -24,13 +26,15 @@ enum TestHelpers {
                 engine: engine, secureEnclave: mockSE,
                 keychain: mockKC, authenticator: mockAuth,
                 memoryInfo: memInfo,
-                defaults: .standard
+                defaults: .standard,
+                privateKeyControlStore: privateKeyControlStore
             )
         } else {
             service = KeyManagementService(
                 engine: engine, secureEnclave: mockSE,
                 keychain: mockKC, authenticator: mockAuth,
-                defaults: .standard
+                defaults: .standard,
+                privateKeyControlStore: privateKeyControlStore
             )
         }
 

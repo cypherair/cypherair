@@ -53,7 +53,7 @@ struct CypherAirApp: App {
     init() {
         let launchConfiguration = AppLaunchConfiguration()
         let container: AppContainer
-        if launchConfiguration.isUITestMode {
+        if launchConfiguration.isUITestMode || launchConfiguration.isXCTestHost {
             container = AppContainer.makeUITest(
                 requiresManualAuthentication: launchConfiguration.requiresManualAuthentication,
                 preloadContact: launchConfiguration.preloadsUITestContact,
@@ -64,7 +64,8 @@ struct CypherAirApp: App {
                 authTraceEnabled: launchConfiguration.isAuthTraceEnabled
             )
         }
-        if launchConfiguration.isUITestMode && !launchConfiguration.requiresManualAuthentication {
+        if (launchConfiguration.isUITestMode || launchConfiguration.isXCTestHost)
+            && !launchConfiguration.requiresManualAuthentication {
             container.appSessionOrchestrator.recordAuthentication()
         }
         if launchConfiguration.shouldSkipOnboarding {
@@ -76,6 +77,7 @@ struct CypherAirApp: App {
             metadata: [
                 "root": launchConfiguration.root.rawValue,
                 "uiTestMode": launchConfiguration.isUITestMode ? "true" : "false",
+                "xctestHost": launchConfiguration.isXCTestHost ? "true" : "false",
                 "requiresManualAuthentication": launchConfiguration.requiresManualAuthentication ? "true" : "false",
                 "authTraceEnabled": launchConfiguration.isAuthTraceEnabled ? "true" : "false"
             ]
@@ -204,6 +206,7 @@ struct CypherAirApp: App {
             recoverPendingMutation: {
                 let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingMutation(
                     handlers: [
+                        container.privateKeyControlStore,
                         container.protectedSettingsStore,
                         container.protectedDataFrameworkSentinelStore
                     ],
@@ -489,6 +492,12 @@ struct CypherAirApp: App {
             pendingLoadError = warning
             container.keyManagement.clearLegacyMetadataMigrationLoadWarning()
             presentPendingLoadWarningIfPossible(source: "legacyMetadataMigration")
+        }
+        .onChange(of: container.config.postUnlockRecoveryLoadWarning) { _, warning in
+            guard let warning else { return }
+            pendingLoadError = warning
+            container.config.clearPostUnlockRecoveryLoadWarning()
+            presentPendingLoadWarningIfPossible(source: "postUnlockRecovery")
         }
         .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
         .authenticationShieldHost(
@@ -815,6 +824,7 @@ struct AppLaunchConfiguration {
     let shouldSkipOnboarding: Bool
     let tutorialModule: TutorialModuleID?
     let isUITestMode: Bool
+    let isXCTestHost: Bool
     let requiresManualAuthentication: Bool
     let opensAuthModeConfirmation: Bool
     let preloadsUITestContact: Bool
@@ -824,6 +834,7 @@ struct AppLaunchConfiguration {
         let environment = processInfo.environment
         self.root = Root(rawValue: environment["UITEST_ROOT"] ?? "main") ?? .main
         self.isUITestMode = environment["UITEST_ROOT"] != nil || environment["UITEST_SKIP_ONBOARDING"] != nil
+        self.isXCTestHost = Self.detectXCTestHost(processInfo: processInfo)
         self.requiresManualAuthentication = environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
         self.opensAuthModeConfirmation = environment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] == "1"
         self.preloadsUITestContact = environment["UITEST_PRELOAD_CONTACT"] == "1"
@@ -840,6 +851,15 @@ struct AppLaunchConfiguration {
             case "enableHighSecurity": .enableHighSecurity
             default: nil
             }
+        }
+    }
+
+    private static func detectXCTestHost(processInfo: ProcessInfo) -> Bool {
+        if processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return true
+        }
+        return Bundle.allBundles.contains { bundle in
+            bundle.bundlePath.hasSuffix(".xctest")
         }
     }
 }

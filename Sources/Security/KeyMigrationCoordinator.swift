@@ -54,6 +54,23 @@ struct KeyMigrationRecoverySummary: Equatable {
             && outcomes.contains(.promotedPendingSafe)
     }
 
+    var isNoActionSafeOnly: Bool {
+        !outcomes.isEmpty && outcomes.allSatisfy { $0 == .noActionSafe }
+    }
+
+    var isRewrapTargetCommitSafe: Bool {
+        !outcomes.isEmpty && outcomes.allSatisfy {
+            $0 == .noActionSafe || $0 == .promotedPendingSafe
+        }
+    }
+
+    func appendingRetryableFailure() -> KeyMigrationRecoverySummary {
+        guard !outcomes.contains(.retryableFailure) else {
+            return self
+        }
+        return KeyMigrationRecoverySummary(outcomes: outcomes + [.retryableFailure])
+    }
+
     var startupDiagnostics: [String] {
         var diagnostics: [String] = []
         for diagnostic in outcomes.compactMap(\.startupDiagnostic) where !diagnostics.contains(diagnostic) {

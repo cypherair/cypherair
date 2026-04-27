@@ -174,10 +174,6 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertTrue(names.contains("startup.protectedDataBootstrap.finish"))
         XCTAssertTrue(names.contains("startup.keys.load.start"))
         XCTAssertTrue(names.contains("startup.keys.load.finish"))
-        XCTAssertTrue(names.contains("startup.rewrapRecovery.start"))
-        XCTAssertTrue(names.contains("startup.rewrapRecovery.finish"))
-        XCTAssertTrue(names.contains("startup.modifyExpiryRecovery.start"))
-        XCTAssertTrue(names.contains("startup.modifyExpiryRecovery.finish"))
         XCTAssertTrue(names.contains("startup.contacts.load.start"))
         XCTAssertTrue(names.contains("startup.contacts.load.finish"))
         XCTAssertTrue(names.contains("startup.loadWarning.computed"))
@@ -522,6 +518,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             defaults: defaults,
             traceStore: traceStore
         )
+        manager.configurePrivateKeyControlStore(InMemoryPrivateKeyControlStore(mode: .standard))
         let fingerprint = String(repeating: "a", count: 40)
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
         let bundle = try secureEnclave.wrap(
@@ -562,6 +559,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             defaults: defaults,
             traceStore: traceStore
         )
+        manager.configurePrivateKeyControlStore(InMemoryPrivateKeyControlStore(mode: .standard))
 
         do {
             try await manager.switchMode(

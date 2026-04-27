@@ -22,7 +22,6 @@ struct ModifyExpirySheetView: View {
     let request: ModifyExpiryRequest
 
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppConfiguration.self) private var config
     @Environment(\.dismiss) private var dismiss
 
     @State private var newExpiryDate: Date
@@ -99,14 +98,12 @@ struct ModifyExpirySheetView: View {
         isModifyingExpiry = true
         let service = keyManagement
         let fingerprint = request.fingerprint
-        let authMode = config.authMode
 
         Task {
             do {
                 _ = try await service.modifyExpiry(
                     fingerprint: fingerprint,
-                    newExpirySeconds: seconds,
-                    authMode: authMode
+                    newExpirySeconds: seconds
                 )
                 request.onComplete()
                 dismiss()

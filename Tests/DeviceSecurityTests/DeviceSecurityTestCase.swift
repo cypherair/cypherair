@@ -80,6 +80,21 @@ class DeviceSecurityTestCase: XCTestCase {
         try await Task.sleep(for: .seconds(2))
     }
 
+    final func makeAuthenticationManager(
+        secureEnclave: any SecureEnclaveManageable,
+        keychain: any KeychainManageable,
+        defaults: UserDefaults = .standard,
+        privateKeyControlStore: InMemoryPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+    ) -> AuthenticationManager {
+        let authManager = AuthenticationManager(
+            secureEnclave: secureEnclave,
+            keychain: keychain,
+            defaults: defaults
+        )
+        authManager.configurePrivateKeyControlStore(privateKeyControlStore)
+        return authManager
+    }
+
     final func storePermanentBundle(_ bundle: WrappedKeyBundle, fingerprint: String) throws {
         let account = KeychainConstants.defaultAccount
         try keychain.save(

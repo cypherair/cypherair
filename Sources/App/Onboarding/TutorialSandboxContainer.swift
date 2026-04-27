@@ -22,6 +22,7 @@ final class TutorialSandboxContainer {
     let mockKeychain: MockKeychain
     let mockAuthenticator: MockAuthenticator
     let authManager: AuthenticationManager
+    let privateKeyControlStore: InMemoryPrivateKeyControlStore
     let securitySimulationStack: TutorialSecuritySimulationStack
     let config: AppConfiguration
     let keyManagement: KeyManagementService
@@ -69,6 +70,8 @@ final class TutorialSandboxContainer {
             defaults: defaults,
             authenticationPromptCoordinator: authenticationPromptCoordinator
         )
+        self.privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        self.authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         self.securitySimulationStack = TutorialSecuritySimulationStack(
             authManager: authManager,
             mockSecureEnclave: mockSecureEnclave,
@@ -76,13 +79,15 @@ final class TutorialSandboxContainer {
             mockAuthenticator: mockAuthenticator
         )
         self.config = AppConfiguration(defaults: defaults)
+        self.config.privateKeyControlState = .unlocked(.standard)
         self.keyManagement = KeyManagementService(
             engine: engine,
             secureEnclave: mockSecureEnclave,
             keychain: mockKeychain,
             authenticator: authManager,
             defaults: defaults,
-            authenticationPromptCoordinator: authenticationPromptCoordinator
+            authenticationPromptCoordinator: authenticationPromptCoordinator,
+            privateKeyControlStore: privateKeyControlStore
         )
         self.contactService = ContactService(engine: engine, contactsDirectory: contactsDirectory)
         self.encryptionService = EncryptionService(
@@ -110,7 +115,7 @@ final class TutorialSandboxContainer {
 
         self.mockAuthenticator.shouldSucceed = true
         self.mockAuthenticator.biometricsAvailable = true
-        self.mockSecureEnclave.simulatedAuthMode = authManager.currentMode
+        self.mockSecureEnclave.simulatedAuthMode = authManager.currentMode ?? .standard
         try? self.contactService.loadContacts()
     }
 

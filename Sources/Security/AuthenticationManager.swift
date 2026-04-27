@@ -83,6 +83,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private let migrationCoordinator: KeyMigrationCoordinator
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
+    private var privateKeyControlStore: (any PrivateKeyControlStoreProtocol)?
 
     // MARK: - State
 
@@ -91,10 +92,9 @@ final class AuthenticationManager: AuthenticationEvaluable {
     /// reconstruction, avoiding repeated Face ID prompts.
     private(set) var lastEvaluatedContext: LAContext?
 
-    /// The current authentication mode, persisted in UserDefaults.
-    var currentMode: AuthenticationMode {
-        let raw = defaults.string(forKey: AuthPreferences.authModeKey) ?? AuthenticationMode.standard.rawValue
-        return AuthenticationMode(rawValue: raw) ?? .standard
+    /// The current authentication mode when the private-key control domain is unlocked.
+    var currentMode: AuthenticationMode? {
+        try? privateKeyControlStore?.requireUnlockedAuthMode()
     }
 
     /// The current grace period in seconds, persisted in UserDefaults.
@@ -119,16 +119,22 @@ final class AuthenticationManager: AuthenticationEvaluable {
         keychain: any KeychainManageable,
         defaults: UserDefaults = .standard,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
-        traceStore: AuthLifecycleTraceStore? = nil
+        traceStore: AuthLifecycleTraceStore? = nil,
+        privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil
     ) {
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.defaults = defaults
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
+        self.privateKeyControlStore = privateKeyControlStore
         let bundleStore = KeyBundleStore(keychain: keychain)
         self.bundleStore = bundleStore
         self.migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
+    }
+
+    func configurePrivateKeyControlStore(_ store: any PrivateKeyControlStoreProtocol) {
+        privateKeyControlStore = store
     }
 
     // MARK: - AuthenticationEvaluable
@@ -487,7 +493,10 @@ final class AuthenticationManager: AuthenticationEvaluable {
         hasBackup: Bool,
         authenticator: any AuthenticationEvaluable
     ) async throws {
-        let oldMode = currentMode
+        guard let privateKeyControlStore else {
+            throw PrivateKeyControlError.missingStore
+        }
+        let oldMode = try privateKeyControlStore.requireUnlockedAuthMode()
         traceStore?.record(
             category: .operation,
             name: "privateKeyProtection.switch.start",
@@ -593,9 +602,8 @@ final class AuthenticationManager: AuthenticationEvaluable {
             throw AuthenticationError.failed
         }
 
-        // Step 1: Set in-progress flag and target mode before any Keychain modifications.
-        defaults.set(true, forKey: AuthPreferences.rewrapInProgressKey)
-        defaults.set(newMode.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
+        // Step 1: Write protected rewrap journal before any Keychain modifications.
+        try privateKeyControlStore.beginRewrap(targetMode: newMode)
 
         // Phase A: Create all pending items (Steps 2-3).
         // If anything fails here, old items are intact — safe to clean up pending and abort.
@@ -669,6 +677,10 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     namespace: .pending
                 )
             }
+
+            // From this point forward Phase B may delete permanent items, so the
+            // target mode must survive even if the final protected write fails.
+            try privateKeyControlStore.markRewrapCommitRequired()
             traceStore?.record(
                 category: .operation,
                 name: "privateKeyProtection.switch.phaseA.finish",
@@ -677,8 +689,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         } catch {
             // Phase A failed: old items are intact. Safe to clean up pending and abort.
             fingerprints.forEach { bundleStore.cleanupPendingBundle(fingerprint: $0) }
-            defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
-            defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
+            try? privateKeyControlStore.clearRewrapJournal()
             traceStore?.record(
                 category: .operation,
                 name: "privateKeyProtection.switch.phaseA.finish",
@@ -734,12 +745,8 @@ final class AuthenticationManager: AuthenticationEvaluable {
                 )
             }
 
-            // Step 6: Persist mode preference.
-            defaults.set(newMode.rawValue, forKey: AuthPreferences.authModeKey)
-
-            // Step 7: Clear in-progress flag and target mode.
-            defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
-            defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
+            // Step 6: Persist the new mode and clear the protected rewrap journal.
+            try privateKeyControlStore.completeRewrap(targetMode: newMode)
             traceStore?.record(
                 category: .operation,
                 name: "privateKeyProtection.switch.phaseB.finish",
@@ -788,34 +795,19 @@ final class AuthenticationManager: AuthenticationEvaluable {
     ///
     /// Call this from the app's initialization path (e.g., `CypherAirApp.init`).
     ///
-    /// Recovery logic:
-    /// - Temporary items exist + old items exist: interrupted before deletion.
-    ///   Delete temporary items. Original keys remain intact.
-    /// - Old items missing + temporary items exist: interrupted after old deletion
-    ///   but before rename. Promote temporary items to permanent names with
-    ///   correct access control flags, and update the persisted auth mode.
-    /// - Neither exists: catastrophic. Clear flag. User must restore from backup.
+    /// Recovery is phase-aware:
+    /// - preparing: old + pending rolls back to the old mode by deleting pending.
+    /// - commitRequired: complete pending bundles are treated as target-mode
+    ///   authoritative data and are promoted/replaced before the target mode is
+    ///   persisted.
     func checkAndRecoverFromInterruptedRewrap(
         fingerprints: [String]
     ) -> KeyMigrationRecoverySummary? {
-        guard defaults.bool(forKey: AuthPreferences.rewrapInProgressKey) else {
+        guard let privateKeyControlStore,
+              let journal = try? privateKeyControlStore.recoveryJournal(),
+              let targetMode = journal.rewrapTargetMode else {
             return nil
         }
-
-        // Read the target mode that was being switched to.
-        // If absent (legacy data or corruption), fall back to current mode.
-        let targetMode: AuthenticationMode
-        if let targetRaw = defaults.string(forKey: AuthPreferences.rewrapTargetModeKey),
-           let mode = AuthenticationMode(rawValue: targetRaw) {
-            targetMode = mode
-        } else {
-            targetMode = currentMode
-        }
-
-        let recoverySummary = migrationCoordinator.recoverInterruptedMigrations(
-            for: fingerprints,
-            seKeyAccessControl: nil
-        )
 
         // If the metadata set is empty but a recovery flag was present, we cannot
         // identify which bundles need recovery. Treat that as unrecoverable.
@@ -823,21 +815,93 @@ final class AuthenticationManager: AuthenticationEvaluable {
         if fingerprints.isEmpty {
             effectiveSummary = KeyMigrationRecoverySummary(outcomes: [.unrecoverable])
         } else {
-            effectiveSummary = recoverySummary
+            effectiveSummary = recoverInterruptedRewrapMigrations(
+                for: fingerprints,
+                phase: journal.rewrapPhase
+            )
         }
 
-        // Persist target mode only when promotion fully succeeded and no
-        // unrecoverable / retryable states remain.
-        if effectiveSummary.shouldUpdateAuthMode {
-            defaults.set(targetMode.rawValue, forKey: AuthPreferences.authModeKey)
+        // Persist target mode only when the selected phase strategy proves all
+        // recoverable bundles are aligned with the target ACL.
+        let shouldCompleteRewrap: Bool
+        if journal.rewrapPhase == .commitRequired {
+            shouldCompleteRewrap = effectiveSummary.isRewrapTargetCommitSafe
+        } else {
+            shouldCompleteRewrap = effectiveSummary.shouldUpdateAuthMode
         }
 
-        if effectiveSummary.shouldClearRecoveryFlag {
-            defaults.set(false, forKey: AuthPreferences.rewrapInProgressKey)
-            defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
+        if shouldCompleteRewrap {
+            do {
+                try privateKeyControlStore.completeRewrap(targetMode: targetMode)
+            } catch {
+                return effectiveSummary.appendingRetryableFailure()
+            }
+        } else if effectiveSummary.shouldClearRecoveryFlag {
+            try? privateKeyControlStore.clearRewrapJournal()
         }
 
         return effectiveSummary
+    }
+
+    private func recoverInterruptedRewrapMigrations(
+        for fingerprints: [String],
+        phase: PrivateKeyControlRewrapPhase?
+    ) -> KeyMigrationRecoverySummary {
+        guard phase == .commitRequired else {
+            return migrationCoordinator.recoverInterruptedMigrations(
+                for: fingerprints,
+                seKeyAccessControl: nil
+            )
+        }
+
+        return KeyMigrationRecoverySummary(
+            outcomes: fingerprints.map(recoverCommitRequiredRewrapMigration)
+        )
+    }
+
+    private func recoverCommitRequiredRewrapMigration(
+        for fingerprint: String
+    ) -> KeyMigrationRecoveryOutcome {
+        let permanentState = bundleStore.bundleState(
+            fingerprint: fingerprint,
+            namespace: .permanent
+        )
+        let pendingState = bundleStore.bundleState(
+            fingerprint: fingerprint,
+            namespace: .pending
+        )
+
+        switch (permanentState, pendingState) {
+        case (.complete, .missing):
+            return .noActionSafe
+        case (.complete, .complete), (.partial, .complete):
+            do {
+                try bundleStore.replacePermanentWithPending(
+                    fingerprint: fingerprint,
+                    seKeyAccessControl: nil
+                )
+                return .promotedPendingSafe
+            } catch {
+                return .retryableFailure
+            }
+        case (.missing, .complete):
+            do {
+                try bundleStore.promotePendingToPermanent(
+                    fingerprint: fingerprint,
+                    seKeyAccessControl: nil
+                )
+                return .promotedPendingSafe
+            } catch {
+                return .retryableFailure
+            }
+        case (.complete, .partial):
+            return .retryableFailure
+        case (.partial, .missing),
+             (.partial, .partial),
+             (.missing, .partial),
+             (.missing, .missing):
+            return .unrecoverable
+        }
     }
 
 }

@@ -1921,6 +1921,86 @@
         }
       }
     },
+    "error.privateKeyControl.invalidLegacyAuthMode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key protection settings need recovery."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保护设置需要恢复。"
+          }
+        }
+      }
+    },
+    "error.privateKeyControl.locked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key protection is locked. Unlock CypherAir and try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保护已锁定。请解锁 CypherAir 后重试。"
+          }
+        }
+      }
+    },
+    "error.privateKeyControl.missingStore" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key protection is not available."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保护不可用。"
+          }
+        }
+      }
+    },
+    "error.privateKeyControl.recoveryNeeded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key protection needs recovery before this operation can continue."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保护需要先恢复，才能继续此操作。"
+          }
+        }
+      }
+    },
+    "error.privateKeyControl.unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key protection is not available."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保护不可用。"
+          }
+        }
+      }
+    },
     "error.badSignature" : {
       "localizations" : {
         "en" : {
