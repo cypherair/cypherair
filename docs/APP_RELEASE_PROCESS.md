@@ -25,6 +25,8 @@ These modes are intentionally different.
 CypherAir's formal stable app-build release uses a unified GitHub release page.
 
 - Stable release tags use the format `cypherair-vX.Y.Z-buildN`.
+- Stable release tags must be SSH-signed annotated tags. Do not publish
+  lightweight or unsigned stable tags.
 - Pushing a stable tag triggers the stable build release workflow; manual runs can dry-run the same contract without publishing the immutable release.
 - Formal publishing is tag-first. Create and push the stable tag on the
   intended `main` commit; the tag push is the preferred trigger for the
@@ -49,6 +51,16 @@ Stable build binding and immutability rules:
 - Stable assets must bind to one exact marketing version, build number, release tag, and commit SHA.
 - App Store candidate archives must embed the exact stable release tag, stable release URL, and commit SHA in `SourceComplianceInfo.json`.
 - Stable assets are immutable once published. If the asset set is wrong, fix it with a new build number, new stable tag, and new release rather than replacing assets in place.
+
+Stable tag signing requirements:
+
+- Use Git SSH signing for stable tags. Configure `gpg.format=ssh` and
+  `user.signingkey` to an SSH public key trusted for release signing before
+  creating the tag.
+- Create stable tags with `git tag -s -m "<tag>" <tag> <main-commit>` so the
+  tag is annotated and signed. For example:
+  `git -c gpg.format=ssh tag -s -m "cypherair-vX.Y.Z-buildN" cypherair-vX.Y.Z-buildN <main-commit>`.
+- Verify the tag signature locally with `git tag -v <tag>` before pushing it.
 
 ## 3. Internal / Experimental TestFlight
 
@@ -123,8 +135,9 @@ This order is mandatory for App Store candidates:
 1. Finish the intended candidate code changes.
 2. Update the version and build number.
 3. Commit and push the candidate commit to `main`.
-4. Create the stable tag:
+4. Create the SSH-signed stable tag:
    - `cypherair-vX.Y.Z-buildN`
+   - annotated and SSH-signed; lightweight and unsigned tags are not allowed
    - push the tag to `origin`; that tag push triggers the formal stable release
      workflow
 5. Wait for the GitHub stable release workflow to complete successfully.
