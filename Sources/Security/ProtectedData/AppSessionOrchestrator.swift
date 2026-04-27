@@ -19,6 +19,7 @@ final class AppSessionOrchestrator {
     var isAuthenticating = false
     var authFailed = false
     private(set) var contentClearGeneration = 0
+    private(set) var postAuthenticationGeneration = 0
     private(set) var lastAuthenticationDate: Date?
 
     convenience init(
@@ -265,6 +266,7 @@ final class AppSessionOrchestrator {
                         borrowAuthenticatedContextForMetadataMigration(),
                         source
                     )
+                    recordPostAuthenticationCompletion(source: source)
                     authFailed = false
                     isPrivacyScreenBlurred = false
                     traceStore?.record(
@@ -404,6 +406,18 @@ final class AppSessionOrchestrator {
                 "reason": reason,
                 "hasContext": context == nil ? "false" : "true",
                 "replacedExisting": hadExistingContext ? "true" : "false"
+            ]
+        )
+    }
+
+    private func recordPostAuthenticationCompletion(source: String) {
+        postAuthenticationGeneration += 1
+        traceStore?.record(
+            category: .session,
+            name: "session.postAuthentication.complete",
+            metadata: [
+                "generation": String(postAuthenticationGeneration),
+                "source": source
             ]
         )
     }

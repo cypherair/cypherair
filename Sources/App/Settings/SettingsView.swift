@@ -70,6 +70,11 @@ struct MainWindowSettingsRootView: View {
                     await protectedSettingsHost?.invalidateForContentClearGeneration(generation)
                 }
             }
+            .onChange(of: appSessionOrchestrator.postAuthenticationGeneration) { _, generation in
+                Task {
+                    await protectedSettingsHost?.refreshAfterAppAuthenticationGeneration(generation)
+                }
+            }
     }
 }
 

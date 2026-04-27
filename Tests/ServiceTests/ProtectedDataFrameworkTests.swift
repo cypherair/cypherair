@@ -1547,6 +1547,89 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         handoffContext.invalidate()
     }
 
+    func test_handleResume_successfulAuthenticationIncrementsPostAuthenticationGenerationAfterHandler() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataPostAuthenticationGeneration")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-auth-generation",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let didRunPostAuthenticationHandler = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
+            postAuthenticationHandler: { _, _ in
+                await didRunPostAuthenticationHandler.setTrue()
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        XCTAssertEqual(orchestrator.postAuthenticationGeneration, 0)
+
+        let attemptedAuthentication = await orchestrator.handleResume(
+            localizedReason: "Successful privacy unlock should publish post-auth generation"
+        )
+        let didRunHandler = await didRunPostAuthenticationHandler.currentValue()
+
+        XCTAssertTrue(attemptedAuthentication)
+        XCTAssertTrue(didRunHandler)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 1)
+        XCTAssertEqual(orchestrator.postAuthenticationGeneration, 1)
+    }
+
+    func test_handleResume_failedAuthenticationDoesNotIncrementPostAuthenticationGeneration() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataFailedPostAuthenticationGeneration")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.failed-post-auth-generation",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let didRunPostAuthenticationHandler = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in .failed },
+            postAuthenticationHandler: { _, _ in
+                await didRunPostAuthenticationHandler.setTrue()
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        let attemptedAuthentication = await orchestrator.handleResume(
+            localizedReason: "Failed privacy unlock should not publish post-auth generation"
+        )
+        let didRunHandler = await didRunPostAuthenticationHandler.currentValue()
+
+        XCTAssertTrue(attemptedAuthentication)
+        XCTAssertFalse(didRunHandler)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 1)
+        XCTAssertEqual(orchestrator.postAuthenticationGeneration, 0)
+        XCTAssertTrue(orchestrator.authFailed)
+    }
+
     func test_appAccessPolicyChange_discardsPendingProtectedDataHandoffContext() async {
         let storageRoot = AppProtectedDataStorageRoot(
             baseDirectory: makeTemporaryDirectory("ProtectedDataPolicyChangeHandoff")
