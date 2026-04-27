@@ -161,6 +161,22 @@
         }
       }
     },
+    "addcontact.file.readFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not read key file"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取密钥文件"
+          }
+        }
+      }
+    },
     "addcontact.file.select" : {
       "localizations" : {
         "en" : {
@@ -433,6 +449,22 @@
         }
       }
     },
+    "app.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir"
+          }
+        }
+      }
+    },
     "auth.switchMode.reason" : {
       "localizations" : {
         "en" : {
@@ -445,6 +477,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "认证以更改安全模式"
+          }
+        }
+      }
+    },
+    "authShield.a11y.label" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authentication in progress"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在进行认证"
+          }
+        }
+      }
+    },
+    "authShield.a11y.value" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secure content is hidden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全内容已隐藏"
+          }
+        }
+      }
+    },
+    "authShield.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secure content is temporarily hidden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全内容已被暂时隐藏"
+          }
+        }
+      }
+    },
+    "authShield.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticating…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在认证…"
           }
         }
       }
@@ -785,6 +881,22 @@
         }
       }
     },
+    "common.exporting" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exporting..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在导出…"
+          }
+        }
+      }
+    },
     "common.no" : {
       "localizations" : {
         "en" : {
@@ -801,6 +913,22 @@
         }
       }
     },
+    "common.retry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
+          }
+        }
+      }
+    },
     "common.save" : {
       "localizations" : {
         "en" : {
@@ -813,6 +941,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存"
+          }
+        }
+      }
+    },
+    "common.working" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Working..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "处理中..."
           }
         }
       }
@@ -845,6 +989,726 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未知"
+          }
+        }
+      }
+    },
+    "contactcertsig.action.certify" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate Certification"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成认证签名"
+          }
+        }
+      }
+    },
+    "contactcertsig.action.verifyBinding" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verify User ID Binding"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证用户 ID 绑定"
+          }
+        }
+      }
+    },
+    "contactcertsig.action.verifyDirect" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verify Direct-Key Signature"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证直接密钥签名"
+          }
+        }
+      }
+    },
+    "contactcertsig.certificationKind" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certification Kind"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "认证类型"
+          }
+        }
+      }
+    },
+    "contactcertsig.clearImportedFile" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear imported signature file"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除已导入的签名文件"
+          }
+        }
+      }
+    },
+    "contactcertsig.contact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人"
+          }
+        }
+      }
+    },
+    "contactcertsig.import.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not read signature file."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取签名文件。"
+          }
+        }
+      }
+    },
+    "contactcertsig.importSignature" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Signature File"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入签名文件"
+          }
+        }
+      }
+    },
+    "contactcertsig.kind.casual" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Casual"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
+          }
+        }
+      }
+    },
+    "contactcertsig.kind.generic" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generic"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通用"
+          }
+        }
+      }
+    },
+    "contactcertsig.kind.persona" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Persona"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "身份"
+          }
+        }
+      }
+    },
+    "contactcertsig.kind.positive" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Positive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "积极"
+          }
+        }
+      }
+    },
+    "contactcertsig.loadFailed.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could Not Load Certificate Details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载证书详情"
+          }
+        }
+      }
+    },
+    "contactcertsig.loading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading certificate signature context..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载证书签名上下文..."
+          }
+        }
+      }
+    },
+    "contactcertsig.mode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模式"
+          }
+        }
+      }
+    },
+    "contactcertsig.mode.binding" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User ID Binding Verify"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户 ID 绑定验证"
+          }
+        }
+      }
+    },
+    "contactcertsig.mode.certify" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certify User ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "认证用户 ID"
+          }
+        }
+      }
+    },
+    "contactcertsig.mode.direct" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Direct Key Verify"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接密钥验证"
+          }
+        }
+      }
+    },
+    "contactcertsig.notFound.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact Not Found"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到联系人"
+          }
+        }
+      }
+    },
+    "contactcertsig.overview" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "概览"
+          }
+        }
+      }
+    },
+    "contactcertsig.result" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Result"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果"
+          }
+        }
+      }
+    },
+    "contactcertsig.result.kind" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certification Kind"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "认证类型"
+          }
+        }
+      }
+    },
+    "contactcertsig.result.signer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名者"
+          }
+        }
+      }
+    },
+    "contactcertsig.result.signingKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signing Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名密钥"
+          }
+        }
+      }
+    },
+    "contactcertsig.result.status" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "状态"
+          }
+        }
+      }
+    },
+    "contactcertsig.signature" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signature"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名"
+          }
+        }
+      }
+    },
+    "contactcertsig.signature.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports .asc and .sig signature files. Imported file bytes remain authoritative until the text is edited or cleared."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持 .asc 和 .sig 签名文件。在编辑或清除文本之前，导入文件的字节内容始终作为权威来源。"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名者"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.contact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No local keys are available to certify this contact."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可用于为此联系人认证的本地密钥。"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.footer.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create or import one of your own keys before generating a certification signature."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先创建或导入你自己的密钥，再生成认证签名。"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.ownKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的密钥"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.unknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知"
+          }
+        }
+      }
+    },
+    "contactcertsig.signer.verified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verified Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已验证联系人"
+          }
+        }
+      }
+    },
+    "contactcertsig.status.invalid" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无效"
+          }
+        }
+      }
+    },
+    "contactcertsig.status.signerMissing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer Missing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缺少签名者"
+          }
+        }
+      }
+    },
+    "contactcertsig.status.valid" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valid"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有效"
+          }
+        }
+      }
+    },
+    "contactcertsig.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate Signatures"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书签名"
+          }
+        }
+      }
+    },
+    "contactcertsig.userId.occurrence" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Occurrence %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 个"
+          }
+        }
+      }
+    },
+    "contactcertsig.userId.primary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primary"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主"
+          }
+        }
+      }
+    },
+    "contactcertsig.userId.revoked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revoked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已吊销"
+          }
+        }
+      }
+    },
+    "contactcertsig.userIds" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户 ID"
+          }
+        }
+      }
+    },
+    "contactcertsig.userIds.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No selectable User IDs were found."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到可供选择的用户 ID。"
+          }
+        }
+      }
+    },
+    "contactcertsig.userIds.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate User IDs remain separate choices. The occurrence number identifies the exact packet."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复的用户 ID 会分别保留为独立选项。出现序号用于标识确切的数据包。"
+          }
+        }
+      }
+    },
+    "contactdetail.actions" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作"
           }
         }
       }
@@ -909,6 +1773,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "可以向此联系人加密发送：是"
+          }
+        }
+      }
+    },
+    "contactdetail.certificateSignatures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate Signatures"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书签名"
           }
         }
       }
@@ -1009,6 +1889,22 @@
         }
       }
     },
+    "contactdetail.markVerified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I Verified This Fingerprint"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我已核对该指纹"
+          }
+        }
+      }
+    },
     "contactdetail.name" : {
       "localizations" : {
         "en" : {
@@ -1057,6 +1953,22 @@
         }
       }
     },
+    "contactdetail.shortKeyId" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short Key ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "短密钥 ID"
+          }
+        }
+      }
+    },
     "contactdetail.title" : {
       "localizations" : {
         "en" : {
@@ -1069,6 +1981,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "联系人"
+          }
+        }
+      }
+    },
+    "contactdetail.unverified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This contact has not been verified yet. Confirm the fingerprint with the key owner before relying on it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此联系人尚未验证。在依赖该联系人前，请先与密钥所有者核对指纹。"
           }
         }
       }
@@ -1121,6 +2049,22 @@
         }
       }
     },
+    "contacts.notFound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected contact could not be found."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到所选联系人。"
+          }
+        }
+      }
+    },
     "contacts.title" : {
       "localizations" : {
         "en" : {
@@ -1133,6 +2077,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通讯录"
+          }
+        }
+      }
+    },
+    "contacts.unverified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unverified"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未验证"
           }
         }
       }
@@ -1537,6 +2497,22 @@
         }
       }
     },
+    "encrypt.contact.unverified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unverified"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未验证"
+          }
+        }
+      }
+    },
     "encrypt.encryptToSelf" : {
       "localizations" : {
         "en" : {
@@ -1713,6 +2689,70 @@
         }
       }
     },
+    "encrypt.unverified.confirm.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypt Anyway"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍然加密"
+          }
+        }
+      }
+    },
+    "encrypt.unverified.confirm.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These recipients are not verified yet: %@. Continue only if you trust these keys."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些收件人尚未验证：%@。仅在你信任这些密钥时才继续。"
+          }
+        }
+      }
+    },
+    "encrypt.unverified.confirm.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Unverified Recipients?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要使用未验证的收件人吗？"
+          }
+        }
+      }
+    },
+    "encrypt.unverified.warning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One or more selected recipients are still unverified. Verify their fingerprints before relying on them."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个或多个已选收件人尚未验证。在信任这些密钥前，请先核对其指纹。"
+          }
+        }
+      }
+    },
     "error.aead" : {
       "localizations" : {
         "en" : {
@@ -1777,6 +2817,22 @@
         }
       }
     },
+    "error.auth.appAccessBiometricsUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometric authentication is currently unavailable. App Access Protection cannot use Biometrics Only until biometric authentication is restored."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生物认证当前不可用。生物认证恢复前，App 访问保护不能使用仅生物识别。"
+          }
+        }
+      }
+    },
     "error.auth.backupRequired" : {
       "localizations" : {
         "en" : {
@@ -1805,22 +2861,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "生物认证当前不可用。在高安全模式下，所有私钥操作将被阻止，直到生物认证恢复。"
-          }
-        }
-      }
-    },
-    "error.auth.appAccessBiometricsUnavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Biometric authentication is currently unavailable. App Access Protection cannot use Biometrics Only until biometric authentication is restored."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生物认证当前不可用。生物认证恢复前，App 访问保护不能使用仅生物识别。"
           }
         }
       }
@@ -1917,86 +2957,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "认证失败。"
-          }
-        }
-      }
-    },
-    "error.privateKeyControl.invalidLegacyAuthMode" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Private key protection settings need recovery."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私钥保护设置需要恢复。"
-          }
-        }
-      }
-    },
-    "error.privateKeyControl.locked" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Private key protection is locked. Unlock CypherAir and try again."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私钥保护已锁定。请解锁 CypherAir 后重试。"
-          }
-        }
-      }
-    },
-    "error.privateKeyControl.missingStore" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Private key protection is not available."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私钥保护不可用。"
-          }
-        }
-      }
-    },
-    "error.privateKeyControl.recoveryNeeded" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Private key protection needs recovery before this operation can continue."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私钥保护需要先恢复，才能继续此操作。"
-          }
-        }
-      }
-    },
-    "error.privateKeyControl.unavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Private key protection is not available."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私钥保护不可用。"
           }
         }
       }
@@ -2129,6 +3089,22 @@
         }
       }
     },
+    "error.generic" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An error occurred."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发生错误。"
+          }
+        }
+      }
+    },
     "error.insufficientDiskSpace" : {
       "localizations" : {
         "en" : {
@@ -2173,70 +3149,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "发生内部错误：%@"
-          }
-        }
-      }
-    },
-    "error.protectedData.domainIdentifierEncoding" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A ProtectedData domain identifier could not be encoded."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法编码 ProtectedData 域标识符。"
-          }
-        }
-      }
-    },
-    "error.protectedData.randomFailure" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A secure random-number operation failed while preparing protected app data."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "准备受保护应用数据时，安全随机数操作失败。"
-          }
-        }
-      }
-    },
-    "error.protectedData.rootSecretMigrationVerification" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The protected app data root secret could not be verified after migration."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "迁移后无法验证受保护应用数据根密钥。"
-          }
-        }
-      }
-    },
-    "error.protectedData.rootSecretVerification" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The protected app data root secret could not be verified after updating its access policy."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更新访问策略后无法验证受保护应用数据根密钥。"
           }
         }
       }
@@ -2413,6 +3325,151 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "操作已取消。"
+          }
+        }
+      }
+    },
+    "error.privateKeyControl.invalidLegacyAuthMode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key protection settings need recovery."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保护设置需要恢复。"
+          }
+        }
+      }
+    },
+    "error.privateKeyControl.locked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key protection is locked. Unlock CypherAir and try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保护已锁定。请解锁 CypherAir 后重试。"
+          }
+        }
+      }
+    },
+    "error.privateKeyControl.missingStore" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key protection is not available."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保护不可用。"
+          }
+        }
+      }
+    },
+    "error.privateKeyControl.recoveryNeeded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key protection needs recovery before this operation can continue."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保护需要先恢复，才能继续此操作。"
+          }
+        }
+      }
+    },
+    "error.privateKeyControl.unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key protection is not available."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保护不可用。"
+          }
+        }
+      }
+    },
+    "error.protectedData.domainIdentifierEncoding" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A ProtectedData domain identifier could not be encoded."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法编码 ProtectedData 域标识符。"
+          }
+        }
+      }
+    },
+    "error.protectedData.randomFailure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A secure random-number operation failed while preparing protected app data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准备受保护应用数据时，安全随机数操作失败。"
+          }
+        }
+      }
+    },
+    "error.protectedData.rootSecretMigrationVerification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The protected app data root secret could not be verified after migration."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "迁移后无法验证受保护应用数据根密钥。"
+          }
+        }
+      }
+    },
+    "error.protectedData.rootSecretVerification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The protected app data root secret could not be verified after updating its access policy."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新访问策略后无法验证受保护应用数据根密钥。"
           }
         }
       }
@@ -2977,6 +4034,38 @@
         }
       }
     },
+    "guidedTutorial.blocked.certificateSignatures.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate signature workflows are unavailable inside the tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书签名工作流在教程沙箱中不可用。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.blocked.certificateSignatures.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate Signatures Unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法使用证书签名"
+          }
+        }
+      }
+    },
     "guidedTutorial.blocked.importKey.body" : {
       "localizations" : {
         "en" : {
@@ -3005,38 +4094,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法导入私钥"
-          }
-        }
-      }
-    },
-    "guidedTutorial.blocked.selfTest.body" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Self-Test is outside the guided tutorial path and is not available in the sandbox workspace."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自检不属于引导教程路径，因此在沙箱工作区中不可用。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.blocked.selfTest.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Self-Test Unavailable"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法使用自检"
           }
         }
       }
@@ -3073,34 +4130,34 @@
         }
       }
     },
-    "guidedTutorial.blocked.certificateSignatures.body" : {
+    "guidedTutorial.blocked.selfTest.body" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Certificate signature workflows are unavailable inside the tutorial sandbox."
+            "value" : "Self-Test is outside the guided tutorial path and is not available in the sandbox workspace."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "证书签名工作流在教程沙箱中不可用。"
+            "value" : "自检不属于引导教程路径，因此在沙箱工作区中不可用。"
           }
         }
       }
     },
-    "guidedTutorial.blocked.certificateSignatures.title" : {
+    "guidedTutorial.blocked.selfTest.title" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Certificate Signatures Unavailable"
+            "value" : "Self-Test Unavailable"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法使用证书签名"
+            "value" : "无法使用自检"
           }
         }
       }
@@ -4145,6 +5202,22 @@
         }
       }
     },
+    "guidedTutorial.restricted.certificateSignatures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate signature workflows are unavailable inside the tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书签名工作流在教程沙箱中不可用。"
+          }
+        }
+      }
+    },
     "guidedTutorial.restricted.detachedVerify" : {
       "localizations" : {
         "en" : {
@@ -4177,6 +5250,22 @@
         }
       }
     },
+    "guidedTutorial.restricted.selectiveRevocation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selective revocation exports are unavailable inside the tutorial sandbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择性吊销导出在教程沙箱中不可用。"
+          }
+        }
+      }
+    },
     "guidedTutorial.restricted.signResult" : {
       "localizations" : {
         "en" : {
@@ -4205,38 +5294,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在教程沙箱中无法导入真实文件。请直接粘贴文本以继续安全探索这个页面。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.restricted.certificateSignatures" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certificate signature workflows are unavailable inside the tutorial sandbox."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "证书签名工作流在教程沙箱中不可用。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.restricted.selectiveRevocation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selective revocation exports are unavailable inside the tutorial sandbox."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择性吊销导出在教程沙箱中不可用。"
           }
         }
       }
@@ -4961,6 +6018,22 @@
         }
       }
     },
+    "import.file.readFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not read key file"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取密钥文件"
+          }
+        }
+      }
+    },
     "import.fingerprint" : {
       "localizations" : {
         "en" : {
@@ -5681,6 +6754,22 @@
         }
       }
     },
+    "keydetail.selectiveRevocation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selective Revocation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择性吊销"
+          }
+        }
+      }
+    },
     "keydetail.setDefault" : {
       "localizations" : {
         "en" : {
@@ -5789,390 +6878,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密钥版本"
-          }
-        }
-      }
-    },
-    "common.exporting" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exporting..."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在导出…"
-          }
-        }
-      }
-    },
-    "common.retry" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retry"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重试"
-          }
-        }
-      }
-    },
-    "error.generic" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "An error occurred."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发生错误。"
-          }
-        }
-      }
-    },
-    "keydetail.selectiveRevocation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selective Revocation"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择性吊销"
-          }
-        }
-      }
-    },
-    "selectiverevocation.explanation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Export a revocation signature for one subkey or one User ID. This does not modify the stored key and does not save a new revocation artifact in CypherAir."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "为一个子密钥或一个用户 ID 导出吊销签名。这不会修改已存储的密钥，也不会在 CypherAir 中保存新的吊销制品。"
-          }
-        }
-      }
-    },
-    "selectiverevocation.key" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密钥"
-          }
-        }
-      }
-    },
-    "selectiverevocation.loadFailed.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could Not Load Revocation Targets"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法载入吊销目标"
-          }
-        }
-      }
-    },
-    "selectiverevocation.loading" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading selectable revocation targets..."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在载入可选吊销目标…"
-          }
-        }
-      }
-    },
-    "selectiverevocation.overview" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Overview"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "概览"
-          }
-        }
-      }
-    },
-    "selectiverevocation.status.encryptCapable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encrypt-capable"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可用于加密"
-          }
-        }
-      }
-    },
-    "selectiverevocation.status.expired" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Expired"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已过期"
-          }
-        }
-      }
-    },
-    "selectiverevocation.status.primary" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Primary"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "主要"
-          }
-        }
-      }
-    },
-    "selectiverevocation.status.revoked" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revoked"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已吊销"
-          }
-        }
-      }
-    },
-    "selectiverevocation.subkey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Subkey"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "子密钥"
-          }
-        }
-      }
-    },
-    "selectiverevocation.subkey.export" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Export Subkey Revocation"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导出子密钥吊销"
-          }
-        }
-      }
-    },
-    "selectiverevocation.subkeys" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Subkey Revocation"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "子密钥吊销"
-          }
-        }
-      }
-    },
-    "selectiverevocation.subkeys.empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No selectable subkeys were found."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到可选子密钥。"
-          }
-        }
-      }
-    },
-    "selectiverevocation.subkeys.footer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose exactly one discovered subkey. Selector values come from the certificate, not from display text."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请选择一个发现到的子密钥。选择器值来自证书，而不是显示文本。"
-          }
-        }
-      }
-    },
-    "selectiverevocation.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selective Revocation"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择性吊销"
-          }
-        }
-      }
-    },
-    "selectiverevocation.userId.export" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Export User ID Revocation"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导出用户 ID 吊销"
-          }
-        }
-      }
-    },
-    "selectiverevocation.userId.occurrence" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Occurrence %lld"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %lld 个"
-          }
-        }
-      }
-    },
-    "selectiverevocation.userIds" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "User ID Revocation"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用户 ID 吊销"
-          }
-        }
-      }
-    },
-    "selectiverevocation.userIds.empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No selectable User IDs were found."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到可选用户 ID。"
-          }
-        }
-      }
-    },
-    "selectiverevocation.userIds.footer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Duplicate User IDs remain separate choices. The occurrence number identifies the exact packet selected for revocation."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重复的用户 ID 会保留为独立选项。出现序号用于标识要吊销的具体数据包。"
           }
         }
       }
@@ -7217,70 +7922,6 @@
         }
       }
     },
-    "authShield.a11y.label" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authentication in progress"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在进行认证"
-          }
-        }
-      }
-    },
-    "authShield.a11y.value" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Secure content is hidden"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安全内容已隐藏"
-          }
-        }
-      }
-    },
-    "authShield.subtitle" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Secure content is temporarily hidden"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安全内容已被暂时隐藏"
-          }
-        }
-      }
-    },
-    "authShield.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authenticating…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在认证…"
-          }
-        }
-      }
-    },
     "profile.advanced.description" : {
       "localizations" : {
         "en" : {
@@ -7377,6 +8018,310 @@
         }
       }
     },
+    "protectedData.postUnlock.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to unlock protected app data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请验证身份以解锁受保护的应用数据。"
+          }
+        }
+      }
+    },
+    "protectedSettings.clipboard.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to access the protected clipboard preference."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请验证身份以访问受保护的剪贴板偏好设置。"
+          }
+        }
+      }
+    },
+    "protectedSettings.frameworkUnavailable.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected preferences are unavailable because the protected-data framework is not ready."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由于受保护数据框架尚未就绪，受保护的偏好设置当前不可用。"
+          }
+        }
+      }
+    },
+    "protectedSettings.loading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading protected preferences..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载受保护的偏好设置..."
+          }
+        }
+      }
+    },
+    "protectedSettings.locked.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to view and change this protected preference."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先验证身份以查看和更改此受保护偏好设置。"
+          }
+        }
+      }
+    },
+    "protectedSettings.pending.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected preferences have pending recovery work and are temporarily unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的偏好设置仍有待恢复的工作，暂时不可用。"
+          }
+        }
+      }
+    },
+    "protectedSettings.pendingReset.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected preferences have unfinished setup work that cannot continue automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的偏好设置存在未完成的初始化工作，当前无法自动继续。"
+          }
+        }
+      }
+    },
+    "protectedSettings.proxy.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected preferences can only be viewed and changed from the main window."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的偏好设置只能在主窗口中查看和修改。"
+          }
+        }
+      }
+    },
+    "protectedSettings.proxy.openMainWindow" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Main Window"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开主窗口"
+          }
+        }
+      }
+    },
+    "protectedSettings.recovery.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected preferences could not be opened safely and may need recovery."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的偏好设置无法安全打开，可能需要恢复。"
+          }
+        }
+      }
+    },
+    "protectedSettings.reset.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Protected Preferences"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置受保护的偏好设置"
+          }
+        }
+      }
+    },
+    "protectedSettings.reset.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Preferences"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置偏好设置"
+          }
+        }
+      }
+    },
+    "protectedSettings.reset.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This will delete and rebuild the protected preferences domain. Only protected preferences will be reset."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这将删除并重建受保护的偏好设置域。只有受保护的偏好设置会被重置。"
+          }
+        }
+      }
+    },
+    "protectedSettings.reset.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Protected Preferences?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置受保护的偏好设置？"
+          }
+        }
+      }
+    },
+    "protectedSettings.retry.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry Recovery"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试恢复"
+          }
+        }
+      }
+    },
+    "protectedSettings.section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected Preferences"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的偏好设置"
+          }
+        }
+      }
+    },
+    "protectedSettings.tutorial.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tutorial sandbox never reads or writes your real protected preferences."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "教程沙盒不会读取或写入你的真实受保护偏好设置。"
+          }
+        }
+      }
+    },
+    "protectedSettings.unlock" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁"
+          }
+        }
+      }
+    },
+    "protectedSettings.unlock.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to access protected preferences."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请验证身份以访问受保护的偏好设置。"
+          }
+        }
+      }
+    },
     "qr.accessibility" : {
       "localizations" : {
         "en" : {
@@ -7421,6 +8366,326 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我的公钥"
+          }
+        }
+      }
+    },
+    "selectiverevocation.explanation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export a revocation signature for one subkey or one User ID. This does not modify the stored key and does not save a new revocation artifact in CypherAir."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为一个子密钥或一个用户 ID 导出吊销签名。这不会修改已存储的密钥，也不会在 CypherAir 中保存新的吊销制品。"
+          }
+        }
+      }
+    },
+    "selectiverevocation.key" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥"
+          }
+        }
+      }
+    },
+    "selectiverevocation.loadFailed.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could Not Load Revocation Targets"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法载入吊销目标"
+          }
+        }
+      }
+    },
+    "selectiverevocation.loading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading selectable revocation targets..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在载入可选吊销目标…"
+          }
+        }
+      }
+    },
+    "selectiverevocation.overview" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "概览"
+          }
+        }
+      }
+    },
+    "selectiverevocation.status.encryptCapable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypt-capable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可用于加密"
+          }
+        }
+      }
+    },
+    "selectiverevocation.status.expired" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expired"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已过期"
+          }
+        }
+      }
+    },
+    "selectiverevocation.status.primary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primary"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主要"
+          }
+        }
+      }
+    },
+    "selectiverevocation.status.revoked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revoked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已吊销"
+          }
+        }
+      }
+    },
+    "selectiverevocation.subkey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subkey"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "子密钥"
+          }
+        }
+      }
+    },
+    "selectiverevocation.subkey.export" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Subkey Revocation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出子密钥吊销"
+          }
+        }
+      }
+    },
+    "selectiverevocation.subkeys" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subkey Revocation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "子密钥吊销"
+          }
+        }
+      }
+    },
+    "selectiverevocation.subkeys.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No selectable subkeys were found."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到可选子密钥。"
+          }
+        }
+      }
+    },
+    "selectiverevocation.subkeys.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose exactly one discovered subkey. Selector values come from the certificate, not from display text."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择一个发现到的子密钥。选择器值来自证书，而不是显示文本。"
+          }
+        }
+      }
+    },
+    "selectiverevocation.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selective Revocation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择性吊销"
+          }
+        }
+      }
+    },
+    "selectiverevocation.userId.export" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export User ID Revocation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出用户 ID 吊销"
+          }
+        }
+      }
+    },
+    "selectiverevocation.userId.occurrence" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Occurrence %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 个"
+          }
+        }
+      }
+    },
+    "selectiverevocation.userIds" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User ID Revocation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户 ID 吊销"
+          }
+        }
+      }
+    },
+    "selectiverevocation.userIds.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No selectable User IDs were found."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到可选用户 ID。"
+          }
+        }
+      }
+    },
+    "selectiverevocation.userIds.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate User IDs remain separate choices. The occurrence number identifies the exact packet selected for revocation."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复的用户 ID 会保留为独立选项。出现序号用于标识要吊销的具体数据包。"
           }
         }
       }
@@ -7793,274 +9058,66 @@
         }
       }
     },
-    "sourceCompliance.commit" : {
+    "settings.appAccessPolicy" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Commit"
+            "value" : "App Access Protection"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "提交"
+            "value" : "App 访问保护"
           }
         }
       }
     },
-    "sourceCompliance.copied" : {
+    "settings.appAccessPolicy.biometricsOnly" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copied"
+            "value" : "Biometrics Only"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已复制"
+            "value" : "仅生物识别"
           }
         }
       }
     },
-    "sourceCompliance.copy" : {
+    "settings.appAccessPolicy.change.reason" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copy Release URL"
+            "value" : "Authenticate to change App Access Protection."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "复制发布链接"
+            "value" : "认证以更改 App 访问保护。"
           }
         }
       }
     },
-    "sourceCompliance.error.fileDecoding" : {
+    "settings.appAccessPolicy.userPresence" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Source compliance information is invalid."
+            "value" : "User Presence"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "源码与合规信息无效。"
-          }
-        }
-      }
-    },
-    "sourceCompliance.error.fileMissing" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Source compliance information is missing."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "源码与合规信息缺失。"
-          }
-        }
-      }
-    },
-    "sourceCompliance.error.fileUnreadable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Source compliance information could not be read."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "源码与合规信息无法读取。"
-          }
-        }
-      }
-    },
-    "sourceCompliance.fulfillmentBasis" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fulfillment Basis"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "履约依据"
-          }
-        }
-      }
-    },
-    "sourceCompliance.license" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "First-Party License"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第一方许可证"
-          }
-        }
-      }
-    },
-    "sourceCompliance.localBuild" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unavailable for local or internal builds"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地或内部构建不可用"
-          }
-        }
-      }
-    },
-    "sourceCompliance.releaseTag" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Release Tag"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发布标签"
-          }
-        }
-      }
-    },
-    "sourceCompliance.releaseURL" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Release URL"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发布链接"
-          }
-        }
-      }
-    },
-    "sourceCompliance.section.build" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Build"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "构建"
-          }
-        }
-      }
-    },
-    "sourceCompliance.section.dependencies" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key Dependencies"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关键依赖"
-          }
-        }
-      }
-    },
-    "sourceCompliance.section.release" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stable Release"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "稳定版发布"
-          }
-        }
-      }
-    },
-    "sourceCompliance.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Source & Compliance"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "源码与合规"
-          }
-        }
-      }
-    },
-    "sourceCompliance.unavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unavailable"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不可用"
-          }
-        }
-      }
-    },
-    "sourceCompliance.version" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Version"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "版本"
+            "value" : "用户在场"
           }
         }
       }
@@ -8177,6 +9234,22 @@
         }
       }
     },
+    "settings.appIcon.visionosUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps built natively with the visionOS SDK do not support changing alternate app icons at runtime."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 visionOS SDK 原生构建的 App 不支持在运行时更换备用 App 图标。"
+          }
+        }
+      }
+    },
     "settings.authMode" : {
       "localizations" : {
         "en" : {
@@ -8189,70 +9262,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "私钥保护"
-          }
-        }
-      }
-    },
-    "settings.appAccessPolicy" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App Access Protection"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App 访问保护"
-          }
-        }
-      }
-    },
-    "settings.appAccessPolicy.biometricsOnly" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Biometrics Only"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仅生物识别"
-          }
-        }
-      }
-    },
-    "settings.appAccessPolicy.change.reason" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authenticate to change App Access Protection."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "认证以更改 App 访问保护。"
-          }
-        }
-      }
-    },
-    "settings.appAccessPolicy.userPresence" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "User Presence"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用户在场"
           }
         }
       }
@@ -8305,306 +9314,18 @@
         }
       }
     },
-    "protectedSettings.clipboard.reason" : {
+    "settings.dangerZone" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Authenticate to access the protected clipboard preference."
+            "value" : "Danger Zone"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请验证身份以访问受保护的剪贴板偏好设置。"
-          }
-        }
-      }
-    },
-    "protectedSettings.frameworkUnavailable.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protected preferences are unavailable because the protected-data framework is not ready."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "由于受保护数据框架尚未就绪，受保护的偏好设置当前不可用。"
-          }
-        }
-      }
-    },
-    "protectedSettings.loading" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading protected preferences..."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在加载受保护的偏好设置..."
-          }
-        }
-      }
-    },
-    "protectedSettings.locked.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authenticate to view and change this protected preference."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请先验证身份以查看和更改此受保护偏好设置。"
-          }
-        }
-      }
-    },
-    "protectedSettings.pending.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protected preferences have pending recovery work and are temporarily unavailable."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "受保护的偏好设置仍有待恢复的工作，暂时不可用。"
-          }
-        }
-      }
-    },
-    "protectedSettings.pendingReset.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protected preferences have unfinished setup work that cannot continue automatically."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "受保护的偏好设置存在未完成的初始化工作，当前无法自动继续。"
-          }
-        }
-      }
-    },
-    "protectedSettings.proxy.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protected preferences can only be viewed and changed from the main window."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "受保护的偏好设置只能在主窗口中查看和修改。"
-          }
-        }
-      }
-    },
-    "protectedSettings.proxy.openMainWindow" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Main Window"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开主窗口"
-          }
-        }
-      }
-    },
-    "protectedSettings.retry.action" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retry Recovery"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重试恢复"
-          }
-        }
-      }
-    },
-    "protectedSettings.recovery.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protected preferences could not be opened safely and may need recovery."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "受保护的偏好设置无法安全打开，可能需要恢复。"
-          }
-        }
-      }
-    },
-    "protectedSettings.reset.action" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset Protected Preferences"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重置受保护的偏好设置"
-          }
-        }
-      }
-    },
-    "protectedSettings.reset.confirm" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset Preferences"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重置偏好设置"
-          }
-        }
-      }
-    },
-    "protectedSettings.reset.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This will delete and rebuild the protected preferences domain. Only protected preferences will be reset."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这将删除并重建受保护的偏好设置域。只有受保护的偏好设置会被重置。"
-          }
-        }
-      }
-    },
-    "protectedSettings.reset.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset Protected Preferences?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重置受保护的偏好设置？"
-          }
-        }
-      }
-    },
-    "protectedSettings.section" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protected Preferences"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "受保护的偏好设置"
-          }
-        }
-      }
-    },
-    "protectedSettings.tutorial.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The tutorial sandbox never reads or writes your real protected preferences."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "教程沙盒不会读取或写入你的真实受保护偏好设置。"
-          }
-        }
-      }
-    },
-    "protectedData.postUnlock.reason" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authenticate to unlock protected app data."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请验证身份以解锁受保护的应用数据。"
-          }
-        }
-      }
-    },
-    "protectedSettings.unlock" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unlock"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "解锁"
-          }
-        }
-      }
-    },
-    "protectedSettings.unlock.reason" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authenticate to access protected preferences."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请验证身份以访问受保护的偏好设置。"
+            "value" : "危险区"
           }
         }
       }
@@ -8829,22 +9550,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "切换到标准模式"
-          }
-        }
-      }
-    },
-    "settings.dangerZone" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Danger Zone"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "危险区"
           }
         }
       }
@@ -9425,6 +10130,102 @@
         }
       }
     },
+    "signature.fingerprint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fingerprint"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指纹"
+          }
+        }
+      }
+    },
+    "signature.identity.contact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人"
+          }
+        }
+      }
+    },
+    "signature.identity.contact.unverified" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unverified Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未验证联系人"
+          }
+        }
+      }
+    },
+    "signature.identity.contact.unverified.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This signer matches a contact in your address book, but you have not verified that contact's fingerprint yet."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该签名者与你通讯录中的联系人匹配，但你尚未验证该联系人的指纹。"
+          }
+        }
+      }
+    },
+    "signature.identity.ownKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的密钥"
+          }
+        }
+      }
+    },
+    "signature.identity.unknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown Signer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知签名者"
+          }
+        }
+      }
+    },
     "signature.none" : {
       "localizations" : {
         "en" : {
@@ -9437,6 +10238,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此消息未签名"
+          }
+        }
+      }
+    },
+    "signature.shortKeyId" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short Key ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "短密钥 ID"
           }
         }
       }
@@ -9501,6 +10318,342 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "来自 %@ 的有效签名"
+          }
+        }
+      }
+    },
+    "sourceCompliance.commit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提交"
+          }
+        }
+      }
+    },
+    "sourceCompliance.copied" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已复制"
+          }
+        }
+      }
+    },
+    "sourceCompliance.copy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Release URL"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制发布链接"
+          }
+        }
+      }
+    },
+    "sourceCompliance.error.fileDecoding" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source compliance information is invalid."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "源码与合规信息无效。"
+          }
+        }
+      }
+    },
+    "sourceCompliance.error.fileMissing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source compliance information is missing."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "源码与合规信息缺失。"
+          }
+        }
+      }
+    },
+    "sourceCompliance.error.fileUnreadable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source compliance information could not be read."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "源码与合规信息无法读取。"
+          }
+        }
+      }
+    },
+    "sourceCompliance.fulfillmentBasis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fulfillment Basis"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "履约依据"
+          }
+        }
+      }
+    },
+    "sourceCompliance.license" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First-Party License"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第一方许可证"
+          }
+        }
+      }
+    },
+    "sourceCompliance.localBuild" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable for local or internal builds"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地或内部构建不可用"
+          }
+        }
+      }
+    },
+    "sourceCompliance.releaseTag" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Release Tag"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发布标签"
+          }
+        }
+      }
+    },
+    "sourceCompliance.releaseURL" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Release URL"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发布链接"
+          }
+        }
+      }
+    },
+    "sourceCompliance.section.build" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Build"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "构建"
+          }
+        }
+      }
+    },
+    "sourceCompliance.section.dependencies" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Dependencies"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关键依赖"
+          }
+        }
+      }
+    },
+    "sourceCompliance.section.release" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stable Release"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稳定版发布"
+          }
+        }
+      }
+    },
+    "sourceCompliance.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source & Compliance"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "源码与合规"
+          }
+        }
+      }
+    },
+    "sourceCompliance.unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不可用"
+          }
+        }
+      }
+    },
+    "sourceCompliance.version" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本"
+          }
+        }
+      }
+    },
+    "startup.protectedData.pendingRecovery" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected app data has pending recovery work that must complete before protected content can open."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的应用数据仍有待完成的恢复工作，必须先完成恢复后才能打开受保护内容。"
+          }
+        }
+      }
+    },
+    "startup.protectedData.recoveryNeeded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected app data is unavailable and may require recovery."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的应用数据当前不可用，可能需要恢复。"
+          }
+        }
+      }
+    },
+    "startup.recovery.retryable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A previous secure key migration could not be fully recovered. CypherAir will retry recovery on next launch."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先前的安全密钥迁移未能完全恢复。CypherAir 将在下次启动时重试恢复。"
+          }
+        }
+      }
+    },
+    "startup.recovery.unrecoverable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A previous secure key migration could not be recovered. Restore from backup if private-key operations fail."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先前的安全密钥迁移无法恢复。如果私钥操作失败，请从备份恢复。"
           }
         }
       }
@@ -10049,22 +11202,6 @@
         }
       }
     },
-    "verify.signer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signer"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "签名者"
-          }
-        }
-      }
-    },
     "verify.selectOriginal" : {
       "localizations" : {
         "en" : {
@@ -10113,6 +11250,22 @@
         }
       }
     },
+    "verify.signer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名者"
+          }
+        }
+      }
+    },
     "verify.title" : {
       "localizations" : {
         "en" : {
@@ -10141,1158 +11294,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "验证中…"
-          }
-        }
-      }
-    },
-    "addcontact.file.readFailed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could not read key file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法读取密钥文件"
-          }
-        }
-      }
-    },
-    "app.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir"
-          }
-        }
-      }
-    },
-    "common.working" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Working..."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "处理中..."
-          }
-        }
-      }
-    },
-    "contactcertsig.action.certify" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate Certification"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成认证签名"
-          }
-        }
-      }
-    },
-    "contactcertsig.action.verifyBinding" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verify User ID Binding"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "验证用户 ID 绑定"
-          }
-        }
-      }
-    },
-    "contactcertsig.action.verifyDirect" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verify Direct-Key Signature"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "验证直接密钥签名"
-          }
-        }
-      }
-    },
-    "contactcertsig.certificationKind" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certification Kind"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "认证类型"
-          }
-        }
-      }
-    },
-    "contactcertsig.clearImportedFile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clear imported signature file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "清除已导入的签名文件"
-          }
-        }
-      }
-    },
-    "contactcertsig.contact" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "联系人"
-          }
-        }
-      }
-    },
-    "contactcertsig.import.failed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could not read signature file."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法读取签名文件。"
-          }
-        }
-      }
-    },
-    "contactcertsig.importSignature" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import Signature File"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导入签名文件"
-          }
-        }
-      }
-    },
-    "contactcertsig.kind.casual" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Casual"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一般"
-          }
-        }
-      }
-    },
-    "contactcertsig.kind.generic" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generic"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通用"
-          }
-        }
-      }
-    },
-    "contactcertsig.kind.persona" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Persona"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "身份"
-          }
-        }
-      }
-    },
-    "contactcertsig.kind.positive" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Positive"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "积极"
-          }
-        }
-      }
-    },
-    "contactcertsig.loadFailed.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could Not Load Certificate Details"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法加载证书详情"
-          }
-        }
-      }
-    },
-    "contactcertsig.loading" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading certificate signature context..."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在加载证书签名上下文..."
-          }
-        }
-      }
-    },
-    "contactcertsig.mode" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mode"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "模式"
-          }
-        }
-      }
-    },
-    "contactcertsig.mode.binding" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "User ID Binding Verify"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用户 ID 绑定验证"
-          }
-        }
-      }
-    },
-    "contactcertsig.mode.certify" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certify User ID"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "认证用户 ID"
-          }
-        }
-      }
-    },
-    "contactcertsig.mode.direct" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Direct Key Verify"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "直接密钥验证"
-          }
-        }
-      }
-    },
-    "contactcertsig.notFound.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact Not Found"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "找不到联系人"
-          }
-        }
-      }
-    },
-    "contactcertsig.overview" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Overview"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "概览"
-          }
-        }
-      }
-    },
-    "contactcertsig.result" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Result"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "结果"
-          }
-        }
-      }
-    },
-    "contactcertsig.result.kind" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certification Kind"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "认证类型"
-          }
-        }
-      }
-    },
-    "contactcertsig.result.signer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signer"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "签名者"
-          }
-        }
-      }
-    },
-    "contactcertsig.result.signingKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signing Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "签名密钥"
-          }
-        }
-      }
-    },
-    "contactcertsig.result.status" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Status"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "状态"
-          }
-        }
-      }
-    },
-    "contactcertsig.signature" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signature"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "签名"
-          }
-        }
-      }
-    },
-    "contactcertsig.signature.footer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supports .asc and .sig signature files. Imported file bytes remain authoritative until the text is edited or cleared."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "支持 .asc 和 .sig 签名文件。在编辑或清除文本之前，导入文件的字节内容始终作为权威来源。"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signer"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "签名者"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer.contact" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "联系人"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer.empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No local keys are available to certify this contact."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有可用于为此联系人认证的本地密钥。"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer.footer.empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create or import one of your own keys before generating a certification signature."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请先创建或导入你自己的密钥，再生成认证签名。"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer.ownKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的密钥"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer.unknown" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unknown"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未知"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer.verified" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verified Contact"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已验证联系人"
-          }
-        }
-      }
-    },
-    "contactcertsig.status.invalid" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Invalid"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无效"
-          }
-        }
-      }
-    },
-    "contactcertsig.status.signerMissing" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signer Missing"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "缺少签名者"
-          }
-        }
-      }
-    },
-    "contactcertsig.status.valid" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valid"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "有效"
-          }
-        }
-      }
-    },
-    "contactcertsig.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certificate Signatures"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "证书签名"
-          }
-        }
-      }
-    },
-    "contactcertsig.userId.occurrence" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Occurrence %lld"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %lld 个"
-          }
-        }
-      }
-    },
-    "contactcertsig.userId.primary" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Primary"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "主"
-          }
-        }
-      }
-    },
-    "contactcertsig.userId.revoked" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revoked"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已吊销"
-          }
-        }
-      }
-    },
-    "contactcertsig.userIds" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "User ID"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用户 ID"
-          }
-        }
-      }
-    },
-    "contactcertsig.userIds.empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No selectable User IDs were found."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到可供选择的用户 ID。"
-          }
-        }
-      }
-    },
-    "contactcertsig.userIds.footer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Duplicate User IDs remain separate choices. The occurrence number identifies the exact packet."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重复的用户 ID 会分别保留为独立选项。出现序号用于标识确切的数据包。"
-          }
-        }
-      }
-    },
-    "contactdetail.actions" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Actions"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "操作"
-          }
-        }
-      }
-    },
-    "contactdetail.certificateSignatures" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certificate Signatures"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "证书签名"
-          }
-        }
-      }
-    },
-    "contactdetail.markVerified" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I Verified This Fingerprint"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "我已核对该指纹"
-          }
-        }
-      }
-    },
-    "contactdetail.shortKeyId" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Short Key ID"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "短密钥 ID"
-          }
-        }
-      }
-    },
-    "contactdetail.unverified" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This contact has not been verified yet. Confirm the fingerprint with the key owner before relying on it."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此联系人尚未验证。在依赖该联系人前，请先与密钥所有者核对指纹。"
-          }
-        }
-      }
-    },
-    "contacts.notFound" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The selected contact could not be found."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "找不到所选联系人。"
-          }
-        }
-      }
-    },
-    "contacts.unverified" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unverified"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未验证"
-          }
-        }
-      }
-    },
-    "encrypt.contact.unverified" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unverified"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未验证"
-          }
-        }
-      }
-    },
-    "encrypt.unverified.confirm.action" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encrypt Anyway"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仍然加密"
-          }
-        }
-      }
-    },
-    "encrypt.unverified.confirm.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "These recipients are not verified yet: %@. Continue only if you trust these keys."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这些收件人尚未验证：%@。仅在你信任这些密钥时才继续。"
-          }
-        }
-      }
-    },
-    "encrypt.unverified.confirm.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use Unverified Recipients?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要使用未验证的收件人吗？"
-          }
-        }
-      }
-    },
-    "encrypt.unverified.warning" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "One or more selected recipients are still unverified. Verify their fingerprints before relying on them."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一个或多个已选收件人尚未验证。在信任这些密钥前，请先核对其指纹。"
-          }
-        }
-      }
-    },
-    "import.file.readFailed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could not read key file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法读取密钥文件"
-          }
-        }
-      }
-    },
-    "settings.appIcon.visionosUnavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apps built natively with the visionOS SDK do not support changing alternate app icons at runtime."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用 visionOS SDK 原生构建的 App 不支持在运行时更换备用 App 图标。"
-          }
-        }
-      }
-    },
-    "signature.fingerprint" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fingerprint"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "指纹"
-          }
-        }
-      }
-    },
-    "signature.identity.contact" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "联系人"
-          }
-        }
-      }
-    },
-    "signature.identity.contact.unverified" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unverified Contact"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未验证联系人"
-          }
-        }
-      }
-    },
-    "signature.identity.contact.unverified.note" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This signer matches a contact in your address book, but you have not verified that contact's fingerprint yet."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "该签名者与你通讯录中的联系人匹配，但你尚未验证该联系人的指纹。"
-          }
-        }
-      }
-    },
-    "signature.identity.ownKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的密钥"
-          }
-        }
-      }
-    },
-    "signature.identity.unknown" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unknown Signer"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未知签名者"
-          }
-        }
-      }
-    },
-    "signature.shortKeyId" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Short Key ID"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "短密钥 ID"
-          }
-        }
-      }
-    },
-    "startup.recovery.retryable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A previous secure key migration could not be fully recovered. CypherAir will retry recovery on next launch."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "先前的安全密钥迁移未能完全恢复。CypherAir 将在下次启动时重试恢复。"
-          }
-        }
-      }
-    },
-    "startup.recovery.unrecoverable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A previous secure key migration could not be recovered. Restore from backup if private-key operations fail."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "先前的安全密钥迁移无法恢复。如果私钥操作失败，请从备份恢复。"
-          }
-        }
-      }
-    },
-    "startup.protectedData.recoveryNeeded" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protected app data is unavailable and may require recovery."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "受保护的应用数据当前不可用，可能需要恢复。"
-          }
-        }
-      }
-    },
-    "startup.protectedData.pendingRecovery" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protected app data has pending recovery work that must complete before protected content can open."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "受保护的应用数据仍有待完成的恢复工作，必须先完成恢复后才能打开受保护内容。"
           }
         }
       }
