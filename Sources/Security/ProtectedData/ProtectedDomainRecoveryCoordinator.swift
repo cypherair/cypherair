@@ -404,9 +404,11 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                     )
                 },
                 validateArtifacts: { [self] in
-                    _ = try readAuthoritativeSnapshot(
-                        wrappingRootKey: wrappingRootKey.dataCopy()
-                    )
+                    try protectedDataValidateSnapshotAndZeroizeDomainMasterKey {
+                        try readAuthoritativeSnapshot(
+                            wrappingRootKey: wrappingRootKey.dataCopy()
+                        )
+                    }
                 }
             )
 
@@ -440,9 +442,11 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                 )
             },
             validateArtifacts: { [self] in
-                _ = try readAuthoritativeSnapshot(
-                    wrappingRootKey: wrappingRootKey.dataCopy()
-                )
+                try protectedDataValidateSnapshotAndZeroizeDomainMasterKey {
+                    try readAuthoritativeSnapshot(
+                        wrappingRootKey: wrappingRootKey.dataCopy()
+                    )
+                }
             }
         )
 
@@ -783,9 +787,11 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                 )
             },
             validateArtifacts: { [self] in
-                _ = try readAuthoritativeSnapshot(
-                    wrappingRootKey: wrappingRootKey.dataCopy()
-                )
+                try protectedDataValidateSnapshotAndZeroizeDomainMasterKey {
+                    try readAuthoritativeSnapshot(
+                        wrappingRootKey: wrappingRootKey.dataCopy()
+                    )
+                }
             }
         )
     }
@@ -805,8 +811,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     private func pendingDomainState(
         for registry: ProtectedDataRegistry
     ) -> ProtectedSettingsDomainState? {
-        guard let pendingMutation = registry.pendingMutation,
-                pendingMutation.targetDomainID == Self.domainID else {
+        guard let pendingMutation = registry.pendingMutation else {
             return nil
         }
 
@@ -814,7 +819,9 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         case .createDomain:
             // Accepted limitation: first-domain pending create remains reset-only
             // because ordinary shared-right authorization is valid only in `ready`.
-            if registry.committedMembership.isEmpty && registry.sharedResourceLifecycleState == .absent {
+            if pendingMutation.targetDomainID == Self.domainID,
+               registry.committedMembership.isEmpty,
+               registry.sharedResourceLifecycleState == .absent {
                 return .pendingResetRequired
             }
             return .pendingRetryRequired

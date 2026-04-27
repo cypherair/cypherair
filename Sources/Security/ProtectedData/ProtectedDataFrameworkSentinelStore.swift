@@ -99,7 +99,9 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
                 try stageInitialPayload(wrappingRootKey: wrappingRootKey.dataCopy())
             },
             validateArtifacts: { [self] in
-                _ = try readAuthoritativeSnapshot(wrappingRootKey: wrappingRootKey.dataCopy())
+                try protectedDataValidateSnapshotAndZeroizeDomainMasterKey {
+                    try readAuthoritativeSnapshot(wrappingRootKey: wrappingRootKey.dataCopy())
+                }
             }
         )
         clearUnlockedState()
@@ -341,7 +343,9 @@ extension ProtectedDataFrameworkSentinelStore: ProtectedDomainRecoveryHandler {
                 try stageInitialPayload(wrappingRootKey: wrappingRootKey.dataCopy())
             },
             validateArtifacts: { [self] in
-                _ = try readAuthoritativeSnapshot(wrappingRootKey: wrappingRootKey.dataCopy())
+                try protectedDataValidateSnapshotAndZeroizeDomainMasterKey {
+                    try readAuthoritativeSnapshot(wrappingRootKey: wrappingRootKey.dataCopy())
+                }
             }
         )
     }

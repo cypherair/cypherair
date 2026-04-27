@@ -2273,6 +2273,50 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertTrue(handler.continuedCreatePhases.isEmpty)
     }
 
+    func test_protectedSettings_surfacesSentinelPendingCreateAsRetryable() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataSettingsSentinelPending")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.settings-sentinel-pending"
+        )
+        let defaultsSuiteName = "com.cypherair.tests.protected-data.settings-sentinel-pending.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+        let protectedSettingsStore = ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.settings-sentinel-pending",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
+            pendingMutation: .createDomain(
+                targetDomainID: AppProtectedDataFrameworkSentinelStore.domainID,
+                phase: .journaled
+            )
+        )
+        try registryStore.saveRegistry(registry)
+
+        protectedSettingsStore.syncPreAuthorizationState()
+
+        XCTAssertEqual(protectedSettingsStore.domainState, .pendingRetryRequired)
+        do {
+            _ = try await protectedSettingsStore.openDomainIfNeeded(
+                wrappingRootKey: Data(repeating: 0xC1, count: 32)
+            )
+            XCTFail("Protected settings must not open while sentinel recovery is pending.")
+        } catch {
+            XCTAssertEqual(protectedSettingsStore.domainState, .pendingRetryRequired)
+        }
+    }
+
     func test_recoveryCoordinator_handlerListDispatchesByPendingDomainID() async throws {
         let baseDirectory = makeTemporaryDirectory("ProtectedDataHandlerListRecovery")
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
