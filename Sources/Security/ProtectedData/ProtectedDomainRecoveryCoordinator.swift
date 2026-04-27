@@ -394,6 +394,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
 
     func migrateLegacyClipboardNoticeIfNeeded(
         persistSharedRight: @escaping @Sendable (Data) async throws -> Void,
+        firstDomainSharedRightCleaner: ProtectedDataFirstDomainSharedRightCleaner? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) async throws {
         let registry = try registryStore.loadRegistry()
@@ -448,6 +449,25 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             clearUnlockedState()
             domainState = .locked
             return
+        }
+        if let firstDomainSharedRightCleaner {
+            do {
+                let cleanupOutcome = try await firstDomainSharedRightCleaner.cleanupOrphanedSharedRightIfSafe(
+                    registry: registry,
+                    source: Self.domainID.rawValue
+                )
+                if cleanupOutcome == .blockedByArtifacts {
+                    domainState = .pendingResetRequired
+                    throw ProtectedDataError.invalidRegistry(
+                        "Protected settings cannot create the first domain while protected-data artifacts remain without registry membership."
+                    )
+                }
+            } catch {
+                if domainState != .pendingResetRequired {
+                    domainState = .frameworkUnavailable
+                }
+                throw error
+            }
         }
 
         let provisionedSecret = SensitiveBytesBox(
@@ -568,6 +588,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     func resetDomain(
         persistSharedRight: @escaping @Sendable (Data) async throws -> Void,
         removeSharedRight: @escaping @Sendable (String) async throws -> Void,
+        firstDomainSharedRightCleaner: ProtectedDataFirstDomainSharedRightCleaner? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) async throws {
         try preflightResetAuthorizationIfNeeded(currentWrappingRootKey: currentWrappingRootKey)
@@ -615,6 +636,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         defaults.removeObject(forKey: AppConfiguration.clipboardNoticeLegacyKey)
         try await migrateLegacyClipboardNoticeIfNeeded(
             persistSharedRight: persistSharedRight,
+            firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
             currentWrappingRootKey: currentWrappingRootKey
         )
     }

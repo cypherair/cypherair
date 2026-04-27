@@ -35,6 +35,7 @@ struct SettingsView: View {
     @Environment(\.macPresentationController) private var macPresentationController
     @Environment(\.appAccessPolicySwitchAction) private var appAccessPolicySwitchAction
     @Environment(\.localDataResetService) private var localDataResetService
+    @Environment(\.localDataResetRestartCoordinator) private var localDataResetRestartCoordinator
 
     let configuration: Configuration
 
@@ -51,6 +52,7 @@ struct SettingsView: View {
             macPresentationController: macPresentationController,
             appAccessPolicySwitchAction: appAccessPolicySwitchAction,
             localDataResetService: localDataResetService,
+            localDataResetRestartCoordinator: localDataResetRestartCoordinator,
             configuration: configuration
         )
     }
@@ -89,6 +91,7 @@ private struct SettingsScreenHostView: View {
         macPresentationController: MacPresentationController?,
         appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction?,
         localDataResetService: LocalDataResetService?,
+        localDataResetRestartCoordinator: LocalDataResetRestartCoordinator?,
         configuration: SettingsView.Configuration
     ) {
         _model = State(
@@ -100,6 +103,7 @@ private struct SettingsScreenHostView: View {
                 macPresentationController: macPresentationController,
                 configuration: configuration,
                 localDataResetService: localDataResetService,
+                localDataResetRestartCoordinator: localDataResetRestartCoordinator,
                 appAccessPolicySwitchAction: appAccessPolicySwitchAction
             )
         )

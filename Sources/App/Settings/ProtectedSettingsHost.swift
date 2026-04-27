@@ -288,7 +288,7 @@ final class ProtectedSettingsHost {
             )
             sectionState = .available(clipboardNoticeEnabled: isEnabled)
         } catch {
-            syncSectionStateFromStore(liveDependencies)
+            syncSectionStateAfterOperationError(liveDependencies)
         }
     }
 
@@ -323,7 +323,7 @@ final class ProtectedSettingsHost {
             }
         } catch {
             liveDependencies.syncPreAuthorizationState()
-            syncSectionStateFromStore(liveDependencies)
+            syncSectionStateAfterOperationError(liveDependencies)
         }
     }
 
@@ -355,7 +355,7 @@ final class ProtectedSettingsHost {
             }
         } catch {
             liveDependencies.syncPreAuthorizationState()
-            syncSectionStateFromStore(liveDependencies)
+            syncSectionStateAfterOperationError(liveDependencies)
         }
     }
 
@@ -474,7 +474,7 @@ final class ProtectedSettingsHost {
             )
             return false
         } catch {
-            syncSectionStateFromStore(liveDependencies)
+            syncSectionStateAfterOperationError(liveDependencies)
             traceHostEvent(
                 "protectedSettings.open.finish",
                 metadata: stateMetadata(liveDependencies)
@@ -792,6 +792,20 @@ final class ProtectedSettingsHost {
         }
         traceHostEvent(
             "protectedSettings.sectionState.synced",
+            metadata: stateMetadata(liveDependencies)
+        )
+    }
+
+    private func syncSectionStateAfterOperationError(_ liveDependencies: LiveDependencies) {
+        liveDependencies.syncPreAuthorizationState()
+        switch liveDependencies.currentDomainState() {
+        case .locked:
+            sectionState = .frameworkUnavailable
+        case .unlocked, .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
+            syncSectionStateFromStore(liveDependencies)
+        }
+        traceHostEvent(
+            "protectedSettings.sectionState.errorSynced",
             metadata: stateMetadata(liveDependencies)
         )
     }

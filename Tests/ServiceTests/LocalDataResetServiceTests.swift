@@ -132,4 +132,170 @@ final class LocalDataResetServiceTests: XCTestCase {
         XCTAssertEqual(validationEntry.metadata["result"], "clean")
         XCTAssertEqual(validationEntry.metadata["hasProtectedDataArtifacts"], "false")
     }
+
+    func test_resetAllLocalData_failsWhenRootSecretStillExistsAfterReset() async throws {
+        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        defer {
+            cleanup(container)
+        }
+        let resetService = makeResetService(
+            from: container,
+            protectedDataRootSecretExists: { true }
+        )
+
+        await XCTAssertThrowsErrorAsync({
+            try await resetService.resetAllLocalData()
+        }) { error in
+            guard let resetError = error as? LocalDataResetError else {
+                XCTFail("Expected LocalDataResetError, got \(type(of: error))")
+                return
+            }
+            XCTAssertTrue(resetError.failures.contains("keychain.protectedDataRootSecret.remaining"))
+        }
+    }
+
+    func test_resetAllLocalData_failsWhenKeychainPrefixItemsRemain() async throws {
+        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        defer {
+            cleanup(container)
+        }
+
+        try container.keychain.save(
+            Data([0x01]),
+            service: "\(KeychainConstants.prefix).residual",
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        if let mockKeychain = container.keychain as? MockKeychain {
+            mockKeychain.failOnDeleteNumber = 1
+        }
+
+        await XCTAssertThrowsErrorAsync({
+            try await container.localDataResetService.resetAllLocalData()
+        }) { error in
+            guard let resetError = error as? LocalDataResetError else {
+                XCTFail("Expected LocalDataResetError, got \(type(of: error))")
+                return
+            }
+            XCTAssertTrue(resetError.failures.contains { $0.hasPrefix("keychain.default.remaining.") })
+        }
+    }
+
+    func test_firstDomainSharedRightCleaner_removesOrphanedRootSecretWhenNoArtifactsRemain() async throws {
+        let baseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: baseDirectory)
+        }
+        let storageRoot = ProtectedDataStorageRoot(
+            baseDirectory: baseDirectory,
+            validationMode: .allowArbitraryBaseDirectoryForTesting
+        )
+        let registry = ProtectedDataRegistry.emptySteadyState(
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+        )
+        let rootSecret = ProtectedDataRootSecretFlag(exists: true)
+        let cleaner = ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: storageRoot,
+            hasPersistedSharedRight: { _ in rootSecret.exists },
+            removePersistedSharedRight: { _ in rootSecret.exists = false }
+        )
+
+        let outcome = try await cleaner.cleanupOrphanedSharedRightIfSafe(
+            registry: registry,
+            source: "test"
+        )
+
+        XCTAssertEqual(outcome, .removedOrphanedSharedRight)
+        XCTAssertFalse(rootSecret.exists)
+    }
+
+    func test_firstDomainSharedRightCleaner_blocksWhenArtifactsRemain() async throws {
+        let baseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: baseDirectory)
+        }
+        let storageRoot = ProtectedDataStorageRoot(
+            baseDirectory: baseDirectory,
+            validationMode: .allowArbitraryBaseDirectoryForTesting
+        )
+        try storageRoot.ensureRootDirectoryExists()
+        try Data([0x01]).write(
+            to: storageRoot.rootURL.appendingPathComponent("orphan-artifact.bin")
+        )
+        let registry = ProtectedDataRegistry.emptySteadyState(
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+        )
+        let cleaner = ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: storageRoot,
+            hasPersistedSharedRight: { _ in true },
+            removePersistedSharedRight: { _ in XCTFail("Should not remove root secret when artifacts remain") }
+        )
+
+        let outcome = try await cleaner.cleanupOrphanedSharedRightIfSafe(
+            registry: registry,
+            source: "test"
+        )
+
+        XCTAssertEqual(outcome, .blockedByArtifacts)
+    }
+
+    private func cleanup(_ container: AppContainer) {
+        try? FileManager.default.removeItem(
+            at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
+        )
+        if let contactsDirectory = container.contactsDirectory {
+            try? FileManager.default.removeItem(at: contactsDirectory)
+        }
+        if let defaultsSuiteName = container.defaultsSuiteName {
+            UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
+        }
+    }
+
+    private func makeResetService(
+        from container: AppContainer,
+        protectedDataRootSecretExists: @escaping () -> Bool
+    ) -> LocalDataResetService {
+        let defaultsSuiteName = container.defaultsSuiteName ?? UUID().uuidString
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        return LocalDataResetService(
+            keychain: container.keychain,
+            protectedDataStorageRoot: container.protectedDataStorageRoot,
+            contactsDirectory: container.contactsDirectory ?? FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true),
+            defaults: defaults,
+            defaultsDomainName: defaultsSuiteName,
+            config: container.config,
+            authManager: container.authManager,
+            keyManagement: container.keyManagement,
+            contactService: container.contactService,
+            protectedDataSessionCoordinator: container.protectedDataSessionCoordinator,
+            appSessionOrchestrator: container.appSessionOrchestrator,
+            protectedDataRootSecretExists: protectedDataRootSecretExists,
+            traceStore: container.authLifecycleTraceStore
+        )
+    }
+}
+
+private final class ProtectedDataRootSecretFlag: @unchecked Sendable {
+    var exists: Bool
+
+    init(exists: Bool) {
+        self.exists = exists
+    }
+}
+
+private func XCTAssertThrowsErrorAsync<T>(
+    _ expression: () async throws -> T,
+    _ errorHandler: (Error) -> Void,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) async {
+    do {
+        _ = try await expression()
+        XCTFail("Expected expression to throw", file: file, line: line)
+    } catch {
+        errorHandler(error)
+    }
 }

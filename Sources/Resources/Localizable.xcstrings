@@ -3362,7 +3362,6 @@
       }
     },
     "error.privateKeyControl.missingStore" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9710,6 +9709,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "确认短语"
+          }
+        }
+      }
+    },
+    "settings.resetAll.restartRequired.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All local CypherAir data was deleted and verified. Close CypherAir from the app switcher, then open it again to complete a clean restart."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有 CypherAir 本机数据已删除并验证。请从 App 切换器关闭 CypherAir，然后重新打开，以完成干净重启。"
+          }
+        }
+      }
+    },
+    "settings.resetAll.restartRequired.message.mac" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All local CypherAir data was deleted and verified. Quit and reopen CypherAir to complete a clean restart."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有 CypherAir 本机数据已删除并验证。请退出并重新打开 CypherAir，以完成干净重启。"
+          }
+        }
+      }
+    },
+    "settings.resetAll.restartRequired.quit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit CypherAir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 CypherAir"
+          }
+        }
+      }
+    },
+    "settings.resetAll.restartRequired.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart Required"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要重启"
           }
         }
       }

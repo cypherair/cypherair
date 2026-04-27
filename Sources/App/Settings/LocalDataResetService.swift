@@ -32,6 +32,7 @@ final class LocalDataResetService {
     private let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     private let appSessionOrchestrator: AppSessionOrchestrator
     private let fileManager: FileManager
+    private let protectedDataRootSecretExists: () -> Bool
     private let traceStore: AuthLifecycleTraceStore?
 
     init(
@@ -48,6 +49,7 @@ final class LocalDataResetService {
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         appSessionOrchestrator: AppSessionOrchestrator,
         fileManager: FileManager = .default,
+        protectedDataRootSecretExists: (() -> Bool)? = nil,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.keychain = keychain
@@ -63,6 +65,13 @@ final class LocalDataResetService {
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.appSessionOrchestrator = appSessionOrchestrator
         self.fileManager = fileManager
+        self.protectedDataRootSecretExists = protectedDataRootSecretExists ?? {
+            keychain.exists(
+                service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+                account: KeychainConstants.defaultAccount,
+                authenticationContext: nil
+            )
+        }
         self.traceStore = traceStore
     }
 
@@ -149,7 +158,10 @@ final class LocalDataResetService {
         appSessionOrchestrator.resetAfterLocalDataReset(
             preserveAuthentication: authenticationContext != nil
         )
-        validateResetPostConditions(failures: &failures)
+        validateResetPostConditions(
+            authenticationContext: authenticationContext,
+            failures: &failures
+        )
 
         guard failures.isEmpty else {
             traceStore?.record(
@@ -314,10 +326,15 @@ final class LocalDataResetService {
         }
     }
 
-    private func validateResetPostConditions(failures: inout [String]) {
+    private func validateResetPostConditions(
+        authenticationContext: LAContext?,
+        failures: inout [String]
+    ) {
         do {
             let hasProtectedArtifacts = try protectedDataStorageRoot.hasProtectedDataArtifacts()
             let rootExists = fileManager.fileExists(atPath: protectedDataStorageRoot.rootURL.path)
+            let contactsDirectoryExists = fileManager.fileExists(atPath: contactsDirectory.path)
+            let hasRootSecret = protectedDataRootSecretExists()
             let hasDeviceBindingKey = keychain.exists(
                 service: KeychainConstants.protectedDataDeviceBindingKeyService,
                 account: KeychainConstants.defaultAccount,
@@ -333,22 +350,49 @@ final class LocalDataResetService {
                 account: KeychainConstants.defaultAccount,
                 authenticationContext: nil
             )
+            let remainingDefaultAccountServices = remainingKeychainServices(
+                account: KeychainConstants.defaultAccount,
+                authenticationContext: authenticationContext,
+                failures: &failures
+            )
+            let remainingMetadataAccountServices = remainingKeychainServices(
+                account: KeychainConstants.metadataAccount,
+                authenticationContext: authenticationContext,
+                failures: &failures
+            )
+            let remainingTemporaryTargets = temporaryResetTargetsRemaining()
+            let hasRemainingData = hasProtectedArtifacts
+                || hasRootSecret
+                || contactsDirectoryExists
+                || !remainingDefaultAccountServices.isEmpty
+                || !remainingMetadataAccountServices.isEmpty
+                || !remainingTemporaryTargets.isEmpty
+                || !keyManagement.keys.isEmpty
+                || !contactService.contacts.isEmpty
             traceStore?.record(
                 category: .operation,
                 name: "localDataReset.validation.finish",
                 metadata: [
-                    "result": hasProtectedArtifacts ? "artifactsRemaining" : "clean",
+                    "result": hasRemainingData ? "remainingData" : "clean",
                     "protectedDataRootExists": rootExists ? "true" : "false",
                     "hasProtectedDataArtifacts": hasProtectedArtifacts ? "true" : "false",
+                    "hasProtectedDataRootSecret": hasRootSecret ? "true" : "false",
                     "hasDeviceBindingKey": hasDeviceBindingKey ? "true" : "false",
                     "hasFormatFloor": hasFormatFloor ? "true" : "false",
                     "hasLegacyCleanup": hasLegacyCleanup ? "true" : "false",
+                    "contactsDirectoryExists": contactsDirectoryExists ? "true" : "false",
+                    "remainingDefaultKeychainItemCount": String(remainingDefaultAccountServices.count),
+                    "remainingMetadataKeychainItemCount": String(remainingMetadataAccountServices.count),
+                    "remainingTemporaryTargetCount": String(remainingTemporaryTargets.count),
                     "keyCount": String(keyManagement.keys.count),
                     "contactCount": String(contactService.contacts.count)
                 ]
             )
             if hasProtectedArtifacts {
                 failures.append("protectedData.artifactsRemaining")
+            }
+            if hasRootSecret {
+                failures.append("keychain.protectedDataRootSecret.remaining")
             }
             if hasDeviceBindingKey {
                 failures.append("keychain.protectedDataDeviceBindingKey.remaining")
@@ -358,6 +402,24 @@ final class LocalDataResetService {
             }
             if hasLegacyCleanup {
                 failures.append("keychain.protectedDataRootSecretLegacyCleanup.remaining")
+            }
+            if contactsDirectoryExists {
+                failures.append("directory.\(contactsDirectory.lastPathComponent).remaining")
+            }
+            if !remainingDefaultAccountServices.isEmpty {
+                failures.append("keychain.default.remaining.\(remainingDefaultAccountServices.count)")
+            }
+            if !remainingMetadataAccountServices.isEmpty {
+                failures.append("keychain.metadata.remaining.\(remainingMetadataAccountServices.count)")
+            }
+            if !remainingTemporaryTargets.isEmpty {
+                failures.append("temporary.remaining.\(remainingTemporaryTargets.count)")
+            }
+            if !keyManagement.keys.isEmpty {
+                failures.append("memory.keys.remaining.\(keyManagement.keys.count)")
+            }
+            if !contactService.contacts.isEmpty {
+                failures.append("memory.contacts.remaining.\(contactService.contacts.count)")
             }
         } catch {
             traceStore?.record(
@@ -369,6 +431,23 @@ final class LocalDataResetService {
                 )
             )
             failures.append("protectedData.storageContract.\(Self.failureName(for: error))")
+        }
+    }
+
+    private func remainingKeychainServices(
+        account: String,
+        authenticationContext: LAContext?,
+        failures: inout [String]
+    ) -> [String] {
+        do {
+            return try keychain.listItems(
+                servicePrefix: KeychainConstants.prefix,
+                account: account,
+                authenticationContext: authenticationContext
+            )
+        } catch {
+            failures.append("keychain.remaining.\(AuthTraceMetadata.keychainAccountKind(for: account)).\(String(describing: type(of: error)))")
+            return []
         }
     }
 
@@ -411,6 +490,30 @@ final class LocalDataResetService {
         let name = url.lastPathComponent
         return name.hasPrefix("export-")
             || name.hasPrefix("CypherAirGuidedTutorial-")
+    }
+
+    private func temporaryResetTargetsRemaining() -> [String] {
+        let temporaryDirectory = fileManager.temporaryDirectory
+        var remaining: [String] = []
+
+        for name in ["decrypted", "streaming"] {
+            let directory = temporaryDirectory.appendingPathComponent(name, isDirectory: true)
+            if fileManager.fileExists(atPath: directory.path) {
+                remaining.append(name)
+            }
+        }
+
+        guard let contents = try? fileManager.contentsOfDirectory(
+            at: temporaryDirectory,
+            includingPropertiesForKeys: nil
+        ) else {
+            return remaining
+        }
+
+        for url in contents where shouldRemoveTemporaryItem(url) {
+            remaining.append(url.lastPathComponent)
+        }
+        return remaining
     }
 
     private static func isItemNotFound(_ error: Error) -> Bool {

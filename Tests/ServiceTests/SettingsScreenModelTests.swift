@@ -440,6 +440,28 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_localDataReset_successMarksRestartRequiredWithoutResultAlert() async {
+        let resetContainer = AppContainer.makeUITest()
+        defer { cleanup(resetContainer) }
+        let restartCoordinator = LocalDataResetRestartCoordinator()
+        let model = makeModel(
+            localDataResetService: resetContainer.localDataResetService,
+            localDataResetRestartCoordinator: restartCoordinator
+        )
+
+        model.requestLocalDataReset()
+        model.continueLocalDataReset()
+        model.localDataResetConfirmationPhrase = "RESET"
+        model.confirmLocalDataReset()
+
+        await waitUntil("reset restart gate", timeout: 10) {
+            restartCoordinator.restartRequiredAfterLocalDataReset
+        }
+        XCTAssertFalse(model.showLocalDataResetResultAlert)
+        XCTAssertNotNil(restartCoordinator.resetSummary)
+    }
+
+    @MainActor
     func test_liveProtectedSettingsHost_authorizationRequired_preservesRecoveryNeededOnRefresh() async {
         var domainState: CypherAir.ProtectedSettingsHost.DomainState = .recoveryNeeded
         var authorizeCallCount = 0
@@ -593,6 +615,72 @@ final class SettingsScreenModelTests: XCTestCase {
 
         XCTAssertEqual(host.sectionState, .locked)
         XCTAssertEqual(authorizeCallCount, 0)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_noProtectedDomainPresent_unlockMigratesAndOpens() async {
+        var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
+        var migrateCallCount = 0
+        var authorizeCallCount = 0
+        var openDomainCallCount = 0
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .noProtectedDomainPresent },
+            authorizeSharedRight: { _, interactionMode in
+                authorizeCallCount += 1
+                XCTAssertEqual(interactionMode, .allowInteraction)
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
+            syncPreAuthorizationState: {},
+            currentDomainState: { domainState },
+            currentClipboardNotice: { domainState == .unlocked ? false : nil },
+            migrateLegacyClipboardNoticeIfNeeded: {
+                migrateCallCount += 1
+                domainState = .locked
+            },
+            openDomainIfNeeded: { _ in
+                openDomainCallCount += 1
+                domainState = .unlocked
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.unlockForSettings()
+
+        XCTAssertEqual(migrateCallCount, 1)
+        XCTAssertEqual(authorizeCallCount, 1)
+        XCTAssertEqual(openDomainCallCount, 1)
+        XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_noProtectedDomainPresent_migrationFailureDoesNotReturnLocked() async {
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .noProtectedDomainPresent },
+            authorizeSharedRight: { _, _ in
+                XCTFail("Migration failure should happen before authorization")
+                return .authorized
+            },
+            currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
+            syncPreAuthorizationState: {},
+            currentDomainState: { .locked },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {
+                throw ProtectedDataError.invalidRegistry("test")
+            },
+            openDomainIfNeeded: { _ in
+                XCTFail("Migration failure should not open protected settings")
+            },
+            updateClipboardNotice: { _, _ in },
+            recoverPendingMutation: { .retryablePending },
+            resetDomain: {}
+        )
+
+        await host.unlockForSettings()
+
+        XCTAssertEqual(host.sectionState, .frameworkUnavailable)
     }
 
     @MainActor
@@ -1150,6 +1238,7 @@ final class SettingsScreenModelTests: XCTestCase {
         iosPresentationController: IOSPresentationController? = nil,
         macPresentationController: MacPresentationController? = nil,
         localDataResetService: LocalDataResetService? = nil,
+        localDataResetRestartCoordinator: LocalDataResetRestartCoordinator? = nil,
         authModeSwitchAction: SettingsScreenModel.AuthModeSwitchAction? = nil,
         appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? = nil
     ) -> SettingsScreenModel {
@@ -1161,6 +1250,7 @@ final class SettingsScreenModelTests: XCTestCase {
             macPresentationController: macPresentationController,
             configuration: configuration,
             localDataResetService: localDataResetService,
+            localDataResetRestartCoordinator: localDataResetRestartCoordinator,
             authModeSwitchAction: authModeSwitchAction,
             appAccessPolicySwitchAction: appAccessPolicySwitchAction
         )

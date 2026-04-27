@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 #if os(iOS)
 import UIKit
 #endif
@@ -37,6 +40,7 @@ struct CypherAirApp: App {
     @State private var pendingLoadError: String?
     @State private var startupSnapshot: AppStartupCoordinator.AppStartupBootstrapSnapshot
     @State private var protectedSettingsHost: ProtectedSettingsHost
+    @State private var localDataResetRestartCoordinator: LocalDataResetRestartCoordinator
     @State private var tutorialStore: TutorialSessionStore
     @State private var incomingURLImportCoordinator: IncomingURLImportCoordinator
     @State private var launchConfiguration: AppLaunchConfiguration
@@ -101,6 +105,16 @@ struct CypherAirApp: App {
                 "frameworkState": Self.traceValue(for: startupSnapshot.protectedDataFrameworkState),
                 "hasLoadError": startupSnapshot.loadError == nil ? "false" : "true"
             ]
+        )
+        let firstDomainSharedRightCleaner = ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: container.protectedDataStorageRoot,
+            hasPersistedSharedRight: { identifier in
+                container.protectedDataSessionCoordinator.hasPersistedRootSecret(identifier: identifier)
+            },
+            removePersistedSharedRight: { identifier in
+                try await container.protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
+            },
+            traceStore: container.authLifecycleTraceStore
         )
         let protectedSettingsHost = ProtectedSettingsHost(
             evaluateAccessGate: { isFirstProtectedAccess in
@@ -182,6 +196,7 @@ struct CypherAirApp: App {
                     persistSharedRight: { secret in
                         try await container.protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
                     },
+                    firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
                     currentWrappingRootKey: {
                         try container.protectedDataSessionCoordinator.wrappingRootKeyData()
                     }
@@ -242,6 +257,7 @@ struct CypherAirApp: App {
                             identifier: identifier
                         )
                     },
+                    firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
                     currentWrappingRootKey: {
                         try container.protectedDataSessionCoordinator.wrappingRootKeyData()
                     }
@@ -256,6 +272,7 @@ struct CypherAirApp: App {
         _pendingLoadError = State(initialValue: startupSnapshot.loadError)
         _startupSnapshot = State(initialValue: startupSnapshot)
         _protectedSettingsHost = State(initialValue: protectedSettingsHost)
+        _localDataResetRestartCoordinator = State(initialValue: LocalDataResetRestartCoordinator())
         _tutorialStore = State(initialValue: tutorialStore)
         _incomingURLImportCoordinator = State(initialValue: incomingURLImportCoordinator)
     }
@@ -306,24 +323,30 @@ struct CypherAirApp: App {
 
         #if os(macOS)
         Settings {
-            MacSettingsRootView(
-                tutorialLaunchRelay: macTutorialLaunchRelay,
-                tutorialHostAvailability: macTutorialHostAvailability
-            )
-            .optionalTint(container.config.colorTheme.accentColor)
-            .environment(container.config)
-            .environment(container.authManager)
-            .environment(container.keyManagement)
-            .environment(container.selfTestService)
-            .environment(\.localDataResetService, container.localDataResetService)
-            .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
-            .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
-            .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
-            .environment(tutorialStore)
-            .authenticationShieldHost(
-                container.authenticationShieldCoordinator,
-                handlesLifecycleEvents: true
-            )
+            LocalDataResetRestartGate(
+                coordinator: localDataResetRestartCoordinator,
+                terminateAction: terminateAfterLocalDataReset
+            ) {
+                MacSettingsRootView(
+                    tutorialLaunchRelay: macTutorialLaunchRelay,
+                    tutorialHostAvailability: macTutorialHostAvailability
+                )
+                .optionalTint(container.config.colorTheme.accentColor)
+                .environment(container.config)
+                .environment(container.authManager)
+                .environment(container.keyManagement)
+                .environment(container.selfTestService)
+                .environment(\.localDataResetService, container.localDataResetService)
+                .environment(\.localDataResetRestartCoordinator, localDataResetRestartCoordinator)
+                .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
+                .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
+                .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
+                .environment(tutorialStore)
+                .authenticationShieldHost(
+                    container.authenticationShieldCoordinator,
+                    handlesLifecycleEvents: true
+                )
+            }
         }
         #endif
     }
@@ -357,39 +380,45 @@ struct CypherAirApp: App {
 
     @ViewBuilder
     private var mainWindowSceneContent: some View {
-        ImportConfirmationSheetHost(coordinator: incomingURLImportCoordinator.importConfirmationCoordinator) {
-            mainWindowContent
-                .onAppear {
-                    container.authLifecycleTraceStore?.record(
-                        category: .lifecycle,
-                        name: "mainWindow.content.appear",
-                        metadata: [
-                            "root": launchConfiguration.root.rawValue,
-                            "hasLoadWarning": loadError == nil ? "false" : "true"
-                        ]
-                    )
-                }
-                .privacyScreen()
-                .optionalTint(container.config.colorTheme.accentColor)
-                .environment(container.config)
-                .environment(container.keyManagement)
-                .environment(container.contactService)
-                .environment(container.encryptionService)
-                .environment(container.decryptionService)
-                .environment(container.signingService)
-                .environment(container.certificateSignatureService)
-                .environment(container.qrService)
-                .environment(container.selfTestService)
-                .environment(container.authManager)
-                .environment(container.appSessionOrchestrator)
-                .environment(\.localDataResetService, container.localDataResetService)
-                .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
-                .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
-                .environment(\.protectedSettingsHost, protectedSettingsHost)
-                .environment(tutorialStore)
-                #if os(iOS) || os(visionOS)
-                .environment(\.iosPresentationController, iosPresentationControllerValue)
-                #endif
+        LocalDataResetRestartGate(
+            coordinator: localDataResetRestartCoordinator,
+            terminateAction: terminateAfterLocalDataReset
+        ) {
+            ImportConfirmationSheetHost(coordinator: incomingURLImportCoordinator.importConfirmationCoordinator) {
+                mainWindowContent
+                    .onAppear {
+                        container.authLifecycleTraceStore?.record(
+                            category: .lifecycle,
+                            name: "mainWindow.content.appear",
+                            metadata: [
+                                "root": launchConfiguration.root.rawValue,
+                                "hasLoadWarning": loadError == nil ? "false" : "true"
+                            ]
+                        )
+                    }
+                    .privacyScreen()
+                    .optionalTint(container.config.colorTheme.accentColor)
+                    .environment(container.config)
+                    .environment(container.keyManagement)
+                    .environment(container.contactService)
+                    .environment(container.encryptionService)
+                    .environment(container.decryptionService)
+                    .environment(container.signingService)
+                    .environment(container.certificateSignatureService)
+                    .environment(container.qrService)
+                    .environment(container.selfTestService)
+                    .environment(container.authManager)
+                    .environment(container.appSessionOrchestrator)
+                    .environment(\.localDataResetService, container.localDataResetService)
+                    .environment(\.localDataResetRestartCoordinator, localDataResetRestartCoordinator)
+                    .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
+                    .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
+                    .environment(\.protectedSettingsHost, protectedSettingsHost)
+                    .environment(tutorialStore)
+                    #if os(iOS) || os(visionOS)
+                    .environment(\.iosPresentationController, iosPresentationControllerValue)
+                    #endif
+            }
         }
         #if os(iOS) || os(visionOS)
         .sheet(item: onboardingPresentationBinding, onDismiss: {
@@ -404,6 +433,7 @@ struct CypherAirApp: App {
             presentInitialIOSFlowIfNeeded()
         }
         .onChange(of: container.config.hasCompletedOnboarding) { _, hasCompletedOnboarding in
+            guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
             if !hasCompletedOnboarding,
                iosPresentationState.activePresentation == nil {
                 iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
@@ -505,6 +535,7 @@ struct CypherAirApp: App {
             handlesLifecycleEvents: true
         )
         .onOpenURL { url in
+            guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
             incomingURLImportCoordinator.handleIncomingURL(
                 url,
                 isTutorialPresentationActive: tutorialStore.isTutorialPresentationActive
@@ -637,6 +668,7 @@ struct CypherAirApp: App {
     }
 
     private func presentPendingLoadWarningIfPossible(source: String) {
+        guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
         guard loadError == nil, let pendingLoadError else { return }
         let presentationState = loadWarningPresentationState
         guard LoadWarningPresentationGate.canPresent(presentationState) else {
@@ -663,6 +695,9 @@ struct CypherAirApp: App {
     private var onboardingPresentationBinding: Binding<IOSPresentation?> {
         Binding(
             get: {
+                guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else {
+                    return nil
+                }
                 guard case .onboarding? = iosPresentationState.activePresentation else {
                     return nil
                 }
@@ -681,6 +716,9 @@ struct CypherAirApp: App {
     private var tutorialPresentationBinding: Binding<IOSPresentation?> {
         Binding(
             get: {
+                guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else {
+                    return nil
+                }
                 guard case .tutorial? = iosPresentationState.activePresentation else {
                     return nil
                 }
@@ -738,6 +776,7 @@ struct CypherAirApp: App {
     }
 
     private func presentInitialIOSFlowIfNeeded() {
+        guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
         guard iosPresentationState.activePresentation == nil else { return }
 
         switch launchConfiguration.root {
@@ -750,6 +789,12 @@ struct CypherAirApp: App {
         }
     }
     #endif
+
+    private func terminateAfterLocalDataReset() {
+        #if os(macOS)
+        NSApplication.shared.terminate(nil)
+        #endif
+    }
 
     #if os(macOS)
     private func syncMacTutorialHostAvailability() {
