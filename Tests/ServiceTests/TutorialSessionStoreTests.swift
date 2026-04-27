@@ -962,6 +962,24 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertEqual(definitions.map(\.tab), AppShellTab.allCases)
     }
 
+    func test_iOSVisionTutorialPresentation_injectsAppSessionOrchestrator() throws {
+        let appContents = try loadRepositoryAuditSource("Sources/App/CypherAirApp.swift")
+        let presentationBlock = try sourceBlock(
+            in: appContents,
+            from: "private func tutorialPresentationView(for presentation: IOSPresentation) -> some View {",
+            to: "private var iosPresentationControllerValue: IOSPresentationController"
+        )
+
+        XCTAssertTrue(
+            presentationBlock.contains("TutorialView("),
+            "iOS/visionOS tutorial presentation should build TutorialView explicitly"
+        )
+        XCTAssertTrue(
+            presentationBlock.contains(".environment(container.appSessionOrchestrator)"),
+            "iOS/visionOS tutorial presentation must inject AppSessionOrchestrator for routed tool pages"
+        )
+    }
+
     func test_finishAndCleanupTutorial_clearsSandboxArtifacts() async throws {
         let store = TutorialSessionStore()
         await startTutorialSession(store)
@@ -1008,6 +1026,16 @@ final class TutorialSessionStoreTests: XCTestCase {
 
     private func loadRepositoryAuditSource(_ relativePath: String) throws -> String {
         try RepositoryAuditLoader.loadString(relativePath: relativePath)
+    }
+
+    private func sourceBlock(
+        in contents: String,
+        from startMarker: String,
+        to endMarker: String
+    ) throws -> String {
+        let start = try XCTUnwrap(contents.range(of: startMarker))
+        let end = try XCTUnwrap(contents.range(of: endMarker, range: start.upperBound..<contents.endIndex))
+        return String(contents[start.lowerBound..<end.lowerBound])
     }
 
 }
