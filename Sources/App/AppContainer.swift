@@ -15,6 +15,7 @@ final class AppContainer: @unchecked Sendable {
     let protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator
     let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     let protectedSettingsStore: ProtectedSettingsStore
+    let protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore
     let protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator
     let appSessionOrchestrator: AppSessionOrchestrator
     let engine: PgpEngine
@@ -45,6 +46,7 @@ final class AppContainer: @unchecked Sendable {
         protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         protectedSettingsStore: ProtectedSettingsStore,
+        protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore,
         protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator = .noOp,
         appSessionOrchestrator: AppSessionOrchestrator,
         engine: PgpEngine,
@@ -74,6 +76,7 @@ final class AppContainer: @unchecked Sendable {
         self.protectedDomainRecoveryCoordinator = protectedDomainRecoveryCoordinator
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.protectedSettingsStore = protectedSettingsStore
+        self.protectedDataFrameworkSentinelStore = protectedDataFrameworkSentinelStore
         self.protectedDataPostUnlockCoordinator = protectedDataPostUnlockCoordinator
         self.appSessionOrchestrator = appSessionOrchestrator
         self.engine = engine
@@ -141,9 +144,21 @@ final class AppContainer: @unchecked Sendable {
             defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
+        )
+        let protectedDataFrameworkSentinelStore = ProtectedDataFrameworkSentinelStore(
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
         )
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -154,6 +169,19 @@ final class AppContainer: @unchecked Sendable {
                     domainID: ProtectedSettingsStore.domainID,
                     open: { wrappingRootKey in
                         _ = try await protectedSettingsStore.openDomainIfNeeded(
+                            wrappingRootKey: wrappingRootKey
+                        )
+                    }
+                ),
+                ProtectedDataPostUnlockDomainOpener(
+                    domainID: ProtectedDataFrameworkSentinelStore.domainID,
+                    ensureCommittedIfNeeded: { wrappingRootKey in
+                        try await protectedDataFrameworkSentinelStore.ensureCommittedIfNeeded(
+                            wrappingRootKey: wrappingRootKey
+                        )
+                    },
+                    open: { wrappingRootKey in
+                        _ = try await protectedDataFrameworkSentinelStore.openDomainIfNeeded(
                             wrappingRootKey: wrappingRootKey
                         )
                     }
@@ -262,6 +290,7 @@ final class AppContainer: @unchecked Sendable {
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             protectedSettingsStore: protectedSettingsStore,
+            protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
@@ -353,9 +382,21 @@ final class AppContainer: @unchecked Sendable {
             defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
+        )
+        let protectedDataFrameworkSentinelStore = ProtectedDataFrameworkSentinelStore(
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
         )
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -366,6 +407,19 @@ final class AppContainer: @unchecked Sendable {
                     domainID: ProtectedSettingsStore.domainID,
                     open: { wrappingRootKey in
                         _ = try await protectedSettingsStore.openDomainIfNeeded(
+                            wrappingRootKey: wrappingRootKey
+                        )
+                    }
+                ),
+                ProtectedDataPostUnlockDomainOpener(
+                    domainID: ProtectedDataFrameworkSentinelStore.domainID,
+                    ensureCommittedIfNeeded: { wrappingRootKey in
+                        try await protectedDataFrameworkSentinelStore.ensureCommittedIfNeeded(
+                            wrappingRootKey: wrappingRootKey
+                        )
+                    },
+                    open: { wrappingRootKey in
+                        _ = try await protectedDataFrameworkSentinelStore.openDomainIfNeeded(
                             wrappingRootKey: wrappingRootKey
                         )
                     }
@@ -478,6 +532,7 @@ final class AppContainer: @unchecked Sendable {
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             protectedSettingsStore: protectedSettingsStore,
+            protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,

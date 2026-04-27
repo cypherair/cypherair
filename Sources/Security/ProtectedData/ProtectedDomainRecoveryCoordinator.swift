@@ -53,18 +53,49 @@ struct ProtectedDomainRecoveryCoordinator {
             }
         )
     }
+
+    func recoverPendingMutation(
+        handlers: [any ProtectedDomainRecoveryHandler],
+        removeSharedRight: @escaping @Sendable (String) async throws -> Void
+    ) async throws -> PendingRecoveryOutcome {
+        let registry = try registryStore.loadRegistry()
+        guard case let pendingMutation? = registry.pendingMutation else {
+            return .frameworkRecoveryNeeded
+        }
+        guard let handler = handlers.first(where: {
+            $0.protectedDataDomainID == pendingMutation.targetDomainID
+        }) else {
+            return .frameworkRecoveryNeeded
+        }
+
+        return try await recoverPendingMutation(
+            handler: handler,
+            removeSharedRight: removeSharedRight
+        )
+    }
 }
 
 struct ProtectedDataPostUnlockDomainOpener: Sendable {
     let domainID: ProtectedDataDomainID
+    private let ensureCommitted: (@Sendable (Data) async throws -> Void)?
     private let open: @Sendable (Data) async throws -> Void
 
     init(
         domainID: ProtectedDataDomainID,
+        ensureCommittedIfNeeded: (@Sendable (Data) async throws -> Void)? = nil,
         open: @escaping @Sendable (Data) async throws -> Void
     ) {
         self.domainID = domainID
+        self.ensureCommitted = ensureCommittedIfNeeded
         self.open = open
+    }
+
+    var canEnsureCommitted: Bool {
+        ensureCommitted != nil
+    }
+
+    func ensureCommittedIfNeeded(wrappingRootKey: Data) async throws {
+        try await ensureCommitted?(wrappingRootKey)
     }
 
     func openDomain(wrappingRootKey: Data) async throws {
@@ -142,10 +173,10 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
             return finish(.noProtectedDomainPresent, source: source)
         }
 
-        let committedOpeners = domainOpeners.filter {
+        let initiallyCommittedOpeners = domainOpeners.filter {
             registry.committedMembership[$0.domainID] != nil
         }
-        guard !committedOpeners.isEmpty else {
+        guard !initiallyCommittedOpeners.isEmpty else {
             return finish(.noRegisteredDomainPresent, source: source)
         }
 
@@ -173,8 +204,26 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
             }
 
             var openedDomainIDs: [ProtectedDataDomainID] = []
-            for opener in committedOpeners {
+            var currentRegistry = registry
+            for opener in domainOpeners {
                 do {
+                    if currentRegistry.committedMembership[opener.domainID] == nil {
+                        guard opener.canEnsureCommitted else {
+                            continue
+                        }
+                        try await opener.ensureCommittedIfNeeded(wrappingRootKey: wrappingRootKey)
+                        currentRegistry = try currentRegistryProvider()
+                    }
+                    guard currentRegistry.committedMembership[opener.domainID] != nil else {
+                        continue
+                    }
+                    guard currentRegistry.pendingMutation == nil,
+                          currentRegistry.sharedResourceLifecycleState == .ready else {
+                        return finish(
+                            .pendingMutationRecoveryRequired,
+                            source: source
+                        )
+                    }
                     try await opener.openDomain(wrappingRootKey: wrappingRootKey)
                     openedDomainIDs.append(opener.domainID)
                 } catch {
@@ -256,6 +305,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     private let registryStore: ProtectedDataRegistryStore
     private let domainKeyManager: ProtectedDomainKeyManager
     private let bootstrapStore: ProtectedDomainBootstrapStore
+    private let currentWrappingRootKey: (() throws -> Data)?
 
     private(set) var domainState: ProtectedSettingsDomainState = .locked
     private(set) var payload: Payload?
@@ -268,13 +318,15 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         storageRoot: ProtectedDataStorageRoot,
         registryStore: ProtectedDataRegistryStore,
         domainKeyManager: ProtectedDomainKeyManager,
-        bootstrapStore: ProtectedDomainBootstrapStore? = nil
+        bootstrapStore: ProtectedDomainBootstrapStore? = nil,
+        currentWrappingRootKey: (() throws -> Data)? = nil
     ) {
         self.defaults = defaults
         self.storageRoot = storageRoot
         self.registryStore = registryStore
         self.domainKeyManager = domainKeyManager
         self.bootstrapStore = bootstrapStore ?? ProtectedDomainBootstrapStore(storageRoot: storageRoot)
+        self.currentWrappingRootKey = currentWrappingRootKey
     }
 
     var clipboardNotice: Bool? {
@@ -309,17 +361,60 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     }
 
     func migrateLegacyClipboardNoticeIfNeeded(
-        persistSharedRight: @escaping @Sendable (Data) async throws -> Void
+        persistSharedRight: @escaping @Sendable (Data) async throws -> Void,
+        currentWrappingRootKey: (() throws -> Data)? = nil
     ) async throws {
         let registry = try registryStore.loadRegistry()
         if registry.committedMembership[Self.domainID] != nil {
             return
         }
 
-        let clipboardNotice = defaults.object(forKey: AppConfiguration.clipboardNoticeLegacyKey) == nil
-            ? true
-            : defaults.bool(forKey: AppConfiguration.clipboardNoticeLegacyKey)
-        let initialPayload = Payload(clipboardNotice: clipboardNotice)
+        let initialPayload = legacyInitialPayload()
+
+        if !registry.committedMembership.isEmpty {
+            guard registry.sharedResourceLifecycleState == .ready else {
+                throw ProtectedDataError.invalidRegistry(
+                    "Protected settings cannot be created while the shared resource is not ready."
+                )
+            }
+            let wrappingRootKeyProvider = currentWrappingRootKey ?? self.currentWrappingRootKey
+            guard let wrappingRootKeyProvider else {
+                throw ProtectedDataError.authorizingUnavailable
+            }
+            let wrappingRootKey = SensitiveBytesBox(data: try wrappingRootKeyProvider())
+            defer {
+                wrappingRootKey.zeroize()
+            }
+
+            _ = try await registryStore.performCreateDomainTransaction(
+                domainID: Self.domainID,
+                validateBeforeJournal: { registry in
+                    guard registry.sharedResourceLifecycleState == .ready,
+                          registry.committedMembership.contains(where: { $0.key != Self.domainID }) else {
+                        throw ProtectedDataError.invalidRegistry(
+                            "Protected settings can only join an existing ready shared resource."
+                        )
+                    }
+                },
+                provisionSharedResourceIfNeeded: {},
+                stageArtifacts: { [self] in
+                    try stageInitialPayload(
+                        initialPayload,
+                        wrappingRootKey: wrappingRootKey.dataCopy()
+                    )
+                },
+                validateArtifacts: { [self] in
+                    _ = try readAuthoritativeSnapshot(
+                        wrappingRootKey: wrappingRootKey.dataCopy()
+                    )
+                }
+            )
+
+            defaults.removeObject(forKey: AppConfiguration.clipboardNoticeLegacyKey)
+            clearUnlockedState()
+            domainState = .locked
+            return
+        }
 
         let provisionedSecret = SensitiveBytesBox(
             data: try randomData(count: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength)
@@ -436,7 +531,8 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
 
     func resetDomain(
         persistSharedRight: @escaping @Sendable (Data) async throws -> Void,
-        removeSharedRight: @escaping @Sendable (String) async throws -> Void
+        removeSharedRight: @escaping @Sendable (String) async throws -> Void,
+        currentWrappingRootKey: (() throws -> Data)? = nil
     ) async throws {
         if let registry = try? registryStore.loadRegistry() {
             if case let pendingMutation? = registry.pendingMutation,
@@ -480,7 +576,8 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         domainState = .locked
         defaults.removeObject(forKey: AppConfiguration.clipboardNoticeLegacyKey)
         try await migrateLegacyClipboardNoticeIfNeeded(
-            persistSharedRight: persistSharedRight
+            persistSharedRight: persistSharedRight,
+            currentWrappingRootKey: currentWrappingRootKey
         )
     }
 
@@ -668,14 +765,41 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             return
         }
 
-        throw ProtectedDataError.invalidRegistry(
-            "Ready-row pending create continuation is not implemented for ProtectedSettings."
+        guard let currentWrappingRootKey else {
+            throw ProtectedDataError.authorizingUnavailable
+        }
+        let initialPayload = legacyInitialPayload()
+        let wrappingRootKey = SensitiveBytesBox(data: try currentWrappingRootKey())
+        defer {
+            wrappingRootKey.zeroize()
+        }
+
+        _ = try await registryStore.completePendingCreate(
+            domainID: Self.domainID,
+            stageArtifacts: { [self] in
+                try stageInitialPayload(
+                    initialPayload,
+                    wrappingRootKey: wrappingRootKey.dataCopy()
+                )
+            },
+            validateArtifacts: { [self] in
+                _ = try readAuthoritativeSnapshot(
+                    wrappingRootKey: wrappingRootKey.dataCopy()
+                )
+            }
         )
     }
 
     private func clearUnlockedState() {
         payload = nil
         unlockedGenerationIdentifier = nil
+    }
+
+    private func legacyInitialPayload() -> Payload {
+        let clipboardNotice = defaults.object(forKey: AppConfiguration.clipboardNoticeLegacyKey) == nil
+            ? true
+            : defaults.bool(forKey: AppConfiguration.clipboardNoticeLegacyKey)
+        return Payload(clipboardNotice: clipboardNotice)
     }
 
     private func pendingDomainState(

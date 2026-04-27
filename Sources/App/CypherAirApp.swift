@@ -179,6 +179,9 @@ struct CypherAirApp: App {
                 try await container.protectedSettingsStore.migrateLegacyClipboardNoticeIfNeeded(
                     persistSharedRight: { secret in
                         try await container.protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
+                    },
+                    currentWrappingRootKey: {
+                        try container.protectedDataSessionCoordinator.wrappingRootKeyData()
                     }
                 )
             },
@@ -195,7 +198,10 @@ struct CypherAirApp: App {
             },
             recoverPendingMutation: {
                 let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingMutation(
-                    handler: container.protectedSettingsStore,
+                    handlers: [
+                        container.protectedSettingsStore,
+                        container.protectedDataFrameworkSentinelStore
+                    ],
                     removeSharedRight: { identifier in
                         try await container.protectedDataSessionCoordinator.removePersistedSharedRight(
                             identifier: identifier
@@ -222,6 +228,9 @@ struct CypherAirApp: App {
                         try await container.protectedDataSessionCoordinator.removePersistedSharedRight(
                             identifier: identifier
                         )
+                    },
+                    currentWrappingRootKey: {
+                        try container.protectedDataSessionCoordinator.wrappingRootKeyData()
                     }
                 )
             },

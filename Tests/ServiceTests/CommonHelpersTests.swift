@@ -531,9 +531,21 @@ final class CommonHelpersTests: XCTestCase {
             defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
-            domainKeyManager: protectedDomainKeyManager
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
+        )
+        let protectedDataFrameworkSentinelStore = ProtectedDataFrameworkSentinelStore(
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
         )
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let appSessionOrchestrator = CypherAir.AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -604,6 +616,7 @@ final class CommonHelpersTests: XCTestCase {
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             protectedSettingsStore: protectedSettingsStore,
+            protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,

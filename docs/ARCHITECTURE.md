@@ -135,17 +135,19 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `ProtectedDataRightStoreClient.swift` — legacy right-store migration/cleanup adapter, not the current authorization path
 - `ProtectedDomainBootstrapStore.swift` — file-side bootstrap metadata persistence
 - `ProtectedDomainRecoveryCoordinator` / `ProtectedDomainRecoveryHandler` — generic pending-mutation recovery dispatch by `ProtectedDataDomainID`
-- `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry, currently registering `protected-settings`
+- `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `protected-settings` plus `protected-framework-sentinel` and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff
+- `ProtectedDataFrameworkSentinelStore.swift` — framework-owned second production domain (`protected-framework-sentinel`) with a minimal schema/purpose payload used to prove multi-domain lifecycle, recovery, and relock behavior before later product-domain migrations
 
 Current ProtectedData scope:
 
 - the framework exists and is wired into startup/bootstrap and app-session ownership
 - `ProtectedSettingsStore` is the first protected-domain adopter; current migrated payload scope is `clipboardNotice`
+- `ProtectedDataFrameworkSentinelStore` is the second production domain; it contains no user data, telemetry, or UI state, and is created only after another domain is already committed and the shared resource is ready
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
-- app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open registered committed domains without a second prompt
+- app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
 - AppData phase completion status is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 
@@ -375,7 +377,8 @@ App Sandbox:
 ├── Application Support/
 │   └── ProtectedData/
 │       ├── ProtectedDataRegistry.plist
-│       └── protected-settings/   → Protected settings envelopes; currently clipboardNotice
+│       ├── protected-settings/              → Protected settings envelopes; currently clipboardNotice
+│       └── protected-framework-sentinel/    → Framework sentinel envelopes; schema/purpose marker only
 ├── Library/Preferences/
 │   └── (UserDefaults)
 │       ├── com.cypherair.preference.authMode              → "standard" | "highSecurity" (future private-key-control domain)
