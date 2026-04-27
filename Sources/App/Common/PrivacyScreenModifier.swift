@@ -57,9 +57,18 @@ struct PrivacyScreenModifier: ViewModifier {
                             name: "privacy.overlay.hidden"
                         )
                     }
+                    .transaction { transaction in
+                        if appSessionOrchestrator.isPrivacyScreenBlurred {
+                            transaction.animation = nil
+                        }
+                    }
+                    .transition(.asymmetric(insertion: .identity, removal: .opacity))
                 }
             }
-            .animation(.easeInOut(duration: 0.15), value: appSessionOrchestrator.isPrivacyScreenBlurred)
+            .animation(
+                appSessionOrchestrator.isPrivacyScreenBlurred ? nil : .easeOut(duration: 0.26),
+                value: appSessionOrchestrator.isPrivacyScreenBlurred
+            )
             #if canImport(UIKit)
             .onChange(of: scenePhase) { _, newPhase in
                 authLifecycleTraceStore?.record(
