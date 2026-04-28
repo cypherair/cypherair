@@ -199,6 +199,15 @@ private actor AsyncBooleanFlag {
     }
 }
 
+private actor AsyncIntegerCounter {
+    private var value = 0
+
+    func next() -> Int {
+        value += 1
+        return value
+    }
+}
+
 private actor AsyncDataBox {
     private var value = Data()
 
@@ -2013,6 +2022,113 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(orchestrator.contentClearGeneration, 1)
         XCTAssertEqual(orchestrator.postAuthenticationGeneration, 0)
         XCTAssertTrue(orchestrator.authFailed)
+        XCTAssertEqual(orchestrator.authenticationFailureReason, .authenticationFailed)
+        XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    func test_handleResume_biometricsLockoutSetsFailureReasonAndKeepsPrivacyOverlay() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataBiometricsLockout")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.biometrics-lockout",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let didRunPostAuthenticationHandler = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                throw AuthenticationError.appAccessBiometricsLockedOut
+            },
+            postAuthenticationHandler: { _, _ in
+                await didRunPostAuthenticationHandler.setTrue()
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        let attemptedAuthentication = await orchestrator.handleResume(
+            localizedReason: "Locked out privacy unlock should keep content hidden"
+        )
+        let didRunHandler = await didRunPostAuthenticationHandler.currentValue()
+
+        XCTAssertTrue(attemptedAuthentication)
+        XCTAssertFalse(didRunHandler)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 1)
+        XCTAssertEqual(orchestrator.postAuthenticationGeneration, 0)
+        XCTAssertNil(orchestrator.lastAuthenticationDate)
+        XCTAssertTrue(orchestrator.authFailed)
+        XCTAssertEqual(orchestrator.authenticationFailureReason, .biometricsLockedOut)
+        XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    func test_handleResume_successfulAuthenticationClearsPreviousFailureReason() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataClearsFailureReason")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.clears-failure-reason",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let authenticationAttempts = AsyncIntegerCounter()
+        let didRunPostAuthenticationHandler = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                if await authenticationAttempts.next() == 1 {
+                    throw AuthenticationError.appAccessBiometricsLockedOut
+                }
+                return .authenticated(context: nil)
+            },
+            postAuthenticationHandler: { _, _ in
+                await didRunPostAuthenticationHandler.setTrue()
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        let firstAttempt = await orchestrator.handleResume(
+            localizedReason: "First privacy unlock attempt is locked out"
+        )
+
+        XCTAssertTrue(firstAttempt)
+        XCTAssertTrue(orchestrator.authFailed)
+        XCTAssertEqual(orchestrator.authenticationFailureReason, .biometricsLockedOut)
+        XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
+        XCTAssertEqual(orchestrator.postAuthenticationGeneration, 0)
+
+        let secondAttempt = await orchestrator.handleResume(
+            localizedReason: "Second privacy unlock succeeds"
+        )
+        let didRunHandler = await didRunPostAuthenticationHandler.currentValue()
+
+        XCTAssertTrue(secondAttempt)
+        XCTAssertTrue(didRunHandler)
+        XCTAssertFalse(orchestrator.authFailed)
+        XCTAssertNil(orchestrator.authenticationFailureReason)
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+        XCTAssertNotNil(orchestrator.lastAuthenticationDate)
+        XCTAssertEqual(orchestrator.postAuthenticationGeneration, 1)
     }
 
     func test_appAccessPolicyChange_discardsPendingProtectedDataHandoffContext() async {

@@ -19,6 +19,7 @@ final class AppSessionOrchestrator {
     var isPrivacyScreenBlurred = false
     var isAuthenticating = false
     var authFailed = false
+    private(set) var authenticationFailureReason: AppSessionAuthenticationFailureReason?
     private(set) var contentClearGeneration = 0
     private(set) var postAuthenticationGeneration = 0
     private(set) var lastAuthenticationDate: Date?
@@ -68,6 +69,7 @@ final class AppSessionOrchestrator {
     }
 
     func recordAuthentication() {
+        clearAuthenticationFailure()
         lastAuthenticationDate = Date()
         traceStore?.record(
             category: .session,
@@ -78,6 +80,7 @@ final class AppSessionOrchestrator {
 
     func requestContentClear() {
         clearAuthenticationSettleBlur()
+        clearAuthenticationFailure()
         discardPendingAuthenticatedContext(reason: "contentClear")
         contentClearGeneration += 1
         traceStore?.record(
@@ -94,6 +97,7 @@ final class AppSessionOrchestrator {
         isAuthenticating = false
         isPrivacyScreenBlurred = false
         authFailed = false
+        clearAuthenticationFailure()
         contentClearGeneration += 1
         traceStore?.record(
             category: .session,
@@ -151,6 +155,7 @@ final class AppSessionOrchestrator {
         if shouldBypassPrivacyAuthentication() {
             clearAuthenticationSettleBlur()
             authFailed = false
+            clearAuthenticationFailure()
             isPrivacyScreenBlurred = false
             traceStore?.record(
                 category: .session,
@@ -161,6 +166,7 @@ final class AppSessionOrchestrator {
         }
 
         clearAuthenticationSettleBlur()
+        clearAuthenticationFailure()
         isPrivacyScreenBlurred = true
         traceStore?.record(
             category: .session,
@@ -181,6 +187,7 @@ final class AppSessionOrchestrator {
         }
         clearAuthenticationSettleBlur()
         discardPendingAuthenticatedContext(reason: "sceneResignActive")
+        clearAuthenticationFailure()
         isPrivacyScreenBlurred = true
         authFailed = false
         traceStore?.record(
@@ -193,6 +200,7 @@ final class AppSessionOrchestrator {
     func handleSceneDidEnterBackground() {
         clearAuthenticationSettleBlur()
         discardPendingAuthenticatedContext(reason: "sceneBackground")
+        clearAuthenticationFailure()
         isPrivacyScreenBlurred = true
         authFailed = false
         traceStore?.record(
@@ -220,6 +228,7 @@ final class AppSessionOrchestrator {
         if shouldBypassPrivacyAuthentication() {
             clearAuthenticationSettleBlur()
             authFailed = false
+            clearAuthenticationFailure()
             isPrivacyScreenBlurred = false
             traceStore?.record(
                 category: .session,
@@ -263,6 +272,7 @@ final class AppSessionOrchestrator {
             clearAuthenticationSettleBlur()
             isAuthenticating = true
             authFailed = false
+            clearAuthenticationFailure()
             isPrivacyScreenBlurred = true
             defer { isAuthenticating = false }
 
@@ -299,6 +309,7 @@ final class AppSessionOrchestrator {
                     recordPostAuthenticationCompletion(source: source)
                     authFailed = false
                     clearAuthenticationSettleBlur()
+                    clearAuthenticationFailure()
                     isPrivacyScreenBlurred = false
                     traceStore?.record(
                         category: .session,
@@ -309,6 +320,7 @@ final class AppSessionOrchestrator {
                     discardPendingAuthenticatedContext(reason: "resumeReturnedFalse")
                     clearAuthenticationSettleBlur()
                     authFailed = true
+                    setAuthenticationFailureReason(.authenticationFailed, source: source)
                     traceStore?.record(
                         category: .session,
                         name: "session.handleResume.exit",
@@ -324,6 +336,8 @@ final class AppSessionOrchestrator {
                 discardPendingAuthenticatedContext(reason: "resumeThrew")
                 clearAuthenticationSettleBlur()
                 authFailed = true
+                let failureReason = authenticationFailureReason(for: error)
+                setAuthenticationFailureReason(failureReason, source: source)
                 traceStore?.record(
                     category: .session,
                     name: "session.handleResume.exit",
@@ -331,7 +345,8 @@ final class AppSessionOrchestrator {
                         "reason": "authenticationThrew",
                         "attemptedAuthentication": "true",
                         "source": source,
-                        "errorType": String(describing: type(of: error))
+                        "errorType": String(describing: type(of: error)),
+                        "failureReason": failureReason.rawValue
                     ]
                 )
             }
@@ -339,6 +354,7 @@ final class AppSessionOrchestrator {
         } else {
             clearAuthenticationSettleBlur()
             authFailed = false
+            clearAuthenticationFailure()
             isPrivacyScreenBlurred = false
             traceStore?.record(
                 category: .session,
@@ -530,6 +546,56 @@ final class AppSessionOrchestrator {
                 "source": source
             ]
         )
+    }
+
+    private func setAuthenticationFailureReason(
+        _ reason: AppSessionAuthenticationFailureReason,
+        source: String
+    ) {
+        authenticationFailureReason = reason
+        traceStore?.record(
+            category: .session,
+            name: "session.authenticationFailure.reason",
+            metadata: [
+                "reason": reason.rawValue,
+                "source": source
+            ]
+        )
+    }
+
+    private func clearAuthenticationFailure() {
+        guard authenticationFailureReason != nil else {
+            return
+        }
+        authenticationFailureReason = nil
+        traceStore?.record(
+            category: .session,
+            name: "session.authenticationFailure.clear"
+        )
+    }
+
+    private func authenticationFailureReason(for error: Error) -> AppSessionAuthenticationFailureReason {
+        if let authenticationError = error as? AuthenticationError {
+            switch authenticationError {
+            case .appAccessBiometricsLockedOut:
+                return .biometricsLockedOut
+            case .biometricsUnavailable,
+                 .appAccessBiometricsUnavailable,
+                 .cancelled,
+                 .failed,
+                 .accessControlCreationFailed,
+                 .modeSwitchFailed,
+                 .noIdentities,
+                 .backupRequired:
+                return .authenticationFailed
+            }
+        }
+
+        if let laError = error as? LAError, laError.code == .biometryLockout {
+            return .biometricsLockedOut
+        }
+
+        return .authenticationFailed
     }
 
     private func discardPendingAuthenticatedContext(reason: String) {

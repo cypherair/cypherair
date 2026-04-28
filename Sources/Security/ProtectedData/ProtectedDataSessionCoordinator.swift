@@ -596,7 +596,11 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
 
         if let authenticationError = error as? AuthenticationError {
             switch authenticationError {
-            case .cancelled, .failed, .biometricsUnavailable, .appAccessBiometricsUnavailable:
+            case .cancelled,
+                 .failed,
+                 .biometricsUnavailable,
+                 .appAccessBiometricsUnavailable,
+                 .appAccessBiometricsLockedOut:
                 return true
             case .accessControlCreationFailed, .modeSwitchFailed, .noIdentities, .backupRequired:
                 return false

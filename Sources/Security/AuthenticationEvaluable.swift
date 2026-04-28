@@ -74,6 +74,11 @@ struct AppSessionAuthenticationResult {
     }
 }
 
+enum AppSessionAuthenticationFailureReason: String, Equatable, Sendable {
+    case authenticationFailed
+    case biometricsLockedOut
+}
+
 /// Authentication mode for the app.
 /// Determines the SecAccessControl flags used for SE key wrapping.
 enum AuthenticationMode: String, Codable, Sendable {
