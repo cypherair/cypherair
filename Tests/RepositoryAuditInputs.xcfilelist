@@ -118,6 +118,7 @@ $(SRCROOT)/Sources/PgpMobile/pgp_mobile.swift
 $(SRCROOT)/Sources/Resources/InfoPlist.xcstrings
 $(SRCROOT)/Sources/Resources/Localizable.xcstrings
 $(SRCROOT)/Sources/Security/Argon2idMemoryGuard.swift
+$(SRCROOT)/Sources/Security/AuthErrorTraceMetadata.swift
 $(SRCROOT)/Sources/Security/AuthLifecycleTraceStore.swift
 $(SRCROOT)/Sources/Security/AuthTraceMetadata.swift
 $(SRCROOT)/Sources/Security/AuthenticationEvaluable.swift

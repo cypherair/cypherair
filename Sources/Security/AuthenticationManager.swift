@@ -8,6 +8,19 @@ private enum AuthStrings {
     static let switchModeReason = String(localized: "auth.switchMode.reason", defaultValue: "Authenticate to change security mode")
 }
 
+// LAContext may reply off-main; this box only forwards that single callback.
+private final class LocalAuthenticationPolicyReplyBox: @unchecked Sendable {
+    private let reply: (Bool, Error?) -> Void
+
+    init(_ reply: @escaping (Bool, Error?) -> Void) {
+        self.reply = reply
+    }
+
+    func callAsFunction(_ success: Bool, _ error: Error?) {
+        reply(success, error)
+    }
+}
+
 /// Errors from authentication and mode switching operations.
 enum AuthenticationError: Error, LocalizedError {
     /// Biometric authentication is not available (sensor damaged, locked out, etc.).
@@ -83,6 +96,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private let migrationCoordinator: KeyMigrationCoordinator
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
+    private let localAuthenticationPolicyEvaluator: (
+        LAContext,
+        LAPolicy,
+        String,
+        @escaping (Bool, Error?) -> Void
+    ) -> Void
     private var privateKeyControlStore: (any PrivateKeyControlStoreProtocol)?
 
     // MARK: - State
@@ -120,13 +139,25 @@ final class AuthenticationManager: AuthenticationEvaluable {
         defaults: UserDefaults = .standard,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil,
-        privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil
+        privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
+        localAuthenticationPolicyEvaluator: @escaping (
+            LAContext,
+            LAPolicy,
+            String,
+            @escaping (Bool, Error?) -> Void
+        ) -> Void = { context, policy, reason, reply in
+            let replyBox = LocalAuthenticationPolicyReplyBox(reply)
+            context.evaluatePolicy(policy, localizedReason: reason) { success, error in
+                replyBox(success, error)
+            }
+        }
     ) {
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.defaults = defaults
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
+        self.localAuthenticationPolicyEvaluator = localAuthenticationPolicyEvaluator
         self.privateKeyControlStore = privateKeyControlStore
         let bundleStore = KeyBundleStore(keychain: keychain)
         self.bundleStore = bundleStore
@@ -356,10 +387,38 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     name: "appSession.evaluate.start",
                     metadata: ["policy": policy.rawValue, "source": source, "promptID": promptID]
                 )
-                return try await context.evaluatePolicy(
-                    policy.localAuthenticationPolicy,
-                    localizedReason: reason
+                traceAppSessionPolicyAwaitStage(
+                    "appSession.evaluate.policy.await.start",
+                    policy: policy,
+                    source: source,
+                    promptID: promptID
                 )
+                do {
+                    let success = try await evaluateLocalAuthenticationPolicyWithCallback(
+                        context,
+                        appSessionPolicy: policy,
+                        reason: reason,
+                        source: source,
+                        promptID: promptID
+                    )
+                    traceAppSessionPolicyAwaitStage(
+                        "appSession.evaluate.policy.await.finish",
+                        policy: policy,
+                        source: source,
+                        promptID: promptID,
+                        metadata: ["result": success ? "success" : "failed"]
+                    )
+                    return success
+                } catch {
+                    traceAppSessionPolicyAwaitStage(
+                        "appSession.evaluate.policy.await.throw",
+                        policy: policy,
+                        source: source,
+                        promptID: promptID,
+                        metadata: AuthErrorTraceMetadata.errorMetadata(error)
+                    )
+                    throw error
+                }
             }
             traceStore?.record(
                 category: .prompt,
@@ -459,6 +518,118 @@ final class AuthenticationManager: AuthenticationEvaluable {
             )
             throw AuthenticationError.failed
         }
+    }
+
+    private func evaluateLocalAuthenticationPolicyWithCallback(
+        _ context: LAContext,
+        appSessionPolicy policy: AppSessionAuthenticationPolicy,
+        reason: String,
+        source: String,
+        promptID: String
+    ) async throws -> Bool {
+        traceAppSessionCallbackStage(
+            "appSession.evaluate.callback.call.start",
+            policy: policy,
+            source: source,
+            promptID: promptID
+        )
+
+        return try await withCheckedThrowingContinuation { continuation in
+            localAuthenticationPolicyEvaluator(
+                context,
+                policy.localAuthenticationPolicy,
+                reason
+            ) { success, error in
+                var metadata = Self.callbackReplyMetadata(success: success, error: error)
+                self.traceAppSessionCallbackStage(
+                    "appSession.evaluate.callback.reply",
+                    policy: policy,
+                    source: source,
+                    promptID: promptID,
+                    metadata: metadata
+                )
+
+                if !success && error == nil {
+                    metadata["mappedError"] = "failedWithoutError"
+                }
+                self.traceAppSessionCallbackStage(
+                    "appSession.evaluate.callback.resume",
+                    policy: policy,
+                    source: source,
+                    promptID: promptID,
+                    metadata: metadata
+                )
+
+                if success {
+                    continuation.resume(returning: true)
+                } else if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(throwing: AuthenticationError.failed)
+                }
+            }
+        }
+    }
+
+    private func traceAppSessionPolicyAwaitStage(
+        _ name: String,
+        policy: AppSessionAuthenticationPolicy,
+        source: String,
+        promptID: String,
+        metadata: [String: String] = [:]
+    ) {
+        var mergedMetadata = metadata
+        mergedMetadata["policy"] = policy.rawValue
+        mergedMetadata["source"] = source
+        mergedMetadata["promptID"] = promptID
+        mergedMetadata["isMainThread"] = Thread.isMainThread ? "true" : "false"
+        traceStore?.record(
+            category: .prompt,
+            name: name,
+            metadata: mergedMetadata
+        )
+    }
+
+    private func traceAppSessionCallbackStage(
+        _ name: String,
+        policy: AppSessionAuthenticationPolicy,
+        source: String,
+        promptID: String,
+        metadata: [String: String] = [:]
+    ) {
+        var mergedMetadata = metadata
+        mergedMetadata["policy"] = policy.rawValue
+        mergedMetadata["source"] = source
+        mergedMetadata["promptID"] = promptID
+        mergedMetadata["isMainThread"] = Thread.isMainThread ? "true" : "false"
+        traceStore?.record(
+            category: .prompt,
+            name: name,
+            metadata: mergedMetadata
+        )
+    }
+
+    private static func callbackReplyMetadata(success: Bool, error: Error?) -> [String: String] {
+        if success {
+            return ["result": "success"]
+        }
+
+        guard let error else {
+            return ["result": "failed"]
+        }
+
+        var metadata = [
+            "result": "error",
+            "errorType": String(describing: type(of: error))
+        ]
+        let nsError = error as NSError
+        metadata["errorDomain"] = nsError.domain
+        metadata["errorCode"] = String(nsError.code)
+        if let laError = error as? LAError {
+            metadata["laCode"] = String(laError.errorCode)
+            metadata["laCodeName"] = String(describing: laError.code)
+        }
+        return metadata
     }
 
     // MARK: - Access Control Creation

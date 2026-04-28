@@ -91,17 +91,33 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         _ operation: (PromptTraceContext) async throws -> T
     ) async rethrows -> T {
         let context = beginPrivacyPrompt(source: source)
+        tracePrivacyPromptStage("prompt.privacy.handler.enter", context: context)
         await shieldEventHandler?(.privacy, 1)
         await Task.yield()
         do {
+            tracePrivacyPromptStage("prompt.privacy.operation.await.start", context: context)
             let result = try await operation(context)
+            tracePrivacyPromptStage("prompt.privacy.operation.await.finish", context: context)
+            tracePrivacyPromptStage("prompt.privacy.endDepth.start", context: context)
             endPrivacyPrompt(context)
+            tracePrivacyPromptStage("prompt.privacy.endDepth.finish", context: context)
+            tracePrivacyPromptStage("prompt.privacy.shieldEnd.start", context: context)
             await shieldEventHandler?(.privacy, -1)
+            tracePrivacyPromptStage("prompt.privacy.shieldEnd.finish", context: context)
             return result
         } catch {
+            tracePrivacyPromptStage(
+                "prompt.privacy.operation.await.throw",
+                context: context,
+                metadata: AuthErrorTraceMetadata.errorMetadata(error)
+            )
             tracePromptError(context: context, error: error)
+            tracePrivacyPromptStage("prompt.privacy.endDepth.start", context: context)
             endPrivacyPrompt(context)
+            tracePrivacyPromptStage("prompt.privacy.endDepth.finish", context: context)
+            tracePrivacyPromptStage("prompt.privacy.shieldEnd.start", context: context)
             await shieldEventHandler?(.privacy, -1)
+            tracePrivacyPromptStage("prompt.privacy.shieldEnd.finish", context: context)
             throw error
         }
     }
@@ -120,17 +136,33 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         _ operation: (PromptTraceContext) async throws -> T
     ) async rethrows -> T {
         let context = beginOperationPrompt(source: source)
+        traceOperationPromptStage("prompt.operation.handler.enter", context: context)
         await shieldEventHandler?(.operation, 1)
         await Task.yield()
         do {
+            traceOperationPromptStage("prompt.operation.operation.await.start", context: context)
             let result = try await operation(context)
+            traceOperationPromptStage("prompt.operation.operation.await.finish", context: context)
+            traceOperationPromptStage("prompt.operation.endDepth.start", context: context)
             endOperationPrompt(context)
+            traceOperationPromptStage("prompt.operation.endDepth.finish", context: context)
+            traceOperationPromptStage("prompt.operation.shieldEnd.start", context: context)
             await shieldEventHandler?(.operation, -1)
+            traceOperationPromptStage("prompt.operation.shieldEnd.finish", context: context)
             return result
         } catch {
+            traceOperationPromptStage(
+                "prompt.operation.operation.await.throw",
+                context: context,
+                metadata: AuthErrorTraceMetadata.errorMetadata(error)
+            )
             tracePromptError(context: context, error: error)
+            traceOperationPromptStage("prompt.operation.endDepth.start", context: context)
             endOperationPrompt(context)
+            traceOperationPromptStage("prompt.operation.endDepth.finish", context: context)
+            traceOperationPromptStage("prompt.operation.shieldEnd.start", context: context)
             await shieldEventHandler?(.operation, -1)
+            traceOperationPromptStage("prompt.operation.shieldEnd.finish", context: context)
             throw error
         }
     }
@@ -222,6 +254,39 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             category: .prompt,
             name: "prompt.error",
             metadata: metadata
+        )
+    }
+
+    private func traceOperationPromptStage(
+        _ name: String,
+        context: PromptTraceContext,
+        metadata: [String: String] = [:]
+    ) {
+        tracePromptStage(name, context: context, metadata: metadata)
+    }
+
+    private func tracePrivacyPromptStage(
+        _ name: String,
+        context: PromptTraceContext,
+        metadata: [String: String] = [:]
+    ) {
+        tracePromptStage(name, context: context, metadata: metadata)
+    }
+
+    private func tracePromptStage(
+        _ name: String,
+        context: PromptTraceContext,
+        metadata: [String: String]
+    ) {
+        var mergedMetadata = metadata
+        mergedMetadata["promptID"] = String(context.promptID)
+        mergedMetadata["source"] = context.source
+        mergedMetadata["kind"] = context.kind
+        mergedMetadata["isMainThread"] = Thread.isMainThread ? "true" : "false"
+        traceStore?.record(
+            category: .prompt,
+            name: name,
+            metadata: mergedMetadata
         )
     }
 

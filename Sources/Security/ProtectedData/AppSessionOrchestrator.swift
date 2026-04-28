@@ -258,13 +258,34 @@ final class AppSessionOrchestrator {
             defer { isAuthenticating = false }
 
             do {
+                traceHandleResumeStage(
+                    "session.handleResume.evaluate.start",
+                    source: source
+                )
                 let result = try await evaluateAppAuthentication(localizedReason, source)
+                traceHandleResumeStage(
+                    "session.handleResume.evaluate.finish",
+                    source: source,
+                    metadata: [
+                        "result": result.isAuthenticated ? "authenticated" : "failed",
+                        "hasContext": result.context == nil ? "false" : "true"
+                    ]
+                )
                 if result.isAuthenticated {
                     replacePendingAuthenticatedContext(with: result.context, reason: "resumeAuthenticated")
                     recordAuthentication()
+                    traceHandleResumeStage(
+                        "session.handleResume.postAuth.start",
+                        source: source,
+                        metadata: ["hasContext": result.context == nil ? "false" : "true"]
+                    )
                     await postAuthenticationHandler(
                         borrowAuthenticatedContextForMetadataMigration(),
                         source
+                    )
+                    traceHandleResumeStage(
+                        "session.handleResume.postAuth.finish",
+                        source: source
                     )
                     recordPostAuthenticationCompletion(source: source)
                     authFailed = false
@@ -284,6 +305,11 @@ final class AppSessionOrchestrator {
                     )
                 }
             } catch {
+                traceHandleResumeStage(
+                    "session.handleResume.evaluate.throw",
+                    source: source,
+                    metadata: AuthErrorTraceMetadata.errorMetadata(error)
+                )
                 discardPendingAuthenticatedContext(reason: "resumeThrew")
                 authFailed = true
                 traceStore?.record(
@@ -308,6 +334,20 @@ final class AppSessionOrchestrator {
             )
             return false
         }
+    }
+
+    private func traceHandleResumeStage(
+        _ name: String,
+        source: String,
+        metadata: [String: String] = [:]
+    ) {
+        var mergedMetadata = metadata
+        mergedMetadata["source"] = source
+        traceStore?.record(
+            category: .session,
+            name: name,
+            metadata: mergedMetadata
+        )
     }
 
     @discardableResult
