@@ -1,5 +1,6 @@
 import Foundation
 import LocalAuthentication
+import Security
 import XCTest
 @testable import CypherAir
 
@@ -29,6 +30,56 @@ private final class TraceLineSink: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return lines
+    }
+}
+
+private enum TracePrivateKeyAccessTestError: Error {
+    case seUnwrapFailed
+}
+
+private final class TraceFailingUnwrapSecureEnclave: SecureEnclaveManageable {
+    private let base: MockSecureEnclave
+    private let unwrapError: Error
+
+    init(base: MockSecureEnclave, unwrapError: Error = TracePrivateKeyAccessTestError.seUnwrapFailed) {
+        self.base = base
+        self.unwrapError = unwrapError
+    }
+
+    static var isAvailable: Bool { MockSecureEnclave.isAvailable }
+
+    func generateWrappingKey(
+        accessControl: SecAccessControl?,
+        authenticationContext: LAContext?
+    ) throws -> any SEKeyHandle {
+        try base.generateWrappingKey(
+            accessControl: accessControl,
+            authenticationContext: authenticationContext
+        )
+    }
+
+    func wrap(
+        privateKey: Data,
+        using handle: any SEKeyHandle,
+        fingerprint: String
+    ) throws -> WrappedKeyBundle {
+        try base.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+    }
+
+    func unwrap(
+        bundle: WrappedKeyBundle,
+        using handle: any SEKeyHandle,
+        fingerprint: String
+    ) throws -> Data {
+        throw unwrapError
+    }
+
+    func deleteKey(_ handle: any SEKeyHandle) throws {
+        try base.deleteKey(handle)
+    }
+
+    func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle {
+        try base.reconstructKey(from: data, authenticationContext: authenticationContext)
     }
 }
 
@@ -89,6 +140,38 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return (defaults, suiteName)
+    }
+
+    private func assertTraceNames(
+        _ names: [String],
+        containOrdered expectedNames: [String],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        var searchStart = names.startIndex
+        for expectedName in expectedNames {
+            guard let foundIndex = names[searchStart...].firstIndex(of: expectedName) else {
+                XCTFail("Missing trace entry \(expectedName) in order", file: file, line: line)
+                return
+            }
+            searchStart = names.index(after: foundIndex)
+        }
+    }
+
+    private func saveTraceWrappedPrivateKey(
+        secureEnclave: MockSecureEnclave,
+        bundleStore: KeyBundleStore,
+        fingerprint: String = String(repeating: "a", count: 40),
+        privateKey: Data = Data([0x11, 0x22, 0x33, 0x44])
+    ) throws -> (fingerprint: String, privateKey: Data) {
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let bundle = try secureEnclave.wrap(
+            privateKey: privateKey,
+            using: handle,
+            fingerprint: fingerprint
+        )
+        try bundleStore.saveBundle(bundle, fingerprint: fingerprint)
+        return (fingerprint, privateKey)
     }
 
     func test_traceStore_capsEntriesAtCapacity() {
@@ -354,6 +437,183 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertEqual(promptBegins.compactMap { $0.metadata["source"] }, ["trace.privacy", "trace.operation"])
         XCTAssertEqual(promptBegins.compactMap { $0.metadata["promptID"] }, promptEnds.compactMap { $0.metadata["promptID"] })
         XCTAssertEqual(Set(promptBegins.compactMap { $0.metadata["promptID"] }).count, 2)
+    }
+
+    func test_authenticationPromptCoordinator_recordsOperationPromptSuccessBoundaries() async throws {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let coordinator = TraceAuthenticationPromptCoordinator(traceStore: store)
+
+        let result = try await coordinator.withOperationPrompt(source: "trace.operation.success") { context in
+            XCTAssertEqual(context.source, "trace.operation.success")
+            return 2
+        }
+
+        XCTAssertEqual(result, 2)
+        let names = store.recentEntries.map(\.name)
+        assertTraceNames(
+            names,
+            containOrdered: [
+                "prompt.operation.handler.enter",
+                "prompt.operation.operation.await.start",
+                "prompt.operation.operation.await.finish",
+                "prompt.operation.endDepth.start",
+                "prompt.operation.endDepth.finish",
+                "prompt.operation.shieldEnd.start",
+                "prompt.operation.shieldEnd.finish"
+            ]
+        )
+
+        let operationBoundaryEntries = store.recentEntries
+            .filter { $0.name.hasPrefix("prompt.operation.") }
+        XCTAssertFalse(operationBoundaryEntries.isEmpty)
+        XCTAssertEqual(Set(operationBoundaryEntries.compactMap { $0.metadata["promptID"] }).count, 1)
+        for entry in operationBoundaryEntries {
+            XCTAssertEqual(entry.metadata["source"], "trace.operation.success")
+            XCTAssertEqual(entry.metadata["kind"], "operation")
+            XCTAssertNotNil(entry.metadata["isMainThread"])
+        }
+    }
+
+    func test_authenticationPromptCoordinator_recordsOperationPromptThrowBoundaries() async {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let coordinator = TraceAuthenticationPromptCoordinator(traceStore: store)
+
+        do {
+            _ = try await coordinator.withOperationPrompt(source: "trace.operation.throw") { _ in
+                throw TracePrivateKeyAccessTestError.seUnwrapFailed
+            }
+            XCTFail("Expected operation prompt to throw")
+        } catch TracePrivateKeyAccessTestError.seUnwrapFailed {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        let names = store.recentEntries.map(\.name)
+        assertTraceNames(
+            names,
+            containOrdered: [
+                "prompt.operation.operation.await.start",
+                "prompt.operation.operation.await.throw",
+                "prompt.operation.endDepth.start",
+                "prompt.operation.endDepth.finish",
+                "prompt.operation.shieldEnd.start",
+                "prompt.operation.shieldEnd.finish"
+            ]
+        )
+
+        guard let throwEntry = store.recentEntries.first(where: { $0.name == "prompt.operation.operation.await.throw" }) else {
+            XCTFail("Expected operation await throw trace")
+            return
+        }
+        XCTAssertEqual(throwEntry.metadata["source"], "trace.operation.throw")
+        XCTAssertEqual(throwEntry.metadata["kind"], "operation")
+        XCTAssertEqual(throwEntry.metadata["errorType"], "TracePrivateKeyAccessTestError")
+        XCTAssertNotNil(throwEntry.metadata["isMainThread"])
+    }
+
+    func test_privateKeyAccessService_recordsSuccessfulUnwrapClosureTraceWithoutSensitiveValues() async throws {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let secureEnclave = MockSecureEnclave()
+        let keychain = MockKeychain()
+        let bundleStore = KeyBundleStore(keychain: keychain)
+        let fixture = try saveTraceWrappedPrivateKey(
+            secureEnclave: secureEnclave,
+            bundleStore: bundleStore
+        )
+        let accessService = PrivateKeyAccessService(
+            secureEnclave: secureEnclave,
+            bundleStore: bundleStore,
+            authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: store),
+            traceStore: store
+        )
+
+        let unwrapped = try await accessService.unwrapPrivateKey(fingerprint: fixture.fingerprint)
+
+        XCTAssertEqual(unwrapped, fixture.privateKey)
+        assertTraceNames(
+            store.recentEntries.map(\.name),
+            containOrdered: [
+                "privateKey.unwrap.bundle.load.start",
+                "privateKey.unwrap.bundle.load.finish",
+                "privateKey.unwrap.reconstruct.start",
+                "privateKey.unwrap.reconstruct.finish",
+                "privateKey.unwrap.seUnwrap.call.start",
+                "privateKey.unwrap.seUnwrap.call.finish",
+                "privateKey.unwrap.closure.return",
+                "prompt.operation.operation.await.finish"
+            ]
+        )
+        XCTAssertTrue(
+            store.recentEntries.contains {
+                $0.name == "privateKey.unwrap.seUnwrap.call.finish"
+                    && $0.metadata["result"] == "success"
+            }
+        )
+
+        let metadataKeys = Set(store.recentEntries.flatMap { $0.metadata.keys })
+        let metadataValues = store.recentEntries.flatMap { $0.metadata.values }
+        XCTAssertFalse(metadataKeys.contains("fingerprint"))
+        XCTAssertFalse(metadataKeys.contains("privateKey"))
+        XCTAssertFalse(metadataValues.contains(fixture.fingerprint))
+    }
+
+    func test_privateKeyAccessService_recordsUnwrapFailureStageWithoutSensitiveValues() async {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let secureEnclave = MockSecureEnclave()
+        let keychain = MockKeychain()
+        let bundleStore = KeyBundleStore(keychain: keychain)
+        let fixture: (fingerprint: String, privateKey: Data)
+        do {
+            fixture = try saveTraceWrappedPrivateKey(
+                secureEnclave: secureEnclave,
+                bundleStore: bundleStore
+            )
+        } catch {
+            XCTFail("Failed to create wrapped test key: \(error)")
+            return
+        }
+        let accessService = PrivateKeyAccessService(
+            secureEnclave: TraceFailingUnwrapSecureEnclave(base: secureEnclave),
+            bundleStore: bundleStore,
+            authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: store),
+            traceStore: store
+        )
+
+        do {
+            _ = try await accessService.unwrapPrivateKey(fingerprint: fixture.fingerprint)
+            XCTFail("Expected unwrapPrivateKey to throw")
+        } catch TracePrivateKeyAccessTestError.seUnwrapFailed {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        assertTraceNames(
+            store.recentEntries.map(\.name),
+            containOrdered: [
+                "privateKey.unwrap.bundle.load.start",
+                "privateKey.unwrap.bundle.load.finish",
+                "privateKey.unwrap.reconstruct.start",
+                "privateKey.unwrap.reconstruct.finish",
+                "privateKey.unwrap.seUnwrap.call.start",
+                "privateKey.unwrap.seUnwrap.call.finish",
+                "prompt.operation.operation.await.throw",
+                "privateKey.unwrap.finish"
+            ]
+        )
+        XCTAssertTrue(
+            store.recentEntries.contains {
+                $0.name == "privateKey.unwrap.seUnwrap.call.finish"
+                    && $0.metadata["result"] == "failure"
+                    && $0.metadata["errorType"] == "TracePrivateKeyAccessTestError"
+            }
+        )
+        XCTAssertFalse(store.recentEntries.contains { $0.name == "privateKey.unwrap.closure.return" })
+
+        let metadataKeys = Set(store.recentEntries.flatMap { $0.metadata.keys })
+        let metadataValues = store.recentEntries.flatMap { $0.metadata.values }
+        XCTAssertFalse(metadataKeys.contains("fingerprint"))
+        XCTAssertFalse(metadataKeys.contains("privateKey"))
+        XCTAssertFalse(metadataValues.contains(fixture.fingerprint))
     }
 
     func test_authenticationShieldCoordinator_recordsShieldTraceEventsIntoStoreAndSink() async {

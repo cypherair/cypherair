@@ -218,7 +218,7 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
             guard !Task.isCancelled else { return }
 
             self?.tracePendingDismissalFallbackFired(for: cycleID, reason: .activeProbe)
-            if self?.completePendingDismissalIfMacOSApplicationIsActive(for: cycleID) == true {
+            if self?.completePendingDismissalIfMacOSApplicationIsActive(for: cycleID, attempt: 1) == true {
                 return
             }
 
@@ -226,19 +226,25 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
             guard !Task.isCancelled else { return }
 
             self?.tracePendingDismissalFallbackFired(for: cycleID, reason: .activeProbe)
-            _ = self?.completePendingDismissalIfMacOSApplicationIsActive(for: cycleID)
+            _ = self?.completePendingDismissalIfMacOSApplicationIsActive(for: cycleID, attempt: 2)
         }
         #endif
     }
 
     @discardableResult
     @MainActor
-    private func completePendingDismissalIfMacOSApplicationIsActive(for cycleID: UInt64) -> Bool {
+    private func completePendingDismissalIfMacOSApplicationIsActive(for cycleID: UInt64, attempt: Int) -> Bool {
         #if os(macOS)
+        let applicationActive = macOSApplicationIsActive()
+        traceMacOSActiveProbeSample(
+            for: cycleID,
+            attempt: attempt,
+            applicationActive: applicationActive
+        )
         guard isPendingDismissal else { return false }
         guard promptCycleID == cycleID else { return false }
         guard totalPromptDepth == 0 else { return false }
-        guard macOSApplicationIsActive() else { return false }
+        guard applicationActive else { return false }
 
         lastLifecyclePhase = .active
         completePendingDismissalIfEligible(for: cycleID, reason: .activeProbe)
@@ -366,6 +372,26 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
                 "cycle": String(cycleID),
                 "elapsedMs": pendingDismissalElapsedMilliseconds(),
                 "reason": reason.rawValue
+            ]
+        )
+    }
+
+    private func traceMacOSActiveProbeSample(
+        for cycleID: UInt64,
+        attempt: Int,
+        applicationActive: Bool
+    ) {
+        traceStore?.record(
+            category: .lifecycle,
+            name: "shield.activeProbe.sample",
+            metadata: [
+                "applicationActive": applicationActive ? "true" : "false",
+                "attempt": String(attempt),
+                "cycle": String(cycleID),
+                "currentCycle": String(promptCycleID),
+                "lastLifecyclePhase": lastLifecyclePhase.rawValue,
+                "pending": isPendingDismissal ? "true" : "false",
+                "totalDepth": String(totalPromptDepth)
             ]
         )
     }

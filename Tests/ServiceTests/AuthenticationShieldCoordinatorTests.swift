@@ -259,6 +259,16 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
         await settleShieldDismissal()
 
         XCTAssertFalse(coordinator.isVisible)
+        guard let activeProbeSample = traceStore.recentEntries.first(where: { $0.name == "shield.activeProbe.sample" }) else {
+            XCTFail("Expected shield.activeProbe.sample trace entry")
+            return
+        }
+        XCTAssertEqual(activeProbeSample.metadata["cycle"], "1")
+        XCTAssertEqual(activeProbeSample.metadata["attempt"], "1")
+        XCTAssertEqual(activeProbeSample.metadata["applicationActive"], "true")
+        XCTAssertEqual(activeProbeSample.metadata["totalDepth"], "0")
+        XCTAssertEqual(activeProbeSample.metadata["lastLifecyclePhase"], "inactive")
+
         guard let completionEntry = traceStore.recentEntries.last(where: { $0.name == "shield.dismissal.complete" }) else {
             XCTFail("Expected shield.dismissal.complete trace entry")
             return
@@ -268,7 +278,11 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
     }
 
     func test_lateInactiveDuringPendingDismissal_clearsWhenMacApplicationIsActive() async {
-        let coordinator = AuthenticationShieldCoordinator(macOSApplicationIsActive: { true })
+        let traceStore = makeTraceStore()
+        let coordinator = AuthenticationShieldCoordinator(
+            traceStore: traceStore,
+            macOSApplicationIsActive: { true }
+        )
 
         coordinator.begin(.operation)
         coordinator.end(.operation)
@@ -281,10 +295,27 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
 
         XCTAssertFalse(coordinator.isVisible)
         XCTAssertNil(coordinator.presentationState)
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "shield.activeProbe.sample"
+                    && $0.metadata["applicationActive"] == "true"
+                    && $0.metadata["lastLifecyclePhase"] == "inactive"
+            }
+        )
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "shield.dismissal.complete"
+                    && $0.metadata["reason"] == "activeProbe"
+            }
+        )
     }
 
     func test_activeProbeFalse_keepsShieldUntilLifecycleBecomesActive() async {
-        let coordinator = AuthenticationShieldCoordinator(macOSApplicationIsActive: { false })
+        let traceStore = makeTraceStore()
+        let coordinator = AuthenticationShieldCoordinator(
+            traceStore: traceStore,
+            macOSApplicationIsActive: { false }
+        )
 
         coordinator.begin(.privacy)
         coordinator.sceneDidResignActive()
@@ -294,6 +325,19 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
 
         XCTAssertTrue(coordinator.isVisible)
         XCTAssertEqual(coordinator.presentationState?.isPendingDismissal, true)
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "shield.activeProbe.sample"
+                    && $0.metadata["applicationActive"] == "false"
+                    && $0.metadata["totalDepth"] == "0"
+                    && $0.metadata["lastLifecyclePhase"] == "inactive"
+            }
+        )
+        XCTAssertFalse(
+            traceStore.recentEntries.contains {
+                $0.name == "shield.dismissal.complete"
+            }
+        )
 
         coordinator.sceneDidBecomeActive()
 
