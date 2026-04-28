@@ -192,7 +192,7 @@ Inspired by Apple's Stolen Device Protection: prevents a thief who has both the 
 When the user changes mode in Settings:
 
 1. Display warning. If switching to High Security and no backup exists, show a stronger warning requiring explicit acknowledgment.
-2. Set an in-progress flag in UserDefaults (`com.cypherair.internal.rewrapInProgress = true`).
+2. Record the rewrap target and phase in the post-unlock `private-key-control.recoveryJournal`.
 3. Authenticate under the **current** mode (proves the user has authority to change).
 4. For each private key:
    a. Unwrap using the current SE key.
@@ -203,20 +203,22 @@ When the user changes mode in Settings:
 5. **Verify all new items are successfully stored.**
 6. Delete the **old** Keychain items (original `com.cypherair.v1.se-key.<fingerprint>` etc.).
 7. Rename the temporary items to their permanent key names.
-8. Persist the mode preference to UserDefaults (`com.cypherair.preference.authMode`).
-9. Clear the in-progress flag (`com.cypherair.internal.rewrapInProgress = false`).
+8. Persist the new mode to `private-key-control.settings.authMode`.
+9. Clear the `private-key-control.recoveryJournal` rewrap entry.
 
 **Atomicity:** Old Keychain items are kept intact until ALL new items are confirmed stored (step 5). If any step fails before step 6, the original keys are unaffected — delete the temporary items and report the error.
 
-**Crash recovery:** On app launch, check for the in-progress flag. If present:
+**Crash recovery:** After app-session authentication opens `private-key-control`, check the rewrap recovery journal. If an entry is present:
 - If the permanent bundle is complete and temporary items exist, the permanent bundle is treated as authoritative. Delete the temporary items and keep the original mode.
 - If the permanent bundle is partial but the temporary bundle is complete, the temporary bundle is treated as authoritative. Delete the residual permanent items, then promote the temporary bundle to permanent names.
 - If the permanent bundle is missing and the temporary bundle is complete, promote the temporary bundle to permanent names.
-- If neither namespace contains a complete three-item bundle, recovery is **unrecoverable**. Clear the flag, surface a generic startup warning, and require the user to restore from backup if private-key operations fail.
-- If deletion or promotion fails for a retryable reason (for example, transient Keychain write/delete failure), preserve the in-progress flag so the app retries recovery on next launch.
-- Startup diagnostics are surfaced through the app's existing startup warning path and must remain generic — never include fingerprints or other key identifiers.
+- If neither namespace contains a complete three-item bundle, recovery is **unrecoverable**. Clear the journal entry, surface a generic post-unlock warning, and require the user to restore from backup if private-key operations fail.
+- If deletion or promotion fails for a retryable reason (for example, transient Keychain write/delete failure), preserve the recovery journal so the app retries recovery after the next successful unlock.
+- Recovery diagnostics are surfaced through the app's existing post-unlock warning path and must remain generic — never include fingerprints or other key identifiers.
 - Persist the new auth mode only after a full successful promotion of complete pending bundles. Cleaning stale pending items alone must not change auth mode.
 - This ensures the app prefers a complete bundle over a partial one and avoids silently finalizing an inconsistent state.
+
+Legacy `UserDefaults` keys such as `com.cypherair.internal.rewrapInProgress` and `com.cypherair.preference.authMode` are migration sources only. Verified Phase 5 migration moves them into `private-key-control` and removes the legacy keys.
 
 ### LAPolicy Selection
 

@@ -166,6 +166,8 @@ This phase does not migrate Contacts or any private-key-adjacent source of truth
 
 Create the `private-key-control` ProtectedData domain, migrate `authMode` and the private-key recovery journal, and move rewrap / modify-expiry recovery detection out of pre-auth startup without moving private-key material into ProtectedData.
 
+Current status: implemented. See [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) for the code-backed boundary and remaining downstream work.
+
 ### Phase 6: Key Metadata Domain
 
 Create the `key metadata` ProtectedData domain, migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account, and avoid empty-key-list flashes during unlock.
@@ -176,9 +178,9 @@ Migrate ordinary protected-after-unlock settings, self-test policy, and related 
 
 ### Phase 8: Contacts Protected Domain
 
-Migrate Contacts onto the shared protected app-data framework only after the earlier private-key-control, key-metadata, and non-Contacts protected-after-unlock work has been completed. Contacts must remain a domain-specific consumer of the shared framework, not a second independent vault architecture.
+Migrate Contacts onto the shared protected app-data framework only after the earlier key-metadata and non-Contacts protected-after-unlock work has been completed. Contacts must remain a domain-specific consumer of the shared framework, not a second independent vault architecture.
 
-See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts-internal PR sequence. AppData Phase 4 is a prerequisite, but Contacts PR1-PR8 remain Phase 8 work behind the Phase 5-7 gates.
+See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts-internal PR sequence. AppData Phase 4 and Phase 5 are prerequisites, but Contacts PR1-PR8 remain Phase 8 work behind the remaining Phase 6-7 gates.
 
 ### Phase 9: Future Persistent Domains
 

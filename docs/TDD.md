@@ -284,7 +284,7 @@ See also [SECURITY.md](SECURITY.md) Section 3 for the full unwrapping security a
 4. Re-wrap each private key with the new SE key.
 5. Store the new wrapped blobs in Keychain.
 
-*This operation requires the user to authenticate once (under the current mode) and is atomic: if any step fails, the original keys remain intact.* Crash recovery via `rewrapInProgress` flag. See [SECURITY.md](SECURITY.md) Section 4.
+*This operation requires the user to authenticate once (under the current mode) and is atomic: if any step fails, the original keys remain intact.* Crash recovery uses the post-unlock `private-key-control.recoveryJournal`. See [SECURITY.md](SECURITY.md) Section 4.
 
 ### 3.5 Keychain Layout
 
@@ -358,10 +358,10 @@ Generate: `CIQRCodeGenerator`. Decode from photo: PHPicker + CoreImage `CIDetect
 Keychain default account: SE key + salt + sealed-key + pending private-key recovery rows
 Keychain metadata account: `PGPKeyIdentity` cold-launch metadata index
 Keychain protected-data row: shared app-data root secret
-/Application Support/ProtectedData/: registry, protected-settings domain, domain bootstrap metadata
+/Application Support/ProtectedData/: registry, private-key-control domain, protected-settings domain, domain bootstrap metadata
 /Documents/: contacts/ (public keys + `contact-metadata.json`), self-test/
 /Library/Preferences/ (UserDefaults):
-  com.cypherair.preference.authMode              → "standard" | "highSecurity" (future private-key-control domain)
+  com.cypherair.preference.authMode              → legacy source removed after private-key-control migration
   com.cypherair.preference.appSessionAuthenticationPolicy → boot auth profile
   com.cypherair.preference.gracePeriod           → Int (0/60/180/300)
   com.cypherair.preference.encryptToSelf         → Bool (default true)
@@ -369,17 +369,17 @@ Keychain protected-data row: shared app-data root secret
   com.cypherair.preference.onboardingComplete    → Bool (default false)
   com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
   com.cypherair.preference.colorTheme            → String (ColorTheme rawValue, default "systemDefault")
-  com.cypherair.internal.rewrapInProgress        → Bool (future private-key-control.recoveryJournal)
-  com.cypherair.internal.rewrapTargetMode        → String (future private-key-control.recoveryJournal)
-  com.cypherair.internal.modifyExpiryInProgress  → Bool (future private-key-control.recoveryJournal)
-  com.cypherair.internal.modifyExpiryFingerprint → String (future private-key-control.recoveryJournal)
+  com.cypherair.internal.rewrapInProgress        → legacy source removed after private-key-control migration
+  com.cypherair.internal.rewrapTargetMode        → legacy source removed after private-key-control migration
+  com.cypherair.internal.modifyExpiryInProgress  → legacy source removed after private-key-control migration
+  com.cypherair.internal.modifyExpiryFingerprint → legacy source removed after private-key-control migration
 /tmp/decrypted/: ephemeral file previews
 /tmp/streaming/: temporary streaming encrypt/decrypt outputs
 /tmp/export-*: temporary fileExporter handoff files
 /tmp/CypherAirGuidedTutorial-*: tutorial contacts sandbox
 ```
 
-Protected app-data planning covers all CypherAir-owned local data, not only preferences. Current permanent exceptions are limited to the app-session boot authentication profile, private-key material rows protected by Keychain / Secure Enclave, ProtectedData framework bootstrap metadata, test-only or legacy-cleanup state, short-lived temporary files with cleanup requirements, and user-exported files after they leave the app-controlled sandbox. Private-key control state and key metadata are future post-unlock ProtectedData domain targets.
+Protected app-data planning covers all CypherAir-owned local data, not only preferences. Current permanent exceptions are limited to the app-session boot authentication profile, private-key material rows protected by Keychain / Secure Enclave, ProtectedData framework bootstrap metadata, test-only or legacy-cleanup state, short-lived temporary files with cleanup requirements, and user-exported files after they leave the app-controlled sandbox. Private-key control state now lives in the post-unlock `private-key-control` ProtectedData domain; key metadata remains a future post-unlock ProtectedData domain target.
 
 ---
 

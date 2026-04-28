@@ -458,10 +458,10 @@ Permanent v1 boot exception:
 
 - `appSessionAuthenticationPolicy`: the boot authentication profile that decides whether app launch and app-data root-secret authorization use user-presence or biometrics-only policy. It stays early-readable unless a future design introduces a separately reviewed protected value plus boot cache.
 
-Future private-key control domain:
+Current private-key control domain:
 
-- `authMode`: private-key protection mode for Secure Enclave / Keychain private-key operations. It should move into a dedicated `private-key-control.settings.authMode` ProtectedData domain section, not into ordinary protected settings.
-- `rewrapInProgress`, `rewrapTargetMode`, `modifyExpiryInProgress`, and `modifyExpiryFingerprint`: private-key operation recovery state. These should move into `private-key-control.recoveryJournal`; pre-auth startup must not keep a recovery marker, and recovery detection should run after app unlock opens this domain.
+- `authMode`: private-key protection mode for Secure Enclave / Keychain private-key operations. It lives in the dedicated `private-key-control.settings.authMode` ProtectedData domain section, not in ordinary protected settings.
+- `rewrapInProgress`, `rewrapTargetMode`, `modifyExpiryInProgress`, and `modifyExpiryFingerprint`: legacy `UserDefaults` source keys for private-key operation recovery state. They migrate into `private-key-control.recoveryJournal`; pre-auth startup must not keep a recovery marker, and recovery detection runs after app unlock opens this domain.
 
 Private-key material exception:
 
@@ -485,7 +485,7 @@ UserDefaults key if present.
 Rules:
 
 - only the boot authentication profile is a current long-term early-readable app-setting exception
-- private-key control state moves only through a dedicated `private-key-control` design; it must not be mixed into ordinary protected settings
+- private-key control state belongs only to the dedicated `private-key-control` design; it must not be mixed into ordinary protected settings
 - private-key bundle material remains in the current Keychain / Secure Enclave domain
 - key metadata migration requires a post-unlock loading design that avoids double authentication and empty key-list flashes
 - deferred settings remain early-readable in v1 only until their startup or routing dependency is removed
