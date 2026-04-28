@@ -26,19 +26,7 @@ struct PrivacyScreenModifier: ViewModifier {
                             .fill(.ultraThinMaterial)
                             .ignoresSafeArea()
 
-                        if appSessionOrchestrator.authFailed && !appSessionOrchestrator.isAuthenticating {
-                            Button {
-                                performResumeAction(retry: true, source: "retryButton")
-                            } label: {
-                                Label(
-                                    String(localized: "privacy.tapToAuth", defaultValue: "Tap to Authenticate"),
-                                    systemImage: biometricIconName
-                                )
-                                .font(.headline)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .accessibilityLabel(String(localized: "privacy.tapToAuth.a11y", defaultValue: "Authenticate to unlock the app"))
-                        }
+                        authenticationFailureView
                     }
                     .transition(.opacity)
                     .onAppear {
@@ -157,6 +145,124 @@ struct PrivacyScreenModifier: ViewModifier {
         "touchid"
         #else
         "faceid"
+        #endif
+    }
+
+    @ViewBuilder
+    private var authenticationFailureView: some View {
+        if appSessionOrchestrator.authFailed && !appSessionOrchestrator.isAuthenticating {
+            switch appSessionOrchestrator.authenticationFailureReason {
+            case .biometricsLockedOut:
+                VStack(spacing: 14) {
+                    Image(systemName: biometricIconName)
+                        .font(.system(size: 32, weight: .semibold))
+                        .foregroundStyle(.secondary)
+
+                    VStack(spacing: 8) {
+                        Text(biometricsLockedOutTitle)
+                            .font(.headline)
+                            .multilineTextAlignment(.center)
+
+                        Text(biometricsLockedOutMessage)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text(biometricsLockedOutRecoveryMessage)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    retryAuthenticationButton(
+                        title: biometricsLockedOutRetryTitle,
+                        accessibilityLabel: biometricsLockedOutRetryAccessibilityLabel
+                    )
+                }
+                .padding(22)
+                .frame(maxWidth: 440)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            case .authenticationFailed, nil:
+                retryAuthenticationButton(
+                    title: String(localized: "privacy.tapToAuth", defaultValue: "Tap to Authenticate"),
+                    accessibilityLabel: String(localized: "privacy.tapToAuth.a11y", defaultValue: "Authenticate to unlock the app")
+                )
+            }
+        }
+    }
+
+    private func retryAuthenticationButton(title: String, accessibilityLabel: String) -> some View {
+        Button {
+            performResumeAction(retry: true, source: "retryButton")
+        } label: {
+            Label(title, systemImage: biometricIconName)
+                .font(.headline)
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var biometricsLockedOutTitle: String {
+        #if os(macOS)
+        String(localized: "privacy.biometricsLockedOut.title.macOS", defaultValue: "Touch ID is locked by macOS")
+        #elseif os(visionOS)
+        String(localized: "privacy.biometricsLockedOut.title.visionOS", defaultValue: "Optic ID is locked by visionOS")
+        #else
+        String(localized: "privacy.biometricsLockedOut.title.iOS", defaultValue: "Biometric authentication is locked by iOS")
+        #endif
+    }
+
+    private var biometricsLockedOutMessage: String {
+        #if os(macOS)
+        String(
+            localized: "privacy.biometricsLockedOut.message.macOS",
+            defaultValue: "CypherAir is set to Biometrics Only, so it will not use your Mac password as a fallback."
+        )
+        #else
+        String(
+            localized: "privacy.biometricsLockedOut.message.device",
+            defaultValue: "CypherAir is set to Biometrics Only, so it will not use your device passcode as a fallback."
+        )
+        #endif
+    }
+
+    private var biometricsLockedOutRecoveryMessage: String {
+        #if os(macOS)
+        String(
+            localized: "privacy.biometricsLockedOut.recovery.macOS",
+            defaultValue: "Unlock your Mac with your password to re-enable Touch ID, then retry."
+        )
+        #else
+        String(
+            localized: "privacy.biometricsLockedOut.recovery.device",
+            defaultValue: "Use the system passcode flow to re-enable biometric authentication, then retry."
+        )
+        #endif
+    }
+
+    private var biometricsLockedOutRetryTitle: String {
+        #if os(macOS)
+        String(localized: "privacy.biometricsLockedOut.retry.touchID", defaultValue: "Retry Touch ID")
+        #elseif os(visionOS)
+        String(localized: "privacy.biometricsLockedOut.retry.opticID", defaultValue: "Retry Optic ID")
+        #else
+        String(localized: "privacy.biometricsLockedOut.retry.faceID", defaultValue: "Retry Face ID")
+        #endif
+    }
+
+    private var biometricsLockedOutRetryAccessibilityLabel: String {
+        #if os(macOS)
+        String(
+            localized: "privacy.biometricsLockedOut.retry.a11y.macOS",
+            defaultValue: "Retry Touch ID after re-enabling it with your Mac password"
+        )
+        #else
+        String(
+            localized: "privacy.biometricsLockedOut.retry.a11y.device",
+            defaultValue: "Retry biometric authentication after re-enabling it with the system passcode"
+        )
         #endif
     }
 

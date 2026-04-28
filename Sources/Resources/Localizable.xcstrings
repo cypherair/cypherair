@@ -2849,6 +2849,22 @@
         }
       }
     },
+    "error.auth.appAccessBiometricsLockedOut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometric authentication is locked by the system. App Access Protection cannot use Biometrics Only until biometric authentication is restored."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生物认证已被系统锁定。生物认证恢复前，App 访问保护不能使用仅生物认证。"
+          }
+        }
+      }
+    },
     "error.auth.backupRequired" : {
       "localizations" : {
         "en" : {
@@ -8061,6 +8077,198 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查看密钥详情"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.message.device" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir is set to Biometrics Only, so it will not use your device passcode as a fallback."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir 当前设置为“仅生物认证”，因此不会使用设备密码作为备用解锁方式。"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.message.macOS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir is set to Biometrics Only, so it will not use your Mac password as a fallback."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir 当前设置为“仅生物认证”，因此不会使用 Mac 密码作为备用解锁方式。"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.recovery.device" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use the system passcode flow to re-enable biometric authentication, then retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先通过系统密码流程重新启用生物认证，然后重试。"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.recovery.macOS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock your Mac with your password to re-enable Touch ID, then retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先用 Mac 密码解锁一次以重新启用 Touch ID，然后重试。"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.retry.a11y.device" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry biometric authentication after re-enabling it with the system passcode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用系统密码重新启用生物认证后重试"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.retry.a11y.macOS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry Touch ID after re-enabling it with your Mac password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Mac 密码重新启用 Touch ID 后重试"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.retry.faceID" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry Face ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试 Face ID"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.retry.opticID" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry Optic ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试 Optic ID"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.retry.touchID" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry Touch ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试 Touch ID"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.title.iOS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometric authentication is locked by iOS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生物认证已被 iOS 锁定"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.title.macOS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch ID is locked by macOS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch ID 已被 macOS 锁定"
+          }
+        }
+      }
+    },
+    "privacy.biometricsLockedOut.title.visionOS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optic ID is locked by visionOS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optic ID 已被 visionOS 锁定"
           }
         }
       }

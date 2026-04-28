@@ -27,6 +27,8 @@ enum AuthenticationError: Error, LocalizedError {
     case biometricsUnavailable
     /// App Access biometrics-only authentication is unavailable.
     case appAccessBiometricsUnavailable
+    /// App Access biometrics-only authentication is locked out by the system.
+    case appAccessBiometricsLockedOut
     /// The user cancelled the authentication prompt.
     case cancelled
     /// Authentication failed (wrong biometric, wrong passcode, etc.).
@@ -50,6 +52,9 @@ enum AuthenticationError: Error, LocalizedError {
         case .appAccessBiometricsUnavailable:
             String(localized: "error.auth.appAccessBiometricsUnavailable",
                    defaultValue: "Biometric authentication is currently unavailable. App Access Protection cannot use Biometrics Only until biometric authentication is restored.")
+        case .appAccessBiometricsLockedOut:
+            String(localized: "error.auth.appAccessBiometricsLockedOut",
+                   defaultValue: "Biometric authentication is locked by the system. App Access Protection cannot use Biometrics Only until biometric authentication is restored.")
         case .cancelled:
             String(localized: "error.auth.cancelled",
                    defaultValue: "Authentication was cancelled.")
@@ -432,9 +437,35 @@ final class AuthenticationManager: AuthenticationEvaluable {
                 ]
             )
             return success ? .authenticated(context: context) : .failed
+        } catch let error as LAError where error.code == .biometryLockout {
+            traceStore?.record(
+                category: .prompt,
+                name: "appSession.evaluate.error",
+                metadata: traceErrorMetadata(
+                    error,
+                    extra: [
+                        "policy": policy.rawValue,
+                        "source": source,
+                        "promptID": promptID,
+                        "mappedError": "appAccessBiometricsLockedOut"
+                    ]
+                )
+            )
+            traceStore?.record(
+                category: .prompt,
+                name: "appSession.evaluate.finish",
+                metadata: [
+                    "result": "error",
+                    "policy": policy.rawValue,
+                    "source": source,
+                    "promptID": promptID,
+                    "mappedError": "appAccessBiometricsLockedOut",
+                    "hasContext": "false"
+                ]
+            )
+            throw AuthenticationError.appAccessBiometricsLockedOut
         } catch let error as LAError where error.code == .biometryNotAvailable
-                                         || error.code == .biometryNotEnrolled
-                                         || error.code == .biometryLockout {
+                                         || error.code == .biometryNotEnrolled {
             traceStore?.record(
                 category: .prompt,
                 name: "appSession.evaluate.error",

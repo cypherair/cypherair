@@ -951,6 +951,75 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertFalse(metadataValues.contains(reason))
     }
 
+    func test_authenticationManager_evaluateAppSessionMapsBiometryLockoutTrace() async {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let reason = "Trace lockout policy reason must stay out of metadata"
+        let manager = TraceAuthenticationManager(
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            defaults: defaults,
+            authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: traceStore),
+            traceStore: traceStore,
+            localAuthenticationPolicyEvaluator: { _, policy, receivedReason, reply in
+                XCTAssertEqual(policy, AppSessionAuthenticationPolicy.biometricsOnly.localAuthenticationPolicy)
+                XCTAssertEqual(receivedReason, reason)
+                reply(false, LAError(.biometryLockout))
+            }
+        )
+
+        do {
+            _ = try await manager.evaluateAppSession(
+                policy: .biometricsOnly,
+                reason: reason,
+                source: "unit.appSession.lockout"
+            )
+            XCTFail("Expected app session evaluation to map biometry lockout")
+        } catch AuthenticationError.appAccessBiometricsLockedOut {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        assertTraceNames(
+            traceStore.recentEntries.map(\.name),
+            containOrdered: [
+                "appSession.evaluate.policy.await.start",
+                "appSession.evaluate.callback.call.start",
+                "appSession.evaluate.callback.reply",
+                "appSession.evaluate.callback.resume",
+                "appSession.evaluate.policy.await.throw",
+                "prompt.privacy.operation.await.throw",
+                "appSession.evaluate.error",
+                "appSession.evaluate.finish"
+            ]
+        )
+
+        guard let errorEntry = traceStore.recentEntries.first(where: { $0.name == "appSession.evaluate.error" }) else {
+            XCTFail("Expected app session evaluation error trace")
+            return
+        }
+        XCTAssertEqual(errorEntry.metadata["policy"], "biometricsOnly")
+        XCTAssertEqual(errorEntry.metadata["source"], "unit.appSession.lockout")
+        XCTAssertEqual(errorEntry.metadata["mappedError"], "appAccessBiometricsLockedOut")
+        XCTAssertEqual(errorEntry.metadata["laCodeName"], String(describing: LAError.Code.biometryLockout))
+
+        guard let finishEntry = traceStore.recentEntries.first(where: { $0.name == "appSession.evaluate.finish" }) else {
+            XCTFail("Expected app session evaluation finish trace")
+            return
+        }
+        XCTAssertEqual(finishEntry.metadata["result"], "error")
+        XCTAssertEqual(finishEntry.metadata["policy"], "biometricsOnly")
+        XCTAssertEqual(finishEntry.metadata["source"], "unit.appSession.lockout")
+        XCTAssertEqual(finishEntry.metadata["mappedError"], "appAccessBiometricsLockedOut")
+        XCTAssertEqual(finishEntry.metadata["hasContext"], "false")
+
+        let metadataKeys = Set(traceStore.recentEntries.flatMap { $0.metadata.keys })
+        let metadataValues = traceStore.recentEntries.flatMap { $0.metadata.values }
+        XCTAssertFalse(metadataKeys.contains("reason"))
+        XCTAssertFalse(metadataValues.contains(reason))
+    }
+
     func test_authenticationManager_evaluateModeBypass_recordsStartAndFinishTrace() async throws {
         let (defaults, suiteName) = makeIsolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
