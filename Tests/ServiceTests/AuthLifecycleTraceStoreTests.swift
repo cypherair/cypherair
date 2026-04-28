@@ -822,10 +822,10 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             defaults: defaults,
             authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: traceStore),
             traceStore: traceStore,
-            localAuthenticationPolicyEvaluator: { _, policy, receivedReason in
+            localAuthenticationPolicyEvaluator: { _, policy, receivedReason, reply in
                 XCTAssertEqual(policy, AppSessionAuthenticationPolicy.biometricsOnly.localAuthenticationPolicy)
                 XCTAssertEqual(receivedReason, reason)
-                return true
+                reply(true, nil)
             }
         )
 
@@ -843,6 +843,9 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 "prompt.privacy.operation.await.start",
                 "appSession.evaluate.start",
                 "appSession.evaluate.policy.await.start",
+                "appSession.evaluate.callback.call.start",
+                "appSession.evaluate.callback.reply",
+                "appSession.evaluate.callback.resume",
                 "appSession.evaluate.policy.await.finish",
                 "prompt.privacy.operation.await.finish",
                 "appSession.evaluate.finish"
@@ -856,6 +859,22 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                     && $0.metadata["promptID"] != "none"
                     && $0.metadata["result"] == "success"
                     && $0.metadata["isMainThread"] != nil
+            }
+        )
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "appSession.evaluate.callback.reply"
+                    && $0.metadata["policy"] == "biometricsOnly"
+                    && $0.metadata["source"] == "unit.appSession.success"
+                    && $0.metadata["promptID"] != "none"
+                    && $0.metadata["result"] == "success"
+                    && $0.metadata["isMainThread"] != nil
+            }
+        )
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "appSession.evaluate.callback.resume"
+                    && $0.metadata["result"] == "success"
             }
         )
 
@@ -876,10 +895,10 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             defaults: defaults,
             authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: traceStore),
             traceStore: traceStore,
-            localAuthenticationPolicyEvaluator: { _, policy, receivedReason in
+            localAuthenticationPolicyEvaluator: { _, policy, receivedReason, reply in
                 XCTAssertEqual(policy, AppSessionAuthenticationPolicy.userPresence.localAuthenticationPolicy)
                 XCTAssertEqual(receivedReason, reason)
-                throw TracePrivateKeyAccessTestError.seUnwrapFailed
+                reply(false, TracePrivateKeyAccessTestError.seUnwrapFailed)
             }
         )
 
@@ -899,6 +918,9 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             traceStore.recentEntries.map(\.name),
             containOrdered: [
                 "appSession.evaluate.policy.await.start",
+                "appSession.evaluate.callback.call.start",
+                "appSession.evaluate.callback.reply",
+                "appSession.evaluate.callback.resume",
                 "appSession.evaluate.policy.await.throw",
                 "prompt.privacy.operation.await.throw",
                 "appSession.evaluate.error",
@@ -913,6 +935,15 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertEqual(throwEntry.metadata["source"], "unit.appSession.throw")
         XCTAssertEqual(throwEntry.metadata["errorType"], "TracePrivateKeyAccessTestError")
         XCTAssertNotNil(throwEntry.metadata["isMainThread"])
+        guard let replyEntry = traceStore.recentEntries.first(where: { $0.name == "appSession.evaluate.callback.reply" }) else {
+            XCTFail("Expected callback reply trace")
+            return
+        }
+        XCTAssertEqual(replyEntry.metadata["policy"], "userPresence")
+        XCTAssertEqual(replyEntry.metadata["source"], "unit.appSession.throw")
+        XCTAssertEqual(replyEntry.metadata["result"], "error")
+        XCTAssertEqual(replyEntry.metadata["errorType"], "TracePrivateKeyAccessTestError")
+        XCTAssertNil(replyEntry.metadata["errorDescription"])
 
         let metadataKeys = Set(traceStore.recentEntries.flatMap { $0.metadata.keys })
         let metadataValues = traceStore.recentEntries.flatMap { $0.metadata.values }
