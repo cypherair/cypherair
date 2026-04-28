@@ -1,5 +1,17 @@
 import Foundation
 
+enum PrivacyScreenLifecycleDecision: String, Equatable {
+    case handle = "handled"
+    case blurOnly
+    case settleTransientBlur
+    case suppress = "suppressed"
+}
+
+private enum PrivacyScreenLifecycleSuppressionScope: String {
+    case appSessionCompletion
+    case promptLifecycle
+}
+
 /// Filters transient resign/activate cycles caused by system biometric prompts
 /// so privacy re-auth runs only for real app resume events.
 ///
@@ -8,7 +20,7 @@ import Foundation
 /// while the auth prompt was already in progress.
 struct PrivacyScreenLifecycleGate {
     private var traceStore: AuthLifecycleTraceStore?
-    private var suppressNextSettledActivation = false
+    private var suppressionScope: PrivacyScreenLifecycleSuppressionScope?
     private var lastObservedOperationAuthenticationAttemptGeneration: UInt64 = 0
 
     init(traceStore: AuthLifecycleTraceStore? = nil) {
@@ -20,11 +32,22 @@ struct PrivacyScreenLifecycleGate {
     }
 
     mutating func armForAuthenticationAttempt() {
-        suppressNextSettledActivation = true
+        armSuppression(scope: .appSessionCompletion)
+    }
+
+    private mutating func armPromptLifecycleSuppression() {
+        armSuppression(scope: .promptLifecycle)
+    }
+
+    private mutating func armSuppression(scope: PrivacyScreenLifecycleSuppressionScope) {
+        suppressionScope = scope
         traceStore?.record(
             category: .lifecycle,
             name: "gate.armForAuthenticationAttempt",
-            metadata: ["suppressed": "true"]
+            metadata: [
+                "suppressed": "true",
+                "suppressionScope": scope.rawValue
+            ]
         )
     }
 
@@ -39,51 +62,53 @@ struct PrivacyScreenLifecycleGate {
             name: "gate.observeOperationAuthenticationAttempt",
             metadata: ["generation": String(generation)]
         )
-        armForAuthenticationAttempt()
+        armPromptLifecycleSuppression()
     }
 
     mutating func shouldHandleInactive(
         isAuthenticating: Bool,
         isOperationPromptInProgress: Bool = false
-    ) -> Bool {
+    ) -> PrivacyScreenLifecycleDecision {
         if isAuthenticating || isOperationPromptInProgress {
-            armForAuthenticationAttempt()
-            traceStore?.record(
-                category: .lifecycle,
+            armPromptLifecycleSuppression()
+            traceLifecycleDecision(
                 name: "gate.inactive",
-                metadata: [
-                    "decision": "suppressed",
-                    "isAuthenticating": isAuthenticating ? "true" : "false",
-                    "appSessionAuthenticating": isAuthenticating ? "true" : "false",
-                    "operationPrompt": isOperationPromptInProgress ? "true" : "false",
-                    "suppressionArmed": suppressNextSettledActivation ? "true" : "false"
-                ]
+                decision: .suppress,
+                isAuthenticating: isAuthenticating,
+                isOperationPromptInProgress: isOperationPromptInProgress
             )
-            return false
+            return .suppress
         }
 
-        let shouldHandle = !suppressNextSettledActivation
-        traceStore?.record(
-            category: .lifecycle,
+        let decision: PrivacyScreenLifecycleDecision
+        switch suppressionScope {
+        case .appSessionCompletion:
+            decision = .blurOnly
+        case .promptLifecycle:
+            decision = .suppress
+        case nil:
+            decision = .handle
+        }
+        traceLifecycleDecision(
             name: "gate.inactive",
-            metadata: [
-                "decision": shouldHandle ? "handled" : "suppressedForSettledActivation",
-                "suppressed": suppressNextSettledActivation ? "true" : "false",
-                "suppressionArmed": suppressNextSettledActivation ? "true" : "false",
-                "isAuthenticating": isAuthenticating ? "true" : "false",
-                "appSessionAuthenticating": isAuthenticating ? "true" : "false",
-                "operationPrompt": isOperationPromptInProgress ? "true" : "false"
-            ]
+            decision: decision,
+            isAuthenticating: isAuthenticating,
+            isOperationPromptInProgress: isOperationPromptInProgress
         )
-        return shouldHandle
+        return decision
     }
 
     mutating func shouldHandleBackground() -> Bool {
-        suppressNextSettledActivation = false
+        suppressionScope = nil
         traceStore?.record(
             category: .lifecycle,
             name: "gate.background",
-            metadata: ["decision": "handled", "suppressed": "false"]
+            metadata: [
+                "decision": PrivacyScreenLifecycleDecision.handle.rawValue,
+                "suppressed": "false",
+                "suppressionArmed": "false",
+                "suppressionScope": "none"
+            ]
         )
         return true
     }
@@ -91,7 +116,7 @@ struct PrivacyScreenLifecycleGate {
     mutating func shouldHandleResignActive(
         isAuthenticating: Bool,
         isOperationPromptInProgress: Bool = false
-    ) -> Bool {
+    ) -> PrivacyScreenLifecycleDecision {
         shouldHandleInactive(
             isAuthenticating: isAuthenticating,
             isOperationPromptInProgress: isOperationPromptInProgress
@@ -101,51 +126,64 @@ struct PrivacyScreenLifecycleGate {
     mutating func shouldHandleBecomeActive(
         isAuthenticating: Bool,
         isOperationPromptInProgress: Bool = false
-    ) -> Bool {
+    ) -> PrivacyScreenLifecycleDecision {
         if isAuthenticating || isOperationPromptInProgress {
-            traceStore?.record(
-                category: .lifecycle,
+            traceLifecycleDecision(
                 name: "gate.active",
-                metadata: [
-                    "decision": "suppressed",
-                    "isAuthenticating": isAuthenticating ? "true" : "false",
-                    "appSessionAuthenticating": isAuthenticating ? "true" : "false",
-                    "operationPrompt": isOperationPromptInProgress ? "true" : "false",
-                    "suppressionArmed": suppressNextSettledActivation ? "true" : "false"
-                ]
+                decision: .suppress,
+                isAuthenticating: isAuthenticating,
+                isOperationPromptInProgress: isOperationPromptInProgress
             )
-            return false
+            return .suppress
         }
 
-        if suppressNextSettledActivation {
-            suppressNextSettledActivation = false
-            traceStore?.record(
-                category: .lifecycle,
+        if let suppressionScope {
+            self.suppressionScope = nil
+            let decision: PrivacyScreenLifecycleDecision = switch suppressionScope {
+            case .appSessionCompletion:
+                .settleTransientBlur
+            case .promptLifecycle:
+                .suppress
+            }
+            traceLifecycleDecision(
                 name: "gate.active",
-                metadata: [
-                    "decision": "consumeSuppression",
-                    "suppressed": "false",
-                    "suppressionArmed": "true",
-                    "isAuthenticating": "false",
-                    "appSessionAuthenticating": "false",
-                    "operationPrompt": "false"
-                ]
+                decision: decision,
+                isAuthenticating: false,
+                isOperationPromptInProgress: false,
+                consumedSuppressionScope: suppressionScope
             )
-            return false
+            return decision
         }
 
+        traceLifecycleDecision(
+            name: "gate.active",
+            decision: .handle,
+            isAuthenticating: false,
+            isOperationPromptInProgress: false
+        )
+        return .handle
+    }
+
+    private func traceLifecycleDecision(
+        name: String,
+        decision: PrivacyScreenLifecycleDecision,
+        isAuthenticating: Bool,
+        isOperationPromptInProgress: Bool,
+        consumedSuppressionScope: PrivacyScreenLifecycleSuppressionScope? = nil
+    ) {
+        let activeSuppressionScope = consumedSuppressionScope ?? suppressionScope
         traceStore?.record(
             category: .lifecycle,
-            name: "gate.active",
+            name: name,
             metadata: [
-                "decision": "handled",
-                "suppressed": "false",
-                "suppressionArmed": "false",
-                "isAuthenticating": "false",
-                "appSessionAuthenticating": "false",
-                "operationPrompt": "false"
+                "decision": decision.rawValue,
+                "suppressed": decision == .handle || decision == .blurOnly || decision == .settleTransientBlur ? "false" : "true",
+                "suppressionArmed": activeSuppressionScope == nil ? "false" : "true",
+                "suppressionScope": activeSuppressionScope?.rawValue ?? "none",
+                "isAuthenticating": isAuthenticating ? "true" : "false",
+                "appSessionAuthenticating": isAuthenticating ? "true" : "false",
+                "operationPrompt": isOperationPromptInProgress ? "true" : "false"
             ]
         )
-        return true
     }
 }

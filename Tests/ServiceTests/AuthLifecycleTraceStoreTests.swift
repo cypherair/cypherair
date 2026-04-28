@@ -1151,12 +1151,22 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         var gate = TracePrivacyScreenLifecycleGate(traceStore: traceStore)
 
-        XCTAssertFalse(gate.shouldHandleInactive(isAuthenticating: false, isOperationPromptInProgress: true))
-        XCTAssertFalse(gate.shouldHandleBecomeActive(isAuthenticating: false))
-        XCTAssertTrue(gate.shouldHandleBecomeActive(isAuthenticating: false))
+        XCTAssertEqual(
+            gate.shouldHandleInactive(isAuthenticating: false, isOperationPromptInProgress: true),
+            .suppress
+        )
+        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .suppress)
+        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .handle)
 
         let names = traceStore.recentEntries.map(\.name)
         XCTAssertTrue(names.contains("gate.inactive"))
         XCTAssertTrue(names.contains("gate.active"))
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "gate.inactive"
+                    && $0.metadata["decision"] == "suppressed"
+                    && $0.metadata["suppressionScope"] == "promptLifecycle"
+            }
+        )
     }
 }

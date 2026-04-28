@@ -84,7 +84,7 @@ struct PrivacyScreenModifier: ViewModifier {
                     guard lifecycleGate.shouldHandleInactive(
                         isAuthenticating: appSessionOrchestrator.isAuthenticating,
                         isOperationPromptInProgress: appSessionOrchestrator.isOperationAuthenticationPromptInProgress
-                    ) else {
+                    ) == .handle else {
                         return
                     }
                     appSessionOrchestrator.handleSceneDidResignActive()
@@ -97,7 +97,7 @@ struct PrivacyScreenModifier: ViewModifier {
                     guard lifecycleGate.shouldHandleBecomeActive(
                         isAuthenticating: appSessionOrchestrator.isAuthenticating,
                         isOperationPromptInProgress: appSessionOrchestrator.isOperationAuthenticationPromptInProgress
-                    ) else {
+                    ) == .handle else {
                         return
                     }
                     performResumeAction(source: "sceneActive")
@@ -111,25 +111,33 @@ struct PrivacyScreenModifier: ViewModifier {
                 lifecycleGate.syncOperationAuthenticationAttemptGeneration(
                     appSessionOrchestrator.operationAuthenticationAttemptGeneration
                 )
-                guard lifecycleGate.shouldHandleResignActive(
+                switch lifecycleGate.shouldHandleResignActive(
                     isAuthenticating: appSessionOrchestrator.isAuthenticating,
                     isOperationPromptInProgress: appSessionOrchestrator.isOperationAuthenticationPromptInProgress
-                ) else {
-                    return
+                ) {
+                case .handle:
+                    appSessionOrchestrator.handleSceneDidResignActive()
+                case .blurOnly:
+                    appSessionOrchestrator.handleAuthenticationSettleInactive(source: "sceneInactive")
+                case .settleTransientBlur, .suppress:
+                    break
                 }
-                appSessionOrchestrator.handleSceneDidResignActive()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 lifecycleGate.syncOperationAuthenticationAttemptGeneration(
                     appSessionOrchestrator.operationAuthenticationAttemptGeneration
                 )
-                guard lifecycleGate.shouldHandleBecomeActive(
+                switch lifecycleGate.shouldHandleBecomeActive(
                     isAuthenticating: appSessionOrchestrator.isAuthenticating,
                     isOperationPromptInProgress: appSessionOrchestrator.isOperationAuthenticationPromptInProgress
-                ) else {
-                    return
+                ) {
+                case .handle:
+                    performResumeAction(source: "sceneActive")
+                case .settleTransientBlur:
+                    appSessionOrchestrator.handleAuthenticationSettleActive(source: "sceneActive")
+                case .blurOnly, .suppress:
+                    break
                 }
-                performResumeAction(source: "sceneActive")
             }
             #endif
             .onAppear {

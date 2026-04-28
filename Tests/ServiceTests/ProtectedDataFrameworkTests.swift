@@ -1673,7 +1673,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         if gate.shouldHandleInactive(
             isAuthenticating: orchestrator.isAuthenticating,
             isOperationPromptInProgress: orchestrator.isOperationAuthenticationPromptInProgress
-        ) {
+        ) == .handle {
             orchestrator.handleSceneDidResignActive()
         }
 
@@ -1684,7 +1684,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         if gate.shouldHandleBecomeActive(
             isAuthenticating: orchestrator.isAuthenticating,
             isOperationPromptInProgress: orchestrator.isOperationAuthenticationPromptInProgress
-        ) {
+        ) == .handle {
             attemptedAuthentication = await orchestrator.handleResume(
                 localizedReason: "Late lifecycle after operation prompt"
             )
@@ -1699,6 +1699,162 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(relockParticipant.relockCallCount, 0)
         XCTAssertFalse(didEvaluate)
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    func test_authenticationSettleInactive_blursWithoutRelockOrAuthentication() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataAuthenticationSettleInactive")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.auth-settle-inactive",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let relockParticipant = MockProtectedDataRelockParticipant()
+        coordinator.registerRelockParticipant(relockParticipant)
+        let didEvaluateAuthentication = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return .authenticated(context: nil)
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        orchestrator.handleAuthenticationSettleInactive(source: "unit.authSettleInactive")
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
+
+        XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
+        XCTAssertFalse(orchestrator.authFailed)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 0)
+        XCTAssertEqual(relockParticipant.relockCallCount, 0)
+        XCTAssertFalse(didEvaluate)
+    }
+
+    func test_authenticationSettleActive_hidesTransientBlurWithoutAuthentication() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataAuthenticationSettleActive")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.auth-settle-active",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let relockParticipant = MockProtectedDataRelockParticipant()
+        coordinator.registerRelockParticipant(relockParticipant)
+        let didEvaluateAuthentication = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return .authenticated(context: nil)
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        orchestrator.handleAuthenticationSettleInactive(source: "unit.authSettleInactive")
+        orchestrator.handleAuthenticationSettleActive(source: "unit.authSettleActive")
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
+
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+        XCTAssertFalse(orchestrator.authFailed)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 0)
+        XCTAssertEqual(relockParticipant.relockCallCount, 0)
+        XCTAssertFalse(didEvaluate)
+    }
+
+    func test_authenticationSettleActive_keepsRetryOverlayAfterAuthFailure() async throws {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataAuthenticationSettleFailure")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.auth-settle-failure",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let didEvaluateAuthentication = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return .authenticated(context: nil)
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        orchestrator.authFailed = true
+        orchestrator.handleAuthenticationSettleInactive(source: "unit.authSettleInactive")
+        orchestrator.handleAuthenticationSettleActive(source: "unit.authSettleActive")
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
+
+        XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
+        XCTAssertTrue(orchestrator.authFailed)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 0)
+        XCTAssertFalse(didEvaluate)
+    }
+
+    func test_realResignClearsTransientSettleBlurAndRemainsBlurred() {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataAuthenticationSettleRealResign")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.auth-settle-real-resign",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        orchestrator.handleAuthenticationSettleInactive(source: "unit.authSettleInactive")
+        orchestrator.handleSceneDidResignActive()
+        orchestrator.handleAuthenticationSettleActive(source: "unit.authSettleActive")
+
+        XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
+        XCTAssertFalse(orchestrator.authFailed)
     }
 
     func test_handleSceneDidEnterBackground_duringExternalAuthenticationPrompt_blursPrivacyScreen() {

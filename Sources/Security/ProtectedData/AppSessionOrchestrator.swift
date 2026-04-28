@@ -14,6 +14,7 @@ final class AppSessionOrchestrator {
 
     private var hasAppearedOnce = false
     private var pendingAuthenticatedContext: LAContext?
+    private var isAuthenticationSettleBlurActive = false
 
     var isPrivacyScreenBlurred = false
     var isAuthenticating = false
@@ -76,6 +77,7 @@ final class AppSessionOrchestrator {
     }
 
     func requestContentClear() {
+        clearAuthenticationSettleBlur()
         discardPendingAuthenticatedContext(reason: "contentClear")
         contentClearGeneration += 1
         traceStore?.record(
@@ -86,6 +88,7 @@ final class AppSessionOrchestrator {
     }
 
     func resetAfterLocalDataReset(preserveAuthentication: Bool = false) {
+        clearAuthenticationSettleBlur()
         discardPendingAuthenticatedContext(reason: "localDataReset")
         lastAuthenticationDate = preserveAuthentication ? Date() : nil
         isAuthenticating = false
@@ -146,6 +149,7 @@ final class AppSessionOrchestrator {
         hasAppearedOnce = true
 
         if shouldBypassPrivacyAuthentication() {
+            clearAuthenticationSettleBlur()
             authFailed = false
             isPrivacyScreenBlurred = false
             traceStore?.record(
@@ -156,6 +160,7 @@ final class AppSessionOrchestrator {
             return false
         }
 
+        clearAuthenticationSettleBlur()
         isPrivacyScreenBlurred = true
         traceStore?.record(
             category: .session,
@@ -174,6 +179,7 @@ final class AppSessionOrchestrator {
             )
             return
         }
+        clearAuthenticationSettleBlur()
         discardPendingAuthenticatedContext(reason: "sceneResignActive")
         isPrivacyScreenBlurred = true
         authFailed = false
@@ -185,6 +191,7 @@ final class AppSessionOrchestrator {
     }
 
     func handleSceneDidEnterBackground() {
+        clearAuthenticationSettleBlur()
         discardPendingAuthenticatedContext(reason: "sceneBackground")
         isPrivacyScreenBlurred = true
         authFailed = false
@@ -211,6 +218,7 @@ final class AppSessionOrchestrator {
             ]
         )
         if shouldBypassPrivacyAuthentication() {
+            clearAuthenticationSettleBlur()
             authFailed = false
             isPrivacyScreenBlurred = false
             traceStore?.record(
@@ -252,6 +260,7 @@ final class AppSessionOrchestrator {
             requestContentClear()
             await protectedDataSessionCoordinator.relockCurrentSession()
 
+            clearAuthenticationSettleBlur()
             isAuthenticating = true
             authFailed = false
             isPrivacyScreenBlurred = true
@@ -289,6 +298,7 @@ final class AppSessionOrchestrator {
                     )
                     recordPostAuthenticationCompletion(source: source)
                     authFailed = false
+                    clearAuthenticationSettleBlur()
                     isPrivacyScreenBlurred = false
                     traceStore?.record(
                         category: .session,
@@ -297,6 +307,7 @@ final class AppSessionOrchestrator {
                     )
                 } else {
                     discardPendingAuthenticatedContext(reason: "resumeReturnedFalse")
+                    clearAuthenticationSettleBlur()
                     authFailed = true
                     traceStore?.record(
                         category: .session,
@@ -311,6 +322,7 @@ final class AppSessionOrchestrator {
                     metadata: AuthErrorTraceMetadata.errorMetadata(error)
                 )
                 discardPendingAuthenticatedContext(reason: "resumeThrew")
+                clearAuthenticationSettleBlur()
                 authFailed = true
                 traceStore?.record(
                     category: .session,
@@ -325,6 +337,7 @@ final class AppSessionOrchestrator {
             }
             return true
         } else {
+            clearAuthenticationSettleBlur()
             authFailed = false
             isPrivacyScreenBlurred = false
             traceStore?.record(
@@ -348,6 +361,63 @@ final class AppSessionOrchestrator {
             name: name,
             metadata: mergedMetadata
         )
+    }
+
+    func handleAuthenticationSettleInactive(source: String = "authenticationSettle") {
+        isAuthenticationSettleBlurActive = true
+        isPrivacyScreenBlurred = true
+        traceStore?.record(
+            category: .session,
+            name: "session.authenticationSettle.inactive",
+            metadata: [
+                "source": source,
+                "result": "blurred",
+                "authFailed": authFailed ? "true" : "false",
+                "isAuthenticating": isAuthenticating ? "true" : "false"
+            ]
+        )
+    }
+
+    func handleAuthenticationSettleActive(source: String = "authenticationSettle") {
+        guard isAuthenticationSettleBlurActive else {
+            traceStore?.record(
+                category: .session,
+                name: "session.authenticationSettle.active",
+                metadata: [
+                    "source": source,
+                    "result": "ignored",
+                    "authFailed": authFailed ? "true" : "false",
+                    "isAuthenticating": isAuthenticating ? "true" : "false"
+                ]
+            )
+            return
+        }
+
+        isAuthenticationSettleBlurActive = false
+        let result: String
+        if authFailed {
+            result = "keptForAuthFailure"
+        } else if isAuthenticating {
+            result = "keptForAuthentication"
+        } else {
+            isPrivacyScreenBlurred = false
+            result = "hidden"
+        }
+
+        traceStore?.record(
+            category: .session,
+            name: "session.authenticationSettle.active",
+            metadata: [
+                "source": source,
+                "result": result,
+                "authFailed": authFailed ? "true" : "false",
+                "isAuthenticating": isAuthenticating ? "true" : "false"
+            ]
+        )
+    }
+
+    private func clearAuthenticationSettleBlur() {
+        isAuthenticationSettleBlurActive = false
     }
 
     @discardableResult
