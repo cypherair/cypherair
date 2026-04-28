@@ -3,7 +3,7 @@
 > **Version:** Archived v1.1  
 > **Status:** Archived historical bridge. This document is no longer an active design or precedence source.  
 > **Purpose:** Preserve a short record that the temporary app-data / Contacts alignment bridge has been superseded by the active Contacts and app-data documents.  
-> **Successor documents:** [APP_DATA_PROTECTION_PLAN](../APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_PROTECTION_TDD](../APP_DATA_PROTECTION_TDD.md) · [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md)
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md) · [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md)
 
 This document was a temporary bridge while the Contacts docs still described an older Contacts-specific vault model.
 

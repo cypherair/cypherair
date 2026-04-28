@@ -227,7 +227,34 @@ Legacy `UserDefaults` keys such as `com.cypherair.internal.rewrapInProgress` and
 | Standard | `.deviceOwnerAuthentication` | Passcode shown |
 | High Security | `.deviceOwnerAuthenticationWithBiometrics` | `context.localizedFallbackTitle = ""` (hidden) |
 
-## 5. Guided Tutorial Sandbox Isolation
+## 5. Protected App Data
+
+Protected app data is a separate security domain for CypherAir-owned local state outside private-key material. It must not be conflated with the Secure Enclave wrapping path that protects OpenPGP secret key bytes.
+
+Current protected app-data scope:
+
+- `private-key-control` stores the private-key control source of truth: `settings.authMode` plus the rewrap / modify-expiry `recoveryJournal`.
+- `key-metadata` stores `PGPKeyIdentity` payloads after app unlock. Legacy metadata Keychain rows are migration and cleanup sources only.
+- `protected-settings` stores the first narrow protected setting, currently `clipboardNotice`.
+- `protected-framework-sentinel` is a framework-owned sentinel domain with a schema/purpose marker only. It contains no user data, telemetry, contacts, or UI state.
+
+Current non-goals and pending surfaces:
+
+- Permanent and pending SE-wrapped private-key bundle rows remain in the existing private-key material domain.
+- `appSessionAuthenticationPolicy` remains an early-readable boot-authentication setting.
+- Ordinary settings other than `clipboardNotice`, self-test reports/state, temporary/export/tutorial cleanup hardening, and Contacts remain outside ProtectedData until their Phase 7 or Phase 8 work lands.
+
+Protected app-data authorization uses `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`. `AppSessionOrchestrator` owns launch/resume privacy authentication and the grace window. When app authentication succeeds, it can hand the authenticated `LAContext` to `ProtectedDataSessionCoordinator`, which reads the shared app-data root secret through Keychain with `kSecUseAuthenticationContext`. That same authenticated handoff is reused by post-unlock domain openers so committed registered domains can open without a second Face ID / Touch ID prompt.
+
+The shared root secret is not stored as raw bytes in the current format. Keychain stores a v2 `CAPDSEV2` envelope that must also unwrap through the ProtectedData-only Secure Enclave device-binding key described in Section 3. The raw root secret is used only to derive the wrapping root key and is immediately zeroized. Each protected domain has its own random domain master key, persisted only as a wrapped-DMK record under the derived wrapping root key. Unwrapped domain keys and decrypted payloads are session-local and must be cleared on relock.
+
+`ProtectedDataRegistry` is the only authority for committed protected-domain membership and pending create/delete work. Cold start may read the registry and per-domain bootstrap metadata before app authentication, but it must not retrieve the root secret, unwrap any DMK, open domain payloads, or infer committed membership by directory enumeration. Invalid registry state enters framework recovery. Domain corruption enters the domain's recovery state; no protected domain may silently reset unreadable state to empty data.
+
+Relock is fail-closed. `ProtectedDataSessionCoordinator` blocks new protected-domain access, fans out to all registered `ProtectedDataRelockParticipant`s, zeroizes the wrapping root key, clears unwrapped DMKs, and returns to `sessionLocked` only if teardown succeeds. Any relock participant failure latches runtime-only `restartRequired`, blocking further protected-domain access until process restart.
+
+ProtectedData files live under `Application Support/ProtectedData/`. Registry files, bootstrap metadata, scratch writes, wrapped-DMK files, and committed domain files use explicit file-protection verification where the platform supports it. Storage outside the app-owned container is not an allowed fallback for protected-domain files.
+
+## 6. Guided Tutorial Sandbox Isolation
 
 The guided tutorial is allowed to run real app services and real OpenPGP operations only inside an isolated tutorial dependency graph. It must not read or mutate the user's real keys, contacts, settings, files, exports, or private-key security assets.
 
@@ -241,7 +268,7 @@ Tutorial isolation boundaries:
 
 Changes to tutorial isolation, output interception, or tutorial security simulation must be reviewed with the same care as other auth and local-data boundaries. A tutorial regression must never weaken the app's zero-network, minimal-permission, no-secret-logging, or real-workspace isolation guarantees.
 
-## 6. Argon2id Parameters (Profile B Only)
+## 7. Argon2id Parameters (Profile B Only)
 
 Used only for private key export (backup) and for importing/unlocking passphrase-protected private key files. **Not used for routine message decryption or signing** — those operations use the SE-unwrapped private key directly.
 
@@ -265,7 +292,7 @@ Before Argon2id derivation **when importing or unlocking a passphrase-protected 
 
 This prevents iOS Jetsam from killing the app. The 75% threshold provides a safety margin.
 
-## 7. Memory Integrity Enforcement (MIE)
+## 8. Memory Integrity Enforcement (MIE)
 
 ### What It Protects
 
@@ -306,9 +333,9 @@ The `openssl-src` crate compiles OpenSSL from C source. Any undiscovered buffer 
 
 The Enhanced Security capability is additive. It never breaks compatibility with older devices.
 
-## 8. Known Limitations
+## 9. Known Limitations
 
-### 8.1 Passphrase `String` Cannot Be Reliably Zeroized
+### 9.1 Passphrase `String` Cannot Be Reliably Zeroized
 
 **Scope:** Affects passphrase-based flows that originate in Swift `String`, specifically private key import/export and password-message encrypt/decrypt operations. It does **not** affect routine recipient-key decryption or signing, which use SE-unwrapped key bytes (`Data`) that are properly zeroized.
 
@@ -332,7 +359,7 @@ The Enhanced Security capability is additive. It never breaks compatibility with
 - `UnsafeMutableBufferPointer<UInt8>` with manual zeroing: Would require forking `SecureField` or building a custom UIKit text field, bypassing system-provided secure input. The security loss from a custom input field (no system-level screen recording protection, no secure text entry mode) would outweigh the benefit of zeroizable memory.
 - `Data`-based passphrase: UniFFI does not support `Data` ↔ `String` conversion at the FFI boundary without an intermediate `String` allocation, negating the benefit.
 
-## 9. AI Coding Red Lines
+## 10. AI Coding Red Lines
 
 The following files and functions are security-critical. Claude Code must **stop and describe proposed changes** before editing them. Do not make autonomous modifications.
 

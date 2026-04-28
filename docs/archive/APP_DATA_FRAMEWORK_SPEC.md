@@ -1,12 +1,20 @@
 # App Data Framework Specification
 
+> **Status:** Archived historical AppData framework specification snapshot.
+> **Archived on:** 2026-04-28.
+> **Archival reason:** The reusable ProtectedData framework for Phase 1-6 has moved from proposal detail into current architecture, security, TDD, and testing documentation.
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md)
+> **Current code and active canonical docs outrank this archived file whenever they disagree.**
+
+Original snapshot metadata follows.
+
 > **Version:** Draft v1.0
 > **Status:** Draft future implementation detail. This document does not describe current shipped behavior.
 > **Purpose:** Define the concrete framework mechanics that implement the architecture and security constraints in the app-data protection TDD.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Primary authority:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture boundaries, security posture, and core design constraints.
-> **Companion documents:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
-> **Related documents:** [CONTACTS_TDD](CONTACTS_TDD.md)
+> **Companion documents:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
+> **Related documents:** [CONTACTS_TDD](../CONTACTS_TDD.md)
 
 ## 1. Scope And Precedence
 

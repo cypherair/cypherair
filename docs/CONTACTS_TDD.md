@@ -2,17 +2,16 @@
 
 > **Version:** Draft v1.1  
 > **Status:** Draft future technical spec. This document does not describe current shipped Contacts implementation.  
-> **Implementation note:** For this initiative, use this proposal document and its linked app-data / Contacts proposal companions as the primary implementation reference. Canonical current-state docs such as [SECURITY](SECURITY.md), [ARCHITECTURE](ARCHITECTURE.md), and [TESTING](TESTING.md) may temporarily lag and will be updated after implementation maturity.  
 > **Purpose:** Technical design for implementing the Contacts enhancement initiative as a Contacts domain on the shared protected app-data framework.  
 > **Audience:** Engineering, QA, and AI coding tools.  
 > **Companion document:** [CONTACTS_PRD](CONTACTS_PRD.md)  
 > **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific technical direction.  
-> **Primary framework references:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) · [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md)  
-> **Related documents:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Primary framework references:** [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md)
+> **Related documents:** [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) · [TESTING](TESTING.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Technical Scope
 
-This document defines the implementation design for the Contacts enhancement initiative. It assumes the product direction in [CONTACTS_PRD](CONTACTS_PRD.md) is approved and fixed, and it assumes the shared protected app-data framework from the `APP_DATA_*` documents already exists before Contacts adoption begins.
+This document defines the implementation design for the Contacts enhancement initiative. It assumes the product direction in [CONTACTS_PRD](CONTACTS_PRD.md) is approved and fixed, and it assumes the shared ProtectedData framework documented in the current architecture, security, TDD, and testing guides already exists before Contacts adoption begins.
 
 This TDD covers:
 
@@ -24,7 +23,7 @@ This TDD covers:
 - migration, quarantine, and final legacy deletion
 - Contacts domain export/import as a formal recovery path
 
-This TDD does not redefine the shared protected app-data framework. The following remain owned by the `APP_DATA_*` documents:
+This TDD does not redefine the shared ProtectedData framework. The following remain owned by the current shared-framework documentation:
 
 - domain envelope rules
 - wrapped-DMK persistence and transaction behavior
@@ -706,7 +705,7 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 
 ### 14.6 Migration And Recovery
 
-- Contacts adoption occurs only after App Data Phase 1-3 prerequisites
+- Contacts adoption occurs only after AppData Phase 1-6 prerequisites are complete and remaining Phase 7 gates are implemented or explicitly resolved
 - Contacts migration is triggered by first Contacts-required protected-domain access, not by process launch or service initialization alone
 - target Contacts domain is validated before legacy source retirement
 - quarantine storage is inactive for normal Contacts resolution

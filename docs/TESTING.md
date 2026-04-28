@@ -96,7 +96,7 @@ ProtectedData device-test isolation rules:
 - clean up by identifier before and after each device test
 - do not call `removeAllRightsWithCompletion()`
 
-ProtectedData Phase 1 unit-test expectations:
+Current ProtectedData unit-test expectations for the implemented Phase 1-6 surface:
 
 - verify that pre-auth bootstrap never touches the root-secret store or legacy right-store adapter
 - verify that pre-auth bootstrap does not load key metadata or enumerate private-key Keychain rows
@@ -106,11 +106,13 @@ ProtectedData Phase 1 unit-test expectations:
 - verify that generic pending-mutation recovery dispatches by domain handler and refuses target mismatches as framework recovery
 - verify that abandoning a first-domain create cleans a provisioned shared resource based on post-removal membership and fails closed if cleanup fails
 - verify that post-unlock orchestration opens only committed registered domains with an authenticated `LAContext`, skips pending mutation recovery, and never authorizes without a context
-- verify that Phase 6 key-metadata pending-create recovery reuses the authenticated `LAContext` for legacy default-account metadata or remains retryable without committing a partial payload, and that legacy cleanup retry deletes already-migrated source rows by fingerprint membership
+- verify that `private-key-control` migrates `authMode` and private-key recovery journals after app unlock, keeps private-key material out of ProtectedData, participates in relock, and runs private-key recovery checks only after the domain opens
+- verify that `key-metadata` pending-create recovery reuses the authenticated `LAContext` for legacy default-account metadata or remains retryable without committing a partial payload, and that legacy cleanup retry deletes already-migrated source rows by fingerprint membership
+- verify that key metadata loading starts as locked/loading before app unlock, completes from `key-metadata` after post-unlock orchestration, and does not regress to pre-auth metadata reads or visible empty-key-list flashes
 - verify that protected-settings refresh auto-opens with a valid handoff context and stays locked without starting interactive authorization when the handoff is absent or disappears
 - verify that Reset All Local Data deletes default-account and metadata-account CypherAir Keychain items, treats missing items as success, clears in-memory state, and validates a clean empty ProtectedData state
 
-ProtectedData Phase 2 file-protection expectations:
+Current ProtectedData file-protection expectations:
 
 - verify that default and UI-test ProtectedData roots remain inside `Application Support`
 - verify that registry, bootstrap metadata, staged wrapped-DMK files, and committed wrapped-DMK files read back with explicit `NSFileProtectionComplete`
@@ -118,6 +120,11 @@ ProtectedData Phase 2 file-protection expectations:
 - verify that macOS ProtectedData bootstrap fails closed when the storage root is outside `Application Support` or when the volume-capability probe reports that file protection is unavailable
 - verify that fresh-install/reset validation uses the nearest existing parent for volume capability probing when `ProtectedData` does not yet exist, without creating the root during validation
 - keep lock-state readability semantics as manual/device validation; do not treat repository automation as proof of locked-device behavior
+
+Future ProtectedData validation targets:
+
+- Phase 7 work must add coverage for any newly migrated ordinary settings, self-test state, and temporary/export/tutorial cleanup or file-protection changes.
+- Phase 8 Contacts work must prove legacy source preservation, protected-domain readability, no-silent-reset failure behavior, locked Contacts route states, and Contacts-specific import recovery.
 
 **CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`. The macOS smoke suite also covers tutorial launch paths for generating Alice's sandbox key, opening key-detail follow-up surfaces, opening sandbox QR / backup surfaces, confirming that tutorial-disabled certificate and selective-revocation routes remain visible but unavailable, and tutorial lifecycle coverage for first-run start/skip, leave confirmation, completion finish, Settings replay, and auth-mode helper-modal automation markers.
 

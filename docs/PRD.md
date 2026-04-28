@@ -199,6 +199,18 @@ Blur overlay when App enters background. Prevents multitasking switcher leakage.
 
 *App-level auth is independent of per-operation Keychain auth.*
 
+**Protected App Data**
+
+After app privacy authentication succeeds, the app can open protected app-data domains through the same authenticated session. Protected app data is separate from private-key material: it protects app-owned local state after unlock, while private keys remain under the Secure Enclave / Keychain private-key domain.
+
+Current protected app-data scope:
+
+- `clipboardNotice` is stored in protected settings.
+- Private-key control state, including the selected auth mode and rewrap / modify-expiry recovery journal, is stored in `private-key-control`.
+- Key-list metadata (`PGPKeyIdentity`) is stored in `key-metadata` and loads after app unlock.
+
+Remaining ordinary settings, self-test persistence, temporary/export/tutorial cleanup hardening, and Contacts are not yet migrated into protected app-data domains. Contacts remains a later protected-domain rollout and is not part of the current App Protection user surface.
+
 **Authentication Mode**
 
 The App offers two authentication modes, selectable in Settings:
@@ -245,7 +257,7 @@ Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biomet
 
 ### 5.5 App Protection
 
-Privacy screen. Re-auth with grace period. Two auth modes. Content lifecycle. Tmp cleanup. Background tasks.
+Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected domains cover `clipboardNotice`, private-key control state, and key metadata; remaining non-Contacts app data and Contacts stay on the documented roadmap. Content lifecycle. Tmp cleanup. Background tasks.
 
 ---
 
@@ -293,6 +305,8 @@ Key gen, encrypt/decrypt, sign/verify, tamper (1-bit flip), QR encode/decode. Ru
 - [ ] Re-auth after grace period functions correctly.
 - [ ] Both Standard and High Security authentication modes function correctly.
 - [ ] High Security Mode blocks all private-key operations when biometrics unavailable.
+- [ ] Protected app data opens only after app privacy authentication or an active protected-data session.
+- [ ] Protected app-data unlock does not add a redundant prompt when the app can reuse the authenticated launch/resume context.
 - [ ] URL scheme import (`cypherair://`) requires user confirmation before adding key.
 - [ ] Encrypt-to-self correct.
 

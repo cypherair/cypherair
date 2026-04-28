@@ -131,13 +131,13 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 
 - `ProtectedDataStorageRoot.swift` — resolves `Application Support/ProtectedData/`, file-protection application, and registry/domain metadata paths
 - `ProtectedDataRegistry.swift` / `ProtectedDataRegistryStore.swift` — registry manifest, consistency validation, recovery classification, empty-registry bootstrap, and bootstrap outcome construction
-- `KeychainProtectedDataRootSecretStore.swift` — Keychain storage for the shared app-data root-secret v2 envelope, legacy raw-secret migration, and anti-downgrade enforcement
+- `KeychainProtectedDataRootSecretStore` (`ProtectedDataRightStoreClient.swift`) — Keychain storage for the shared app-data root-secret v2 envelope, legacy raw-secret migration, and anti-downgrade enforcement
 - `ProtectedDataDeviceBinding.swift` — ProtectedData-only Secure Enclave P-256 device-binding key plus mockable provider and format-floor marker store
 - `ProtectedDataRootSecretEnvelope.swift` — binary-plist `CAPDSEV2` codec, HKDF/AAD binding data, and AES-GCM open/seal validation
 - `ProtectedDataRightStoreClient.swift` — legacy right-store migration/cleanup adapter, not the current authorization path
 - `ProtectedDomainBootstrapStore.swift` — file-side bootstrap metadata persistence
 - `ProtectedDomainRecoveryCoordinator` / `ProtectedDomainRecoveryHandler` — generic pending-mutation recovery dispatch by `ProtectedDataDomainID`
-- `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `private-key-control`, `protected-settings`, and `protected-framework-sentinel`, and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff
+- `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `private-key-control`, `key-metadata`, `protected-settings`, and `protected-framework-sentinel`, and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff
 - `ProtectedDataFrameworkSentinelStore.swift` — framework-owned second production domain (`protected-framework-sentinel`) with a minimal schema/purpose payload used to prove multi-domain lifecycle, recovery, and relock behavior before later product-domain migrations
 - `PrivateKeyControlStore.swift` — Phase 5 protected domain for `settings.authMode` plus `recoveryJournal`; migrates legacy UserDefaults sources after app authentication and opens through post-unlock orchestration
 - `KeyMetadataDomainStore.swift` — Phase 6 protected domain `key-metadata`; stores `schemaVersion` plus `identities: [PGPKeyIdentity]`, migrates legacy Keychain metadata rows after unlock, and participates in relock/recovery
@@ -153,7 +153,8 @@ Current ProtectedData scope:
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
-- app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control`
+- app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`
+- current Phase 1-6 ProtectedData work is implemented; remaining Phase 7 surfaces include ordinary settings beyond `clipboardNotice`, self-test state, and temporary/export/tutorial cleanup and file-protection hardening, while Contacts remains Phase 8
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
 - AppData phase completion status is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 
@@ -344,6 +345,34 @@ sequenceDiagram
     Note over AM: After app unlock opens private-key-control, run shared crash recovery via KeyMigrationCoordinator if the journal requires it (see SECURITY.md Section 4).
 ```
 
+### Protected App Data Unlock
+
+```mermaid
+sequenceDiagram
+    participant App as AppSessionOrchestrator
+    participant Auth as AuthenticationManager
+    participant PDS as ProtectedDataSessionCoordinator
+    participant KC as Keychain Root Secret Store
+    participant SE as ProtectedData SE Device Binding
+    participant Post as ProtectedDataPostUnlockCoordinator
+    participant Domain as Protected Domain Store
+
+    App->>Auth: evaluate app privacy authentication
+    Auth-->>App: authenticated LAContext
+    App->>Post: open registered domains(context)
+    Post->>PDS: beginProtectedDataAuthorization(registry, context)
+    PDS->>KC: load root-secret envelope with kSecUseAuthenticationContext
+    KC-->>PDS: CAPDSEV2 envelope
+    PDS->>SE: unwrap device-bound root secret
+    SE-->>PDS: raw root-secret bytes
+    PDS->>PDS: derive wrapping root key, zeroize raw root secret
+    PDS-->>Post: sessionAuthorized
+    Post->>Domain: ensureCommittedIfNeeded / openDomainIfNeeded(wrapping root key)
+    Domain->>Domain: unwrap domain DMK and read encrypted payload generation
+```
+
+Pre-auth startup may classify `ProtectedDataRegistry` and bootstrap metadata only. It must not read the root secret, unwrap a domain master key, or open protected payloads. Post-unlock orchestration currently opens `private-key-control`, `key-metadata`, `protected-settings`, and the framework sentinel when their registry state allows it. If the registry reports pending mutation or framework recovery, domain open is blocked until recovery completes.
+
 ## 4. Tightly Coupled Modules
 
 These pairs must be updated together. A change to one without the other will cause build failures or runtime errors.
@@ -422,6 +451,6 @@ App Sandbox:
 
 MIE is built right into Apple hardware and software in all models of iPhone 17 and iPhone Air (A19/A19 Pro). It is enabled via the Enhanced Security capability in Xcode, adding hardware memory tagging (EMTE) that protects all C/C++ code — including vendored OpenSSL — against buffer overflows and use-after-free.
 
-The capability is configured in Xcode 26 via Signing & Capabilities → Add Capability → Enhanced Security. Xcode manages this through the `ENABLE_ENHANCED_SECURITY = YES` build setting and writes the required entitlement keys (Hardened Process, Hardened Heap, Enhanced Security version, Platform Restrictions, Read-Only Platform Memory, Hardware Memory Tagging, etc.) into `CypherAir.entitlements`. These entitlement keys must be committed to source control — Xcode reads them to determine which protections are enabled. See [SECURITY.md](SECURITY.md) Section 7.
+The capability is configured in Xcode 26 via Signing & Capabilities → Add Capability → Enhanced Security. Xcode manages this through the `ENABLE_ENHANCED_SECURITY = YES` build setting and writes the required entitlement keys (Hardened Process, Hardened Heap, Enhanced Security version, Platform Restrictions, Read-Only Platform Memory, Hardware Memory Tagging, etc.) into `CypherAir.entitlements`. These entitlement keys must be committed to source control — Xcode reads them to determine which protections are enabled. See [SECURITY.md](SECURITY.md) Section 8.
 
-On older devices without A19/A19 Pro chips, the app runs normally — the capability is additive and never breaks compatibility with older devices. See [SECURITY.md](SECURITY.md) Section 7 for the full testing workflow.
+On older devices without A19/A19 Pro chips, the app runs normally — the capability is additive and never breaks compatibility with older devices. See [SECURITY.md](SECURITY.md) Section 8 for the full testing workflow.

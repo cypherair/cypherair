@@ -2,15 +2,15 @@
 
 > **Version:** Draft v0.1
 > **Status:** Draft implementation-prep plan. This document does not describe current shipped behavior.
-> **Purpose:** Bridge the gap between the existing `APP_DATA_*` / `CONTACTS_*` proposal documents and the current repository state so the deferred Contacts protected-domain work can later be implemented through a stable, reviewable PR sequence.
+> **Purpose:** Bridge the gap between the current shared ProtectedData framework, the active Contacts documents, and the deferred Contacts protected-domain work so the later implementation can proceed through a stable, reviewable PR sequence.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
-> **Primary authority:** [CONTACTS_TDD](CONTACTS_TDD.md) for Contacts design intent and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for shared protected app-data architecture.
-> **Related documents:** [CONTACTS_PRD](CONTACTS_PRD.md) · [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
+> **Primary authority:** [CONTACTS_TDD](CONTACTS_TDD.md) for Contacts design intent and [ARCHITECTURE](ARCHITECTURE.md) / [SECURITY](SECURITY.md) / [TDD](TDD.md) for current shared ProtectedData architecture.
+> **Related documents:** [CONTACTS_PRD](CONTACTS_PRD.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) · [TESTING](TESTING.md)
 
 ## 1. Scope And Relationship
 
-This document is an implementation-prep companion for the deferred Contacts protected-domain phase. It exists because the repository has already landed parts of the shared protected app-data framework, while the active Contacts and app-data proposal documents still describe a future-state design rather than a current code migration path.
+This document is an implementation-prep companion for the deferred Contacts protected-domain phase. It exists because the repository has landed the shared ProtectedData foundation and Phase 1-6 domains, while Contacts still needs a current-state implementation path that accounts for remaining Phase 7 gates.
 
 This document specifies:
 
@@ -23,7 +23,7 @@ This document does not replace the existing formal specs.
 
 If this document conflicts with:
 
-- [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) on shared framework architecture or security rules, the TDD wins
+- [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), or [TDD](TDD.md) on current shared-framework architecture or security rules, those long-lived docs win
 - [CONTACTS_TDD](CONTACTS_TDD.md) on Contacts target behavior, the Contacts TDD wins
 - [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) on roadmap order, the migration guide wins unless this document is explicitly used to refine the missing implementation detail needed to realize that order
 
@@ -262,34 +262,22 @@ This implementation plan references the inventory by behavior group rather than 
 
 ## 6. Prerequisites And Planned Contacts PR Sequence
 
-This section freezes the later implementation order and separates shared AppData prerequisites from Contacts-internal PRs. AppData Phase 4 is only a prerequisite; Contacts PR1-PR8 remain AppData Phase 8 work and do not begin until the Phase 5-7 roadmap gates are complete, unless the AppData roadmap is explicitly revised.
+This section freezes the later implementation order and separates completed shared AppData prerequisites from Contacts-internal PRs. Contacts PR1-PR8 remain AppData Phase 8 work and do not begin until the remaining Phase 7 roadmap gate is implemented or explicitly resolved, unless the AppData roadmap is revised.
 
-### 6.1 Prerequisite — AppData Phase 4 Framework Hardening
+### 6.1 Shared AppData Prerequisites
 
-**Goals**
+Completed prerequisites:
 
-- remove the documented pending-create / recovery limitations that block a second real protected domain
-- make second-domain recovery and last-domain cleanup reliable before Contacts depends on them
-- keep Contacts implementation from needing one-off framework exceptions
-- keep this work owned by AppData Phase 4 rather than the Contacts protected-domain PR sequence
+- Phase 1 reusable ProtectedData framework is implemented.
+- Phase 2 file-protection baseline is implemented for ProtectedData storage.
+- Phase 3 first low-risk protected domain completed its narrow `protected-settings` / `clipboardNotice` scope.
+- Phase 4 post-unlock multi-domain orchestration and framework hardening is implemented.
+- Phase 5 `private-key-control` is implemented for `authMode` and private-key recovery journal state.
+- Phase 6 `key-metadata` is implemented for `PGPKeyIdentity` payloads.
 
-**Key Changes**
+Remaining prerequisite:
 
-- fix first-domain pending-create continuation gaps
-- fix shared-resource cleanup decisions for abandoned or resumed create/delete flows
-- extend framework tests to explicitly cover `contacts` as the second real domain
-
-**Not In Scope**
-
-- no Contacts schema or app-surface changes
-- no Contacts migration logic
-- no Contacts-internal PR coverage claim
-- no early Contacts schema-only prep before Phase 8
-
-**Validation**
-
-- protected-data unit coverage for second-domain create/delete/recovery
-- framework-level relock and `restartRequired` baseline assertions still pass
+- Phase 7 non-Contacts protected-after-unlock domains and local file/static-protection cleanup must be implemented or explicitly resolved before Contacts PR1 starts.
 
 ### 6.2 Contacts PR1 — Contacts Schema Skeleton And Compatibility Facade
 
@@ -626,8 +614,8 @@ The later implementation PRs must collectively satisfy the following scenario se
 This implementation-prep document is only complete if a later implementer can answer all of the following without inventing new architecture:
 
 - why Contacts protected-domain adoption needs more than a storage swap
-- why AppData Phase 4 framework hardening is a prerequisite rather than a Contacts-internal PR
-- why Contacts PR1-PR8 remain Phase 8 work behind the Phase 5-7 gates
+- why completed shared framework hardening remains a prerequisite rather than a Contacts-internal PR
+- why Contacts PR1-PR8 remain Phase 8 work behind the remaining Phase 7 gate
 - what the Contacts schema skeleton may define before later behavior PRs
 - why verification contract refactor must happen before lifecycle wiring
 - which Contacts entrypoints are gated and which are only enrichment consumers
@@ -640,7 +628,7 @@ The companion inventory document must also be detailed enough that an implemente
 ## 9. Assumptions
 
 - This document prepares implementation. It does not authorize direct code changes by itself.
-- Existing `APP_DATA_*` and `CONTACTS_*` docs remain the architecture and product authorities.
+- Current shared-framework docs and existing Contacts docs remain the architecture and product authorities.
 - Future implementation proceeds with conservative, smaller PRs rather than a single large Contacts protected-domain rollout.
 - Verification contract refactor is a dedicated earlier PR.
 - Certification projection / reconciliation is a dedicated pre-cutover capability PR.

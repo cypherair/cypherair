@@ -9,7 +9,7 @@ Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-o
 - **OpenPGP:** Sequoia PGP 2.2.0 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Stable build release ordering and the current source/compliance asset contract are documented in @docs/APP_RELEASE_PROCESS.md and @docs/XCFRAMEWORK_RELEASES.md.
 - **Profiles:** Profile A (Universal): v4 keys, Ed25519+X25519, SEIPDv1. Profile B (Advanced): v6 keys, Ed448+X448, SEIPDv2 AEAD. See @docs/PRD.md Section 3.
 - **FFI:** Mozilla UniFFI 0.31.x. Rust wrapper crate `pgp-mobile` generates Swift bindings and packaged outputs, while Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap`.
-- **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain).
+- **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain), ProtectedData app-data domains opened after app privacy authentication.
 - **Build:** Xcode 26.4.1, Rust stable (latest, MSRV follows sequoia-openpgp requirements), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`.
 - **Localization:** English + Simplified Chinese via `.xcstrings` String Catalog.
 
@@ -21,7 +21,7 @@ Three-layer bridge: Rust (`pgp-mobile`) → UniFFI scaffolding → Swift app.
 Sources/
 ├── App/              # SwiftUI views, navigation, onboarding
 ├── Services/         # Encryption, signing, key management, contacts, QR
-├── Security/         # SE wrapping, Keychain, auth modes, Argon2id memory guard, memory zeroing
+├── Security/         # SE wrapping, Keychain, auth modes, ProtectedData, Argon2id memory guard, memory zeroing
 ├── Models/           # Data types, PGP key representations, error types
 ├── Extensions/       # Swift/Foundation extensions
 └── Resources/        # Assets, String Catalog
@@ -88,7 +88,7 @@ For the full Rust artifact refresh, UniFFI/bindings sync, and Xcode validation w
 4. **No plaintext or private keys in logs.** Never `print()`, `os_log()`, or `NSLog()` any key material, passphrase, or decrypted content. Not even in DEBUG builds.
 5. **Memory zeroing.** All sensitive data (`Data` buffers containing keys, passphrases, plaintext) must be overwritten with zeros when no longer needed. Rust side: `zeroize` crate. Swift side: `resetBytes(in:)` on `Data`.
 6. **Secure random only.** Swift side: `SecRandomCopyBytes` or CryptoKit (which uses it internally). Rust side: `getrandom` crate (delegates to `SecRandomCopyBytes` on Apple platforms). No `arc4random`, no `Int.random`.
-7. **MIE enabled.** Enhanced Security capability with Hardware Memory Tagging must remain enabled. Never remove the entitlements. See @docs/SECURITY.md Section 7.
+7. **MIE enabled.** Enhanced Security capability with Hardware Memory Tagging must remain enabled. Never remove the entitlements. See @docs/SECURITY.md Section 8.
 8. **Profile-correct message format.** v4 recipient → SEIPDv1. v6 recipient → SEIPDv2. Mixed → SEIPDv1. Never send SEIPDv2 to a v4 key holder. See @docs/TDD.md Section 1.4.
 
 ## Security Boundaries — Ask Before Modifying
@@ -99,6 +99,7 @@ STOP and describe proposed changes before editing any file in these areas:
 - `Sources/Security/SecureEnclaveManager.swift` — wrapping/unwrapping flow
 - `Sources/Security/KeychainManager.swift` — access control flags
 - `Sources/Security/AuthenticationManager.swift` — Standard/High Security mode switching
+- `Sources/Security/ProtectedData/` — app-data root-secret authorization, registry/recovery, wrapped-DMK lifecycle, relock semantics
 - `Sources/Services/DecryptionService.swift` — Phase 1/Phase 2 authentication boundary
 - `Sources/Services/QRService.swift` — external URL input parsing (untrusted data)
 - `pgp-mobile/src/` — any Rust cryptographic code
