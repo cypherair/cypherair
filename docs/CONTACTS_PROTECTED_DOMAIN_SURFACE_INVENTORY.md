@@ -5,7 +5,7 @@
 > **Purpose:** Enumerate all Contacts-required access and mutation surfaces that must be accounted for during Contacts protected-domain implementation.
 > **Audience:** Engineering, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
-> **Primary design references:** [CONTACTS_TDD](CONTACTS_TDD.md) · [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)
+> **Primary design references:** [CONTACTS_TDD](CONTACTS_TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md)
 
 ## 1. Scope And Usage
 

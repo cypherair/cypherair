@@ -381,6 +381,33 @@ Keychain protected-data row: shared app-data root secret
 
 Protected app-data planning covers all CypherAir-owned local data, not only preferences. Current permanent exceptions are limited to the app-session boot authentication profile, private-key material rows protected by Keychain / Secure Enclave, ProtectedData framework bootstrap metadata, test-only or legacy-cleanup state, short-lived temporary files with cleanup requirements, and user-exported files after they leave the app-controlled sandbox. Private-key control state now lives in the post-unlock `private-key-control` ProtectedData domain, and key metadata now lives in the post-unlock `key-metadata` ProtectedData domain.
 
+### 6.1 ProtectedData Current Contract
+
+ProtectedData is the current shared framework for app-owned local state that opens only after app privacy authentication. It is separate from the private-key material domain and does not store OpenPGP secret key bytes.
+
+Current framework contracts:
+
+- `ProtectedDataRegistry` is the plaintext bootstrap authority for committed domain membership, shared-resource lifecycle state, root-secret envelope minimum version, and a single pending create/delete mutation.
+- Pre-auth startup may classify the registry and per-domain bootstrap metadata, but must not load the shared app-data root secret, unwrap any domain master key, or open protected payload generations.
+- The shared app-data root secret is stored in the Keychain as a v2 `CAPDSEV2` envelope and is loaded with an authenticated `LAContext` handoff. The ProtectedData-only Secure Enclave device-binding key silently unwraps that envelope under the same app-session gate.
+- `ProtectedDomainKeyManager` derives a wrapping root key from the raw root secret, zeroizes the raw root secret, then unwraps per-domain 256-bit domain master keys from wrapped-DMK records.
+- Protected domain files live under `Application Support/ProtectedData/`; registry, bootstrap metadata, scratch writes, and wrapped-DMK files verify explicit file protection where available.
+- Relock clears the wrapping root key, unwrapped DMKs, and registered domain-local decrypted state. A relock participant failure latches runtime-only `restartRequired`.
+
+Current production domains:
+
+- `private-key-control`: `settings.authMode` plus rewrap / modify-expiry recovery journal state.
+- `key-metadata`: schema v1 `PGPKeyIdentity` list, migrated from legacy metadata Keychain rows after app unlock.
+- `protected-settings`: currently only `clipboardNotice`; other settings remain Phase 7 work.
+- `protected-framework-sentinel`: framework-owned schema/purpose marker only, used to exercise multi-domain lifecycle behavior.
+
+Migration and exception rules:
+
+- Legacy `authMode`, rewrap, and modify-expiry `UserDefaults` keys are migration sources only after verified `private-key-control` creation/open.
+- Legacy key metadata rows in the dedicated metadata account and older default-account rows are migration/cleanup sources only after verified `key-metadata` readability.
+- Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
+- Contacts, self-test state, remaining ordinary settings, and temporary/export/tutorial cleanup hardening remain outside the completed Phase 1-6 scope.
+
 ---
 
 ## 7. UI Framework
@@ -424,4 +451,4 @@ The Enhanced Security capability is additive and does not affect compatibility w
 - Verify no tag mismatch terminations occur (check Console.app and Xcode crash logs).
 - Test under Xcode Instruments "Memory Tag Violations" instrument if available.
 
-See also [SECURITY.md](SECURITY.md) Section 7 for additional MIE security analysis.
+See also [SECURITY.md](SECURITY.md) Section 8 for additional MIE security analysis.

@@ -6,14 +6,14 @@
 > **Audience:** Product, design, engineering, QA, and AI coding tools.  
 > **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific product direction.  
 > **Companion document:** [CONTACTS_TDD](CONTACTS_TDD.md)  
-> **Primary framework references:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)  
-> **Related documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Primary framework references:** [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md)
+> **Related documents:** [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) · [TESTING](TESTING.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Product Intent
 
 CypherAir's current Contacts capability is sufficient for a small number of imported public keys, but it is not yet structured for real-world relationship management, recurring recipient workflows, or social-graph-sensitive privacy requirements.
 
-This document defines the product requirements for the next-generation Contacts capability. It describes the target Contacts experience after the shared protected app-data framework and the earlier AppData domains have landed. In delivery order, Contacts adopts that framework in the Contacts Protected Domain phase, currently Phase 8 of the AppData roadmap.
+This document defines the product requirements for the next-generation Contacts capability. The shared ProtectedData framework and AppData Phase 1-6 domains have landed, while Phase 7 remains the remaining non-Contacts gate before Contacts protected-domain adoption unless the roadmap is explicitly revised. In delivery order, Contacts adopts that framework in the Contacts Protected Domain phase, currently Phase 8 of the AppData roadmap.
 
 The Contacts enhancement initiative covers four user-facing capability areas:
 
@@ -431,17 +431,18 @@ Migration source remains the legacy plaintext contacts storage:
 
 Contacts migration belongs to the Contacts Protected Domain phase, currently Phase 8 of the AppData roadmap.
 
-Current AppData progress is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md). Required roadmap gates before Contacts PR1-PR8 begin:
+Current AppData progress is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md). Completed prerequisites:
 
 - Phase 1 reusable protected app-data framework is implemented
 - Phase 2 file-protection baseline is implemented for ProtectedData storage
 - Phase 3 first low-risk protected domain has completed its narrow `protected-settings` / `clipboardNotice` scope
-- Phase 4 post-unlock multi-domain orchestration and framework hardening must be complete, including second-real-domain coverage and pending-create continuation hardening
-- Phase 5 `private-key-control` domain must be implemented
-- Phase 6 `key metadata` domain must be implemented
-- Phase 7 non-Contacts protected-after-unlock domains and required local file/static-protection cleanup must be implemented or explicitly resolved
+- Phase 4 post-unlock multi-domain orchestration and framework hardening is complete, including second-real-domain coverage and pending-create continuation hardening
+- Phase 5 `private-key-control` domain is implemented
+- Phase 6 `key-metadata` domain is implemented
 
-These bullets are Phase 8 gates, not a claim that all listed pending phases already ship.
+Remaining gate before Contacts PR1-PR8 begin:
+
+- Phase 7 non-Contacts protected-after-unlock domains and required local file/static-protection cleanup must be implemented or explicitly resolved
 
 Contacts adoption and migration occur on the first Contacts-required protected-domain access into the new Contacts architecture. That access may happen during launch or resume if the initial route immediately needs Contacts data, and the same orchestrated unlock flow may activate the shared app-data session there by reusing the authenticated `LAContext` for root-secret retrieval.
 
@@ -591,9 +592,9 @@ This initiative is product-complete only if all of the following are true:
 This document does not define:
 
 - packet-level certification implementation
-- shared protected app-data framework internals such as registry invariants, wrapped-DMK transactions, or relock state-machine mechanics
+- shared ProtectedData framework internals such as registry invariants, wrapped-DMK transactions, or relock state-machine mechanics
 - the exact export/import cryptographic packaging
 - detailed service APIs
 - persistence schema internals
 
-Those topics belong in [CONTACTS_TDD](CONTACTS_TDD.md) and the related `APP_DATA_*` framework documents.
+Those topics belong in [CONTACTS_TDD](CONTACTS_TDD.md) and the current shared-framework references listed at the top of this document.

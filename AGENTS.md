@@ -56,7 +56,7 @@ CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and 
   toolchain for Apple `arm64e` slices
 - `sequoia-openpgp` 2.2.0 with `crypto-openssl`
 - UniFFI 0.31.x
-- CryptoKit + Security.framework
+- CryptoKit + Security.framework, including ProtectedData app-data domains opened after app privacy authentication
 
 ## Repository Layout
 
@@ -64,7 +64,7 @@ CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and 
 Sources/
 ├── App/              # SwiftUI views, onboarding, navigation, app wiring
 ├── Services/         # Encryption, signing, keys, contacts, QR, self-test
-├── Security/         # Secure Enclave wrapping, Keychain, auth mode logic
+├── Security/         # Secure Enclave wrapping, Keychain, auth mode logic, ProtectedData
 ├── Models/           # Data models and error types
 ├── Extensions/       # Small Foundation/Swift helpers
 └── Resources/        # String catalogs, previews
@@ -151,6 +151,7 @@ Pause and explicitly call out the intended change before editing these areas:
 - `Sources/Security/SecureEnclaveManager.swift` — wrapping/unwrapping flow
 - `Sources/Security/KeychainManager.swift` — access control flags
 - `Sources/Security/AuthenticationManager.swift` — Standard/High Security mode switching
+- `Sources/Security/ProtectedData/` — app-data root-secret authorization, registry/recovery, wrapped-DMK lifecycle, relock semantics
 - `Sources/Services/DecryptionService.swift` — Phase 1/Phase 2 authentication boundary
 - `Sources/Services/QRService.swift` — external URL input parsing (untrusted data)
 - `pgp-mobile/src/` — any Rust cryptographic code
@@ -270,5 +271,7 @@ After editing:
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY.md`
 - `docs/TESTING.md`
+- `docs/APP_DATA_MIGRATION_GUIDE.md`
+- `docs/APP_DATA_ROADMAP_STATUS.md`
 - `docs/CONVENTIONS.md`
 - `docs/CODE_REVIEW.md`

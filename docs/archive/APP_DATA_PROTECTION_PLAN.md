@@ -1,13 +1,21 @@
 # App Data Protection Migration Plan
 
+> **Status:** Archived historical AppData roadmap snapshot.
+> **Archived on:** 2026-04-28.
+> **Archival reason:** AppData Phase 1-6 implementation details have been absorbed into long-lived current-state documentation; the active AppData stack now keeps only the remaining migration guide and roadmap status.
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md)
+> **Current code and active canonical docs outrank this archived file whenever they disagree.**
+
+Original snapshot metadata follows.
+
 > **Version:** Draft v1.0  
 > **Status:** Draft active roadmap. This document does not describe current shipped behavior.  
 > **Purpose:** Define the migration strategy for introducing a protected app-data layer beside the existing private-key security architecture.  
 > **Audience:** Engineering, security review, QA, and AI coding tools.  
 > **Companion document:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)  
-> **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
-> **Current progress record:** [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
-> **Related documents:** [SECURITY](SECURITY.md) · [ARCHITECTURE](ARCHITECTURE.md) · [TESTING](TESTING.md) · [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
+> **Current progress record:** [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md)
+> **Related documents:** [SECURITY](../SECURITY.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [TESTING](../TESTING.md) · [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](../SPECIAL_SECURITY_MODE.md)
 
 ## 1. Intent
 
@@ -142,19 +150,19 @@ Implementation should follow this sequence.
 
 Build the reusable protected app-data substrate first so later domains inherit a shared architecture instead of inventing one-off vault behavior.
 
-Detailed phase goals and framework mechanics live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.1 and [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md).
+Detailed phase goals and framework mechanics live in [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 2.1 and [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md).
 
 ### Phase 2: File-Protection Baseline
 
 Establish the platform-specific file/static-protection baseline for registry files, protected-domain files, bootstrap metadata, and scratch files before any real protected domain ships.
 
-See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.2 and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 6.7.
+See [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 2.2 and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 6.7.
 
 ### Phase 3: First Low-Risk Real Domain
 
 Use a low-risk domain such as protected-after-unlock settings or recovery/control state as the first concrete adopter. In the current implementation, this phase is limited to `ProtectedSettingsStore` plus the migrated `clipboardNotice` setting; remaining ordinary settings stay in Phase 7.
 
-See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 2.3 and Section 5, plus [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) for current progress.
+See [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 2.3 and Section 5, plus [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md) for current progress.
 
 ### Phase 4: Post-Unlock Multi-Domain Orchestration And Framework Hardening
 
@@ -166,13 +174,13 @@ This phase does not migrate Contacts or any private-key-adjacent source of truth
 
 Create the `private-key-control` ProtectedData domain, migrate `authMode` and the private-key recovery journal, and move rewrap / modify-expiry recovery detection out of pre-auth startup without moving private-key material into ProtectedData.
 
-Current status: implemented. See [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) for the code-backed boundary and remaining downstream work.
+Current status: implemented. See [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md) for the code-backed boundary and remaining downstream work.
 
 ### Phase 6: Key Metadata Domain
 
 Create the `key metadata` ProtectedData domain, migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account, and avoid empty-key-list flashes during unlock.
 
-Current status: implemented. See [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) for the code-backed boundary and remaining downstream work.
+Current status: implemented. See [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md) for the code-backed boundary and remaining downstream work.
 
 ### Phase 7: Non-Contacts Protected-After-Unlock Domains
 
@@ -182,7 +190,7 @@ Migrate ordinary protected-after-unlock settings, self-test policy, and related 
 
 Migrate Contacts onto the shared protected app-data framework only after the earlier key-metadata and non-Contacts protected-after-unlock work has been completed. Contacts must remain a domain-specific consumer of the shared framework, not a second independent vault architecture.
 
-See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts-internal PR sequence. AppData Phase 4 and Phase 5 are prerequisites, but Contacts PR1-PR8 remain Phase 8 work behind the remaining Phase 6-7 gates.
+See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts-internal PR sequence. AppData Phase 4 and Phase 5 are prerequisites, but Contacts PR1-PR8 remain Phase 8 work behind the remaining Phase 6-7 gates.
 
 ### Phase 9: Future Persistent Domains
 
@@ -192,7 +200,7 @@ Migrate future app-owned persistent domains that are not covered by the current 
 
 All future implementations derived from this roadmap must follow a two-phase startup model with a pre-auth bootstrap phase and a post-auth unlock phase. This remains a roadmap-level constraint rather than an implementation detail.
 
-See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.12 and [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.1.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.12 and [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 3.1.
 
 ### 5.2 App-Data Session Lifetime
 
@@ -200,19 +208,19 @@ The shared app-data session follows the current grace-window model, but the grac
 
 `First real protected-domain access` means the first route in the current app session that actually needs protected-domain contents, not process launch by itself. If launch or resume immediately enters such a route, the same orchestrated unlock flow may pass the authenticated `LAContext` into root-secret Keychain retrieval so the user does not encounter a second distinct app-data prompt. Root-secret retrieval must still remain fail-closed and must not be triggered merely because process launch or service initialization happened.
 
-See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7.3-7.4, plus [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.2.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7.3-7.4, plus [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 3.2.
 
 ### 5.3 Persistent-State Classification Inventory
 
 Implementation planning must maintain a complete inventory of persisted app-owned state in app-data migration scope, with target class, target phase or exception, current status, and migration readiness tracked explicitly and with reviewed private-key-domain exclusions called out explicitly.
 
-The detailed inventory table and first-domain readiness rules live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 4-5. Current roadmap status lives in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
+The detailed inventory table and first-domain readiness rules live in [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Sections 4-5. Current roadmap status lives in [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md).
 
 ### 5.4 Startup Architecture Impact
 
 Protected app-data is not only a local service addition. Any real protected-domain rollout must treat startup ordering, service initialization timing, locked-state routing, and orchestrator wiring as explicit migration surfaces.
 
-See [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.4.
+See [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 3.4.
 
 ## 6. Explicit Do-Not-Change List
 
@@ -255,11 +263,11 @@ These proposal documents are planning and design inputs first. They are not yet 
 
 After approval and implementation maturity:
 
-- fold accepted app-data protection rules into [SECURITY](SECURITY.md)
-- update [ARCHITECTURE](ARCHITECTURE.md) with the new domain boundaries and startup wiring
-- update [TESTING](TESTING.md) with protected-domain validation requirements
-- update [PRD](PRD.md) or future domain-specific PRDs when user-visible behavior changes
-- update [TDD](TDD.md) only for durable cross-cutting technical rules that become current-state
+- fold accepted app-data protection rules into [SECURITY](../SECURITY.md)
+- update [ARCHITECTURE](../ARCHITECTURE.md) with the new domain boundaries and startup wiring
+- update [TESTING](../TESTING.md) with protected-domain validation requirements
+- update [PRD](../PRD.md) or future domain-specific PRDs when user-visible behavior changes
+- update [TDD](../TDD.md) only for durable cross-cutting technical rules that become current-state
 
 Until then:
 

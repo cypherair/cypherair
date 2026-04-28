@@ -26,10 +26,13 @@ Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`
 - [ ] Only `NSFaceIDUsageDescription` in `CypherAir-Info.plist`
 - [ ] No network APIs introduced (URLSession, NWConnection, HTTP)
 - [ ] Secure random only (`SecRandomCopyBytes` / `getrandom`)
-- [ ] Human review obtained for files listed in [SECURITY.md](SECURITY.md) §8
+- [ ] Human review obtained for files listed in [SECURITY.md](SECURITY.md) Section 10
 - [ ] Crash recovery distinguishes safe cleanup, retryable failure, and unrecoverable failure correctly
 - [ ] Retryable recovery failures keep retry flags set; unrecoverable states clear flags and surface a generic warning
 - [ ] Startup diagnostics remain generic and do not leak fingerprints or key identifiers
+- [ ] ProtectedData changes preserve the app-data/private-key-material boundary: no SE-wrapped private-key bundle bytes are copied into ProtectedData payloads
+- [ ] ProtectedData changes preserve registry authority, explicit pending-mutation recovery, no-silent-reset behavior, relock zeroization, and `restartRequired` fail-closed semantics
+- [ ] ProtectedData changes that migrate a persisted surface update `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, `APP_DATA_MIGRATION_GUIDE.md`, and `APP_DATA_ROADMAP_STATUS.md` as needed
 
 ## Rust API Changes
 

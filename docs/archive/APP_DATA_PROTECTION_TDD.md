@@ -1,13 +1,21 @@
 # App Data Protection Technical Design Document
 
-> **Version:** Draft v1.0  
-> **Status:** Draft future technical spec. This document does not describe current shipped behavior.  
-> **Implementation note:** For this initiative, use this proposal document and its linked app-data / Contacts proposal companions as the primary implementation reference. Canonical current-state docs such as [SECURITY](SECURITY.md), [ARCHITECTURE](ARCHITECTURE.md), and [TESTING](TESTING.md) may temporarily lag and will be updated after implementation maturity.  
-> **Purpose:** Define the reusable technical substrate for protected app-owned persistent data outside the existing private-key domain.  
-> **Audience:** Engineering, security review, QA, and AI coding tools.  
-> **Companion document:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md)  
-> **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
-> **Related documents:** [SECURITY](SECURITY.md) · [ARCHITECTURE](ARCHITECTURE.md) · [TESTING](TESTING.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Status:** Archived historical AppData technical design snapshot.
+> **Archived on:** 2026-04-28.
+> **Archival reason:** Implemented Phase 1-6 framework facts now live in long-lived current-state documentation; this file is retained only as historical design context.
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md)
+> **Current code and active canonical docs outrank this archived file whenever they disagree.**
+
+Original snapshot metadata follows.
+
+> **Version:** Draft v1.0
+> **Status:** Draft future technical spec. This document does not describe current shipped behavior.
+> **Implementation note:** For this initiative, use this proposal document and its linked app-data / Contacts proposal companions as the primary implementation reference. Canonical current-state docs such as [SECURITY](../SECURITY.md), [ARCHITECTURE](../ARCHITECTURE.md), and [TESTING](../TESTING.md) may temporarily lag and will be updated after implementation maturity.
+> **Purpose:** Define the reusable technical substrate for protected app-owned persistent data outside the existing private-key domain.
+> **Audience:** Engineering, security review, QA, and AI coding tools.
+> **Companion document:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md)
+> **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
+> **Related documents:** [SECURITY](../SECURITY.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [TESTING](../TESTING.md) · [CONTACTS_TDD](../CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](../SPECIAL_SECURITY_MODE.md)
 
 ## 1. Technical Scope
 
@@ -26,7 +34,7 @@ This TDD is the primary app-data technical source for:
 The detailed framework mechanics, migration sequencing, and validation checklists live in:
 
 - [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md)
-- [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md)
+- [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md)
 - [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
 
 This TDD does not redesign the current private-key system.
@@ -495,7 +503,7 @@ Rules:
 - protected settings must not rely on hidden shadow copies to recreate early boot behavior
 - any future migration of a startup-influencing setting requires a documented two-phase startup design and tests proving startup authentication strength is unchanged
 
-The detailed rollout and inventory handling for these settings live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 2.3, 3.1, and 4.
+The detailed rollout and inventory handling for these settings live in [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Sections 2.3, 3.1, and 4.
 
 ### 5.10 Deterministic Registry Recovery Model
 
@@ -583,7 +591,7 @@ After app-session authentication succeeds and protected-domain access is request
 
 This is a required implementation boundary, not a best-effort guideline.
 
-The current app startup path already performs cold-start loading and recovery work. Future real protected domains must therefore treat this two-phase model as an explicit startup-architecture migration, not as a mere local refactor inside one new service. The current owner split that this migration must absorb is documented in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.5.
+The current app startup path already performs cold-start loading and recovery work. Future real protected domains must therefore treat this two-phase model as an explicit startup-architecture migration, not as a mere local refactor inside one new service. The current owner split that this migration must absorb is documented in [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 3.5.
 
 Phase 1 implementation note:
 
@@ -593,7 +601,7 @@ Phase 1 implementation note:
 - cold-start bootstrap output is an initial handoff, not the lifetime source of truth for registry state
 - future protected-domain access must re-evaluate current framework state instead of assuming the cold-start snapshot remains current forever
 
-The rollout sequencing details live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Section 3.1.
+The rollout sequencing details live in [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 3.1.
 
 ## 6. Storage Model
 
@@ -900,7 +908,7 @@ In practical terms:
 - Contacts owns person/key/tag/list semantics
 - the protected app-data framework owns registry authority, shared-session authority, wrapped-DMK lifecycle, envelope rules, generation recovery, and relock posture
 
-Contacts-specific adoption behavior now lives directly in [CONTACTS_PRD](CONTACTS_PRD.md), [CONTACTS_TDD](CONTACTS_TDD.md), [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), and the rollout sequencing sections of [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md).
+Contacts-specific adoption behavior now lives directly in [CONTACTS_PRD](../CONTACTS_PRD.md), [CONTACTS_TDD](../CONTACTS_TDD.md), [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), and the rollout sequencing sections of [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md).
 
 ## 10. Migration Rules
 
@@ -913,13 +921,13 @@ This TDD keeps the cross-cutting rule set:
 - require explicit post-cutover cleanup rules
 - keep `ProtectedSettingsStore` constrained to non-bootstrap settings/control state in the first-domain round
 
-The phased rollout, startup adoption sequencing, inventory table, and first-domain detail live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 2-5.
+The phased rollout, startup adoption sequencing, inventory table, and first-domain detail live in [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Sections 2-5.
 
 ### 10.1 Persisted-State Classification Inventory
 
 Implementation planning must maintain one reviewed inventory of currently persisted app-owned state in app-data migration scope, with each item tracked by target class and migration readiness and with reviewed private-key-domain exclusions called out explicitly.
 
-The full inventory baseline and first-domain adoption rules live in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) Sections 4-5.
+The full inventory baseline and first-domain adoption rules live in [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Sections 4-5.
 
 ## 11. Recovery Contracts
 
