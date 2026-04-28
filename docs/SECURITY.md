@@ -45,8 +45,8 @@ Generate (Profile A: Ed25519+X25519 v4 / Profile B: Ed448+X448 v6)
     │       │
     │       └──→ Store private-key material in Keychain (3 protected items per identity)
     │
-    ├──→ Store PGPKeyIdentity metadata in dedicated Keychain metadata account
-    │       └──→ No SE auth; used for cold-launch enumeration only
+    ├──→ Store PGPKeyIdentity metadata in ProtectedData `key-metadata`
+    │       └──→ Opened after app-session authentication; no private-key material
     │
     ├──→ Auto-generate revocation certificate
     │       └──→ Prompt user to export separately
@@ -72,11 +72,11 @@ Revocation:
 
 Deletion:
     Double-confirm → Delete SE key from Keychain → Delete salt + sealed box
-    → Delete dedicated metadata entry
+    → Delete protected key-metadata entry
     → Key permanently inaccessible
 ```
 
-**Metadata storage note:** `PGPKeyIdentity` metadata is non-sensitive indexing data. It is stored under a dedicated Keychain account (`KeychainConstants.metadataAccount`) so cold launch can enumerate keys without touching private-key material or protected Keychain rows. Older metadata items that were stored under the default account are migrated only after app-session authentication succeeds, using the authenticated `LAContext` handoff; private-key blobs, salts, and sealed boxes remain in the protected private-key namespace.
+**Metadata storage note:** `PGPKeyIdentity` metadata is non-sensitive indexing data, but it now lives in the ProtectedData `key-metadata` domain so key-list loading happens only after app-session authentication opens protected app data. Legacy metadata rows may still exist in the dedicated metadata Keychain account (`KeychainConstants.metadataAccount`) or older default-account locations; those rows are migration/cleanup sources only and are read after app-session authentication, using the authenticated `LAContext` handoff when the default account requires it. Private-key blobs, salts, and sealed boxes remain in the protected private-key namespace.
 
 **Revocation storage/export note:** CypherAir stores revocation signatures internally as binary OpenPGP signature packets. Export converts those bytes to ASCII armor on demand. Imported keys now receive key-level revocation export capability as part of import. Older imported keys that predate this support lazily backfill the binary revocation at export time, then immediately zeroize the temporarily unwrapped secret certificate bytes after use.
 

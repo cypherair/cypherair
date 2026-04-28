@@ -303,7 +303,7 @@ com.cypherair.v1.metadata.<fingerprint>
 | SE key `dataRepresentation` | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | Per auth mode |
 | Salt | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 | Encrypted private key | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
-| Key metadata (PGPKeyIdentity JSON) | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None (no SE auth); transitional cold-launch index before future `key metadata` domain |
+| Legacy key metadata migration rows (PGPKeyIdentity JSON) | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None (no SE auth); migration/cleanup source before verified ProtectedData `key-metadata` domain creation |
 | ProtectedData SE device-binding key | Keychain-backed SE key representation | `WhenPasscodeSetThisDeviceOnly` | `.privateKeyUsage` only; no Face ID flags |
 
 ProtectedData uses this device-binding key only to open the app-data
@@ -356,9 +356,9 @@ Generate: `CIQRCodeGenerator`. Decode from photo: PHPicker + CoreImage `CIDetect
 
 ```
 Keychain default account: SE key + salt + sealed-key + pending private-key recovery rows
-Keychain metadata account: `PGPKeyIdentity` cold-launch metadata index
+Keychain metadata account: legacy `PGPKeyIdentity` migration/cleanup source
 Keychain protected-data row: shared app-data root secret
-/Application Support/ProtectedData/: registry, private-key-control domain, protected-settings domain, domain bootstrap metadata
+/Application Support/ProtectedData/: registry, private-key-control domain, key-metadata domain, protected-settings domain, domain bootstrap metadata
 /Documents/: contacts/ (public keys + `contact-metadata.json`), self-test/
 /Library/Preferences/ (UserDefaults):
   com.cypherair.preference.authMode              → legacy source removed after private-key-control migration
@@ -379,7 +379,7 @@ Keychain protected-data row: shared app-data root secret
 /tmp/CypherAirGuidedTutorial-*: tutorial contacts sandbox
 ```
 
-Protected app-data planning covers all CypherAir-owned local data, not only preferences. Current permanent exceptions are limited to the app-session boot authentication profile, private-key material rows protected by Keychain / Secure Enclave, ProtectedData framework bootstrap metadata, test-only or legacy-cleanup state, short-lived temporary files with cleanup requirements, and user-exported files after they leave the app-controlled sandbox. Private-key control state now lives in the post-unlock `private-key-control` ProtectedData domain; key metadata remains a future post-unlock ProtectedData domain target.
+Protected app-data planning covers all CypherAir-owned local data, not only preferences. Current permanent exceptions are limited to the app-session boot authentication profile, private-key material rows protected by Keychain / Secure Enclave, ProtectedData framework bootstrap metadata, test-only or legacy-cleanup state, short-lived temporary files with cleanup requirements, and user-exported files after they leave the app-controlled sandbox. Private-key control state now lives in the post-unlock `private-key-control` ProtectedData domain, and key metadata now lives in the post-unlock `key-metadata` ProtectedData domain.
 
 ---
 

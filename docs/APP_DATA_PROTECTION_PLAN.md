@@ -172,6 +172,8 @@ Current status: implemented. See [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STAT
 
 Create the `key metadata` ProtectedData domain, migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account, and avoid empty-key-list flashes during unlock.
 
+Current status: implemented. See [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) for the code-backed boundary and remaining downstream work.
+
 ### Phase 7: Non-Contacts Protected-After-Unlock Domains
 
 Migrate ordinary protected-after-unlock settings, self-test policy, and related local file/static-protection cleanup once their synchronous read paths have been removed or replaced.
