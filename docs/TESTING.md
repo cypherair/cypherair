@@ -106,6 +106,7 @@ ProtectedData Phase 1 unit-test expectations:
 - verify that generic pending-mutation recovery dispatches by domain handler and refuses target mismatches as framework recovery
 - verify that abandoning a first-domain create cleans a provisioned shared resource based on post-removal membership and fails closed if cleanup fails
 - verify that post-unlock orchestration opens only committed registered domains with an authenticated `LAContext`, skips pending mutation recovery, and never authorizes without a context
+- verify that Phase 6 key-metadata pending-create recovery reuses the authenticated `LAContext` for legacy default-account metadata or remains retryable without committing a partial payload, and that legacy cleanup retry deletes already-migrated source rows by fingerprint membership
 - verify that protected-settings refresh auto-opens with a valid handoff context and stays locked without starting interactive authorization when the handoff is absent or disappears
 - verify that Reset All Local Data deletes default-account and metadata-account CypherAir Keychain items, treats missing items as success, clears in-memory state, and validates a clean empty ProtectedData state
 

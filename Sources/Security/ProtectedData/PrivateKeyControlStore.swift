@@ -364,7 +364,10 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
         }
     }
 
-    func continuePendingCreate(phase: CreateDomainPhase) async throws {
+    func continuePendingCreate(
+        phase: CreateDomainPhase,
+        authenticationContext: LAContext?
+    ) async throws {
         if phase == .membershipCommitted {
             return
         }

@@ -24,6 +24,7 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
     private(set) var listItemsCallCount = 0
     private(set) var lastSavedService: String?
     private(set) var lastDeletedService: String?
+    private(set) var loadCalls: [(service: String, account: String, hasAuthenticationContext: Bool)] = []
     private(set) var listItemsCalls: [(servicePrefix: String, account: String, hasAuthenticationContext: Bool)] = []
 
     /// If set, the next save operation will throw this error (one-shot).
@@ -74,12 +75,18 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
     }
 
     func load(service: String, account: String, authenticationContext: LAContext?) throws -> Data {
-        _ = authenticationContext
+        loadCallCount += 1
+        loadCalls.append(
+            (
+                service: service,
+                account: account,
+                hasAuthenticationContext: authenticationContext != nil
+            )
+        )
         if let error = loadError {
             loadError = nil
             throw error
         }
-        loadCallCount += 1
         let key = storageKey(service: service, account: account)
         guard let data = storage[key] else {
             throw MockKeychainError.itemNotFound
@@ -152,6 +159,7 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
         listItemsCallCount = 0
         lastSavedService = nil
         lastDeletedService = nil
+        loadCalls.removeAll()
         listItemsCalls.removeAll()
     }
 }

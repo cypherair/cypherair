@@ -1,3 +1,4 @@
+import LocalAuthentication
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -149,20 +150,19 @@ struct CypherAirApp: App {
                     guard interactionMode == .allowInteraction || authenticationContext != nil else {
                         return .cancelledOrDenied
                     }
-                    defer {
-                        authenticationContext?.invalidate()
-                    }
-                    let result = await container.protectedDataSessionCoordinator.beginProtectedDataAuthorization(
+                    let authorization = await container.protectedDataSessionCoordinator.beginProtectedDataAuthorizationReturningContext(
                         registry: registry,
                         localizedReason: localizedReason,
                         authenticationContext: authenticationContext
                     )
-                    switch result {
+                    switch authorization.result {
                     case .authorized:
-                        return .authorized
+                        return .authorizedWithContext(authorization.authenticationContext)
                     case .cancelledOrDenied:
+                        authorization.authenticationContext.invalidate()
                         return .cancelledOrDenied
                     case .frameworkRecoveryNeeded:
+                        authorization.authenticationContext.invalidate()
                         return .frameworkRecoveryNeeded
                     }
                 } catch {
@@ -227,32 +227,16 @@ struct CypherAirApp: App {
                 )
             },
             recoverPendingMutation: {
-                var recoveryHandlers: [any ProtectedDomainRecoveryHandler] = [
-                    container.privateKeyControlStore,
-                    container.protectedSettingsStore,
-                    container.protectedDataFrameworkSentinelStore
-                ]
-                if let keyMetadataDomainStore = container.keyMetadataDomainStore {
-                    recoveryHandlers.append(keyMetadataDomainStore)
-                }
-                let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingMutation(
-                    handlers: recoveryHandlers,
-                    removeSharedRight: { identifier in
-                        try await container.protectedDataSessionCoordinator.removePersistedSharedRight(
-                            identifier: identifier
-                        )
-                    }
+                try await Self.recoverProtectedSettingsPendingMutation(
+                    container: container,
+                    authenticationContext: nil
                 )
-                switch outcome {
-                case .resumedToSteadyState:
-                    return .resumedToSteadyState
-                case .retryablePending:
-                    return .retryablePending
-                case .resetRequired:
-                    return .resetRequired
-                case .frameworkRecoveryNeeded:
-                    return .frameworkRecoveryNeeded
-                }
+            },
+            recoverPendingMutationWithContext: { authenticationContext in
+                try await Self.recoverProtectedSettingsPendingMutation(
+                    container: container,
+                    authenticationContext: authenticationContext
+                )
             },
             resetAuthorizationRequirement: {
                 Self.protectedSettingsMutationRequirement(
@@ -299,6 +283,40 @@ struct CypherAirApp: App {
             .wrappingRootKeyRequired
         case .frameworkRecoveryNeeded:
             .frameworkRecoveryNeeded
+        }
+    }
+
+    @MainActor
+    private static func recoverProtectedSettingsPendingMutation(
+        container: AppContainer,
+        authenticationContext: LAContext?
+    ) async throws -> ProtectedSettingsHost.RecoveryOutcome {
+        var recoveryHandlers: [any ProtectedDomainRecoveryHandler] = [
+            container.privateKeyControlStore,
+            container.protectedSettingsStore,
+            container.protectedDataFrameworkSentinelStore
+        ]
+        if let keyMetadataDomainStore = container.keyMetadataDomainStore {
+            recoveryHandlers.append(keyMetadataDomainStore)
+        }
+        let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingMutation(
+            handlers: recoveryHandlers,
+            authenticationContext: authenticationContext,
+            removeSharedRight: { identifier in
+                try await container.protectedDataSessionCoordinator.removePersistedSharedRight(
+                    identifier: identifier
+                )
+            }
+        )
+        switch outcome {
+        case .resumedToSteadyState:
+            return .resumedToSteadyState
+        case .retryablePending:
+            return .retryablePending
+        case .resetRequired:
+            return .resetRequired
+        case .frameworkRecoveryNeeded:
+            return .frameworkRecoveryNeeded
         }
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant, @unchecked Sendable {
     struct Payload: Codable, Equatable, Sendable {
@@ -324,7 +325,10 @@ extension ProtectedDataFrameworkSentinelStore: ProtectedDomainRecoveryHandler {
         Self.domainID
     }
 
-    func continuePendingCreate(phase: CreateDomainPhase) async throws {
+    func continuePendingCreate(
+        phase: CreateDomainPhase,
+        authenticationContext: LAContext?
+    ) async throws {
         if phase == .membershipCommitted {
             return
         }

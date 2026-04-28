@@ -72,6 +72,7 @@ Phase 6 is complete for the key metadata source of truth:
 - Post-unlock orchestration creates/opens `key-metadata` after `private-key-control` and before protected settings/sentinel recovery checks, reusing the same authenticated `LAContext`.
 - `AppStartupCoordinator` no longer loads key metadata before privacy authentication; Home and My Keys render locked/loading/recovery states until `.loaded`.
 - Migration preserves both upgrade paths: current transitional `metadataAccount` rows and older default-account metadata rows. Dedicated metadata rows win by fingerprint during dual-source migration.
+- Pending-create recovery must reuse the authenticated `LAContext` for default-account metadata or remain retryable without committing a partial payload; legacy cleanup retry deletes already-migrated source rows by fingerprint membership.
 
 Phase 6 does not move private-key material. Permanent and pending SE-wrapped private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain.
 

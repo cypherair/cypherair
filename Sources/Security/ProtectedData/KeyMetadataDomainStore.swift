@@ -442,11 +442,9 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             let sourceSnapshot = try legacyMetadataStore.loadMigrationSourceSnapshot(
                 authenticationContext: authenticationContext
             )
-            let payloadByFingerprint = Dictionary(
-                uniqueKeysWithValues: payload.identities.map { ($0.fingerprint, $0) }
-            )
+            let migratedFingerprints = Set(payload.identities.map(\.fingerprint))
             let matchingSourceItems = sourceSnapshot.items.filter { item in
-                payloadByFingerprint[item.identity.fingerprint] == item.identity
+                migratedFingerprints.contains(item.identity.fingerprint)
             }
             let cleanupOutcome = legacyMetadataStore.cleanupMigrationSourceItems(
                 matchingSourceItems,
@@ -518,7 +516,10 @@ extension KeyMetadataDomainStore: ProtectedDomainRecoveryHandler {
         Self.domainID
     }
 
-    func continuePendingCreate(phase: CreateDomainPhase) async throws {
+    func continuePendingCreate(
+        phase: CreateDomainPhase,
+        authenticationContext: LAContext?
+    ) async throws {
         if phase == .membershipCommitted {
             return
         }
@@ -527,8 +528,11 @@ extension KeyMetadataDomainStore: ProtectedDomainRecoveryHandler {
             throw ProtectedDataError.authorizingUnavailable
         }
         let sourceSnapshot = try legacyMetadataStore.loadMigrationSourceSnapshot(
-            authenticationContext: nil
+            authenticationContext: authenticationContext
         )
+        guard authenticationContext != nil || sourceSnapshot.failedItemCount == 0 else {
+            throw ProtectedDataError.authorizingUnavailable
+        }
         let initialPayload = Payload.initial(
             identities: Self.mergedIdentities(from: sourceSnapshot.items)
         )
