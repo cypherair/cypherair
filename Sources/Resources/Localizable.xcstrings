@@ -433,22 +433,6 @@
         }
       }
     },
-    "app.loadWarning.legacyMetadataMigration" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Some saved key metadata could not be migrated. Your private keys remain protected; restart CypherAir and unlock again to retry."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "部分已保存的密钥元数据无法迁移。你的私钥仍然受到保护；请重启 CypherAir 并再次解锁以重试。"
-          }
-        }
-      }
-    },
     "app.loadWarning.keyMetadataMigration" : {
       "localizations" : {
         "en" : {
@@ -461,6 +445,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "部分已保存的密钥元数据无法迁移或清理。你的私钥仍然受到保护；请重启 CypherAir 并再次解锁以重试。"
+          }
+        }
+      }
+    },
+    "app.loadWarning.legacyMetadataMigration" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some saved key metadata could not be migrated. Your private keys remain protected; restart CypherAir and unlock again to retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分已保存的密钥元数据无法迁移。你的私钥仍然受到保护；请重启 CypherAir 并再次解锁以重试。"
           }
         }
       }
@@ -3373,22 +3373,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "私钥保护已锁定。请解锁 CypherAir 后重试。"
-          }
-        }
-      }
-    },
-    "error.privateKeyControl.missingStore" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Private key protection is not available."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私钥保护不可用。"
           }
         }
       }
@@ -7265,6 +7249,22 @@
         }
       }
     },
+    "keys.generate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成密钥"
+          }
+        }
+      }
+    },
     "keys.loading.description" : {
       "localizations" : {
         "en" : {
@@ -7329,6 +7329,22 @@
         }
       }
     },
+    "keys.notBackedUp" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not backed up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未备份"
+          }
+        }
+      }
+    },
     "keys.recovery.description" : {
       "localizations" : {
         "en" : {
@@ -7357,38 +7373,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密钥元数据需要恢复"
-          }
-        }
-      }
-    },
-    "keys.generate" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成密钥"
-          }
-        }
-      }
-    },
-    "keys.notBackedUp" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not backed up"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未备份"
           }
         }
       }
