@@ -35,7 +35,7 @@ are not part of the standard GitHub workflows.
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
-**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, key-metadata cold-load/migration, protected-settings handoff-only auto-open behavior, private-key-control migration/recovery behavior, and the root-secret SE device-binding envelope through protocol-based mocks. Uses protocol-based mocks for Keychain and SE. v2 `CAPDSEV2` coverage belongs here first: seal/open round trip, field-length validation, HKDF sharedInfo mismatch, AAD mismatch, AAD-version rejection, ephemeral public-key binding, ciphertext/tag/nonce/salt/public-key tampering, v1-to-v2 migration, registry + Keychain `format-floor` downgrade rejection, `legacy-cleanup` deletion after the next successful v2 open, and Reset deleting the SE binding key.
+**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, post-unlock key-metadata domain creation/migration/recovery, protected-settings handoff-only auto-open behavior, private-key-control migration/recovery behavior, and the root-secret SE device-binding envelope through protocol-based mocks. Uses protocol-based mocks for Keychain and SE. v2 `CAPDSEV2` coverage belongs here first: seal/open round trip, field-length validation, HKDF sharedInfo mismatch, AAD mismatch, AAD-version rejection, ephemeral public-key binding, ciphertext/tag/nonce/salt/public-key tampering, v1-to-v2 migration, registry + Keychain `format-floor` downgrade rejection, `legacy-cleanup` deletion after the next successful v2 open, and Reset deleting the SE binding key.
 
 ```bash
 # Practical local path used in this repository
@@ -99,7 +99,7 @@ ProtectedData device-test isolation rules:
 ProtectedData Phase 1 unit-test expectations:
 
 - verify that pre-auth bootstrap never touches the root-secret store or legacy right-store adapter
-- verify that pre-auth key-metadata loading queries only the dedicated metadata account and does not touch private-key Keychain rows
+- verify that pre-auth bootstrap does not load key metadata or enumerate private-key Keychain rows
 - verify that bootstrap can return framework recovery without a trusted registry object
 - verify that `.continuePendingMutation` is preserved as an explicit bootstrap outcome
 - verify that the access gate distinguishes authorization-required, already-authorized, pending-mutation-recovery, framework-recovery, and no-protected-domain states

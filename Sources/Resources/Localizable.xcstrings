@@ -449,6 +449,22 @@
         }
       }
     },
+    "app.loadWarning.keyMetadataMigration" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some saved key metadata could not be migrated or cleaned up. Your private keys remain protected; restart CypherAir and unlock again to retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分已保存的密钥元数据无法迁移或清理。你的私钥仍然受到保护；请重启 CypherAir 并再次解锁以重试。"
+          }
+        }
+      }
+    },
     "app.name" : {
       "localizations" : {
         "en" : {
@@ -3362,7 +3378,6 @@
       }
     },
     "error.privateKeyControl.missingStore" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5746,6 +5761,102 @@
         }
       }
     },
+    "home.keysLoading.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your protected key metadata is opening."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在打开受保护的密钥元数据。"
+          }
+        }
+      }
+    },
+    "home.keysLoading.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载密钥"
+          }
+        }
+      }
+    },
+    "home.keysLocked.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock CypherAir to show your key list."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁 CypherAir 以显示你的密钥列表。"
+          }
+        }
+      }
+    },
+    "home.keysLocked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keys Locked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥已锁定"
+          }
+        }
+      }
+    },
+    "home.keysRecovery.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected key metadata could not be opened. Use protected data recovery or reset local data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开受保护的密钥元数据。请使用受保护数据恢复或重置本地数据。"
+          }
+        }
+      }
+    },
+    "home.keysRecovery.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Metadata Needs Recovery"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥元数据需要恢复"
+          }
+        }
+      }
+    },
     "home.noKeys.subtitle" : {
       "localizations" : {
         "en" : {
@@ -7150,6 +7261,102 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无密钥"
+          }
+        }
+      }
+    },
+    "keys.loading.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your protected key metadata is opening."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在打开受保护的密钥元数据。"
+          }
+        }
+      }
+    },
+    "keys.loading.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载密钥"
+          }
+        }
+      }
+    },
+    "keys.locked.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock CypherAir to show your keys."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁 CypherAir 以显示你的密钥。"
+          }
+        }
+      }
+    },
+    "keys.locked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keys Locked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥已锁定"
+          }
+        }
+      }
+    },
+    "keys.recovery.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected key metadata could not be opened. Use protected data recovery or reset local data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开受保护的密钥元数据。请使用受保护数据恢复或重置本地数据。"
+          }
+        }
+      }
+    },
+    "keys.recovery.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Metadata Needs Recovery"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥元数据需要恢复"
           }
         }
       }

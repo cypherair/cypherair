@@ -136,6 +136,7 @@ $(SRCROOT)/Sources/Security/Mocks/MockKeychain.swift
 $(SRCROOT)/Sources/Security/Mocks/MockMemoryInfo.swift
 $(SRCROOT)/Sources/Security/Mocks/MockSecureEnclave.swift
 $(SRCROOT)/Sources/Security/ProtectedData/AppSessionOrchestrator.swift
+$(SRCROOT)/Sources/Security/ProtectedData/KeyMetadataDomainStore.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataDeviceBinding.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataDomain.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift

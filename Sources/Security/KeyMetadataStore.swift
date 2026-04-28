@@ -1,6 +1,20 @@
 import Foundation
 import LocalAuthentication
 
+enum KeyMetadataLoadState: Equatable {
+    case locked
+    case loading
+    case loaded
+    case recoveryNeeded
+}
+
+protocol KeyMetadataPersistence: AnyObject {
+    func loadAll() throws -> [PGPKeyIdentity]
+    func save(_ identity: PGPKeyIdentity) throws
+    func update(_ identity: PGPKeyIdentity) throws
+    func delete(fingerprint: String) throws
+}
+
 struct KeyMetadataLegacyMigrationOutcome: Equatable {
     let legacyServiceCount: Int
     let migratedCount: Int
@@ -12,8 +26,20 @@ struct KeyMetadataLegacyMigrationOutcome: Equatable {
     }
 }
 
+struct KeyMetadataMigrationSourceItem: Equatable {
+    let service: String
+    let account: String
+    let identity: PGPKeyIdentity
+}
+
+struct KeyMetadataMigrationSourceSnapshot: Equatable {
+    let sourceItemCount: Int
+    let items: [KeyMetadataMigrationSourceItem]
+    let failedItemCount: Int
+}
+
 /// Persistence layer for non-sensitive key metadata stored in the Keychain.
-struct KeyMetadataStore {
+final class KeyMetadataStore: KeyMetadataPersistence {
     private let keychain: any KeychainManageable
     private let traceStore: AuthLifecycleTraceStore?
     private let encoder = JSONEncoder()
@@ -28,6 +54,66 @@ struct KeyMetadataStore {
         try loadAll(
             account: KeychainConstants.metadataAccount,
             authenticationContext: nil
+        )
+    }
+
+    func loadMigrationSourceSnapshot(
+        authenticationContext: LAContext?
+    ) throws -> KeyMetadataMigrationSourceSnapshot {
+        let dedicatedItems = loadMigrationItemsOrFailure(
+            account: KeychainConstants.metadataAccount,
+            authenticationContext: nil
+        )
+        let legacyItems = loadMigrationItemsOrFailure(
+            account: KeychainConstants.defaultAccount,
+            authenticationContext: authenticationContext
+        )
+
+        return KeyMetadataMigrationSourceSnapshot(
+            sourceItemCount: dedicatedItems.sourceItemCount + legacyItems.sourceItemCount,
+            items: legacyItems.items + dedicatedItems.items,
+            failedItemCount: dedicatedItems.failedItemCount + legacyItems.failedItemCount
+        )
+    }
+
+    func cleanupMigrationSourceItems(
+        _ sourceItems: [KeyMetadataMigrationSourceItem],
+        authenticationContext: LAContext?
+    ) -> KeyMetadataLegacyMigrationOutcome {
+        var deletedCount = 0
+        var failedCount = 0
+
+        for item in sourceItems {
+            do {
+                try keychain.delete(
+                    service: item.service,
+                    account: item.account,
+                    authenticationContext: item.account == KeychainConstants.defaultAccount ? authenticationContext : nil
+                )
+                deletedCount += 1
+            } catch where Self.isItemNotFound(error) {
+            } catch {
+                failedCount += 1
+                traceStore?.record(
+                    category: .operation,
+                    name: "keyMetadata.legacyMigration.itemError",
+                    metadata: AuthTraceMetadata.errorMetadata(
+                        error,
+                        extra: [
+                            "step": "deleteSource",
+                            "serviceKind": AuthTraceMetadata.keychainServiceKind(for: item.service),
+                            "accountKind": AuthTraceMetadata.keychainAccountKind(for: item.account)
+                        ]
+                    )
+                )
+            }
+        }
+
+        return KeyMetadataLegacyMigrationOutcome(
+            legacyServiceCount: sourceItems.count,
+            migratedCount: sourceItems.count,
+            deletedLegacyCount: deletedCount,
+            failedItemCount: failedCount
         )
     }
 
@@ -127,7 +213,11 @@ struct KeyMetadataStore {
         try save(identity, account: KeychainConstants.metadataAccount)
     }
 
-    func delete(fingerprint: String, account: String = KeychainConstants.metadataAccount) throws {
+    func delete(fingerprint: String) throws {
+        try delete(fingerprint: fingerprint, account: KeychainConstants.metadataAccount)
+    }
+
+    func delete(fingerprint: String, account: String) throws {
         try keychain.delete(
             service: KeychainConstants.metadataService(fingerprint: fingerprint),
             account: account
@@ -183,6 +273,86 @@ struct KeyMetadataStore {
         }
 
         return loaded
+    }
+
+    private func loadMigrationItems(
+        account: String,
+        authenticationContext: LAContext?
+    ) throws -> KeyMetadataMigrationSourceSnapshot {
+        let metadataServices = try keychain.listItems(
+            servicePrefix: KeychainConstants.metadataPrefix,
+            account: account,
+            authenticationContext: authenticationContext
+        )
+
+        var loaded: [KeyMetadataMigrationSourceItem] = []
+        var failedItemCount = 0
+        for service in metadataServices.sorted() {
+            do {
+                let data = try keychain.load(
+                    service: service,
+                    account: account,
+                    authenticationContext: authenticationContext
+                )
+                let identity = try decoder.decode(PGPKeyIdentity.self, from: data)
+                loaded.append(
+                    KeyMetadataMigrationSourceItem(
+                        service: service,
+                        account: account,
+                        identity: identity
+                    )
+                )
+            } catch {
+                failedItemCount += 1
+                traceStore?.record(
+                    category: .operation,
+                    name: "keyMetadata.legacyMigration.itemError",
+                    metadata: AuthTraceMetadata.errorMetadata(
+                        error,
+                        extra: [
+                            "step": "loadMigrationItem",
+                            "serviceKind": AuthTraceMetadata.keychainServiceKind(for: service),
+                            "accountKind": AuthTraceMetadata.keychainAccountKind(for: account)
+                        ]
+                    )
+                )
+            }
+        }
+
+        return KeyMetadataMigrationSourceSnapshot(
+            sourceItemCount: metadataServices.count,
+            items: loaded,
+            failedItemCount: failedItemCount
+        )
+    }
+
+    private func loadMigrationItemsOrFailure(
+        account: String,
+        authenticationContext: LAContext?
+    ) -> KeyMetadataMigrationSourceSnapshot {
+        do {
+            return try loadMigrationItems(
+                account: account,
+                authenticationContext: authenticationContext
+            )
+        } catch {
+            traceStore?.record(
+                category: .operation,
+                name: "keyMetadata.legacyMigration.itemError",
+                metadata: AuthTraceMetadata.errorMetadata(
+                    error,
+                    extra: [
+                        "step": "listMigrationSource",
+                        "accountKind": AuthTraceMetadata.keychainAccountKind(for: account)
+                    ]
+                )
+            )
+            return KeyMetadataMigrationSourceSnapshot(
+                sourceItemCount: 0,
+                items: [],
+                failedItemCount: 1
+            )
+        }
     }
 
     private static func isItemNotFound(_ error: Error) -> Bool {

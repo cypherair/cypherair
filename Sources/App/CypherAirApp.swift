@@ -227,12 +227,16 @@ struct CypherAirApp: App {
                 )
             },
             recoverPendingMutation: {
+                var recoveryHandlers: [any ProtectedDomainRecoveryHandler] = [
+                    container.privateKeyControlStore,
+                    container.protectedSettingsStore,
+                    container.protectedDataFrameworkSentinelStore
+                ]
+                if let keyMetadataDomainStore = container.keyMetadataDomainStore {
+                    recoveryHandlers.append(keyMetadataDomainStore)
+                }
                 let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingMutation(
-                    handlers: [
-                        container.privateKeyControlStore,
-                        container.protectedSettingsStore,
-                        container.protectedDataFrameworkSentinelStore
-                    ],
+                    handlers: recoveryHandlers,
                     removeSharedRight: { identifier in
                         try await container.protectedDataSessionCoordinator.removePersistedSharedRight(
                             identifier: identifier

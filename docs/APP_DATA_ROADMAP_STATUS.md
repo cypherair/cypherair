@@ -14,7 +14,7 @@
 | Phase 3 | First Low-Risk Real Domain | Implemented narrowly | The first real domain is `protected-settings`; the only migrated setting is `clipboardNotice`. Other ordinary settings remain outside this phase and are tracked as Phase 7 targets. |
 | Phase 4 | Post-Unlock Multi-Domain Orchestration And Framework Hardening | Implemented | Phase 4 established production wiring for `protected-settings` plus the framework-owned `protected-framework-sentinel` domain. Post-unlock handoff can create/open the sentinel as a second domain after settings is committed, generic recovery dispatch is keyed by `ProtectedDataDomainID`, and second-domain create/delete/recovery plus pending-create continuation coverage live in `ProtectedDataFrameworkTests`. Phase 5 later adds `private-key-control` to the post-unlock opener path. |
 | Phase 5 | Private-Key Control Domain | Implemented | `PrivateKeyControlStore` is wired as the `private-key-control` ProtectedData domain. It migrates `authMode` plus rewrap / modify-expiry recovery journal state out of legacy `UserDefaults` after app authentication, opens through post-unlock orchestration, participates in relock, and is covered by `ProtectedDataFrameworkTests` plus private-key recovery tests. |
-| Phase 6 | Key Metadata Domain | Pending | `PGPKeyIdentity` metadata remains in the transitional Keychain metadata account. |
+| Phase 6 | Key Metadata Domain | Implemented | `KeyMetadataDomainStore` owns ProtectedData domain `key-metadata` for `PGPKeyIdentity` payloads after app unlock. Migration reads both the transitional metadata account and older default-account metadata rows, cleans source rows only after verified domain creation/open, and preserves private-key material in the existing Keychain / Secure Enclave domain. |
 | Phase 7 | Non-Contacts Protected-After-Unlock Domains | Pending / partial by surface | Ordinary settings other than `clipboardNotice`, self-test state, and temporary/export/tutorial cleanup or file-protection work remain here unless explicitly classified as an exception. |
 | Phase 8 | Contacts Protected Domain | Pending | Contacts migration has not started. Contacts PR1-PR8 belong to Phase 8 and remain gated behind the remaining Phase 6-7 work, with AppData Phase 4 as a prerequisite. |
 | Phase 9 | Future Persistent Domains | Pending | Reserved for future app-owned persistent domains not covered by the current inventory. |
@@ -46,7 +46,7 @@ Implemented:
 
 Remaining product migrations:
 
-- `key metadata`, ordinary settings, contacts, and other protected-after-unlock surfaces remain Phase 6-8 work.
+- ordinary settings, contacts, and other protected-after-unlock surfaces remain Phase 7-8 work.
 
 ## 4. Phase 5 Boundary
 
@@ -60,9 +60,22 @@ Phase 5 is complete for the private-key control source of truth:
 
 Phase 5 does not move private-key material into ProtectedData. Permanent and pending SE-wrapped private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain.
 
-Phase 5 also does not complete the `key metadata` domain, ordinary protected-after-unlock settings, Contacts, or temporary/export/tutorial cleanup work. Those remain Phase 6-8 targets.
+Phase 5 did not move private-key material into ProtectedData. Phase 6 later moved key metadata only; ordinary protected-after-unlock settings, Contacts, and temporary/export/tutorial cleanup remain Phase 7-8 targets.
 
-## 5. Inventory Status Rule
+## 5. Phase 6 Boundary
+
+Phase 6 is complete for the key metadata source of truth:
+
+- `KeyMetadataDomainStore` exists as the `key-metadata` ProtectedData domain.
+- Payload schema v1 stores `schemaVersion` plus sorted `identities: [PGPKeyIdentity]`.
+- `KeyCatalogStore` writes through `KeyMetadataPersistence`; production wiring uses ProtectedData metadata while the legacy Keychain store remains a migration source and test helper.
+- Post-unlock orchestration creates/opens `key-metadata` after `private-key-control` and before protected settings/sentinel recovery checks, reusing the same authenticated `LAContext`.
+- `AppStartupCoordinator` no longer loads key metadata before privacy authentication; Home and My Keys render locked/loading/recovery states until `.loaded`.
+- Migration preserves both upgrade paths: current transitional `metadataAccount` rows and older default-account metadata rows. Dedicated metadata rows win by fingerprint during dual-source migration.
+
+Phase 6 does not move private-key material. Permanent and pending SE-wrapped private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain.
+
+## 6. Inventory Status Rule
 
 The persistent-state inventory in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) is the row-level tracking table. Every in-scope row must carry:
 

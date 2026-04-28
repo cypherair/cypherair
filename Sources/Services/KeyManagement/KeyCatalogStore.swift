@@ -3,11 +3,11 @@ import LocalAuthentication
 
 /// Owns in-memory key identity state and metadata persistence coordination.
 final class KeyCatalogStore {
-    private let metadataStore: KeyMetadataStore
+    private let metadataStore: any KeyMetadataPersistence
 
     private(set) var keys: [PGPKeyIdentity] = []
 
-    init(metadataStore: KeyMetadataStore) {
+    init(metadataStore: any KeyMetadataPersistence) {
         self.metadataStore = metadataStore
     }
 
@@ -22,7 +22,15 @@ final class KeyCatalogStore {
     func migrateLegacyMetadataIfNeeded(
         authenticationContext: LAContext?
     ) throws -> KeyMetadataLegacyMigrationOutcome {
-        let outcome = try metadataStore.migrateLegacyMetadataIfNeeded(
+        guard let keychainMetadataStore = metadataStore as? KeyMetadataStore else {
+            return KeyMetadataLegacyMigrationOutcome(
+                legacyServiceCount: 0,
+                migratedCount: 0,
+                deletedLegacyCount: 0,
+                failedItemCount: 0
+            )
+        }
+        let outcome = try keychainMetadataStore.migrateLegacyMetadataIfNeeded(
             authenticationContext: authenticationContext
         )
         if outcome.didChangeDedicatedMetadata {
@@ -92,7 +100,8 @@ final class KeyCatalogStore {
         keys[index] = identity
     }
 
-    func removeKey(fingerprint: String) {
+    func removeKey(fingerprint: String) throws {
+        try metadataStore.delete(fingerprint: fingerprint)
         keys.removeAll { $0.fingerprint == fingerprint }
 
         guard !keys.isEmpty, !keys.contains(where: \.isDefault) else {
@@ -100,7 +109,7 @@ final class KeyCatalogStore {
         }
 
         keys[0].isDefault = true
-        try? metadataStore.update(keys[0])
+        try metadataStore.update(keys[0])
     }
 
     func setDefaultKey(fingerprint: String) throws {

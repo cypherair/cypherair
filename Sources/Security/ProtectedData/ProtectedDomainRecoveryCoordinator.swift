@@ -107,10 +107,15 @@ struct ProtectedDomainRecoveryCoordinator {
     }
 }
 
+struct ProtectedDataPostUnlockOpenContext: @unchecked Sendable {
+    let wrappingRootKey: Data
+    let authenticationContext: LAContext?
+}
+
 struct ProtectedDataPostUnlockDomainOpener: Sendable {
     let domainID: ProtectedDataDomainID
-    private let ensureCommitted: (@Sendable (Data) async throws -> Void)?
-    private let open: @Sendable (Data) async throws -> Void
+    private let ensureCommitted: (@Sendable (ProtectedDataPostUnlockOpenContext) async throws -> Void)?
+    private let open: @Sendable (ProtectedDataPostUnlockOpenContext) async throws -> Void
 
     init(
         domainID: ProtectedDataDomainID,
@@ -118,20 +123,38 @@ struct ProtectedDataPostUnlockDomainOpener: Sendable {
         open: @escaping @Sendable (Data) async throws -> Void
     ) {
         self.domainID = domainID
-        self.ensureCommitted = ensureCommittedIfNeeded
-        self.open = open
+        if let ensureCommittedIfNeeded {
+            self.ensureCommitted = { context in
+                try await ensureCommittedIfNeeded(context.wrappingRootKey)
+            }
+        } else {
+            self.ensureCommitted = nil
+        }
+        self.open = { context in
+            try await open(context.wrappingRootKey)
+        }
+    }
+
+    init(
+        domainID: ProtectedDataDomainID,
+        ensureCommittedWithContext: (@Sendable (ProtectedDataPostUnlockOpenContext) async throws -> Void)? = nil,
+        openWithContext: @escaping @Sendable (ProtectedDataPostUnlockOpenContext) async throws -> Void
+    ) {
+        self.domainID = domainID
+        self.ensureCommitted = ensureCommittedWithContext
+        self.open = openWithContext
     }
 
     var canEnsureCommitted: Bool {
         ensureCommitted != nil
     }
 
-    func ensureCommittedIfNeeded(wrappingRootKey: Data) async throws {
-        try await ensureCommitted?(wrappingRootKey)
+    func ensureCommittedIfNeeded(context: ProtectedDataPostUnlockOpenContext) async throws {
+        try await ensureCommitted?(context)
     }
 
-    func openDomain(wrappingRootKey: Data) async throws {
-        try await open(wrappingRootKey)
+    func openDomain(context: ProtectedDataPostUnlockOpenContext) async throws {
+        try await open(context)
     }
 }
 
@@ -234,6 +257,10 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
             defer {
                 wrappingRootKey.protectedDataZeroize()
             }
+            let openContext = ProtectedDataPostUnlockOpenContext(
+                wrappingRootKey: wrappingRootKey,
+                authenticationContext: authenticationContext
+            )
 
             var openedDomainIDs: [ProtectedDataDomainID] = []
             var currentRegistry = registry
@@ -243,7 +270,7 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
                         guard opener.canEnsureCommitted else {
                             continue
                         }
-                        try await opener.ensureCommittedIfNeeded(wrappingRootKey: wrappingRootKey)
+                        try await opener.ensureCommittedIfNeeded(context: openContext)
                         currentRegistry = try currentRegistryProvider()
                     }
                     guard currentRegistry.committedMembership[opener.domainID] != nil else {
@@ -256,7 +283,7 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
                             source: source
                         )
                     }
-                    try await opener.openDomain(wrappingRootKey: wrappingRootKey)
+                    try await opener.openDomain(context: openContext)
                     openedDomainIDs.append(opener.domainID)
                 } catch {
                     return finish(

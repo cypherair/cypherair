@@ -89,6 +89,7 @@ final class TutorialSandboxContainer {
             authenticationPromptCoordinator: authenticationPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore
         )
+        try? self.keyManagement.loadKeys()
         self.contactService = ContactService(engine: engine, contactsDirectory: contactsDirectory)
         self.encryptionService = EncryptionService(
             engine: engine,

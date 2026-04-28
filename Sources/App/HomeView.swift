@@ -6,14 +6,50 @@ struct HomeView: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(\.appRouteNavigator) private var routeNavigator
     var body: some View {
-        Group {
+        content
+        .navigationTitle(String(localized: "home.title", defaultValue: "CypherAir"))
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch keyManagement.metadataLoadState {
+        case .locked:
+            metadataStateContent(
+                title: String(localized: "home.keysLocked.title", defaultValue: "Keys Locked"),
+                subtitle: String(localized: "home.keysLocked.subtitle", defaultValue: "Unlock CypherAir to show your key list."),
+                systemImage: "lock"
+            )
+        case .loading:
+            metadataStateContent(
+                title: String(localized: "home.keysLoading.title", defaultValue: "Loading Keys"),
+                subtitle: String(localized: "home.keysLoading.subtitle", defaultValue: "Your protected key metadata is opening."),
+                systemImage: "key"
+            )
+        case .recoveryNeeded:
+            metadataStateContent(
+                title: String(localized: "home.keysRecovery.title", defaultValue: "Key Metadata Needs Recovery"),
+                subtitle: String(localized: "home.keysRecovery.subtitle", defaultValue: "Protected key metadata could not be opened. Use protected data recovery or reset local data."),
+                systemImage: "exclamationmark.triangle"
+            )
+        case .loaded:
             if keyManagement.keys.isEmpty {
                 noKeysContent
             } else {
                 hasKeysContent
             }
         }
-        .navigationTitle(String(localized: "home.title", defaultValue: "CypherAir"))
+    }
+
+    private func metadataStateContent(
+        title: String,
+        subtitle: String,
+        systemImage: String
+    ) -> some View {
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage)
+        } description: {
+            Text(subtitle)
+        }
     }
 
     private var noKeysContent: some View {

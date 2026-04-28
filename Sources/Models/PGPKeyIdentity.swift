@@ -4,8 +4,8 @@ import Foundation
 /// The actual secret key bytes are SE-wrapped in Keychain — this model
 /// holds only metadata and the public key data.
 ///
-/// Conforms to `Codable` for serialization into a Keychain metadata item,
-/// enabling key enumeration on cold launch without SE authentication.
+/// Conforms to `Codable` for serialization into the protected key-metadata
+/// domain, with legacy Keychain decoding retained for migration.
 struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// Unique identifier — the full fingerprint in lowercase hex.
     var id: String { fingerprint }

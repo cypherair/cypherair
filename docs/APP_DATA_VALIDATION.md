@@ -94,7 +94,7 @@ This document is a downstream review aid. It does not change the architecture or
 
 - wrong auth does not unlock the shared app-data session
 - pre-auth attempts must not fetch the root-secret Keychain item
-- pre-auth key-metadata loading must use only the dedicated non-sensitive metadata account and must not enumerate private-key Keychain rows
+- pre-auth startup must not load key metadata or enumerate private-key Keychain rows
 - an unauthenticated `LAContext` does not release the root secret
 - an interaction-disallowed context that is not already authenticated fails without displaying a second prompt and does not release the root secret
 - invariant violation or unclassifiable registry row enters `frameworkRecoveryNeeded`
@@ -116,7 +116,7 @@ This draft proposal must map its validation buckets onto the repository's existi
 - registry authority, state-machine, consistency-matrix, and invariant checks belong to Swift unit coverage in `CypherAir-UnitTests` using `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 - startup recovery, relock orchestration, and route-handoff integration belong to macOS-local validation using `CypherAir-UnitTests`, with `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` added whenever launch, routing, or protected-content smoke coverage is part of the change
 - unit coverage must verify that pre-auth bootstrap never touches the root-secret store or any root-secret retrieval adapter
-- unit coverage must verify that metadata cold-load uses only the dedicated metadata account, and that authenticated legacy metadata migration is retried after app-session unlock without introducing a new prompt
+- unit coverage must verify that key metadata opens only after app-session unlock, reuses the authenticated `LAContext` for legacy default-account reads, and does not introduce a new prompt
 - Keychain root-secret behavior, `kSecUseAuthenticationContext`, real LocalAuthentication prompt semantics, and device-only authorization guarantees belong to `CypherAir-DeviceTests` using `xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests -destination 'platform=iOS,name=<DEVICE_NAME>'`, plus explicit manual device validation whenever automation cannot prove platform prompt timing or system UX behavior
 - device coverage should verify that one authenticated `LAContext` can unlock the root-secret Keychain record without a second prompt
 - device tests for root-secret storage must use test-only service/account identifiers of the form `com.cypherair.tests.protected-data.<TestCase>.<UUID>`
@@ -133,7 +133,7 @@ This draft proposal must map its validation buckets onto the repository's existi
 - the `appSessionAuthenticationPolicy` boot authentication profile must stay early-readable unless a future testable design provides a protected value plus boot cache without changing launch authentication strength
 - Phase 5 `private-key-control` coverage proves that `authMode` and private-key recovery journal data are unavailable pre-auth, that app unlock opens the domain through post-unlock orchestration without a second prompt, that legacy `UserDefaults` sources are cleaned after verified migration, and that rewrap / modify-expiry recovery detection runs only after this domain opens
 - private-key bundle tests must prove that permanent and pending SE-wrapped private-key rows remain in the existing Keychain / Secure Enclave material domain and are not copied into ProtectedData payloads
-- key metadata migration tests must prove that `PGPKeyIdentity` data can load from the future `key metadata` domain after app unlock, that the transitional metadata Keychain account is cleaned only after verified migration, and that startup does not regress to a double-authentication flow or a visible empty-key-list flash
+- Phase 6 key metadata migration tests must prove that `PGPKeyIdentity` data loads from `key-metadata` only after app unlock, that both transitional metadata-account and older default-account rows migrate with fingerprint de-duplication, that legacy rows are cleaned only after verified protected-domain readability, that corrupt legacy rows remain retryable, and that startup does not regress to pre-auth metadata reads, double authentication, or a visible empty-key-list flash
 - protected settings route tests must cover the already-on-Settings background/foreground path: after app privacy unlock, `contentClearGeneration` invalidation should non-interactively auto-open protected settings when the session is already authorized or handoff is available
 - Phase 8 Contacts migration tests must cover `Documents/contacts/*.gpg` and `Documents/contacts/contact-metadata.json` source preservation, protected-domain readability, and no-silent-reset failure behavior
 - self-test persistence tests must prove either protected diagnostics storage or short-lived/export-only cleanup semantics for `Documents/self-test`
