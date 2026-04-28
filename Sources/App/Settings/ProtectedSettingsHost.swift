@@ -44,6 +44,7 @@ final class ProtectedSettingsHost {
     enum AuthorizationInteractionMode: Equatable {
         case allowInteraction
         case handoffOnly
+        case requireReusableContext
     }
 
     enum RecoveryOutcome: Equatable {
@@ -351,11 +352,15 @@ final class ProtectedSettingsHost {
 
         sectionState = .loading
         do {
+            let recoveryRequirement = liveDependencies.pendingRecoveryAuthorizationRequirement()
             let recoveryAuthorization = try await authorizeMutationIfNeeded(
                 using: liveDependencies,
-                requirement: liveDependencies.pendingRecoveryAuthorizationRequirement(),
+                requirement: recoveryRequirement,
                 localizedReason: settingsLocalizedReason,
-                operation: "pendingRecovery"
+                operation: "pendingRecovery",
+                interactionMode: recoveryRequirement == .wrappingRootKeyRequired
+                    ? .requireReusableContext
+                    : .allowInteraction
             )
             guard recoveryAuthorization.isAuthorized else {
                 return
@@ -550,7 +555,8 @@ final class ProtectedSettingsHost {
         using liveDependencies: LiveDependencies,
         requirement: MutationAuthorizationRequirement,
         localizedReason: String,
-        operation: String
+        operation: String,
+        interactionMode: AuthorizationInteractionMode = .allowInteraction
     ) async throws -> MutationAuthorizationResult {
         traceHostEvent(
             "protectedSettings.mutationAuthorization.start",
@@ -578,7 +584,7 @@ final class ProtectedSettingsHost {
         case .wrappingRootKeyRequired:
             let authorizationResult = await liveDependencies.authorizeSharedRight(
                 localizedReason,
-                .allowInteraction
+                interactionMode
             )
             traceHostEvent(
                 "protectedSettings.mutationAuthorization.result",

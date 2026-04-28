@@ -527,15 +527,23 @@ extension KeyMetadataDomainStore: ProtectedDomainRecoveryHandler {
         guard let currentWrappingRootKey else {
             throw ProtectedDataError.authorizingUnavailable
         }
-        let sourceSnapshot = try legacyMetadataStore.loadMigrationSourceSnapshot(
-            authenticationContext: authenticationContext
-        )
-        guard authenticationContext != nil || sourceSnapshot.failedItemCount == 0 else {
-            throw ProtectedDataError.authorizingUnavailable
+        let stagedPayload: Payload?
+        switch phase {
+        case .journaled, .sharedResourceProvisioned:
+            let sourceSnapshot = try legacyMetadataStore.loadMigrationSourceSnapshot(
+                authenticationContext: authenticationContext
+            )
+            guard authenticationContext != nil || sourceSnapshot.failedItemCount == 0 else {
+                throw ProtectedDataError.authorizingUnavailable
+            }
+            stagedPayload = Payload.initial(
+                identities: Self.mergedIdentities(from: sourceSnapshot.items)
+            )
+        case .artifactsStaged, .validated:
+            stagedPayload = nil
+        case .membershipCommitted:
+            return
         }
-        let initialPayload = Payload.initial(
-            identities: Self.mergedIdentities(from: sourceSnapshot.items)
-        )
         let wrappingRootKey = SensitiveBytesBox(data: try currentWrappingRootKey())
         defer {
             wrappingRootKey.zeroize()
@@ -544,8 +552,11 @@ extension KeyMetadataDomainStore: ProtectedDomainRecoveryHandler {
         _ = try await registryStore.completePendingCreate(
             domainID: Self.domainID,
             stageArtifacts: { [self] in
+                guard let stagedPayload else {
+                    return
+                }
                 try stageInitialPayload(
-                    initialPayload,
+                    stagedPayload,
                     wrappingRootKey: wrappingRootKey.dataCopy()
                 )
             },

@@ -1124,7 +1124,7 @@ final class SettingsScreenModelTests: XCTestCase {
             evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
             authorizeSharedRight: { _, interactionMode in
                 events.append("authorize")
-                XCTAssertEqual(interactionMode, .allowInteraction)
+                XCTAssertEqual(interactionMode, .requireReusableContext)
                 return .authorized
             },
             currentWrappingRootKey: {
@@ -1163,7 +1163,7 @@ final class SettingsScreenModelTests: XCTestCase {
             evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
             authorizeSharedRight: { _, interactionMode in
                 events.append("authorize")
-                XCTAssertEqual(interactionMode, .allowInteraction)
+                XCTAssertEqual(interactionMode, .requireReusableContext)
                 return .authorizedWithContext(authenticationContext)
             },
             currentWrappingRootKey: {

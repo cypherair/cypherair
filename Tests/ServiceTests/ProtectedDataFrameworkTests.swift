@@ -389,6 +389,83 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(phase, .journaled, file: file, line: line)
     }
 
+    private func leaveKeyMetadataPendingCreateWithStagedArtifacts(
+        storageRoot: AppProtectedDataStorageRoot,
+        registryStore: AppProtectedDataRegistryStore,
+        domainKeyManager: AppProtectedDomainKeyManager,
+        wrappingRootKey: Data,
+        identity: PGPKeyIdentity,
+        phase: CreateDomainPhase,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        guard phase == .artifactsStaged || phase == .validated else {
+            XCTFail("Staged-artifact fixture only supports artifactsStaged or validated.", file: file, line: line)
+            return
+        }
+
+        let payload = AppKeyMetadataDomainStore.Payload.initial(identities: [identity])
+        var domainMasterKey = try domainKeyManager.generateDomainMasterKey()
+        defer {
+            domainMasterKey.protectedDataZeroize()
+        }
+        let wrappedRecord = try domainKeyManager.wrapDomainMasterKey(
+            domainMasterKey,
+            for: AppKeyMetadataDomainStore.domainID,
+            wrappingRootKey: wrappingRootKey
+        )
+        try domainKeyManager.writeWrappedDomainMasterKeyRecordTransaction(
+            wrappedRecord,
+            wrappingRootKey: wrappingRootKey
+        )
+
+        try storageRoot.ensureDomainDirectoryExists(for: AppKeyMetadataDomainStore.domainID)
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        var plaintext = try encoder.encode(payload)
+        defer {
+            plaintext.protectedDataZeroize()
+        }
+        let envelope = try ProtectedDomainEnvelopeCodec.seal(
+            plaintext: plaintext,
+            domainID: AppKeyMetadataDomainStore.domainID,
+            schemaVersion: AppKeyMetadataDomainStore.Payload.currentSchemaVersion,
+            generationIdentifier: 1,
+            domainMasterKey: domainMasterKey
+        )
+        let envelopeData = try encoder.encode(envelope)
+        let pendingURL = storageRoot.domainEnvelopeURL(
+            for: AppKeyMetadataDomainStore.domainID,
+            slot: .pending
+        )
+        try storageRoot.writeProtectedData(envelopeData, to: pendingURL)
+        try storageRoot.promoteStagedFile(
+            from: pendingURL,
+            to: storageRoot.domainEnvelopeURL(
+                for: AppKeyMetadataDomainStore.domainID,
+                slot: .current
+            )
+        )
+        try ProtectedDomainBootstrapStore(storageRoot: storageRoot).saveMetadata(
+            ProtectedDomainBootstrapMetadata(
+                schemaVersion: AppKeyMetadataDomainStore.Payload.currentSchemaVersion,
+                expectedCurrentGenerationIdentifier: "1",
+                coarseRecoveryReason: nil,
+                wrappedDomainMasterKeyRecordVersion: AppWrappedDomainMasterKeyRecord.currentFormatVersion
+            ),
+            for: AppKeyMetadataDomainStore.domainID
+        )
+
+        var registry = try registryStore.loadRegistry()
+        XCTAssertEqual(registry.sharedResourceLifecycleState, .ready, file: file, line: line)
+        XCTAssertNil(registry.committedMembership[AppKeyMetadataDomainStore.domainID], file: file, line: line)
+        registry.pendingMutation = .createDomain(
+            targetDomainID: AppKeyMetadataDomainStore.domainID,
+            phase: phase
+        )
+        try registryStore.saveRegistry(registry)
+    }
+
     private func replacing(
         _ envelope: ProtectedDataRootSecretEnvelope,
         magic: String? = nil,
@@ -3798,6 +3875,61 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(domainID, AppKeyMetadataDomainStore.domainID)
         XCTAssertEqual(phase, .journaled)
         XCTAssertThrowsError(try harness.store.loadAll())
+    }
+
+    func test_keyMetadataDomain_pendingCreateRecoveryFromStagedArtifactsSkipsLegacySourcesWithoutContext() async throws {
+        for (index, phase) in [CreateDomainPhase.artifactsStaged, .validated].enumerated() {
+            let harness = try await makeKeyMetadataDomainHarness("KeyMetadataRecoveryStaged\(index)")
+            defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+            let identity = makeMetadataIdentity(
+                fingerprint: index == 0
+                    ? "dededededededededededededededededededede"
+                    : "efefefefefefefefefefefefefefefefefefefef",
+                userId: "Staged \(index) <staged-\(index)@example.invalid>",
+                publicKeySeed: UInt8(0x30 + index)
+            )
+            try leaveKeyMetadataPendingCreateWithStagedArtifacts(
+                storageRoot: harness.storageRoot,
+                registryStore: harness.registryStore,
+                domainKeyManager: harness.domainKeyManager,
+                wrappingRootKey: harness.wrappingRootKey,
+                identity: identity,
+                phase: phase
+            )
+            try harness.keychain.save(
+                Data("not-valid-key-metadata".utf8),
+                service: KeychainConstants.metadataService(
+                    fingerprint: index == 0
+                        ? "fdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfd"
+                        : "fefefefefefefefefefefefefefefefefefefefe"
+                ),
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+            harness.keychain.resetCallHistory()
+
+            let recoveryCoordinator = ProtectedDomainRecoveryCoordinator(registryStore: harness.registryStore)
+            let outcome = try await recoveryCoordinator.recoverPendingMutation(
+                handler: harness.store,
+                authenticationContext: nil,
+                removeSharedRight: { _ in
+                    XCTFail("Key metadata recovery must not remove the shared right.")
+                }
+            )
+
+            XCTAssertEqual(outcome, .resumedToSteadyState)
+            XCTAssertNil(try harness.registryStore.loadRegistry().pendingMutation)
+            XCTAssertEqual(harness.keychain.listItemsCallCount, 0)
+            XCTAssertEqual(harness.keychain.loadCallCount, 0)
+
+            let openContext = LAContext()
+            defer { openContext.invalidate() }
+            _ = try await harness.store.openDomainIfNeeded(
+                wrappingRootKey: harness.wrappingRootKey,
+                authenticationContext: openContext
+            )
+            XCTAssertEqual(try harness.store.loadAll(), [identity])
+        }
     }
 
     func test_keyMetadataDomain_deduplicatesDualSourcesWithDedicatedAccountPriority() async throws {
