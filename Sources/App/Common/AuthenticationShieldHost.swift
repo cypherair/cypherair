@@ -23,11 +23,13 @@ private enum AuthenticationShieldLifecyclePhase: String, Equatable {
 private enum AuthenticationShieldDismissalCompletionReason: String {
     case lifecycleSettle
     case fallbackYield
+    case activeProbe
 }
 
 @Observable
 final class AuthenticationShieldCoordinator: @unchecked Sendable {
     private let traceStore: AuthLifecycleTraceStore?
+    private let macOSApplicationIsActive: @MainActor () -> Bool
     private var privacyPromptDepth = 0
     private var operationPromptDepth = 0
     private var isPendingDismissal = false
@@ -42,8 +44,12 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
     private var lastDismissalCompletedCycleID: UInt64?
     private var lastDismissalElapsedMilliseconds: String?
 
-    init(traceStore: AuthLifecycleTraceStore? = nil) {
+    init(
+        traceStore: AuthLifecycleTraceStore? = nil,
+        macOSApplicationIsActive: @escaping @MainActor () -> Bool = AuthenticationShieldCoordinator.defaultMacOSApplicationIsActive
+    ) {
         self.traceStore = traceStore
+        self.macOSApplicationIsActive = macOSApplicationIsActive
     }
 
     var isVisible: Bool {
@@ -177,20 +183,69 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
         case .inactive, .background:
             observedNonActiveLifecycleInCurrentCycle = true
             cancelDismissalFallback()
+            if isPendingDismissal {
+                scheduleFallbackDismissalIfNeeded(for: promptCycleID)
+            }
         }
     }
 
     private func scheduleFallbackDismissalIfNeeded(for cycleID: UInt64) {
-        guard isPendingDismissal, lastLifecyclePhase == .active else { return }
+        guard isPendingDismissal else { return }
 
         cancelDismissalFallback()
-        tracePendingDismissalFallbackScheduled(for: cycleID)
+
+        switch lastLifecyclePhase {
+        case .active:
+            tracePendingDismissalFallbackScheduled(for: cycleID, reason: .fallbackYield)
+            dismissalFallbackTask = Task { @MainActor [weak self] in
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                self?.tracePendingDismissalFallbackFired(for: cycleID, reason: .fallbackYield)
+                self?.completePendingDismissalIfEligible(for: cycleID, reason: .fallbackYield)
+            }
+        case .inactive:
+            scheduleMacOSActiveProbeFallback(for: cycleID)
+        case .background:
+            break
+        }
+    }
+
+    private func scheduleMacOSActiveProbeFallback(for cycleID: UInt64) {
+        #if os(macOS)
+        tracePendingDismissalFallbackScheduled(for: cycleID, reason: .activeProbe)
         dismissalFallbackTask = Task { @MainActor [weak self] in
             await Task.yield()
             guard !Task.isCancelled else { return }
-            self?.tracePendingDismissalFallbackFired(for: cycleID)
-            self?.completePendingDismissalIfEligible(for: cycleID, reason: .fallbackYield)
+
+            self?.tracePendingDismissalFallbackFired(for: cycleID, reason: .activeProbe)
+            if self?.completePendingDismissalIfMacOSApplicationIsActive(for: cycleID) == true {
+                return
+            }
+
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            guard !Task.isCancelled else { return }
+
+            self?.tracePendingDismissalFallbackFired(for: cycleID, reason: .activeProbe)
+            _ = self?.completePendingDismissalIfMacOSApplicationIsActive(for: cycleID)
         }
+        #endif
+    }
+
+    @discardableResult
+    @MainActor
+    private func completePendingDismissalIfMacOSApplicationIsActive(for cycleID: UInt64) -> Bool {
+        #if os(macOS)
+        guard isPendingDismissal else { return false }
+        guard promptCycleID == cycleID else { return false }
+        guard totalPromptDepth == 0 else { return false }
+        guard macOSApplicationIsActive() else { return false }
+
+        lastLifecyclePhase = .active
+        completePendingDismissalIfEligible(for: cycleID, reason: .activeProbe)
+        return !isPendingDismissal
+        #else
+        return false
+        #endif
     }
 
     private func completePendingDismissalIfEligible(
@@ -276,24 +331,41 @@ final class AuthenticationShieldCoordinator: @unchecked Sendable {
         )
     }
 
-    private func tracePendingDismissalFallbackScheduled(for cycleID: UInt64) {
+    @MainActor
+    private static func defaultMacOSApplicationIsActive() -> Bool {
+        #if os(macOS)
+        NSApplication.shared.isActive
+        #else
+        false
+        #endif
+    }
+
+    private func tracePendingDismissalFallbackScheduled(
+        for cycleID: UInt64,
+        reason: AuthenticationShieldDismissalCompletionReason
+    ) {
         traceStore?.record(
             category: .lifecycle,
             name: "shield.pendingDismissal.fallbackScheduled",
             metadata: [
                 "cycle": String(cycleID),
-                "lastLifecyclePhase": lastLifecyclePhase.rawValue
+                "lastLifecyclePhase": lastLifecyclePhase.rawValue,
+                "reason": reason.rawValue
             ]
         )
     }
 
-    private func tracePendingDismissalFallbackFired(for cycleID: UInt64) {
+    private func tracePendingDismissalFallbackFired(
+        for cycleID: UInt64,
+        reason: AuthenticationShieldDismissalCompletionReason
+    ) {
         traceStore?.record(
             category: .lifecycle,
             name: "shield.pendingDismissal.fallbackFired",
             metadata: [
                 "cycle": String(cycleID),
-                "elapsedMs": pendingDismissalElapsedMilliseconds()
+                "elapsedMs": pendingDismissalElapsedMilliseconds(),
+                "reason": reason.rawValue
             ]
         )
     }
