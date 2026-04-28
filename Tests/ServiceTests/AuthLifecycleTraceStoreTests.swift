@@ -511,6 +511,78 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertNotNil(throwEntry.metadata["isMainThread"])
     }
 
+    func test_authenticationPromptCoordinator_recordsPrivacyPromptSuccessBoundaries() async throws {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let coordinator = TraceAuthenticationPromptCoordinator(traceStore: store)
+
+        let result = await coordinator.withPrivacyPrompt(source: "trace.privacy.success") { context in
+            XCTAssertEqual(context.source, "trace.privacy.success")
+            return 1
+        }
+
+        XCTAssertEqual(result, 1)
+        let names = store.recentEntries.map(\.name)
+        assertTraceNames(
+            names,
+            containOrdered: [
+                "prompt.privacy.handler.enter",
+                "prompt.privacy.operation.await.start",
+                "prompt.privacy.operation.await.finish",
+                "prompt.privacy.endDepth.start",
+                "prompt.privacy.endDepth.finish",
+                "prompt.privacy.shieldEnd.start",
+                "prompt.privacy.shieldEnd.finish"
+            ]
+        )
+
+        let privacyBoundaryEntries = store.recentEntries
+            .filter { $0.name.hasPrefix("prompt.privacy.") }
+        XCTAssertFalse(privacyBoundaryEntries.isEmpty)
+        XCTAssertEqual(Set(privacyBoundaryEntries.compactMap { $0.metadata["promptID"] }).count, 1)
+        for entry in privacyBoundaryEntries {
+            XCTAssertEqual(entry.metadata["source"], "trace.privacy.success")
+            XCTAssertEqual(entry.metadata["kind"], "privacy")
+            XCTAssertNotNil(entry.metadata["isMainThread"])
+        }
+    }
+
+    func test_authenticationPromptCoordinator_recordsPrivacyPromptThrowBoundaries() async {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let coordinator = TraceAuthenticationPromptCoordinator(traceStore: store)
+
+        do {
+            _ = try await coordinator.withPrivacyPrompt(source: "trace.privacy.throw") { _ in
+                throw TracePrivateKeyAccessTestError.seUnwrapFailed
+            }
+            XCTFail("Expected privacy prompt to throw")
+        } catch TracePrivateKeyAccessTestError.seUnwrapFailed {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        let names = store.recentEntries.map(\.name)
+        assertTraceNames(
+            names,
+            containOrdered: [
+                "prompt.privacy.operation.await.start",
+                "prompt.privacy.operation.await.throw",
+                "prompt.privacy.endDepth.start",
+                "prompt.privacy.endDepth.finish",
+                "prompt.privacy.shieldEnd.start",
+                "prompt.privacy.shieldEnd.finish"
+            ]
+        )
+
+        guard let throwEntry = store.recentEntries.first(where: { $0.name == "prompt.privacy.operation.await.throw" }) else {
+            XCTFail("Expected privacy await throw trace")
+            return
+        }
+        XCTAssertEqual(throwEntry.metadata["source"], "trace.privacy.throw")
+        XCTAssertEqual(throwEntry.metadata["kind"], "privacy")
+        XCTAssertEqual(throwEntry.metadata["errorType"], "TracePrivateKeyAccessTestError")
+        XCTAssertNotNil(throwEntry.metadata["isMainThread"])
+    }
+
     func test_privateKeyAccessService_recordsSuccessfulUnwrapClosureTraceWithoutSensitiveValues() async throws {
         let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         let secureEnclave = MockSecureEnclave()
@@ -693,6 +765,16 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.pendingContext.store" && $0.metadata["reason"] == "resumeAuthenticated" }))
         XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.recordAuthentication" }))
         XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.handleResume.exit" }))
+        assertTraceNames(
+            traceStore.recentEntries.map(\.name),
+            containOrdered: [
+                "session.handleResume.evaluate.start",
+                "session.handleResume.evaluate.finish",
+                "session.handleResume.postAuth.start",
+                "session.handleResume.postAuth.finish",
+                "session.handleResume.exit"
+            ]
+        )
     }
 
     func test_authenticationManager_evaluateAppSessionBypass_recordsStartAndFinishTrace() async throws {
@@ -727,6 +809,115 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                     && $0.metadata["promptID"] == "none"
             }
         )
+    }
+
+    func test_authenticationManager_evaluateAppSessionRecordsPolicyAwaitSuccessTrace() async throws {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let reason = "Trace policy reason must stay out of metadata"
+        let manager = TraceAuthenticationManager(
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            defaults: defaults,
+            authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: traceStore),
+            traceStore: traceStore,
+            localAuthenticationPolicyEvaluator: { _, policy, receivedReason in
+                XCTAssertEqual(policy, AppSessionAuthenticationPolicy.biometricsOnly.localAuthenticationPolicy)
+                XCTAssertEqual(receivedReason, reason)
+                return true
+            }
+        )
+
+        let result = try await manager.evaluateAppSession(
+            policy: .biometricsOnly,
+            reason: reason,
+            source: "unit.appSession.success"
+        )
+
+        XCTAssertTrue(result.isAuthenticated)
+        XCTAssertNotNil(result.context)
+        assertTraceNames(
+            traceStore.recentEntries.map(\.name),
+            containOrdered: [
+                "prompt.privacy.operation.await.start",
+                "appSession.evaluate.start",
+                "appSession.evaluate.policy.await.start",
+                "appSession.evaluate.policy.await.finish",
+                "prompt.privacy.operation.await.finish",
+                "appSession.evaluate.finish"
+            ]
+        )
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "appSession.evaluate.policy.await.finish"
+                    && $0.metadata["policy"] == "biometricsOnly"
+                    && $0.metadata["source"] == "unit.appSession.success"
+                    && $0.metadata["promptID"] != "none"
+                    && $0.metadata["result"] == "success"
+                    && $0.metadata["isMainThread"] != nil
+            }
+        )
+
+        let metadataKeys = Set(traceStore.recentEntries.flatMap { $0.metadata.keys })
+        let metadataValues = traceStore.recentEntries.flatMap { $0.metadata.values }
+        XCTAssertFalse(metadataKeys.contains("reason"))
+        XCTAssertFalse(metadataValues.contains(reason))
+    }
+
+    func test_authenticationManager_evaluateAppSessionRecordsPolicyAwaitThrowTrace() async {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let reason = "Trace failing policy reason must stay out of metadata"
+        let manager = TraceAuthenticationManager(
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            defaults: defaults,
+            authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: traceStore),
+            traceStore: traceStore,
+            localAuthenticationPolicyEvaluator: { _, policy, receivedReason in
+                XCTAssertEqual(policy, AppSessionAuthenticationPolicy.userPresence.localAuthenticationPolicy)
+                XCTAssertEqual(receivedReason, reason)
+                throw TracePrivateKeyAccessTestError.seUnwrapFailed
+            }
+        )
+
+        do {
+            _ = try await manager.evaluateAppSession(
+                policy: .userPresence,
+                reason: reason,
+                source: "unit.appSession.throw"
+            )
+            XCTFail("Expected app session evaluation to throw")
+        } catch AuthenticationError.failed {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        assertTraceNames(
+            traceStore.recentEntries.map(\.name),
+            containOrdered: [
+                "appSession.evaluate.policy.await.start",
+                "appSession.evaluate.policy.await.throw",
+                "prompt.privacy.operation.await.throw",
+                "appSession.evaluate.error",
+                "appSession.evaluate.finish"
+            ]
+        )
+        guard let throwEntry = traceStore.recentEntries.first(where: { $0.name == "appSession.evaluate.policy.await.throw" }) else {
+            XCTFail("Expected policy await throw trace")
+            return
+        }
+        XCTAssertEqual(throwEntry.metadata["policy"], "userPresence")
+        XCTAssertEqual(throwEntry.metadata["source"], "unit.appSession.throw")
+        XCTAssertEqual(throwEntry.metadata["errorType"], "TracePrivateKeyAccessTestError")
+        XCTAssertNotNil(throwEntry.metadata["isMainThread"])
+
+        let metadataKeys = Set(traceStore.recentEntries.flatMap { $0.metadata.keys })
+        let metadataValues = traceStore.recentEntries.flatMap { $0.metadata.values }
+        XCTAssertFalse(metadataKeys.contains("reason"))
+        XCTAssertFalse(metadataValues.contains(reason))
     }
 
     func test_authenticationManager_evaluateModeBypass_recordsStartAndFinishTrace() async throws {

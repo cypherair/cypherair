@@ -83,6 +83,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private let migrationCoordinator: KeyMigrationCoordinator
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
+    private let localAuthenticationPolicyEvaluator: (LAContext, LAPolicy, String) async throws -> Bool
     private var privateKeyControlStore: (any PrivateKeyControlStoreProtocol)?
 
     // MARK: - State
@@ -120,13 +121,17 @@ final class AuthenticationManager: AuthenticationEvaluable {
         defaults: UserDefaults = .standard,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil,
-        privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil
+        privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
+        localAuthenticationPolicyEvaluator: @escaping (LAContext, LAPolicy, String) async throws -> Bool = { context, policy, reason in
+            try await context.evaluatePolicy(policy, localizedReason: reason)
+        }
     ) {
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.defaults = defaults
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
+        self.localAuthenticationPolicyEvaluator = localAuthenticationPolicyEvaluator
         self.privateKeyControlStore = privateKeyControlStore
         let bundleStore = KeyBundleStore(keychain: keychain)
         self.bundleStore = bundleStore
@@ -356,10 +361,36 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     name: "appSession.evaluate.start",
                     metadata: ["policy": policy.rawValue, "source": source, "promptID": promptID]
                 )
-                return try await context.evaluatePolicy(
-                    policy.localAuthenticationPolicy,
-                    localizedReason: reason
+                traceAppSessionPolicyAwaitStage(
+                    "appSession.evaluate.policy.await.start",
+                    policy: policy,
+                    source: source,
+                    promptID: promptID
                 )
+                do {
+                    let success = try await localAuthenticationPolicyEvaluator(
+                        context,
+                        policy.localAuthenticationPolicy,
+                        reason
+                    )
+                    traceAppSessionPolicyAwaitStage(
+                        "appSession.evaluate.policy.await.finish",
+                        policy: policy,
+                        source: source,
+                        promptID: promptID,
+                        metadata: ["result": success ? "success" : "failed"]
+                    )
+                    return success
+                } catch {
+                    traceAppSessionPolicyAwaitStage(
+                        "appSession.evaluate.policy.await.throw",
+                        policy: policy,
+                        source: source,
+                        promptID: promptID,
+                        metadata: AuthErrorTraceMetadata.errorMetadata(error)
+                    )
+                    throw error
+                }
             }
             traceStore?.record(
                 category: .prompt,
@@ -459,6 +490,25 @@ final class AuthenticationManager: AuthenticationEvaluable {
             )
             throw AuthenticationError.failed
         }
+    }
+
+    private func traceAppSessionPolicyAwaitStage(
+        _ name: String,
+        policy: AppSessionAuthenticationPolicy,
+        source: String,
+        promptID: String,
+        metadata: [String: String] = [:]
+    ) {
+        var mergedMetadata = metadata
+        mergedMetadata["policy"] = policy.rawValue
+        mergedMetadata["source"] = source
+        mergedMetadata["promptID"] = promptID
+        mergedMetadata["isMainThread"] = Thread.isMainThread ? "true" : "false"
+        traceStore?.record(
+            category: .prompt,
+            name: name,
+            metadata: mergedMetadata
+        )
     }
 
     // MARK: - Access Control Creation
