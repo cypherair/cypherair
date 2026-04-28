@@ -35,7 +35,7 @@ are not part of the standard GitHub workflows.
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
-**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, key-metadata cold-load/migration, protected-settings handoff-only auto-open behavior, and the root-secret SE device-binding envelope through protocol-based mocks. Uses protocol-based mocks for Keychain and SE. v2 `CAPDSEV2` coverage belongs here first: seal/open round trip, field-length validation, HKDF sharedInfo mismatch, AAD mismatch, AAD-version rejection, ephemeral public-key binding, ciphertext/tag/nonce/salt/public-key tampering, v1-to-v2 migration, registry + Keychain `format-floor` downgrade rejection, `legacy-cleanup` deletion after the next successful v2 open, and Reset deleting the SE binding key.
+**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, key-metadata cold-load/migration, protected-settings handoff-only auto-open behavior, private-key-control migration/recovery behavior, and the root-secret SE device-binding envelope through protocol-based mocks. Uses protocol-based mocks for Keychain and SE. v2 `CAPDSEV2` coverage belongs here first: seal/open round trip, field-length validation, HKDF sharedInfo mismatch, AAD mismatch, AAD-version rejection, ephemeral public-key binding, ciphertext/tag/nonce/salt/public-key tampering, v1-to-v2 migration, registry + Keychain `format-floor` downgrade rejection, `legacy-cleanup` deletion after the next successful v2 open, and Reset deleting the SE binding key.
 
 ```bash
 # Practical local path used in this repository
@@ -604,21 +604,23 @@ func test_privateKeyBytes_zeroedAfterDecrypt() throws {
 }
 ```
 
-### Mode Switch Crash Recovery Test (Device Only)
+### Mode Switch Journal Recovery Test (Device Only)
 
 ```swift
 func test_modeSwitch_crashMidway_recoversOnLaunch() throws {
     try XCTSkipUnless(SecureEnclave.isAvailable)
-    
-    // Simulate interrupted re-wrap by setting flag and leaving temporary items
-    UserDefaults.standard.set(true, forKey: "com.cypherair.internal.rewrapInProgress")
+
+    // Simulate interrupted re-wrap by writing the post-unlock recovery journal
+    // and leaving temporary items.
+    try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
+    try privateKeyControlStore.markRewrapCommitRequired()
     try keychain.save(someData, service: "com.cypherair.v1.pending-se-key.abcdef...", ...)
-    
-    // Run recovery
-    authManager.checkAndRecoverFromInterruptedRewrap()
-    
-    // Verify: flag cleared, temporary items removed, original keys intact
-    XCTAssertFalse(UserDefaults.standard.bool(forKey: "com.cypherair.internal.rewrapInProgress"))
+
+    // Run recovery after app unlock has opened private-key-control.
+    authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: ["abcdef..."])
+
+    // Verify: journal cleared, temporary items removed, original keys intact
+    XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
     XCTAssertThrowsError(try keychain.load(service: "com.cypherair.v1.pending-se-key.abcdef..."))
     XCTAssertNoThrow(try keychain.load(service: "com.cypherair.v1.se-key.abcdef..."))
 }

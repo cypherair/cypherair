@@ -113,9 +113,10 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 |-----------|---------------|
 | `SecureEnclaveManager` | P-256 key generation in SE, self-ECDH + HKDF + AES-GCM wrapping/unwrapping, key deletion. Same wrapping scheme for Ed25519/X25519/Ed448/X448. |
 | `KeychainManager` | CRUD for Keychain items (SE key blob, salt, sealed box), access control flag configuration |
-| `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, and auth-mode crash recovery |
+| `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, and post-unlock auth-mode crash recovery |
 | `ProtectedDataSessionCoordinator` | Shared Keychain-protected v2 root-secret envelope retrieval through authenticated `LAContext`, SE device-bound unwrap, wrapping-root-key derivation, relock, and `restartRequired` latching for protected app-data domains |
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, staged wrapped-DMK validation/promotion, and unlocked-domain-key zeroization |
+| `PrivateKeyControlStore` | ProtectedData `private-key-control` domain for `authMode` and private-key rewrap / modify-expiry recovery journal state. Private-key material remains in the existing Keychain / Secure Enclave domain. |
 | ProtectedData device-binding layer | Secure Enclave device-bound root-secret envelope layer. It adds a silent P-256 SE factor under the existing Keychain / `LAContext` app-data gate and does not replace app privacy authentication. |
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |
@@ -135,19 +136,21 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `ProtectedDataRightStoreClient.swift` — legacy right-store migration/cleanup adapter, not the current authorization path
 - `ProtectedDomainBootstrapStore.swift` — file-side bootstrap metadata persistence
 - `ProtectedDomainRecoveryCoordinator` / `ProtectedDomainRecoveryHandler` — generic pending-mutation recovery dispatch by `ProtectedDataDomainID`
-- `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `protected-settings` plus `protected-framework-sentinel` and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff
+- `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `private-key-control`, `protected-settings`, and `protected-framework-sentinel`, and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff
 - `ProtectedDataFrameworkSentinelStore.swift` — framework-owned second production domain (`protected-framework-sentinel`) with a minimal schema/purpose payload used to prove multi-domain lifecycle, recovery, and relock behavior before later product-domain migrations
+- `PrivateKeyControlStore.swift` — Phase 5 protected domain for `settings.authMode` plus `recoveryJournal`; migrates legacy UserDefaults sources after app authentication and opens through post-unlock orchestration
 
 Current ProtectedData scope:
 
 - the framework exists and is wired into startup/bootstrap and app-session ownership
+- `PrivateKeyControlStore` is the private-key control source of truth; current migrated payload scope is `authMode`, rewrap recovery, and modify-expiry recovery
 - `ProtectedSettingsStore` is the first protected-domain adopter; current migrated payload scope is `clipboardNotice`
 - `ProtectedDataFrameworkSentinelStore` is the second production domain; it contains no user data, telemetry, or UI state, and is created only after another domain is already committed and the shared resource is ready
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
-- app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt
+- app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control`
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
 - AppData phase completion status is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 
@@ -315,7 +318,7 @@ sequenceDiagram
 
     U->>AM: switchMode(to: .highSecurity)
     AM->>AM: Verify backup exists (if not: show strong warning)
-    AM->>AM: Set rewrapInProgress flag in UserDefaults
+    AM->>AM: Record rewrap journal in private-key-control
     AM->>AM: Authenticate under CURRENT mode
 
     loop For each private key
@@ -330,12 +333,12 @@ sequenceDiagram
     AM->>AM: Verify all new items stored successfully
     AM->>KC: Delete OLD Keychain items (original keys)
     AM->>KC: Promote temporary items to permanent key names
-    AM->>AM: Persist mode preference
-    AM->>AM: Clear rewrapInProgress flag
+    AM->>AM: Persist private-key-control settings.authMode
+    AM->>AM: Clear private-key-control rewrap journal
     AM-->>U: Mode switched successfully
 
-    Note over AM: If any step fails before deletion: delete temp items, clear flag, report error. Original keys remain intact.
-    Note over AM: On app launch: if rewrapInProgress flag exists, run shared crash recovery via KeyMigrationCoordinator (see SECURITY.md Section 4).
+    Note over AM: If any step fails before deletion: delete temp items, clear journal, report error. Original keys remain intact.
+    Note over AM: After app unlock opens private-key-control, run shared crash recovery via KeyMigrationCoordinator if the journal requires it (see SECURITY.md Section 4).
 ```
 
 ## 4. Tightly Coupled Modules
@@ -377,11 +380,12 @@ App Sandbox:
 ├── Application Support/
 │   └── ProtectedData/
 │       ├── ProtectedDataRegistry.plist
+│       ├── private-key-control/           → Auth mode + private-key recovery journal envelopes
 │       ├── protected-settings/              → Protected settings envelopes; currently clipboardNotice
 │       └── protected-framework-sentinel/    → Framework sentinel envelopes; schema/purpose marker only
 ├── Library/Preferences/
 │   └── (UserDefaults)
-│       ├── com.cypherair.preference.authMode              → "standard" | "highSecurity" (future private-key-control domain)
+│       ├── com.cypherair.preference.authMode              → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.preference.appSessionAuthenticationPolicy → App-session boot auth profile
 │       ├── com.cypherair.preference.gracePeriod            → Int (seconds): 0 / 60 / 180 / 300
 │       ├── com.cypherair.preference.encryptToSelf          → Bool (default true)
@@ -389,10 +393,10 @@ App Sandbox:
 │       ├── com.cypherair.preference.onboardingComplete     → Bool (default false)
 │       ├── com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
 │       ├── com.cypherair.preference.colorTheme             → String (ColorTheme rawValue, default "systemDefault")
-│       ├── com.cypherair.internal.rewrapInProgress         → Bool (future private-key-control.recoveryJournal)
-│       ├── com.cypherair.internal.rewrapTargetMode         → String (future private-key-control.recoveryJournal)
-│       ├── com.cypherair.internal.modifyExpiryInProgress   → Bool (future private-key-control.recoveryJournal)
-│       └── com.cypherair.internal.modifyExpiryFingerprint  → String (future private-key-control.recoveryJournal)
+│       ├── com.cypherair.internal.rewrapInProgress         → Legacy source removed after private-key-control migration
+│       ├── com.cypherair.internal.rewrapTargetMode         → Legacy source removed after private-key-control migration
+│       ├── com.cypherair.internal.modifyExpiryInProgress   → Legacy source removed after private-key-control migration
+│       └── com.cypherair.internal.modifyExpiryFingerprint  → Legacy source removed after private-key-control migration
 └── tmp/
     ├── decrypted/               → Decrypted file previews (deleted on view exit + app launch)
     ├── streaming/               → Temporary streaming encrypt/decrypt outputs (deleted on app launch)
@@ -404,11 +408,11 @@ App Sandbox:
 - All keys prefixed with `com.cypherair.v1.` — the `v1` segment enables future data migration if the wrapping scheme changes.
 - `<fingerprint>` is the full key fingerprint in lowercase hexadecimal, no spaces or separators (e.g., `a1b2c3d4...`).
 - Metadata items use `metadata.` prefix under the dedicated metadata account and store `PGPKeyIdentity` as JSON. These items have no access control (no SE authentication required) and are the current transitional cold-launch index. The long-term target is a ProtectedData `key metadata` domain opened automatically after app unlock.
-- Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain; future ProtectedData recovery journals may reference these rows but must not store the bundle material.
+- Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain; the `private-key-control` recovery journal may reference these rows but must not store the bundle material.
 - The ProtectedData device-binding key is separate from private-key SE keys. It is a P-256 Secure Enclave key with `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no Face ID flags, and exists only to unwrap the app-data root-secret envelope after the existing Keychain / `LAContext` gate succeeds. It uses a normal software-ephemeral P-256 ECDH envelope, not the private-key self-ECDH wrapping pattern.
 - The v2 root-secret envelope is guarded against downgrade by registry state plus the ThisDeviceOnly `format-floor` marker. If either marker says v2 and the root-secret row later looks like v1 raw bytes, ProtectedData fails closed.
 - The long-term app-data goal is to move every CypherAir-owned local data surface behind ProtectedData after unlock unless it is a documented boot-authentication, private-key-material, framework-bootstrap, ephemeral-cleanup, test-only, legacy-cleanup, or out-of-app-custody exception.
-- Future post-unlock orchestration should open required domains such as `private-key-control`, `key metadata`, and protected settings by reusing the app privacy authentication context without extra Face ID prompts.
+- Post-unlock orchestration opens required domains such as `private-key-control` and protected settings by reusing the app privacy authentication context without extra Face ID prompts. Phase 6 will add the `key metadata` domain to this path.
 
 ## 6. Memory Integrity Enforcement
 

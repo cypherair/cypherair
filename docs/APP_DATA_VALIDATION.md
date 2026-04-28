@@ -131,7 +131,7 @@ This draft proposal must map its validation buckets onto the repository's existi
 - Phase 3 protected-settings coverage currently proves only the narrow first-domain scope: `ProtectedSettingsStore`, `clipboardNotice`, legacy-key cleanup, relock cleanup, and handoff-only open behavior
 - protected-after-unlock setting migration must prove that pre-auth startup does not read protected payloads, does not fetch the root-secret Keychain item, and does not weaken or change the selected app-session authentication policy
 - the `appSessionAuthenticationPolicy` boot authentication profile must stay early-readable unless a future testable design provides a protected value plus boot cache without changing launch authentication strength
-- `private-key-control` migration tests must prove that `authMode` and private-key recovery journal data are unavailable pre-auth, that app unlock opens the domain through post-unlock orchestration without a second prompt, and that rewrap / modify-expiry recovery detection runs only after this domain opens
+- Phase 5 `private-key-control` coverage proves that `authMode` and private-key recovery journal data are unavailable pre-auth, that app unlock opens the domain through post-unlock orchestration without a second prompt, that legacy `UserDefaults` sources are cleaned after verified migration, and that rewrap / modify-expiry recovery detection runs only after this domain opens
 - private-key bundle tests must prove that permanent and pending SE-wrapped private-key rows remain in the existing Keychain / Secure Enclave material domain and are not copied into ProtectedData payloads
 - key metadata migration tests must prove that `PGPKeyIdentity` data can load from the future `key metadata` domain after app unlock, that the transitional metadata Keychain account is cleaned only after verified migration, and that startup does not regress to a double-authentication flow or a visible empty-key-list flash
 - protected settings route tests must cover the already-on-Settings background/foreground path: after app privacy unlock, `contentClearGeneration` invalidation should non-interactively auto-open protected settings when the session is already authorized or handoff is available
@@ -147,7 +147,7 @@ This proposal is only acceptable if an implementer can proceed without making hi
 At minimum, an implementer must be able to tell:
 
 - that the current private-key material domain should remain semantically unchanged
-- that private-key control state is a future protected domain target, not an ordinary protected-settings payload
+- that private-key control state belongs to the dedicated `private-key-control` protected domain, not an ordinary protected-settings payload
 - that protected app data uses one shared Keychain-protected root secret plus per-domain DMKs
 - that `ProtectedDataRegistry` is the only membership authority
 - that shared-resource lifecycle state and mutation execution phase are distinct concepts
