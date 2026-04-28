@@ -467,9 +467,12 @@ Private-key material exception:
 
 - Permanent and pending SE-wrapped private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain. The `private-key-control` recovery journal may reference these rows, but must not store the wrapped private-key bundle material.
 
-Future key metadata domain:
+Key metadata domain:
 
-- `PGPKeyIdentity` metadata currently lives in a dedicated Keychain metadata account to avoid cold-launch private-key Keychain enumeration. The long-term target is a ProtectedData `key metadata` domain that app unlock opens automatically before the home key list is shown.
+- `PGPKeyIdentity` metadata now lives in ProtectedData domain `key-metadata`.
+- Legacy Keychain metadata rows under both the dedicated metadata account and older default account are migration/cleanup sources only.
+- App unlock opens `key-metadata` through post-unlock orchestration before the home key list is shown; pre-auth startup must not enumerate metadata rows.
+- A committed corrupt `key-metadata` payload enters domain recovery and must not be silently rebuilt from private-key bundle rows.
 
 Deferred protected-after-unlock targets:
 
@@ -487,7 +490,7 @@ Rules:
 - only the boot authentication profile is a current long-term early-readable app-setting exception
 - private-key control state belongs only to the dedicated `private-key-control` design; it must not be mixed into ordinary protected settings
 - private-key bundle material remains in the current Keychain / Secure Enclave domain
-- key metadata migration requires a post-unlock loading design that avoids double authentication and empty key-list flashes
+- key metadata migration uses post-unlock loading states to avoid double authentication and empty key-list flashes
 - deferred settings remain early-readable in v1 only until their startup or routing dependency is removed
 - protected settings must not rely on hidden shadow copies to recreate early boot behavior
 - any future migration of a startup-influencing setting requires a documented two-phase startup design and tests proving startup authentication strength is unchanged

@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
@@ -1123,7 +1124,7 @@ final class SettingsScreenModelTests: XCTestCase {
             evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
             authorizeSharedRight: { _, interactionMode in
                 events.append("authorize")
-                XCTAssertEqual(interactionMode, .allowInteraction)
+                XCTAssertEqual(interactionMode, .requireReusableContext)
                 return .authorized
             },
             currentWrappingRootKey: {
@@ -1150,6 +1151,52 @@ final class SettingsScreenModelTests: XCTestCase {
         await host.retryPendingRecovery()
 
         XCTAssertEqual(events, ["requirement", "authorize", "wrappingKey", "recover"])
+        XCTAssertEqual(host.sectionState, .pendingRetryRequired)
+    }
+
+    @MainActor
+    func test_liveProtectedSettingsHost_retryPassesAuthorizationContextToRecovery() async {
+        var events: [String] = []
+        let authenticationContext = LAContext()
+        var recoveredContext: LAContext?
+        let host = CypherAir.ProtectedSettingsHost(
+            evaluateAccessGate: { _ in .pendingMutationRecoveryRequired },
+            authorizeSharedRight: { _, interactionMode in
+                events.append("authorize")
+                XCTAssertEqual(interactionMode, .requireReusableContext)
+                return .authorizedWithContext(authenticationContext)
+            },
+            currentWrappingRootKey: {
+                events.append("wrappingKey")
+                return Data(repeating: 0xAA, count: 32)
+            },
+            syncPreAuthorizationState: {},
+            currentDomainState: { .pendingRetryRequired },
+            currentClipboardNotice: { nil },
+            migrateLegacyClipboardNoticeIfNeeded: {},
+            openDomainIfNeeded: { _ in },
+            updateClipboardNotice: { _, _ in },
+            pendingRecoveryAuthorizationRequirement: {
+                events.append("requirement")
+                return .wrappingRootKeyRequired
+            },
+            recoverPendingMutation: {
+                XCTFail("Retry recovery should use the context-aware dependency.")
+                return .retryablePending
+            },
+            recoverPendingMutationWithContext: { context in
+                events.append("recover")
+                recoveredContext = context
+                XCTAssertTrue(context === authenticationContext)
+                return .retryablePending
+            },
+            resetDomain: {}
+        )
+
+        await host.retryPendingRecovery()
+
+        XCTAssertEqual(events, ["requirement", "authorize", "wrappingKey", "recover"])
+        XCTAssertTrue(recoveredContext === authenticationContext)
         XCTAssertEqual(host.sectionState, .pendingRetryRequired)
     }
 

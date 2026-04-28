@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import SwiftUI
 
 @MainActor
@@ -14,13 +15,36 @@ final class ProtectedSettingsHost {
 
     enum AuthorizationOutcome: Equatable {
         case authorized
+        case authorizedWithContext(LAContext)
         case cancelledOrDenied
         case frameworkRecoveryNeeded
+
+        static func == (lhs: AuthorizationOutcome, rhs: AuthorizationOutcome) -> Bool {
+            switch (lhs, rhs) {
+            case (.authorized, .authorized),
+                 (.authorized, .authorizedWithContext),
+                 (.authorizedWithContext, .authorized),
+                 (.authorizedWithContext, .authorizedWithContext),
+                 (.cancelledOrDenied, .cancelledOrDenied),
+                 (.frameworkRecoveryNeeded, .frameworkRecoveryNeeded):
+                return true
+            default:
+                return false
+            }
+        }
+
+        var authenticationContext: LAContext? {
+            if case .authorizedWithContext(let context) = self {
+                return context
+            }
+            return nil
+        }
     }
 
     enum AuthorizationInteractionMode: Equatable {
         case allowInteraction
         case handoffOnly
+        case requireReusableContext
     }
 
     enum RecoveryOutcome: Equatable {
@@ -82,9 +106,32 @@ final class ProtectedSettingsHost {
         let openDomainIfNeeded: @MainActor (_ wrappingRootKey: Data) async throws -> Void
         let updateClipboardNotice: @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void
         let pendingRecoveryAuthorizationRequirement: @MainActor () -> MutationAuthorizationRequirement
-        let recoverPendingMutation: @MainActor () async throws -> RecoveryOutcome
+        let recoverPendingMutation: @MainActor (_ authenticationContext: LAContext?) async throws -> RecoveryOutcome
         let resetAuthorizationRequirement: @MainActor () -> MutationAuthorizationRequirement
         let resetDomain: @MainActor () async throws -> Void
+    }
+
+    private struct MutationAuthorizationResult: @unchecked Sendable {
+        let isAuthorized: Bool
+        let authenticationContext: LAContext?
+
+        static var notAuthorized: MutationAuthorizationResult {
+            MutationAuthorizationResult(
+                isAuthorized: false,
+                authenticationContext: nil
+            )
+        }
+
+        static func authorized(authenticationContext: LAContext?) -> MutationAuthorizationResult {
+            MutationAuthorizationResult(
+                isAuthorized: true,
+                authenticationContext: authenticationContext
+            )
+        }
+
+        func invalidateAuthenticationContext() {
+            authenticationContext?.invalidate()
+        }
     }
 
     let mode: Mode
@@ -111,6 +158,7 @@ final class ProtectedSettingsHost {
         updateClipboardNotice: @escaping @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void,
         pendingRecoveryAuthorizationRequirement: @escaping @MainActor () -> MutationAuthorizationRequirement = { .notRequired },
         recoverPendingMutation: @escaping @MainActor () async throws -> RecoveryOutcome,
+        recoverPendingMutationWithContext: (@MainActor (_ authenticationContext: LAContext?) async throws -> RecoveryOutcome)? = nil,
         resetAuthorizationRequirement: @escaping @MainActor () -> MutationAuthorizationRequirement = { .notRequired },
         resetDomain: @escaping @MainActor () async throws -> Void,
         traceStore: AuthLifecycleTraceStore? = nil
@@ -131,7 +179,9 @@ final class ProtectedSettingsHost {
             openDomainIfNeeded: openDomainIfNeeded,
             updateClipboardNotice: updateClipboardNotice,
             pendingRecoveryAuthorizationRequirement: pendingRecoveryAuthorizationRequirement,
-            recoverPendingMutation: recoverPendingMutation,
+            recoverPendingMutation: recoverPendingMutationWithContext ?? { _ in
+                try await recoverPendingMutation()
+            },
             resetAuthorizationRequirement: resetAuthorizationRequirement,
             resetDomain: resetDomain
         )
@@ -302,16 +352,26 @@ final class ProtectedSettingsHost {
 
         sectionState = .loading
         do {
-            guard try await authorizeMutationIfNeeded(
+            let recoveryRequirement = liveDependencies.pendingRecoveryAuthorizationRequirement()
+            let recoveryAuthorization = try await authorizeMutationIfNeeded(
                 using: liveDependencies,
-                requirement: liveDependencies.pendingRecoveryAuthorizationRequirement(),
+                requirement: recoveryRequirement,
                 localizedReason: settingsLocalizedReason,
-                operation: "pendingRecovery"
-            ) else {
+                operation: "pendingRecovery",
+                interactionMode: recoveryRequirement == .wrappingRootKeyRequired
+                    ? .requireReusableContext
+                    : .allowInteraction
+            )
+            guard recoveryAuthorization.isAuthorized else {
                 return
             }
+            defer {
+                recoveryAuthorization.invalidateAuthenticationContext()
+            }
 
-            let outcome = try await liveDependencies.recoverPendingMutation()
+            let outcome = try await liveDependencies.recoverPendingMutation(
+                recoveryAuthorization.authenticationContext
+            )
             switch outcome {
             case .resumedToSteadyState:
                 liveDependencies.syncPreAuthorizationState()
@@ -337,13 +397,17 @@ final class ProtectedSettingsHost {
 
         sectionState = .loading
         do {
-            guard try await authorizeMutationIfNeeded(
+            let resetAuthorization = try await authorizeMutationIfNeeded(
                 using: liveDependencies,
                 requirement: liveDependencies.resetAuthorizationRequirement(),
                 localizedReason: settingsLocalizedReason,
                 operation: "reset"
-            ) else {
+            )
+            guard resetAuthorization.isAuthorized else {
                 return
+            }
+            defer {
+                resetAuthorization.invalidateAuthenticationContext()
             }
 
             try await liveDependencies.resetDomain()
@@ -491,8 +555,9 @@ final class ProtectedSettingsHost {
         using liveDependencies: LiveDependencies,
         requirement: MutationAuthorizationRequirement,
         localizedReason: String,
-        operation: String
-    ) async throws -> Bool {
+        operation: String,
+        interactionMode: AuthorizationInteractionMode = .allowInteraction
+    ) async throws -> MutationAuthorizationResult {
         traceHostEvent(
             "protectedSettings.mutationAuthorization.start",
             metadata: [
@@ -507,7 +572,7 @@ final class ProtectedSettingsHost {
                 "protectedSettings.mutationAuthorization.finish",
                 metadata: ["operation": operation, "result": "notRequired"]
             )
-            return true
+            return .authorized(authenticationContext: nil)
         case .frameworkRecoveryNeeded:
             liveDependencies.syncPreAuthorizationState()
             sectionState = .frameworkUnavailable
@@ -515,11 +580,11 @@ final class ProtectedSettingsHost {
                 "protectedSettings.mutationAuthorization.finish",
                 metadata: ["operation": operation, "result": "frameworkRecoveryNeeded"]
             )
-            return false
+            return .notAuthorized
         case .wrappingRootKeyRequired:
             let authorizationResult = await liveDependencies.authorizeSharedRight(
                 localizedReason,
-                .allowInteraction
+                interactionMode
             )
             traceHostEvent(
                 "protectedSettings.mutationAuthorization.result",
@@ -529,14 +594,19 @@ final class ProtectedSettingsHost {
                 ]
             )
             switch authorizationResult {
-            case .authorized:
-                var wrappingRootKey = try liveDependencies.currentWrappingRootKey()
-                wrappingRootKey.resetBytes(in: 0..<wrappingRootKey.count)
+            case .authorized, .authorizedWithContext:
+                do {
+                    var wrappingRootKey = try liveDependencies.currentWrappingRootKey()
+                    wrappingRootKey.resetBytes(in: 0..<wrappingRootKey.count)
+                } catch {
+                    authorizationResult.authenticationContext?.invalidate()
+                    throw error
+                }
                 traceHostEvent(
                     "protectedSettings.mutationAuthorization.finish",
                     metadata: ["operation": operation, "result": "authorized"]
                 )
-                return true
+                return .authorized(authenticationContext: authorizationResult.authenticationContext)
             case .cancelledOrDenied:
                 liveDependencies.syncPreAuthorizationState()
                 syncSectionStateFromStore(liveDependencies)
@@ -544,7 +614,7 @@ final class ProtectedSettingsHost {
                     "protectedSettings.mutationAuthorization.finish",
                     metadata: ["operation": operation, "result": "cancelledOrDenied"]
                 )
-                return false
+                return .notAuthorized
             case .frameworkRecoveryNeeded:
                 liveDependencies.syncPreAuthorizationState()
                 sectionState = .frameworkUnavailable
@@ -552,7 +622,7 @@ final class ProtectedSettingsHost {
                     "protectedSettings.mutationAuthorization.finish",
                     metadata: ["operation": operation, "result": "frameworkRecoveryNeeded"]
                 )
-                return false
+                return .notAuthorized
             }
         }
     }
@@ -604,6 +674,10 @@ final class ProtectedSettingsHost {
             "protectedSettings.ensureAccess.start",
             metadata: ["authorizationMode": authorizationModeTraceValue(authorizationMode)]
         )
+        var operationAuthenticationContexts: [LAContext] = []
+        defer {
+            operationAuthenticationContexts.forEach { $0.invalidate() }
+        }
         let preAuthorizationState = syncPreAuthorizationSectionState(liveDependencies)
         traceHostEvent(
             "protectedSettings.ensureAccess.preAuthorization",
@@ -657,18 +731,22 @@ final class ProtectedSettingsHost {
             case .notRequired:
                 didPreauthorizeMigration = false
             case .wrappingRootKeyRequired:
-                guard try await authorizeMutationIfNeeded(
+                let migrationAuthorization = try await authorizeMutationIfNeeded(
                     using: liveDependencies,
                     requirement: migrationRequirement,
                     localizedReason: localizedReason,
                     operation: "legacyMigration"
-                ) else {
+                )
+                guard migrationAuthorization.isAuthorized else {
                     traceHostEvent(
                         "protectedSettings.ensureAccess.finish",
                         metadata: stateMetadata(liveDependencies)
                             .merging(["result": "migrationAuthorizationBlocked", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
                     )
                     return false
+                }
+                if let authenticationContext = migrationAuthorization.authenticationContext {
+                    operationAuthenticationContexts.append(authenticationContext)
                 }
                 didPreauthorizeMigration = true
             case .frameworkRecoveryNeeded:
@@ -697,7 +775,10 @@ final class ProtectedSettingsHost {
                     metadata: ["outcome": authorizationOutcomeTraceValue(authorizationResult)]
                 )
                 switch authorizationResult {
-                case .authorized:
+                case .authorized, .authorizedWithContext:
+                    if let authenticationContext = authorizationResult.authenticationContext {
+                        operationAuthenticationContexts.append(authenticationContext)
+                    }
                     break
                 case .cancelledOrDenied:
                     sectionState = .locked
@@ -768,7 +849,10 @@ final class ProtectedSettingsHost {
                 metadata: ["outcome": authorizationOutcomeTraceValue(authorizationResult)]
             )
             switch authorizationResult {
-            case .authorized:
+            case .authorized, .authorizedWithContext:
+                if let authenticationContext = authorizationResult.authenticationContext {
+                    operationAuthenticationContexts.append(authenticationContext)
+                }
                 try await migrateLegacyClipboardNoticeIfNeeded(
                     using: liveDependencies,
                     gateDecision: decision,
@@ -964,7 +1048,7 @@ final class ProtectedSettingsHost {
 
     private func authorizationOutcomeTraceValue(_ outcome: AuthorizationOutcome) -> String {
         switch outcome {
-        case .authorized:
+        case .authorized, .authorizedWithContext:
             "authorized"
         case .cancelledOrDenied:
             "cancelledOrDenied"

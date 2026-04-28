@@ -1,42 +1,44 @@
 import Foundation
 import LocalAuthentication
+import Security
 
-final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant, @unchecked Sendable {
-    struct Payload: Codable, Equatable, Sendable {
+final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockParticipant, @unchecked Sendable {
+    struct Payload: Codable, Equatable {
         static let currentSchemaVersion = 1
-        static let expectedPurposeMarker = "CypherAir.ProtectedData.FrameworkSentinel.v1"
 
-        let schemaVersion: Int
-        let purposeMarker: String
+        var schemaVersion: Int
+        var identities: [PGPKeyIdentity]
 
-        static var current: Payload {
+        static func initial(identities: [PGPKeyIdentity]) -> Payload {
             Payload(
                 schemaVersion: currentSchemaVersion,
-                purposeMarker: expectedPurposeMarker
+                identities: identities.sorted { $0.fingerprint < $1.fingerprint }
             )
         }
 
         func validateContract() throws {
             guard schemaVersion == Self.currentSchemaVersion else {
                 throw ProtectedDataError.invalidEnvelope(
-                    "ProtectedData framework sentinel payload has an unsupported schema version."
+                    "Key metadata payload has an unsupported schema version."
                 )
             }
-            guard purposeMarker == Self.expectedPurposeMarker else {
+            let fingerprints = identities.map(\.fingerprint)
+            guard Set(fingerprints).count == fingerprints.count else {
                 throw ProtectedDataError.invalidEnvelope(
-                    "ProtectedData framework sentinel payload marker is invalid."
+                    "Key metadata payload contains duplicate fingerprints."
                 )
             }
         }
     }
 
-    static let domainID: ProtectedDataDomainID = "protected-framework-sentinel"
+    static let domainID: ProtectedDataDomainID = "key-metadata"
 
     private struct OpenedSnapshot {
         let payload: Payload
         let generationIdentifier: Int
     }
 
+    private let legacyMetadataStore: KeyMetadataStore
     private let storageRoot: ProtectedDataStorageRoot
     private let registryStore: ProtectedDataRegistryStore
     private let domainKeyManager: ProtectedDomainKeyManager
@@ -44,16 +46,20 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
     private let currentWrappingRootKey: (() throws -> Data)?
 
     private(set) var payload: Payload?
+    private(set) var domainState: KeyMetadataLoadState = .locked
+    private(set) var migrationWarning: String?
 
     private var unlockedGenerationIdentifier: Int?
 
     init(
+        legacyMetadataStore: KeyMetadataStore,
         storageRoot: ProtectedDataStorageRoot,
         registryStore: ProtectedDataRegistryStore,
         domainKeyManager: ProtectedDomainKeyManager,
         bootstrapStore: ProtectedDomainBootstrapStore? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) {
+        self.legacyMetadataStore = legacyMetadataStore
         self.storageRoot = storageRoot
         self.registryStore = registryStore
         self.domainKeyManager = domainKeyManager
@@ -61,28 +67,35 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
         self.currentWrappingRootKey = currentWrappingRootKey
     }
 
-    var hasCommittedDomain: Bool {
-        (try? registryStore.loadRegistry().committedMembership[Self.domainID] != nil) ?? false
-    }
-
-    func ensureCommittedIfNeeded(wrappingRootKey: Data) async throws {
+    func ensureCommittedIfNeeded(
+        wrappingRootKey: Data,
+        authenticationContext: LAContext?
+    ) async throws {
         let registry = try registryStore.loadRegistry()
         if registry.committedMembership[Self.domainID] != nil {
             return
         }
-        guard registry.pendingMutation == nil else {
+        guard registry.classifyRecoveryDisposition() == .resumeSteadyState else {
+            domainState = .recoveryNeeded
             throw ProtectedDataError.invalidRegistry(
-                "ProtectedData framework sentinel cannot be created while another domain mutation is pending."
+                "Key metadata cannot be created while ProtectedData requires recovery."
             )
         }
         guard registry.sharedResourceLifecycleState == .ready,
-              registry.committedMembership.contains(where: { $0.key != Self.domainID }) else {
+              !registry.committedMembership.isEmpty,
+              registry.pendingMutation == nil else {
             return
         }
 
-        let wrappingRootKey = SensitiveBytesBox(data: wrappingRootKey)
+        let sourceSnapshot = try legacyMetadataStore.loadMigrationSourceSnapshot(
+            authenticationContext: authenticationContext
+        )
+        let initialPayload = Payload.initial(
+            identities: Self.mergedIdentities(from: sourceSnapshot.items)
+        )
+        let wrappingRootKeyBox = SensitiveBytesBox(data: wrappingRootKey)
         defer {
-            wrappingRootKey.zeroize()
+            wrappingRootKeyBox.zeroize()
         }
 
         _ = try await registryStore.performCreateDomainTransaction(
@@ -91,38 +104,61 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
                 guard registry.sharedResourceLifecycleState == .ready,
                       registry.committedMembership.contains(where: { $0.key != Self.domainID }) else {
                     throw ProtectedDataError.invalidRegistry(
-                        "ProtectedData framework sentinel can only join an existing ready shared resource."
+                        "Key metadata can only join an existing ready shared resource."
                     )
                 }
             },
             provisionSharedResourceIfNeeded: {},
             stageArtifacts: { [self] in
-                try stageInitialPayload(wrappingRootKey: wrappingRootKey.dataCopy())
+                try stageInitialPayload(
+                    initialPayload,
+                    wrappingRootKey: wrappingRootKeyBox.dataCopy()
+                )
             },
             validateArtifacts: { [self] in
                 try protectedDataValidateSnapshotAndZeroizeDomainMasterKey {
-                    try readAuthoritativeSnapshot(wrappingRootKey: wrappingRootKey.dataCopy())
+                    try readAuthoritativeSnapshot(
+                        wrappingRootKey: wrappingRootKeyBox.dataCopy()
+                    )
                 }
             }
         )
+
+        let cleanupOutcome = legacyMetadataStore.cleanupMigrationSourceItems(
+            sourceSnapshot.items.filter { item in
+                initialPayload.identities.contains { $0.fingerprint == item.identity.fingerprint }
+            },
+            authenticationContext: authenticationContext
+        )
+        updateMigrationWarning(
+            failedLoadCount: sourceSnapshot.failedItemCount,
+            failedDeleteCount: cleanupOutcome.failedItemCount
+        )
         clearUnlockedState()
+        domainState = .locked
     }
 
-    func openDomainIfNeeded(wrappingRootKey: Data) async throws -> Payload {
-        if let payload {
+    @discardableResult
+    func openDomainIfNeeded(
+        wrappingRootKey: Data,
+        authenticationContext: LAContext?
+    ) async throws -> Payload {
+        if let payload, domainState == .loaded {
             return payload
         }
 
         let registry = try registryStore.loadRegistry()
-        if let pendingMutation = registry.pendingMutation,
-           pendingMutation.targetDomainID == Self.domainID {
+        guard registry.pendingMutation == nil,
+              registry.sharedResourceLifecycleState == .ready else {
+            domainState = .recoveryNeeded
             throw ProtectedDataError.invalidRegistry(
-                "ProtectedData framework sentinel has pending recovery work."
+                "Key metadata domain has pending recovery work."
             )
         }
         guard registry.committedMembership[Self.domainID] != nil else {
+            domainState = .locked
             throw ProtectedDataError.invalidRegistry(
-                "ProtectedData framework sentinel domain is not committed yet."
+                "Key metadata domain is not committed yet."
             )
         }
 
@@ -136,6 +172,7 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
             mutableDomainMasterKey.protectedDataZeroize()
             payload = openedSnapshot.payload
             unlockedGenerationIdentifier = openedSnapshot.generationIdentifier
+            domainState = .loaded
 
             if registry.committedMembership[Self.domainID] == .recoveryNeeded {
                 _ = try await registryStore.updateCommittedDomainState(
@@ -144,9 +181,11 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
                 )
             }
 
+            cleanupLegacyRowsMatchingOpenedPayload(authenticationContext: authenticationContext)
             return openedSnapshot.payload
         } catch {
             clearUnlockedState()
+            domainState = .recoveryNeeded
             if registry.committedMembership[Self.domainID] != .recoveryNeeded {
                 _ = try? await registryStore.updateCommittedDomainState(
                     domainID: Self.domainID,
@@ -157,15 +196,91 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
         }
     }
 
+    func loadAll() throws -> [PGPKeyIdentity] {
+        guard let payload, domainState == .loaded else {
+            if domainState == .recoveryNeeded {
+                throw ProtectedDataError.invalidRegistry(
+                    "Key metadata requires recovery before it can be loaded."
+                )
+            }
+            throw ProtectedDataError.authorizingUnavailable
+        }
+        return payload.identities
+    }
+
+    func save(_ identity: PGPKeyIdentity) throws {
+        try updatePayload { payload in
+            guard !payload.identities.contains(where: { $0.fingerprint == identity.fingerprint }) else {
+                throw ProtectedDataError.invalidEnvelope(
+                    "Key metadata already contains this fingerprint."
+                )
+            }
+            payload.identities.append(identity)
+            payload.identities.sort { $0.fingerprint < $1.fingerprint }
+        }
+    }
+
+    func update(_ identity: PGPKeyIdentity) throws {
+        try updatePayload { payload in
+            if let index = payload.identities.firstIndex(where: { $0.fingerprint == identity.fingerprint }) {
+                payload.identities[index] = identity
+            } else {
+                payload.identities.append(identity)
+            }
+            payload.identities.sort { $0.fingerprint < $1.fingerprint }
+        }
+    }
+
+    func delete(fingerprint: String) throws {
+        try updatePayload { payload in
+            payload.identities.removeAll { $0.fingerprint == fingerprint }
+        }
+    }
+
     func relockProtectedData() async throws {
         clearUnlockedState()
+        if domainState == .loaded {
+            domainState = .locked
+        }
     }
 
-    func deleteDomainArtifactsForRecovery() throws {
-        try deleteDomainArtifacts()
+    private func updatePayload(_ mutate: (inout Payload) throws -> Void) throws {
+        guard var updatedPayload = payload,
+              domainState == .loaded else {
+            if domainState == .recoveryNeeded {
+                throw ProtectedDataError.invalidRegistry(
+                    "Key metadata requires recovery before it can be updated."
+                )
+            }
+            throw ProtectedDataError.authorizingUnavailable
+        }
+
+        try mutate(&updatedPayload)
+        try updatedPayload.validateContract()
+        try persistUpdatedPayload(updatedPayload)
     }
 
-    private func stageInitialPayload(wrappingRootKey: Data) throws {
+    private func persistUpdatedPayload(_ updatedPayload: Payload) throws {
+        var domainMasterKey = try activeDomainMasterKey()
+        defer {
+            domainMasterKey.protectedDataZeroize()
+        }
+
+        let nextGenerationIdentifier = max(unlockedGenerationIdentifier ?? 0, 0) + 1
+        try writePayloadGeneration(
+            updatedPayload,
+            generationIdentifier: nextGenerationIdentifier,
+            domainMasterKey: domainMasterKey
+        )
+        payload = updatedPayload
+        unlockedGenerationIdentifier = nextGenerationIdentifier
+        domainState = .loaded
+    }
+
+    private func stageInitialPayload(
+        _ payload: Payload,
+        wrappingRootKey: Data
+    ) throws {
         var domainMasterKey = try domainKeyManager.generateDomainMasterKey()
         defer {
             domainMasterKey.protectedDataZeroize()
@@ -181,7 +296,7 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
             wrappingRootKey: wrappingRootKey
         )
         try writePayloadGeneration(
-            Payload.current,
+            payload,
             generationIdentifier: 1,
             domainMasterKey: domainMasterKey
         )
@@ -218,6 +333,7 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
             envelope: decodedEnvelope,
             domainMasterKey: domainMasterKey
         )
+        try PropertyListDecoder().decode(Payload.self, from: validatedPlaintext).validateContract()
         validatedPlaintext.protectedDataZeroize()
 
         let currentURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .current)
@@ -287,11 +403,60 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
         }) else {
             domainMasterKey.protectedDataZeroize()
             throw ProtectedDataError.invalidEnvelope(
-                "ProtectedData framework sentinel does not contain a readable authoritative generation."
+                "Key metadata does not contain a readable authoritative generation."
             )
         }
 
         return (selectedSnapshot, domainMasterKey)
+    }
+
+    private func activeDomainMasterKey() throws -> Data {
+        if let cachedKey = domainKeyManager.unlockedDomainMasterKey(for: Self.domainID) {
+            return Data(cachedKey)
+        }
+
+        guard let currentWrappingRootKey else {
+            throw ProtectedDataError.authorizingUnavailable
+        }
+        let wrappingRootKey = SensitiveBytesBox(data: try currentWrappingRootKey())
+        defer {
+            wrappingRootKey.zeroize()
+        }
+        guard let wrappedRecord = try domainKeyManager.loadWrappedDomainMasterKeyRecord(
+            for: Self.domainID
+        ) else {
+            throw ProtectedDataError.missingWrappedDomainMasterKey(Self.domainID)
+        }
+
+        return try domainKeyManager.unwrapDomainMasterKey(
+            from: wrappedRecord,
+            wrappingRootKey: wrappingRootKey.dataCopy()
+        )
+    }
+
+    private func cleanupLegacyRowsMatchingOpenedPayload(authenticationContext: LAContext?) {
+        guard let payload else {
+            return
+        }
+        do {
+            let sourceSnapshot = try legacyMetadataStore.loadMigrationSourceSnapshot(
+                authenticationContext: authenticationContext
+            )
+            let migratedFingerprints = Set(payload.identities.map(\.fingerprint))
+            let matchingSourceItems = sourceSnapshot.items.filter { item in
+                migratedFingerprints.contains(item.identity.fingerprint)
+            }
+            let cleanupOutcome = legacyMetadataStore.cleanupMigrationSourceItems(
+                matchingSourceItems,
+                authenticationContext: authenticationContext
+            )
+            updateMigrationWarning(
+                failedLoadCount: sourceSnapshot.failedItemCount,
+                failedDeleteCount: cleanupOutcome.failedItemCount
+            )
+        } catch {
+            migrationWarning = Self.migrationWarningMessage()
+        }
     }
 
     private func deleteDomainArtifacts() throws {
@@ -318,9 +483,35 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
         payload = nil
         unlockedGenerationIdentifier = nil
     }
+
+    private func updateMigrationWarning(
+        failedLoadCount: Int,
+        failedDeleteCount: Int
+    ) {
+        migrationWarning = failedLoadCount == 0 && failedDeleteCount == 0
+            ? nil
+            : Self.migrationWarningMessage()
+    }
+
+    static func migrationWarningMessage() -> String {
+        String(
+            localized: "app.loadWarning.keyMetadataMigration",
+            defaultValue: "Some saved key metadata could not be migrated or cleaned up. Your private keys remain protected; restart CypherAir and unlock again to retry."
+        )
+    }
+
+    private static func mergedIdentities(
+        from sourceItems: [KeyMetadataMigrationSourceItem]
+    ) -> [PGPKeyIdentity] {
+        var byFingerprint: [String: PGPKeyIdentity] = [:]
+        for item in sourceItems {
+            byFingerprint[item.identity.fingerprint] = item.identity
+        }
+        return byFingerprint.values.sorted { $0.fingerprint < $1.fingerprint }
+    }
 }
 
-extension ProtectedDataFrameworkSentinelStore: ProtectedDomainRecoveryHandler {
+extension KeyMetadataDomainStore: ProtectedDomainRecoveryHandler {
     var protectedDataDomainID: ProtectedDataDomainID {
         Self.domainID
     }
@@ -336,6 +527,23 @@ extension ProtectedDataFrameworkSentinelStore: ProtectedDomainRecoveryHandler {
         guard let currentWrappingRootKey else {
             throw ProtectedDataError.authorizingUnavailable
         }
+        let stagedPayload: Payload?
+        switch phase {
+        case .journaled, .sharedResourceProvisioned:
+            let sourceSnapshot = try legacyMetadataStore.loadMigrationSourceSnapshot(
+                authenticationContext: authenticationContext
+            )
+            guard authenticationContext != nil || sourceSnapshot.failedItemCount == 0 else {
+                throw ProtectedDataError.authorizingUnavailable
+            }
+            stagedPayload = Payload.initial(
+                identities: Self.mergedIdentities(from: sourceSnapshot.items)
+            )
+        case .artifactsStaged, .validated:
+            stagedPayload = nil
+        case .membershipCommitted:
+            return
+        }
         let wrappingRootKey = SensitiveBytesBox(data: try currentWrappingRootKey())
         defer {
             wrappingRootKey.zeroize()
@@ -344,13 +552,25 @@ extension ProtectedDataFrameworkSentinelStore: ProtectedDomainRecoveryHandler {
         _ = try await registryStore.completePendingCreate(
             domainID: Self.domainID,
             stageArtifacts: { [self] in
-                try stageInitialPayload(wrappingRootKey: wrappingRootKey.dataCopy())
+                guard let stagedPayload else {
+                    return
+                }
+                try stageInitialPayload(
+                    stagedPayload,
+                    wrappingRootKey: wrappingRootKey.dataCopy()
+                )
             },
             validateArtifacts: { [self] in
                 try protectedDataValidateSnapshotAndZeroizeDomainMasterKey {
-                    try readAuthoritativeSnapshot(wrappingRootKey: wrappingRootKey.dataCopy())
+                    try readAuthoritativeSnapshot(
+                        wrappingRootKey: wrappingRootKey.dataCopy()
+                    )
                 }
             }
         )
+    }
+
+    func deleteDomainArtifactsForRecovery() throws {
+        try deleteDomainArtifacts()
     }
 }

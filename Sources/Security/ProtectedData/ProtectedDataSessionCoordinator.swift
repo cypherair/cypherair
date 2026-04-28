@@ -1,6 +1,11 @@
 import Foundation
 import LocalAuthentication
 
+struct ProtectedDataAuthorizationContextResult: @unchecked Sendable {
+    let result: ProtectedDataAuthorizationResult
+    let authenticationContext: LAContext
+}
+
 @Observable
 final class ProtectedDataSessionCoordinator: @unchecked Sendable {
     private let rootSecretStore: any ProtectedDataRootSecretStoreProtocol
@@ -102,6 +107,47 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
         authenticationContext: LAContext? = nil,
         allowLegacyMigration: Bool = true
     ) async -> ProtectedDataAuthorizationResult {
+        let context = authenticationContext ?? makeRootSecretAuthenticationContext(
+            localizedReason: localizedReason
+        )
+        return await authorizeProtectedDataSession(
+            registry: registry,
+            localizedReason: localizedReason,
+            context: context,
+            usesHandoffContext: authenticationContext != nil,
+            allowLegacyMigration: allowLegacyMigration
+        )
+    }
+
+    func beginProtectedDataAuthorizationReturningContext(
+        registry: ProtectedDataRegistry,
+        localizedReason: String,
+        authenticationContext: LAContext? = nil,
+        allowLegacyMigration: Bool = true
+    ) async -> ProtectedDataAuthorizationContextResult {
+        let context = authenticationContext ?? makeRootSecretAuthenticationContext(
+            localizedReason: localizedReason
+        )
+        let result = await authorizeProtectedDataSession(
+            registry: registry,
+            localizedReason: localizedReason,
+            context: context,
+            usesHandoffContext: authenticationContext != nil,
+            allowLegacyMigration: allowLegacyMigration
+        )
+        return ProtectedDataAuthorizationContextResult(
+            result: result,
+            authenticationContext: context
+        )
+    }
+
+    private func authorizeProtectedDataSession(
+        registry: ProtectedDataRegistry,
+        localizedReason: String,
+        context: LAContext,
+        usesHandoffContext: Bool,
+        allowLegacyMigration: Bool
+    ) async -> ProtectedDataAuthorizationResult {
         traceStore?.record(
             category: .operation,
             name: "protectedSettings.authorization.start",
@@ -128,10 +174,6 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
             return .frameworkRecoveryNeeded
         }
 
-        let context = authenticationContext ?? makeRootSecretAuthenticationContext(
-            localizedReason: localizedReason
-        )
-        let usesHandoffContext = authenticationContext != nil
         if usesHandoffContext {
             context.interactionNotAllowed = true
         }

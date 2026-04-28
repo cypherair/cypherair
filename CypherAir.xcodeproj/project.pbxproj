@@ -186,6 +186,7 @@
 				Security/Mocks/MockMemoryInfo.swift,
 				Security/Mocks/MockSecureEnclave.swift,
 				Security/ProtectedData/AppSessionOrchestrator.swift,
+				Security/ProtectedData/KeyMetadataDomainStore.swift,
 				Security/ProtectedData/PrivateKeyControlStore.swift,
 				Security/ProtectedData/ProtectedDataDeviceBinding.swift,
 				Security/ProtectedData/ProtectedDataDomain.swift,

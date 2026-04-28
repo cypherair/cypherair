@@ -6,11 +6,12 @@ import LocalAuthentication
 ///
 /// All private key material is SE-wrapped before storage and zeroized from memory after use.
 @Observable
-final class KeyManagementService {
+final class KeyManagementService: @unchecked Sendable {
 
     /// All key identities stored on this device.
     private(set) var keys: [PGPKeyIdentity] = []
     private(set) var legacyMetadataMigrationLoadWarning: String?
+    private(set) var metadataLoadState: KeyMetadataLoadState = .locked
 
     private let engine: PgpEngine
     private let catalogStore: KeyCatalogStore
@@ -32,12 +33,14 @@ final class KeyManagementService {
         defaults: UserDefaults = .standard,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
-        authLifecycleTraceStore: AuthLifecycleTraceStore? = nil
+        authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
+        metadataPersistence: (any KeyMetadataPersistence)? = nil
     ) {
-        let bundleStore = KeyBundleStore(keychain: keychain)
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
+        let keyMetadataPersistence = metadataPersistence ?? metadataStore
+        let bundleStore = KeyBundleStore(keychain: keychain)
         let migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
-        let catalogStore = KeyCatalogStore(metadataStore: metadataStore)
+        let catalogStore = KeyCatalogStore(metadataStore: keyMetadataPersistence)
         let privateKeyAccessService = PrivateKeyAccessService(
             secureEnclave: secureEnclave,
             bundleStore: bundleStore,
@@ -83,11 +86,49 @@ final class KeyManagementService {
 
     // MARK: - Key Enumeration
 
-    /// Load all key identities from Keychain metadata items.
-    /// Called on cold launch — does NOT require SE authentication.
+    /// Load all key identities from the configured metadata persistence layer.
     func loadKeys() throws {
-        try catalogStore.loadAll()
-        syncKeys()
+        metadataLoadState = .loading
+        do {
+            try catalogStore.loadAll()
+            syncKeys()
+            metadataLoadState = .loaded
+        } catch {
+            keys = []
+            metadataLoadState = .recoveryNeeded
+            throw error
+        }
+    }
+
+    func beginKeyMetadataLoad() {
+        metadataLoadState = .loading
+    }
+
+    func markKeyMetadataLocked() {
+        keys = []
+        metadataLoadState = .locked
+    }
+
+    func markKeyMetadataRecoveryNeeded() {
+        keys = []
+        metadataLoadState = .recoveryNeeded
+    }
+
+    func completeKeyMetadataLoad(
+        migrationWarning: String?,
+        source: String
+    ) throws {
+        try loadKeys()
+        legacyMetadataMigrationLoadWarning = migrationWarning
+        traceStore?.record(
+            category: .operation,
+            name: "keyMetadata.protectedDomain.sessionUpdate",
+            metadata: [
+                "source": source,
+                "keyCount": String(keys.count),
+                "hasMigrationWarning": migrationWarning == nil ? "false" : "true"
+            ]
+        )
     }
 
     func migrateLegacyMetadataAfterAppAuthentication(
@@ -139,6 +180,7 @@ final class KeyManagementService {
         keys = []
         legacyMetadataMigrationCompletedInProcess = false
         legacyMetadataMigrationLoadWarning = nil
+        metadataLoadState = .locked
     }
 
     private static func legacyMetadataMigrationWarningMessage() -> String {
@@ -472,5 +514,11 @@ final class KeyManagementService {
 
     private func syncKeys() {
         keys = catalogStore.keys
+    }
+}
+
+extension KeyManagementService: ProtectedDataRelockParticipant {
+    func relockProtectedData() async throws {
+        markKeyMetadataLocked()
     }
 }

@@ -130,8 +130,13 @@ final class KeyMutationService {
     }
 
     func deleteKey(fingerprint: String) throws {
-        let deletionErrors = deleteAllKeychainMaterial(for: fingerprint)
-        catalogStore.removeKey(fingerprint: fingerprint)
+        var deletionErrors = deleteAllPrivateKeychainMaterial(for: fingerprint)
+        do {
+            try catalogStore.removeKey(fingerprint: fingerprint)
+        } catch {
+            deletionErrors.append(error)
+        }
+        cleanupLegacyMetadataRows(for: fingerprint, deletionErrors: &deletionErrors)
         clearRecoveryStateIfNeeded(afterDeleting: fingerprint)
 
         if let firstError = deletionErrors.first {
@@ -165,10 +170,10 @@ final class KeyMutationService {
         return recoveryOutcome
     }
 
-    private func deleteAllKeychainMaterial(for fingerprint: String) -> [Error] {
+    private func deleteAllPrivateKeychainMaterial(for fingerprint: String) -> [Error] {
         var deletionErrors: [Error] = []
 
-        for service in allKeychainServices(for: fingerprint) {
+        for service in allPrivateKeychainServices(for: fingerprint) {
             do {
                 try keychain.delete(service: service, account: KeychainConstants.defaultAccount)
             } catch {
@@ -178,30 +183,35 @@ final class KeyMutationService {
                 deletionErrors.append(error)
             }
         }
-        do {
-            try keychain.delete(
-                service: KeychainConstants.metadataService(fingerprint: fingerprint),
-                account: KeychainConstants.metadataAccount
-            )
-        } catch {
-            guard !Self.isItemNotFound(error) else {
-                return deletionErrors
-            }
-            deletionErrors.append(error)
-        }
 
         return deletionErrors
     }
 
-    private func allKeychainServices(for fingerprint: String) -> [String] {
+    private func cleanupLegacyMetadataRows(
+        for fingerprint: String,
+        deletionErrors: inout [Error]
+    ) {
+        let service = KeychainConstants.metadataService(fingerprint: fingerprint)
+        for account in [KeychainConstants.defaultAccount, KeychainConstants.metadataAccount] {
+            do {
+                try keychain.delete(service: service, account: account)
+            } catch {
+                guard !Self.isItemNotFound(error) else {
+                    continue
+                }
+                deletionErrors.append(error)
+            }
+        }
+    }
+
+    private func allPrivateKeychainServices(for fingerprint: String) -> [String] {
         [
             KeychainConstants.seKeyService(fingerprint: fingerprint),
             KeychainConstants.saltService(fingerprint: fingerprint),
             KeychainConstants.sealedKeyService(fingerprint: fingerprint),
             KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
             KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-            KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-            KeychainConstants.metadataService(fingerprint: fingerprint)
+            KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint)
         ]
     }
 

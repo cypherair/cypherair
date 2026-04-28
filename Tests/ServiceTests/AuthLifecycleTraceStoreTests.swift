@@ -172,8 +172,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         let names = container.authLifecycleTraceStore?.recentEntries.map(\.name) ?? []
         XCTAssertTrue(names.contains("startup.protectedDataBootstrap.start"))
         XCTAssertTrue(names.contains("startup.protectedDataBootstrap.finish"))
-        XCTAssertTrue(names.contains("startup.keys.load.start"))
-        XCTAssertTrue(names.contains("startup.keys.load.finish"))
+        XCTAssertTrue(names.contains("startup.keyMetadata.load.deferred"))
         XCTAssertTrue(names.contains("startup.contacts.load.start"))
         XCTAssertTrue(names.contains("startup.contacts.load.finish"))
         XCTAssertTrue(names.contains("startup.loadWarning.computed"))

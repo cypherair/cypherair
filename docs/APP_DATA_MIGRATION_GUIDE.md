@@ -135,13 +135,14 @@ Current implementation status:
 
 ### 2.6 Phase 6: Key Metadata Domain
 
-Create the `key metadata` ProtectedData domain.
+Create the `key-metadata` ProtectedData domain. This phase is implemented.
 
 Goals:
 
-- migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account
-- open key metadata after app privacy authentication through post-unlock orchestration
+- migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account and older default-account metadata rows
+- open key metadata after app privacy authentication through post-unlock orchestration with the same `LAContext` handoff
 - avoid double authentication and empty-key-list flashes while preserving the private-key material boundary
+- treat committed `key-metadata` corruption as protected-domain recovery, not as a reason to rebuild metadata from private-key bundle rows
 
 ### 2.7 Phase 7: Non-Contacts Protected-After-Unlock Domains
 
@@ -284,7 +285,7 @@ This migration guide documents the remaining handoff points around future protec
 | Resume authentication after grace expiry | `AppSessionOrchestrator` through scene-phase observation | Scene activation routes through the orchestrator, which owns suppression around system auth UI, content clearing, and reusable context storage |
 | Grace-window timing | `AppSessionOrchestrator` | The orchestrator owns last-authentication timing and grace-period expiry decisions |
 | Content clearing on auth boundary | `AppSessionOrchestrator` + relock participants | Grace-expiry re-auth increments `contentClearGeneration`; ProtectedData participants use relock hooks for domain-local cleanup |
-| Cold-start loading and temp cleanup | `AppStartupCoordinator` | cold start loads keys and Contacts, runs recovery checks, and cleans temporary files before any future protected app-data layer exists | Split startup into pre-auth bootstrap plus post-auth protected-domain unlock; future protected-domain loading must not happen merely from startup initialization |
+| Cold-start loading and temp cleanup | `AppStartupCoordinator` | cold start performs ProtectedData bootstrap classification, loads Contacts, and cleans temporary files; key metadata loading is deferred to post-unlock domain open | Future protected-domain loading must not happen merely from startup initialization |
 
 Current implementation progress for these owners lives in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md). Keep that file as the current progress record rather than mixing Phase 1, Phase 3, and Phase 4 status into this migration guide.
 
@@ -348,12 +349,13 @@ Initial classification baseline:
 | `modifyExpiryFingerprint` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as pre-migration source | `private-key-control target` | Phase 5 | Implemented | implemented | Migrated into `private-key-control.recoveryJournal`; keeps the affected key fingerprint out of pre-auth UserDefaults |
 | Permanent SE-wrapped private-key bundle rows | Keychain default account | `private-key-material exception` | Private-key-material exception | Exception retained | n/a | `se-key`, `salt`, and `sealed-key` rows remain under existing Secure Enclave / Keychain protection |
 | Pending SE-wrapped private-key bundle rows | Keychain default account | `private-key-material exception` | Private-key-material exception | Exception retained | n/a | `pending-se-key`, `pending-salt`, and `pending-sealed-key` stay in the private-key material domain; protected recovery journals may reference them but must not store them |
-| `PGPKeyIdentity` metadata rows | Dedicated Keychain metadata account | `key-metadata-domain target` | Phase 6 | Pending | no | Transitional cold-launch Keychain account; long-term target is a ProtectedData `key metadata` domain opened automatically after app unlock |
+| `PGPKeyIdentity` metadata rows | `ProtectedData/key-metadata`; legacy dedicated metadata account and default account only as migration sources | `key-metadata-domain target` | Phase 6 | Implemented | implemented | Payload schema v1 stores `schemaVersion` plus `identities`; app unlock creates/opens the domain through post-unlock orchestration, migrates both legacy sources with `metadataAccount` priority by fingerprint, and cleans legacy rows only after verified protected-domain readability |
 | Shared app-data root secret | Keychain default account | `framework-bootstrap` | Phase 1 | Implemented with SE device binding | implemented | Keychain-protected root secret released only through authenticated `LAContext` handoff; v2 stores a Secure Enclave device-bound envelope rather than raw root-secret bytes |
 | `ProtectedDataRegistry` | `Application Support/ProtectedData/ProtectedDataRegistry.plist` | `framework-bootstrap` | Phase 1 / Phase 2 | Implemented | framework prerequisite | Bootstrap authority for membership and shared-resource lifecycle; file-protection coverage belongs to Phase 2 |
 | Per-domain bootstrap metadata | `Application Support/ProtectedData/<domain>/bootstrap.plist` | `framework-bootstrap` | Phase 2 / domain phase | Implemented for existing domain | domain-specific | Read before app-data authorization by design; contains framework metadata, not protected payload plaintext |
 | Protected settings payload | `Application Support/ProtectedData/protected-settings/` | `protected-after-unlock` | Phase 3 | Implemented narrowly | implemented | Current `clipboardNotice` domain with encrypted generations and wrapped DMK metadata |
 | Private-key control payload | `Application Support/ProtectedData/private-key-control/` | `private-key-control target` | Phase 5 | Implemented | implemented | Contains `settings.authMode` plus `recoveryJournal`; private-key bundle material remains in the existing Keychain / Secure Enclave domain |
+| Key metadata payload | `Application Support/ProtectedData/key-metadata/` | `key-metadata-domain target` | Phase 6 | Implemented | implemented | Contains `PGPKeyIdentity` metadata only; relock clears in-memory list state and corrupted committed payloads enter domain recovery |
 | `Documents/contacts/*.gpg` | App sandbox documents | `protected-after-unlock` | Phase 8 | Pending | no | Planned Contacts protected domain; includes imported public certificates used for encryption and verification enrichment |
 | `Documents/contacts/contact-metadata.json` | App sandbox documents | `protected-after-unlock` | Phase 8 | Pending | no | Planned Contacts protected domain; stores verification-state manifest |
 | `Documents/self-test/` | App sandbox documents | `protected-after-unlock` or `ephemeral-with-cleanup` | Phase 7 | Pending | no | Decide whether to move reports into a protected diagnostics domain or make reports short-lived/export-only |
@@ -378,7 +380,7 @@ Private-key-adjacent control state is now owned by one physical ProtectedData `p
 
 The `private-key-control` domain opens after app privacy authentication by reusing the current authenticated context. Pre-auth startup does not retain a recovery marker for this domain. Recovery detection and any warning about interrupted private-key operations run after this post-unlock open step.
 
-Key metadata is also not a permanent private-key-material exception. The dedicated Keychain metadata account is a transitional cold-launch index. The long-term target is a ProtectedData `key metadata` domain that opens after app unlock and loads `PGPKeyIdentity` state without touching private-key bundle rows.
+Key metadata is also not a private-key-material exception. It is now stored in the `key-metadata` ProtectedData domain, opened after app unlock, and loaded without touching private-key bundle rows. The dedicated Keychain metadata account and older default-account metadata rows remain migration/cleanup sources only.
 
 ### 4.2 Unified Protection Roadmap
 
@@ -386,7 +388,7 @@ The inventory follows the same numeric phase order as Section 2:
 
 - Phase 4: extend post-unlock orchestration and harden second-domain framework behavior before additional product domains depend on it
 - Phase 5: implemented `private-key-control`, migrated `authMode` and the private-key `recoveryJournal`, and moved rewrap / modify-expiry recovery detection out of pre-auth startup
-- Phase 6: create the `key metadata` domain, migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account, and avoid empty-key-list flashes during unlock
+- Phase 6: implemented `key-metadata`, migrated `PGPKeyIdentity` metadata out of transitional Keychain rows, and moved key-list loading to post-unlock state handling
 - Phase 7: migrate non-Contacts ordinary protected-after-unlock settings, self-test policy, and local file/static-protection cleanup once synchronous read paths have been removed or replaced
 - Phase 8: migrate Contacts as a later independent protected domain on the shared framework
 - Phase 9: migrate future app-owned persistent domains not yet covered by the current inventory

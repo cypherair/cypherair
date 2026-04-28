@@ -74,22 +74,14 @@ struct AppStartupCoordinator {
             )
         }
 
-        traceStore?.record(category: .lifecycle, name: "startup.keys.load.start")
-        do {
-            try container.keyManagement.loadKeys()
-            traceStore?.record(
-                category: .lifecycle,
-                name: "startup.keys.load.finish",
-                metadata: ["result": "success", "keyCount": String(container.keyManagement.keys.count)]
-            )
-        } catch {
-            traceStore?.record(
-                category: .lifecycle,
-                name: "startup.keys.load.finish",
-                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failed"])
-            )
-            errors.append(error.localizedDescription)
-        }
+        traceStore?.record(
+            category: .lifecycle,
+            name: "startup.keyMetadata.load.deferred",
+            metadata: [
+                "reason": "protectedDataPostUnlock",
+                "state": "\(container.keyManagement.metadataLoadState)"
+            ]
+        )
 
         traceStore?.record(category: .lifecycle, name: "startup.contacts.load.start")
         do {

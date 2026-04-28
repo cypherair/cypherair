@@ -153,6 +153,40 @@ private final class FailingModifyExpiryPrivateKeyControlStore: PrivateKeyControl
     }
 }
 
+private final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
+    private(set) var identities: [PGPKeyIdentity] = []
+    private(set) var loadAllCallCount = 0
+    private(set) var saveCallCount = 0
+    private(set) var updateCallCount = 0
+    private(set) var deleteCallCount = 0
+
+    func loadAll() throws -> [PGPKeyIdentity] {
+        loadAllCallCount += 1
+        return identities.sorted { $0.fingerprint < $1.fingerprint }
+    }
+
+    func save(_ identity: PGPKeyIdentity) throws {
+        saveCallCount += 1
+        identities.append(identity)
+        identities.sort { $0.fingerprint < $1.fingerprint }
+    }
+
+    func update(_ identity: PGPKeyIdentity) throws {
+        updateCallCount += 1
+        if let index = identities.firstIndex(where: { $0.fingerprint == identity.fingerprint }) {
+            identities[index] = identity
+        } else {
+            identities.append(identity)
+        }
+        identities.sort { $0.fingerprint < $1.fingerprint }
+    }
+
+    func delete(fingerprint: String) throws {
+        deleteCallCount += 1
+        identities.removeAll { $0.fingerprint == fingerprint }
+    }
+}
+
 /// Tests for KeyManagementService — full key lifecycle with mock SE/Keychain/Auth.
 final class KeyManagementServiceTests: XCTestCase {
 
@@ -340,6 +374,34 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertTrue(mockKC.exists(
             service: KeychainConstants.metadataService(fingerprint: fp),
             account: KeychainConstants.metadataAccount))
+    }
+
+    func test_generateKey_withInjectedMetadataPersistenceDoesNotWriteMetadataKeychainRows() async throws {
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        let protectedMetadataService = KeyManagementService(
+            engine: engine,
+            secureEnclave: mockSE,
+            keychain: mockKC,
+            authenticator: mockAuth,
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: metadataPersistence
+        )
+
+        let identity = try await TestHelpers.generateProfileAKey(service: protectedMetadataService)
+
+        XCTAssertEqual(metadataPersistence.saveCallCount, 1)
+        XCTAssertEqual(metadataPersistence.identities, [identity])
+        XCTAssertFalse(mockKC.exists(
+            service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
+            account: KeychainConstants.metadataAccount
+        ))
+        XCTAssertFalse(mockKC.listItemsCalls.contains { call in
+            call.servicePrefix == KeychainConstants.metadataPrefix
+        })
+        XCTAssertTrue(mockKC.exists(
+            service: KeychainConstants.sealedKeyService(fingerprint: identity.fingerprint),
+            account: KeychainConstants.defaultAccount
+        ))
     }
 
     func test_generateKey_profileA_returnsCorrectIdentity() async throws {

@@ -21,6 +21,8 @@ private typealias AppProtectedDataPostUnlockDomainOpener = CypherAir.ProtectedDa
 private typealias AppProtectedDataPostUnlockOutcome = CypherAir.ProtectedDataPostUnlockOutcome
 private typealias AppProtectedDataFrameworkSentinelStore = CypherAir.ProtectedDataFrameworkSentinelStore
 private typealias AppPrivateKeyControlStore = CypherAir.PrivateKeyControlStore
+private typealias AppKeyMetadataDomainStore = CypherAir.KeyMetadataDomainStore
+private typealias AppKeyMetadataStore = CypherAir.KeyMetadataStore
 private typealias AppProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
 private typealias AppProtectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager
 private typealias AppProtectedDomainRecoveryHandler = CypherAir.ProtectedDomainRecoveryHandler
@@ -209,6 +211,10 @@ private actor AsyncDataBox {
     }
 }
 
+private enum ProtectedDataTestInterruption: Error {
+    case injectedPendingCreateInterruption
+}
+
 private final class MockProtectedDomainRecoveryHandler: AppProtectedDomainRecoveryHandler, @unchecked Sendable {
     let protectedDataDomainID: ProtectedDataDomainID
     private(set) var continuedCreatePhases: [CreateDomainPhase] = []
@@ -218,7 +224,10 @@ private final class MockProtectedDomainRecoveryHandler: AppProtectedDomainRecove
         self.protectedDataDomainID = domainID
     }
 
-    func continuePendingCreate(phase: CreateDomainPhase) async throws {
+    func continuePendingCreate(
+        phase: CreateDomainPhase,
+        authenticationContext: LAContext?
+    ) async throws {
         continuedCreatePhases.append(phase)
     }
 
@@ -251,6 +260,210 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             .appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private func makeMetadataIdentity(
+        fingerprint: String,
+        userId: String? = nil,
+        isDefault: Bool = false,
+        isBackedUp: Bool = false,
+        publicKeySeed: UInt8 = 0x11
+    ) -> PGPKeyIdentity {
+        PGPKeyIdentity(
+            fingerprint: fingerprint.lowercased(),
+            keyVersion: 4,
+            profile: .universal,
+            userId: userId,
+            hasEncryptionSubkey: true,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: isDefault,
+            isBackedUp: isBackedUp,
+            publicKeyData: Data([publicKeySeed, 0x42, 0x43]),
+            revocationCert: Data([0x52, publicKeySeed]),
+            primaryAlgo: "Ed25519",
+            subkeyAlgo: "X25519",
+            expiryDate: nil
+        )
+    }
+
+    private func makeKeyMetadataDomainHarness(
+        _ prefix: String,
+        keychain providedKeychain: MockKeychain? = nil
+    ) async throws -> (
+        storageRoot: AppProtectedDataStorageRoot,
+        registryStore: AppProtectedDataRegistryStore,
+        domainKeyManager: AppProtectedDomainKeyManager,
+        wrappingRootKey: Data,
+        keychain: MockKeychain,
+        legacyStore: AppKeyMetadataStore,
+        store: AppKeyMetadataDomainStore
+    ) {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory(prefix))
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.key-metadata.\(UUID().uuidString)"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+
+        let defaultsSuiteName = "com.cypherair.tests.key-metadata.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let privateKeyControlStore = AppPrivateKeyControlStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager
+        )
+        let handoffContext = LAContext()
+        defer { handoffContext.invalidate() }
+        let persistedSecretBox = AsyncDataBox()
+
+        _ = try await privateKeyControlStore.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
+            authenticationContext: handoffContext,
+            persistSharedRight: { secret in
+                await persistedSecretBox.set(secret)
+            }
+        )
+
+        var rootSecret = await persistedSecretBox.data()
+        let wrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rootSecret)
+        rootSecret.protectedDataZeroize()
+
+        let keychain = providedKeychain ?? MockKeychain()
+        let legacyStore = AppKeyMetadataStore(keychain: keychain)
+        let store = AppKeyMetadataDomainStore(
+            legacyMetadataStore: legacyStore,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+
+        return (
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            wrappingRootKey: wrappingRootKey,
+            keychain: keychain,
+            legacyStore: legacyStore,
+            store: store
+        )
+    }
+
+    private func leaveKeyMetadataPendingCreateAtJournaled(
+        registryStore: AppProtectedDataRegistryStore,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        do {
+            _ = try await registryStore.performCreateDomainTransaction(
+                domainID: AppKeyMetadataDomainStore.domainID,
+                validateBeforeJournal: { registry in
+                    guard registry.sharedResourceLifecycleState == .ready,
+                          !registry.committedMembership.isEmpty else {
+                        throw ProtectedDataError.invalidRegistry(
+                            "Key metadata pending-create fixture requires a ready shared resource."
+                        )
+                    }
+                },
+                provisionSharedResourceIfNeeded: {},
+                stageArtifacts: {
+                    throw ProtectedDataTestInterruption.injectedPendingCreateInterruption
+                },
+                validateArtifacts: {}
+            )
+            XCTFail("Expected injected key metadata create interruption.", file: file, line: line)
+        } catch ProtectedDataTestInterruption.injectedPendingCreateInterruption {
+        }
+
+        let registry = try registryStore.loadRegistry()
+        guard case let .createDomain(domainID, phase)? = registry.pendingMutation else {
+            XCTFail("Expected key metadata pending create to remain journaled.", file: file, line: line)
+            return
+        }
+        XCTAssertEqual(domainID, AppKeyMetadataDomainStore.domainID, file: file, line: line)
+        XCTAssertEqual(phase, .journaled, file: file, line: line)
+    }
+
+    private func leaveKeyMetadataPendingCreateWithStagedArtifacts(
+        storageRoot: AppProtectedDataStorageRoot,
+        registryStore: AppProtectedDataRegistryStore,
+        domainKeyManager: AppProtectedDomainKeyManager,
+        wrappingRootKey: Data,
+        identity: PGPKeyIdentity,
+        phase: CreateDomainPhase,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        guard phase == .artifactsStaged || phase == .validated else {
+            XCTFail("Staged-artifact fixture only supports artifactsStaged or validated.", file: file, line: line)
+            return
+        }
+
+        let payload = AppKeyMetadataDomainStore.Payload.initial(identities: [identity])
+        var domainMasterKey = try domainKeyManager.generateDomainMasterKey()
+        defer {
+            domainMasterKey.protectedDataZeroize()
+        }
+        let wrappedRecord = try domainKeyManager.wrapDomainMasterKey(
+            domainMasterKey,
+            for: AppKeyMetadataDomainStore.domainID,
+            wrappingRootKey: wrappingRootKey
+        )
+        try domainKeyManager.writeWrappedDomainMasterKeyRecordTransaction(
+            wrappedRecord,
+            wrappingRootKey: wrappingRootKey
+        )
+
+        try storageRoot.ensureDomainDirectoryExists(for: AppKeyMetadataDomainStore.domainID)
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        var plaintext = try encoder.encode(payload)
+        defer {
+            plaintext.protectedDataZeroize()
+        }
+        let envelope = try ProtectedDomainEnvelopeCodec.seal(
+            plaintext: plaintext,
+            domainID: AppKeyMetadataDomainStore.domainID,
+            schemaVersion: AppKeyMetadataDomainStore.Payload.currentSchemaVersion,
+            generationIdentifier: 1,
+            domainMasterKey: domainMasterKey
+        )
+        let envelopeData = try encoder.encode(envelope)
+        let pendingURL = storageRoot.domainEnvelopeURL(
+            for: AppKeyMetadataDomainStore.domainID,
+            slot: .pending
+        )
+        try storageRoot.writeProtectedData(envelopeData, to: pendingURL)
+        try storageRoot.promoteStagedFile(
+            from: pendingURL,
+            to: storageRoot.domainEnvelopeURL(
+                for: AppKeyMetadataDomainStore.domainID,
+                slot: .current
+            )
+        )
+        try ProtectedDomainBootstrapStore(storageRoot: storageRoot).saveMetadata(
+            ProtectedDomainBootstrapMetadata(
+                schemaVersion: AppKeyMetadataDomainStore.Payload.currentSchemaVersion,
+                expectedCurrentGenerationIdentifier: "1",
+                coarseRecoveryReason: nil,
+                wrappedDomainMasterKeyRecordVersion: AppWrappedDomainMasterKeyRecord.currentFormatVersion
+            ),
+            for: AppKeyMetadataDomainStore.domainID
+        )
+
+        var registry = try registryStore.loadRegistry()
+        XCTAssertEqual(registry.sharedResourceLifecycleState, .ready, file: file, line: line)
+        XCTAssertNil(registry.committedMembership[AppKeyMetadataDomainStore.domainID], file: file, line: line)
+        registry.pendingMutation = .createDomain(
+            targetDomainID: AppKeyMetadataDomainStore.domainID,
+            phase: phase
+        )
+        try registryStore.saveRegistry(registry)
     }
 
     private func replacing(
@@ -1246,6 +1459,8 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(rightStoreClient.rightLookupCallCount, 0)
         XCTAssertEqual(rightStoreClient.saveWithoutSecretCallCount, 0)
         XCTAssertEqual(rightStoreClient.saveWithSecretCallCount, 0)
+        XCTAssertEqual(keychain.listItemsCallCount, 0)
+        XCTAssertEqual(keychain.loadCallCount, 0)
         XCTAssertEqual(protectedDataSessionCoordinator.frameworkState, AppProtectedDataFrameworkState.sessionLocked)
     }
 
@@ -3421,6 +3636,465 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(clearedRegistry.sharedResourceLifecycleState, .absent)
         let didCleanup = await cleanupCalled.currentValue()
         XCTAssertFalse(didCleanup)
+    }
+
+    func test_keyMetadataDomain_freshInstallCreatesEmptyPayloadAndRelockClearsMemory() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataFresh")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        let payload = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+
+        XCTAssertEqual(payload.schemaVersion, AppKeyMetadataDomainStore.Payload.currentSchemaVersion)
+        XCTAssertEqual(payload.identities, [])
+        XCTAssertEqual(try harness.store.loadAll(), [])
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[AppKeyMetadataDomainStore.domainID],
+            .active
+        )
+
+        try await harness.store.relockProtectedData()
+
+        XCTAssertEqual(harness.store.domainState, .locked)
+        XCTAssertNil(harness.store.payload)
+        XCTAssertThrowsError(try harness.store.loadAll())
+    }
+
+    func test_keyMetadataDomain_migratesDedicatedMetadataAccountAndCleansSource() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataDedicatedMigration")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let identity = makeMetadataIdentity(
+            fingerprint: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            userId: "Dedicated <dedicated@example.invalid>",
+            isDefault: true
+        )
+        try harness.legacyStore.save(identity)
+
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+
+        XCTAssertEqual(try harness.store.loadAll(), [identity])
+        XCTAssertFalse(harness.keychain.exists(
+            service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
+            account: KeychainConstants.metadataAccount
+        ))
+        XCTAssertNil(harness.store.migrationWarning)
+    }
+
+    func test_keyMetadataDomain_cleanupFailureKeepsMigratedSourceForRetry() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataCleanupFailure")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let identity = makeMetadataIdentity(
+            fingerprint: "abababababababababababababababababababab",
+            userId: "Cleanup Retry <cleanup@example.invalid>"
+        )
+        try harness.legacyStore.save(identity)
+        harness.keychain.failOnDeleteNumber = 1
+
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+
+        XCTAssertTrue(harness.keychain.exists(
+            service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
+            account: KeychainConstants.metadataAccount
+        ))
+        XCTAssertEqual(harness.store.migrationWarning, AppKeyMetadataDomainStore.migrationWarningMessage())
+
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+
+        XCTAssertEqual(try harness.store.loadAll(), [identity])
+        XCTAssertFalse(harness.keychain.exists(
+            service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
+            account: KeychainConstants.metadataAccount
+        ))
+        XCTAssertNil(harness.store.migrationWarning)
+    }
+
+    func test_keyMetadataDomain_cleanupRetryDeletesSameFingerprintLegacyDuplicate() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataDuplicateCleanupRetry")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let legacyDuplicate = makeMetadataIdentity(
+            fingerprint: "acacacacacacacacacacacacacacacacacacacac",
+            userId: "Default Duplicate <default-duplicate@example.invalid>",
+            publicKeySeed: 0x21
+        )
+        let dedicatedDuplicate = makeMetadataIdentity(
+            fingerprint: legacyDuplicate.fingerprint,
+            userId: "Dedicated Duplicate <dedicated-duplicate@example.invalid>",
+            isBackedUp: true,
+            publicKeySeed: 0x22
+        )
+        try harness.legacyStore.save(legacyDuplicate, account: KeychainConstants.defaultAccount)
+        try harness.legacyStore.save(dedicatedDuplicate, account: KeychainConstants.metadataAccount)
+        harness.keychain.failOnDeleteNumber = 1
+
+        let authenticationContext = LAContext()
+        defer { authenticationContext.invalidate() }
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: authenticationContext
+        )
+
+        XCTAssertEqual(harness.store.migrationWarning, AppKeyMetadataDomainStore.migrationWarningMessage())
+        XCTAssertTrue(harness.keychain.exists(
+            service: KeychainConstants.metadataService(fingerprint: legacyDuplicate.fingerprint),
+            account: KeychainConstants.defaultAccount
+        ))
+        XCTAssertFalse(harness.keychain.exists(
+            service: KeychainConstants.metadataService(fingerprint: dedicatedDuplicate.fingerprint),
+            account: KeychainConstants.metadataAccount
+        ))
+
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: authenticationContext
+        )
+
+        XCTAssertEqual(try harness.store.loadAll(), [dedicatedDuplicate])
+        XCTAssertFalse(harness.keychain.exists(
+            service: KeychainConstants.metadataService(fingerprint: legacyDuplicate.fingerprint),
+            account: KeychainConstants.defaultAccount
+        ))
+        XCTAssertNil(harness.store.migrationWarning)
+    }
+
+    func test_keyMetadataDomain_migratesDefaultAccountWithAuthenticatedContextAndCleansSource() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataDefaultMigration")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let identity = makeMetadataIdentity(
+            fingerprint: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            userId: "Default <default@example.invalid>"
+        )
+        try harness.legacyStore.save(identity, account: KeychainConstants.defaultAccount)
+        let handoffContext = LAContext()
+        defer { handoffContext.invalidate() }
+
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: handoffContext
+        )
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: handoffContext
+        )
+
+        XCTAssertEqual(try harness.store.loadAll(), [identity])
+        XCTAssertFalse(harness.keychain.exists(
+            service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
+            account: KeychainConstants.defaultAccount
+        ))
+        XCTAssertTrue(harness.keychain.listItemsCalls.contains { call in
+            call.account == KeychainConstants.defaultAccount && call.hasAuthenticationContext
+        })
+    }
+
+    func test_keyMetadataDomain_pendingCreateRecoveryUsesAuthenticationContextForDefaultAccount() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataRecoveryContext")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let identity = makeMetadataIdentity(
+            fingerprint: "bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc",
+            userId: "Recovered Default <recovered-default@example.invalid>"
+        )
+        try harness.legacyStore.save(identity, account: KeychainConstants.defaultAccount)
+        try await leaveKeyMetadataPendingCreateAtJournaled(registryStore: harness.registryStore)
+        harness.keychain.resetCallHistory()
+
+        let authenticationContext = LAContext()
+        defer { authenticationContext.invalidate() }
+        let recoveryCoordinator = ProtectedDomainRecoveryCoordinator(registryStore: harness.registryStore)
+        let outcome = try await recoveryCoordinator.recoverPendingMutation(
+            handler: harness.store,
+            authenticationContext: authenticationContext,
+            removeSharedRight: { _ in
+                XCTFail("Key metadata recovery must not remove the shared right.")
+            }
+        )
+
+        XCTAssertEqual(outcome, .resumedToSteadyState)
+        XCTAssertNil(try harness.registryStore.loadRegistry().pendingMutation)
+
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: authenticationContext
+        )
+
+        XCTAssertEqual(try harness.store.loadAll(), [identity])
+        XCTAssertTrue(harness.keychain.listItemsCalls.contains { call in
+            call.account == KeychainConstants.defaultAccount && call.hasAuthenticationContext
+        })
+        XCTAssertTrue(harness.keychain.loadCalls.contains { call in
+            call.account == KeychainConstants.defaultAccount && call.hasAuthenticationContext
+        })
+    }
+
+    func test_keyMetadataDomain_pendingCreateRecoveryWithoutContextKeepsRetryableWhenSourcesFail() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataRecoveryNoContext")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let corruptFingerprint = "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+        try harness.keychain.save(
+            Data("not-valid-key-metadata".utf8),
+            service: KeychainConstants.metadataService(fingerprint: corruptFingerprint),
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        try await leaveKeyMetadataPendingCreateAtJournaled(registryStore: harness.registryStore)
+
+        let recoveryCoordinator = ProtectedDomainRecoveryCoordinator(registryStore: harness.registryStore)
+        let outcome = try await recoveryCoordinator.recoverPendingMutation(
+            handler: harness.store,
+            authenticationContext: nil,
+            removeSharedRight: { _ in
+                XCTFail("Retryable key metadata recovery must not remove the shared right.")
+            }
+        )
+
+        XCTAssertEqual(outcome, .retryablePending)
+        let registry = try harness.registryStore.loadRegistry()
+        XCTAssertEqual(registry.committedMembership[AppKeyMetadataDomainStore.domainID], nil)
+        guard case let .createDomain(domainID, phase)? = registry.pendingMutation else {
+            XCTFail("Expected key metadata pending create to remain retryable.")
+            return
+        }
+        XCTAssertEqual(domainID, AppKeyMetadataDomainStore.domainID)
+        XCTAssertEqual(phase, .journaled)
+        XCTAssertThrowsError(try harness.store.loadAll())
+    }
+
+    func test_keyMetadataDomain_pendingCreateRecoveryFromStagedArtifactsSkipsLegacySourcesWithoutContext() async throws {
+        for (index, phase) in [CreateDomainPhase.artifactsStaged, .validated].enumerated() {
+            let harness = try await makeKeyMetadataDomainHarness("KeyMetadataRecoveryStaged\(index)")
+            defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+            let identity = makeMetadataIdentity(
+                fingerprint: index == 0
+                    ? "dededededededededededededededededededede"
+                    : "efefefefefefefefefefefefefefefefefefefef",
+                userId: "Staged \(index) <staged-\(index)@example.invalid>",
+                publicKeySeed: UInt8(0x30 + index)
+            )
+            try leaveKeyMetadataPendingCreateWithStagedArtifacts(
+                storageRoot: harness.storageRoot,
+                registryStore: harness.registryStore,
+                domainKeyManager: harness.domainKeyManager,
+                wrappingRootKey: harness.wrappingRootKey,
+                identity: identity,
+                phase: phase
+            )
+            try harness.keychain.save(
+                Data("not-valid-key-metadata".utf8),
+                service: KeychainConstants.metadataService(
+                    fingerprint: index == 0
+                        ? "fdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfd"
+                        : "fefefefefefefefefefefefefefefefefefefefe"
+                ),
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+            harness.keychain.resetCallHistory()
+
+            let recoveryCoordinator = ProtectedDomainRecoveryCoordinator(registryStore: harness.registryStore)
+            let outcome = try await recoveryCoordinator.recoverPendingMutation(
+                handler: harness.store,
+                authenticationContext: nil,
+                removeSharedRight: { _ in
+                    XCTFail("Key metadata recovery must not remove the shared right.")
+                }
+            )
+
+            XCTAssertEqual(outcome, .resumedToSteadyState)
+            XCTAssertNil(try harness.registryStore.loadRegistry().pendingMutation)
+            XCTAssertEqual(harness.keychain.listItemsCallCount, 0)
+            XCTAssertEqual(harness.keychain.loadCallCount, 0)
+
+            let openContext = LAContext()
+            defer { openContext.invalidate() }
+            _ = try await harness.store.openDomainIfNeeded(
+                wrappingRootKey: harness.wrappingRootKey,
+                authenticationContext: openContext
+            )
+            XCTAssertEqual(try harness.store.loadAll(), [identity])
+        }
+    }
+
+    func test_keyMetadataDomain_deduplicatesDualSourcesWithDedicatedAccountPriority() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataDualSource")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let defaultOnly = makeMetadataIdentity(
+            fingerprint: "1111111111111111111111111111111111111111",
+            userId: "Default Only <default-only@example.invalid>",
+            publicKeySeed: 0x01
+        )
+        let legacyDuplicate = makeMetadataIdentity(
+            fingerprint: "2222222222222222222222222222222222222222",
+            userId: "Legacy Duplicate <legacy@example.invalid>",
+            publicKeySeed: 0x02
+        )
+        let dedicatedDuplicate = makeMetadataIdentity(
+            fingerprint: legacyDuplicate.fingerprint,
+            userId: "Dedicated Duplicate <dedicated@example.invalid>",
+            isBackedUp: true,
+            publicKeySeed: 0x03
+        )
+        try harness.legacyStore.save(defaultOnly, account: KeychainConstants.defaultAccount)
+        try harness.legacyStore.save(legacyDuplicate, account: KeychainConstants.defaultAccount)
+        try harness.legacyStore.save(dedicatedDuplicate, account: KeychainConstants.metadataAccount)
+
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        let migrated = try harness.store.loadAll()
+
+        XCTAssertEqual(migrated.map(\.fingerprint), [
+            defaultOnly.fingerprint,
+            dedicatedDuplicate.fingerprint
+        ])
+        XCTAssertEqual(migrated.first(where: { $0.fingerprint == dedicatedDuplicate.fingerprint }), dedicatedDuplicate)
+    }
+
+    func test_keyMetadataDomain_corruptLegacyRowsDoNotBlockReadableRowsAndRemainForRetry() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataCorruptLegacy")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let readable = makeMetadataIdentity(
+            fingerprint: "cccccccccccccccccccccccccccccccccccccccc",
+            userId: "Readable <readable@example.invalid>"
+        )
+        let corruptFingerprint = "dddddddddddddddddddddddddddddddddddddddd"
+        let corruptService = KeychainConstants.metadataService(fingerprint: corruptFingerprint)
+        try harness.legacyStore.save(readable)
+        try harness.keychain.save(
+            Data("not-valid-key-metadata".utf8),
+            service: corruptService,
+            account: KeychainConstants.metadataAccount,
+            accessControl: nil
+        )
+
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+
+        XCTAssertEqual(try harness.store.loadAll(), [readable])
+        XCTAssertFalse(harness.keychain.exists(
+            service: KeychainConstants.metadataService(fingerprint: readable.fingerprint),
+            account: KeychainConstants.metadataAccount
+        ))
+        XCTAssertTrue(harness.keychain.exists(
+            service: corruptService,
+            account: KeychainConstants.metadataAccount
+        ))
+        XCTAssertEqual(harness.store.migrationWarning, AppKeyMetadataDomainStore.migrationWarningMessage())
+    }
+
+    func test_keyMetadataDomain_committedCorruptionEntersRecoveryWithoutLegacyRebuild() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataCommittedCorruption")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let domainIdentity = makeMetadataIdentity(
+            fingerprint: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            userId: "Domain <domain@example.invalid>"
+        )
+        let legacyIdentity = makeMetadataIdentity(
+            fingerprint: "ffffffffffffffffffffffffffffffffffffffff",
+            userId: "Legacy <legacy@example.invalid>"
+        )
+        try harness.legacyStore.save(domainIdentity)
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        try harness.legacyStore.save(legacyIdentity)
+        try harness.storageRoot.writeProtectedData(
+            Data("corrupt-current-key-metadata".utf8),
+            to: harness.storageRoot.domainEnvelopeURL(
+                for: AppKeyMetadataDomainStore.domainID,
+                slot: .current
+            )
+        )
+        let reopenedStore = AppKeyMetadataDomainStore(
+            legacyMetadataStore: harness.legacyStore,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        do {
+            _ = try await reopenedStore.openDomainIfNeeded(
+                wrappingRootKey: harness.wrappingRootKey,
+                authenticationContext: LAContext()
+            )
+            XCTFail("Expected corrupt committed key metadata to require recovery.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
+        XCTAssertNil(reopenedStore.payload)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[AppKeyMetadataDomainStore.domainID],
+            .recoveryNeeded
+        )
+        XCTAssertTrue(harness.keychain.exists(
+            service: KeychainConstants.metadataService(fingerprint: legacyIdentity.fingerprint),
+            account: KeychainConstants.metadataAccount
+        ))
+    }
+
+    func test_keyMetadataDomain_mutationsPersistWithoutEnumeratingPrivateKeychainRows() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataMutations")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        harness.keychain.resetCallHistory()
+
+        var identity = makeMetadataIdentity(
+            fingerprint: "9999999999999999999999999999999999999999",
+            userId: "Mutable <mutable@example.invalid>"
+        )
+        try harness.store.save(identity)
+        identity.isBackedUp = true
+        try harness.store.update(identity)
+        XCTAssertEqual(try harness.store.loadAll(), [identity])
+        try harness.store.delete(fingerprint: identity.fingerprint)
+
+        XCTAssertEqual(try harness.store.loadAll(), [])
+        XCTAssertEqual(harness.keychain.listItemsCallCount, 0)
+        XCTAssertEqual(harness.keychain.loadCallCount, 0)
+        XCTAssertEqual(harness.keychain.saveCallCount, 0)
+        XCTAssertEqual(harness.keychain.deleteCallCount, 0)
     }
 
     func test_completePendingDelete_clearsCleanupPendingAndPendingMutation() async throws {

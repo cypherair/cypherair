@@ -38,7 +38,7 @@ protocol KeychainManageable {
     func exists(service: String, account: String, authenticationContext: LAContext?) -> Bool
 
     /// List all service names matching a given prefix.
-    /// Used for key enumeration on cold launch.
+    /// Used by legacy metadata migration and reset cleanup.
     ///
     /// - Parameters:
     ///   - servicePrefix: The prefix to filter by (e.g., "com.cypherair.v1.metadata.").
@@ -101,8 +101,8 @@ enum KeychainConstants {
         "\(prefix).pending-sealed-key.\(fingerprint)"
     }
 
-    /// Key identity metadata (Codable JSON, no sensitive data).
-    /// Used for cold-launch key enumeration without SE authentication.
+    /// Legacy key identity metadata (Codable JSON, no sensitive data).
+    /// Retained as a migration source for the protected key-metadata domain.
     static func metadataService(fingerprint: String) -> String {
         "\(prefix).metadata.\(fingerprint)"
     }

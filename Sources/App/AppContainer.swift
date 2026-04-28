@@ -15,6 +15,7 @@ final class AppContainer: @unchecked Sendable {
     let protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator
     let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     let privateKeyControlStore: PrivateKeyControlStore
+    let keyMetadataDomainStore: KeyMetadataDomainStore?
     let protectedSettingsStore: ProtectedSettingsStore
     let protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore
     let protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator
@@ -47,6 +48,7 @@ final class AppContainer: @unchecked Sendable {
         protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         privateKeyControlStore: PrivateKeyControlStore,
+        keyMetadataDomainStore: KeyMetadataDomainStore? = nil,
         protectedSettingsStore: ProtectedSettingsStore,
         protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore,
         protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator = .noOp,
@@ -78,6 +80,7 @@ final class AppContainer: @unchecked Sendable {
         self.protectedDomainRecoveryCoordinator = protectedDomainRecoveryCoordinator
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.privateKeyControlStore = privateKeyControlStore
+        self.keyMetadataDomainStore = keyMetadataDomainStore
         self.protectedSettingsStore = protectedSettingsStore
         self.protectedDataFrameworkSentinelStore = protectedDataFrameworkSentinelStore
         self.protectedDataPostUnlockCoordinator = protectedDataPostUnlockCoordinator
@@ -179,10 +182,37 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
+        let legacyKeyMetadataStore = KeyMetadataStore(
+            keychain: keychain,
+            traceStore: authLifecycleTraceStore
+        )
+        let keyMetadataDomainStore = KeyMetadataDomainStore(
+            legacyMetadataStore: legacyKeyMetadataStore,
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
+        )
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(keyMetadataDomainStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
+        let engine = PgpEngine()
+        let keyManagement = KeyManagementService(
+            engine: engine,
+            secureEnclave: secureEnclave,
+            keychain: keychain,
+            authenticator: authManager,
+            defaults: .standard,
+            authenticationPromptCoordinator: authPromptCoordinator,
+            privateKeyControlStore: privateKeyControlStore,
+            authLifecycleTraceStore: authLifecycleTraceStore,
+            metadataPersistence: keyMetadataDomainStore
+        )
+        protectedDataSessionCoordinator.registerRelockParticipant(keyManagement)
         let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -200,6 +230,37 @@ final class AppContainer: @unchecked Sendable {
                         _ = try await privateKeyControlStore.openDomainIfNeeded(
                             wrappingRootKey: wrappingRootKey
                         )
+                    }
+                ),
+                ProtectedDataPostUnlockDomainOpener(
+                    domainID: KeyMetadataDomainStore.domainID,
+                    ensureCommittedWithContext: { context in
+                        keyManagement.beginKeyMetadataLoad()
+                        do {
+                            try await keyMetadataDomainStore.ensureCommittedIfNeeded(
+                                wrappingRootKey: context.wrappingRootKey,
+                                authenticationContext: context.authenticationContext
+                            )
+                        } catch {
+                            keyManagement.markKeyMetadataRecoveryNeeded()
+                            throw error
+                        }
+                    },
+                    openWithContext: { context in
+                        keyManagement.beginKeyMetadataLoad()
+                        do {
+                            _ = try await keyMetadataDomainStore.openDomainIfNeeded(
+                                wrappingRootKey: context.wrappingRootKey,
+                                authenticationContext: context.authenticationContext
+                            )
+                            try keyManagement.completeKeyMetadataLoad(
+                                migrationWarning: keyMetadataDomainStore.migrationWarning,
+                                source: context.authenticationContext == nil ? "postUnlockNoContext" : "postUnlock"
+                            )
+                        } catch {
+                            keyManagement.markKeyMetadataRecoveryNeeded()
+                            throw error
+                        }
                     }
                 ),
                 ProtectedDataPostUnlockDomainOpener(
@@ -226,17 +287,6 @@ final class AppContainer: @unchecked Sendable {
             ],
             traceStore: authLifecycleTraceStore
         )
-        let engine = PgpEngine()
-        let keyManagement = KeyManagementService(
-            engine: engine,
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            authenticator: authManager,
-            defaults: .standard,
-            authenticationPromptCoordinator: authPromptCoordinator,
-            privateKeyControlStore: privateKeyControlStore,
-            authLifecycleTraceStore: authLifecycleTraceStore
-        )
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -262,10 +312,6 @@ final class AppContainer: @unchecked Sendable {
                 } catch {
                     config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
                 }
-                await keyManagement.migrateLegacyMetadataAfterAppAuthentication(
-                    authenticationContext: authenticationContext,
-                    source: source
-                )
                 _ = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
                     authenticationContext: authenticationContext,
                     localizedReason: String(
@@ -349,6 +395,7 @@ final class AppContainer: @unchecked Sendable {
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             privateKeyControlStore: privateKeyControlStore,
+            keyMetadataDomainStore: keyMetadataDomainStore,
             protectedSettingsStore: protectedSettingsStore,
             protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,
@@ -533,6 +580,7 @@ final class AppContainer: @unchecked Sendable {
             privateKeyControlStore: privateKeyControlStore,
             authLifecycleTraceStore: authLifecycleTraceStore
         )
+        try? keyManagement.loadKeys()
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
