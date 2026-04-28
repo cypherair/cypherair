@@ -241,6 +241,67 @@ final class AuthenticationShieldCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.isVisible)
     }
 
+    #if os(macOS)
+    func test_pendingDismissalAfterInactivePromptEnd_clearsWhenMacApplicationIsActive() async {
+        let traceStore = makeTraceStore()
+        let coordinator = AuthenticationShieldCoordinator(
+            traceStore: traceStore,
+            macOSApplicationIsActive: { true }
+        )
+
+        coordinator.begin(.privacy)
+        coordinator.sceneDidResignActive()
+        coordinator.end(.privacy)
+
+        XCTAssertTrue(coordinator.isVisible)
+        XCTAssertEqual(coordinator.presentationState?.isPendingDismissal, true)
+
+        await settleShieldDismissal()
+
+        XCTAssertFalse(coordinator.isVisible)
+        guard let completionEntry = traceStore.recentEntries.last(where: { $0.name == "shield.dismissal.complete" }) else {
+            XCTFail("Expected shield.dismissal.complete trace entry")
+            return
+        }
+        XCTAssertEqual(completionEntry.metadata["cycle"], "1")
+        XCTAssertEqual(completionEntry.metadata["reason"], "activeProbe")
+    }
+
+    func test_lateInactiveDuringPendingDismissal_clearsWhenMacApplicationIsActive() async {
+        let coordinator = AuthenticationShieldCoordinator(macOSApplicationIsActive: { true })
+
+        coordinator.begin(.operation)
+        coordinator.end(.operation)
+        coordinator.sceneDidResignActive()
+
+        XCTAssertTrue(coordinator.isVisible)
+        XCTAssertEqual(coordinator.presentationState?.isPendingDismissal, true)
+
+        await settleShieldDismissal()
+
+        XCTAssertFalse(coordinator.isVisible)
+        XCTAssertNil(coordinator.presentationState)
+    }
+
+    func test_activeProbeFalse_keepsShieldUntilLifecycleBecomesActive() async {
+        let coordinator = AuthenticationShieldCoordinator(macOSApplicationIsActive: { false })
+
+        coordinator.begin(.privacy)
+        coordinator.sceneDidResignActive()
+        coordinator.end(.privacy)
+
+        await settleShieldDismissal()
+
+        XCTAssertTrue(coordinator.isVisible)
+        XCTAssertEqual(coordinator.presentationState?.isPendingDismissal, true)
+
+        coordinator.sceneDidBecomeActive()
+
+        XCTAssertFalse(coordinator.isVisible)
+        XCTAssertNil(coordinator.presentationState)
+    }
+    #endif
+
     func test_pendingDismissal_isCancelledWhenANewPromptBegins() {
         let coordinator = AuthenticationShieldCoordinator()
 
