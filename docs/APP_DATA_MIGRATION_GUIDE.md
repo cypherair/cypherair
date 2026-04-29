@@ -49,6 +49,8 @@ Known Phase 7 surfaces:
 
 Phase 7 must not move a setting merely because it is user-visible. It must first remove or replace synchronous/pre-unlock read paths and prove launch authentication strength is unchanged.
 
+The temporary [APP_DATA_PHASE7_TEMPORARY_RECORD](APP_DATA_PHASE7_TEMPORARY_RECORD.md) restores Phase 7 notes that were compressed out of this active guide during documentation consolidation. That record is not a reviewed implementation plan; formal Phase 7 planning must validate the recovered notes against current code.
+
 ### Phase 8: Contacts Protected Domain
 
 Phase 8 remains pending and should continue through the Contacts-specific documents:
