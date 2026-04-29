@@ -365,7 +365,7 @@ Keychain protected-data row: shared app-data root secret
   com.cypherair.preference.appSessionAuthenticationPolicy → boot auth profile
   com.cypherair.preference.gracePeriod           → Int (0/60/180/300)
   com.cypherair.preference.encryptToSelf         → Bool (default true)
-  com.cypherair.preference.clipboardNotice       → Bool (default true)
+  com.cypherair.preference.clipboardNotice       → Legacy Bool used only for ProtectedSettingsStore migration cleanup
   com.cypherair.preference.onboardingComplete    → Bool (default false)
   com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
   com.cypherair.preference.colorTheme            → String (ColorTheme rawValue, default "systemDefault")

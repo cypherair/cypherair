@@ -150,19 +150,19 @@ Implementation should follow this sequence.
 
 Build the reusable protected app-data substrate first so later domains inherit a shared architecture instead of inventing one-off vault behavior.
 
-Detailed phase goals and framework mechanics live in [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 2.1 and [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md).
+Detailed phase goals and framework mechanics live in [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Section 2.1 and [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md).
 
 ### Phase 2: File-Protection Baseline
 
 Establish the platform-specific file/static-protection baseline for registry files, protected-domain files, bootstrap metadata, and scratch files before any real protected domain ships.
 
-See [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 2.2 and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 6.7.
+See [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Section 2.2 and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 6.7.
 
 ### Phase 3: First Low-Risk Real Domain
 
 Use a low-risk domain such as protected-after-unlock settings or recovery/control state as the first concrete adopter. In the current implementation, this phase is limited to `ProtectedSettingsStore` plus the migrated `clipboardNotice` setting; remaining ordinary settings stay in Phase 7.
 
-See [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 2.3 and Section 5, plus [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md) for current progress.
+See [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Section 2.3 and Section 5, plus [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md) for current progress.
 
 ### Phase 4: Post-Unlock Multi-Domain Orchestration And Framework Hardening
 
@@ -200,7 +200,7 @@ Migrate future app-owned persistent domains that are not covered by the current 
 
 All future implementations derived from this roadmap must follow a two-phase startup model with a pre-auth bootstrap phase and a post-auth unlock phase. This remains a roadmap-level constraint rather than an implementation detail.
 
-See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.12 and [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 3.1.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Section 5.12 and [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Section 3.1.
 
 ### 5.2 App-Data Session Lifetime
 
@@ -208,19 +208,19 @@ The shared app-data session follows the current grace-window model, but the grac
 
 `First real protected-domain access` means the first route in the current app session that actually needs protected-domain contents, not process launch by itself. If launch or resume immediately enters such a route, the same orchestrated unlock flow may pass the authenticated `LAContext` into root-secret Keychain retrieval so the user does not encounter a second distinct app-data prompt. Root-secret retrieval must still remain fail-closed and must not be triggered merely because process launch or service initialization happened.
 
-See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7.3-7.4, plus [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 3.2.
+See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7.3-7.4, plus [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Section 3.2.
 
 ### 5.3 Persistent-State Classification Inventory
 
 Implementation planning must maintain a complete inventory of persisted app-owned state in app-data migration scope, with target class, target phase or exception, current status, and migration readiness tracked explicitly and with reviewed private-key-domain exclusions called out explicitly.
 
-The detailed inventory table and first-domain readiness rules live in [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Sections 4-5. Current roadmap status lives in [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md).
+The detailed inventory table and first-domain readiness rules live in [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Sections 4-5. Current roadmap status lives in [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md).
 
 ### 5.4 Startup Architecture Impact
 
 Protected app-data is not only a local service addition. Any real protected-domain rollout must treat startup ordering, service initialization timing, locked-state routing, and orchestrator wiring as explicit migration surfaces.
 
-See [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) Section 3.4.
+See [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Section 3.4.
 
 ## 6. Explicit Do-Not-Change List
 
