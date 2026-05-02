@@ -1,7 +1,7 @@
 # AppData Phase 7 Implementation Reference
 
 > **Status:** Active Phase 7 architecture reference.
-> **Purpose:** Define the Phase 7 protection requirements and auditable PR tracks for remaining non-Contacts app-owned data surfaces after AppData Phase 1-6 and Phase 7 PR 1-PR 2.
+> **Purpose:** Define the Phase 7 protection requirements and auditable PR tracks for remaining non-Contacts app-owned data surfaces after AppData Phase 1-6 and Phase 7 PR 1-PR 4.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Relationship:** This document is not a symbol-level implementation plan and must not freeze future schema, type, method, or file names. It complements the inventory in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) and the progress record in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
 > **Last reviewed:** 2026-05-02.
@@ -29,7 +29,7 @@ Contacts remain Phase 8 work unless the roadmap is explicitly revised. This docu
 
 ## 2. Current Baseline
 
-Implemented AppData Phase 1-6 plus Phase 7 PR 1-PR 2 behavior:
+Implemented AppData Phase 1-6 plus Phase 7 PR 1-PR 4 behavior:
 
 - `ProtectedDataRegistry`, shared root-secret authorization, wrapped-DMK lifecycle, relock, recovery dispatch, and post-unlock domain opening are present.
 - `protected-settings` exists as the first real ProtectedData domain. Schema v2 preserves `clipboardNotice` and stores the ordinary-settings snapshot for `gracePeriod`, `hasCompletedOnboarding`, `colorTheme`, `encryptToSelf`, and `guidedTutorialCompletedVersion`.
@@ -38,16 +38,20 @@ Implemented AppData Phase 1-6 plus Phase 7 PR 1-PR 2 behavior:
 - ProtectedData storage under `Application Support/ProtectedData/` applies and verifies explicit file protection where supported.
 - `ProtectedOrdinarySettingsCoordinator` owns the Phase 7 ordinary-settings lock state and loads/saves through `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff.
 
-Current Phase 7 gaps:
+Current Phase 7 status:
 
 - Phase 7 PR 3 selected the short-lived/export-only self-test model: current self-test reports are in-memory only until explicit user export, and legacy `Documents/self-test/` content is cleanup-only on startup and local-data reset.
-- `tmp/decrypted/`, `tmp/streaming/`, `tmp/export-*`, `tmp/CypherAirGuidedTutorial-*`, and tutorial-only `UserDefaults` suites have partial cleanup coverage but still need final Phase 7 review.
+- Phase 7 PR 4 selected the `ephemeral-with-cleanup` model for decrypted, streaming, export handoff, guided tutorial artifacts, and tutorial-only `UserDefaults` suites. It does not add a ProtectedData domain.
+- `tmp/decrypted/op-<UUID>/...` and `tmp/streaming/op-<UUID>/...` provide per-operation ownership for streaming outputs; owner cleanup deletes the operation directory.
+- `tmp/export-<UUID>-<filename>` remains a fileExporter handoff path owned by `FileExportController`, with owner cleanup through `finish()`.
+- `tmp/CypherAirGuidedTutorial-<UUID>/` remains tutorial-local storage, and orphaned `com.cypherair.tutorial.<UUID>` defaults suites are removed by startup and Reset All Local Data prefix sweeps.
 
 Apple platform references that motivate Phase 7:
 
 - [UserDefaults](https://developer.apple.com/documentation/foundation/userdefaults) is documented as a persistent settings store for app-specific settings; Apple warns not to store personal or sensitive information there because defaults are stored on disk in an unencrypted format.
 - [Encrypting Your App's Files](https://developer.apple.com/documentation/uikit/encrypting-your-app-s-files) requires apps to choose data-protection levels deliberately and recommends the strongest workable protection for user data files.
 - [FileProtectionType.complete](https://developer.apple.com/documentation/foundation/fileprotectiontype/complete) is the level where the file is encrypted on disk and unavailable while the device is locked or booting.
+- [Data.WritingOptions.completeFileProtection](https://developer.apple.com/documentation/foundation/data/writingoptions/completefileprotection) applies complete file protection when data writes create app-owned temporary handoff files.
 - [Data Protection Entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.default-data-protection) provides a default protection class, but Phase 7 must not rely on a default entitlement as a substitute for explicit protection and verification where CypherAir owns the file.
 
 ## 3. Protection Requirements
@@ -87,10 +91,12 @@ Self-test persistence:
 
 Temporary, export, and tutorial files:
 
-- `tmp/decrypted/` and `tmp/streaming/` must have explicit owner cleanup plus startup and reset cleanup.
-- `tmp/export-*` handoff files must have owner cleanup after exporter completion/cancellation, reset cleanup, and startup cleanup or a documented reason startup cleanup is unsafe.
-- `tmp/CypherAirGuidedTutorial-*` and tutorial-only `UserDefaults` suites must remain isolated from real app data and must be cleaned on tutorial reset/finish plus local-data reset.
-- Any app-owned temporary file containing plaintext, decrypted content, generated report data, or tutorial data must either have explicit file protection or be short-lived with documented cleanup coverage. User-selected export destinations become out-of-app-custody only after the user-controlled transfer succeeds.
+- `AppTemporaryArtifactStore` is the central owner for Phase 7 PR 4 temporary file paths, `.complete` protection application, protection verification, startup cleanup, reset cleanup, and tutorial defaults prefix cleanup.
+- `tmp/decrypted/` and `tmp/streaming/` outputs must live under one operation directory per service call: `tmp/decrypted/op-<UUID>/...` and `tmp/streaming/op-<UUID>/...`. Final filenames remain recognizable sanitized source names, but cleanup ownership is the operation directory, not the shared filename.
+- `tmp/export-*` handoff files must be written atomically with `.completeFileProtection`, verified with `.complete`, and owned only by the export controller that created them. `prepareFileExport` for an existing file does not take custody of that file.
+- `tmp/CypherAirGuidedTutorial-*` directories must be created with verified `.complete` protection and removed on current tutorial cleanup plus startup and local-data reset cleanup.
+- Tutorial-only `UserDefaults` suites use the `com.cypherair.tutorial.<UUID>` prefix. Current-container cleanup removes the active suite, while startup and Reset All Local Data enumerate the app Preferences directory for matching `*.plist` files, call `removePersistentDomain(forName:)`, and remove any residual plist. No tutorial suite registry is used because a registry could itself orphan.
+- User-selected export destinations become out-of-app-custody only after the user-controlled transfer succeeds. Startup/reset cleanup only removes app-owned temporary handoff paths, not user-selected destinations.
 
 ## 4. Auditable PR Tracks
 
@@ -115,8 +121,9 @@ Phase 7 should be delivered as multiple reviewable PRs. A later implementation p
    - Prove self-test reports do not remain as unreviewed plaintext durable state.
 
 4. Temporary, export, and tutorial file hardening
+   - Status: implemented by Phase 7 PR 4 as `ephemeral-with-cleanup`.
    - Finalize cleanup and file-protection policy for decrypted, streaming, export handoff, and tutorial sandbox artifacts.
-   - Cover owner cleanup, startup cleanup, reset cleanup, and relock behavior where each surface applies.
+   - Cover owner cleanup, startup cleanup, reset cleanup, and relock/content-clear behavior where each surface applies.
    - Keep user-selected exported files classified as out-of-app-custody after transfer.
 
 5. Documentation and gate closure
@@ -135,6 +142,7 @@ Every Phase 7 implementation PR must include tests appropriate to its surface. A
 - relock clears unlocked settings and any decrypted in-memory protected payloads
 - self-test reports follow the selected protected-diagnostics or short-lived/export-only model
 - temporary decrypted, streaming, export, and tutorial artifacts are covered by owner cleanup, startup cleanup, reset cleanup, and file-protection checks where applicable
+- orphaned tutorial `UserDefaults` suites are discoverable and removable by prefix without touching real app defaults
 
 Expected validation levels:
 

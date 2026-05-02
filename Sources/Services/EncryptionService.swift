@@ -14,17 +14,20 @@ final class EncryptionService {
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
     private let diskSpaceChecker: DiskSpaceChecker
+    private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     init(
         engine: PgpEngine,
         keyManagement: KeyManagementService,
         contactService: ContactService,
-        diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker()
+        diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker(),
+        temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
         self.engine = engine
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.diskSpaceChecker = diskSpaceChecker
+        self.temporaryArtifactStore = temporaryArtifactStore
     }
 
     // MARK: - Text Encryption
@@ -104,7 +107,7 @@ final class EncryptionService {
     ///   - signWithFingerprint: Fingerprint of the signing key (nil = don't sign).
     ///   - encryptToSelf: Whether to also encrypt to the sender's own key.
     ///   - progress: Progress reporter for UI updates and cancellation.
-    /// - Returns: URL of the encrypted output file (.gpg).
+    /// - Returns: App-owned encrypted output artifact (.gpg).
     func encryptFileStreaming(
         inputURL: URL,
         recipientFingerprints: [String],
@@ -112,7 +115,7 @@ final class EncryptionService {
         encryptToSelf: Bool,
         encryptToSelfFingerprint: String? = nil,
         progress: FileProgressReporter?
-    ) async throws -> URL {
+    ) async throws -> AppTemporaryArtifact {
         guard !recipientFingerprints.isEmpty else {
             throw CypherAirError.noRecipientsSelected
         }
@@ -168,26 +171,21 @@ final class EncryptionService {
             }
         }
 
-        // Prepare output path in tmp/streaming/
-        let streamingDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("streaming", isDirectory: true)
-        try FileManager.default.createDirectory(at: streamingDir, withIntermediateDirectories: true)
-        let outputFilename = inputURL.lastPathComponent + ".gpg"
-        let outputURL = streamingDir.appendingPathComponent(outputFilename)
+        let outputArtifact = try temporaryArtifactStore.makeStreamingArtifact(for: inputURL)
 
         do {
             try await Self.performEncryptFile(
                 engine: engine,
                 inputPath: inputPath,
-                outputPath: outputURL.path,
+                outputPath: outputArtifact.fileURL.path,
                 recipientKeys: recipientKeys,
                 signingKey: signingKey,
                 selfKey: selfKey,
                 progress: progress
             )
+            try temporaryArtifactStore.applyAndVerifyCompleteProtection(to: outputArtifact.fileURL)
         } catch {
-            // Clean up partial output on failure
-            try? FileManager.default.removeItem(at: outputURL)
+            outputArtifact.cleanup()
             throw CypherAirError.from(error) { .encryptionFailed(reason: $0) }
         }
 
@@ -197,7 +195,7 @@ final class EncryptionService {
             signingKey = nil
         }
 
-        return outputURL
+        return outputArtifact
     }
 
     // MARK: - Private

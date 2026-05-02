@@ -341,7 +341,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
         let model = makeModel(
             configuration: configuration,
-            fileEncryptionAction: { _, _, _, _, _, _ in outputURL }
+            fileEncryptionAction: { _, _, _, _, _, _ in CypherAir.AppTemporaryArtifact(fileURL: outputURL) }
         )
         model.encryptMode = .file
         model.handleAppear()
@@ -388,7 +388,7 @@ final class EncryptScreenModelTests: XCTestCase {
                 _ = progress.onProgress(bytesProcessed: 5, totalBytes: 10)
                 await gate.suspend()
                 try Task.checkCancellation()
-                return inputURL
+                return CypherAir.AppTemporaryArtifact(fileURL: inputURL)
             }
         )
         model.encryptMode = .file
@@ -417,6 +417,53 @@ final class EncryptScreenModelTests: XCTestCase {
 
         XCTAssertNil(model.encryptedFileURL)
         XCTAssertNil(model.operation.progress)
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
+    func test_encryptFile_cancellationAfterServiceSuccess_cleansUnpublishedOutput() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let recipientIdentity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+        try stack.contactService.addContact(publicKeyData: recipientIdentity.publicKeyData)
+        let operation = OperationController()
+        let inputURL = try makeTemporaryFile(
+            named: "cancel-after-success.txt",
+            contents: Data("plaintext".utf8)
+        )
+        let outputURL = try makeTemporaryFile(
+            named: "cancel-after-success.txt.gpg",
+            contents: Data("ciphertext".utf8)
+        )
+        defer {
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+
+        var configuration = EncryptView.Configuration()
+        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        let model = makeModel(
+            configuration: configuration,
+            operation: operation,
+            fileEncryptionAction: { _, _, _, _, _, _ in
+                operation.cancel()
+                return CypherAir.AppTemporaryArtifact(fileURL: outputURL)
+            }
+        )
+        model.encryptMode = .file
+        model.handleAppear()
+        model.handleImportedFile(inputURL)
+
+        model.encryptFile()
+
+        await waitUntil("cancelled after service success") {
+            model.operation.isRunning == false
+        }
+
+        XCTAssertNil(model.encryptedFileURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
         XCTAssertFalse(model.operation.isShowingError)
     }
 

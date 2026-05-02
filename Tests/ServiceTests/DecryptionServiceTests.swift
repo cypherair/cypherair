@@ -850,7 +850,7 @@ final class DecryptionServiceTests: XCTestCase {
             phase1: phase1,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: detailed.outputURL) }
+        defer { detailed.artifact.cleanup() }
 
         let inMemory = try await stack.decryptionService.decryptDetailed(
             phase1: makePhase1(matchedKey: identity, ciphertext: ciphertext)
@@ -867,7 +867,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: expectedOutputURL) }
 
-        XCTAssertEqual(try Data(contentsOf: detailed.outputURL), inMemory.plaintext)
+        XCTAssertEqual(try Data(contentsOf: detailed.artifact.fileURL), inMemory.plaintext)
         XCTAssertEqual(detailed.verification.legacyStatus, inMemory.verification.legacyStatus)
         assertDetailedEntriesMatchFFI(
             detailed.verification.signatures,
@@ -911,13 +911,13 @@ final class DecryptionServiceTests: XCTestCase {
             phase1: phase1,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: detailed.outputURL) }
+        defer { detailed.artifact.cleanup() }
 
         let inMemory = try await stack.decryptionService.decryptDetailed(
             phase1: makePhase1(matchedKey: recipient, ciphertext: ciphertext)
         )
 
-        XCTAssertEqual(try Data(contentsOf: detailed.outputURL), plaintext)
+        XCTAssertEqual(try Data(contentsOf: detailed.artifact.fileURL), plaintext)
         XCTAssertEqual(detailed.verification, inMemory.verification)
         XCTAssertEqual(detailed.verification.signatures.count, 1)
         XCTAssertEqual(detailed.verification.signatures[0].status, .unknownSigner)
@@ -954,7 +954,7 @@ final class DecryptionServiceTests: XCTestCase {
             phase1: phase1,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: detailed.outputURL) }
+        defer { detailed.artifact.cleanup() }
 
         XCTAssertEqual(detailed.verification.signatures.count, 2)
         XCTAssertEqual(
@@ -981,18 +981,18 @@ final class DecryptionServiceTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: plaintextURL) }
 
-        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+        let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: plaintextURL,
             recipientFingerprints: [recipient.fingerprint],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+        let encryptedURL = encryptedArtifact.fileURL
+        defer { encryptedArtifact.cleanup() }
 
         let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedURL)
-        let expectedOutputURL = expectedDecryptedOutputURL(for: encryptedURL)
-        try? FileManager.default.removeItem(at: expectedOutputURL)
+        try cleanupDecryptedOperationArtifacts()
 
         let progress = FileProgressReporter()
         progress.cancel()
@@ -1010,7 +1010,7 @@ final class DecryptionServiceTests: XCTestCase {
             }
         }
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: expectedOutputURL.path))
+        try assertNoDecryptedOperationArtifacts()
     }
 
     func test_decryptFileStreamingDetailed_profileA_midpointBitFlip_rejectsTamperedFileAndCleansUp()
@@ -1028,14 +1028,15 @@ final class DecryptionServiceTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: plaintextURL) }
 
-        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+        let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: plaintextURL,
             recipientFingerprints: [identity.fingerprint],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+        let encryptedURL = encryptedArtifact.fileURL
+        defer { encryptedArtifact.cleanup() }
 
         var encryptedData = try Data(contentsOf: encryptedURL)
         encryptedData[encryptedData.count / 2] ^= 0x01
@@ -1046,8 +1047,7 @@ final class DecryptionServiceTests: XCTestCase {
             matchedKey: identity,
             inputPath: encryptedURL.path
         )
-        let expectedOutputURL = expectedDecryptedOutputURL(for: encryptedURL)
-        try? FileManager.default.removeItem(at: expectedOutputURL)
+        try cleanupDecryptedOperationArtifacts()
 
         do {
             _ = try await stack.decryptionService.decryptFileStreamingDetailed(
@@ -1066,7 +1066,7 @@ final class DecryptionServiceTests: XCTestCase {
             }
         }
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: expectedOutputURL.path))
+        try assertNoDecryptedOperationArtifacts()
     }
 
     func test_decryptFileStreamingDetailed_profileA_targetedTamper_throwsIntegrityCheckFailedAndCleansUp()
@@ -1084,14 +1084,15 @@ final class DecryptionServiceTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: plaintextURL) }
 
-        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+        let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: plaintextURL,
             recipientFingerprints: [identity.fingerprint],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+        let encryptedURL = encryptedArtifact.fileURL
+        defer { encryptedArtifact.cleanup() }
 
         let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedURL)
         let originalCiphertext = try Data(contentsOf: encryptedURL)
@@ -1105,8 +1106,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
         try targetedCiphertext.write(to: encryptedURL, options: .atomic)
 
-        let expectedOutputURL = expectedDecryptedOutputURL(for: encryptedURL)
-        try? FileManager.default.removeItem(at: expectedOutputURL)
+        try cleanupDecryptedOperationArtifacts()
 
         do {
             _ = try await stack.decryptionService.decryptFileStreamingDetailed(
@@ -1121,7 +1121,7 @@ final class DecryptionServiceTests: XCTestCase {
             }
         }
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: expectedOutputURL.path))
+        try assertNoDecryptedOperationArtifacts()
     }
 
     func test_decryptFileStreamingDetailed_profileB_midpointBitFlip_hardFailsAndCleansUp()
@@ -1139,14 +1139,15 @@ final class DecryptionServiceTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: plaintextURL) }
 
-        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+        let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: plaintextURL,
             recipientFingerprints: [identity.fingerprint],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+        let encryptedURL = encryptedArtifact.fileURL
+        defer { encryptedArtifact.cleanup() }
 
         var encryptedData = try Data(contentsOf: encryptedURL)
         encryptedData[encryptedData.count / 2] ^= 0x01
@@ -1157,8 +1158,7 @@ final class DecryptionServiceTests: XCTestCase {
             matchedKey: identity,
             inputPath: encryptedURL.path
         )
-        let expectedOutputURL = expectedDecryptedOutputURL(for: encryptedURL)
-        try? FileManager.default.removeItem(at: expectedOutputURL)
+        try cleanupDecryptedOperationArtifacts()
 
         do {
             _ = try await stack.decryptionService.decryptFileStreamingDetailed(
@@ -1179,7 +1179,7 @@ final class DecryptionServiceTests: XCTestCase {
             }
         }
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: expectedOutputURL.path))
+        try assertNoDecryptedOperationArtifacts()
     }
 
     // MARK: - H1: High Security Biometrics Blocking
@@ -1267,18 +1267,26 @@ final class DecryptionServiceTests: XCTestCase {
         )
     }
 
-    private func expectedDecryptedOutputURL(for inputURL: URL) -> URL {
+    private func cleanupDecryptedOperationArtifacts() throws {
         let decryptedDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("decrypted", isDirectory: true)
-        let inputFilename = inputURL.lastPathComponent
-        let ext = inputURL.pathExtension.lowercased()
-        let outputFilename: String
-        if ["gpg", "pgp", "asc"].contains(ext) {
-            outputFilename = inputURL.deletingPathExtension().lastPathComponent
-        } else {
-            outputFilename = inputFilename + ".decrypted"
+        guard FileManager.default.fileExists(atPath: decryptedDir.path) else { return }
+        for url in try FileManager.default.contentsOfDirectory(at: decryptedDir, includingPropertiesForKeys: nil)
+            where url.lastPathComponent.hasPrefix("op-") {
+            try? FileManager.default.removeItem(at: url)
         }
-        return decryptedDir.appendingPathComponent(outputFilename)
+    }
+
+    private func assertNoDecryptedOperationArtifacts(
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let decryptedDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("decrypted", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: decryptedDir.path) else { return }
+        let remaining = try FileManager.default.contentsOfDirectory(at: decryptedDir, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("op-") }
+        XCTAssertTrue(remaining.isEmpty, file: file, line: line)
     }
 
     private func assertLegacyVerificationEquivalent(

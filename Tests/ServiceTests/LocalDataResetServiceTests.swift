@@ -150,6 +150,40 @@ final class LocalDataResetServiceTests: XCTestCase {
         XCTAssertEqual(validationEntry.metadata["hasProtectedDataArtifacts"], "false")
     }
 
+    func test_resetAllLocalData_cleansPhase7TemporaryArtifactsAndTutorialDefaultsSuites() async throws {
+        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirResetTemp-\(UUID().uuidString)", isDirectory: true)
+        let store = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
+        let tutorialSuiteName = "com.cypherair.tutorial.\(UUID().uuidString)"
+        let unrelatedSuiteName = "com.cypherair.tests.tutorial.\(UUID().uuidString)"
+        defer {
+            cleanup(container)
+            try? FileManager.default.removeItem(at: temporaryDirectory)
+            UserDefaults(suiteName: tutorialSuiteName)?.removePersistentDomain(forName: tutorialSuiteName)
+            UserDefaults(suiteName: unrelatedSuiteName)?.removePersistentDomain(forName: unrelatedSuiteName)
+        }
+
+        try makePhase7TemporaryArtifacts(in: temporaryDirectory)
+        let tutorialDefaults = try XCTUnwrap(UserDefaults(suiteName: tutorialSuiteName))
+        tutorialDefaults.set("orphan", forKey: "marker")
+        _ = tutorialDefaults.synchronize()
+        let unrelatedDefaults = try XCTUnwrap(UserDefaults(suiteName: unrelatedSuiteName))
+        unrelatedDefaults.set("keep", forKey: "marker")
+        _ = unrelatedDefaults.synchronize()
+
+        let resetService = makeResetService(
+            from: container,
+            temporaryArtifactStore: store
+        )
+
+        _ = try await resetService.resetAllLocalData()
+
+        XCTAssertTrue(store.remainingTemporaryArtifacts().isEmpty)
+        XCTAssertNil(UserDefaults(suiteName: tutorialSuiteName)?.string(forKey: "marker"))
+        XCTAssertEqual(UserDefaults(suiteName: unrelatedSuiteName)?.string(forKey: "marker"), "keep")
+    }
+
     func test_resetAllLocalData_failsWhenRootSecretStillExistsAfterReset() async throws {
         let container = AppContainer.makeUITest(authTraceEnabled: true)
         defer {
@@ -274,7 +308,8 @@ final class LocalDataResetServiceTests: XCTestCase {
 
     private func makeResetService(
         from container: AppContainer,
-        protectedDataRootSecretExists: @escaping () -> Bool
+        temporaryArtifactStore: CypherAir.AppTemporaryArtifactStore? = nil,
+        protectedDataRootSecretExists: @escaping () -> Bool = { false }
     ) -> LocalDataResetService {
         let defaultsSuiteName = container.defaultsSuiteName ?? UUID().uuidString
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
@@ -293,10 +328,30 @@ final class LocalDataResetServiceTests: XCTestCase {
             selfTestService: container.selfTestService,
             protectedDataSessionCoordinator: container.protectedDataSessionCoordinator,
             appSessionOrchestrator: container.appSessionOrchestrator,
+            temporaryArtifactStore: temporaryArtifactStore,
             legacySelfTestReportsDirectory: container.legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: protectedDataRootSecretExists,
             traceStore: container.authLifecycleTraceStore
         )
+    }
+
+    private func makePhase7TemporaryArtifacts(in temporaryDirectory: URL) throws {
+        let decryptedDir = temporaryDirectory.appendingPathComponent("decrypted", isDirectory: true)
+        let streamingDir = temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
+        let exportURL = temporaryDirectory.appendingPathComponent("export-\(UUID().uuidString)-sample.asc")
+        let tutorialDir = temporaryDirectory
+            .appendingPathComponent("CypherAirGuidedTutorial-\(UUID().uuidString)", isDirectory: true)
+
+        try FileManager.default.createDirectory(
+            at: decryptedDir.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: streamingDir.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(at: tutorialDir, withIntermediateDirectories: true)
+        try Data("export".utf8).write(to: exportURL, options: .atomic)
     }
 }
 

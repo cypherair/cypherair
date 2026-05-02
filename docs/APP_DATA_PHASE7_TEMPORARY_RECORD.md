@@ -44,8 +44,8 @@ Current active-guide summary:
 
 - targeted ordinary settings moved into `protected-settings` schema v2; legacy ordinary `UserDefaults` keys are cleanup-only after verified migration
 - self-test reports are in-memory export-only data; legacy `Documents/self-test/` is cleanup-only on startup and Reset All Local Data
-- temporary decrypted, streaming, export, and tutorial files that need final cleanup and file-protection review
-- tutorial-only defaults and sandbox cleanup guarantees
+- temporary decrypted, streaming, export, and tutorial files are implemented as Phase 7 PR 4 `ephemeral-with-cleanup` with verified `.complete` file protection where CypherAir creates the file or directory
+- tutorial-only defaults use current-suite cleanup plus startup/reset prefix sweep for orphaned `com.cypherair.tutorial.<UUID>` suites
 
 ## 4. Restored Surface Notes
 
@@ -59,11 +59,11 @@ These rows are recovered notes, not revalidated implementation decisions.
 | `encryptToSelf` | `protected-after-unlock`, Phase 7, pending, not ready | Current sync read path still exists in Encrypt flow. |
 | `guidedTutorialCompletedVersion` | `protected-after-unlock`, Phase 7, pending, not ready | Current sync read path still exists in tutorial and Settings entry flows. |
 | `Documents/self-test/` | `ephemeral-with-cleanup`, Phase 7 PR 3, implemented as legacy cleanup-only | PR 3 selected the short-lived/export-only model. New self-test reports are held in memory until explicit export, reset, or app exit; no ProtectedData diagnostics domain was added. |
-| `tmp/decrypted/` | `ephemeral-with-cleanup`, Phase 7, partial | Decrypted file previews; cleanup exists in some flows, but file-protection review remains Phase 7 work. |
-| `tmp/streaming/` | `ephemeral-with-cleanup`, Phase 7, partial | Streaming encrypt/decrypt outputs; startup cleanup exists, but file-protection review remains Phase 7 work. |
-| `tmp/export-*` | `ephemeral-with-cleanup`, Phase 7, partial | Temporary fileExporter handoff files; deleted by owner/reset cleanup where possible, with remaining cleanup/file-protection review in Phase 7. |
-| `tmp/CypherAirGuidedTutorial-*` | `ephemeral-with-cleanup`, Phase 7, partial | Tutorial contacts sandbox; isolated from real app data and deleted on tutorial cleanup/reset, with remaining cleanup/file-protection review in Phase 7. |
-| Tutorial `UserDefaults` suite | `ephemeral-with-cleanup`, Phase 7, partial | Tutorial-only settings sandbox; removed on tutorial cleanup, with remaining cleanup review in Phase 7. |
+| `tmp/decrypted/` | `ephemeral-with-cleanup`, Phase 7 PR 4, implemented | Decrypted file previews now live under `tmp/decrypted/op-<UUID>/<sanitized output filename>`. The service creates a unique owner directory for each decrypt operation, applies and verifies `.complete` file protection, and cleans the owner directory on failure, cancellation-after-return, view cleanup, startup, or Reset All Local Data. |
+| `tmp/streaming/` | `ephemeral-with-cleanup`, Phase 7 PR 4, implemented | Streaming encryption outputs now live under `tmp/streaming/op-<UUID>/<sanitized input filename>.gpg`. Ownership is per operation, so repeated same-name operations do not share a path. |
+| `tmp/export-*` | `ephemeral-with-cleanup`, Phase 7 PR 4, implemented | Temporary fileExporter handoff files are written as `tmp/export-<UUID>-<sanitized filename>` with atomic complete file protection, verified after write, owned by `FileExportController`, and deleted by `finish()`, next export, startup, or Reset All Local Data. |
+| `tmp/CypherAirGuidedTutorial-*` | `ephemeral-with-cleanup`, Phase 7 PR 4, implemented | Tutorial contacts sandbox directories are created with verified `.complete` protection and remain isolated from real app data. Current tutorial cleanup, startup cleanup, and Reset All Local Data remove matching directories. |
+| Tutorial `UserDefaults` suite | `ephemeral-with-cleanup`, Phase 7 PR 4, implemented | Current tutorial cleanup removes the active `com.cypherair.tutorial.<UUID>` suite. Startup cleanup and Reset All Local Data enumerate the app Preferences directory for matching `com.cypherair.tutorial.*.plist`, remove those persistent domains, and delete residual plists without a registry. |
 
 ## 5. Restored Constraints
 
@@ -82,5 +82,5 @@ Recovered validation clues for later Phase 7 planning:
 - Protected-after-unlock setting migration must prove that pre-auth startup does not read protected payloads, does not fetch the root-secret Keychain item, and does not weaken or change the selected app-session authentication policy.
 - The `appSessionAuthenticationPolicy` boot authentication profile must stay early-readable unless a future testable design provides a protected value plus boot cache without changing launch authentication strength.
 - PR 3 self-test coverage proves short-lived/export-only report generation plus cleanup semantics for legacy `Documents/self-test/`.
-- Temporary-file tests must cover `tmp/decrypted`, `tmp/streaming`, `tmp/export-*`, and tutorial sandbox cleanup, including relock, reset, and startup cleanup where each surface applies.
+- PR 4 temporary-file coverage proves `tmp/decrypted`, `tmp/streaming`, `tmp/export-*`, `tmp/CypherAirGuidedTutorial-*`, and tutorial defaults cleanup, including owner, reset, startup, protection, same-name, and orphan-suite cases where each surface applies.
 - Migration survivability, startup adoption, and no-silent-reset guarantees belong to Swift unit coverage, plus targeted macOS-local integration validation when startup routing or user-visible recovery flows are part of the scenario.

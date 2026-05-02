@@ -39,9 +39,11 @@ final class TutorialSandboxContainer {
 
     private let defaults: UserDefaults
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
+    private let temporaryArtifactStore: AppTemporaryArtifactStore
     private var didCleanup = false
 
-    init() throws {
+    init(temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()) throws {
+        self.temporaryArtifactStore = temporaryArtifactStore
         self.engine = PgpEngine()
         self.mockSecureEnclave = MockSecureEnclave()
         self.mockKeychain = MockKeychain()
@@ -56,14 +58,12 @@ final class TutorialSandboxContainer {
         self.defaultsSuiteName = suiteName
         self.defaults = defaults
 
-        let contactsDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAirGuidedTutorial-\(UUID().uuidString)", isDirectory: true)
         do {
-            try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
+            let contactsDirectory = try temporaryArtifactStore.makeTutorialSandboxDirectory()
+            self.contactsDirectory = contactsDirectory
         } catch {
             throw TutorialSandboxContainerError.contactsDirectoryCreationFailed
         }
-        self.contactsDirectory = contactsDirectory
 
         self.authManager = AuthenticationManager(
             secureEnclave: mockSecureEnclave,
@@ -100,12 +100,14 @@ final class TutorialSandboxContainer {
         self.encryptionService = EncryptionService(
             engine: engine,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            temporaryArtifactStore: temporaryArtifactStore
         )
         self.decryptionService = DecryptionService(
             engine: engine,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            temporaryArtifactStore: temporaryArtifactStore
         )
         self.signingService = SigningService(
             engine: engine,

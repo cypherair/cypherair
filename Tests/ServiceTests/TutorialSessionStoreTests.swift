@@ -9,6 +9,7 @@ final class TutorialSessionStoreTests: XCTestCase {
         defer { container.cleanup() }
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: container.contactsDirectory.path))
+        try assertCompleteFileProtection(at: container.contactsDirectory)
         XCTAssertTrue(container.defaultsSuiteName.hasPrefix("com.cypherair.tutorial."))
         XCTAssertEqual(container.authManager.currentMode, .standard)
         XCTAssertEqual(container.contactService.contacts.count, 0)
@@ -998,14 +999,31 @@ final class TutorialSessionStoreTests: XCTestCase {
         await startTutorialSession(store)
         let container = try XCTUnwrap(store.container)
         let oldSuite = container.defaultsSuiteName
+        UserDefaults(suiteName: oldSuite)?.set("temporary", forKey: "marker")
+        XCTAssertEqual(UserDefaults(suiteName: oldSuite)?.string(forKey: "marker"), "temporary")
 
         store.finishAndCleanupTutorial()
 
         XCTAssertNil(store.container)
         XCTAssertEqual(store.lifecycleState, .notStarted)
+        XCTAssertNil(UserDefaults(suiteName: oldSuite)?.string(forKey: "marker"))
 
         await startTutorialSession(store)
         XCTAssertNotEqual(store.container?.defaultsSuiteName, oldSuite)
+    }
+
+    private func assertCompleteFileProtection(
+        at url: URL,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        XCTAssertEqual(
+            attributes[.protectionKey] as? FileProtectionType,
+            .complete,
+            file: file,
+            line: line
+        )
     }
 
     private func startTutorialSession(_ store: TutorialSessionStore) async {

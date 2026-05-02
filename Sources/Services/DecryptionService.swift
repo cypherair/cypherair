@@ -35,15 +35,18 @@ final class DecryptionService {
     private let engine: PgpEngine
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
+    private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     init(
         engine: PgpEngine,
         keyManagement: KeyManagementService,
-        contactService: ContactService
+        contactService: ContactService,
+        temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
         self.engine = engine
         self.keyManagement = keyManagement
         self.contactService = contactService
+        self.temporaryArtifactStore = temporaryArtifactStore
     }
 
     // MARK: - Phase 1: Parse Recipients (No Authentication)
@@ -284,7 +287,7 @@ final class DecryptionService {
     func decryptFileStreaming(
         phase1: FilePhase1Result,
         progress: FileProgressReporter?
-    ) async throws -> (outputURL: URL, signature: SignatureVerification) {
+    ) async throws -> (artifact: AppTemporaryArtifact, signature: SignatureVerification) {
         guard let matchedKey = phase1.matchedKey else {
             throw CypherAirError.noMatchingKey
         }
@@ -303,21 +306,8 @@ final class DecryptionService {
         // Gather verification keys (all contacts + own public keys)
         let verificationKeys = allVerificationKeys()
 
-        // Prepare output path in tmp/decrypted/
-        let decryptedDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("decrypted", isDirectory: true)
-        try FileManager.default.createDirectory(at: decryptedDir, withIntermediateDirectories: true)
-
-        // Strip .gpg/.pgp/.asc extension for output filename
         let inputFilename = (phase1.inputPath as NSString).lastPathComponent
-        let outputFilename: String
-        let ext = (inputFilename as NSString).pathExtension.lowercased()
-        if ["gpg", "pgp", "asc"].contains(ext) {
-            outputFilename = (inputFilename as NSString).deletingPathExtension
-        } else {
-            outputFilename = inputFilename + ".decrypted"
-        }
-        let outputURL = decryptedDir.appendingPathComponent(outputFilename)
+        let outputArtifact = try temporaryArtifactStore.makeDecryptedArtifact(for: inputFilename)
 
         // Decrypt via Rust engine (streaming) — off main thread
         let fileResult: FileDecryptResult
@@ -325,14 +315,14 @@ final class DecryptionService {
             fileResult = try await Self.performDecryptFile(
                 engine: engine,
                 inputPath: phase1.inputPath,
-                outputPath: outputURL.path,
+                outputPath: outputArtifact.fileURL.path,
                 secretKeys: [secretKey],
                 verificationKeys: verificationKeys,
                 progress: progress
             )
+            try temporaryArtifactStore.applyAndVerifyCompleteProtection(to: outputArtifact.fileURL)
         } catch {
-            // Clean up partial output on failure
-            try? FileManager.default.removeItem(at: outputURL)
+            outputArtifact.cleanup()
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
@@ -352,7 +342,7 @@ final class DecryptionService {
             signerIdentity: signerIdentity
         )
 
-        return (outputURL: outputURL, signature: sigVerification)
+        return (artifact: outputArtifact, signature: sigVerification)
     }
 
     /// Decrypt a file using streaming I/O while preserving per-signature detailed
@@ -363,7 +353,7 @@ final class DecryptionService {
     func decryptFileStreamingDetailed(
         phase1: FilePhase1Result,
         progress: FileProgressReporter?
-    ) async throws -> (outputURL: URL, verification: DetailedSignatureVerification) {
+    ) async throws -> (artifact: AppTemporaryArtifact, verification: DetailedSignatureVerification) {
         guard let matchedKey = phase1.matchedKey else {
             throw CypherAirError.noMatchingKey
         }
@@ -380,37 +370,27 @@ final class DecryptionService {
 
         let verificationKeys = allVerificationKeys()
 
-        let decryptedDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("decrypted", isDirectory: true)
-        try FileManager.default.createDirectory(at: decryptedDir, withIntermediateDirectories: true)
-
         let inputFilename = (phase1.inputPath as NSString).lastPathComponent
-        let outputFilename: String
-        let ext = (inputFilename as NSString).pathExtension.lowercased()
-        if ["gpg", "pgp", "asc"].contains(ext) {
-            outputFilename = (inputFilename as NSString).deletingPathExtension
-        } else {
-            outputFilename = inputFilename + ".decrypted"
-        }
-        let outputURL = decryptedDir.appendingPathComponent(outputFilename)
+        let outputArtifact = try temporaryArtifactStore.makeDecryptedArtifact(for: inputFilename)
 
         let fileResult: FileDecryptDetailedResult
         do {
             fileResult = try await Self.performDecryptFileDetailed(
                 engine: engine,
                 inputPath: phase1.inputPath,
-                outputPath: outputURL.path,
+                outputPath: outputArtifact.fileURL.path,
                 secretKeys: [secretKey],
                 verificationKeys: verificationKeys,
                 progress: progress
             )
+            try temporaryArtifactStore.applyAndVerifyCompleteProtection(to: outputArtifact.fileURL)
         } catch {
-            try? FileManager.default.removeItem(at: outputURL)
+            outputArtifact.cleanup()
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
         return (
-            outputURL: outputURL,
+            artifact: outputArtifact,
             verification: DetailedSignatureVerification.from(
                 legacyStatus: fileResult.legacyStatus,
                 legacySignerFingerprint: fileResult.legacySignerFingerprint,

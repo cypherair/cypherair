@@ -31,6 +31,7 @@ final class AppContainer: @unchecked Sendable {
     let certificateSignatureService: CertificateSignatureService
     let qrService: QRService
     let selfTestService: SelfTestService
+    let temporaryArtifactStore: AppTemporaryArtifactStore
     let localDataResetService: LocalDataResetService
     let contactsDirectory: URL?
     let legacySelfTestReportsDirectory: URL?
@@ -66,6 +67,7 @@ final class AppContainer: @unchecked Sendable {
         certificateSignatureService: CertificateSignatureService,
         qrService: QRService,
         selfTestService: SelfTestService,
+        temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore(),
         localDataResetService: LocalDataResetService,
         contactsDirectory: URL? = nil,
         legacySelfTestReportsDirectory: URL? = nil,
@@ -100,6 +102,7 @@ final class AppContainer: @unchecked Sendable {
         self.certificateSignatureService = certificateSignatureService
         self.qrService = qrService
         self.selfTestService = selfTestService
+        self.temporaryArtifactStore = temporaryArtifactStore
         self.localDataResetService = localDataResetService
         self.contactsDirectory = contactsDirectory
         self.legacySelfTestReportsDirectory = legacySelfTestReportsDirectory
@@ -366,15 +369,18 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let contactService = ContactService(engine: engine)
+        let temporaryArtifactStore = AppTemporaryArtifactStore()
         let encryptionService = EncryptionService(
             engine: engine,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            temporaryArtifactStore: temporaryArtifactStore
         )
         let decryptionService = DecryptionService(
             engine: engine,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            temporaryArtifactStore: temporaryArtifactStore
         )
         let passwordMessageService = PasswordMessageService(
             engine: engine,
@@ -413,6 +419,7 @@ final class AppContainer: @unchecked Sendable {
             selfTestService: selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
+            temporaryArtifactStore: temporaryArtifactStore,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
@@ -450,6 +457,7 @@ final class AppContainer: @unchecked Sendable {
             certificateSignatureService: certificateSignatureService,
             qrService: qrService,
             selfTestService: selfTestService,
+            temporaryArtifactStore: temporaryArtifactStore,
             localDataResetService: localDataResetService,
             contactsDirectory: contactsDirectory,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory
@@ -719,15 +727,18 @@ final class AppContainer: @unchecked Sendable {
             engine: engine,
             contactsDirectory: contactsDirectory
         )
+        let temporaryArtifactStore = AppTemporaryArtifactStore()
         let encryptionService = EncryptionService(
             engine: engine,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            temporaryArtifactStore: temporaryArtifactStore
         )
         let decryptionService = DecryptionService(
             engine: engine,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            temporaryArtifactStore: temporaryArtifactStore
         )
         let passwordMessageService = PasswordMessageService(
             engine: engine,
@@ -761,6 +772,7 @@ final class AppContainer: @unchecked Sendable {
             selfTestService: selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
+            temporaryArtifactStore: temporaryArtifactStore,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
@@ -801,6 +813,7 @@ final class AppContainer: @unchecked Sendable {
             certificateSignatureService: certificateSignatureService,
             qrService: qrService,
             selfTestService: selfTestService,
+            temporaryArtifactStore: temporaryArtifactStore,
             localDataResetService: localDataResetService,
             contactsDirectory: contactsDirectory,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,

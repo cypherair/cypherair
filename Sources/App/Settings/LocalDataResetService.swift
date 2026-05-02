@@ -35,6 +35,7 @@ final class LocalDataResetService {
     private let appSessionOrchestrator: AppSessionOrchestrator
     private let fileManager: FileManager
     private let legacySelfTestReportsDirectory: URL
+    private let temporaryArtifactStore: AppTemporaryArtifactStore
     private let protectedDataRootSecretExists: () -> Bool
     private let traceStore: AuthLifecycleTraceStore?
 
@@ -53,6 +54,7 @@ final class LocalDataResetService {
         selfTestService: SelfTestService? = nil,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         appSessionOrchestrator: AppSessionOrchestrator,
+        temporaryArtifactStore: AppTemporaryArtifactStore? = nil,
         fileManager: FileManager = .default,
         legacySelfTestReportsDirectory: URL? = nil,
         protectedDataRootSecretExists: (() -> Bool)? = nil,
@@ -73,6 +75,7 @@ final class LocalDataResetService {
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.appSessionOrchestrator = appSessionOrchestrator
         self.fileManager = fileManager
+        self.temporaryArtifactStore = temporaryArtifactStore ?? AppTemporaryArtifactStore(fileManager: fileManager)
         self.legacySelfTestReportsDirectory = legacySelfTestReportsDirectory
             ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("self-test", isDirectory: true)
@@ -479,65 +482,18 @@ final class LocalDataResetService {
         _ removedDirectoryCount: inout Int,
         failures: inout [String]
     ) {
-        let temporaryDirectory = fileManager.temporaryDirectory
-        let fixedDirectories = [
-            temporaryDirectory.appendingPathComponent("decrypted", isDirectory: true),
-            temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
-        ]
+        let temporaryCleanup = temporaryArtifactStore.cleanupTemporaryArtifacts()
+        removedDirectoryCount += temporaryCleanup.removedItemCount
+        failures.append(contentsOf: temporaryCleanup.failures.map { "temporary.\($0)" })
 
-        for directory in fixedDirectories {
-            removedDirectoryCount += removeDirectoryIfPresent(
-                directory,
-                failurePrefix: "temporary",
-                failures: &failures
-            )
-        }
-
-        guard let contents = try? fileManager.contentsOfDirectory(
-            at: temporaryDirectory,
-            includingPropertiesForKeys: nil
-        ) else {
-            return
-        }
-
-        for url in contents where shouldRemoveTemporaryItem(url) {
-            do {
-                try fileManager.removeItem(at: url)
-                removedDirectoryCount += 1
-            } catch {
-                failures.append("temporary.\(url.lastPathComponent).\(String(describing: type(of: error)))")
-            }
-        }
-    }
-
-    private func shouldRemoveTemporaryItem(_ url: URL) -> Bool {
-        let name = url.lastPathComponent
-        return name.hasPrefix("export-")
-            || name.hasPrefix("CypherAirGuidedTutorial-")
+        let tutorialDefaultsCleanup = temporaryArtifactStore.cleanupTutorialDefaultsSuites()
+        removedDirectoryCount += tutorialDefaultsCleanup.removedItemCount
+        failures.append(contentsOf: tutorialDefaultsCleanup.failures.map { "tutorialDefaults.\($0)" })
     }
 
     private func temporaryResetTargetsRemaining() -> [String] {
-        let temporaryDirectory = fileManager.temporaryDirectory
-        var remaining: [String] = []
-
-        for name in ["decrypted", "streaming"] {
-            let directory = temporaryDirectory.appendingPathComponent(name, isDirectory: true)
-            if fileManager.fileExists(atPath: directory.path) {
-                remaining.append(name)
-            }
-        }
-
-        guard let contents = try? fileManager.contentsOfDirectory(
-            at: temporaryDirectory,
-            includingPropertiesForKeys: nil
-        ) else {
-            return remaining
-        }
-
-        for url in contents where shouldRemoveTemporaryItem(url) {
-            remaining.append(url.lastPathComponent)
-        }
-        return remaining
+        temporaryArtifactStore.remainingTemporaryArtifacts()
+            + temporaryArtifactStore.remainingTutorialDefaultsSuites()
     }
 
     private static func isItemNotFound(_ error: Error) -> Bool {

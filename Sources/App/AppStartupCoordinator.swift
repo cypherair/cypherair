@@ -102,6 +102,7 @@ struct AppStartupCoordinator {
 
         traceStore?.record(category: .lifecycle, name: "startup.temporaryCleanup.start")
         cleanupTemporaryFiles(
+            temporaryArtifactStore: container.temporaryArtifactStore,
             legacySelfTestReportsDirectory: container.legacySelfTestReportsDirectory
         )
         traceStore?.record(category: .lifecycle, name: "startup.temporaryCleanup.finish")
@@ -129,20 +130,13 @@ struct AppStartupCoordinator {
 
     func cleanupTemporaryFiles(
         fileManager: FileManager = .default,
+        temporaryArtifactStore: AppTemporaryArtifactStore? = nil,
         documentDirectory: URL? = nil,
         legacySelfTestReportsDirectory: URL? = nil
     ) {
-        let decryptedDir = fileManager.temporaryDirectory
-            .appendingPathComponent("decrypted", isDirectory: true)
-        if fileManager.fileExists(atPath: decryptedDir.path) {
-            try? fileManager.removeItem(at: decryptedDir)
-        }
-
-        let streamingDir = fileManager.temporaryDirectory
-            .appendingPathComponent("streaming", isDirectory: true)
-        if fileManager.fileExists(atPath: streamingDir.path) {
-            try? fileManager.removeItem(at: streamingDir)
-        }
+        let artifactStore = temporaryArtifactStore ?? AppTemporaryArtifactStore(fileManager: fileManager)
+        _ = artifactStore.cleanupTemporaryArtifacts()
+        _ = artifactStore.cleanupTutorialDefaultsSuites()
 
         let selfTestDir = legacySelfTestReportsDirectory
             ?? legacySelfTestReportDirectory(

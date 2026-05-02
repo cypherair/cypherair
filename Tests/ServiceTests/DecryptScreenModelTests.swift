@@ -472,7 +472,7 @@ final class DecryptScreenModelTests: XCTestCase {
             fileDecryptionAction: { url, phase1, _ in
                 XCTAssertEqual(url, inputURL)
                 XCTAssertEqual(phase1.inputPath, inputURL.path)
-                return (outputURL, detailedVerification)
+                return (CypherAir.AppTemporaryArtifact(fileURL: outputURL), detailedVerification)
             }
         )
         model.decryptMode = .file
@@ -524,7 +524,7 @@ final class DecryptScreenModelTests: XCTestCase {
                 _ = progress.onProgress(bytesProcessed: 5, totalBytes: 10)
                 await gate.suspend()
                 try Task.checkCancellation()
-                return (inputURL, self.makeDetailedVerification(status: .valid))
+                return (CypherAir.AppTemporaryArtifact(fileURL: inputURL), self.makeDetailedVerification(status: .valid))
             }
         )
         model.decryptMode = .file
@@ -557,6 +557,56 @@ final class DecryptScreenModelTests: XCTestCase {
 
         XCTAssertNil(model.decryptedFileURL)
         XCTAssertNil(model.operation.progress)
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
+    func test_decryptFile_cancellationAfterServiceSuccess_cleansUnpublishedOutput() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+        let operation = OperationController()
+        let inputURL = try makeTemporaryFile(
+            named: "cancel-after-success.gpg",
+            contents: Data("cipher".utf8)
+        )
+        let outputURL = try makeTemporaryFile(
+            named: "cancel-after-success",
+            contents: Data("plaintext".utf8)
+        )
+        defer {
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+
+        let model = makeModel(
+            operation: operation,
+            fileDecryptionAction: { _, _, _ in
+                operation.cancel()
+                return (
+                    CypherAir.AppTemporaryArtifact(fileURL: outputURL),
+                    self.makeDetailedVerification(status: .valid)
+                )
+            }
+        )
+        model.decryptMode = .file
+        model.selectedFileURL = inputURL
+        model.selectedFileName = inputURL.lastPathComponent
+        model.filePhase1Result = makeFilePhase1Result(
+            matchedKey: identity,
+            inputURL: inputURL
+        )
+
+        model.decryptFile()
+
+        await waitUntil("cancelled after service success") {
+            model.operation.isRunning == false
+        }
+
+        XCTAssertNil(model.decryptedFileURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
+        XCTAssertNil(model.signatureVerification)
         XCTAssertFalse(model.operation.isShowingError)
     }
 
