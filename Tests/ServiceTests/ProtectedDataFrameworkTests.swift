@@ -31,6 +31,8 @@ private typealias AppMockProtectedDataRootSecretStore = CypherAir.MockProtectedD
 private typealias AppPrivacyScreenLifecycleGate = CypherAir.PrivacyScreenLifecycleGate
 private typealias AppPendingRecoveryOutcome = CypherAir.PendingRecoveryOutcome
 private typealias AppWrappedDomainMasterKeyRecord = CypherAir.WrappedDomainMasterKeyRecord
+private typealias AppProtectedOrdinarySettingsCoordinator = CypherAir.ProtectedOrdinarySettingsCoordinator
+private typealias AppLegacyOrdinarySettingsStore = CypherAir.LegacyOrdinarySettingsStore
 
 private final class MockProtectedDataPersistedRightHandle: AppProtectedDataPersistedRightHandle {
     let identifier: String
@@ -1312,6 +1314,13 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             authenticationPromptCoordinator: authPromptCoordinator
         )
         let config = AppConfiguration(defaults: defaults)
+        let protectedOrdinarySettingsCoordinator = AppProtectedOrdinarySettingsCoordinator(
+            persistence: AppLegacyOrdinarySettingsStore(defaults: defaults)
+        )
+        protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
+        authManager.configureGracePeriodProvider {
+            protectedOrdinarySettingsCoordinator.gracePeriodForSession
+        }
         let protectedDataBaseDirectory = makeTemporaryDirectory("ProtectedDataStartup")
         let contactsDirectory = makeTemporaryDirectory("ProtectedDataStartupContacts")
         defer { try? FileManager.default.removeItem(at: protectedDataBaseDirectory) }
@@ -1366,7 +1375,9 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 try recoveryCoordinator.loadCurrentRegistry()
             },
             shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { config.gracePeriod },
+            gracePeriodProvider: {
+                protectedOrdinarySettingsCoordinator.gracePeriodForSession
+            },
             evaluateAppAuthentication: { reason in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
@@ -1420,6 +1431,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             defaults: defaults,
             defaultsDomainName: defaultsSuiteName,
             config: config,
+            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             authManager: authManager,
             keyManagement: keyManagement,
             contactService: contactService,
@@ -1434,6 +1446,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             keychain: keychain,
             authManager: authManager,
             config: config,
+            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             protectedDataStorageRoot: storageRoot,
             protectedDataRegistryStore: registryStore,
             protectedDomainKeyManager: domainKeyManager,

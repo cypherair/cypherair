@@ -15,7 +15,7 @@ struct ContentView: View {
 
 #if os(macOS)
 struct MacAppShellView: View {
-    @Environment(AppConfiguration.self) private var config
+    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
 
     let tutorialLaunchRelay: MacTutorialLaunchRelay
     let tutorialHostAvailability: MacTutorialHostAvailability
@@ -57,11 +57,19 @@ struct MacAppShellView: View {
             tutorialHostAvailability: tutorialHostAvailability
         )
         .task {
-            if !config.hasCompletedOnboarding,
-               navigationState.activePresentation == nil {
-                navigationState.activePresentation = .onboarding(initialPage: 0)
-            }
+            presentOnboardingIfNeeded()
         }
+        .onChange(of: protectedOrdinarySettings.state) { _, _ in
+            presentOnboardingIfNeeded()
+        }
+    }
+
+    private func presentOnboardingIfNeeded() {
+        guard protectedOrdinarySettings.hasCompletedOnboarding == false,
+              navigationState.activePresentation == nil else {
+            return
+        }
+        navigationState.activePresentation = .onboarding(initialPage: 0)
     }
 
     private func sidebarRow(_ tab: AppShellTab) -> some View {

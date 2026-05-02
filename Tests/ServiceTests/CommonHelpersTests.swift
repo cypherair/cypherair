@@ -1049,6 +1049,13 @@ final class CommonHelpersTests: XCTestCase {
             privateKeyControlStore: keyManagementPrivateKeyControlStore
         )
         let config = AppConfiguration(defaults: defaults)
+        let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+        )
+        protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
+        authManager.configureGracePeriodProvider {
+            protectedOrdinarySettingsCoordinator.gracePeriodForSession
+        }
         let contactDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirStartupTests-\(UUID().uuidString)", isDirectory: true)
         let protectedDataBaseDirectory = FileManager.default.temporaryDirectory
@@ -1107,7 +1114,9 @@ final class CommonHelpersTests: XCTestCase {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
             },
             shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { config.gracePeriod },
+            gracePeriodProvider: {
+                protectedOrdinarySettingsCoordinator.gracePeriodForSession
+            },
             evaluateAppAuthentication: { reason in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
@@ -1152,6 +1161,7 @@ final class CommonHelpersTests: XCTestCase {
             defaults: defaults,
             defaultsDomainName: suiteName,
             config: config,
+            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             authManager: authManager,
             keyManagement: keyManagement,
             contactService: contactService,
@@ -1166,6 +1176,7 @@ final class CommonHelpersTests: XCTestCase {
             keychain: mockKC,
             authManager: authManager,
             config: config,
+            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             protectedDataStorageRoot: protectedDataStorageRoot,
             protectedDataRegistryStore: protectedDataRegistryStore,
             protectedDomainKeyManager: protectedDomainKeyManager,

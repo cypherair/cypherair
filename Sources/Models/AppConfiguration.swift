@@ -10,8 +10,7 @@ enum GuidedTutorialCompletionState: Equatable {
     case completedPreviousVersion
 }
 
-/// App-wide configuration stored in UserDefaults.
-/// Uses the key names defined in ARCHITECTURE.md Section 5.
+/// App-wide boot-safe configuration stored in UserDefaults.
 @Observable
 final class AppConfiguration {
     private let defaults: UserDefaults
@@ -38,46 +37,6 @@ final class AppConfiguration {
         }
     }
 
-    /// Grace period in seconds before re-authentication is required.
-    /// Valid values: 0, 60, 180, 300.
-    var gracePeriod: Int {
-        didSet {
-            let validValues = Self.gracePeriodOptions.map { $0.value }
-            if !validValues.contains(gracePeriod) {
-                gracePeriod = AuthPreferences.defaultGracePeriod
-            }
-            defaults.set(gracePeriod, forKey: AuthPreferences.gracePeriodKey)
-        }
-    }
-
-    /// Whether to encrypt messages to self by default.
-    var encryptToSelf: Bool {
-        didSet {
-            defaults.set(encryptToSelf, forKey: Self.encryptToSelfKey)
-        }
-    }
-
-    /// Whether the user has completed onboarding.
-    var hasCompletedOnboarding: Bool {
-        didSet {
-            defaults.set(hasCompletedOnboarding, forKey: Self.onboardingCompleteKey)
-        }
-    }
-
-    /// The latest Guided Tutorial version the user has completed.
-    var guidedTutorialCompletedVersion: Int {
-        didSet {
-            defaults.set(guidedTutorialCompletedVersion, forKey: Self.guidedTutorialCompletedVersionKey)
-        }
-    }
-
-    /// The selected color theme preset.
-    var colorTheme: ColorTheme {
-        didSet {
-            defaults.set(colorTheme.rawValue, forKey: Self.colorThemeKey)
-        }
-    }
-
     /// Incremented when decrypted content should be cleared (e.g., grace period expired).
     var contentClearGeneration: Int = 0
 
@@ -91,13 +50,9 @@ final class AppConfiguration {
 
     // MARK: - UserDefaults Keys
 
-    static let encryptToSelfKey = "com.cypherair.preference.encryptToSelf"
     static let clipboardNoticeLegacyKey = "com.cypherair.preference.clipboardNotice"
     static let appSessionAuthenticationPolicyKey = "com.cypherair.preference.appSessionAuthenticationPolicy"
     private static let legacyRequireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
-    private static let onboardingCompleteKey = "com.cypherair.preference.onboardingComplete"
-    private static let guidedTutorialCompletedVersionKey = "com.cypherair.preference.guidedTutorialCompletedVersion"
-    private static let colorThemeKey = "com.cypherair.preference.colorTheme"
 
     // MARK: - Initialization
 
@@ -108,37 +63,6 @@ final class AppConfiguration {
             ?? AppSessionAuthenticationPolicy.userPresence.rawValue
         self.appSessionAuthenticationPolicy = AppSessionAuthenticationPolicy(rawValue: appSessionPolicyString)
             ?? .userPresence
-
-        // Grace period (default 180s = 3 minutes)
-        let storedGrace = defaults.object(forKey: AuthPreferences.gracePeriodKey) as? Int
-        self.gracePeriod = storedGrace ?? AuthPreferences.defaultGracePeriod
-
-        // Encrypt to self (default true)
-        if defaults.object(forKey: Self.encryptToSelfKey) != nil {
-            self.encryptToSelf = defaults.bool(forKey: Self.encryptToSelfKey)
-        } else {
-            self.encryptToSelf = true
-        }
-
-        // Onboarding
-        self.hasCompletedOnboarding = defaults.bool(forKey: Self.onboardingCompleteKey)
-
-        // Guided Tutorial completion
-        self.guidedTutorialCompletedVersion = defaults.integer(forKey: Self.guidedTutorialCompletedVersionKey)
-
-        // Color theme (default: system accent — no tint override)
-        if let themeRaw = defaults.string(forKey: Self.colorThemeKey),
-           let theme = ColorTheme(rawValue: themeRaw) {
-            self.colorTheme = theme
-        } else {
-            self.colorTheme = .systemDefault
-        }
-    }
-
-    /// Check if the grace period has expired since last authentication.
-    var isGracePeriodExpired: Bool {
-        guard let lastAuth = lastAuthenticationDate else { return true }
-        return Date().timeIntervalSince(lastAuth) > TimeInterval(gracePeriod)
     }
 
     /// Record a successful authentication.
@@ -146,40 +70,9 @@ final class AppConfiguration {
         lastAuthenticationDate = Date()
     }
 
-    var guidedTutorialCompletionState: GuidedTutorialCompletionState {
-        if guidedTutorialCompletedVersion >= GuidedTutorialVersion.current {
-            return .completedCurrentVersion
-        }
-        if guidedTutorialCompletedVersion > 0 {
-            return .completedPreviousVersion
-        }
-        return .neverCompleted
-    }
-
-    var hasCompletedCurrentGuidedTutorialVersion: Bool {
-        guidedTutorialCompletionState == .completedCurrentVersion
-    }
-
-    var hasCompletedPreviousGuidedTutorialVersion: Bool {
-        guidedTutorialCompletionState == .completedPreviousVersion
-    }
-
-    var hasNeverCompletedGuidedTutorial: Bool {
-        guidedTutorialCompletionState == .neverCompleted
-    }
-
-    func markGuidedTutorialCompletedCurrentVersion() {
-        guidedTutorialCompletedVersion = GuidedTutorialVersion.current
-    }
-
     func resetToFirstRunDefaults() {
         privateKeyControlState = .locked
         appSessionAuthenticationPolicy = .userPresence
-        gracePeriod = AuthPreferences.defaultGracePeriod
-        encryptToSelf = true
-        hasCompletedOnboarding = false
-        guidedTutorialCompletedVersion = 0
-        colorTheme = .systemDefault
         contentClearGeneration += 1
         lastAuthenticationDate = nil
 
@@ -198,20 +91,15 @@ final class AppConfiguration {
 
     private static var resetPersistentKeys: [String] {
         [
-            encryptToSelfKey,
             clipboardNoticeLegacyKey,
             appSessionAuthenticationPolicyKey,
             legacyRequireAuthOnLaunchKey,
-            onboardingCompleteKey,
-            guidedTutorialCompletedVersionKey,
-            colorThemeKey,
             AuthPreferences.authModeKey,
-            AuthPreferences.gracePeriodKey,
             AuthPreferences.rewrapInProgressKey,
             AuthPreferences.rewrapTargetModeKey,
             AuthPreferences.modifyExpiryInProgressKey,
             AuthPreferences.modifyExpiryFingerprintKey,
             "com.cypherair.preference.uiTestBypassAuthentication"
-        ]
+        ] + LegacyOrdinarySettingsStore.persistentKeys
     }
 }

@@ -29,6 +29,7 @@ struct SettingsView: View {
     }
 
     @Environment(AppConfiguration.self) private var config
+    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(AuthenticationManager.self) private var authManager
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.iosPresentationController) private var iosPresentationController
@@ -46,6 +47,7 @@ struct SettingsView: View {
     var body: some View {
         SettingsScreenHostView(
             config: config,
+            protectedOrdinarySettings: protectedOrdinarySettings,
             authManager: authManager,
             keyManagement: keyManagement,
             iosPresentationController: iosPresentationController,
@@ -85,6 +87,7 @@ private struct SettingsScreenHostView: View {
 
     init(
         config: AppConfiguration,
+        protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
         authManager: AuthenticationManager,
         keyManagement: KeyManagementService,
         iosPresentationController: IOSPresentationController?,
@@ -97,6 +100,7 @@ private struct SettingsScreenHostView: View {
         _model = State(
             initialValue: SettingsScreenModel(
                 config: config,
+                protectedOrdinarySettings: protectedOrdinarySettings,
                 authManager: authManager,
                 keyManagement: keyManagement,
                 iosPresentationController: iosPresentationController,
@@ -155,12 +159,16 @@ private struct SettingsScreenHostView: View {
 
                 Picker(
                     String(localized: "settings.gracePeriod", defaultValue: "Re-authentication"),
-                    selection: $appConfiguration.gracePeriod
+                    selection: Binding(
+                        get: { model.gracePeriodSelection },
+                        set: { model.setGracePeriod($0) }
+                    )
                 ) {
                     ForEach(AppConfiguration.gracePeriodOptions, id: \.value) { option in
                         Text(option.label).tag(option.value)
                     }
                 }
+                .disabled(!model.isProtectedOrdinarySettingsEditable)
             } header: {
                 Text(String(localized: "settings.security", defaultValue: "Security"))
             }
@@ -168,8 +176,12 @@ private struct SettingsScreenHostView: View {
             Section {
                 Toggle(
                     String(localized: "settings.encryptToSelf", defaultValue: "Encrypt to Self"),
-                    isOn: $appConfiguration.encryptToSelf
+                    isOn: Binding(
+                        get: { model.encryptToSelfSelection },
+                        set: { model.setEncryptToSelf($0) }
+                    )
                 )
+                .disabled(!model.isProtectedOrdinarySettingsEditable)
             } header: {
                 Text(String(localized: "settings.encryption", defaultValue: "Encryption"))
             }
@@ -190,7 +202,10 @@ private struct SettingsScreenHostView: View {
                     )
                 }
                 .accessibilityIdentifier("settings.theme")
-                .disabled(!model.configuration.isThemePickerEnabled)
+                .disabled(
+                    !model.configuration.isThemePickerEnabled
+                        || !model.isProtectedOrdinarySettingsEditable
+                )
 
                 #if os(iOS)
                 NavigationLink(value: AppRoute.appIcon) {
@@ -240,7 +255,10 @@ private struct SettingsScreenHostView: View {
                 }
                 .accessibilityIdentifier("settings.tutorial")
                 .buttonStyle(.plain)
-                .disabled(!model.configuration.isGuidedTutorialEntryEnabled)
+                .disabled(
+                    !model.configuration.isGuidedTutorialEntryEnabled
+                        || !model.isProtectedOrdinarySettingsEditable
+                )
 
                 NavigationLink(value: AppRoute.license) {
                     Label(

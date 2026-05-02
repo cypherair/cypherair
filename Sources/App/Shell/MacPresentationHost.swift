@@ -8,6 +8,7 @@ private struct MacPresentationHostModifier: ViewModifier {
     let onTutorialLaunchBlocked: @MainActor (MacTutorialHostBlocker) -> Void
 
     @Environment(AppConfiguration.self) private var config
+    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(TutorialSessionStore.self) private var tutorialStore
     @Environment(\.openWindow) private var openWindow
 
@@ -115,6 +116,7 @@ private struct MacPresentationHostModifier: ViewModifier {
         case .onboarding(let initialPage):
             OnboardingView(initialPage: initialPage)
                 .environment(config)
+                .environment(protectedOrdinarySettings)
                 .environment(tutorialStore)
                 .environment(\.macPresentationController, macPresentationControllerValue)
         case .tutorial(let presentationContext):
@@ -125,6 +127,7 @@ private struct MacPresentationHostModifier: ViewModifier {
                 }
             )
             .environment(config)
+            .environment(protectedOrdinarySettings)
             .environment(tutorialStore)
             .environment(\.macPresentationController, macPresentationControllerValue)
         case .importConfirmation, .authModeConfirmation, .modifyExpiry:

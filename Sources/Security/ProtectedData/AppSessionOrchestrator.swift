@@ -6,9 +6,10 @@ final class AppSessionOrchestrator {
     private let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     private let currentRegistryProvider: () throws -> ProtectedDataRegistry
     private let shouldBypassPrivacyAuthentication: () -> Bool
-    private let gracePeriodProvider: () -> Int
+    private let gracePeriodProvider: () -> Int?
     private let evaluateAppAuthentication: (String, String) async throws -> AppSessionAuthenticationResult
     private let postAuthenticationHandler: (LAContext?, String) async -> Void
+    private let contentClearHandler: () -> Void
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
 
@@ -27,9 +28,10 @@ final class AppSessionOrchestrator {
     convenience init(
         currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry,
         shouldBypassPrivacyAuthentication: @escaping () -> Bool = { false },
-        gracePeriodProvider: @escaping () -> Int,
+        gracePeriodProvider: @escaping () -> Int?,
         evaluateAppAuthentication: @escaping (String) async throws -> AppSessionAuthenticationResult,
         postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
+        contentClearHandler: @escaping () -> Void = {},
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil
@@ -42,6 +44,7 @@ final class AppSessionOrchestrator {
                 try await evaluateAppAuthentication(reason)
             },
             postAuthenticationHandler: postAuthenticationHandler,
+            contentClearHandler: contentClearHandler,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
             traceStore: traceStore
@@ -51,9 +54,10 @@ final class AppSessionOrchestrator {
     init(
         currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry,
         shouldBypassPrivacyAuthentication: @escaping () -> Bool = { false },
-        gracePeriodProvider: @escaping () -> Int,
+        gracePeriodProvider: @escaping () -> Int?,
         evaluateAppAuthenticationWithSource: @escaping (String, String) async throws -> AppSessionAuthenticationResult,
         postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
+        contentClearHandler: @escaping () -> Void = {},
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil
@@ -63,6 +67,7 @@ final class AppSessionOrchestrator {
         self.gracePeriodProvider = gracePeriodProvider
         self.evaluateAppAuthentication = evaluateAppAuthenticationWithSource
         self.postAuthenticationHandler = postAuthenticationHandler
+        self.contentClearHandler = contentClearHandler
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
@@ -82,6 +87,7 @@ final class AppSessionOrchestrator {
         clearAuthenticationSettleBlur()
         clearAuthenticationFailure()
         discardPendingAuthenticatedContext(reason: "contentClear")
+        contentClearHandler()
         contentClearGeneration += 1
         traceStore?.record(
             category: .session,
@@ -129,7 +135,7 @@ final class AppSessionOrchestrator {
         guard let lastAuthenticationDate else {
             return true
         }
-        return Date().timeIntervalSince(lastAuthenticationDate) > TimeInterval(gracePeriodProvider())
+        return Date().timeIntervalSince(lastAuthenticationDate) > TimeInterval(effectiveGracePeriod())
     }
 
     @discardableResult
@@ -256,13 +262,16 @@ final class AppSessionOrchestrator {
             return false
         }
 
-        if gracePeriodProvider() == 0 || isGracePeriodExpired {
+        let gracePeriod = effectiveGracePeriod()
+        let graceExpired = isGracePeriodExpired
+        if gracePeriod == 0 || graceExpired {
             traceStore?.record(
                 category: .session,
                 name: "session.handleResume.reauthRequired",
                 metadata: [
-                    "gracePeriod": String(gracePeriodProvider()),
-                    "graceExpired": isGracePeriodExpired ? "true" : "false",
+                    "gracePeriod": String(gracePeriod),
+                    "graceAvailable": gracePeriodProvider() == nil ? "false" : "true",
+                    "graceExpired": graceExpired ? "true" : "false",
                     "source": source
                 ]
             )
@@ -377,6 +386,10 @@ final class AppSessionOrchestrator {
             name: name,
             metadata: mergedMetadata
         )
+    }
+
+    private func effectiveGracePeriod() -> Int {
+        gracePeriodProvider() ?? 0
     }
 
     func handleAuthenticationSettleInactive(source: String = "authenticationSettle") {

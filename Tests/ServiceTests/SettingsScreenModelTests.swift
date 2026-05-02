@@ -12,6 +12,7 @@ private struct SettingsScreenModelTestError: LocalizedError {
 final class SettingsScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
     private var config: AppConfiguration!
+    private var protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator!
     private var authManager: AuthenticationManager!
     private var privateKeyControlStore: InMemoryPrivateKeyControlStore!
     private var defaultsSuiteName: String!
@@ -23,6 +24,10 @@ final class SettingsScreenModelTests: XCTestCase {
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         config = AppConfiguration(defaults: defaults)
+        protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
+            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+        )
+        protectedOrdinarySettings.loadForAuthenticatedTestBypass()
         config.privateKeyControlState = .unlocked(.standard)
         authManager = AuthenticationManager(
             secureEnclave: stack.mockSE,
@@ -41,6 +46,7 @@ final class SettingsScreenModelTests: XCTestCase {
         stack.cleanup()
         stack = nil
         config = nil
+        protectedOrdinarySettings = nil
         authManager = nil
         privateKeyControlStore = nil
         defaultsSuiteName = nil
@@ -1373,6 +1379,7 @@ final class SettingsScreenModelTests: XCTestCase {
     ) -> SettingsScreenModel {
         SettingsScreenModel(
             config: config,
+            protectedOrdinarySettings: protectedOrdinarySettings,
             authManager: authManager,
             keyManagement: stack.keyManagement,
             iosPresentationController: iosPresentationController,

@@ -3,8 +3,6 @@ import SwiftUI
 /// Three-page onboarding flow shown on first launch.
 /// Can be re-viewed from Settings.
 struct OnboardingView: View {
-    @Environment(AppConfiguration.self) private var config
-
     let presentationContext: OnboardingPresentationContext
     @State private var currentPage: Int
 
@@ -125,7 +123,7 @@ struct OnboardingPageTwo: View {
 
 /// Page 3: Generate Key CTA
 struct OnboardingPageThree: View {
-    @Environment(AppConfiguration.self) private var config
+    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(\.dismiss) private var dismiss
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
@@ -178,7 +176,7 @@ struct OnboardingPageThree: View {
     }
 
     private func presentTutorial() {
-        config.hasCompletedOnboarding = true
+        protectedOrdinarySettings.setHasCompletedOnboarding(true)
         #if os(iOS)
         if let iosPresentationController {
             iosPresentationController.handoffToTutorialAfterOnboardingDismiss(.onboardingFirstRun)
@@ -195,7 +193,7 @@ struct OnboardingPageThree: View {
     }
 
     private func skipTutorial() {
-        config.hasCompletedOnboarding = true
+        protectedOrdinarySettings.setHasCompletedOnboarding(true)
         if let macPresentationController {
             macPresentationController.dismiss()
         } else if let iosPresentationController {

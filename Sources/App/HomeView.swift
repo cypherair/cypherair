@@ -3,7 +3,7 @@ import SwiftUI
 /// Home screen with quick-access actions for core operations.
 struct HomeView: View {
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppConfiguration.self) private var config
+    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(\.appRouteNavigator) private var routeNavigator
     var body: some View {
         content
@@ -122,27 +122,27 @@ struct HomeView: View {
             actionButton(
                 title: String(localized: "home.encrypt", defaultValue: "Encrypt"),
                 icon: "lock.fill",
-                tint: config.colorTheme.actionColors.encrypt,
+                tint: protectedOrdinarySettings.colorTheme.actionColors.encrypt,
                 route: .encrypt,
                 anchor: .homeEncryptAction
             )
             actionButton(
                 title: String(localized: "home.decrypt", defaultValue: "Decrypt"),
                 icon: "lock.open.fill",
-                tint: config.colorTheme.actionColors.decrypt,
+                tint: protectedOrdinarySettings.colorTheme.actionColors.decrypt,
                 route: .decrypt,
                 anchor: .homeDecryptAction
             )
             actionButton(
                 title: String(localized: "home.sign", defaultValue: "Sign"),
                 icon: "signature",
-                tint: config.colorTheme.actionColors.sign,
+                tint: protectedOrdinarySettings.colorTheme.actionColors.sign,
                 route: .sign
             )
             actionButton(
                 title: String(localized: "home.verify", defaultValue: "Verify"),
                 icon: "checkmark.seal",
-                tint: config.colorTheme.actionColors.verify,
+                tint: protectedOrdinarySettings.colorTheme.actionColors.verify,
                 route: .verify
             )
         }

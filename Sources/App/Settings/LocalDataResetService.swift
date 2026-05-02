@@ -26,6 +26,7 @@ final class LocalDataResetService {
     private let defaults: UserDefaults
     private let defaultsDomainName: String?
     private let config: AppConfiguration
+    private let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
     private let authManager: AuthenticationManager
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
@@ -43,6 +44,7 @@ final class LocalDataResetService {
         defaults: UserDefaults,
         defaultsDomainName: String?,
         config: AppConfiguration,
+        protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator,
         authManager: AuthenticationManager,
         keyManagement: KeyManagementService,
         contactService: ContactService,
@@ -59,6 +61,7 @@ final class LocalDataResetService {
         self.defaults = defaults
         self.defaultsDomainName = defaultsDomainName
         self.config = config
+        self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
         self.authManager = authManager
         self.keyManagement = keyManagement
         self.contactService = contactService
@@ -151,6 +154,9 @@ final class LocalDataResetService {
             defaults.removePersistentDomain(forName: defaultsDomainName)
         }
         config.resetToFirstRunDefaults()
+        protectedOrdinarySettingsCoordinator.resetAfterLocalDataReset(
+            preserveAuthentication: authenticationContext != nil
+        )
         authManager.clearCachedAuthenticationContextAfterLocalDataReset()
         keyManagement.resetInMemoryStateAfterLocalDataReset()
         contactService.resetInMemoryStateAfterLocalDataReset()

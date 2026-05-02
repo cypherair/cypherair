@@ -26,6 +26,7 @@ final class EncryptScreenModel {
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
     private let appConfiguration: AppConfiguration
+    private let protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator
     private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let textEncryptionAction: TextEncryptionAction
@@ -51,6 +52,7 @@ final class EncryptScreenModel {
         keyManagement: KeyManagementService,
         contactService: ContactService,
         config: AppConfiguration,
+        protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         protectedSettingsHost: ProtectedSettingsHost? = nil,
         configuration: EncryptView.Configuration,
@@ -65,6 +67,7 @@ final class EncryptScreenModel {
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.appConfiguration = config
+        self.protectedOrdinarySettings = protectedOrdinarySettings
         self.authLifecycleTraceStore = authLifecycleTraceStore
         self.protectedSettingsHost = protectedSettingsHost
         self.textEncryptionAction = textEncryptionAction ?? {
@@ -138,6 +141,9 @@ final class EncryptScreenModel {
         if selectedRecipients.isEmpty {
             return true
         }
+        if resolvedEncryptToSelf == nil {
+            return true
+        }
 
         switch encryptMode {
         case .text:
@@ -151,8 +157,19 @@ final class EncryptScreenModel {
         encryptMode == .file && operation.isRunning && operation.progress != nil
     }
 
-    var resolvedEncryptToSelf: Bool {
-        encryptToSelf ?? appConfiguration.encryptToSelf
+    var resolvedEncryptToSelf: Bool? {
+        encryptToSelf ?? protectedOrdinarySettings.encryptToSelf
+    }
+
+    var encryptToSelfToggleValue: Bool {
+        resolvedEncryptToSelf ?? false
+    }
+
+    var isEncryptToSelfControlEnabled: Bool {
+        if configuration.encryptToSelfPolicy.isLocked {
+            return false
+        }
+        return resolvedEncryptToSelf != nil
     }
 
     var ciphertextString: String? {
@@ -242,7 +259,10 @@ final class EncryptScreenModel {
         let text = plaintext
         let recipients = Array(selectedRecipients)
         let signerFingerprint = signMessage ? signerFingerprint : nil
-        let encryptToSelf = resolvedEncryptToSelf
+        guard let encryptToSelf = resolvedEncryptToSelf else {
+            presentProtectedOrdinarySettingsLockedError()
+            return
+        }
         let encryptToSelfFingerprint = encryptToSelf ? self.encryptToSelfFingerprint : nil
         let onEncrypted = configuration.onEncrypted
 
@@ -277,7 +297,10 @@ final class EncryptScreenModel {
 
         let recipients = Array(selectedRecipients)
         let signerFingerprint = signMessage ? signerFingerprint : nil
-        let encryptToSelf = resolvedEncryptToSelf
+        guard let encryptToSelf = resolvedEncryptToSelf else {
+            presentProtectedOrdinarySettingsLockedError()
+            return
+        }
         let encryptToSelfFingerprint = encryptToSelf ? self.encryptToSelfFingerprint : nil
 
         encryptedFileURL = nil
@@ -404,6 +427,11 @@ final class EncryptScreenModel {
         operation.present(error: mapEncryptionError(error))
     }
 
+    func refreshProtectedOrdinarySettings() {
+        guard configuration.encryptToSelfPolicy == .appDefault else { return }
+        encryptToSelf = protectedOrdinarySettings.encryptToSelf
+    }
+
     private func performEncrypt() {
         switch encryptMode {
         case .text:
@@ -441,8 +469,19 @@ final class EncryptScreenModel {
     }
 
     private func applyEncryptToSelfPolicy(from configuration: EncryptView.Configuration) {
-        encryptToSelf = configuration.encryptToSelfPolicy.initialValue(
-            appDefault: appConfiguration.encryptToSelf
+        encryptToSelf = configuration.encryptToSelfPolicy.optionalInitialValue(
+            appDefault: protectedOrdinarySettings.encryptToSelf
+        )
+    }
+
+    private func presentProtectedOrdinarySettingsLockedError() {
+        operation.present(
+            error: .encryptionFailed(
+                reason: String(
+                    localized: "encrypt.protectedPreferencesLocked",
+                    defaultValue: "Unlock CypherAir before encrypting with app defaults."
+                )
+            )
         )
     }
 

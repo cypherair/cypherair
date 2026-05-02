@@ -3,7 +3,7 @@ import SwiftUI
 /// Grid-based color theme selection view.
 /// Works on both iOS and macOS (pure SwiftUI, no UIKit dependency).
 struct ThemePickerView: View {
-    @Environment(AppConfiguration.self) private var config
+    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     #if os(macOS)
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 20), count: 4)
     #else
@@ -11,20 +11,36 @@ struct ThemePickerView: View {
     #endif
 
     var body: some View {
-        @Bindable var config = config
-
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 20) {
-                ForEach(ColorTheme.allCases) { theme in
-                    ThemeCell(
-                        theme: theme,
-                        isSelected: config.colorTheme == theme
-                    ) {
-                        config.colorTheme = theme
+        Group {
+            if protectedOrdinarySettings.isLoaded {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 20) {
+                        ForEach(ColorTheme.allCases) { theme in
+                            ThemeCell(
+                                theme: theme,
+                                isSelected: protectedOrdinarySettings.colorTheme == theme
+                            ) {
+                                protectedOrdinarySettings.setColorTheme(theme)
+                            }
+                        }
                     }
+                    .padding()
+                }
+            } else {
+                ContentUnavailableView {
+                    Label(
+                        String(localized: "protectedSettings.locked.title", defaultValue: "Protected Preferences Locked"),
+                        systemImage: "lock"
+                    )
+                } description: {
+                    Text(
+                        String(
+                            localized: "protectedSettings.locked.message",
+                            defaultValue: "Authenticate to view and change this protected preference."
+                        )
+                    )
                 }
             }
-            .padding()
         }
         .accessibilityIdentifier("theme.root")
         .screenReady("theme.ready")

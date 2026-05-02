@@ -212,20 +212,23 @@ final class TutorialSessionStoreTests: XCTestCase {
 
     func test_markFinishedTutorial_isTheOnlyPointThatPersistsCompletion() {
         let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
-        let config = AppConfiguration(defaults: defaults)
+        let protectedOrdinarySettings = makeLoadedProtectedOrdinarySettings(defaults: defaults)
         let store = TutorialSessionStore()
-        store.configurePersistence(appConfiguration: config)
+        store.configurePersistence(protectedOrdinarySettings: protectedOrdinarySettings)
 
         for module in TutorialModuleID.allCases {
             store.markCompletedForTesting(module)
         }
 
         XCTAssertEqual(store.lifecycleState, .stepsCompleted)
-        XCTAssertEqual(config.guidedTutorialCompletedVersion, 0)
+        XCTAssertEqual(protectedOrdinarySettings.snapshot?.guidedTutorialCompletedVersion, 0)
 
         store.markFinishedTutorial()
 
-        XCTAssertEqual(config.guidedTutorialCompletedVersion, GuidedTutorialVersion.current)
+        XCTAssertEqual(
+            protectedOrdinarySettings.snapshot?.guidedTutorialCompletedVersion,
+            GuidedTutorialVersion.current
+        )
         XCTAssertEqual(store.lifecycleState, .finished)
     }
 
@@ -244,9 +247,9 @@ final class TutorialSessionStoreTests: XCTestCase {
 
     func test_prepareForPresentation_afterFinishedReplay_resetsSession() {
         let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
-        let config = AppConfiguration(defaults: defaults)
+        let protectedOrdinarySettings = makeLoadedProtectedOrdinarySettings(defaults: defaults)
         let store = TutorialSessionStore()
-        store.configurePersistence(appConfiguration: config)
+        store.configurePersistence(protectedOrdinarySettings: protectedOrdinarySettings)
         for module in TutorialModuleID.allCases {
             store.markCompletedForTesting(module)
         }
@@ -261,9 +264,9 @@ final class TutorialSessionStoreTests: XCTestCase {
 
     func test_canOpen_unlocksSequentiallyBeforeReplayAndEverythingAfterReplay() {
         let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
-        let config = AppConfiguration(defaults: defaults)
+        let protectedOrdinarySettings = makeLoadedProtectedOrdinarySettings(defaults: defaults)
         let store = TutorialSessionStore()
-        store.configurePersistence(appConfiguration: config)
+        store.configurePersistence(protectedOrdinarySettings: protectedOrdinarySettings)
 
         XCTAssertTrue(store.canOpen(.sandbox))
         XCTAssertFalse(store.canOpen(.addDemoContact))
@@ -274,10 +277,20 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertTrue(store.canOpen(.addDemoContact))
         XCTAssertFalse(store.canOpen(.backupKey))
 
-        config.markGuidedTutorialCompletedCurrentVersion()
+        protectedOrdinarySettings.markGuidedTutorialCompletedCurrentVersion()
 
         XCTAssertTrue(store.canOpen(.backupKey))
         XCTAssertTrue(store.canOpen(.enableHighSecurity))
+    }
+
+    private func makeLoadedProtectedOrdinarySettings(
+        defaults: UserDefaults
+    ) -> ProtectedOrdinarySettingsCoordinator {
+        let coordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+        )
+        coordinator.loadForAuthenticatedTestBypass()
+        return coordinator
     }
 
     func test_presentLeaveConfirmation_installsTutorialOwnedModal() {

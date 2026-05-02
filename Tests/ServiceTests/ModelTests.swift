@@ -441,19 +441,91 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(identity?.fingerprint, fingerprint)
     }
 
-    // MARK: - AppConfiguration: Grace Period Validation
+    // MARK: - Protected Ordinary Settings
 
-    func test_appConfiguration_gracePeriod_validValuePersists() {
-        let config = AppConfiguration()
-        config.gracePeriod = 60
-        XCTAssertEqual(config.gracePeriod, 60)
+    func test_protectedOrdinarySettings_gracePeriod_validValuePersists() {
+        let defaults = makeIsolatedDefaults()
+        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+
+        coordinator.setGracePeriod(60)
+
+        let reloaded = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        XCTAssertEqual(reloaded.snapshot?.gracePeriod, 60)
     }
 
-    func test_appConfiguration_gracePeriod_invalidValueClampsToDefault() {
-        let config = AppConfiguration()
-        config.gracePeriod = 42  // Not a valid option
-        XCTAssertEqual(config.gracePeriod, 180,
-                       "Invalid gracePeriod should be clamped to the default (180)")
+    func test_protectedOrdinarySettings_gracePeriod_invalidValueClampsToDefault() {
+        let defaults = makeIsolatedDefaults()
+        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+
+        coordinator.setGracePeriod(42)
+
+        XCTAssertEqual(coordinator.snapshot?.gracePeriod, AuthPreferences.defaultGracePeriod)
+    }
+
+    func test_protectedOrdinarySettings_startsLockedWithoutReadingPersistence() {
+        let persistence = SpyProtectedOrdinarySettingsPersistence(
+            snapshot: .firstRunDefaults
+        )
+
+        let coordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: persistence
+        )
+
+        XCTAssertNil(coordinator.gracePeriodForSession)
+        XCTAssertNil(coordinator.hasCompletedOnboarding)
+        XCTAssertNil(coordinator.encryptToSelf)
+        XCTAssertEqual(coordinator.colorTheme, .systemDefault)
+        XCTAssertEqual(persistence.loadCount, 0)
+        XCTAssertEqual(persistence.saveCount, 0)
+    }
+
+    func test_protectedOrdinarySettings_loadsOnlyAfterHealthyPostAuthenticationDomain() {
+        let persistence = SpyProtectedOrdinarySettingsPersistence(
+            snapshot: ProtectedOrdinarySettingsSnapshot(
+                gracePeriod: 300,
+                hasCompletedOnboarding: true,
+                colorTheme: .teal,
+                encryptToSelf: false,
+                guidedTutorialCompletedVersion: GuidedTutorialVersion.current
+            )
+        )
+        let coordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: persistence
+        )
+
+        coordinator.loadAfterAppAuthentication(
+            protectedSettingsDomainState: .locked
+        )
+
+        XCTAssertEqual(coordinator.snapshot?.gracePeriod, 300)
+        XCTAssertEqual(coordinator.snapshot?.hasCompletedOnboarding, true)
+        XCTAssertEqual(coordinator.snapshot?.colorTheme, .teal)
+        XCTAssertEqual(coordinator.snapshot?.encryptToSelf, false)
+        XCTAssertEqual(persistence.loadCount, 1)
+    }
+
+    func test_protectedOrdinarySettings_recoveryDoesNotReadPersistence() {
+        let persistence = SpyProtectedOrdinarySettingsPersistence(
+            snapshot: ProtectedOrdinarySettingsSnapshot(
+                gracePeriod: 300,
+                hasCompletedOnboarding: true,
+                colorTheme: .teal,
+                encryptToSelf: false,
+                guidedTutorialCompletedVersion: GuidedTutorialVersion.current
+            )
+        )
+        let coordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: persistence
+        )
+
+        coordinator.loadAfterAppAuthentication(
+            protectedSettingsDomainState: .recoveryNeeded
+        )
+
+        XCTAssertNil(coordinator.snapshot)
+        XCTAssertEqual(coordinator.state, .recoveryRequired)
+        XCTAssertEqual(persistence.loadCount, 0)
+        XCTAssertEqual(persistence.saveCount, 0)
     }
 
     func test_appConfiguration_appSessionPolicy_defaultsToUserPresence() {
@@ -482,33 +554,30 @@ final class ModelTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: "com.cypherair.preference.requireAuthOnLaunch"))
     }
 
-    func test_appConfiguration_guidedTutorial_defaultsToNeverCompleted() {
+    func test_protectedOrdinarySettings_guidedTutorial_defaultsToNeverCompleted() {
         let defaults = makeIsolatedDefaults()
-        let config = AppConfiguration(defaults: defaults)
+        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
 
-        XCTAssertEqual(config.guidedTutorialCompletedVersion, 0)
-        XCTAssertEqual(config.guidedTutorialCompletionState, .neverCompleted)
-        XCTAssertTrue(config.hasNeverCompletedGuidedTutorial)
+        XCTAssertEqual(coordinator.snapshot?.guidedTutorialCompletedVersion, 0)
+        XCTAssertEqual(coordinator.guidedTutorialCompletionState, .neverCompleted)
     }
 
-    func test_appConfiguration_guidedTutorial_currentVersionPersists() {
+    func test_protectedOrdinarySettings_guidedTutorial_currentVersionPersists() {
         let defaults = makeIsolatedDefaults()
-        let config = AppConfiguration(defaults: defaults)
-        config.markGuidedTutorialCompletedCurrentVersion()
+        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        coordinator.markGuidedTutorialCompletedCurrentVersion()
 
-        let reloaded = AppConfiguration(defaults: defaults)
-        XCTAssertEqual(reloaded.guidedTutorialCompletedVersion, GuidedTutorialVersion.current)
+        let reloaded = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        XCTAssertEqual(reloaded.snapshot?.guidedTutorialCompletedVersion, GuidedTutorialVersion.current)
         XCTAssertEqual(reloaded.guidedTutorialCompletionState, .completedCurrentVersion)
-        XCTAssertTrue(reloaded.hasCompletedCurrentGuidedTutorialVersion)
     }
 
-    func test_appConfiguration_guidedTutorial_oldVersionIsRecognized() {
+    func test_protectedOrdinarySettings_guidedTutorial_oldVersionIsRecognized() {
         let defaults = makeIsolatedDefaults()
         defaults.set(GuidedTutorialVersion.current - 1, forKey: "com.cypherair.preference.guidedTutorialCompletedVersion")
 
-        let config = AppConfiguration(defaults: defaults)
-        XCTAssertEqual(config.guidedTutorialCompletionState, .completedPreviousVersion)
-        XCTAssertTrue(config.hasCompletedPreviousGuidedTutorialVersion)
+        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        XCTAssertEqual(coordinator.guidedTutorialCompletionState, .completedPreviousVersion)
     }
 
     // MARK: - Contact: Formatted Fingerprint
@@ -568,6 +637,37 @@ final class ModelTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
+    }
+
+    private func makeLoadedProtectedOrdinarySettings(
+        defaults: UserDefaults
+    ) -> ProtectedOrdinarySettingsCoordinator {
+        let coordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+        )
+        coordinator.loadForAuthenticatedTestBypass()
+        return coordinator
+    }
+
+    private final class SpyProtectedOrdinarySettingsPersistence: ProtectedOrdinarySettingsPersistence {
+        private let storedSnapshot: ProtectedOrdinarySettingsSnapshot
+        private(set) var loadCount = 0
+        private(set) var saveCount = 0
+
+        init(snapshot: ProtectedOrdinarySettingsSnapshot) {
+            self.storedSnapshot = snapshot
+        }
+
+        func loadSnapshot() -> ProtectedOrdinarySettingsSnapshot {
+            loadCount += 1
+            return storedSnapshot
+        }
+
+        func saveSnapshot(_ snapshot: ProtectedOrdinarySettingsSnapshot) {
+            saveCount += 1
+        }
+
+        func removePersistentValues() {}
     }
 
     // MARK: - ColorTheme
@@ -639,23 +739,19 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(ColorTheme.graphite.isMultiColor)
     }
 
-    func test_appConfiguration_colorTheme_persistsToUserDefaults() {
-        let config = AppConfiguration()
-        config.colorTheme = .purple
+    func test_protectedOrdinarySettings_colorTheme_persistsToUserDefaults() {
+        let defaults = makeIsolatedDefaults()
+        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        coordinator.setColorTheme(.purple)
 
-        // Read back from a fresh AppConfiguration instance
-        let config2 = AppConfiguration()
-        XCTAssertEqual(config2.colorTheme, .purple)
-
-        // Clean up: restore default
-        config.colorTheme = .systemDefault
+        let reloaded = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        XCTAssertEqual(reloaded.colorTheme, .purple)
     }
 
-    func test_appConfiguration_colorTheme_defaultsToSystemDefault() {
-        // Remove the key to simulate fresh install
-        UserDefaults.standard.removeObject(forKey: "com.cypherair.preference.colorTheme")
-        let config = AppConfiguration()
-        XCTAssertEqual(config.colorTheme, .systemDefault)
+    func test_protectedOrdinarySettings_colorTheme_defaultsToSystemDefault() {
+        let defaults = makeIsolatedDefaults()
+        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        XCTAssertEqual(coordinator.colorTheme, .systemDefault)
     }
 
     func test_colorTheme_rawValue_roundTrips() {

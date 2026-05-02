@@ -5,7 +5,7 @@ struct TutorialView: View {
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @Environment(AppConfiguration.self) private var config
+    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(TutorialSessionStore.self) private var tutorialStore
 
     let presentationContext: TutorialPresentationContext
@@ -39,7 +39,7 @@ struct TutorialView: View {
             .task {
                 guard !hasPreparedPresentation else { return }
                 hasPreparedPresentation = true
-                tutorialStore.configurePersistence(appConfiguration: config)
+                tutorialStore.configurePersistence(protectedOrdinarySettings: protectedOrdinarySettings)
                 tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
                 #if DEBUG
                 if tutorialStore.prepareUITestCompletionSurfaceIfRequested() {
@@ -300,7 +300,7 @@ struct TutorialView: View {
                 ? String(localized: "guidedTutorial.reviewCompletion", defaultValue: "Review Completion")
                 : String(localized: "guidedTutorial.continue", defaultValue: "Continue Tutorial")
         case .notStarted, .finished:
-            switch config.guidedTutorialCompletionState {
+            switch protectedOrdinarySettings.guidedTutorialCompletionState ?? .neverCompleted {
             case .neverCompleted:
                 return String(localized: "guidedTutorial.start", defaultValue: "Start Guided Tutorial")
             case .completedCurrentVersion:
@@ -331,7 +331,7 @@ struct TutorialView: View {
                 tutorialStore.showCompletionView()
             }
         case .notStarted, .finished:
-            if config.guidedTutorialCompletionState != .neverCompleted {
+            if (protectedOrdinarySettings.guidedTutorialCompletionState ?? .neverCompleted) != .neverCompleted {
                 tutorialStore.resetTutorial()
                 tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
             }

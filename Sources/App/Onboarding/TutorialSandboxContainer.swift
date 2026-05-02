@@ -25,6 +25,7 @@ final class TutorialSandboxContainer {
     let privateKeyControlStore: InMemoryPrivateKeyControlStore
     let securitySimulationStack: TutorialSecuritySimulationStack
     let config: AppConfiguration
+    let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
     let keyManagement: KeyManagementService
     let contactService: ContactService
     let encryptionService: EncryptionService
@@ -80,6 +81,11 @@ final class TutorialSandboxContainer {
         )
         self.config = AppConfiguration(defaults: defaults)
         self.config.privateKeyControlState = .unlocked(.standard)
+        let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+        )
+        protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
+        self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
         self.keyManagement = KeyManagementService(
             engine: engine,
             secureEnclave: mockSecureEnclave,
@@ -117,6 +123,9 @@ final class TutorialSandboxContainer {
         self.mockAuthenticator.shouldSucceed = true
         self.mockAuthenticator.biometricsAvailable = true
         self.mockSecureEnclave.simulatedAuthMode = authManager.currentMode ?? .standard
+        self.authManager.configureGracePeriodProvider {
+            protectedOrdinarySettingsCoordinator.gracePeriodForSession
+        }
         try? self.contactService.loadContacts()
     }
 

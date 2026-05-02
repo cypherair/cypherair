@@ -10,6 +10,7 @@ final class SettingsScreenModel {
 
     let configuration: SettingsView.Configuration
     let appConfiguration: AppConfiguration
+    let protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator
     let protectedSettingsHost: ProtectedSettingsHost?
 
     private let authManager: AuthenticationManager
@@ -41,6 +42,7 @@ final class SettingsScreenModel {
 
     init(
         config: AppConfiguration,
+        protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
         authManager: AuthenticationManager,
         keyManagement: KeyManagementService,
         iosPresentationController: IOSPresentationController?,
@@ -53,6 +55,7 @@ final class SettingsScreenModel {
     ) {
         self.configuration = configuration
         self.appConfiguration = config
+        self.protectedOrdinarySettings = protectedOrdinarySettings
         self.protectedSettingsHost = configuration.protectedSettingsHost
         self.authManager = authManager
         self.keyManagement = keyManagement
@@ -76,7 +79,7 @@ final class SettingsScreenModel {
     }
 
     var guidedTutorialEntryTitle: String {
-        switch appConfiguration.guidedTutorialCompletionState {
+        switch protectedOrdinarySettings.guidedTutorialCompletionState ?? .neverCompleted {
         case .neverCompleted:
             String(localized: "guidedTutorial.settings.entry", defaultValue: "Guided Tutorial")
         case .completedCurrentVersion:
@@ -84,6 +87,26 @@ final class SettingsScreenModel {
         case .completedPreviousVersion:
             String(localized: "guidedTutorial.updated.entry", defaultValue: "Updated Guided Tutorial Available")
         }
+    }
+
+    var isProtectedOrdinarySettingsEditable: Bool {
+        protectedOrdinarySettings.isLoaded
+    }
+
+    var gracePeriodSelection: Int {
+        protectedOrdinarySettings.snapshot?.gracePeriod ?? AuthPreferences.defaultGracePeriod
+    }
+
+    var encryptToSelfSelection: Bool {
+        protectedOrdinarySettings.snapshot?.encryptToSelf ?? true
+    }
+
+    func setGracePeriod(_ gracePeriod: Int) {
+        protectedOrdinarySettings.setGracePeriod(gracePeriod)
+    }
+
+    func setEncryptToSelf(_ encryptToSelf: Bool) {
+        protectedOrdinarySettings.setEncryptToSelf(encryptToSelf)
     }
 
     var protectedSettingsSectionState: ProtectedSettingsHost.SectionState {

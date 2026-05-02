@@ -64,8 +64,8 @@ final class LocalDataResetServiceTests: XCTestCase {
         let contactMarker = contactsDirectory.appendingPathComponent("contact.gpg")
         try Data([0x04]).write(to: contactMarker)
 
-        container.config.hasCompletedOnboarding = true
-        container.config.encryptToSelf = false
+        container.protectedOrdinarySettingsCoordinator.setHasCompletedOnboarding(true)
+        container.protectedOrdinarySettingsCoordinator.setEncryptToSelf(false)
 
         let summary = try await container.localDataResetService.resetAllLocalData()
 
@@ -90,8 +90,8 @@ final class LocalDataResetServiceTests: XCTestCase {
         ))
         XCTAssertFalse(FileManager.default.fileExists(atPath: container.protectedDataStorageRoot.rootURL.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
-        XCTAssertFalse(container.config.hasCompletedOnboarding)
-        XCTAssertTrue(container.config.encryptToSelf)
+        XCTAssertNil(container.protectedOrdinarySettingsCoordinator.snapshot)
+        XCTAssertEqual(container.protectedOrdinarySettingsCoordinator.state, .locked)
         XCTAssertTrue(container.keyManagement.keys.isEmpty)
         XCTAssertTrue(container.contactService.contacts.isEmpty)
 
@@ -267,6 +267,7 @@ final class LocalDataResetServiceTests: XCTestCase {
             defaults: defaults,
             defaultsDomainName: defaultsSuiteName,
             config: container.config,
+            protectedOrdinarySettingsCoordinator: container.protectedOrdinarySettingsCoordinator,
             authManager: container.authManager,
             keyManagement: container.keyManagement,
             contactService: container.contactService,

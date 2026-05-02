@@ -5,7 +5,7 @@ import SwiftUI
 @Observable
 final class TutorialSessionStore {
     @ObservationIgnored
-    private weak var appConfiguration: AppConfiguration?
+    private weak var protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator?
 
     private(set) var session = TutorialSessionState()
     private(set) var container: TutorialSandboxContainer?
@@ -70,8 +70,10 @@ final class TutorialSessionStore {
         if session.lifecycleState == .finished {
             return true
         }
-        guard let appConfiguration else { return false }
-        return appConfiguration.guidedTutorialCompletionState != .neverCompleted
+        guard let completionState = protectedOrdinarySettings?.guidedTutorialCompletionState else {
+            return false
+        }
+        return completionState != .neverCompleted
     }
 
     var outputInterceptionPolicy: OutputInterceptionPolicy? {
@@ -108,8 +110,8 @@ final class TutorialSessionStore {
         return previousModules.allSatisfy { isCompleted($0) }
     }
 
-    func configurePersistence(appConfiguration: AppConfiguration) {
-        self.appConfiguration = appConfiguration
+    func configurePersistence(protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator) {
+        self.protectedOrdinarySettings = protectedOrdinarySettings
     }
 
     func setTutorialPresentationActive(_ isActive: Bool) {
@@ -226,7 +228,7 @@ final class TutorialSessionStore {
     }
 
     func markFinishedTutorial() {
-        appConfiguration?.markGuidedTutorialCompletedCurrentVersion()
+        protectedOrdinarySettings?.markGuidedTutorialCompletedCurrentVersion()
         session.lifecycleState = .finished
     }
 
