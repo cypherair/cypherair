@@ -55,16 +55,18 @@ final class StreamingServiceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
         // Encrypt
-        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+        let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
             recipientFingerprints: [recipient.fingerprint],
             signWithFingerprint: sender.fingerprint,
             encryptToSelf: false,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+        let encryptedURL = encryptedArtifact.fileURL
+        defer { encryptedArtifact.cleanup() }
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: encryptedURL.path))
+        try assertCompleteFileProtection(at: encryptedURL)
         let encryptedData = try Data(contentsOf: encryptedURL)
         XCTAssertFalse(encryptedData.isEmpty)
 
@@ -73,13 +75,16 @@ final class StreamingServiceTests: XCTestCase {
         XCTAssertEqual(phase1.matchedKey?.fingerprint, recipient.fingerprint)
 
         // Phase 2: Decrypt
-        let (outputURL, sig) = try await stack.decryptionService.decryptFileStreaming(
+        let decryptedResult = try await stack.decryptionService.decryptFileStreaming(
             phase1: phase1,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: outputURL) }
+        let outputURL = decryptedResult.artifact.fileURL
+        let sig = decryptedResult.signature
+        defer { decryptedResult.artifact.cleanup() }
 
         let decrypted = try Data(contentsOf: outputURL)
+        try assertCompleteFileProtection(at: outputURL)
         XCTAssertEqual(decrypted, plaintext)
         // Signature should be valid (known signer is a contact)
         XCTAssertTrue(
@@ -98,30 +103,121 @@ final class StreamingServiceTests: XCTestCase {
         let inputURL = try writeTempFile(plaintext)
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
-        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+        let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
             recipientFingerprints: [recipient.fingerprint],
             signWithFingerprint: sender.fingerprint,
             encryptToSelf: false,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+        let encryptedURL = encryptedArtifact.fileURL
+        defer { encryptedArtifact.cleanup() }
 
         let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedURL)
         XCTAssertEqual(phase1.matchedKey?.fingerprint, recipient.fingerprint)
 
-        let (outputURL, sig) = try await stack.decryptionService.decryptFileStreaming(
+        let decryptedResult = try await stack.decryptionService.decryptFileStreaming(
             phase1: phase1,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: outputURL) }
+        let outputURL = decryptedResult.artifact.fileURL
+        let sig = decryptedResult.signature
+        defer { decryptedResult.artifact.cleanup() }
 
         let decrypted = try Data(contentsOf: outputURL)
+        try assertCompleteFileProtection(at: outputURL)
         XCTAssertEqual(decrypted, plaintext)
         XCTAssertTrue(
             sig.status == .valid,
             "Expected valid signature, got: \(sig.status)"
         )
+    }
+
+    func test_encryptFileStreaming_sameFilename_usesUniqueOperationDirectories() async throws {
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        let inputURL = try writeTempFile(Data("same name".utf8), filename: "same-name.txt")
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+
+        let first = try await stack.encryptionService.encryptFileStreaming(
+            inputURL: inputURL,
+            recipientFingerprints: [recipient.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        let second = try await stack.encryptionService.encryptFileStreaming(
+            inputURL: inputURL,
+            recipientFingerprints: [recipient.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        defer {
+            first.cleanup()
+            second.cleanup()
+        }
+
+        XCTAssertNotEqual(first.fileURL, second.fileURL)
+        XCTAssertEqual(first.fileURL.lastPathComponent, "same-name.txt.gpg")
+        XCTAssertTrue(first.fileURL.path.contains("/streaming/op-"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: first.fileURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: second.fileURL.path))
+    }
+
+    func test_decryptFileStreaming_sameFilename_usesUniqueOperationDirectories() async throws {
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+        let inputURL = try writeTempFile(Data("same encrypted".utf8), filename: "same-encrypted.txt")
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+        let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
+            inputURL: inputURL,
+            recipientFingerprints: [recipient.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        defer { encryptedArtifact.cleanup() }
+        let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedArtifact.fileURL)
+
+        let first = try await stack.decryptionService.decryptFileStreaming(phase1: phase1, progress: nil)
+        let second = try await stack.decryptionService.decryptFileStreaming(phase1: phase1, progress: nil)
+        defer {
+            first.artifact.cleanup()
+            second.artifact.cleanup()
+        }
+
+        XCTAssertNotEqual(first.artifact.fileURL, second.artifact.fileURL)
+        XCTAssertEqual(first.artifact.fileURL.lastPathComponent, "same-encrypted.txt")
+        XCTAssertTrue(first.artifact.fileURL.path.contains("/decrypted/op-"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: first.artifact.fileURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: second.artifact.fileURL.path))
+    }
+
+    func test_decryptFileStreaming_failedRepeatDoesNotDeletePreviousSuccessfulOutput() async throws {
+        let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient")
+        let inputURL = try writeTempFile(Data("survives failure".utf8), filename: "repeat-failure.txt")
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+        let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
+            inputURL: inputURL,
+            recipientFingerprints: [recipient.fingerprint],
+            signWithFingerprint: nil,
+            encryptToSelf: false,
+            progress: nil
+        )
+        defer { encryptedArtifact.cleanup() }
+        let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedArtifact.fileURL)
+        let first = try await stack.decryptionService.decryptFileStreaming(phase1: phase1, progress: nil)
+        defer { first.artifact.cleanup() }
+
+        var tampered = try Data(contentsOf: encryptedArtifact.fileURL)
+        tampered[tampered.count / 2] ^= 0x01
+        try tampered.write(to: encryptedArtifact.fileURL, options: .atomic)
+
+        do {
+            _ = try await stack.decryptionService.decryptFileStreaming(phase1: phase1, progress: nil)
+            XCTFail("Expected tampered repeat decrypt to fail")
+        } catch {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: first.artifact.fileURL.path))
+        }
     }
 
     // MARK: - Sign/Verify Round-Trip: Profile A
@@ -195,7 +291,7 @@ final class StreamingServiceTests: XCTestCase {
         progress.cancel()
 
         do {
-            let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+            let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
                 inputURL: inputURL,
                 recipientFingerprints: [recipient.fingerprint],
                 signWithFingerprint: nil,
@@ -203,7 +299,7 @@ final class StreamingServiceTests: XCTestCase {
                 progress: progress
             )
             // Clean up if it somehow succeeds
-            try? FileManager.default.removeItem(at: encryptedURL)
+            encryptedArtifact.cleanup()
             XCTFail("Expected operationCancelled error")
         } catch let error as CypherAirError {
             if case .operationCancelled = error {
@@ -280,14 +376,14 @@ final class StreamingServiceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
         do {
-            let encryptedURL = try await encService.encryptFileStreaming(
+            let encryptedArtifact = try await encService.encryptFileStreaming(
                 inputURL: inputURL,
                 recipientFingerprints: [recipient.fingerprint],
                 signWithFingerprint: nil,
                 encryptToSelf: false,
                 progress: nil
             )
-            try? FileManager.default.removeItem(at: encryptedURL)
+            encryptedArtifact.cleanup()
             XCTFail("Expected insufficientDiskSpace error")
         } catch let error as CypherAirError {
             if case .insufficientDiskSpace = error {
@@ -310,31 +406,32 @@ final class StreamingServiceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
         // Encrypt
-        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+        let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
             recipientFingerprints: [key.fingerprint],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
         )
+        let encryptedURL = encryptedArtifact.fileURL
 
         // Tamper with the encrypted file (1-bit flip near the middle)
         var encryptedData = try Data(contentsOf: encryptedURL)
         let midpoint = encryptedData.count / 2
         encryptedData[midpoint] ^= 0x01
         try encryptedData.write(to: encryptedURL)
-        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+        defer { encryptedArtifact.cleanup() }
 
         // Parse recipients should still work (PKESK headers are at the beginning)
         // But decryption should fail with an integrity error
         do {
             let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedURL)
 
-            let (outputURL, _) = try await stack.decryptionService.decryptFileStreaming(
+            let decryptedResult = try await stack.decryptionService.decryptFileStreaming(
                 phase1: phase1,
                 progress: nil
             )
-            try? FileManager.default.removeItem(at: outputURL)
+            decryptedResult.artifact.cleanup()
             XCTFail("Expected decryption to fail on tampered file")
         } catch {
             // Any error is acceptable — could be AEAD failure, MDC failure,
@@ -367,14 +464,15 @@ final class StreamingServiceTests: XCTestCase {
         let keyInfo = try engine.parseKeyInfo(keyData: externalKey.publicKeyData)
 
         // Encrypt to the external contact
-        let encryptedURL = try await stack.encryptionService.encryptFileStreaming(
+        let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
             recipientFingerprints: [keyInfo.fingerprint],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
         )
-        defer { try? FileManager.default.removeItem(at: encryptedURL) }
+        let encryptedURL = encryptedArtifact.fileURL
+        defer { encryptedArtifact.cleanup() }
 
         // Now remove all local keys so nothing matches
         // We need a fresh decryption service with no local keys
@@ -418,5 +516,19 @@ final class StreamingServiceTests: XCTestCase {
             // or as NSCocoaErrorDomain/NSPOSIXErrorDomain (from Swift file validation).
             // The key invariant is that encryption does NOT succeed for a nonexistent path.
         }
+    }
+
+    private func assertCompleteFileProtection(
+        at url: URL,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        XCTAssertEqual(
+            attributes[.protectionKey] as? FileProtectionType,
+            .complete,
+            file: file,
+            line: line
+        )
     }
 }

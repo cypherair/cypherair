@@ -125,7 +125,8 @@ Current ProtectedData file-protection expectations:
 
 Future ProtectedData validation targets:
 
-- Phase 7 PR 3 covers self-test export-only report state and legacy `Documents/self-test/` cleanup. Later Phase 7 work must add coverage for temporary/export/tutorial cleanup or file-protection changes.
+- Phase 7 PR 3 covers self-test export-only report state and legacy `Documents/self-test/` cleanup.
+- Phase 7 PR 4 covers temporary/export/tutorial hardening: per-operation streaming/decrypted owner directories, owner cleanup, startup cleanup, Reset All Local Data cleanup, verified complete file protection, export handoff ownership, fixed tutorial defaults cleanup, and legacy tutorial defaults UUID cleanup.
 - Phase 8 Contacts work must prove legacy source preservation, protected-domain readability, no-silent-reset failure behavior, locked Contacts route states, and Contacts-specific import recovery.
 
 **CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`. The macOS smoke suite also covers tutorial launch paths for generating Alice's sandbox key, opening key-detail follow-up surfaces, opening sandbox QR / backup surfaces, confirming that tutorial-disabled certificate and selective-revocation routes remain visible but unavailable, and tutorial lifecycle coverage for first-run start/skip, leave confirmation, completion finish, Settings replay, and auth-mode helper-modal automation markers.

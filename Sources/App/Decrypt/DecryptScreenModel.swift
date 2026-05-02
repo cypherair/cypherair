@@ -14,7 +14,7 @@ final class DecryptScreenModel {
         URL,
         DecryptionService.FilePhase1Result,
         FileProgressReporter
-    ) async throws -> (outputURL: URL, verification: DetailedSignatureVerification)
+    ) async throws -> (artifact: AppTemporaryArtifact, verification: DetailedSignatureVerification)
 
     private(set) var configuration: DecryptView.Configuration
     let operation: OperationController
@@ -27,6 +27,7 @@ final class DecryptScreenModel {
     private let textDecryptionAction: TextDecryptionAction
     private let fileDecryptionAction: FileDecryptionAction
     private let authLifecycleTraceStore: AuthLifecycleTraceStore?
+    @ObservationIgnored private var decryptedFileArtifact: AppTemporaryArtifact?
 
     private struct PendingTextModeImport {
         let fileURL: URL
@@ -44,7 +45,13 @@ final class DecryptScreenModel {
     var fileImportTarget: DecryptView.FileImportTarget?
     var selectedFileURL: URL?
     var selectedFileName: String?
-    var decryptedFileURL: URL?
+    var decryptedFileURL: URL? {
+        didSet {
+            if decryptedFileURL != decryptedFileArtifact?.fileURL {
+                decryptedFileArtifact = decryptedFileURL.map { AppTemporaryArtifact(fileURL: $0) }
+            }
+        }
+    }
     var filePhase1Result: DecryptionService.FilePhase1Result?
     var importedCiphertext = ImportedTextInputState()
     private var pendingTextModeImport: PendingTextModeImport?
@@ -343,8 +350,13 @@ final class DecryptScreenModel {
                 filePhase1Result,
                 progress
             )
+            var pendingArtifact: AppTemporaryArtifact? = result.artifact
+            defer {
+                pendingArtifact?.cleanup()
+            }
             try Task.checkCancellation()
-            self.decryptedFileURL = result.outputURL
+            self.adoptDecryptedFileArtifact(result.artifact)
+            pendingArtifact = nil
             self.replaceDetailedSignatureVerification(with: result.verification)
             self.authLifecycleTraceStore?.record(
                 category: .operation,
@@ -522,12 +534,15 @@ final class DecryptScreenModel {
     }
 
     private func deleteTemporaryDecryptedFile() {
-        if let decryptedFileURL {
-            try? FileManager.default.removeItem(at: decryptedFileURL)
-            self.decryptedFileURL = nil
-        } else {
-            decryptedFileURL = nil
-        }
+        decryptedFileArtifact?.cleanup()
+        decryptedFileArtifact = nil
+        decryptedFileURL = nil
+    }
+
+    private func adoptDecryptedFileArtifact(_ artifact: AppTemporaryArtifact) {
+        deleteTemporaryDecryptedFile()
+        decryptedFileArtifact = artifact
+        decryptedFileURL = artifact.fileURL
     }
 
     private func applyPrefilledCiphertextIfNeeded(from configuration: DecryptView.Configuration) {

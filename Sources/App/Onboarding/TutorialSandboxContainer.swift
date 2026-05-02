@@ -16,6 +16,7 @@ enum TutorialSandboxContainerError: LocalizedError {
 
 /// Isolated dependency graph for the guided tutorial.
 /// Uses real app services backed by sandbox storage and mock security primitives.
+/// The product flow owns a single active tutorial sandbox at a time.
 final class TutorialSandboxContainer {
     let engine: PgpEngine
     let mockSecureEnclave: MockSecureEnclave
@@ -39,31 +40,32 @@ final class TutorialSandboxContainer {
 
     private let defaults: UserDefaults
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
+    private let temporaryArtifactStore: AppTemporaryArtifactStore
     private var didCleanup = false
 
-    init() throws {
+    init(temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()) throws {
+        self.temporaryArtifactStore = temporaryArtifactStore
         self.engine = PgpEngine()
         self.mockSecureEnclave = MockSecureEnclave()
         self.mockKeychain = MockKeychain()
         self.mockAuthenticator = MockAuthenticator()
         self.authenticationPromptCoordinator = AuthenticationPromptCoordinator()
 
-        let suiteName = "com.cypherair.tutorial.\(UUID().uuidString)"
+        let suiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             throw TutorialSandboxContainerError.defaultsUnavailable
         }
         defaults.removePersistentDomain(forName: suiteName)
+        _ = defaults.synchronize()
         self.defaultsSuiteName = suiteName
         self.defaults = defaults
 
-        let contactsDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAirGuidedTutorial-\(UUID().uuidString)", isDirectory: true)
         do {
-            try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
+            let contactsDirectory = try temporaryArtifactStore.makeTutorialSandboxDirectory()
+            self.contactsDirectory = contactsDirectory
         } catch {
             throw TutorialSandboxContainerError.contactsDirectoryCreationFailed
         }
-        self.contactsDirectory = contactsDirectory
 
         self.authManager = AuthenticationManager(
             secureEnclave: mockSecureEnclave,
@@ -100,12 +102,14 @@ final class TutorialSandboxContainer {
         self.encryptionService = EncryptionService(
             engine: engine,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            temporaryArtifactStore: temporaryArtifactStore
         )
         self.decryptionService = DecryptionService(
             engine: engine,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            temporaryArtifactStore: temporaryArtifactStore
         )
         self.signingService = SigningService(
             engine: engine,
@@ -132,6 +136,7 @@ final class TutorialSandboxContainer {
 
         try? FileManager.default.removeItem(at: contactsDirectory)
         defaults.removePersistentDomain(forName: defaultsSuiteName)
+        _ = defaults.synchronize()
     }
 
     deinit {

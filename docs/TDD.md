@@ -373,10 +373,12 @@ Keychain protected-data row: shared app-data root secret
   com.cypherair.internal.rewrapTargetMode        → legacy source removed after private-key-control migration
   com.cypherair.internal.modifyExpiryInProgress  → legacy source removed after private-key-control migration
   com.cypherair.internal.modifyExpiryFingerprint → legacy source removed after private-key-control migration
-/tmp/decrypted/: ephemeral file previews
-/tmp/streaming/: temporary streaming encrypt/decrypt outputs
-/tmp/export-*: temporary fileExporter handoff files
-/tmp/CypherAirGuidedTutorial-*: tutorial contacts sandbox
+  com.cypherair.tutorial.sandbox.plist           → fixed tutorial sandbox defaults, cleared on container creation/startup/reset
+  com.cypherair.tutorial.<UUID>.plist            → legacy tutorial sandbox defaults, fallback-cleaned on startup/reset if orphaned
+/tmp/decrypted/op-<UUID>/: per-operation decrypted file previews
+/tmp/streaming/op-<UUID>/: per-operation streaming encryption outputs
+/tmp/export-<UUID>-<filename>: temporary fileExporter handoff files
+/tmp/CypherAirGuidedTutorial-<UUID>/: tutorial contacts sandbox
 ```
 
 Protected app-data planning covers all CypherAir-owned local data, not only preferences. Current permanent exceptions are limited to the app-session boot authentication profile, private-key material rows protected by Keychain / Secure Enclave, ProtectedData framework bootstrap metadata, test-only or legacy-cleanup state, short-lived temporary files with cleanup requirements, and user-exported files after they leave the app-controlled sandbox. Private-key control state now lives in the post-unlock `private-key-control` ProtectedData domain, and key metadata now lives in the post-unlock `key-metadata` ProtectedData domain.
@@ -406,7 +408,8 @@ Migration and exception rules:
 - Legacy `authMode`, rewrap, and modify-expiry `UserDefaults` keys are migration sources only after verified `private-key-control` creation/open.
 - Legacy key metadata rows in the dedicated metadata account and older default-account rows are migration/cleanup sources only after verified `key-metadata` readability.
 - Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
-- Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset. Contacts and temporary/export/tutorial cleanup hardening remain outside the completed Phase 1-6 and Phase 7 PR 1-PR 3 scope.
+- Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset.
+- Phase 7 PR 4 temporary artifacts are centralized through `AppTemporaryArtifactStore`: streaming/decrypted outputs use one `op-<UUID>` owner directory per operation, export handoff files use atomic complete-protection writes, tutorial sandbox directories use verified complete protection, and startup/reset cleanup removes `decrypted`, `streaming`, `export-*`, `CypherAirGuidedTutorial-*`, fixed `com.cypherair.tutorial.sandbox` defaults, and orphaned legacy `com.cypherair.tutorial.<UUID>.plist` suites. Contacts remain outside the completed Phase 1-6 and Phase 7 PR 1-PR 4 scope.
 
 ---
 

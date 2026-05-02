@@ -115,6 +115,7 @@ struct EncryptView: View {
     @Environment(ContactService.self) private var contactService
     @Environment(AppConfiguration.self) private var config
     @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
     @Environment(\.protectedSettingsHost) private var protectedSettingsHost
 
@@ -131,6 +132,7 @@ struct EncryptView: View {
             contactService: contactService,
             config: config,
             protectedOrdinarySettings: protectedOrdinarySettings,
+            appSessionOrchestrator: appSessionOrchestrator,
             authLifecycleTraceStore: authLifecycleTraceStore,
             protectedSettingsHost: protectedSettingsHost,
             configuration: configuration
@@ -141,6 +143,7 @@ struct EncryptView: View {
 private struct EncryptScreenHostView: View {
     let configuration: EncryptView.Configuration
     let protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator
+    let appSessionOrchestrator: AppSessionOrchestrator
 
     @State private var model: EncryptScreenModel
 
@@ -150,12 +153,14 @@ private struct EncryptScreenHostView: View {
         contactService: ContactService,
         config: AppConfiguration,
         protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
+        appSessionOrchestrator: AppSessionOrchestrator,
         authLifecycleTraceStore: AuthLifecycleTraceStore?,
         protectedSettingsHost: ProtectedSettingsHost?,
         configuration: EncryptView.Configuration
     ) {
         self.configuration = configuration
         self.protectedOrdinarySettings = protectedOrdinarySettings
+        self.appSessionOrchestrator = appSessionOrchestrator
         _model = State(
             initialValue: EncryptScreenModel(
                 encryptionService: encryptionService,
@@ -453,6 +458,12 @@ private struct EncryptScreenHostView: View {
         }
         .onAppear {
             model.handleAppear()
+        }
+        .onDisappear {
+            model.handleDisappear()
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            model.handleContentClearGenerationChange()
         }
     }
 

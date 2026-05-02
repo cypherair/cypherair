@@ -19,20 +19,25 @@ struct ExportPayload: Transferable {
 /// Shared export state for exporting either an existing file or generated data.
 @Observable
 final class FileExportController {
+    private let temporaryArtifactStore: AppTemporaryArtifactStore
+
     private(set) var payload: ExportPayload?
     private(set) var defaultFilename = "export"
     var isPresented = false
 
     private var ownedTemporaryFile: URL?
 
+    init(temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()) {
+        self.temporaryArtifactStore = temporaryArtifactStore
+    }
+
     func prepareDataExport(_ data: Data, suggestedFilename: String) throws {
         cleanupOwnedTemporaryFile()
 
-        let sanitizedFilename = (suggestedFilename as NSString).lastPathComponent
-        let temporaryURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("export-\(UUID().uuidString)-\(sanitizedFilename)")
-
-        try data.write(to: temporaryURL, options: .atomic)
+        let temporaryURL = try temporaryArtifactStore.writeProtectedExportData(
+            data,
+            suggestedFilename: suggestedFilename
+        )
 
         ownedTemporaryFile = temporaryURL
         payload = ExportPayload(url: temporaryURL)

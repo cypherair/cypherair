@@ -83,7 +83,7 @@ Orchestrates user-facing operations by coordinating the Security layer and the R
 
 The guided tutorial is a host-driven sandbox that teaches the real app workflow without touching real workspace state. `TutorialView` owns the hub, sandbox acknowledgement, workspace, completion, and leave-confirmation surfaces. `TutorialSessionStore` owns the current tutorial session, seven-module progress, replay unlock rules, navigation state, active tutorial modal, output interception policy, and completion-version persistence.
 
-`TutorialSandboxContainer` builds a separate dependency graph for the tutorial using isolated `UserDefaults`, a temporary contacts directory, real app services, and mock Secure Enclave / Keychain primitives behind a real `AuthenticationManager`. The tutorial reuses production pages through `TutorialConfigurationFactory`, `TutorialRouteDestinationView`, and `TutorialShellDefinitionsBuilder`; tutorial behavior is injected through generic page configuration instead of pervasive page-level tutorial branches.
+`TutorialSandboxContainer` builds a separate dependency graph for the tutorial using the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite, a temporary contacts directory with verified complete file protection, real app services, and mock Secure Enclave / Keychain primitives behind a real `AuthenticationManager`. The product flow owns a single active tutorial sandbox at a time; creating the container first clears the fixed suite. Current tutorial cleanup removes the fixed suite and directory, while startup/reset cleanup also removes legacy orphaned `com.cypherair.tutorial.<UUID>` defaults suites and tutorial temp directories. The tutorial reuses production pages through `TutorialConfigurationFactory`, `TutorialRouteDestinationView`, and `TutorialShellDefinitionsBuilder`; tutorial behavior is injected through generic page configuration instead of pervasive page-level tutorial branches.
 
 Safety is enforced by narrow host boundaries:
 
@@ -155,7 +155,7 @@ Current ProtectedData scope:
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`
-- current Phase 1-6 ProtectedData work plus Phase 7 PR 1-PR 3 ordinary-settings and self-test export-only work are implemented; remaining Phase 7 surfaces include temporary/export/tutorial cleanup and file-protection hardening, while Contacts remains Phase 8
+- current Phase 1-6 ProtectedData work plus Phase 7 PR 1-PR 4 ordinary-settings, self-test export-only, and temporary/export/tutorial hardening work are implemented; Contacts remains Phase 8
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
 - AppData phase completion status is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 
@@ -430,12 +430,14 @@ App Sandbox:
 │       ├── com.cypherair.internal.rewrapInProgress         → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.internal.rewrapTargetMode         → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.internal.modifyExpiryInProgress   → Legacy source removed after private-key-control migration
-│       └── com.cypherair.internal.modifyExpiryFingerprint  → Legacy source removed after private-key-control migration
+│       ├── com.cypherair.internal.modifyExpiryFingerprint  → Legacy source removed after private-key-control migration
+│       ├── com.cypherair.tutorial.sandbox.plist            → Fixed tutorial sandbox defaults; startup/reset direct cleanup
+│       └── com.cypherair.tutorial.<UUID>.plist             → Legacy tutorial sandbox defaults orphan; startup/reset fallback cleanup
 └── tmp/
-    ├── decrypted/               → Decrypted file previews (deleted on view exit + app launch)
-    ├── streaming/               → Temporary streaming encrypt/decrypt outputs (deleted on app launch)
-    ├── export-*                 → Temporary fileExporter handoff files
-    └── CypherAirGuidedTutorial-* → Tutorial contacts sandbox
+    ├── decrypted/op-<UUID>/     → Per-operation decrypted file previews with verified complete protection
+    ├── streaming/op-<UUID>/     → Per-operation streaming outputs with verified complete protection
+    ├── export-<UUID>-<filename> → Temporary fileExporter handoff files with verified complete protection
+    └── CypherAirGuidedTutorial-<UUID>/ → Tutorial contacts sandbox with verified complete protection
 ```
 
 **Keychain key naming conventions:**

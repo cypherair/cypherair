@@ -17,7 +17,7 @@ final class EncryptScreenModel {
         Bool,
         String?,
         FileProgressReporter
-    ) async throws -> URL
+    ) async throws -> AppTemporaryArtifact
 
     private(set) var configuration: EncryptView.Configuration
     let operation: OperationController
@@ -31,6 +31,7 @@ final class EncryptScreenModel {
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let textEncryptionAction: TextEncryptionAction
     private let fileEncryptionAction: FileEncryptionAction
+    @ObservationIgnored private var encryptedFileArtifact: AppTemporaryArtifact?
 
     var encryptMode: EncryptView.EncryptMode = .text
     var plaintext = ""
@@ -43,7 +44,13 @@ final class EncryptScreenModel {
     var showFileImporter = false
     var selectedFileURL: URL?
     var selectedFileName: String?
-    var encryptedFileURL: URL?
+    var encryptedFileURL: URL? {
+        didSet {
+            if encryptedFileURL != encryptedFileArtifact?.fileURL {
+                encryptedFileArtifact = encryptedFileURL.map { AppTemporaryArtifact(fileURL: $0) }
+            }
+        }
+    }
     var showUnverifiedRecipientsWarning = false
     var textInputSectionEpoch = 0
 
@@ -233,6 +240,7 @@ final class EncryptScreenModel {
     }
 
     func handleImportedFile(_ url: URL) {
+        cleanupTemporaryEncryptedFile()
         selectedFileURL = url
         selectedFileName = url.lastPathComponent
     }
@@ -303,7 +311,7 @@ final class EncryptScreenModel {
         }
         let encryptToSelfFingerprint = encryptToSelf ? self.encryptToSelfFingerprint : nil
 
-        encryptedFileURL = nil
+        cleanupTemporaryEncryptedFile()
         authLifecycleTraceStore?.record(
             category: .operation,
             name: "encrypt.file.start",
@@ -311,7 +319,7 @@ final class EncryptScreenModel {
         )
 
         operation.runFileOperation(mapError: mapEncryptionError) { [self] progress in
-            let result = try await self.fileEncryptionAction(
+            let artifact = try await self.fileEncryptionAction(
                 fileURL,
                 recipients,
                 signerFingerprint,
@@ -319,8 +327,13 @@ final class EncryptScreenModel {
                 encryptToSelfFingerprint,
                 progress
             )
+            var pendingArtifact: AppTemporaryArtifact? = artifact
+            defer {
+                pendingArtifact?.cleanup()
+            }
             try Task.checkCancellation()
-            self.encryptedFileURL = result
+            self.adoptEncryptedFileArtifact(artifact)
+            pendingArtifact = nil
             self.authLifecycleTraceStore?.record(
                 category: .operation,
                 name: "encrypt.file.finish",
@@ -423,6 +436,14 @@ final class EncryptScreenModel {
         exportController.finish()
     }
 
+    func handleDisappear() {
+        cleanupTemporaryEncryptedFile()
+    }
+
+    func handleContentClearGenerationChange() {
+        cleanupTemporaryEncryptedFile()
+    }
+
     func handleExportError(_ error: Error) {
         operation.present(error: mapEncryptionError(error))
     }
@@ -439,6 +460,18 @@ final class EncryptScreenModel {
         case .file:
             encryptFile()
         }
+    }
+
+    private func adoptEncryptedFileArtifact(_ artifact: AppTemporaryArtifact) {
+        cleanupTemporaryEncryptedFile()
+        encryptedFileArtifact = artifact
+        encryptedFileURL = artifact.fileURL
+    }
+
+    private func cleanupTemporaryEncryptedFile() {
+        encryptedFileArtifact?.cleanup()
+        encryptedFileArtifact = nil
+        encryptedFileURL = nil
     }
 
     private func applyPrefilledPlaintextIfNeeded(from configuration: EncryptView.Configuration) {

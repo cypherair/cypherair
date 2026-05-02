@@ -208,8 +208,87 @@ final class CommonHelpersTests: XCTestCase {
         }
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        try assertCompleteFileProtection(at: url)
         controller.finish()
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    func test_fileExportController_prepareFileExport_doesNotOwnSourceFile() throws {
+        let controller = FileExportController()
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirFileExportSource-\(UUID().uuidString).asc")
+        try Data("source".utf8).write(to: url, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        controller.prepareFileExport(fileURL: url, suggestedFilename: "source.asc")
+
+        XCTAssertEqual(controller.payload?.url, url)
+        controller.finish()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    func test_appTemporaryArtifactStore_operationArtifactsUseUniqueOwnerDirectoriesAndProtection() throws {
+        let store = CypherAir.AppTemporaryArtifactStore()
+        let inputURL = URL(fileURLWithPath: "/tmp/repeated-name.txt")
+
+        let first = try store.makeStreamingArtifact(for: inputURL)
+        let second = try store.makeStreamingArtifact(for: inputURL)
+        defer {
+            first.cleanup()
+            second.cleanup()
+        }
+
+        XCTAssertNotEqual(first.fileURL, second.fileURL)
+        XCTAssertNotEqual(first.ownerDirectoryURL, second.ownerDirectoryURL)
+        XCTAssertEqual(first.fileURL.lastPathComponent, "repeated-name.txt.gpg")
+        XCTAssertTrue(first.fileURL.path.contains("/streaming/op-"))
+        try assertCompleteFileProtection(at: try XCTUnwrap(first.ownerDirectoryURL))
+        try assertCompleteFileProtection(at: try XCTUnwrap(second.ownerDirectoryURL))
+    }
+
+    func test_appStartupCoordinator_cleansPhase7TemporaryArtifactsAndTutorialDefaults() throws {
+        let baseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirStartupTemp-\(UUID().uuidString)", isDirectory: true)
+        let preferencesDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirStartupPrefs-\(UUID().uuidString)", isDirectory: true)
+        let legacySelfTestDirectory = baseDirectory
+            .appendingPathComponent("legacy-self-test", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: baseDirectory)
+            try? FileManager.default.removeItem(at: preferencesDirectory)
+        }
+        try makePhase7TemporaryArtifacts(in: baseDirectory)
+        try FileManager.default.createDirectory(at: preferencesDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: legacySelfTestDirectory, withIntermediateDirectories: true)
+        try Data("legacy".utf8).write(
+            to: legacySelfTestDirectory.appendingPathComponent("self-test.txt"),
+            options: .atomic
+        )
+        let fixedTutorialSuiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
+        let fixedTutorialPlist = preferencesDirectory.appendingPathComponent("\(fixedTutorialSuiteName).plist")
+        try Data("fixed".utf8).write(to: fixedTutorialPlist, options: .atomic)
+        let legacyTutorialSuiteName = "com.cypherair.tutorial.\(UUID().uuidString)"
+        let legacyTutorialPlist = preferencesDirectory.appendingPathComponent("\(legacyTutorialSuiteName).plist")
+        try Data("orphan".utf8).write(to: legacyTutorialPlist, options: .atomic)
+        let similarTutorialSuiteName = "com.cypherair.tutorial.not-a-uuid"
+        let similarTutorialPlist = preferencesDirectory.appendingPathComponent("\(similarTutorialSuiteName).plist")
+        try Data("keep".utf8).write(to: similarTutorialPlist, options: .atomic)
+
+        let store = CypherAir.AppTemporaryArtifactStore(
+            temporaryDirectory: baseDirectory,
+            preferencesDirectory: preferencesDirectory
+        )
+        AppStartupCoordinator().cleanupTemporaryFiles(
+            temporaryArtifactStore: store,
+            legacySelfTestReportsDirectory: legacySelfTestDirectory
+        )
+
+        XCTAssertTrue(store.remainingTemporaryArtifacts().isEmpty)
+        XCTAssertTrue(store.remainingTutorialDefaultsSuites().isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixedTutorialPlist.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyTutorialPlist.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: similarTutorialPlist.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacySelfTestDirectory.path))
     }
 
     func test_privacyScreenLifecycleGate_allowsNormalResignAndActivation() {
@@ -1321,5 +1400,38 @@ final class CommonHelpersTests: XCTestCase {
             try? await Task.sleep(nanoseconds: 1_000_000)
         }
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func makePhase7TemporaryArtifacts(in temporaryDirectory: URL) throws {
+        let decryptedDir = temporaryDirectory.appendingPathComponent("decrypted", isDirectory: true)
+        let streamingDir = temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
+        let exportURL = temporaryDirectory.appendingPathComponent("export-\(UUID().uuidString)-sample.asc")
+        let tutorialDir = temporaryDirectory
+            .appendingPathComponent("CypherAirGuidedTutorial-\(UUID().uuidString)", isDirectory: true)
+
+        try FileManager.default.createDirectory(
+            at: decryptedDir.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: streamingDir.appendingPathComponent("op-\(UUID().uuidString)", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(at: tutorialDir, withIntermediateDirectories: true)
+        try Data("export".utf8).write(to: exportURL, options: .atomic)
+    }
+
+    private func assertCompleteFileProtection(
+        at url: URL,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        XCTAssertEqual(
+            attributes[.protectionKey] as? FileProtectionType,
+            .complete,
+            file: file,
+            line: line
+        )
     }
 }
