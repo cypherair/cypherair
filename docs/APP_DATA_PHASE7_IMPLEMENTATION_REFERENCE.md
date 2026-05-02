@@ -1,7 +1,7 @@
 # AppData Phase 7 Implementation Reference
 
-> **Status:** Active Phase 7 architecture reference.
-> **Purpose:** Define the Phase 7 protection requirements and auditable PR tracks for remaining non-Contacts app-owned data surfaces after AppData Phase 1-6 and Phase 7 PR 1-PR 4.
+> **Status:** Completed Phase 7 architecture and closure reference.
+> **Purpose:** Document the completed Phase 7 protection requirements and auditable PR tracks for non-Contacts app-owned data surfaces after AppData Phase 1-6.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Relationship:** This document is not a symbol-level implementation plan and must not freeze future schema, type, method, or file names. It complements the inventory in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) and the progress record in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
 > **Last reviewed:** 2026-05-02.
@@ -9,14 +9,14 @@
 
 ## 1. Scope And Document Roles
 
-Phase 7 covers the remaining non-Contacts protected-after-unlock surfaces:
+Phase 7 covered the non-Contacts protected-after-unlock surfaces:
 
 - ordinary app settings now protected by `protected-settings` schema v2, with legacy `UserDefaults` keys retained only as cleanup/migration sources
 - self-test report or diagnostics persistence
 - decrypted, streaming, export, and guided-tutorial temporary files
 - tutorial-only defaults and sandbox cleanup guarantees
 
-This document defines architecture requirements and review boundaries for those surfaces. Future implementation PRs must still carry their own focused implementation plans, concrete API choices, migration details, and tests.
+This document records architecture requirements and review boundaries for those surfaces. It is a closure reference, not a new source of code, schema, or API work.
 
 Document ownership:
 
@@ -25,11 +25,11 @@ Document ownership:
 - [SECURITY](SECURITY.md), [ARCHITECTURE](ARCHITECTURE.md), [TDD](TDD.md), and [TESTING](TESTING.md) remain the durable technical contract for implemented behavior.
 - [APP_DATA_PHASE7_TEMPORARY_RECORD](APP_DATA_PHASE7_TEMPORARY_RECORD.md) is superseded by this document and should be retained only as a recovery/audit note for pre-reference material.
 
-Contacts remain Phase 8 work unless the roadmap is explicitly revised. This document may describe the Phase 7 gate that blocks Contacts PR1-PR8, but it must not define Contacts-internal schema or rollout details.
+Contacts are unblocked Phase 8 work after Phase 7 closure. This document may point to the Contacts follow-on plan, but it must not define Contacts-internal schema or rollout details.
 
 ## 2. Current Baseline
 
-Implemented AppData Phase 1-6 plus Phase 7 PR 1-PR 4 behavior:
+Implemented AppData Phase 1-7 behavior:
 
 - `ProtectedDataRegistry`, shared root-secret authorization, wrapped-DMK lifecycle, relock, recovery dispatch, and post-unlock domain opening are present.
 - `protected-settings` exists as the first real ProtectedData domain. Schema v2 preserves `clipboardNotice` and stores the ordinary-settings snapshot for `gracePeriod`, `hasCompletedOnboarding`, `colorTheme`, `encryptToSelf`, and `guidedTutorialCompletedVersion`.
@@ -38,7 +38,7 @@ Implemented AppData Phase 1-6 plus Phase 7 PR 1-PR 4 behavior:
 - ProtectedData storage under `Application Support/ProtectedData/` applies and verifies explicit file protection where supported.
 - `ProtectedOrdinarySettingsCoordinator` owns the Phase 7 ordinary-settings lock state and loads/saves through `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff.
 
-Current Phase 7 status:
+Completed Phase 7 status:
 
 - Phase 7 PR 3 selected the short-lived/export-only self-test model: current self-test reports are in-memory only until explicit user export, and legacy `Documents/self-test/` content is cleanup-only on startup and local-data reset.
 - Phase 7 PR 4 selected the `ephemeral-with-cleanup` model for decrypted, streaming, export handoff, guided tutorial artifacts, and tutorial-only `UserDefaults` suites. It does not add a ProtectedData domain.
@@ -51,7 +51,7 @@ Apple platform references that motivate Phase 7:
 - [UserDefaults](https://developer.apple.com/documentation/foundation/userdefaults) is documented as a persistent settings store for app-specific settings; Apple warns not to store personal or sensitive information there because defaults are stored on disk in an unencrypted format.
 - [Encrypting Your App's Files](https://developer.apple.com/documentation/uikit/encrypting-your-app-s-files) requires apps to choose data-protection levels deliberately and recommends the strongest workable protection for user data files.
 - [FileProtectionType.complete](https://developer.apple.com/documentation/foundation/fileprotectiontype/complete) is the level where the file is encrypted on disk and unavailable while the device is locked or booting.
-- [Data.WritingOptions.completeFileProtection](https://developer.apple.com/documentation/foundation/data/writingoptions/completefileprotection) applies complete file protection when data writes create app-owned temporary handoff files.
+- [NSData.WritingOptions.completeFileProtection](https://developer.apple.com/documentation/foundation/nsdata/writingoptions/completefileprotection) applies complete file protection when data writes create app-owned temporary handoff files.
 - [Data Protection Entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.default-data-protection) provides a default protection class, but Phase 7 must not rely on a default entitlement as a substitute for explicit protection and verification where CypherAir owns the file.
 
 ## 3. Protection Requirements
@@ -100,7 +100,7 @@ Temporary, export, and tutorial files:
 
 ## 4. Auditable PR Tracks
 
-Phase 7 should be delivered as multiple reviewable PRs. A later implementation plan may split or combine work only if it preserves these audit boundaries.
+Phase 7 was delivered as multiple reviewable PRs. Future documentation should preserve these audit boundaries when describing the completed work.
 
 1. Startup and synchronous read-path removal
    - Status: implemented for ordinary settings by Phase 7 PR 1.
@@ -109,6 +109,7 @@ Phase 7 should be delivered as multiple reviewable PRs. A later implementation p
    - Pre-auth startup must not fetch the root secret, unwrap a DMK, open protected payloads, read legacy ordinary-setting sources, or weaken the selected app-session authentication policy.
 
 2. Protected settings expansion
+   - Status: implemented by Phase 7 PR 2.
    - Extend the existing protected-settings capability to cover the targeted ordinary settings.
    - Preserve `clipboardNotice` compatibility and legacy cleanup guarantees.
    - Include migration survivability, unreadable-state recovery, relock cleanup, and no-shadow-copy coverage.
@@ -127,12 +128,14 @@ Phase 7 should be delivered as multiple reviewable PRs. A later implementation p
    - Keep user-selected exported files classified as out-of-app-custody after transfer.
 
 5. Documentation and gate closure
+   - Status: implemented by Phase 7 PR 5 as docs-only closure.
    - Update [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md), [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md), [SECURITY](SECURITY.md), [ARCHITECTURE](ARCHITECTURE.md), [TDD](TDD.md), and [TESTING](TESTING.md) to match implemented Phase 7 behavior.
-   - Decide whether Phase 8 Contacts remains blocked, is unblocked, or needs an explicit roadmap revision.
+   - Mark Phase 8 Contacts as unblocked follow-on work without implementing Contacts or redefining its schema.
+   - Do not introduce, remove, or rename Swift/Rust public APIs, ProtectedData schemas, UniFFI surfaces, entitlements, permission strings, or build settings.
 
 ## 5. Validation Requirements
 
-Every Phase 7 implementation PR must include tests appropriate to its surface. At minimum, the complete Phase 7 closure must prove:
+Every Phase 7 implementation PR included tests appropriate to its surface. At minimum, the complete Phase 7 closure must prove:
 
 - pre-auth startup does not read protected settings payloads, fetch the root secret, or unwrap any domain master key
 - app-session authentication strength and `LAContext` handoff behavior are preserved

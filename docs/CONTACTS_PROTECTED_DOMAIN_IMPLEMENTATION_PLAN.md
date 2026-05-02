@@ -1,8 +1,8 @@
 # Contacts Protected Domain Implementation Plan
 
 > **Version:** Draft v0.1
-> **Status:** Draft implementation-prep plan. This document does not describe current shipped behavior.
-> **Purpose:** Bridge the gap between the current shared ProtectedData framework, the active Contacts documents, and the deferred Contacts protected-domain work so the later implementation can proceed through a stable, reviewable PR sequence.
+> **Status:** Draft implementation-prep plan for unblocked Phase 8 work. This document does not describe current shipped behavior.
+> **Purpose:** Bridge the gap between the current shared ProtectedData framework, the active Contacts documents, and the Phase 8 Contacts protected-domain work so the later implementation can proceed through a stable, reviewable PR sequence.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
 > **Primary authority:** [CONTACTS_TDD](CONTACTS_TDD.md) for Contacts design intent and [ARCHITECTURE](ARCHITECTURE.md) / [SECURITY](SECURITY.md) / [TDD](TDD.md) for current shared ProtectedData architecture.
@@ -10,7 +10,7 @@
 
 ## 1. Scope And Relationship
 
-This document is an implementation-prep companion for the deferred Contacts protected-domain phase. It exists because the repository has landed the shared ProtectedData foundation and Phase 1-6 domains, while Contacts still needs a current-state implementation path that accounts for remaining Phase 7 gates.
+This document is an implementation-prep companion for the Contacts protected-domain phase. It exists because the repository has landed the shared ProtectedData foundation plus completed Phase 7 non-Contacts work, while Contacts still needs a current-state implementation path.
 
 This document specifies:
 
@@ -262,7 +262,7 @@ This implementation plan references the inventory by behavior group rather than 
 
 ## 6. Prerequisites And Planned Contacts PR Sequence
 
-This section freezes the later implementation order and separates completed shared AppData prerequisites from Contacts-internal PRs. Contacts PR1-PR8 remain AppData Phase 8 work and do not begin until the remaining Phase 7 roadmap gate is implemented or explicitly resolved, unless the AppData roadmap is revised.
+This section freezes the later implementation order and separates completed shared AppData prerequisites from Contacts-internal PRs. Contacts PR1-PR8 remain AppData Phase 8 work and are unblocked now that the Phase 7 roadmap gate is closed.
 
 ### 6.1 Shared AppData Prerequisites
 
@@ -274,10 +274,9 @@ Completed prerequisites:
 - Phase 4 post-unlock multi-domain orchestration and framework hardening is implemented.
 - Phase 5 `private-key-control` is implemented for `authMode` and private-key recovery journal state.
 - Phase 6 `key-metadata` is implemented for `PGPKeyIdentity` payloads.
+- Phase 7 non-Contacts protected-after-unlock domains and local file/static-protection cleanup are implemented and closed through PR 5 documentation/gate closure.
 
-Remaining prerequisite:
-
-- Phase 7 non-Contacts protected-after-unlock domains and local file/static-protection cleanup must be implemented or explicitly resolved before Contacts PR1 starts.
+No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation still follows the PR1-PR8 sequence below and does not start from this document alone.
 
 ### 6.2 Contacts PR1 — Contacts Schema Skeleton And Compatibility Facade
 
@@ -615,7 +614,7 @@ This implementation-prep document is only complete if a later implementer can an
 
 - why Contacts protected-domain adoption needs more than a storage swap
 - why completed shared framework hardening remains a prerequisite rather than a Contacts-internal PR
-- why Contacts PR1-PR8 remain Phase 8 work behind the remaining Phase 7 gate
+- why Contacts PR1-PR8 remain Phase 8 work now that the Phase 7 gate is closed
 - what the Contacts schema skeleton may define before later behavior PRs
 - why verification contract refactor must happen before lifecycle wiring
 - which Contacts entrypoints are gated and which are only enrichment consumers

@@ -409,7 +409,7 @@ Migration and exception rules:
 - Legacy key metadata rows in the dedicated metadata account and older default-account rows are migration/cleanup sources only after verified `key-metadata` readability.
 - Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
 - Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset.
-- Phase 7 PR 4 temporary artifacts are centralized through `AppTemporaryArtifactStore`: streaming/decrypted outputs use one `op-<UUID>` owner directory per operation, export handoff files use atomic complete-protection writes, tutorial sandbox directories use verified complete protection, and startup/reset cleanup removes `decrypted`, `streaming`, `export-*`, `CypherAirGuidedTutorial-*`, fixed `com.cypherair.tutorial.sandbox` defaults, and orphaned legacy `com.cypherair.tutorial.<UUID>.plist` suites. Contacts remain outside the completed Phase 1-6 and Phase 7 PR 1-PR 4 scope.
+- Phase 7 temporary artifacts are centralized through `AppTemporaryArtifactStore`: streaming/decrypted outputs use one `op-<UUID>` owner directory per operation, export handoff files use atomic complete-protection writes, tutorial sandbox directories use verified complete protection, and startup/reset cleanup removes `decrypted`, `streaming`, `export-*`, `CypherAirGuidedTutorial-*`, fixed `com.cypherair.tutorial.sandbox` defaults, and orphaned legacy `com.cypherair.tutorial.<UUID>.plist` suites. Contacts remain outside the completed Phase 1-7 scope and are pending unblocked Phase 8 protected-domain implementation.
 
 ---
 

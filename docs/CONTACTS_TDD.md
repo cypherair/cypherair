@@ -705,7 +705,7 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 
 ### 14.6 Migration And Recovery
 
-- Contacts adoption occurs only after AppData Phase 1-6 prerequisites are complete and remaining Phase 7 gates are implemented or explicitly resolved
+- Contacts adoption occurs after AppData Phase 1-7 prerequisites are complete; Phase 8 is unblocked but still follows the Contacts-specific implementation plan
 - Contacts migration is triggered by first Contacts-required protected-domain access, not by process launch or service initialization alone
 - target Contacts domain is validated before legacy source retirement
 - quarantine storage is inactive for normal Contacts resolution

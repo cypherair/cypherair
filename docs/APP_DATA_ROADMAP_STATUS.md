@@ -15,8 +15,8 @@
 | Phase 4 | Post-Unlock Multi-Domain Orchestration And Framework Hardening | Implemented | Phase 4 established production wiring for `protected-settings` plus the framework-owned `protected-framework-sentinel` domain. Post-unlock handoff can create/open the sentinel as a second domain after settings is committed, generic recovery dispatch is keyed by `ProtectedDataDomainID`, and second-domain create/delete/recovery plus pending-create continuation coverage live in `ProtectedDataFrameworkTests`. Phase 5 later adds `private-key-control` to the post-unlock opener path. |
 | Phase 5 | Private-Key Control Domain | Implemented | `PrivateKeyControlStore` is wired as the `private-key-control` ProtectedData domain. It migrates `authMode` plus rewrap / modify-expiry recovery journal state out of legacy `UserDefaults` after app authentication, opens through post-unlock orchestration, participates in relock, and is covered by `ProtectedDataFrameworkTests` plus private-key recovery tests. |
 | Phase 6 | Key Metadata Domain | Implemented | `KeyMetadataDomainStore` owns ProtectedData domain `key-metadata` for `PGPKeyIdentity` payloads after app unlock. Migration reads both the transitional metadata account and older default-account metadata rows, cleans source rows only after verified domain creation/open, and preserves private-key material in the existing Keychain / Secure Enclave domain. |
-| Phase 7 | Non-Contacts Protected-After-Unlock Domains | In progress / PR 4 implemented for temporary, export, and tutorial hardening | `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings lock state and now loads/saves grace period, onboarding, theme, encrypt-to-self, and tutorial completion from `protected-settings` schema v2 after app authentication. Legacy ordinary `UserDefaults` keys are cleanup-only after verified migration. Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset. `AppTemporaryArtifactStore` now owns Phase 7 PR 4 temporary paths, verified `.complete` file protection, owner cleanup, startup/reset cleanup, fixed tutorial defaults cleanup, and legacy tutorial defaults UUID sweep for decrypted, streaming, export handoff, and tutorial artifacts. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). |
-| Phase 8 | Contacts Protected Domain | Pending | Contacts migration has not started. Contacts PR1-PR8 belong to Phase 8 and remain gated behind remaining Phase 7 work unless the roadmap is explicitly revised. |
+| Phase 7 | Non-Contacts Protected-After-Unlock Domains | Implemented / PR 5 documentation gate closed | `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings lock state and now loads/saves grace period, onboarding, theme, encrypt-to-self, and tutorial completion from `protected-settings` schema v2 after app authentication. Legacy ordinary `UserDefaults` keys are cleanup-only after verified migration. Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset. `AppTemporaryArtifactStore` owns Phase 7 temporary paths, verified `.complete` file protection, owner cleanup, startup/reset cleanup, fixed tutorial defaults cleanup, and legacy tutorial defaults UUID sweep for decrypted, streaming, export handoff, and tutorial artifacts. PR 5 closed the documentation and Phase 8 gate. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). |
+| Phase 8 | Contacts Protected Domain | Pending / unblocked | Contacts migration has not started. Contacts PR1-PR8 belong to Phase 8 and are unblocked by the completed Phase 7 closure; implementation proceeds through the Contacts-specific plan and inventory. |
 | Phase 9 | Future Persistent Domains | Pending | Reserved for future app-owned persistent domains not covered by the current inventory. |
 
 ## 2. Phase 3 Boundary
@@ -27,7 +27,7 @@ Phase 3 is complete only in its narrow first-domain sense:
 - `clipboardNotice` is migrated into that domain. Phase 7 PR 2 keeps this domain as the protected settings home for ordinary settings too.
 - Settings unlock can reuse a current app-session `LAContext` handoff without an extra prompt.
 
-Phase 3 by itself did not mean all settings had moved. Phase 7 PR 2 owns the ordinary-settings expansion; other protected-after-unlock surfaces remain Phase 7 work unless another phase explicitly owns them.
+Phase 3 by itself did not mean all settings had moved. Phase 7 PR 2 owns the ordinary-settings expansion, and Phase 7 PR 3-PR 5 closed the non-Contacts protected-after-unlock documentation gate.
 
 ## 3. Phase 4 Boundary
 
@@ -46,7 +46,7 @@ Implemented:
 
 Remaining product migrations:
 
-- contacts and any future protected-after-unlock product surfaces remain Phase 8+ work. Self-test report persistence is implemented as Phase 7 PR 3 export-only memory state plus legacy cleanup, and temporary/export/tutorial hardening is implemented as Phase 7 PR 4 `ephemeral-with-cleanup`.
+- contacts and any future protected-after-unlock product surfaces remain Phase 8+ pending implementation. Self-test report persistence is implemented as Phase 7 PR 3 export-only memory state plus legacy cleanup, temporary/export/tutorial hardening is implemented as Phase 7 PR 4 `ephemeral-with-cleanup`, and PR 5 closed the Phase 7 documentation gate.
 
 ## 4. Phase 5 Boundary
 
@@ -60,7 +60,7 @@ Phase 5 is complete for the private-key control source of truth:
 
 Phase 5 does not move private-key material into ProtectedData. Permanent and pending SE-wrapped private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain.
 
-Phase 6 later moved key metadata only. Ordinary protected-after-unlock settings are implemented by Phase 7 PR 1-PR 2, self-test export-only state by PR 3, and temporary/export/tutorial cleanup by PR 4; Contacts remain Phase 8 targets.
+Phase 6 later moved key metadata only. Ordinary protected-after-unlock settings are implemented by Phase 7 PR 1-PR 2, self-test export-only state by PR 3, temporary/export/tutorial cleanup by PR 4, and documentation/gate closure by PR 5; Contacts are unblocked Phase 8 targets.
 
 ## 5. Phase 6 Boundary
 
@@ -76,9 +76,9 @@ Phase 6 is complete for the key metadata source of truth:
 
 Phase 6 does not move private-key material. Permanent and pending SE-wrapped private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain.
 
-## 6. Phase 7 PR 1 Through PR 4 Boundary
+## 6. Phase 7 Closure Summary
 
-Phase 7 PR 1 is complete for ordinary-settings read-path ownership, PR 2 is complete for the ordinary-settings payload migration, PR 3 is complete for the self-test persistence decision, and PR 4 is complete for temporary/export/tutorial hardening:
+Phase 7 is complete. PR 1 is complete for ordinary-settings read-path ownership, PR 2 is complete for the ordinary-settings payload migration, PR 3 is complete for the self-test persistence decision, PR 4 is complete for temporary/export/tutorial hardening, and PR 5 closes the documentation and Phase 8 gate:
 
 - `ProtectedOrdinarySettingsCoordinator` is the app-wide source for ordinary-settings `locked`, `loaded(snapshot)`, and `recoveryRequired` state.
 - `AppConfiguration` keeps the early-readable `appSessionAuthenticationPolicy` boot exception plus runtime session state; it no longer owns ordinary settings such as grace period, onboarding completion, theme, encrypt-to-self, or guided tutorial completion.
@@ -95,7 +95,7 @@ Phase 7 PR 1 is complete for ordinary-settings read-path ownership, PR 2 is comp
 - `TutorialSandboxContainer` creates `tmp/CypherAirGuidedTutorial-<UUID>/` with verified `.complete` protection, uses the fixed `com.cypherair.tutorial.sandbox` defaults suite for the single active tutorial sandbox, and removes the current tutorial directory plus fixed suite on reset/finish.
 - Startup cleanup and Reset All Local Data directly clear `com.cypherair.tutorial.sandbox`, then enumerate the app Preferences directory for legacy `com.cypherair.tutorial.<UUID>.plist` orphans and delete residual plists so tutorial defaults orphaned by crash or system kill do not persist.
 
-Phase 7 PR 4 does not change Rust cryptographic behavior, UniFFI shape, ProtectedData schema, entitlements, Contacts storage, or user-selected export destinations after they leave app custody.
+Phase 7 closure does not change Rust cryptographic behavior, UniFFI shape, ProtectedData schema, entitlements, Contacts storage, or user-selected export destinations after they leave app custody.
 
 ## 7. Inventory Status Rule
 

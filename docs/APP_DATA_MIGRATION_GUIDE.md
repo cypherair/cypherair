@@ -1,7 +1,7 @@
-# AppData Remaining Migration Guide
+# AppData Migration Guide
 
-> **Status:** Active remaining-roadmap and inventory document.
-> **Purpose:** Track the remaining ProtectedData migration work after AppData Phase 1-6 and Phase 7 PR 1-PR 4, and keep the persisted-state inventory current while later Phase 7 work and Phase 8 wait for dedicated implementation planning.
+> **Status:** Active current-state, roadmap, and inventory document.
+> **Purpose:** Track completed AppData migration state, keep the persisted-state inventory current, and identify remaining Phase 8+ work after Phase 7 closure.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Source of truth:** Current implementation details live in [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md). Phase 7 implementation-reference requirements live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). Phase completion status lives in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
 > **Last reviewed:** 2026-05-02.
@@ -9,17 +9,17 @@
 
 ## 1. Scope And Relationship
 
-This guide is no longer the detailed implementation plan for the completed AppData foundation. Phase 1-6 have landed and are now documented as current behavior in the long-lived architecture, security, technical, and testing docs.
+This guide is no longer the detailed implementation plan for the completed AppData foundation. Phase 1-7 have landed and are now documented as current behavior in the long-lived architecture, security, technical, and testing docs.
 
 This guide remains active for:
 
-- remaining Phase 7 non-Contacts protected-after-unlock surfaces
-- Phase 8 Contacts readiness gates
+- implemented Phase 7 non-Contacts protected-after-unlock surfaces and closure state
+- Phase 8 Contacts readiness and follow-on planning
 - Phase 9 future app-owned persistent domains
 - the reviewed persistent-state inventory
 - cross-domain migration rules that future dedicated plans must preserve
 
-This guide does not create the Phase 7 implementation plan. It records the remaining scope and constraints that later Phase 7 plans must honor. The Phase 7 architecture-level implementation reference lives in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md).
+This guide no longer creates Phase 7 implementation work. It records the completed Phase 7 scope and the constraints future Phase 8+ plans must preserve. The Phase 7 architecture-level closure reference lives in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md).
 
 ## 2. Current Foundation Status
 
@@ -35,6 +35,7 @@ This guide does not create the Phase 7 implementation plan. It records the remai
 | Phase 7 PR 2: Protected Settings Expansion | Implemented | `protected-settings` schema v2 owns grace period, onboarding completion, theme, encrypt-to-self, and guided tutorial completion after verified migration. |
 | Phase 7 PR 3: Self-Test Persistence Decision | Implemented | Current self-test reports are in-memory export-only data; legacy `Documents/self-test/` is cleanup-only on startup and Reset All Local Data. |
 | Phase 7 PR 4: Temporary / Export / Tutorial Hardening | Implemented | Streaming/decrypted outputs use per-operation temporary owner directories, export handoff files use verified complete protection, tutorial sandbox directories use verified complete protection, and startup/reset cleanup removes Phase 7 temporary artifacts plus the fixed tutorial defaults suite and legacy UUID tutorial-suite orphans. |
+| Phase 7 PR 5: Documentation And Gate Closure | Implemented | Long-lived docs record Phase 7 as complete, and Phase 8 Contacts is unblocked for its Contacts-specific implementation plan. |
 
 Current ProtectedData implementation details are intentionally not repeated here. Use [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md) for the current technical contract.
 
@@ -42,7 +43,7 @@ Current ProtectedData implementation details are intentionally not repeated here
 
 ### Phase 7: Non-Contacts Protected-After-Unlock Domains
 
-Phase 7 is in progress. PR 1 removed synchronous/pre-auth ordinary-settings read paths and introduced `ProtectedOrdinarySettingsCoordinator` as the app-wide `locked` / `loaded(snapshot)` / `recoveryRequired` source for ordinary settings. PR 2 moved the targeted ordinary settings into `protected-settings` schema v2. PR 3 selected the self-test short-lived/export-only model and made legacy `Documents/self-test/` cleanup-only. PR 4 hardened decrypted, streaming, export handoff, guided tutorial, and tutorial defaults artifacts as `ephemeral-with-cleanup`. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md); later implementation PRs still need their own focused plans.
+Phase 7 is complete. PR 1 removed synchronous/pre-auth ordinary-settings read paths and introduced `ProtectedOrdinarySettingsCoordinator` as the app-wide `locked` / `loaded(snapshot)` / `recoveryRequired` source for ordinary settings. PR 2 moved the targeted ordinary settings into `protected-settings` schema v2. PR 3 selected the self-test short-lived/export-only model and made legacy `Documents/self-test/` cleanup-only. PR 4 hardened decrypted, streaming, export handoff, guided tutorial, and tutorial defaults artifacts as `ephemeral-with-cleanup`. PR 5 closes the documentation and roadmap gate. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md).
 
 Known Phase 7 surfaces:
 
@@ -59,7 +60,7 @@ The older [APP_DATA_PHASE7_TEMPORARY_RECORD](APP_DATA_PHASE7_TEMPORARY_RECORD.md
 
 ### Phase 8: Contacts Protected Domain
 
-Phase 8 remains pending and should continue through the Contacts-specific documents:
+Phase 8 remains pending but is unblocked by Phase 7 closure. Contacts work should continue through the Contacts-specific documents:
 
 - [CONTACTS_PRD](CONTACTS_PRD.md)
 - [CONTACTS_TDD](CONTACTS_TDD.md)
@@ -68,7 +69,7 @@ Phase 8 remains pending and should continue through the Contacts-specific docume
 
 Contacts must remain a domain-specific consumer of the shared ProtectedData framework. It must not introduce a second vault architecture or take ownership of registry authority, root-secret lifecycle, wrapped-DMK lifecycle, or app-session grace-window behavior.
 
-Contacts PR1-PR8 remain gated behind Phase 7 unless the roadmap is explicitly revised.
+Contacts PR1-PR8 remain Phase 8 work and should follow the Contacts-specific PR sequence. PR5 does not implement Contacts or redesign the Contacts protected-domain schema.
 
 ### Phase 9: Future Persistent Domains
 
