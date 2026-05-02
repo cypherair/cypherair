@@ -190,8 +190,7 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [DOCUMENTATION_GOVERNANCE](docs/DOCUMENTATION_GOVERNANCE.md) | Documentation classes, metadata rules, archive rules, and update triggers |
 | [COMPLIANCE_REMEDIATION_PLAN (Archive)](docs/archive/COMPLIANCE_REMEDIATION_PLAN.md) | Archived remediation plan and close-out history for the licensing/distribution rollout |
 | [POC](docs/archive/POC.md) | Proof-of-concept test plan (archived) |
-| [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards and SwiftUI patterns |
-| [LIQUID_GLASS](docs/LIQUID_GLASS.md) | iOS 26 Liquid Glass and platform-native SwiftUI chrome guidance |
+| [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards, SwiftUI patterns, and current Liquid Glass rules |
 | [CODE_REVIEW](docs/CODE_REVIEW.md) | Code review checklist by change type |
 | [XCFRAMEWORK_RELEASES](docs/XCFRAMEWORK_RELEASES.md) | Current edge, drill, and stable XCFramework release channels and verification |
 | [CHANGELOG](docs/CHANGELOG.md) | PRD revision history |

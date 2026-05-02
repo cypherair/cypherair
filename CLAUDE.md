@@ -128,7 +128,7 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 
 - Swift API Design Guidelines. `guard let` over force-unwrap. `async/await` over Combine.
 - `@Observable` for state. `NavigationStack` with typed paths. No `NavigationView`.
-- Use iOS 26 Liquid Glass conventions where applicable, and prefer platform-native SwiftUI chrome on macOS and visionOS. Custom controls use `.glassEffect()` only when the API is available and matches platform conventions. See @docs/LIQUID_GLASS.md.
+- Use iOS 26 Liquid Glass conventions where applicable, and prefer platform-native SwiftUI chrome on macOS and visionOS. Custom controls use `.glassEffect()` only when the API is available and matches platform conventions. See @docs/CONVENTIONS.md.
 - One type per file. Group by feature. All user strings in String Catalog.
 - Full conventions: @docs/CONVENTIONS.md
 
