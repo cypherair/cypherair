@@ -23,7 +23,7 @@ It exists because current Contacts access is distributed across:
 Every later implementation PR should use this document to answer:
 
 - which surfaces it owns
-- whether each surface is a domain read, mutation, recovery action, or optional Contacts enrichment
+- whether each surface is a domain read, mutation, package action, maintenance action, or optional Contacts enrichment
 - what the locked-state behavior must be
 - whether framework gating is required
 
@@ -35,7 +35,8 @@ Each row in the inventory uses the following concepts.
 
 - `read` — needs Contacts domain content for ordinary user-visible behavior
 - `mutation` — changes Contacts domain content
-- `recovery` — imports, exports, migration, reconciliation, or cleanup flows
+- `package` — selected-contact `.cypherair-contacts` package export/import preview/commit
+- `maintenance` — migration, quarantine, reset, cleanup, reconciliation, or sandbox boundary flows
 - `enrichment` — optional Contacts-aware enhancement around otherwise meaningful non-Contacts work
 
 ### 2.2 Target Unlock Requirement
@@ -61,9 +62,10 @@ Locked-state behavior is frozen at the inventory level so later PRs do not reint
 Allowed outcomes:
 
 - explicit Contacts locked state
+- explicit Contacts opening state
 - explicit framework unavailable state
 - recovery-needed state
-- core result completed with Contacts enrichment pending
+- plaintext delivered with signature verification context unavailable
 - pre-commit inspection allowed, commit blocked until unlock
 
 ## 3. Access Surfaces
@@ -74,13 +76,15 @@ Allowed outcomes:
 | Contacts root list | `ContactsView` + `ContactService.loadContacts()` | read | yes | yes | Show explicit Contacts locked / recovery-needed / framework-unavailable state instead of empty list | Contacts PR3 | Current `.task`-based load bypasses future gate |
 | Contact detail lookup | `ContactDetailView` + `contactService.contact(forFingerprint:)` | read | yes | yes | Route blocked or explicit locked-state presentation; never nil-as-not-found because domain is locked | Contacts PR3 | Current view treats missing contact and unavailable domain too similarly |
 | Encrypt recipient browsing | `EncryptView` / `EncryptScreenModel.encryptableContacts` | read | yes | yes | Show explicit Contacts locked recipient state with unlock CTA | Contacts PR3 | Current recipient list assumes startup-loaded Contacts |
-| Encrypt recipient resolution | `EncryptionService` recipient fingerprint -> public key lookup | read | yes | yes | Encryption cannot proceed until Contacts domain is available | Contacts PR3, Contacts PR7 | Later Contacts PR7 changes resolution to contact-identity/preferred-key semantics |
-| Decrypt Contacts enrichment | `DecryptionService` signer lookup / identity resolution | enrichment | conditional | conditional | Plaintext and core verification complete; Contacts enrichment remains pending | Contacts PR2, Contacts PR3 | Core verification and Contacts enrichment are intentionally split |
-| Password-message Contacts enrichment | `PasswordMessageService.decryptMessage(...)` signer lookup / identity resolution | enrichment | conditional | conditional | Core password decrypt completes; Contacts enrichment remains pending when locked | Contacts PR2, Contacts PR3 | Mirrors ordinary decrypt semantics for signed SKESK flows |
-| Verify route Contacts-aware verification | `Verify` route via `SigningService` verify helpers | enrichment | conditional | conditional | Route requires unlock before presenting its intended final contacts-aware result | Contacts PR2, Contacts PR3 | Service contract still splits core verification from Contacts enrichment |
-| Certificate-signature target contact access | `ContactCertificateSignaturesScreenModel.contact` | read | yes | yes | Route blocked or explicit Contacts locked state | Contacts PR3 | Target certificate remains Contacts-owned state |
+| Encrypt recipient resolution | `EncryptionService` recipient fingerprint -> public key lookup | read | yes | yes | Encryption cannot proceed until Contacts domain is available | Contacts PR3, Contacts PR5 | Later Contacts PR5 changes resolution to contact-identity/preferred-key semantics |
+| Decrypt Contacts enrichment | `DecryptionService` signer lookup / identity resolution | enrichment | conditional | conditional | Plaintext may complete; signature verification reports missing Contacts context or signer certificate accurately | Contacts PR2, Contacts PR3 | Verification accuracy and Contacts enrichment are intentionally split |
+| Password-message Contacts enrichment | `PasswordMessageService.decryptMessage(...)` signer lookup / identity resolution | enrichment | conditional | conditional | Password decrypt may complete; signed-message verification reports missing Contacts context or signer certificate accurately | Contacts PR2, Contacts PR3 | Mirrors ordinary decrypt semantics for signed SKESK flows |
+| Verify route Contacts-aware verification | `Verify` route via `SigningService` verify helpers | enrichment | conditional | conditional | Route requires required verification context before presenting final contacts-aware result | Contacts PR2, Contacts PR3 | Service contract distinguishes missing context from invalid signatures |
+| Certificate-signature target contact access | current `ContactCertificateSignaturesScreenModel.contact`; future certification details flow | read | yes | yes | Route blocked or explicit Contacts opening / locked state | Contacts PR3, Contacts PR6 | Target certificate remains Contacts-owned state |
 | Certificate-signature verification-time candidate signer read | `CertificateSignatureService` candidate signer certificate loading via `contactService.contacts` | read | yes | yes | Verification cannot consume Contacts-backed candidate signer certificates until the Contacts domain is available | Contacts PR3 | Current service passes Contacts certificates into the engine as `candidateSigners`; this is verification input, not just UI enrichment |
-| Certificate-signature signer identity and projection enrichment | `CertificateSignatureService` signer identity resolution and certification projection through Contacts | enrichment | conditional | conditional | Contacts enrichment blocked until unlock; framework unavailable stays distinct | Contacts PR2, Contacts PR3, Contacts PR4 | Contacts PR2 owns the raw verification contract split; Contacts PR3 owns route/access gating; Contacts PR4 lands projection/reconciliation support |
+| Certification summary read | future Contact Detail trust/certification summary | read | yes | yes | Show opening / locked / recovery-needed state rather than stale certification summary | Contacts PR6 | Summary reads protected projection state |
+| Certification details read | redesigned certification details surface | read | yes | yes | Show opening / locked / recovery-needed state rather than empty history | Contacts PR6 | Replaces the current three-mode technical page with saved history and details |
+| Certificate-signature signer identity and projection enrichment | `CertificateSignatureService` signer identity resolution and certification projection through Contacts | enrichment | conditional | conditional | Contacts enrichment blocked until available; framework unavailable stays distinct | Contacts PR2, Contacts PR3, Contacts PR6 | Contacts PR6 lands projection/artifact persistence and redesigned UX |
 
 ## 4. Mutation Surfaces
 
@@ -89,26 +93,32 @@ Allowed outcomes:
 | Add Contact import inspection | `AddContactScreenModel`, `PublicKeyImportLoader`, URL/QR/file inspection | mutation | no | no | Allow key inspection and preview without Contacts unlock | Contacts PR3 | Inspection of candidate public key bytes is not itself a Contacts domain write |
 | Add Contact import commit | `ContactImportWorkflow.importContact(...)` | mutation | yes | yes | Pre-commit preview may remain visible, but commit requires Contacts unlock | Contacts PR3 | Current workflow writes directly through `ContactService.addContact(...)` |
 | URL-based contact import commit | `IncomingURLImportCoordinator.handleIncomingURL(...)` -> import confirmation success path | mutation | yes | yes | URL parsing may happen before unlock; final import commit requires Contacts unlock | Contacts PR3 | Current coordinator reaches import workflow directly |
-| Confirm key replacement / same-user update | `ContactImportWorkflow.confirmReplacement(...)` | mutation | yes | yes | Block replacement until Contacts unlock | Contacts PR3, Contacts PR7 | Later Contacts PR7 changes replacement semantics under person-centered model |
+| Confirm key replacement / same-user update | `ContactImportWorkflow.confirmReplacement(...)` | mutation | yes | yes | Block replacement until Contacts unlock | Contacts PR3, Contacts PR5 | Later Contacts PR5 changes replacement semantics under person-centered model |
 | Delete contact | `ContactsView` delete, `ContactDetailView` destructive action, `ContactService.removeContact(...)` | mutation | yes | yes | Show explicit locked or framework-unavailable state; never best-effort delete while locked | Contacts PR3 | Current deletes hit plaintext storage directly |
 | Manual verification promotion | `ContactDetailView` -> `ContactService.setVerificationState(...)` | mutation | yes | yes | Unlock required before mutation; no shadow write path | Contacts PR3 | Manual verification remains distinct from certification |
-| Merge contacts | future Contacts management surfaces | mutation | yes | yes | Unlock required; explicit merge workflow only | Contacts PR7 | Not yet implemented in current code |
-| Preferred key management | future Contacts detail or merge follow-up surfaces | mutation | yes | yes | Unlock required; must preserve deterministic preferred/additional/historical rules | Contacts PR7 | Depends on person-centered model |
+| Certify this contact | future Contact Detail primary certification action | mutation | yes | yes | Requires Contacts availability and private-key access according to existing signing rules | Contacts PR6 | Generates and saves certification projection plus signature artifact |
+| Save imported certification signature | redesigned certification details secondary import action | mutation | yes | yes | Preview may inspect external signature first; commit requires Contacts availability | Contacts PR6 | Covers current text/file external signature verification capability |
+| Merge contacts | future Contacts management surfaces | mutation | yes | yes | Unlock required; explicit merge workflow only | Contacts PR5 | Not yet implemented in current code |
+| Preferred key management | future Contacts detail or merge follow-up surfaces | mutation | yes | yes | Unlock required; must preserve deterministic preferred/additional/historical rules | Contacts PR5 | Depends on person-centered model |
 | Tag management | future Contacts detail / filter management | mutation | yes | yes | Unlock required | Contacts PR8 | Tags belong to `ContactIdentity` layer |
 | Recipient-list management | future Contacts list/detail management surfaces | mutation | yes | yes | Unlock required | Contacts PR8 | Lists bind to `ContactIdentity`, not fingerprints |
 
-## 5. Recovery, Migration, And Maintenance Surfaces
+## 5. Package, Migration, Certification, And Maintenance Surfaces
 
 | Surface | Current entrypoints | Type | Target unlock requirement | Framework gate | Locked-state target behavior | Planned PR | Notes |
 |---------|---------------------|------|---------------------------|----------------|------------------------------|------------|-------|
-| Contacts recovery export | future Contacts recovery action | recovery | yes | yes | Requires unlocked Contacts plus fresh authentication immediately before export | Contacts PR5 | Export serializes Contacts business data, not framework artifacts |
-| Contacts recovery import | future Contacts recovery import action | recovery | no | yes | Requires framework availability, app-session unlock, and root-secret availability; no routine second Contacts prompt beyond defined policy | Contacts PR5 | Covers replace-domain import and does not require a previously unlocked Contacts domain |
-| Empty-install restore | recovery import on installation with no protected domains | recovery | no | yes | Framework owns first-domain provisioning; Contacts does not special-case lifecycle | Contacts PR5 | Must bridge from empty steady-state / no protected domain present and does not require a pre-existing unlocked Contacts domain |
-| Certification projection reconciliation on unlock | Contacts unlock flow + reconciliation helper | recovery | yes | yes | Runs after unlock as needed; failures must not be misrepresented as empty Contacts state | Contacts PR4 | Separate from raw crypto verification |
-| Certification projection reconciliation on import | recovery import finalization | recovery | yes | yes | Rebuild projected state deterministically after import | Contacts PR4, Contacts PR5 | Import and reconciliation responsibilities meet here |
-| Legacy plaintext migration read | migration coordinator reading `.gpg` files and `contact-metadata.json` | recovery | conditional | yes | Old source remains authoritative until target readability is proven | Contacts PR6 | Reads legacy plaintext without treating it as the final source after cutover |
-| Quarantine management | migration coordinator quarantine paths | recovery | yes | yes | Quarantine is inactive for normal Contacts display and resolution | Contacts PR6 | No ordinary route may read quarantine as active source |
-| Final legacy deletion | post-cutover cleanup after later successful Contacts domain open | recovery | yes | yes | Delete only after later successful open confirmation | Contacts PR6 | Avoids destructive deletion on first cutover success |
+| Contact Detail single-contact export | future Contact Detail export action | package | yes | yes | Requires unlocked Contacts plus fresh authentication immediately before export | Contacts PR7 | Exports one contact into `.cypherair-contacts` |
+| Contacts list multi-select export | future Contacts list selection mode | package | yes | yes | Requires unlocked Contacts plus fresh authentication immediately before export | Contacts PR7 | Exports one or more selected contacts into one package |
+| Contact package import preview | future package import route / file importer | package | no | conditional | Parse and preview without Contacts mutation; framework gate is required only for later commit | Contacts PR7 | Reject malformed packages before preview |
+| Contact package import commit | future package import confirmation | package | yes | yes | Commit blocked until Contacts domain is available | Contacts PR7 | Creates/updates contacts through protected-domain write path; never whole-domain restore |
+| Certification projection revalidation on unlock | Contacts unlock flow + revalidation helper | maintenance | yes | yes | Runs after open as needed; failures must not be misrepresented as empty Contacts state | Contacts PR6 | Separate from raw crypto verification |
+| Certification projection revalidation on package import | package import commit finalization | maintenance | yes | yes | Rebuild projected state deterministically after commit | Contacts PR6, Contacts PR7 | Import and certification responsibilities meet here |
+| Legacy plaintext migration read | migration coordinator reading `.gpg` files and `contact-metadata.json` | maintenance | conditional | yes | Old source remains authoritative until target readability is proven | Contacts PR4 | Reads legacy plaintext without treating it as the final source after cutover |
+| Quarantine management | migration coordinator quarantine paths | maintenance | yes | yes | Quarantine is inactive for normal Contacts display and resolution | Contacts PR4 | No ordinary route may read quarantine as active source |
+| Final legacy deletion | post-cutover cleanup after later successful Contacts domain open | maintenance | yes | yes | Delete only after later successful open confirmation | Contacts PR4 | Avoids destructive deletion on first cutover success |
+| Local data reset | `LocalDataResetService.resetAllLocalData(...)` | maintenance | no | yes | Delete legacy Contacts, protected Contacts artifacts, package temporary artifacts, and clear `ContactService` runtime state | Contacts PR4, Contacts PR7 | Current reset already deletes legacy contacts directory and clears in-memory Contacts state |
+| Tutorial / test sandbox Contacts stores | `TutorialSandboxContainer`, UI test preload helpers | maintenance | no | no | Remain isolated from real protected Contacts migration and package exchange | Contacts PR4 | Sandbox contacts are test/tutorial data, not production protected-domain state |
+| Package temporary artifact cleanup | `AppTemporaryArtifactStore` / future package export temp files | maintenance | no | no | Temporary package files are cleaned after completion, cancellation, startup cleanup, and reset | Contacts PR7 | Mirrors existing protected export handoff expectations |
 
 ## 6. Surfaces Explicitly Not Treated As Contacts Domain Access
 
@@ -118,15 +128,15 @@ These repository behaviors remain important, but they are not ordinary Contacts 
 |---------|--------|
 | Pre-auth registry bootstrap | May inspect only framework-readable metadata, never Contacts payload content or the root-secret Keychain item |
 | Public-key inspection before import commit | Examines incoming key bytes, not existing Contacts domain state |
-| Core decrypt and core signature verification | Remains meaningful without Contacts, though Contacts enrichment may be pending or blocked |
+| Plaintext decrypt and low-level signer evidence extraction | May remain meaningful without Contacts, but signature verification must not be reported complete without a suitable verification certificate |
 
 ## 7. Inventory Acceptance Criteria
 
 This inventory is only complete if later implementers can use it to answer all of the following without rediscovering repository state manually:
 
 - which current entrypoints directly touch Contacts behavior
-- which surfaces are reads vs mutations vs recovery actions vs optional enrichment
-- which surfaces can partially operate while Contacts is locked
+- which surfaces are reads vs mutations vs package actions vs maintenance actions vs optional enrichment
+- which surfaces can partially operate while Contacts is opening, locked, or unavailable
 - which surfaces must wait for Contacts unlock before commit
 - which PR will own each surface during later implementation
 

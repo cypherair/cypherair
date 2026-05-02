@@ -21,7 +21,7 @@ This TDD covers:
 - search, tags, recipient lists, and merge behavior
 - manual verification and certification integration
 - migration, quarantine, and final legacy deletion
-- Contacts domain export/import as a formal recovery path
+- `.cypherair-contacts` package export/import for one or more selected contacts
 
 This TDD does not redefine the shared ProtectedData framework. The following remain owned by the current shared-framework documentation:
 
@@ -31,7 +31,7 @@ This TDD does not redefine the shared ProtectedData framework. The following rem
 - shared root-secret activation and relock behavior
 - framework-level recovery and `restartRequired`
 
-This document also does not redesign the separate certification feature. It assumes certification capability exists before Contacts implementation begins and defines how Contacts consumes its results.
+This document does not redefine packet-level OpenPGP certification cryptography. It does define how Contacts owns the certification projection, saved certification artifacts, and user-facing certification workflow around the existing certificate-signature service.
 
 ## 2. Design Principles
 
@@ -45,7 +45,7 @@ The implementation must satisfy these principles:
 - shared-session-authenticated Contacts access rather than Contacts-owned session ownership
 - deterministic behavior for multi-key contacts
 - conservative identity-linking behavior
-- explicit import-recoverable domain semantics
+- explicit contact-package exchange without whole-domain backup or restore semantics
 - deterministic crash recovery with no silent reset to an empty Contacts domain
 - stable UI dependency through a single `ContactService` facade
 
@@ -87,7 +87,8 @@ Required conceptual fields:
 - `isRevoked`
 - `isExpired`
 - `manualVerificationState`
-- `certificationState`
+- `certificationProjection`
+- saved certification artifact references for this key or User ID
 - `usageState`
 - timestamps
 
@@ -137,16 +138,18 @@ This state is local-only and does not imply OpenPGP certification.
 
 #### Certification State
 
-This state is provided by the certification subsystem, which is assumed to exist before Contacts implementation begins.
+Certification state is Contacts-owned projection over real OpenPGP certification signatures.
 
-Contacts consumes certification state at the `ContactKeyRecord` level. Contacts does not define the packet-level certification mechanism in this document.
+Contacts persists both a user-facing projection and the saved certification signature artifacts needed to inspect, export, and revalidate that projection later.
 
-The minimum integration requirement is that Contacts can distinguish:
+The minimum projection requirement is that Contacts can distinguish:
 
 - certified
 - not certified
+- certification present but currently invalid or stale
+- certification material present but requiring revalidation
 
-The certification subsystem may expose richer technical states, but Contacts surfaces must at minimum support a user-facing certified/not-certified distinction.
+Manual verification and certification are never collapsed. A manually verified contact key may still have no OpenPGP certification, and a saved OpenPGP certification does not imply that the local manual fingerprint-check state is `verified`.
 
 ## 4. Identity Linkage And Import Semantics
 
@@ -335,6 +338,7 @@ The payload contains:
 - recipient lists
 - normalized tag representations or equivalent
 - certification projection state and reconciliation metadata
+- saved certification signature artifact metadata and protected payload references
 - Contacts domain metadata
 
 Contacts owns the snapshot schema. The framework owns how that snapshot is encrypted, staged, promoted, reopened, and recovered on disk.
@@ -356,9 +360,11 @@ The unlocked runtime state contains:
 - `recoveryNeeded`: the framework is healthy enough to route domain access, but the Contacts domain itself cannot open a readable authoritative state
 - `frameworkUnavailable`: framework-level blocked state such as `frameworkRecoveryNeeded` or `restartRequired`
 
-Contacts must never present `frameworkUnavailable` as an empty dataset or as a Contacts import-recovery screen.
+In normal app use, `locked` is a boundary state rather than a long-lived state after app authentication. Once `AppSessionOrchestrator` completes privacy authentication, shared post-unlock orchestration should open registered protected domains, including Contacts. `locked` remains visible when authentication is canceled, the app relocks, the session is unavailable, or the domain has not yet finished opening.
 
-### 7.4 Domain Write And Recovery Responsibilities
+Contacts must never present `frameworkUnavailable` as an empty dataset or as a Contacts package-import screen.
+
+### 7.4 Domain Write And Failure Responsibilities
 
 `ContactsDomainRepository` is the single-writer subsystem for Contacts business data.
 
@@ -374,7 +380,7 @@ Startup and recovery boundary:
 
 1. before shared app-data session activation, Contacts may consult only framework-readable bootstrap inputs such as registry state and minimal per-domain bootstrap metadata
 2. before shared app-data session activation, Contacts must not attempt to open domain payload generations
-3. after shared app-data session activation succeeds, the Contacts DMK may lazy-unlock and the framework may select an authoritative readable generation
+3. after shared app-data session activation succeeds, shared post-unlock orchestration opens the Contacts domain and the framework may select an authoritative readable generation
 4. Contacts then validates schema and business invariants for the selected snapshot
 5. if no readable authoritative Contacts state exists, the Contacts domain enters `recoveryNeeded`
 
@@ -404,13 +410,13 @@ Contacts access follows this order:
 
 1. the app enters `AppSessionOrchestrator`
 2. if app session is not active, `AppSessionOrchestrator` completes app-level privacy unlock first
-3. `first real protected-domain access` means the first route in the current app session that actually needs protected-domain content, not process launch by itself
-4. on first real Contacts access, if the shared app-data session is inactive, the orchestrator asks `ProtectedDataSessionCoordinator` to retrieve the shared root secret through an authenticated `LAContext`
-5. if launch/resume immediately continues into a Contacts-dependent route, that same orchestrated flow may reuse the launch/resume `LAContext` for root-secret retrieval rather than surfacing a later second Contacts-specific prompt
-6. after shared app-data session activation succeeds, the Contacts domain DMK may lazy-unlock through framework-owned key management
-7. `ContactService` opens the Contacts domain snapshot and derived in-memory indexes
+3. the app-authenticated `LAContext` is passed to shared post-unlock protected-domain orchestration when available
+4. `ProtectedDataSessionCoordinator` retrieves the shared root secret and derives the wrapping root key through the framework-owned path
+5. `ProtectedDataPostUnlockCoordinator` opens or ensures committed registered protected domains, including Contacts
+6. `ContactService` opens the Contacts domain snapshot and derived in-memory indexes
+7. route-level Contacts UI consumes `ContactsAvailability` rather than calling plaintext load paths
 
-Completing launch/resume authentication alone does not imply that the shared app-data session is already active unless root-secret retrieval and wrapping-root-key derivation also succeeded.
+Completing launch/resume authentication alone does not imply that Contacts is available unless root-secret retrieval, wrapping-root-key derivation, and Contacts domain open also succeeded.
 
 Ordinary Contacts browsing, search, tag/list management, and recipient selection reuse the active shared app-data session and do not trigger a Contacts-specific second prompt.
 
@@ -434,16 +440,16 @@ The framework owns:
 
 If the framework enters `restartRequired`, Contacts must treat that as `frameworkUnavailable` until restart and must not attempt an independent in-process recovery path.
 
-### 8.4 Export Authentication Boundary
+### 8.4 Contact Package Export Authentication Boundary
 
-Contacts backup export is a high-risk externalization action.
+Contact package export is a high-risk externalization action because it intentionally externalizes relationship and public-key possession information.
 
 Required behavior:
 
 - export requires a currently available and unlocked Contacts domain
-- export requires a fresh authentication immediately before snapshot generation
-- export serializes Contacts business data, not framework artifacts
-- import requires framework availability and an unlocked app session but does not require a routine second prompt beyond session unlock unless a later product decision adds one
+- export requires a fresh authentication immediately before package generation
+- export serializes only export-safe selected contact data, not framework artifacts or whole-domain state
+- import preview may parse an external package before Contacts is open, but import commit requires framework availability and an unlocked Contacts domain
 
 ## 9. Decrypt And Verify Integration
 
@@ -452,13 +458,16 @@ Required behavior:
 Decrypt is split into:
 
 - core decryption
-- contacts-aware verification enrichment
+- signature packet / signer evidence extraction when the lower layer can determine it
+- certificate-backed signature verification when a suitable verification certificate is available
+- contacts-aware signer recognition and trust/certification enrichment
 
-If the Contacts domain is locked:
+If Contacts verification context is unavailable because Contacts is locked, opening, recovering, or framework-unavailable:
 
 - core plaintext decryption may complete
-- signer recognition and contact-aware verification remain pending
-- UI shows `Unlock Contacts to complete verification`
+- signer recognition may remain unavailable
+- signature verification must not be reported as completed unless a suitable verification certificate was actually available
+- UI shows the most precise state available, such as Contacts context unavailable, signer certificate unavailable, or verification pending protected-data unlock
 - there is no silent fallback to `unknown signer`
 
 If the framework is unavailable:
@@ -471,10 +480,11 @@ If the framework is unavailable:
 
 Independent verify requires full contacts-aware context to complete its intended behavior.
 
-If the Contacts domain is locked:
+If Contacts verification context is unavailable and the verify route requires it:
 
-- unlock is required before final verify completion
-- if unlock fails or is canceled, verify stops
+- app-data unlock may be requested when it can make Contacts context available
+- if unlock fails or is canceled, verify reports that required verification context is unavailable
+- verify never reports a completed contacts-aware verification result by silently omitting Contacts-provided certificates
 
 If the framework is unavailable:
 
@@ -493,16 +503,31 @@ This is required so that old signatures can still resolve to the same `ContactId
 
 ## 10. Certification Integration Contract
 
-Contacts assumes a pre-existing certification feature and integrates with it.
+Contacts uses the existing low-level certificate-signature service but owns the redesigned certification workflow, projection, and protected persistence.
 
 Contacts-side requirements:
 
-- each `ContactKeyRecord` stores a certification projection used by Contacts surfaces
-- each stored certification projection includes enough source reference or revision information for later reconciliation
-- contact detail exposes certification actions
+- each `ContactKeyRecord` stores certification projection used by Contacts surfaces
+- each stored certification projection includes enough source reference, target selector, signer identity, and revision information for later revalidation
+- valid imported or locally generated certification signature artifacts are saved as protected Contacts data
+- contact detail exposes a compact trust/certification summary
+- contact detail exposes the common `Certify This Contact` action without embedding the full advanced tool surface
+- a redesigned certification details surface exposes saved history, exportable signature material, raw details, and secondary external signature import/verification actions
 - import flow does not perform certification
-- unlock and import flows may trigger reconciliation against the certification subsystem so stale projected state can be corrected
+- Contacts package import may bring in certification signature artifacts, but commit must validate them before saving projection state
+- unlock and package import flows may trigger revalidation so stale projected state can be corrected
 - Contacts surfaces keep manual verification and certification visually separate
+
+The redesigned workflow must cover the capabilities of the current three-mode page without preserving that UI model:
+
+- direct-key signature verification
+- User ID binding signature verification
+- text/file import of external certification signatures
+- generation of a certification over a contact User ID using one of the user's private keys
+- export/share of generated certification signatures
+- signer identity resolution
+- target certificate selector validation
+- certification-kind display
 
 Contacts does not define:
 
@@ -525,7 +550,7 @@ Legacy source:
 
 Contacts migration occurs after the earlier shared-framework prerequisites are already satisfied, including protected app-data framework setup, post-unlock multi-domain hardening, `private-key-control`, `key metadata`, and completed non-Contacts protected-after-unlock work. Phase 1-7 prerequisites are complete; Phase 8 Contacts remains pending implementation and follows the Contacts-specific implementation plan.
 
-The cutover trigger is the first Contacts-required protected-domain access after the Contacts protected-domain adoption point is reached. That access may occur during launch or resume if the initial route immediately needs Contacts data, but migration must not be triggered merely by process launch or service initialization.
+The cutover trigger is the first post-auth protected-domain open after the Contacts protected-domain adoption point is reached. This may occur during launch/resume post-unlock orchestration. Migration must not be triggered merely by process launch or service initialization before app-data authorization.
 
 Migration sequence:
 
@@ -559,67 +584,70 @@ If migration is interrupted:
 - later recovery logic must be deterministic and idempotent
 - any framework `pendingMutation` or Contacts domain generation cleanup resumes under the shared framework recovery rules rather than a Contacts-specific parallel mechanism
 
-## 12. Contacts Domain Export / Import
+## 12. Contacts Package Export / Import
 
-The Contacts subsystem must provide a first-class export/import path.
+The Contacts subsystem must provide a first-class export/import path for one or more selected contacts. This is a contact exchange format, not a whole-domain backup or recovery artifact.
 
-### 12.1 Export Package
+### 12.1 Package Format
 
-Export produces a portable recovery artifact rather than a copy of raw local protected-domain files.
+Export produces an Apple Archive-backed `.cypherair-contacts` package.
 
-Required export envelope fields:
+The package is not a standard ZIP file. It should use Apple Archive / Compression facilities where practical and should be exported through the existing system file exporter handoff pattern.
 
-- export format version
-- Argon2id parameters
-- random nonce
-- ciphertext
-- AEAD authentication tag
-- minimal metadata required to validate and open the export package
+Required package entries:
 
-The encrypted export payload restores:
+- `manifest.json`
+- `contacts/<stable-export-id>/keys/*.asc`
+- optional `contacts/<stable-export-id>/certifications/*.asc`
 
-- contact identities
-- key records
-- tags
-- recipient lists
-- preferred-key selection
-- manual verification state
-- certification integration state as exposed to the Contacts subsystem
+Required manifest fields:
 
-Export encryption requirements:
+- package format version
+- producer app identifier and package creation timestamp
+- `contacts[]`
+- per-contact display label
+- per-contact exported key fingerprints and file references
+- per-key public User ID / selector metadata needed for preview and certification validation
+- per-contact certification signature references when included
+- required-feature flags so future packages fail closed when the app cannot understand mandatory semantics
 
-- require a user passphrase for every export
-- derive the export encryption key with the app's canonical Argon2id backup profile
-- encrypt the export payload with `AES.GCM`
-- never export the shared app-data root secret, Contacts wrapped-DMK record, `ProtectedDataRegistry` state, source-device authorization state, or other framework-owned recovery artifacts
+Package payload rules:
+
+- one package may contain one or more contacts
+- each contact may include multiple public certificates or public update artifacts
+- certification signature artifacts are optional and user-selectable
+- private keys are never included
+- local manual verification state is never included
+- tags, notes, recipient lists, local contact IDs, protected-domain generation IDs, wrapped-DMK records, registry state, root-secret state, and source-device authorization state are never included
 
 ### 12.2 Export Flow
 
 Export flow:
 
 1. require a currently unlocked Contacts domain inside an available app-data session
-2. require a fresh authentication immediately before export
-3. serialize a canonical Contacts snapshot from unlocked runtime state
-4. derive an export key from the user passphrase using Argon2id
-5. encrypt the snapshot into the versioned export envelope
-6. write a temporary export file for the system file exporter / Share Sheet
-7. delete the temporary export file after completion or cancellation
-
-The implementation must reuse the existing memory-safety posture for Argon2id-backed operations and refuse import-time Argon2id parameters that exceed the app's memory guard threshold.
+2. require a fresh authentication immediately before package generation
+3. collect one selected contact from Contact Detail or one or more selected contacts from Contacts list selection mode
+4. build a package manifest from export-safe contact data
+5. write armored public certificates and optional saved certification signature artifacts into the package
+6. write a temporary protected export file for the system file exporter / Share Sheet
+7. delete temporary export material after completion or cancellation
 
 ### 12.3 Import Flow
 
 Import flow:
 
-1. open the portable recovery artifact
-2. validate the encoded Argon2id parameters against the memory guard before key derivation
-3. derive the export key from the user passphrase
-4. decrypt and parse the exported Contacts snapshot
-5. ask the shared framework to create or write the Contacts domain on the target installation
-6. if the target installation has no protected domains yet, let the framework own any required first-domain provisioning
-7. write the imported snapshot as fresh local Contacts domain state and validate post-auth readability
+1. open the `.cypherair-contacts` package or ordinary public certificate input
+2. validate the package container and manifest before reading referenced payload entries
+3. reject path traversal, absolute paths, parent directory references, symlinks, hard links, duplicate logical paths, unknown required features, excessive file counts, excessive total size, and excessive per-entry size
+4. parse public certificates and certification signatures through the existing OpenPGP validation layer
+5. build an import preview without mutating Contacts
+6. let the user choose which contacts, keys, and valid certification artifacts to commit
+7. require framework availability and an unlocked Contacts domain for commit
+8. merge committed data through `ContactService` / `ContactsDomainRepository`
+9. persist valid certification projection and saved signature artifacts as protected Contacts data
+10. rebuild search, signer-recognition, and certification projection indexes from committed state
 
-Import restores Contacts contents into a new or explicitly replaced Contacts domain on the target installation. The source device's local authorization material is never migrated.
+Package import never replaces the Contacts domain as a whole. It creates or updates local contact/key/certification records through the normal protected-domain write path.
 
 ## 13. Service Architecture
 
@@ -631,6 +659,8 @@ Planned Contacts-owned components:
 - `ContactsDomainRepository`
 - `ContactsMigrationCoordinator`
 - `ContactsSearchIndex`
+- `ContactsPackageService`
+- `ContactsCertificationStore` or equivalent certification-record repository
 
 Framework-owned dependencies consumed by Contacts:
 
@@ -646,12 +676,17 @@ Responsibilities:
 - `ContactsDomainRepository`: canonical snapshot encode/decode, Contacts schema validation, translation between snapshot and runtime graphs, and delegation into the shared framework storage path
 - `ContactsMigrationCoordinator`: legacy import, quarantine, and final cleanup flow
 - `ContactsSearchIndex`: in-memory search and ranking over unlocked Contacts data plus relock-time cleanup participation
+- `ContactsPackageService`: Apple Archive-backed `.cypherair-contacts` package export/import, preview, validation, and temporary export cleanup
+- `ContactsCertificationStore`: persistence and revalidation of certification projections and saved signature artifacts inside the Contacts protected domain
 
 Minimum supporting internal types:
 
 - `ContactsDomainSnapshot`
 - `ContactsDomainSchemaVersion`
 - `ContactsAvailability`
+- `ContactCertificationRecord`
+- `ContactPackageManifest`
+- `ContactPackageImportPreview`
 
 Vault-specific infrastructure types such as dedicated vault envelope headers, vault-key managers, or Contacts-owned recovery state machines are not the authoritative design for this round.
 
@@ -676,22 +711,28 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 
 - import flow handles manual verification only
 - manual verification remains per-key
-- certification remains per-key
+- certification projection remains per-key and may target specific User ID selectors
 - contact detail exposes both layers distinctly
+- Contact Detail shows a compact trust/certification summary and common `Certify This Contact` action
+- certification details surface covers saved history, exportable signature artifacts, raw details, and secondary external signature import/verification
+- the redesigned certification workflow covers direct-key verification, User ID binding verification, external signature import, user certification generation, generated-signature export/share, signer identity resolution, selector validation, and certification-kind display
+- valid certification projection and saved signature artifacts persist as protected Contacts data
 
 ### 14.4 Shared Access And Locked State
 
-- locked Contacts domain produces explicit `Contacts` locked state
-- locked Contacts domain produces explicit `Encrypt` locked recipient state
-- decrypt completes plaintext while verification stays pending
-- verify requires unlock
-- unlock cancel/failure results in hard stop for verify
-- if launch/resume immediately enters Contacts-required protected access, the same orchestrated flow retrieves the shared root secret and activates the shared app-data session before Contacts opens
-- launch/resume authentication alone is not treated as an already active app-data session unless root-secret retrieval also completed
+- app authentication followed by post-unlock orchestration opens Contacts in normal app use
+- locked Contacts domain remains an explicit boundary state for cancellation, relock, opening, recovery, or framework unavailability
+- locked Contacts domain produces explicit `Contacts` locked/opening state when it is visible
+- locked Contacts domain produces explicit `Encrypt` locked/opening recipient state when it is visible
+- decrypt may complete plaintext while signer recognition or signature verification context stays unavailable
+- decrypt and verify never claim completed signature verification without a suitable verification certificate
+- verify reports required verification context unavailable when unlock is canceled or cannot provide Contacts context
+- launch/resume post-unlock orchestration retrieves the shared root secret and activates the shared app-data session before Contacts opens
+- launch/resume authentication alone is not treated as Contacts availability unless root-secret retrieval and Contacts open also completed
 - ordinary Contacts use within an already active app-data session does not trigger redundant prompts
 - if another protected domain already activated the shared session, opening Contacts does not prompt again
 - framework-level blocked state is surfaced distinctly from Contacts domain recovery
-- export requires fresh authentication and cancellation produces no offline backup file
+- contact package export requires fresh authentication and cancellation produces no package file
 
 ### 14.5 Domain Integrity And Recovery
 
@@ -703,18 +744,18 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 - relock clears Contacts in-memory search and signer-recognition state through relock-participant cleanup
 - `restartRequired` is treated as framework-level blocked state, not as Contacts data loss
 
-### 14.6 Migration And Recovery
+### 14.6 Migration And Contact Package Exchange
 
 - Contacts adoption occurs after AppData Phase 1-7 prerequisites are complete; Phase 8 is unblocked but still follows the Contacts-specific implementation plan
-- Contacts migration is triggered by first Contacts-required protected-domain access, not by process launch or service initialization alone
+- Contacts migration is triggered by post-auth protected-domain open, not by process launch or service initialization before app-data authorization
 - target Contacts domain is validated before legacy source retirement
 - quarantine storage is inactive for normal Contacts resolution
 - final deletion happens only after next successful Contacts domain open
 - interrupted migration recovers deterministically
-- export/import restores Contacts state coherently
-- import with wrong passphrase fails gracefully
-- export/import never transports the shared root secret, wrapped-DMK record, registry state, or source-device authorization state
-- if target-install first-domain provisioning is required during import, the framework owns it
+- `.cypherair-contacts` export supports one or more selected contacts
+- `.cypherair-contacts` import previews before commit and never replaces the Contacts domain wholesale
+- package import rejects path traversal, link entries, duplicate logical paths, excessive size/count, bad manifests, bad certificates, and bad certification signatures
+- package export/import never transports private keys, manual verification state, tags, notes, recipient lists, the shared root secret, wrapped-DMK record, registry state, or source-device authorization state
 
 ### 14.7 Search And Tags
 
@@ -726,7 +767,7 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 
 This document does not define:
 
-- the internals of the certification feature
-- the final localized UI copy for passphrase education and recovery messaging
+- packet-level OpenPGP certification cryptography
+- the final localized UI copy for package export/import education
 - shared protected app-data framework internals such as registry invariants, wrapped-DMK transactions, root-secret lifecycle, or framework recovery classification
 - implementation details for unrelated canonical documents outside the Contacts initiative

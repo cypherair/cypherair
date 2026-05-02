@@ -34,7 +34,7 @@ This document refines implementation sequencing and repository-specific integrat
 The active Contacts and shared-framework documents already establish the correct target direction:
 
 - Contacts is a protected domain on the shared app-data framework
-- Contacts must be `import-recoverable`
+- Contacts package export/import supports explicit one-or-more-contact exchange, not whole-domain recovery
 - `AppSessionOrchestrator` owns app-session sequencing
 - `ProtectedDataSessionCoordinator` owns shared app-data root-secret retrieval
 - Contacts must not invent a second vault architecture
@@ -44,8 +44,8 @@ The repository, however, still has material current-state behavior that must be 
 - startup still loads plaintext Contacts before protected-domain root-secret activation and Contacts domain unlock
 - verification-capable services still use Contacts as direct cryptographic verification input
 - Contacts access and mutation entrypoints are scattered across app surfaces and service helpers
-- empty-install recovery import is required by the Contacts TDD but not yet represented in the current access-gate model
-- certification support exists as a crypto workflow, but not as Contacts-owned projected state with reconciliation metadata
+- local reset and tutorial/test sandbox paths must be explicitly classified so they do not bypass or pollute the real Contacts domain
+- certification support exists as a crypto workflow, but not as Contacts-owned projected state with saved signature artifacts and redesigned UX
 
 This document turns those deltas into a concrete PR sequence with explicit dependencies and validation gates.
 
@@ -95,13 +95,17 @@ Contacts access and mutation is not centralized in a single route boundary today
 
 Because these surfaces are distributed, Contacts protected-domain adoption requires an explicit inventory and PR-by-PR coverage checklist rather than relying on memory or a short prose summary.
 
-### 3.4 Recovery And Empty-Install Import Delta
+### 3.4 Package Export / Import And Maintenance Delta
 
-The Contacts TDD requires recovery import to work even when the target installation has no protected domains yet. In that case the framework, not Contacts, owns first-domain provisioning.
+Whole-domain Contacts backup, replace-domain restore, and empty-install Contacts restore are no longer in scope for Phase 8.
 
-Current access-gate behavior still maps empty steady-state protected-data bootstrap to `.noProtectedDomainPresent`. That is correct for ordinary route access, but it means Contacts protected-domain adoption must explicitly define how recovery import transitions from empty steady-state into framework-owned first-domain provisioning.
+The target package feature instead exports and imports selected contact public material through a `.cypherair-contacts` package. That package may contain one or more contacts and optional saved certification signature artifacts, but it must not transport local protected-domain state, manual verification state, tags, notes, recipient lists, root-secret material, wrapped-DMK records, registry state, or source-device authorization material.
 
-This is not an optional extension scenario. It is a documented Contacts protected-domain requirement.
+Current reset and sandbox paths are also relevant implementation deltas:
+
+- `LocalDataResetService` currently deletes the legacy contacts directory and clears `ContactService` in-memory state
+- tutorial sandbox containers use isolated temporary Contacts directories and must remain outside real protected Contacts migration
+- future package export/import temporary artifacts must be covered by reset/cleanup paths
 
 ### 3.5 Certification Projection Delta
 
@@ -109,43 +113,54 @@ Current certification support is still workflow-oriented:
 
 - `CertificateSignatureService` discovers, verifies, and generates certification artifacts
 - it does not persist Contacts-owned certification projection state
-- it does not maintain reconciliation metadata at the `ContactKeyRecord` level
+- it does not save valid imported or locally generated certification signature artifacts as protected Contacts data
+- the current Contacts UI exposes direct-key verification, User ID binding verification, and certification generation as a three-mode technical page
 
 The Contacts TDD requires:
 
 - certification projection on each `ContactKeyRecord`
-- enough source reference or revision metadata for later reconciliation
-- reconciliation on unlock and import when needed
+- enough source reference, selector, signer, and revision metadata for later revalidation
+- protected persistence for saved certification signature artifacts
+- a redesigned contact-centered workflow that preserves all current capabilities without keeping the three-mode technical UI
 
-Therefore certification projection cannot be treated as a late-stage UI-only finishing task.
+Therefore certification projection and UX cannot be treated as late-stage UI polish.
 
 ## 4. Frozen Implementation Decisions
 
 The following decisions are fixed by this document and should not be reopened during implementation unless a blocking defect appears.
 
-### 4.1 Contacts Uses A Dual-Layer Verification Model
+### 4.1 Contacts Uses An Accurate Verification / Enrichment Model
 
 Future verification-capable services must split:
 
-- **core cryptographic verification**
+- **core decrypt / packet evidence**
+  - plaintext delivery after authenticated decryption succeeds
   - packet parsing
-  - signature verification outcome
-  - signer fingerprint or equivalent key-handle level evidence exposed through Rust/UniFFI when the lower layer can determine it without Contacts
+  - signer fingerprint or equivalent key-handle level evidence only when the lower layer can determine it without a Contacts-provided certificate
+- **certificate-backed signature verification**
+  - signature verification outcome only when a suitable verification certificate is available
+  - explicit unavailable state when the signer certificate or Contacts verification context is missing
 - **Contacts enrichment**
   - matching signer identity to `ContactIdentity`
   - mapping signer evidence into contact / own-key recognition state
   - surfacing manual verification and certification projection
   - mapping historical / preferred / additional keys to the same person record
 
-This separation is required for Contacts protected-domain adoption because Contacts can be locked while cryptographic verification remains meaningful.
+This separation is required for accuracy. Contacts can be unavailable while plaintext decryption or low-level signer evidence remains meaningful, but the app must not claim completed cryptographic signature verification without the verification certificate that made that claim possible.
 
-Core verification must not depend on Contacts having already supplied verification certificates or an unlocked Contacts domain.
+Verification output must distinguish:
+
+- verified signature
+- invalid signature
+- signer certificate unavailable
+- Contacts verification context unavailable
+- signer evidence unavailable
 
 Route policy after the split:
 
-- `Decrypt` may complete plaintext delivery and core verification while Contacts enrichment remains pending
+- `Decrypt` may complete plaintext delivery while signature verification or Contacts enrichment remains unavailable
 - password-message decrypt follows the same split when signed content is present
-- `Verify` route requires Contacts unlock before presenting its intended final contacts-aware result
+- `Verify` route requires required verification context before presenting its intended final contacts-aware result
 - `SigningService` verification helpers must no longer encode Contacts presence as the only way to avoid `.unknownSigner`
 
 ### 4.2 Verification Contract Refactor Lands As Its Own PR
@@ -158,7 +173,7 @@ It lands as a dedicated, earlier PR because it changes:
 - service outputs
 - route expectations
 - unit-test baselines
-- Contacts-lock semantics across multiple consumers
+- Contacts-unavailable semantics across multiple consumers
 
 This PR explicitly owns the Rust/UniFFI verification contract expansion plus the corresponding Swift service contract refactor.
 
@@ -174,7 +189,7 @@ Views and app coordinators continue to depend on a single `ContactService`.
 - route-aware open / unlock coordination for Contacts-dependent surfaces
 - Contacts query APIs
 - Contacts mutation APIs
-- import / merge / recovery actions
+- import / merge / contact-package actions
 - recipient resolution by `ContactIdentity`
 - signer enrichment lookup over unlocked Contacts runtime state
 
@@ -200,6 +215,7 @@ Before any migration or cutover PR, the Contacts protected-domain implementation
 - manual verification state
 - certification projection
 - certification reconciliation metadata
+- saved certification signature artifact references
 
 This avoids a second schema turn after migration and projection work has already started.
 
@@ -221,31 +237,44 @@ Every future implementation PR must:
 - update the coverage status for those rows
 - avoid expanding behavior outside the rows explicitly owned by that PR
 
-### 4.6 Certification Projection Is A Separate Pre-Cutover Capability
+### 4.6 Certification Redesign Is A Separate Capability
 
-Certification projection and reconciliation lands as its own pre-cutover capability PR.
+Certification projection, saved signature artifacts, and the redesigned contact-centered certification workflow land as their own capability PR.
 
 It is intentionally separated from:
 
 - the early schema skeleton / facade PR
-- the later UI finishing PR
+- the later package export/import PR
+- the final search / tags / recipient-list finish PR
 
 This keeps the sequence stable:
 
 - snapshot schema can reserve the necessary fields early
-- projection persistence and reconciliation can be implemented before migration / cutover depends on them
-- later UI work can consume an already-defined projection model instead of inventing it on the fly
+- projection persistence and signature artifact storage can be implemented before package export/import depends on them
+- the old three-mode technical page can be replaced by a clearer workflow without waiting for final Contacts organization UI
 
-### 4.7 Recovery PR Owns Empty-Install Restore
+The redesigned workflow must cover all capabilities of the current page:
 
-The recovery export/import PR must explicitly include:
+- direct-key signature verification
+- User ID binding signature verification
+- external certification signature text/file import
+- certification generation with one of the user's private keys
+- generated certification signature export/share
+- signer identity resolution
+- target certificate selector validation
+- certification-kind display
 
-- replace-domain import
-- empty-install restore
-- framework-owned first-domain provisioning
-- post-import readability validation
+### 4.7 Package Export / Import Is Not Domain Recovery
 
-Empty-install restore is not deferred to migration or cutover.
+The package PR owns selected-contact exchange only:
+
+- one-contact export from Contact Detail
+- one-or-more-contact export from Contacts list selection mode
+- `.cypherair-contacts` Apple Archive-backed package generation
+- package preview before import commit
+- protected Contacts commit after framework/domain availability
+
+It explicitly does not own whole-domain backup, replace-domain restore, empty-install restore, or framework-owned first-domain recovery import.
 
 ## 5. Companion Inventory Document
 
@@ -253,7 +282,7 @@ The companion [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_D
 
 It is responsible for:
 
-- classifying whether a surface is a read, mutation, recovery action, or optional Contacts enrichment
+- classifying whether a surface is a read, mutation, package action, maintenance action, or optional Contacts enrichment
 - defining whether the surface requires Contacts unlocked, framework gate only, or no Contacts access
 - freezing the target locked-state behavior
 - assigning each surface to a future Contacts-internal PR
@@ -292,7 +321,7 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 - add the `ContactsAvailability` type shape
 - add a domain repository layer under `ContactService`
 - preserve a compatibility projection so existing UI and service consumers can still operate during the migration sequence
-- keep ordinary runtime reads on the legacy plaintext source through Contacts PR5; compatibility projection exists to preserve consumers, not to switch source of truth early
+- keep ordinary runtime reads on the legacy plaintext source through Contacts PR3; compatibility projection exists to preserve consumers, not to switch source of truth early
 - register Contacts as a `ProtectedDataRelockParticipant`
 - clear decrypted snapshot state, serialization scratch buffers, search index state, and signer-recognition state on relock
 
@@ -315,31 +344,30 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 - compatibility-projection tests
 - relock cleanup assertions for snapshot, scratch-buffer, search-index, and signer-recognition teardown
 
-### 6.3 Contacts PR2 — Verification Contract Refactor
+### 6.3 Contacts PR2 — Verification Accuracy Refactor
 
 **Goals**
 
-- expand the lower-level verification contract before splitting Swift service outputs
-- split core verification from Contacts enrichment in service contracts
-- remove the assumption that Contacts must provide the only verification keys used to avoid `.unknownSigner`
+- make decrypt / verify outputs accurately distinguish plaintext delivery, signer evidence, certificate-backed signature verification, and Contacts enrichment
+- remove the assumption that missing Contacts certificates can be represented as generic `.unknownSigner`
+- stop claiming completed signature verification when no suitable verification certificate was available
 
 **Key Changes**
 
-- extend Rust verification results and UniFFI surfaces to expose non-Contacts core signer evidence when the lower layer can determine it
+- extend Rust verification results and UniFFI surfaces only as needed to expose signer evidence when the lower layer can determine it without a Contacts certificate
 - refactor `DecryptionService`
 - refactor `SigningService`
 - refactor `PasswordMessageService`
-- change Swift verification-capable services to consume core evidence plus explicit Contacts enrichment status instead of treating Contacts-provided certificates as the only path out of `.unknownSigner`
-- rewrite test baselines around split verification / enrichment semantics
+- change Swift verification-capable services to return explicit statuses for signer certificate unavailable, Contacts context unavailable, signer evidence unavailable, verified, and invalid
+- rewrite test baselines around accurate verification / enrichment semantics
 
 **Required Outcomes**
 
-- Decrypt-capable flows can return plaintext plus core verification even when Contacts enrichment is unavailable
-- core verification no longer depends on Contacts being unlocked and having already supplied verification certificates
-- Rust/UniFFI exposes signer fingerprint or equivalent key-handle level evidence when the lower layer can determine it without Contacts
-- Verify-capable flows expose enough contract surface for route policy to decide whether to block on Contacts unlock
-- Contacts enrichment only maps core signer evidence into identity/contact/projection state; it does not decide whether core verification exists
-- Contacts enrichment status can distinguish locked, framework-unavailable, and available outcomes
+- Decrypt-capable flows can return plaintext while signature verification remains unavailable
+- signature verification is reported as completed only when a suitable verification certificate was used
+- Rust/UniFFI exposes signer fingerprint or equivalent key-handle evidence only when available from the lower-level operation
+- Verify-capable flows expose enough contract surface for route policy to decide whether required verification context is missing
+- Contacts enrichment maps signer evidence into identity/contact/projection state, but it does not invent a verification result
 
 **Not In Scope**
 
@@ -355,35 +383,37 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 **Validation**
 
 - updated Rust, UniFFI-surface, and decrypt/signing/password-message tests
-- explicit regression tests for lower-level signer evidence being available without unlocked Contacts state when the engine can determine it
-- explicit regression tests for locked Contacts vs absent signer data
+- explicit regression tests for signer certificate unavailable vs Contacts context unavailable vs absent signer evidence
+- explicit regression tests that no path claims signature verification without an available verification certificate
 
-### 6.4 Contacts PR3 — Contacts Lifecycle Wiring And Surface Gating
+### 6.4 Contacts PR3 — Contacts Post-Auth Lifecycle And Surface Availability
 
 **Goals**
 
 - stop all ordinary Contacts route access and mutations from bypassing shared protected-domain lifecycle rules
 - remove pre-auth Contacts loading from startup and direct route tasks
+- open Contacts through shared post-auth / post-unlock domain orchestration in normal app use
 
 **Key Changes**
 
 - remove startup-time Contacts payload loading before shared root-secret activation and Contacts domain unlock
-- ensure launch/resume may activate the shared app-data session through authenticated `LAContext` reuse without opening Contacts payload generations eagerly
+- register Contacts as a post-unlock protected-domain opener
+- reuse the app-authenticated `LAContext` for root-secret retrieval when available
+- open or ensure committed Contacts domain state through the shared framework path after app authentication
 - gate Contacts list, detail, import commit, delete, manual verification, Encrypt recipient resolution, and certificate-signature entry through `ContactsAvailability`
 - gate certificate-signature verification-time candidate signer reads so `CertificateSignatureService` cannot consume Contacts-backed `candidateSigners` while the Contacts domain is locked
-- implement route-level locked / recovery-needed / framework-unavailable behavior
+- implement route-level opening / locked / recovery-needed / framework-unavailable behavior
 
 **Required Outcomes**
 
-- Contacts browsing requires an unlocked Contacts domain
+- Contacts is normally available after successful app authentication and post-unlock domain opening
 - import inspection can remain pre-commit, but import commit requires the Contacts domain path
-- Decrypt route can show core result with Contacts enrichment pending
-- Verify route requires Contacts unlock for its final contacts-aware result
+- Decrypt route can show plaintext with explicit missing verification context when needed
+- Verify route requires required verification context for its final contacts-aware result
 
 **Not In Scope**
 
 - no legacy plaintext cutover
-- no empty-install recovery import
 - no projection persistence yet
 
 **Inventory Coverage**
@@ -400,81 +430,12 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 - macOS route and UI smoke coverage
 - unit coverage for lock-state mapping across the gated surfaces
 
-### 6.5 Contacts PR4 — Certification Projection And Reconciliation Capability
-
-**Goals**
-
-- land Contacts-owned certification projection state before migration or cutover depends on it
-- define the boundary between `CertificateSignatureService` and Contacts projection persistence
-
-**Key Changes**
-
-- add certification projection storage on `ContactKeyRecord`
-- add reconciliation metadata storage
-- add reconciliation triggers on unlock and import where required
-- keep manual verification and certification distinct in the model
-
-**Not In Scope**
-
-- no final UI polish for all certification presentation
-- no recovery export/import yet
-
-**Inventory Coverage**
-
-- certificate-signature enrichment / projection-supporting rows
-- projection/reconciliation maintenance rows
-
-**Validation**
-
-- projection persistence tests
-- reconciliation trigger tests
-- regression tests confirming crypto workflow and Contacts projection are not collapsed into one state
-
-### 6.6 Contacts PR5 — Contacts Recovery Export / Import
-
-**Goals**
-
-- implement import-recoverable Contacts domain behavior before migration cutover
-- make recovery work both for empty-install restore and replace-domain import
-
-**Key Changes**
-
-- portable recovery artifact
-- passphrase-based export encryption
-- import-time validation and rewrite into local protected-domain state
-- framework-owned first-domain provisioning when the target installation has no protected domains yet
-
-**Required Outcomes**
-
-- export requires unlocked Contacts plus fresh authentication
-- import handles empty steady-state installations
-- import also handles replacing an existing Contacts domain
-- import requires framework availability plus app-session unlock and root-secret availability, not a previously unlocked Contacts domain
-- post-import readability validation is mandatory
-
-**Not In Scope**
-
-- no legacy plaintext migration yet
-
-**Inventory Coverage**
-
-- recovery export row
-- recovery import row
-- empty-install restore row
-
-**Validation**
-
-- wrong-passphrase failure
-- memory-guard validation
-- empty-install restore
-- replace-domain import
-
-### 6.7 Contacts PR6 — Legacy Contacts Migration, Quarantine, And Cutover
+### 6.5 Contacts PR4 — Legacy Contacts Migration, Quarantine, And Cutover
 
 **Goals**
 
 - move existing plaintext Contacts into the protected Contacts domain
-- preserve deterministic rollback and recovery behavior during cutover
+- preserve deterministic rollback behavior during cutover
 
 **Key Changes**
 
@@ -488,6 +449,8 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 **Not In Scope**
 
 - no search / tags / recipient lists yet
+- no contact package export/import yet
+- no certification UI redesign yet
 
 **Inventory Coverage**
 
@@ -500,7 +463,7 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 - quarantine inactivity for normal Contacts access
 - post-open deletion rules
 
-### 6.8 Contacts PR7 — Person-Centered Contacts Model And Multi-Key Behavior
+### 6.6 Contacts PR5 — Person-Centered Contacts Model And Multi-Key Behavior
 
 **Goals**
 
@@ -531,11 +494,90 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 - preferred-key fallback rules
 - historical-key signer recognition
 
+### 6.7 Contacts PR6 — Certification Projection Persistence And UX Redesign
+
+**Goals**
+
+- persist Contacts-owned certification projection and signature artifacts
+- replace the current three-mode technical page with a contact-centered workflow
+- keep manual verification and OpenPGP certification visibly distinct
+
+**Key Changes**
+
+- add certification projection storage on `ContactKeyRecord`
+- add `ContactCertificationRecord` or equivalent saved signature artifact model
+- save valid imported and locally generated certification signature artifacts as protected Contacts data
+- implement Contact Detail trust/certification summary
+- implement `Certify This Contact` as the common action from Contact Detail
+- implement a certification details surface for saved history, exportable signature material, raw details, and secondary external signature import/verification
+- retain coverage for direct-key verification, User ID binding verification, external text/file import, certification generation, generated signature export/share, signer identity resolution, selector validation, and certification-kind display
+
+**Not In Scope**
+
+- no contact package export/import yet
+- no search / tags / recipient-list finish yet
+
+**Inventory Coverage**
+
+- certification summary row
+- certify-contact action row
+- certification details rows
+- external certification signature import/verification rows
+- projection/artifact persistence rows
+
+**Validation**
+
+- projection persistence tests
+- saved signature artifact persistence tests
+- external signature import validation tests
+- generated certification save and export/share tests
+- regression tests confirming manual verification and OpenPGP certification are not collapsed
+
+### 6.8 Contacts PR7 — `.cypherair-contacts` Package Export / Import
+
+**Goals**
+
+- implement selected-contact package exchange after the person-centered and certification persistence models are stable
+- support one-contact export from Contact Detail and one-or-more-contact export from Contacts list selection mode
+- support safe preview-then-commit import
+
+**Key Changes**
+
+- Apple Archive-backed `.cypherair-contacts` package generation
+- package manifest with `contacts[]`, key file references, selector metadata, and optional certification signature references
+- selected-contact export through the existing protected temporary export/fileExporter pattern
+- package import parser and preview model
+- package commit through `ContactService` / `ContactsDomainRepository`
+- validation for path traversal, absolute paths, parent-directory references, links, duplicate logical paths, unknown required features, excessive size/count, invalid certificates, and invalid certification signatures
+
+**Not In Scope**
+
+- no whole-domain backup
+- no replace-domain restore
+- no empty-install restore
+- no standard ZIP support
+
+**Inventory Coverage**
+
+- Contact Detail single-contact export row
+- Contacts list multi-select export row
+- package import preview row
+- package import commit row
+- package temporary artifact cleanup row
+
+**Validation**
+
+- single-contact and multi-contact export tests
+- package preview without mutation
+- package commit into protected Contacts state
+- malformed package rejection tests
+- package export omits private keys, manual verification state, tags, notes, recipient lists, root-secret material, wrapped-DMK records, registry state, and source-device authorization state
+
 ### 6.9 Contacts PR8 — Search, Tags, Recipient Lists, And UI Finish
 
 **Goals**
 
-- complete the remaining Contacts product capabilities once lifecycle, recovery, migration, and model semantics are already stable
+- complete the remaining Contacts product capabilities once lifecycle, migration, model semantics, certification persistence, and package exchange are already stable
 
 **Key Changes**
 
@@ -567,34 +609,47 @@ The later implementation PRs must collectively satisfy the following scenario se
 
 ### 7.1 Verification Semantics
 
-- Contacts locked during decrypt yields:
+- Contacts verification context unavailable during decrypt yields:
   - plaintext delivered
-  - core verification delivered
-  - Contacts enrichment pending, not silently downgraded to generic unknown-signer behavior
-- locked Contacts and truly absent signer data remain distinguishable because core signer evidence comes from the lower-level verification contract, not from unlocked Contacts state alone
-- Verify route requiring Contacts context:
-  - prompts for unlock
-  - stops when unlock is denied or canceled
+  - signature verification reported as unavailable when no suitable verification certificate is available
+  - Contacts enrichment unavailable or pending, not silently downgraded to generic unknown-signer behavior
+- locked Contacts, missing signer certificate, and truly absent signer evidence remain distinguishable
+- Verify route requiring Contacts context or signer certificate:
+  - prompts for app-data unlock only when it can make the required context available
+  - reports required verification context unavailable when unlock is denied or canceled
 - Password-message signed decrypt:
-  - preserves the same core/enrichment split as ordinary decrypt
+  - preserves the same accurate verification / enrichment split as ordinary decrypt
 
 ### 7.2 Lifecycle And Surface Coverage
 
 - pre-auth bootstrap does not open Contacts payload content
-- Contacts list and detail do not silently substitute empty state for locked or recovery-needed state
+- post-auth domain orchestration opens Contacts in normal app use
+- Contacts list and detail do not silently substitute empty state for opening, locked, or recovery-needed state
 - URL import and import confirmation do not bypass Contacts gate on commit
 - delete and manual verification mutations do not bypass Contacts gate
 - Encrypt recipient selection and recipient resolution use Contacts availability rather than startup-loaded plaintext state
 
-### 7.3 Recovery And Restore
+### 7.3 Certification Redesign
 
-- export/import recovery works on installations with existing protected domains
-- export/import recovery works on empty steady-state installations
-- framework-owned first-domain provisioning is used when required
-- import requires framework availability plus app-session unlock and root-secret availability, not a pre-existing unlocked Contacts domain
-- replace-domain import remains explicit and deterministic
+- direct-key signature verification remains supported
+- User ID binding signature verification remains supported
+- external certification signature text/file import remains supported behind a secondary action
+- `Certify This Contact` generates, saves, and can export/share certification signatures
+- signer identity resolution, target selector validation, and certification-kind display remain supported
+- certification projection and saved signature artifacts persist as protected Contacts data
+- manual verification and OpenPGP certification remain separate
 
-### 7.4 Migration And Cutover
+### 7.4 Contact Package Exchange
+
+- `.cypherair-contacts` export supports one or more selected contacts
+- Contact Detail can export the current contact
+- Contacts list selection mode can export multiple contacts
+- package import previews before mutating Contacts
+- package import commit requires protected Contacts availability
+- malformed packages fail closed for path traversal, links, excessive size/count, invalid manifests, invalid certificates, and invalid certification signatures
+- package export/import never acts as whole-domain backup, replace-domain restore, or empty-install restore
+
+### 7.5 Migration And Cutover
 
 - legacy plaintext remains authoritative until protected destination readability is proven
 - source-of-truth cutover occurs only after that readability proof succeeds
@@ -602,11 +657,12 @@ The later implementation PRs must collectively satisfy the following scenario se
 - post-open deletion occurs only after a later successful Contacts domain open
 - interrupted migration is idempotent
 
-### 7.5 Projection And Reconciliation
+### 7.6 Reset, Cleanup, And Sandbox Boundaries
 
-- certification projection is persisted at the `ContactKeyRecord` level
-- reconciliation metadata is sufficient to detect stale projected state
-- projection work does not collapse manual verification and certification into one status
+- local reset deletes legacy Contacts, protected Contacts artifacts, and package temporary artifacts
+- local reset clears `ContactService` runtime state
+- tutorial sandbox Contacts directories remain isolated from real Contacts migration and package exchange
+- package temporary files are cleaned after completion or cancellation
 
 ## 8. Documentation Acceptance Criteria
 
@@ -618,8 +674,9 @@ This implementation-prep document is only complete if a later implementer can an
 - what the Contacts schema skeleton may define before later behavior PRs
 - why verification contract refactor must happen before lifecycle wiring
 - which Contacts entrypoints are gated and which are only enrichment consumers
-- where certification projection lands relative to migration and cutover
-- how empty-install recovery import is supposed to work
+- where certification projection / artifact persistence lands relative to package exchange
+- why whole-domain backup, replace-domain restore, and empty-install restore are not in scope
+- how `.cypherair-contacts` one-or-more-contact package exchange is supposed to work
 - which PR owns which behavior and what each PR explicitly avoids
 
 The companion inventory document must also be detailed enough that an implementer does not need to rediscover Contacts-dependent surfaces by searching the repository from scratch.
@@ -629,6 +686,7 @@ The companion inventory document must also be detailed enough that an implemente
 - This document prepares implementation. It does not authorize direct code changes by itself.
 - Current shared-framework docs and existing Contacts docs remain the architecture and product authorities.
 - Future implementation proceeds with conservative, smaller PRs rather than a single large Contacts protected-domain rollout.
-- Verification contract refactor is a dedicated earlier PR.
-- Certification projection / reconciliation is a dedicated pre-cutover capability PR.
-- Empty-install restore is part of the recovery PR, not a late migration detail.
+- Verification accuracy refactor is a dedicated earlier PR.
+- Certification projection, saved signature artifacts, and UX redesign are a dedicated capability PR.
+- `.cypherair-contacts` package export/import is selected-contact exchange, not whole-domain recovery.
+- Empty-install restore is out of scope for Contacts Phase 8.
