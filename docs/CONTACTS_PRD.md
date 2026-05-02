@@ -7,13 +7,13 @@
 > **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific product direction.  
 > **Companion document:** [CONTACTS_TDD](CONTACTS_TDD.md)  
 > **Primary framework references:** [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md)
-> **Related documents:** [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) · [TESTING](TESTING.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Related documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [TESTING](TESTING.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Product Intent
 
 CypherAir's current Contacts capability is sufficient for a small number of imported public keys, but it is not yet structured for real-world relationship management, recurring recipient workflows, or social-graph-sensitive privacy requirements.
 
-This document defines the product requirements for the next-generation Contacts capability. The shared ProtectedData framework and AppData Phase 1-6 domains have landed, while Phase 7 remains the remaining non-Contacts gate before Contacts protected-domain adoption unless the roadmap is explicitly revised. In delivery order, Contacts adopts that framework in the Contacts Protected Domain phase, currently Phase 8 of the AppData roadmap.
+This document defines the product requirements for the next-generation Contacts capability. The shared ProtectedData framework and Phase 1-7 non-Contacts domains have landed. Contacts protected-domain adoption is now unblocked as Phase 8, with implementation sequencing owned by [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage owned by [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md).
 
 The Contacts enhancement initiative covers four user-facing capability areas:
 
@@ -429,9 +429,9 @@ Migration source remains the legacy plaintext contacts storage:
 
 ### 12.2 Migration Order And Policy
 
-Contacts migration belongs to the Contacts Protected Domain phase, currently Phase 8 of the AppData roadmap.
+Contacts migration belongs to the Contacts Protected Domain phase, currently Phase 8.
 
-Current AppData progress is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md). Completed prerequisites:
+Shared-framework prerequisites are complete:
 
 - Phase 1 reusable protected app-data framework is implemented
 - Phase 2 file-protection baseline is implemented for ProtectedData storage
@@ -439,10 +439,9 @@ Current AppData progress is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMA
 - Phase 4 post-unlock multi-domain orchestration and framework hardening is complete, including second-real-domain coverage and pending-create continuation hardening
 - Phase 5 `private-key-control` domain is implemented
 - Phase 6 `key-metadata` domain is implemented
+- Phase 7 non-Contacts protected-after-unlock domains and required local file/static-protection cleanup are implemented
 
-Remaining gate before Contacts PR1-PR8 begin:
-
-- Phase 7 non-Contacts protected-after-unlock domains and required local file/static-protection cleanup must be implemented or explicitly resolved
+No remaining AppData gate blocks Contacts PR1-PR8. Contacts still follows the PR sequence in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and must not start migration merely from process launch or service initialization.
 
 Contacts adoption and migration occur on the first Contacts-required protected-domain access into the new Contacts architecture. That access may happen during launch or resume if the initial route immediately needs Contacts data, and the same orchestrated unlock flow may activate the shared app-data session there by reusing the authenticated `LAContext` for root-secret retrieval.
 

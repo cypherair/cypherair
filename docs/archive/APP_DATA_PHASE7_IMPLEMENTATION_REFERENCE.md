@@ -1,6 +1,14 @@
 # AppData Phase 7 Implementation Reference
 
-> **Status:** Completed Phase 7 architecture and closure reference.
+> **Status:** Archived historical Phase 7 closure reference.
+> **Archived on:** 2026-05-02.
+> **Archival reason:** Phase 7 is complete and its current-state facts now live in long-lived architecture, security, technical, testing, and review docs. Contacts Phase 8 sequencing now lives in Contacts-specific docs.
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](../CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+> **Current code and active canonical docs outrank this archived file whenever they disagree.**
+>
+> Original snapshot metadata follows.
+>
+> **Original pre-archive status:** Completed Phase 7 architecture and closure reference.
 > **Purpose:** Document the completed Phase 7 protection requirements and auditable PR tracks for non-Contacts app-owned data surfaces after AppData Phase 1-6.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Relationship:** This document is not a symbol-level implementation plan and must not freeze future schema, type, method, or file names. It complements the inventory in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) and the progress record in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
@@ -22,7 +30,7 @@ Document ownership:
 
 - [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) remains the row-level inventory and cross-domain migration rule document.
 - [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) remains the code-backed progress record.
-- [SECURITY](SECURITY.md), [ARCHITECTURE](ARCHITECTURE.md), [TDD](TDD.md), and [TESTING](TESTING.md) remain the durable technical contract for implemented behavior.
+- [SECURITY](../SECURITY.md), [ARCHITECTURE](../ARCHITECTURE.md), [TDD](../TDD.md), and [TESTING](../TESTING.md) remain the durable technical contract for implemented behavior.
 - [APP_DATA_PHASE7_TEMPORARY_RECORD](APP_DATA_PHASE7_TEMPORARY_RECORD.md) is superseded by this document and should be retained only as a recovery/audit note for pre-reference material.
 
 Contacts are unblocked Phase 8 work after Phase 7 closure. This document may point to the Contacts follow-on plan, but it must not define Contacts-internal schema or rollout details.
@@ -129,7 +137,7 @@ Phase 7 was delivered as multiple reviewable PRs. Future documentation should pr
 
 5. Documentation and gate closure
    - Status: implemented by Phase 7 PR 5 as docs-only closure.
-   - Update [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md), [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md), [SECURITY](SECURITY.md), [ARCHITECTURE](ARCHITECTURE.md), [TDD](TDD.md), and [TESTING](TESTING.md) to match implemented Phase 7 behavior.
+   - Update [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md), [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md), [SECURITY](../SECURITY.md), [ARCHITECTURE](../ARCHITECTURE.md), [TDD](../TDD.md), and [TESTING](../TESTING.md) to match implemented Phase 7 behavior.
    - Mark Phase 8 Contacts as unblocked follow-on work without implementing Contacts or redefining its schema.
    - Do not introduce, remove, or rename Swift/Rust public APIs, ProtectedData schemas, UniFFI surfaces, entitlements, permission strings, or build settings.
 

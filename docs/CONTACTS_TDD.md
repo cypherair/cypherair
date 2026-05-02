@@ -7,7 +7,7 @@
 > **Companion document:** [CONTACTS_PRD](CONTACTS_PRD.md)  
 > **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific technical direction.  
 > **Primary framework references:** [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md)
-> **Related documents:** [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) · [TESTING](TESTING.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Related documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [TESTING](TESTING.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Technical Scope
 
@@ -523,7 +523,7 @@ Legacy source:
 
 ### 11.2 Migration Phases
 
-Contacts migration occurs only after the earlier AppData roadmap phases are already satisfied, including shared framework prerequisites, post-unlock multi-domain hardening, `private-key-control`, `key metadata`, and non-Contacts protected-after-unlock work.
+Contacts migration occurs after the earlier shared-framework prerequisites are already satisfied, including protected app-data framework setup, post-unlock multi-domain hardening, `private-key-control`, `key metadata`, and completed non-Contacts protected-after-unlock work. Phase 1-7 prerequisites are complete; Phase 8 Contacts remains pending implementation and follows the Contacts-specific implementation plan.
 
 The cutover trigger is the first Contacts-required protected-domain access after the Contacts protected-domain adoption point is reached. That access may occur during launch or resume if the initial route immediately needs Contacts data, but migration must not be triggered merely by process launch or service initialization.
 
