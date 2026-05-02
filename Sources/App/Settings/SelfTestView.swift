@@ -115,8 +115,30 @@ struct SelfTestView: View {
             item: report?.data,
             contentTypes: [.data],
             defaultFilename: report?.suggestedFilename ?? "CypherAir-SelfTest-Report.txt"
-        ) { _ in
-            report = nil
+        ) { result in
+            SelfTestReportExportCompletion.finish(
+                result,
+                clearLatestReport: {
+                    selfTestService.clearLatestReport()
+                },
+                clearPresentedReport: {
+                    report = nil
+                }
+            )
         }
+    }
+}
+
+enum SelfTestReportExportCompletion {
+    static func finish(
+        _ result: Result<URL, Error>,
+        clearLatestReport: () -> Void,
+        clearPresentedReport: () -> Void
+    ) {
+        if case .success = result {
+            clearLatestReport()
+        }
+
+        clearPresentedReport()
     }
 }
