@@ -359,7 +359,7 @@ Keychain default account: SE key + salt + sealed-key + pending private-key recov
 Keychain metadata account: legacy `PGPKeyIdentity` migration/cleanup source
 Keychain protected-data row: shared app-data root secret
 /Application Support/ProtectedData/: registry, private-key-control domain, key-metadata domain, protected-settings domain, domain bootstrap metadata
-/Documents/: contacts/ (public keys + `contact-metadata.json`), self-test/
+/Documents/: contacts/ (public keys + `contact-metadata.json`), legacy self-test/ cleanup source only
 /Library/Preferences/ (UserDefaults):
   com.cypherair.preference.authMode              → legacy source removed after private-key-control migration
   com.cypherair.preference.appSessionAuthenticationPolicy → boot auth profile
@@ -406,7 +406,7 @@ Migration and exception rules:
 - Legacy `authMode`, rewrap, and modify-expiry `UserDefaults` keys are migration sources only after verified `private-key-control` creation/open.
 - Legacy key metadata rows in the dedicated metadata account and older default-account rows are migration/cleanup sources only after verified `key-metadata` readability.
 - Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
-- Contacts, self-test state, and temporary/export/tutorial cleanup hardening remain outside the completed Phase 1-6 and Phase 7 PR 2 ordinary-settings scope.
+- Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset. Contacts and temporary/export/tutorial cleanup hardening remain outside the completed Phase 1-6 and Phase 7 PR 1-PR 3 scope.
 
 ---
 

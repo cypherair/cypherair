@@ -3,7 +3,7 @@ import Foundation
 /// One-tap self-diagnostic covering both profiles:
 /// key generation → encrypt/decrypt → sign/verify → tamper detection → QR round-trip.
 ///
-/// Results are stored as a shareable report in Documents/self-test/.
+/// Results are kept as an in-memory export-only report.
 @Observable
 final class SelfTestService {
 
@@ -25,11 +25,17 @@ final class SelfTestService {
         case failed(error: Error)
     }
 
+    /// In-memory report prepared for explicit user export.
+    struct SelfTestReport: Equatable {
+        let data: Data
+        let suggestedFilename: String
+    }
+
     /// Current state of the self-test run.
     private(set) var state: RunState = .idle
 
-    /// URL of the most recently saved report, for sharing.
-    private(set) var lastReportURL: URL?
+    /// Most recent report data, retained only in process memory.
+    private(set) var latestReport: SelfTestReport?
 
     private let engine: PgpEngine
 
@@ -43,6 +49,7 @@ final class SelfTestService {
     /// Heavy crypto work is delegated to `@concurrent` helpers so progress
     /// updates remain responsive while crypto stays off the main actor.
     func runAllTests() async {
+        latestReport = nil
         state = .running(progress: 0)
 
         let engine = self.engine
@@ -131,9 +138,12 @@ final class SelfTestService {
         completedTests += 1
         state = .running(progress: Double(completedTests) / Double(totalTests))
 
-        // Save report
-        saveReport(results: results)
+        latestReport = Self.makeReport(results: results)
         state = .completed(results: results)
+    }
+
+    func clearLatestReport() {
+        latestReport = nil
     }
 
     // MARK: - Private Helpers
@@ -322,20 +332,13 @@ final class SelfTestService {
         return decodedInfo
     }
 
-    private func saveReport(results: [TestResult]) {
-        let fm = FileManager.default
-        let docsDir = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let reportDir = docsDir.appendingPathComponent("self-test", isDirectory: true)
-
-        try? fm.createDirectory(at: reportDir, withIntermediateDirectories: true)
-
+    private static func makeReport(results: [TestResult], date: Date = Date()) -> SelfTestReport {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        let filename = "self-test-\(dateFormatter.string(from: Date())).txt"
-        let fileURL = reportDir.appendingPathComponent(filename)
+        let filename = "CypherAir-SelfTest-Report-\(dateFormatter.string(from: date)).txt"
 
         var report = String(localized: "selftest.report.title", defaultValue: "CypherAir Self-Test Report") + "\n"
-        let dateString = String(describing: Date())
+        let dateString = String(describing: date)
         report += String(localized: "selftest.report.date", defaultValue: "Date: \(dateString)") + "\n"
         report += "========================\n\n"
 
@@ -357,11 +360,9 @@ final class SelfTestService {
             report += "\n"
         }
 
-        do {
-            try report.write(to: fileURL, atomically: true, encoding: .utf8)
-            lastReportURL = fileURL
-        } catch {
-            lastReportURL = nil
-        }
+        return SelfTestReport(
+            data: Data(report.utf8),
+            suggestedFilename: filename
+        )
     }
 }

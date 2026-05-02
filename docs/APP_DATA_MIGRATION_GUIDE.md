@@ -40,12 +40,12 @@ Current ProtectedData implementation details are intentionally not repeated here
 
 ### Phase 7: Non-Contacts Protected-After-Unlock Domains
 
-Phase 7 is in progress. PR 1 removed synchronous/pre-auth ordinary-settings read paths and introduced `ProtectedOrdinarySettingsCoordinator` as the app-wide `locked` / `loaded(snapshot)` / `recoveryRequired` source for ordinary settings. PR 2 moved the targeted ordinary settings into `protected-settings` schema v2. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md); later implementation PRs still need their own focused plans.
+Phase 7 is in progress. PR 1 removed synchronous/pre-auth ordinary-settings read paths and introduced `ProtectedOrdinarySettingsCoordinator` as the app-wide `locked` / `loaded(snapshot)` / `recoveryRequired` source for ordinary settings. PR 2 moved the targeted ordinary settings into `protected-settings` schema v2. PR 3 selected the self-test short-lived/export-only model and made legacy `Documents/self-test/` cleanup-only. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md); later implementation PRs still need their own focused plans.
 
 Known Phase 7 surfaces:
 
 - ordinary settings now owned by `ProtectedData/protected-settings` schema v2: `gracePeriod`, onboarding completion, theme, encrypt-to-self, and guided tutorial completion state
-- self-test reports or diagnostics state under `Documents/self-test/`
+- self-test reports now generated as in-memory export-only data; legacy `Documents/self-test/` is cleanup-only
 - temporary decrypted, streaming, export, and tutorial files that need final cleanup and file-protection review
 - tutorial-only defaults and sandbox cleanup guarantees
 
@@ -139,7 +139,7 @@ Allowed target classes:
 | Framework sentinel payload | `Application Support/ProtectedData/protected-framework-sentinel/` | `framework-bootstrap` | Phase 4 | Implemented | implemented |
 | `Documents/contacts/*.gpg` | App sandbox documents | `protected-after-unlock` | Phase 8 | Pending | no |
 | `Documents/contacts/contact-metadata.json` | App sandbox documents | `protected-after-unlock` | Phase 8 | Pending | no |
-| `Documents/self-test/` | App sandbox documents | `protected-after-unlock` or `ephemeral-with-cleanup` | Phase 7 | Pending | no |
+| Self-test reports / legacy `Documents/self-test/` | In-memory export-only report data; legacy app sandbox `Documents/self-test/` cleanup source only | `ephemeral-with-cleanup` / `legacy cleanup-only` | Phase 7 PR 3 | Implemented | implemented |
 | `tmp/decrypted/` | App temporary directory | `ephemeral-with-cleanup` | Phase 7 | Partial | partial |
 | `tmp/streaming/` | App temporary directory | `ephemeral-with-cleanup` | Phase 7 | Partial | partial |
 | `tmp/export-*` | App temporary directory | `ephemeral-with-cleanup` | Phase 7 | Partial | partial |

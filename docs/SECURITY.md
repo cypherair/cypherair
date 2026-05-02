@@ -242,7 +242,7 @@ Current non-goals and pending surfaces:
 
 - Permanent and pending SE-wrapped private-key bundle rows remain in the existing private-key material domain.
 - `appSessionAuthenticationPolicy` remains an early-readable boot-authentication setting.
-- Self-test reports/state, temporary/export/tutorial cleanup hardening, and Contacts remain outside ProtectedData until their later Phase 7 or Phase 8 work lands. Phase 7 PR 2 moved the targeted ordinary settings into `protected-settings`; legacy ordinary `UserDefaults` keys are cleanup-only after verified schema v2 readback.
+- Self-test reports are short-lived export-only data held in memory until explicit user export, reset, or app exit; legacy `Documents/self-test/` content is cleanup-only on startup and local-data reset. Temporary/export/tutorial cleanup hardening and Contacts remain outside ProtectedData until their later Phase 7 or Phase 8 work lands. Phase 7 PR 2 moved the targeted ordinary settings into `protected-settings`; legacy ordinary `UserDefaults` keys are cleanup-only after verified schema v2 readback.
 
 Protected app-data authorization uses `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`. `AppSessionOrchestrator` owns launch/resume privacy authentication and the grace window. When app authentication succeeds, it can hand the authenticated `LAContext` to `ProtectedDataSessionCoordinator`, which reads the shared app-data root secret through Keychain with `kSecUseAuthenticationContext`. That same authenticated handoff is reused by post-unlock domain openers so committed registered domains can open without a second Face ID / Touch ID prompt.
 

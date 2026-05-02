@@ -155,7 +155,7 @@ Current ProtectedData scope:
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`
-- current Phase 1-6 ProtectedData work and Phase 7 PR 1-PR 2 ordinary-settings protection are implemented; remaining Phase 7 surfaces include self-test state and temporary/export/tutorial cleanup and file-protection hardening, while Contacts remains Phase 8
+- current Phase 1-6 ProtectedData work plus Phase 7 PR 1-PR 3 ordinary-settings and self-test export-only work are implemented; remaining Phase 7 surfaces include temporary/export/tutorial cleanup and file-protection hardening, while Contacts remains Phase 8
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
 - AppData phase completion status is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 
@@ -409,7 +409,7 @@ App Sandbox:
 ├── Documents/
 │   ├── contacts/                → Public key files (.gpg binary)
 │   │   └── contact-metadata.json → Verification-state manifest for stored contacts
-│   └── self-test/               → Self-test reports
+│   └── self-test/               → Legacy self-test reports cleanup source only; new reports are in-memory export-only
 ├── Application Support/
 │   └── ProtectedData/
 │       ├── ProtectedDataRegistry.plist

@@ -30,9 +30,11 @@ final class LocalDataResetService {
     private let authManager: AuthenticationManager
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
+    private let selfTestService: SelfTestService?
     private let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     private let appSessionOrchestrator: AppSessionOrchestrator
     private let fileManager: FileManager
+    private let legacySelfTestReportsDirectory: URL
     private let protectedDataRootSecretExists: () -> Bool
     private let traceStore: AuthLifecycleTraceStore?
 
@@ -48,9 +50,11 @@ final class LocalDataResetService {
         authManager: AuthenticationManager,
         keyManagement: KeyManagementService,
         contactService: ContactService,
+        selfTestService: SelfTestService? = nil,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         appSessionOrchestrator: AppSessionOrchestrator,
         fileManager: FileManager = .default,
+        legacySelfTestReportsDirectory: URL? = nil,
         protectedDataRootSecretExists: (() -> Bool)? = nil,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
@@ -65,9 +69,13 @@ final class LocalDataResetService {
         self.authManager = authManager
         self.keyManagement = keyManagement
         self.contactService = contactService
+        self.selfTestService = selfTestService
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.appSessionOrchestrator = appSessionOrchestrator
         self.fileManager = fileManager
+        self.legacySelfTestReportsDirectory = legacySelfTestReportsDirectory
+            ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("self-test", isDirectory: true)
         self.protectedDataRootSecretExists = protectedDataRootSecretExists ?? {
             keychain.exists(
                 service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
@@ -157,6 +165,7 @@ final class LocalDataResetService {
         protectedOrdinarySettingsCoordinator.resetAfterLocalDataReset(
             preserveAuthentication: authenticationContext != nil
         )
+        selfTestService?.clearLatestReport()
         authManager.clearCachedAuthenticationContextAfterLocalDataReset()
         keyManagement.resetInMemoryStateAfterLocalDataReset()
         contactService.resetInMemoryStateAfterLocalDataReset()
@@ -196,7 +205,8 @@ final class LocalDataResetService {
     private var resetDirectories: [URL] {
         [
             protectedDataStorageRoot.rootURL,
-            contactsDirectory
+            contactsDirectory,
+            legacySelfTestReportsDirectory
         ]
     }
 
@@ -340,6 +350,9 @@ final class LocalDataResetService {
             let hasProtectedArtifacts = try protectedDataStorageRoot.hasProtectedDataArtifacts()
             let rootExists = fileManager.fileExists(atPath: protectedDataStorageRoot.rootURL.path)
             let contactsDirectoryExists = fileManager.fileExists(atPath: contactsDirectory.path)
+            let legacySelfTestReportsDirectoryExists = fileManager.fileExists(
+                atPath: legacySelfTestReportsDirectory.path
+            )
             let hasRootSecret = protectedDataRootSecretExists()
             let hasDeviceBindingKey = keychain.exists(
                 service: KeychainConstants.protectedDataDeviceBindingKeyService,
@@ -370,6 +383,7 @@ final class LocalDataResetService {
             let hasRemainingData = hasProtectedArtifacts
                 || hasRootSecret
                 || contactsDirectoryExists
+                || legacySelfTestReportsDirectoryExists
                 || !remainingDefaultAccountServices.isEmpty
                 || !remainingMetadataAccountServices.isEmpty
                 || !remainingTemporaryTargets.isEmpty
@@ -387,6 +401,7 @@ final class LocalDataResetService {
                     "hasFormatFloor": hasFormatFloor ? "true" : "false",
                     "hasLegacyCleanup": hasLegacyCleanup ? "true" : "false",
                     "contactsDirectoryExists": contactsDirectoryExists ? "true" : "false",
+                    "legacySelfTestReportsDirectoryExists": legacySelfTestReportsDirectoryExists ? "true" : "false",
                     "remainingDefaultKeychainItemCount": String(remainingDefaultAccountServices.count),
                     "remainingMetadataKeychainItemCount": String(remainingMetadataAccountServices.count),
                     "remainingTemporaryTargetCount": String(remainingTemporaryTargets.count),
@@ -411,6 +426,9 @@ final class LocalDataResetService {
             }
             if contactsDirectoryExists {
                 failures.append("directory.\(contactsDirectory.lastPathComponent).remaining")
+            }
+            if legacySelfTestReportsDirectoryExists {
+                failures.append("directory.\(legacySelfTestReportsDirectory.lastPathComponent).remaining")
             }
             if !remainingDefaultAccountServices.isEmpty {
                 failures.append("keychain.default.remaining.\(remainingDefaultAccountServices.count)")

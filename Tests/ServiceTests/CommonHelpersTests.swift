@@ -1058,6 +1058,8 @@ final class CommonHelpersTests: XCTestCase {
         }
         let contactDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirStartupTests-\(UUID().uuidString)", isDirectory: true)
+        let legacySelfTestReportsDirectory = contactDirectory
+            .appendingPathComponent("self-test", isDirectory: true)
         let protectedDataBaseDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirProtectedDataStartupTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: contactDirectory) }
@@ -1165,8 +1167,10 @@ final class CommonHelpersTests: XCTestCase {
             authManager: authManager,
             keyManagement: keyManagement,
             contactService: contactService,
+            selfTestService: selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            appSessionOrchestrator: appSessionOrchestrator
+            appSessionOrchestrator: appSessionOrchestrator,
+            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory
         )
         let container = AppContainer(
             authLifecycleTraceStore: nil,
@@ -1198,6 +1202,7 @@ final class CommonHelpersTests: XCTestCase {
             selfTestService: selfTestService,
             localDataResetService: localDataResetService,
             contactsDirectory: contactDirectory,
+            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             defaultsSuiteName: suiteName
         )
 

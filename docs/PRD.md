@@ -209,7 +209,7 @@ Current protected app-data scope:
 - Private-key control state, including the selected auth mode and rewrap / modify-expiry recovery journal, is stored in `private-key-control`.
 - Key-list metadata (`PGPKeyIdentity`) is stored in `key-metadata` and loads after app unlock.
 
-Remaining ordinary settings, self-test persistence, temporary/export/tutorial cleanup hardening, and Contacts are not yet migrated into protected app-data domains. Contacts remains a later protected-domain rollout and is not part of the current App Protection user surface.
+Ordinary protected settings are migrated into `protected-settings`, and self-test reports are short-lived export-only data rather than a protected diagnostics domain. Temporary/export/tutorial cleanup hardening and Contacts are not yet migrated into protected app-data domains. Contacts remains a later protected-domain rollout and is not part of the current App Protection user surface.
 
 **Authentication Mode**
 

@@ -42,8 +42,8 @@ Recovered candidate areas:
 
 Current active-guide summary:
 
-- ordinary settings that remain in `UserDefaults`, including `gracePeriod`, onboarding completion, theme, encrypt-to-self, and guided tutorial completion state
-- self-test reports or diagnostics state under `Documents/self-test/`
+- targeted ordinary settings moved into `protected-settings` schema v2; legacy ordinary `UserDefaults` keys are cleanup-only after verified migration
+- self-test reports are in-memory export-only data; legacy `Documents/self-test/` is cleanup-only on startup and Reset All Local Data
 - temporary decrypted, streaming, export, and tutorial files that need final cleanup and file-protection review
 - tutorial-only defaults and sandbox cleanup guarantees
 
@@ -58,7 +58,7 @@ These rows are recovered notes, not revalidated implementation decisions.
 | `colorTheme` | `protected-after-unlock`, Phase 7, pending, not ready | Requires UI refactor: use system/default tint before unlock, then apply the user's theme after protected settings open. |
 | `encryptToSelf` | `protected-after-unlock`, Phase 7, pending, not ready | Current sync read path still exists in Encrypt flow. |
 | `guidedTutorialCompletedVersion` | `protected-after-unlock`, Phase 7, pending, not ready | Current sync read path still exists in tutorial and Settings entry flows. |
-| `Documents/self-test/` | `protected-after-unlock` or `ephemeral-with-cleanup`, Phase 7, pending, not ready | Decide whether to move reports into a protected diagnostics domain or make reports short-lived/export-only. |
+| `Documents/self-test/` | `ephemeral-with-cleanup`, Phase 7 PR 3, implemented as legacy cleanup-only | PR 3 selected the short-lived/export-only model. New self-test reports are held in memory until explicit export, reset, or app exit; no ProtectedData diagnostics domain was added. |
 | `tmp/decrypted/` | `ephemeral-with-cleanup`, Phase 7, partial | Decrypted file previews; cleanup exists in some flows, but file-protection review remains Phase 7 work. |
 | `tmp/streaming/` | `ephemeral-with-cleanup`, Phase 7, partial | Streaming encrypt/decrypt outputs; startup cleanup exists, but file-protection review remains Phase 7 work. |
 | `tmp/export-*` | `ephemeral-with-cleanup`, Phase 7, partial | Temporary fileExporter handoff files; deleted by owner/reset cleanup where possible, with remaining cleanup/file-protection review in Phase 7. |
@@ -81,6 +81,6 @@ Recovered validation clues for later Phase 7 planning:
 
 - Protected-after-unlock setting migration must prove that pre-auth startup does not read protected payloads, does not fetch the root-secret Keychain item, and does not weaken or change the selected app-session authentication policy.
 - The `appSessionAuthenticationPolicy` boot authentication profile must stay early-readable unless a future testable design provides a protected value plus boot cache without changing launch authentication strength.
-- Self-test persistence tests must prove either protected diagnostics storage or short-lived/export-only cleanup semantics for `Documents/self-test/`.
+- PR 3 self-test coverage proves short-lived/export-only report generation plus cleanup semantics for legacy `Documents/self-test/`.
 - Temporary-file tests must cover `tmp/decrypted`, `tmp/streaming`, `tmp/export-*`, and tutorial sandbox cleanup, including relock, reset, and startup cleanup where each surface applies.
 - Migration survivability, startup adoption, and no-silent-reset guarantees belong to Swift unit coverage, plus targeted macOS-local integration validation when startup routing or user-visible recovery flows are part of the scenario.
