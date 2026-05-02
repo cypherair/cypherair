@@ -262,7 +262,7 @@ The guided tutorial is allowed to run real app services and real OpenPGP operati
 
 Tutorial isolation boundaries:
 
-- `TutorialSandboxContainer` uses a unique `UserDefaults` suite and a temporary contacts directory with verified complete file protection instead of the app's real preferences and `Documents/contacts` storage. Current tutorial cleanup removes the active suite and directory; startup and Reset All Local Data also remove orphaned tutorial suites by the `com.cypherair.tutorial.` prefix.
+- `TutorialSandboxContainer` uses the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite and a temporary contacts directory with verified complete file protection instead of the app's real preferences and `Documents/contacts` storage. The product flow owns a single active tutorial sandbox at a time; container creation and current tutorial cleanup clear the fixed suite and directory. Startup and Reset All Local Data also remove legacy orphaned `com.cypherair.tutorial.<UUID>` suites.
 - Tutorial key management, encryption, decryption, signing, certificate, QR, and self-test services are constructed against tutorial-local storage and the same Rust engine API shape used by the real app.
 - Tutorial private-key protection uses mock Secure Enclave and mock Keychain primitives behind a real `AuthenticationManager` instance, so auth-mode behavior is exercised without touching real Secure Enclave-wrapped private keys or real Keychain rows.
 - `OutputInterceptionPolicy` and page-level configuration must block or intercept real file import/export, clipboard writes, share-sheet export, URL handoff, app icon changes, onboarding management actions, and other real-workspace side effects.

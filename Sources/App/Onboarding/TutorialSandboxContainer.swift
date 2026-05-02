@@ -16,6 +16,7 @@ enum TutorialSandboxContainerError: LocalizedError {
 
 /// Isolated dependency graph for the guided tutorial.
 /// Uses real app services backed by sandbox storage and mock security primitives.
+/// The product flow owns a single active tutorial sandbox at a time.
 final class TutorialSandboxContainer {
     let engine: PgpEngine
     let mockSecureEnclave: MockSecureEnclave
@@ -50,11 +51,12 @@ final class TutorialSandboxContainer {
         self.mockAuthenticator = MockAuthenticator()
         self.authenticationPromptCoordinator = AuthenticationPromptCoordinator()
 
-        let suiteName = "com.cypherair.tutorial.\(UUID().uuidString)"
+        let suiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             throw TutorialSandboxContainerError.defaultsUnavailable
         }
         defaults.removePersistentDomain(forName: suiteName)
+        _ = defaults.synchronize()
         self.defaultsSuiteName = suiteName
         self.defaults = defaults
 
@@ -134,6 +136,7 @@ final class TutorialSandboxContainer {
 
         try? FileManager.default.removeItem(at: contactsDirectory)
         defaults.removePersistentDomain(forName: defaultsSuiteName)
+        _ = defaults.synchronize()
     }
 
     deinit {

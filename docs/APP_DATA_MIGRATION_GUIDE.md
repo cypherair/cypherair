@@ -34,7 +34,7 @@ This guide does not create the Phase 7 implementation plan. It records the remai
 | Phase 7 PR 1: Ordinary Settings Read Paths | Implemented | `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings lock state; PR 2 replaced the temporary legacy persistence source with `protected-settings` schema v2. |
 | Phase 7 PR 2: Protected Settings Expansion | Implemented | `protected-settings` schema v2 owns grace period, onboarding completion, theme, encrypt-to-self, and guided tutorial completion after verified migration. |
 | Phase 7 PR 3: Self-Test Persistence Decision | Implemented | Current self-test reports are in-memory export-only data; legacy `Documents/self-test/` is cleanup-only on startup and Reset All Local Data. |
-| Phase 7 PR 4: Temporary / Export / Tutorial Hardening | Implemented | Streaming/decrypted outputs use per-operation temporary owner directories, export handoff files use verified complete protection, tutorial sandbox directories use verified complete protection, and startup/reset cleanup removes Phase 7 temporary artifacts plus orphaned tutorial defaults suites by prefix. |
+| Phase 7 PR 4: Temporary / Export / Tutorial Hardening | Implemented | Streaming/decrypted outputs use per-operation temporary owner directories, export handoff files use verified complete protection, tutorial sandbox directories use verified complete protection, and startup/reset cleanup removes Phase 7 temporary artifacts plus the fixed tutorial defaults suite and legacy UUID tutorial-suite orphans. |
 
 Current ProtectedData implementation details are intentionally not repeated here. Use [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md) for the current technical contract.
 
@@ -51,7 +51,7 @@ Known Phase 7 surfaces:
 - temporary decrypted and streaming files now live under per-operation owner directories with verified `.complete` file protection and owner/startup/reset cleanup
 - export handoff files now use atomic `.completeFileProtection` writes, verified `.complete` protection, owner cleanup, startup cleanup, and reset cleanup
 - tutorial sandbox directories now use verified `.complete` protection, current tutorial cleanup, startup cleanup, and reset cleanup
-- tutorial-only `UserDefaults` suites now have current-container cleanup plus startup/reset prefix sweep for orphaned `com.cypherair.tutorial.<UUID>.plist` files
+- tutorial-only `UserDefaults` now use the fixed `com.cypherair.tutorial.sandbox` suite with current-container cleanup, startup/reset direct cleanup, and legacy startup/reset cleanup for orphaned `com.cypherair.tutorial.<UUID>.plist` files
 
 Phase 7 must not move a setting merely because it is user-visible. It must first remove or replace synchronous/pre-unlock read paths and prove launch authentication strength is unchanged. PR 1 completed that read-path prerequisite for ordinary settings. PR 2 extended the protected-settings payload and retires legacy ordinary-setting sources only after schema v2 write/readback verification. PR 4 intentionally did not add a new ProtectedData domain because these artifacts remain short-lived and app-owned only until cleanup or explicit user export handoff.
 
@@ -148,7 +148,7 @@ Allowed target classes:
 | `tmp/streaming/` | App temporary directory `tmp/streaming/op-<UUID>/<sanitized input filename>.gpg` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
 | `tmp/export-*` | App temporary directory `tmp/export-<UUID>-<sanitized filename>` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
 | `tmp/CypherAirGuidedTutorial-*` | App temporary directory `tmp/CypherAirGuidedTutorial-<UUID>/` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
-| Tutorial `UserDefaults` suite | App Preferences plist `com.cypherair.tutorial.<UUID>.plist` plus current suite domain | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
+| Tutorial `UserDefaults` suite | App Preferences plist/domain `com.cypherair.tutorial.sandbox`, plus legacy orphan cleanup for `com.cypherair.tutorial.<UUID>.plist` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
 | Files exported to user-selected locations | Outside app-controlled sandbox after export | `out-of-app-custody` | Out-of-app-custody exception | Exception retained | n/a |
 
 ## 6. Migration Rules

@@ -45,7 +45,7 @@ Current active-guide summary:
 - targeted ordinary settings moved into `protected-settings` schema v2; legacy ordinary `UserDefaults` keys are cleanup-only after verified migration
 - self-test reports are in-memory export-only data; legacy `Documents/self-test/` is cleanup-only on startup and Reset All Local Data
 - temporary decrypted, streaming, export, and tutorial files are implemented as Phase 7 PR 4 `ephemeral-with-cleanup` with verified `.complete` file protection where CypherAir creates the file or directory
-- tutorial-only defaults use current-suite cleanup plus startup/reset prefix sweep for orphaned `com.cypherair.tutorial.<UUID>` suites
+- tutorial-only defaults use fixed-suite cleanup for `com.cypherair.tutorial.sandbox` plus startup/reset fallback cleanup for orphaned legacy `com.cypherair.tutorial.<UUID>` suites
 
 ## 4. Restored Surface Notes
 
@@ -63,7 +63,7 @@ These rows are recovered notes, not revalidated implementation decisions.
 | `tmp/streaming/` | `ephemeral-with-cleanup`, Phase 7 PR 4, implemented | Streaming encryption outputs now live under `tmp/streaming/op-<UUID>/<sanitized input filename>.gpg`. Ownership is per operation, so repeated same-name operations do not share a path. |
 | `tmp/export-*` | `ephemeral-with-cleanup`, Phase 7 PR 4, implemented | Temporary fileExporter handoff files are written as `tmp/export-<UUID>-<sanitized filename>` with atomic complete file protection, verified after write, owned by `FileExportController`, and deleted by `finish()`, next export, startup, or Reset All Local Data. |
 | `tmp/CypherAirGuidedTutorial-*` | `ephemeral-with-cleanup`, Phase 7 PR 4, implemented | Tutorial contacts sandbox directories are created with verified `.complete` protection and remain isolated from real app data. Current tutorial cleanup, startup cleanup, and Reset All Local Data remove matching directories. |
-| Tutorial `UserDefaults` suite | `ephemeral-with-cleanup`, Phase 7 PR 4, implemented | Current tutorial cleanup removes the active `com.cypherair.tutorial.<UUID>` suite. Startup cleanup and Reset All Local Data enumerate the app Preferences directory for matching `com.cypherair.tutorial.*.plist`, remove those persistent domains, and delete residual plists without a registry. |
+| Tutorial `UserDefaults` suite | `ephemeral-with-cleanup`, Phase 7 PR 4, implemented | Current tutorial cleanup removes the fixed `com.cypherair.tutorial.sandbox` suite used by the single active tutorial sandbox. Startup cleanup and Reset All Local Data clear that fixed suite directly, then enumerate the app Preferences directory for legacy `com.cypherair.tutorial.<UUID>.plist` orphans, remove those persistent domains, and delete residual plists without a registry. |
 
 ## 5. Restored Constraints
 

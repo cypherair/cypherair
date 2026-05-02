@@ -6,18 +6,19 @@ final class AppTemporaryArtifactStore {
         var failures: [String] = []
     }
 
-    static let tutorialDefaultsSuitePrefix = "com.cypherair.tutorial."
+    static let tutorialSandboxDefaultsSuiteName = "com.cypherair.tutorial.sandbox"
+    static let legacyTutorialDefaultsSuitePrefix = "com.cypherair.tutorial."
 
     private let fileManager: FileManager
     private let temporaryDirectory: URL
     private let preferencesDirectory: URL
-    private let tutorialDefaultsSuitePrefix: String
+    private let legacyTutorialDefaultsSuitePrefix: String
 
     init(
         fileManager: FileManager = .default,
         temporaryDirectory: URL? = nil,
         preferencesDirectory: URL? = nil,
-        tutorialDefaultsSuitePrefix: String = AppTemporaryArtifactStore.tutorialDefaultsSuitePrefix
+        legacyTutorialDefaultsSuitePrefix: String = AppTemporaryArtifactStore.legacyTutorialDefaultsSuitePrefix
     ) {
         self.fileManager = fileManager
         self.temporaryDirectory = (temporaryDirectory ?? fileManager.temporaryDirectory).standardizedFileURL
@@ -26,7 +27,7 @@ final class AppTemporaryArtifactStore {
                 ?? fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
                     .appendingPathComponent("Preferences", isDirectory: true)
         ).standardizedFileURL
-        self.tutorialDefaultsSuitePrefix = tutorialDefaultsSuitePrefix
+        self.legacyTutorialDefaultsSuitePrefix = legacyTutorialDefaultsSuitePrefix
     }
 
     func makeStreamingArtifact(for inputURL: URL) throws -> AppTemporaryArtifact {
@@ -124,22 +125,25 @@ final class AppTemporaryArtifactStore {
 
     func cleanupTutorialDefaultsSuites() -> CleanupResult {
         var result = CleanupResult()
-        for suiteName in tutorialDefaultsSuiteNames() {
-            if let defaults = UserDefaults(suiteName: suiteName) {
-                defaults.removePersistentDomain(forName: suiteName)
-                _ = defaults.synchronize()
-            }
-
-            let plistURL = preferencesDirectory.appendingPathComponent("\(suiteName).plist")
-            if fileManager.fileExists(atPath: plistURL.path) {
-                removeItem(plistURL, result: &result)
-            }
+        cleanupTutorialDefaultsSuite(
+            named: Self.tutorialSandboxDefaultsSuiteName,
+            result: &result
+        )
+        for suiteName in legacyTutorialDefaultsSuiteNames() {
+            cleanupTutorialDefaultsSuite(named: suiteName, result: &result)
         }
         return result
     }
 
     func remainingTutorialDefaultsSuites() -> [String] {
-        tutorialDefaultsSuiteNames()
+        var suiteNames: [String] = []
+        if fileManager.fileExists(
+            atPath: tutorialDefaultsPlistURL(for: Self.tutorialSandboxDefaultsSuiteName).path
+        ) {
+            suiteNames.append(Self.tutorialSandboxDefaultsSuiteName)
+        }
+        suiteNames.append(contentsOf: legacyTutorialDefaultsSuiteNames())
+        return suiteNames
     }
 
     static func decryptedOutputFilename(for inputFilename: String) -> String {
@@ -195,7 +199,26 @@ final class AppTemporaryArtifactStore {
             || name.hasPrefix("CypherAirGuidedTutorial-")
     }
 
-    private func tutorialDefaultsSuiteNames() -> [String] {
+    private func cleanupTutorialDefaultsSuite(
+        named suiteName: String,
+        result: inout CleanupResult
+    ) {
+        if let defaults = UserDefaults(suiteName: suiteName) {
+            defaults.removePersistentDomain(forName: suiteName)
+            _ = defaults.synchronize()
+        }
+
+        let plistURL = tutorialDefaultsPlistURL(for: suiteName)
+        if fileManager.fileExists(atPath: plistURL.path) {
+            removeItem(plistURL, result: &result)
+        }
+    }
+
+    private func tutorialDefaultsPlistURL(for suiteName: String) -> URL {
+        preferencesDirectory.appendingPathComponent("\(suiteName).plist")
+    }
+
+    private func legacyTutorialDefaultsSuiteNames() -> [String] {
         guard let contents = try? fileManager.contentsOfDirectory(
             at: preferencesDirectory,
             includingPropertiesForKeys: nil
@@ -206,7 +229,10 @@ final class AppTemporaryArtifactStore {
         return contents.compactMap { url in
             guard url.pathExtension == "plist" else { return nil }
             let suiteName = url.deletingPathExtension().lastPathComponent
-            guard suiteName.hasPrefix(tutorialDefaultsSuitePrefix) else { return nil }
+            guard suiteName.hasPrefix(legacyTutorialDefaultsSuitePrefix) else { return nil }
+            guard suiteName != Self.tutorialSandboxDefaultsSuiteName else { return nil }
+            let suffix = suiteName.dropFirst(legacyTutorialDefaultsSuitePrefix.count)
+            guard UUID(uuidString: String(suffix)) != nil else { return nil }
             return suiteName
         }
     }

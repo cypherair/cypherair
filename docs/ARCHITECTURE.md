@@ -83,7 +83,7 @@ Orchestrates user-facing operations by coordinating the Security layer and the R
 
 The guided tutorial is a host-driven sandbox that teaches the real app workflow without touching real workspace state. `TutorialView` owns the hub, sandbox acknowledgement, workspace, completion, and leave-confirmation surfaces. `TutorialSessionStore` owns the current tutorial session, seven-module progress, replay unlock rules, navigation state, active tutorial modal, output interception policy, and completion-version persistence.
 
-`TutorialSandboxContainer` builds a separate dependency graph for the tutorial using isolated `UserDefaults`, a temporary contacts directory with verified complete file protection, real app services, and mock Secure Enclave / Keychain primitives behind a real `AuthenticationManager`. Current tutorial cleanup removes the active suite and directory; startup/reset cleanup also prefix-sweeps orphaned tutorial defaults suites and tutorial temp directories. The tutorial reuses production pages through `TutorialConfigurationFactory`, `TutorialRouteDestinationView`, and `TutorialShellDefinitionsBuilder`; tutorial behavior is injected through generic page configuration instead of pervasive page-level tutorial branches.
+`TutorialSandboxContainer` builds a separate dependency graph for the tutorial using the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite, a temporary contacts directory with verified complete file protection, real app services, and mock Secure Enclave / Keychain primitives behind a real `AuthenticationManager`. The product flow owns a single active tutorial sandbox at a time; creating the container first clears the fixed suite. Current tutorial cleanup removes the fixed suite and directory, while startup/reset cleanup also removes legacy orphaned `com.cypherair.tutorial.<UUID>` defaults suites and tutorial temp directories. The tutorial reuses production pages through `TutorialConfigurationFactory`, `TutorialRouteDestinationView`, and `TutorialShellDefinitionsBuilder`; tutorial behavior is injected through generic page configuration instead of pervasive page-level tutorial branches.
 
 Safety is enforced by narrow host boundaries:
 
@@ -431,7 +431,8 @@ App Sandbox:
 │       ├── com.cypherair.internal.rewrapTargetMode         → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.internal.modifyExpiryInProgress   → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.internal.modifyExpiryFingerprint  → Legacy source removed after private-key-control migration
-│       └── com.cypherair.tutorial.<UUID>.plist             → Tutorial sandbox defaults; startup/reset prefix cleanup
+│       ├── com.cypherair.tutorial.sandbox.plist            → Fixed tutorial sandbox defaults; startup/reset direct cleanup
+│       └── com.cypherair.tutorial.<UUID>.plist             → Legacy tutorial sandbox defaults orphan; startup/reset fallback cleanup
 └── tmp/
     ├── decrypted/op-<UUID>/     → Per-operation decrypted file previews with verified complete protection
     ├── streaming/op-<UUID>/     → Per-operation streaming outputs with verified complete protection

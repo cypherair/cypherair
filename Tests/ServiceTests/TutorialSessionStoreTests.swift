@@ -10,12 +10,27 @@ final class TutorialSessionStoreTests: XCTestCase {
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: container.contactsDirectory.path))
         try assertCompleteFileProtection(at: container.contactsDirectory)
-        XCTAssertTrue(container.defaultsSuiteName.hasPrefix("com.cypherair.tutorial."))
+        XCTAssertEqual(
+            container.defaultsSuiteName,
+            AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
+        )
         XCTAssertEqual(container.authManager.currentMode, .standard)
         XCTAssertEqual(container.contactService.contacts.count, 0)
         XCTAssertEqual(container.keyManagement.keys.count, 0)
         XCTAssertFalse(container.contactsDirectory.path.contains("/Documents/contacts"))
         XCTAssertNotNil(container.securitySimulationStack.authManager)
+    }
+
+    func test_tutorialSandboxContainer_clearsFixedDefaultsSuiteOnCreation() throws {
+        let suiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.set("stale", forKey: "marker")
+        _ = defaults.synchronize()
+
+        let container = try TutorialSandboxContainer()
+        defer { container.cleanup() }
+
+        XCTAssertNil(defaults.string(forKey: "marker"))
     }
 
     func test_prepareForPresentation_doesNotStartSandboxUntilModuleOpens() {
@@ -999,6 +1014,7 @@ final class TutorialSessionStoreTests: XCTestCase {
         await startTutorialSession(store)
         let container = try XCTUnwrap(store.container)
         let oldSuite = container.defaultsSuiteName
+        let oldContactsDirectory = container.contactsDirectory
         UserDefaults(suiteName: oldSuite)?.set("temporary", forKey: "marker")
         XCTAssertEqual(UserDefaults(suiteName: oldSuite)?.string(forKey: "marker"), "temporary")
 
@@ -1007,9 +1023,14 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNil(store.container)
         XCTAssertEqual(store.lifecycleState, .notStarted)
         XCTAssertNil(UserDefaults(suiteName: oldSuite)?.string(forKey: "marker"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldContactsDirectory.path))
 
         await startTutorialSession(store)
-        XCTAssertNotEqual(store.container?.defaultsSuiteName, oldSuite)
+        let newContainer = try XCTUnwrap(store.container)
+        defer { newContainer.cleanup() }
+        XCTAssertEqual(newContainer.defaultsSuiteName, oldSuite)
+        XCTAssertNotEqual(newContainer.contactsDirectory, oldContactsDirectory)
+        XCTAssertNil(UserDefaults(suiteName: oldSuite)?.string(forKey: "marker"))
     }
 
     private func assertCompleteFileProtection(

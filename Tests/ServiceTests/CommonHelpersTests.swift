@@ -264,9 +264,15 @@ final class CommonHelpersTests: XCTestCase {
             to: legacySelfTestDirectory.appendingPathComponent("self-test.txt"),
             options: .atomic
         )
-        let tutorialSuiteName = "com.cypherair.tutorial.\(UUID().uuidString)"
-        let tutorialPlist = preferencesDirectory.appendingPathComponent("\(tutorialSuiteName).plist")
-        try Data("orphan".utf8).write(to: tutorialPlist, options: .atomic)
+        let fixedTutorialSuiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
+        let fixedTutorialPlist = preferencesDirectory.appendingPathComponent("\(fixedTutorialSuiteName).plist")
+        try Data("fixed".utf8).write(to: fixedTutorialPlist, options: .atomic)
+        let legacyTutorialSuiteName = "com.cypherair.tutorial.\(UUID().uuidString)"
+        let legacyTutorialPlist = preferencesDirectory.appendingPathComponent("\(legacyTutorialSuiteName).plist")
+        try Data("orphan".utf8).write(to: legacyTutorialPlist, options: .atomic)
+        let similarTutorialSuiteName = "com.cypherair.tutorial.not-a-uuid"
+        let similarTutorialPlist = preferencesDirectory.appendingPathComponent("\(similarTutorialSuiteName).plist")
+        try Data("keep".utf8).write(to: similarTutorialPlist, options: .atomic)
 
         let store = CypherAir.AppTemporaryArtifactStore(
             temporaryDirectory: baseDirectory,
@@ -279,6 +285,9 @@ final class CommonHelpersTests: XCTestCase {
 
         XCTAssertTrue(store.remainingTemporaryArtifacts().isEmpty)
         XCTAssertTrue(store.remainingTutorialDefaultsSuites().isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixedTutorialPlist.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyTutorialPlist.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: similarTutorialPlist.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacySelfTestDirectory.path))
     }
 

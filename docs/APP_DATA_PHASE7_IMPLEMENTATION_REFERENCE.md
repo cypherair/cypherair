@@ -44,7 +44,7 @@ Current Phase 7 status:
 - Phase 7 PR 4 selected the `ephemeral-with-cleanup` model for decrypted, streaming, export handoff, guided tutorial artifacts, and tutorial-only `UserDefaults` suites. It does not add a ProtectedData domain.
 - `tmp/decrypted/op-<UUID>/...` and `tmp/streaming/op-<UUID>/...` provide per-operation ownership for streaming outputs; owner cleanup deletes the operation directory.
 - `tmp/export-<UUID>-<filename>` remains a fileExporter handoff path owned by `FileExportController`, with owner cleanup through `finish()`.
-- `tmp/CypherAirGuidedTutorial-<UUID>/` remains tutorial-local storage, and orphaned `com.cypherair.tutorial.<UUID>` defaults suites are removed by startup and Reset All Local Data prefix sweeps.
+- `tmp/CypherAirGuidedTutorial-<UUID>/` remains tutorial-local storage. Tutorial defaults use the fixed `com.cypherair.tutorial.sandbox` suite, while orphaned legacy `com.cypherair.tutorial.<UUID>` defaults suites are removed by startup and Reset All Local Data fallback sweeps.
 
 Apple platform references that motivate Phase 7:
 
@@ -91,11 +91,11 @@ Self-test persistence:
 
 Temporary, export, and tutorial files:
 
-- `AppTemporaryArtifactStore` is the central owner for Phase 7 PR 4 temporary file paths, `.complete` protection application, protection verification, startup cleanup, reset cleanup, and tutorial defaults prefix cleanup.
+- `AppTemporaryArtifactStore` is the central owner for Phase 7 PR 4 temporary file paths, `.complete` protection application, protection verification, startup cleanup, reset cleanup, fixed tutorial defaults cleanup, and legacy tutorial defaults UUID cleanup.
 - `tmp/decrypted/` and `tmp/streaming/` outputs must live under one operation directory per service call: `tmp/decrypted/op-<UUID>/...` and `tmp/streaming/op-<UUID>/...`. Final filenames remain recognizable sanitized source names, but cleanup ownership is the operation directory, not the shared filename.
 - `tmp/export-*` handoff files must be written atomically with `.completeFileProtection`, verified with `.complete`, and owned only by the export controller that created them. `prepareFileExport` for an existing file does not take custody of that file.
 - `tmp/CypherAirGuidedTutorial-*` directories must be created with verified `.complete` protection and removed on current tutorial cleanup plus startup and local-data reset cleanup.
-- Tutorial-only `UserDefaults` suites use the `com.cypherair.tutorial.<UUID>` prefix. Current-container cleanup removes the active suite, while startup and Reset All Local Data enumerate the app Preferences directory for matching `*.plist` files, call `removePersistentDomain(forName:)`, and remove any residual plist. No tutorial suite registry is used because a registry could itself orphan.
+- Tutorial-only `UserDefaults` use the fixed `com.cypherair.tutorial.sandbox` suite for the single active tutorial sandbox. `TutorialSandboxContainer` clears that suite before each creation and on current-container cleanup. Startup and Reset All Local Data clear the fixed suite directly, then enumerate the app Preferences directory for legacy `com.cypherair.tutorial.<UUID>.plist` orphans, call `removePersistentDomain(forName:)`, and remove residual plists. No tutorial suite registry is used because the fixed suite plus legacy sweep is deterministic.
 - User-selected export destinations become out-of-app-custody only after the user-controlled transfer succeeds. Startup/reset cleanup only removes app-owned temporary handoff paths, not user-selected destinations.
 
 ## 4. Auditable PR Tracks

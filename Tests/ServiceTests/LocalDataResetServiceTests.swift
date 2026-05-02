@@ -155,19 +155,29 @@ final class LocalDataResetServiceTests: XCTestCase {
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirResetTemp-\(UUID().uuidString)", isDirectory: true)
         let store = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
-        let tutorialSuiteName = "com.cypherair.tutorial.\(UUID().uuidString)"
+        let fixedTutorialSuiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
+        let legacyTutorialSuiteName = "com.cypherair.tutorial.\(UUID().uuidString)"
+        let similarTutorialSuiteName = "com.cypherair.tutorial.not-a-uuid-\(UUID().uuidString)"
         let unrelatedSuiteName = "com.cypherair.tests.tutorial.\(UUID().uuidString)"
         defer {
             cleanup(container)
             try? FileManager.default.removeItem(at: temporaryDirectory)
-            UserDefaults(suiteName: tutorialSuiteName)?.removePersistentDomain(forName: tutorialSuiteName)
+            UserDefaults(suiteName: fixedTutorialSuiteName)?.removePersistentDomain(forName: fixedTutorialSuiteName)
+            UserDefaults(suiteName: legacyTutorialSuiteName)?.removePersistentDomain(forName: legacyTutorialSuiteName)
+            UserDefaults(suiteName: similarTutorialSuiteName)?.removePersistentDomain(forName: similarTutorialSuiteName)
             UserDefaults(suiteName: unrelatedSuiteName)?.removePersistentDomain(forName: unrelatedSuiteName)
         }
 
         try makePhase7TemporaryArtifacts(in: temporaryDirectory)
-        let tutorialDefaults = try XCTUnwrap(UserDefaults(suiteName: tutorialSuiteName))
-        tutorialDefaults.set("orphan", forKey: "marker")
-        _ = tutorialDefaults.synchronize()
+        let fixedTutorialDefaults = try XCTUnwrap(UserDefaults(suiteName: fixedTutorialSuiteName))
+        fixedTutorialDefaults.set("fixed", forKey: "marker")
+        _ = fixedTutorialDefaults.synchronize()
+        let legacyTutorialDefaults = try XCTUnwrap(UserDefaults(suiteName: legacyTutorialSuiteName))
+        legacyTutorialDefaults.set("orphan", forKey: "marker")
+        _ = legacyTutorialDefaults.synchronize()
+        let similarTutorialDefaults = try XCTUnwrap(UserDefaults(suiteName: similarTutorialSuiteName))
+        similarTutorialDefaults.set("keep", forKey: "marker")
+        _ = similarTutorialDefaults.synchronize()
         let unrelatedDefaults = try XCTUnwrap(UserDefaults(suiteName: unrelatedSuiteName))
         unrelatedDefaults.set("keep", forKey: "marker")
         _ = unrelatedDefaults.synchronize()
@@ -180,7 +190,9 @@ final class LocalDataResetServiceTests: XCTestCase {
         _ = try await resetService.resetAllLocalData()
 
         XCTAssertTrue(store.remainingTemporaryArtifacts().isEmpty)
-        XCTAssertNil(UserDefaults(suiteName: tutorialSuiteName)?.string(forKey: "marker"))
+        XCTAssertNil(UserDefaults(suiteName: fixedTutorialSuiteName)?.string(forKey: "marker"))
+        XCTAssertNil(UserDefaults(suiteName: legacyTutorialSuiteName)?.string(forKey: "marker"))
+        XCTAssertEqual(UserDefaults(suiteName: similarTutorialSuiteName)?.string(forKey: "marker"), "keep")
         XCTAssertEqual(UserDefaults(suiteName: unrelatedSuiteName)?.string(forKey: "marker"), "keep")
     }
 
