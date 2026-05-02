@@ -1,8 +1,8 @@
 import Foundation
 
 protocol ProtectedOrdinarySettingsPersistence {
-    func loadSnapshot() -> ProtectedOrdinarySettingsSnapshot
-    func saveSnapshot(_ snapshot: ProtectedOrdinarySettingsSnapshot)
+    func loadSnapshot() throws -> ProtectedOrdinarySettingsSnapshot
+    func saveSnapshot(_ snapshot: ProtectedOrdinarySettingsSnapshot) throws
     func removePersistentValues()
 }
 
@@ -86,4 +86,24 @@ final class LegacyOrdinarySettingsStore: ProtectedOrdinarySettingsPersistence {
         ProtectedOrdinarySettingsLegacyKeys.guidedTutorialCompletedVersion,
         ProtectedOrdinarySettingsLegacyKeys.colorTheme
     ]
+}
+
+final class ProtectedSettingsOrdinarySettingsPersistence: ProtectedOrdinarySettingsPersistence {
+    private let protectedSettingsStore: ProtectedSettingsStore
+
+    init(protectedSettingsStore: ProtectedSettingsStore) {
+        self.protectedSettingsStore = protectedSettingsStore
+    }
+
+    func loadSnapshot() throws -> ProtectedOrdinarySettingsSnapshot {
+        try protectedSettingsStore.ordinarySettingsSnapshot()
+    }
+
+    func saveSnapshot(_ snapshot: ProtectedOrdinarySettingsSnapshot) throws {
+        try protectedSettingsStore.updateOrdinarySettingsSnapshot(snapshot)
+    }
+
+    func removePersistentValues() {
+        protectedSettingsStore.resetOrdinarySettingsRuntimeStateAfterLocalDataReset()
+    }
 }

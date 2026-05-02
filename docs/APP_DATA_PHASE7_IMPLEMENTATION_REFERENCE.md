@@ -1,7 +1,7 @@
 # AppData Phase 7 Implementation Reference
 
 > **Status:** Active Phase 7 architecture reference.
-> **Purpose:** Define the Phase 7 protection requirements and auditable PR tracks for remaining non-Contacts app-owned data surfaces after AppData Phase 1-6 and Phase 7 PR 1.
+> **Purpose:** Define the Phase 7 protection requirements and auditable PR tracks for remaining non-Contacts app-owned data surfaces after AppData Phase 1-6 and Phase 7 PR 1-PR 2.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Relationship:** This document is not a symbol-level implementation plan and must not freeze future schema, type, method, or file names. It complements the inventory in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) and the progress record in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
 > **Last reviewed:** 2026-05-02.
@@ -11,7 +11,7 @@
 
 Phase 7 covers the remaining non-Contacts protected-after-unlock surfaces:
 
-- ordinary app settings still stored in `UserDefaults`
+- ordinary app settings now protected by `protected-settings` schema v2, with legacy `UserDefaults` keys retained only as cleanup/migration sources
 - self-test report or diagnostics persistence
 - decrypted, streaming, export, and guided-tutorial temporary files
 - tutorial-only defaults and sandbox cleanup guarantees
@@ -29,18 +29,17 @@ Contacts remain Phase 8 work unless the roadmap is explicitly revised. This docu
 
 ## 2. Current Baseline
 
-Implemented AppData Phase 1-6 plus Phase 7 PR 1 behavior:
+Implemented AppData Phase 1-6 plus Phase 7 PR 1-PR 2 behavior:
 
 - `ProtectedDataRegistry`, shared root-secret authorization, wrapped-DMK lifecycle, relock, recovery dispatch, and post-unlock domain opening are present.
-- `protected-settings` exists as the first real ProtectedData domain, but its current production scope is narrow: `clipboardNotice` only.
+- `protected-settings` exists as the first real ProtectedData domain. Schema v2 preserves `clipboardNotice` and stores the ordinary-settings snapshot for `gracePeriod`, `hasCompletedOnboarding`, `colorTheme`, `encryptToSelf`, and `guidedTutorialCompletedVersion`.
 - `private-key-control` owns `authMode` plus private-key rewrap / modify-expiry recovery journal state after app unlock.
 - `key-metadata` owns `PGPKeyIdentity` payloads after app unlock.
 - ProtectedData storage under `Application Support/ProtectedData/` applies and verifies explicit file protection where supported.
-- `ProtectedOrdinarySettingsCoordinator` owns the Phase 7 ordinary-settings lock state and loads legacy ordinary-setting values only after app privacy authentication and a healthy `protected-settings` handoff.
+- `ProtectedOrdinarySettingsCoordinator` owns the Phase 7 ordinary-settings lock state and loads/saves through `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff.
 
 Current Phase 7 gaps:
 
-- `gracePeriod`, `hasCompletedOnboarding`, `colorTheme`, `encryptToSelf`, and `guidedTutorialCompletedVersion` remain ordinary settings outside the protected-settings payload. PR 1 removed their synchronous/pre-auth read paths, but PR 2 still needs to migrate the payload and retire or quarantine legacy ordinary-setting sources after verified cutover.
 - Self-test reports are written under `Documents/self-test/`.
 - `tmp/decrypted/`, `tmp/streaming/`, `tmp/export-*`, `tmp/CypherAirGuidedTutorial-*`, and tutorial-only `UserDefaults` suites have partial cleanup coverage but still need final Phase 7 review.
 

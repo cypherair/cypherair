@@ -102,7 +102,7 @@ final class ProtectedSettingsHost {
         let currentDomainState: @MainActor () -> DomainState
         let currentClipboardNotice: @MainActor () -> Bool?
         let migrationAuthorizationRequirement: @MainActor () -> MutationAuthorizationRequirement
-        let migrateLegacyClipboardNoticeIfNeeded: @MainActor () async throws -> Void
+        let ensureCommittedAndMigrateSettingsIfNeeded: @MainActor () async throws -> Void
         let openDomainIfNeeded: @MainActor (_ wrappingRootKey: Data) async throws -> Void
         let updateClipboardNotice: @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void
         let pendingRecoveryAuthorizationRequirement: @MainActor () -> MutationAuthorizationRequirement
@@ -153,7 +153,7 @@ final class ProtectedSettingsHost {
         currentDomainState: @escaping @MainActor () -> DomainState,
         currentClipboardNotice: @escaping @MainActor () -> Bool?,
         migrationAuthorizationRequirement: @escaping @MainActor () -> MutationAuthorizationRequirement = { .notRequired },
-        migrateLegacyClipboardNoticeIfNeeded: @escaping @MainActor () async throws -> Void,
+        ensureCommittedAndMigrateSettingsIfNeeded: @escaping @MainActor () async throws -> Void,
         openDomainIfNeeded: @escaping @MainActor (_ wrappingRootKey: Data) async throws -> Void,
         updateClipboardNotice: @escaping @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void,
         pendingRecoveryAuthorizationRequirement: @escaping @MainActor () -> MutationAuthorizationRequirement = { .notRequired },
@@ -175,7 +175,7 @@ final class ProtectedSettingsHost {
             currentDomainState: currentDomainState,
             currentClipboardNotice: currentClipboardNotice,
             migrationAuthorizationRequirement: migrationAuthorizationRequirement,
-            migrateLegacyClipboardNoticeIfNeeded: migrateLegacyClipboardNoticeIfNeeded,
+            ensureCommittedAndMigrateSettingsIfNeeded: ensureCommittedAndMigrateSettingsIfNeeded,
             openDomainIfNeeded: openDomainIfNeeded,
             updateClipboardNotice: updateClipboardNotice,
             pendingRecoveryAuthorizationRequirement: pendingRecoveryAuthorizationRequirement,
@@ -627,22 +627,22 @@ final class ProtectedSettingsHost {
         }
     }
 
-    private func migrateLegacyClipboardNoticeIfNeeded(
+    private func ensureCommittedAndMigrateSettingsIfNeeded(
         using liveDependencies: LiveDependencies,
         gateDecision: AccessGateDecision,
         preauthorized: Bool
     ) async throws {
         traceHostEvent(
-            "protectedSettings.legacyMigration.start",
+            "protectedSettings.settingsMigration.start",
             metadata: [
                 "gateDecision": accessGateTraceValue(gateDecision),
                 "preauthorized": preauthorized ? "true" : "false"
             ]
         )
         do {
-            try await liveDependencies.migrateLegacyClipboardNoticeIfNeeded()
+            try await liveDependencies.ensureCommittedAndMigrateSettingsIfNeeded()
             traceHostEvent(
-                "protectedSettings.legacyMigration.finish",
+                "protectedSettings.settingsMigration.finish",
                 metadata: [
                     "result": "success",
                     "gateDecision": accessGateTraceValue(gateDecision),
@@ -651,7 +651,7 @@ final class ProtectedSettingsHost {
             )
         } catch {
             traceHostEvent(
-                "protectedSettings.legacyMigration.finish",
+                "protectedSettings.settingsMigration.finish",
                 metadata: traceErrorMetadata(
                     error,
                     extra: [
@@ -735,7 +735,7 @@ final class ProtectedSettingsHost {
                     using: liveDependencies,
                     requirement: migrationRequirement,
                     localizedReason: localizedReason,
-                    operation: "legacyMigration"
+                    operation: "settingsMigration"
                 )
                 guard migrationAuthorization.isAuthorized else {
                     traceHostEvent(
@@ -759,7 +759,7 @@ final class ProtectedSettingsHost {
                 )
                 return false
             }
-            try await migrateLegacyClipboardNoticeIfNeeded(
+            try await ensureCommittedAndMigrateSettingsIfNeeded(
                 using: liveDependencies,
                 gateDecision: decision,
                 preauthorized: didPreauthorizeMigration
@@ -853,7 +853,7 @@ final class ProtectedSettingsHost {
                 if let authenticationContext = authorizationResult.authenticationContext {
                     operationAuthenticationContexts.append(authenticationContext)
                 }
-                try await migrateLegacyClipboardNoticeIfNeeded(
+                try await ensureCommittedAndMigrateSettingsIfNeeded(
                     using: liveDependencies,
                     gateDecision: decision,
                     preauthorized: true
@@ -876,7 +876,7 @@ final class ProtectedSettingsHost {
                 return false
             }
         case .alreadyAuthorized:
-            try await migrateLegacyClipboardNoticeIfNeeded(
+            try await ensureCommittedAndMigrateSettingsIfNeeded(
                 using: liveDependencies,
                 gateDecision: decision,
                 preauthorized: true

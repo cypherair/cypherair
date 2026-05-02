@@ -1,7 +1,7 @@
 # AppData Remaining Migration Guide
 
 > **Status:** Active remaining-roadmap and inventory document.
-> **Purpose:** Track the remaining ProtectedData migration work after AppData Phase 1-6 and Phase 7 PR 1, and keep the persisted-state inventory current while later Phase 7 work and Phase 8 wait for dedicated implementation planning.
+> **Purpose:** Track the remaining ProtectedData migration work after AppData Phase 1-6 and Phase 7 PR 1-PR 2, and keep the persisted-state inventory current while later Phase 7 work and Phase 8 wait for dedicated implementation planning.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Source of truth:** Current implementation details live in [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md). Phase 7 implementation-reference requirements live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). Phase completion status lives in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
 > **Last reviewed:** 2026-05-02.
@@ -27,11 +27,12 @@ This guide does not create the Phase 7 implementation plan. It records the remai
 |-------|---------------|----------------|
 | Phase 1: Protected App-Data Framework | Implemented | `ProtectedDataRegistry`, shared root-secret authorization, wrapped-DMK lifecycle, relock, recovery dispatch, and app-session access gates exist. |
 | Phase 2: File-Protection Baseline | Implemented for ProtectedData storage | Registry, bootstrap metadata, scratch writes, and wrapped-DMK files use explicit file-protection checks where supported. |
-| Phase 3: First Low-Risk Real Domain | Implemented narrowly | `protected-settings` exists and currently stores only `clipboardNotice`. |
+| Phase 3: First Low-Risk Real Domain | Implemented narrowly | `protected-settings` exists and stores the original `clipboardNotice` payload; Phase 7 PR 2 extends that domain with ordinary settings. |
 | Phase 4: Post-Unlock Multi-Domain Orchestration | Implemented | App unlock can open registered committed domains with the authenticated `LAContext`; the framework sentinel proves multi-domain lifecycle behavior. |
 | Phase 5: Private-Key Control Domain | Implemented | `private-key-control` owns `authMode` and private-key rewrap / modify-expiry recovery journal state after app unlock. |
 | Phase 6: Key Metadata Domain | Implemented | `key-metadata` owns `PGPKeyIdentity` payloads after app unlock and migrates legacy metadata Keychain rows. |
-| Phase 7 PR 1: Ordinary Settings Read Paths | Implemented | `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings lock state and loads legacy values only after app privacy authentication and healthy `protected-settings` handoff. |
+| Phase 7 PR 1: Ordinary Settings Read Paths | Implemented | `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings lock state; PR 2 replaced the temporary legacy persistence source with `protected-settings` schema v2. |
+| Phase 7 PR 2: Protected Settings Expansion | Implemented | `protected-settings` schema v2 owns grace period, onboarding completion, theme, encrypt-to-self, and guided tutorial completion after verified migration. |
 
 Current ProtectedData implementation details are intentionally not repeated here. Use [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md) for the current technical contract.
 
@@ -39,16 +40,16 @@ Current ProtectedData implementation details are intentionally not repeated here
 
 ### Phase 7: Non-Contacts Protected-After-Unlock Domains
 
-Phase 7 is in progress. PR 1 removed synchronous/pre-auth ordinary-settings read paths and introduced `ProtectedOrdinarySettingsCoordinator` as the app-wide `locked` / `loaded(snapshot)` / `recoveryRequired` source for ordinary settings. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md); later implementation PRs still need their own focused plans.
+Phase 7 is in progress. PR 1 removed synchronous/pre-auth ordinary-settings read paths and introduced `ProtectedOrdinarySettingsCoordinator` as the app-wide `locked` / `loaded(snapshot)` / `recoveryRequired` source for ordinary settings. PR 2 moved the targeted ordinary settings into `protected-settings` schema v2. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md); later implementation PRs still need their own focused plans.
 
 Known Phase 7 surfaces:
 
-- ordinary settings whose PR 1 access path is now protected-after-unlock gated while persistence still remains in legacy `UserDefaults`: `gracePeriod`, onboarding completion, theme, encrypt-to-self, and guided tutorial completion state
+- ordinary settings now owned by `ProtectedData/protected-settings` schema v2: `gracePeriod`, onboarding completion, theme, encrypt-to-self, and guided tutorial completion state
 - self-test reports or diagnostics state under `Documents/self-test/`
 - temporary decrypted, streaming, export, and tutorial files that need final cleanup and file-protection review
 - tutorial-only defaults and sandbox cleanup guarantees
 
-Phase 7 must not move a setting merely because it is user-visible. It must first remove or replace synchronous/pre-unlock read paths and prove launch authentication strength is unchanged. PR 1 completed that read-path prerequisite for ordinary settings; PR 2 is still responsible for extending the protected-settings payload and retiring legacy ordinary-setting sources after verified cutover.
+Phase 7 must not move a setting merely because it is user-visible. It must first remove or replace synchronous/pre-unlock read paths and prove launch authentication strength is unchanged. PR 1 completed that read-path prerequisite for ordinary settings. PR 2 extended the protected-settings payload and retires legacy ordinary-setting sources only after schema v2 write/readback verification.
 
 The older [APP_DATA_PHASE7_TEMPORARY_RECORD](APP_DATA_PHASE7_TEMPORARY_RECORD.md) is superseded by the implementation reference and should be used only as a recovery/audit note for pre-reference material.
 
@@ -114,13 +115,13 @@ Allowed target classes:
 |------|------------------|--------------|--------------------------|----------------|---------------------|
 | `appSessionAuthenticationPolicy` | `UserDefaults` | `early-readable boot exception` | Boot exception | Exception retained | n/a in v1 |
 | `authMode` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | Phase 5 | Implemented | implemented |
-| `gracePeriod` | Legacy `UserDefaults` via `ProtectedOrdinarySettingsCoordinator` after app authentication | `protected-after-unlock` | Phase 7 | PR 1 read-path gated; payload migration pending | PR 2 payload migration pending |
-| `hasCompletedOnboarding` | Legacy `UserDefaults` via `ProtectedOrdinarySettingsCoordinator` after app authentication | `protected-after-unlock` | Phase 7 | PR 1 read-path gated; payload migration pending | PR 2 payload migration pending |
-| `colorTheme` | Legacy `UserDefaults` via `ProtectedOrdinarySettingsCoordinator` after app authentication | `protected-after-unlock` | Phase 7 | PR 1 read-path gated; payload migration pending | PR 2 payload migration pending |
+| `gracePeriod` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 7 | Implemented in PR 2 | implemented |
+| `hasCompletedOnboarding` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 7 | Implemented in PR 2 | implemented |
+| `colorTheme` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 7 | Implemented in PR 2 | implemented |
 | `requireAuthOnLaunch` | Retired legacy `UserDefaults` key | `legacy cleanup-only` | Legacy cleanup | Cleanup-only | cleanup only |
-| `encryptToSelf` | Legacy `UserDefaults` via `ProtectedOrdinarySettingsCoordinator` after app authentication | `protected-after-unlock` | Phase 7 | PR 1 read-path gated; payload migration pending | PR 2 payload migration pending |
-| `clipboardNotice` | `ProtectedSettingsStore`; legacy `UserDefaults` only as migration source | `protected-after-unlock` | Phase 3 | Implemented | implemented |
-| `guidedTutorialCompletedVersion` | Legacy `UserDefaults` via `ProtectedOrdinarySettingsCoordinator` after app authentication | `protected-after-unlock` | Phase 7 | PR 1 read-path gated; payload migration pending | PR 2 payload migration pending |
+| `encryptToSelf` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 7 | Implemented in PR 2 | implemented |
+| `clipboardNotice` | `ProtectedData/protected-settings`; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 3 | Implemented | implemented |
+| `guidedTutorialCompletedVersion` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 7 | Implemented in PR 2 | implemented |
 | `uiTestBypassAuthentication` | Test-only `UserDefaults` key | `test-only exception` | Test-only exception | Exception retained | n/a |
 | `rewrapInProgress` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | Phase 5 | Implemented | implemented |
 | `rewrapTargetMode` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | Phase 5 | Implemented | implemented |

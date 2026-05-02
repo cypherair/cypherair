@@ -126,12 +126,6 @@ final class AppContainer: @unchecked Sendable {
         )
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
-        let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
-        )
-        authManager.configureGracePeriodProvider {
-            protectedOrdinarySettingsCoordinator.gracePeriodForSession
-        }
         let protectedDataStorageRoot = ProtectedDataStorageRoot(traceStore: authLifecycleTraceStore)
         let protectedDomainKeyManager = ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
         let protectedDataRegistryStore = ProtectedDataRegistryStore(
@@ -183,6 +177,14 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
+        let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: ProtectedSettingsOrdinarySettingsPersistence(
+                protectedSettingsStore: protectedSettingsStore
+            )
+        )
+        authManager.configureGracePeriodProvider {
+            protectedOrdinarySettingsCoordinator.gracePeriodForSession
+        }
         let protectedDataFrameworkSentinelStore = ProtectedDataFrameworkSentinelStore(
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
@@ -274,6 +276,17 @@ final class AppContainer: @unchecked Sendable {
                 ),
                 ProtectedDataPostUnlockDomainOpener(
                     domainID: ProtectedSettingsStore.domainID,
+                    ensureCommittedIfNeeded: { wrappingRootKey in
+                        try await protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                            persistSharedRight: { secret in
+                                try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
+                            },
+                            firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
+                            currentWrappingRootKey: {
+                                wrappingRootKey
+                            }
+                        )
+                    },
                     open: { wrappingRootKey in
                         _ = try await protectedSettingsStore.openDomainIfNeeded(
                             wrappingRootKey: wrappingRootKey
@@ -466,15 +479,6 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let config = AppConfiguration(defaults: defaults)
-        let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
-        )
-        authManager.configureGracePeriodProvider {
-            protectedOrdinarySettingsCoordinator.gracePeriodForSession
-        }
-        if !requiresManualAuthentication {
-            protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
-        }
         let engine = PgpEngine()
         let contactsDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirUITests-\(UUID().uuidString)", isDirectory: true)
@@ -546,6 +550,22 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
+        let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
+        if requiresManualAuthentication {
+            protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
+                persistence: ProtectedSettingsOrdinarySettingsPersistence(
+                    protectedSettingsStore: protectedSettingsStore
+                )
+            )
+        } else {
+            protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
+                persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+            )
+            protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
+        }
+        authManager.configureGracePeriodProvider {
+            protectedOrdinarySettingsCoordinator.gracePeriodForSession
+        }
         let protectedDataFrameworkSentinelStore = ProtectedDataFrameworkSentinelStore(
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
@@ -579,6 +599,17 @@ final class AppContainer: @unchecked Sendable {
                 ),
                 ProtectedDataPostUnlockDomainOpener(
                     domainID: ProtectedSettingsStore.domainID,
+                    ensureCommittedIfNeeded: { wrappingRootKey in
+                        try await protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                            persistSharedRight: { secret in
+                                try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
+                            },
+                            firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
+                            currentWrappingRootKey: {
+                                wrappingRootKey
+                            }
+                        )
+                    },
                     open: { wrappingRootKey in
                         _ = try await protectedSettingsStore.openDomainIfNeeded(
                             wrappingRootKey: wrappingRootKey

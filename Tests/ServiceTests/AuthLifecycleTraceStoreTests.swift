@@ -1193,7 +1193,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { nil },
-            migrateLegacyClipboardNoticeIfNeeded: {},
+            ensureCommittedAndMigrateSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in domainState = .unlocked },
             updateClipboardNotice: { _, _ in },
             recoverPendingMutation: { .retryablePending },
