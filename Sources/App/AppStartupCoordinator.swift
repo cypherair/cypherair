@@ -101,7 +101,9 @@ struct AppStartupCoordinator {
         }
 
         traceStore?.record(category: .lifecycle, name: "startup.temporaryCleanup.start")
-        cleanupTemporaryFiles()
+        cleanupTemporaryFiles(
+            legacySelfTestReportsDirectory: container.legacySelfTestReportsDirectory
+        )
         traceStore?.record(category: .lifecycle, name: "startup.temporaryCleanup.finish")
 
         let loadError = mergedStartupMessages(
@@ -125,7 +127,11 @@ struct AppStartupCoordinator {
         )
     }
 
-    func cleanupTemporaryFiles(fileManager: FileManager = .default) {
+    func cleanupTemporaryFiles(
+        fileManager: FileManager = .default,
+        documentDirectory: URL? = nil,
+        legacySelfTestReportsDirectory: URL? = nil
+    ) {
         let decryptedDir = fileManager.temporaryDirectory
             .appendingPathComponent("decrypted", isDirectory: true)
         if fileManager.fileExists(atPath: decryptedDir.path) {
@@ -137,6 +143,24 @@ struct AppStartupCoordinator {
         if fileManager.fileExists(atPath: streamingDir.path) {
             try? fileManager.removeItem(at: streamingDir)
         }
+
+        let selfTestDir = legacySelfTestReportsDirectory
+            ?? legacySelfTestReportDirectory(
+                fileManager: fileManager,
+                documentDirectory: documentDirectory
+            )
+        if fileManager.fileExists(atPath: selfTestDir.path) {
+            try? fileManager.removeItem(at: selfTestDir)
+        }
+    }
+
+    func legacySelfTestReportDirectory(
+        fileManager: FileManager = .default,
+        documentDirectory: URL? = nil
+    ) -> URL {
+        let documents = documentDirectory
+            ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documents.appendingPathComponent("self-test", isDirectory: true)
     }
 
     func mergedStartupMessages(

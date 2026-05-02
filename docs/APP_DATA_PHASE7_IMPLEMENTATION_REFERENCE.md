@@ -40,7 +40,7 @@ Implemented AppData Phase 1-6 plus Phase 7 PR 1-PR 2 behavior:
 
 Current Phase 7 gaps:
 
-- Self-test reports are written under `Documents/self-test/`.
+- Phase 7 PR 3 selected the short-lived/export-only self-test model: current self-test reports are in-memory only until explicit user export, and legacy `Documents/self-test/` content is cleanup-only on startup and local-data reset.
 - `tmp/decrypted/`, `tmp/streaming/`, `tmp/export-*`, `tmp/CypherAirGuidedTutorial-*`, and tutorial-only `UserDefaults` suites have partial cleanup coverage but still need final Phase 7 review.
 
 Apple platform references that motivate Phase 7:
@@ -80,7 +80,7 @@ Settings and state not targeted for ordinary protected settings:
 
 Self-test persistence:
 
-- Phase 7 must choose one architecture result for `Documents/self-test/` before implementation: either protected diagnostics storage or short-lived/export-only reports.
+- Phase 7 PR 3 chose short-lived/export-only reports for self-test persistence; no protected diagnostics domain was added.
 - A protected diagnostics design must reuse the shared ProtectedData framework and must define unlock, relock, recovery, reset, migration, and cleanup behavior.
 - A short-lived/export-only design must define report lifetime, owner cleanup, reset cleanup, startup cleanup if needed, and file-protection expectations for any intermediate file.
 - Self-test reports must not become a silent long-lived plaintext diagnostics cache.
@@ -108,7 +108,9 @@ Phase 7 should be delivered as multiple reviewable PRs. A later implementation p
    - Include migration survivability, unreadable-state recovery, relock cleanup, and no-shadow-copy coverage.
 
 3. Self-test persistence decision
-   - Implement either protected diagnostics storage or short-lived/export-only reports.
+   - Status: implemented by Phase 7 PR 3 as short-lived/export-only reports.
+   - Keep generated self-test reports in memory until explicit user export, reset, or app exit.
+   - Treat legacy `Documents/self-test/` as cleanup-only on startup and local-data reset.
    - Update inventory and testing docs with the selected classification.
    - Prove self-test reports do not remain as unreviewed plaintext durable state.
 

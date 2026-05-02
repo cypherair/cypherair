@@ -15,7 +15,7 @@
 | Phase 4 | Post-Unlock Multi-Domain Orchestration And Framework Hardening | Implemented | Phase 4 established production wiring for `protected-settings` plus the framework-owned `protected-framework-sentinel` domain. Post-unlock handoff can create/open the sentinel as a second domain after settings is committed, generic recovery dispatch is keyed by `ProtectedDataDomainID`, and second-domain create/delete/recovery plus pending-create continuation coverage live in `ProtectedDataFrameworkTests`. Phase 5 later adds `private-key-control` to the post-unlock opener path. |
 | Phase 5 | Private-Key Control Domain | Implemented | `PrivateKeyControlStore` is wired as the `private-key-control` ProtectedData domain. It migrates `authMode` plus rewrap / modify-expiry recovery journal state out of legacy `UserDefaults` after app authentication, opens through post-unlock orchestration, participates in relock, and is covered by `ProtectedDataFrameworkTests` plus private-key recovery tests. |
 | Phase 6 | Key Metadata Domain | Implemented | `KeyMetadataDomainStore` owns ProtectedData domain `key-metadata` for `PGPKeyIdentity` payloads after app unlock. Migration reads both the transitional metadata account and older default-account metadata rows, cleans source rows only after verified domain creation/open, and preserves private-key material in the existing Keychain / Secure Enclave domain. |
-| Phase 7 | Non-Contacts Protected-After-Unlock Domains | In progress / PR 2 implemented for ordinary settings | `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings lock state and now loads/saves grace period, onboarding, theme, encrypt-to-self, and tutorial completion from `protected-settings` schema v2 after app authentication. Legacy ordinary `UserDefaults` keys are cleanup-only after verified migration. Self-test state and temporary/export/tutorial cleanup or file-protection work remain here unless explicitly classified as an exception. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). |
+| Phase 7 | Non-Contacts Protected-After-Unlock Domains | In progress / PR 3 implemented for self-test export-only reports | `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings lock state and now loads/saves grace period, onboarding, theme, encrypt-to-self, and tutorial completion from `protected-settings` schema v2 after app authentication. Legacy ordinary `UserDefaults` keys are cleanup-only after verified migration. Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset. Temporary/export/tutorial cleanup or file-protection work remains here unless explicitly classified as an exception. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). |
 | Phase 8 | Contacts Protected Domain | Pending | Contacts migration has not started. Contacts PR1-PR8 belong to Phase 8 and remain gated behind remaining Phase 7 work unless the roadmap is explicitly revised. |
 | Phase 9 | Future Persistent Domains | Pending | Reserved for future app-owned persistent domains not covered by the current inventory. |
 
@@ -46,7 +46,7 @@ Implemented:
 
 Remaining product migrations:
 
-- self-test state, temporary/export/tutorial cleanup, contacts, and other protected-after-unlock surfaces remain Phase 7-8 work.
+- temporary/export/tutorial cleanup, contacts, and other protected-after-unlock surfaces remain Phase 7-8 work. Self-test report persistence is implemented as Phase 7 PR 3 export-only memory state plus legacy cleanup.
 
 ## 4. Phase 5 Boundary
 
@@ -76,9 +76,9 @@ Phase 6 is complete for the key metadata source of truth:
 
 Phase 6 does not move private-key material. Permanent and pending SE-wrapped private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain.
 
-## 6. Phase 7 PR 1 And PR 2 Boundary
+## 6. Phase 7 PR 1 Through PR 3 Boundary
 
-Phase 7 PR 1 is complete for ordinary-settings read-path ownership, and PR 2 is complete for the ordinary-settings payload migration:
+Phase 7 PR 1 is complete for ordinary-settings read-path ownership, PR 2 is complete for the ordinary-settings payload migration, and PR 3 is complete for the self-test persistence decision:
 
 - `ProtectedOrdinarySettingsCoordinator` is the app-wide source for ordinary-settings `locked`, `loaded(snapshot)`, and `recoveryRequired` state.
 - `AppConfiguration` keeps the early-readable `appSessionAuthenticationPolicy` boot exception plus runtime session state; it no longer owns ordinary settings such as grace period, onboarding completion, theme, encrypt-to-self, or guided tutorial completion.
@@ -88,8 +88,10 @@ Phase 7 PR 1 is complete for ordinary-settings read-path ownership, and PR 2 is 
 - Existing schema v2 protected-settings payloads are authoritative over conflicting legacy `UserDefaults`; legacy keys are cleanup-only, never fallback.
 - Resume grace fails closed to immediate authentication until the coordinator has a loaded snapshot. Relock and content-clear paths clear the loaded snapshot.
 - `ProtectedSettingsHost` remains a Settings UI host for protected-settings section state such as clipboard notice. It is not the ordinary-settings source of truth.
+- `SelfTestService` now produces the latest self-test report as in-memory export-only `Data` with a suggested filename. It no longer writes report history under `Documents/self-test/`.
+- `AppStartupCoordinator` and Reset All Local Data remove legacy `Documents/self-test/` content without opening ProtectedData, fetching the root secret, or creating a diagnostics ProtectedData domain.
 
-Phase 7 PR 2 does not move self-test data or harden temporary/export/tutorial files. Those remain later Phase 7 work.
+Phase 7 PR 3 does not harden the broader temporary/export/tutorial file surfaces. Those remain later Phase 7 work.
 
 ## 7. Inventory Status Rule
 

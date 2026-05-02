@@ -33,6 +33,7 @@ final class AppContainer: @unchecked Sendable {
     let selfTestService: SelfTestService
     let localDataResetService: LocalDataResetService
     let contactsDirectory: URL?
+    let legacySelfTestReportsDirectory: URL?
     let defaultsSuiteName: String?
 
     init(
@@ -67,6 +68,7 @@ final class AppContainer: @unchecked Sendable {
         selfTestService: SelfTestService,
         localDataResetService: LocalDataResetService,
         contactsDirectory: URL? = nil,
+        legacySelfTestReportsDirectory: URL? = nil,
         defaultsSuiteName: String? = nil
     ) {
         self.authLifecycleTraceStore = authLifecycleTraceStore
@@ -100,6 +102,7 @@ final class AppContainer: @unchecked Sendable {
         self.selfTestService = selfTestService
         self.localDataResetService = localDataResetService
         self.contactsDirectory = contactsDirectory
+        self.legacySelfTestReportsDirectory = legacySelfTestReportsDirectory
         self.defaultsSuiteName = defaultsSuiteName
     }
 
@@ -393,8 +396,11 @@ final class AppContainer: @unchecked Sendable {
         )
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
-        let contactsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let contactsDirectory = documentDirectory
             .appendingPathComponent("contacts", isDirectory: true)
+        let legacySelfTestReportsDirectory = documentDirectory
+            .appendingPathComponent("self-test", isDirectory: true)
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
             legacyRightStoreClient: protectedDataRightStoreClient,
@@ -407,8 +413,10 @@ final class AppContainer: @unchecked Sendable {
             authManager: authManager,
             keyManagement: keyManagement,
             contactService: contactService,
+            selfTestService: selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
+            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
             },
@@ -445,7 +453,9 @@ final class AppContainer: @unchecked Sendable {
             certificateSignatureService: certificateSignatureService,
             qrService: qrService,
             selfTestService: selfTestService,
-            localDataResetService: localDataResetService
+            localDataResetService: localDataResetService,
+            contactsDirectory: contactsDirectory,
+            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory
         )
     }
 
@@ -480,11 +490,19 @@ final class AppContainer: @unchecked Sendable {
         )
         let config = AppConfiguration(defaults: defaults)
         let engine = PgpEngine()
-        let contactsDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAirUITests-\(UUID().uuidString)", isDirectory: true)
+        let documentDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirUITestDocuments-\(UUID().uuidString)", isDirectory: true)
+        let contactsDirectory = documentDirectory
+            .appendingPathComponent("contacts", isDirectory: true)
+        let legacySelfTestReportsDirectory = documentDirectory
+            .appendingPathComponent("self-test", isDirectory: true)
         let applicationSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let protectedDataBaseDirectory = applicationSupportDirectory
             .appendingPathComponent("CypherAirUITestProtectedData-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: documentDirectory,
+            withIntermediateDirectories: true
+        )
         try? FileManager.default.createDirectory(
             at: contactsDirectory,
             withIntermediateDirectories: true
@@ -746,8 +764,10 @@ final class AppContainer: @unchecked Sendable {
             authManager: authManager,
             keyManagement: keyManagement,
             contactService: contactService,
+            selfTestService: selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
+            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
             },
@@ -789,6 +809,7 @@ final class AppContainer: @unchecked Sendable {
             selfTestService: selfTestService,
             localDataResetService: localDataResetService,
             contactsDirectory: contactsDirectory,
+            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             defaultsSuiteName: suiteName
         )
     }

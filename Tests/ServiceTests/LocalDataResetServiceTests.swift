@@ -8,7 +8,9 @@ final class LocalDataResetServiceTests: XCTestCase {
     func test_resetAllLocalData_removesStorageAndClearsMemoryState() async throws {
         let container = AppContainer.makeUITest(authTraceEnabled: true)
         defer {
-            if let contactsDirectory = container.contactsDirectory {
+            if let legacySelfTestReportsDirectory = container.legacySelfTestReportsDirectory {
+                try? FileManager.default.removeItem(at: legacySelfTestReportsDirectory.deletingLastPathComponent())
+            } else if let contactsDirectory = container.contactsDirectory {
                 try? FileManager.default.removeItem(at: contactsDirectory)
             }
             if let defaultsSuiteName = container.defaultsSuiteName {
@@ -64,6 +66,17 @@ final class LocalDataResetServiceTests: XCTestCase {
         let contactMarker = contactsDirectory.appendingPathComponent("contact.gpg")
         try Data([0x04]).write(to: contactMarker)
 
+        let legacySelfTestReportsDirectory = try XCTUnwrap(container.legacySelfTestReportsDirectory)
+        try FileManager.default.createDirectory(
+            at: legacySelfTestReportsDirectory,
+            withIntermediateDirectories: true
+        )
+        try Data("legacy self-test report".utf8).write(
+            to: legacySelfTestReportsDirectory.appendingPathComponent("self-test-legacy.txt")
+        )
+        await container.selfTestService.runAllTests()
+        XCTAssertNotNil(container.selfTestService.latestReport)
+
         container.protectedOrdinarySettingsCoordinator.setHasCompletedOnboarding(true)
         container.protectedOrdinarySettingsCoordinator.setEncryptToSelf(false)
 
@@ -90,8 +103,10 @@ final class LocalDataResetServiceTests: XCTestCase {
         ))
         XCTAssertFalse(FileManager.default.fileExists(atPath: container.protectedDataStorageRoot.rootURL.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacySelfTestReportsDirectory.path))
         XCTAssertNil(container.protectedOrdinarySettingsCoordinator.snapshot)
         XCTAssertEqual(container.protectedOrdinarySettingsCoordinator.state, .locked)
+        XCTAssertNil(container.selfTestService.latestReport)
         XCTAssertTrue(container.keyManagement.keys.isEmpty)
         XCTAssertTrue(container.contactService.contacts.isEmpty)
 
@@ -107,7 +122,9 @@ final class LocalDataResetServiceTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
             )
-            if let contactsDirectory = container.contactsDirectory {
+            if let legacySelfTestReportsDirectory = container.legacySelfTestReportsDirectory {
+                try? FileManager.default.removeItem(at: legacySelfTestReportsDirectory.deletingLastPathComponent())
+            } else if let contactsDirectory = container.contactsDirectory {
                 try? FileManager.default.removeItem(at: contactsDirectory)
             }
             if let defaultsSuiteName = container.defaultsSuiteName {
@@ -245,7 +262,9 @@ final class LocalDataResetServiceTests: XCTestCase {
         try? FileManager.default.removeItem(
             at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
         )
-        if let contactsDirectory = container.contactsDirectory {
+        if let legacySelfTestReportsDirectory = container.legacySelfTestReportsDirectory {
+            try? FileManager.default.removeItem(at: legacySelfTestReportsDirectory.deletingLastPathComponent())
+        } else if let contactsDirectory = container.contactsDirectory {
             try? FileManager.default.removeItem(at: contactsDirectory)
         }
         if let defaultsSuiteName = container.defaultsSuiteName {
@@ -271,8 +290,10 @@ final class LocalDataResetServiceTests: XCTestCase {
             authManager: container.authManager,
             keyManagement: container.keyManagement,
             contactService: container.contactService,
+            selfTestService: container.selfTestService,
             protectedDataSessionCoordinator: container.protectedDataSessionCoordinator,
             appSessionOrchestrator: container.appSessionOrchestrator,
+            legacySelfTestReportsDirectory: container.legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: protectedDataRootSecretExists,
             traceStore: container.authLifecycleTraceStore
         )

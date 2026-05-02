@@ -15,10 +15,6 @@ final class SelfTestServiceTests: XCTestCase {
     }
 
     override func tearDown() {
-        // Clean up self-test reports in Documents/self-test/
-        if let url = selfTestService.lastReportURL {
-            try? FileManager.default.removeItem(at: url)
-        }
         selfTestService = nil
         engine = nil
         super.tearDown()
@@ -59,7 +55,7 @@ final class SelfTestServiceTests: XCTestCase {
         }
     }
 
-    func test_selfTest_reportGeneration_containsAllSections() async {
+    func test_selfTest_reportGeneration_containsAllSections() async throws {
         await selfTestService.runAllTests()
 
         guard case .completed(let results) = selfTestService.state else {
@@ -70,16 +66,19 @@ final class SelfTestServiceTests: XCTestCase {
         // Verify all 11 results present (5 per profile + 1 QR)
         XCTAssertEqual(results.count, 11, "Should have 11 total test results")
 
-        // Verify report file was saved
-        XCTAssertNotNil(selfTestService.lastReportURL, "Report URL should be set after test run")
+        let report = try XCTUnwrap(selfTestService.latestReport)
+        XCTAssertTrue(
+            report.suggestedFilename.hasPrefix("CypherAir-SelfTest-Report-"),
+            "Report should have a suggested export filename"
+        )
+        XCTAssertEqual((report.suggestedFilename as NSString).pathExtension, "txt")
 
-        if let url = selfTestService.lastReportURL {
-            let report = try? String(contentsOf: url, encoding: .utf8)
-            XCTAssertNotNil(report, "Report file should be readable")
-            // Verify report has results line
-            if let report = report {
-                XCTAssertTrue(report.contains("11"), "Report should reference 11 tests")
-            }
-        }
+        let reportString = String(data: report.data, encoding: .utf8)
+        XCTAssertNotNil(reportString, "Report should be UTF-8 text in memory")
+        XCTAssertTrue(reportString?.contains("11") == true, "Report should reference 11 tests")
+        XCTAssertTrue(
+            reportString?.contains("CypherAir Self-Test Report") == true,
+            "Report should include the report title"
+        )
     }
 }

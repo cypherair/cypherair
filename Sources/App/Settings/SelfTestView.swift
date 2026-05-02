@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 struct SelfTestView: View {
     @Environment(SelfTestService.self) private var selfTestService
     @State private var showReportExporter = false
-    @State private var reportData: Data?
+    @State private var report: SelfTestService.SelfTestReport?
 
     var body: some View {
         List {
@@ -94,14 +94,11 @@ struct SelfTestView: View {
         .screenReady("selftest.ready")
         .navigationTitle(String(localized: "selftest.title", defaultValue: "Self-Test"))
         .toolbar {
-            if case .completed = selfTestService.state, selfTestService.lastReportURL != nil {
+            if case .completed = selfTestService.state, selfTestService.latestReport != nil {
                 ToolbarItem(placement: .automatic) {
                     Button {
-                        if let url = selfTestService.lastReportURL {
-                            guard let data = try? Data(contentsOf: url) else {
-                                return
-                            }
-                            reportData = data
+                        if let latestReport = selfTestService.latestReport {
+                            report = latestReport
                             showReportExporter = true
                         }
                     } label: {
@@ -115,11 +112,11 @@ struct SelfTestView: View {
         }
         .fileExporter(
             isPresented: $showReportExporter,
-            item: reportData,
+            item: report?.data,
             contentTypes: [.data],
-            defaultFilename: "CypherAir-SelfTest-Report.txt"
+            defaultFilename: report?.suggestedFilename ?? "CypherAir-SelfTest-Report.txt"
         ) { _ in
-            reportData = nil
+            report = nil
         }
     }
 }

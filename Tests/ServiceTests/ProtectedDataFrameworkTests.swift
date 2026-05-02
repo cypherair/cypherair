@@ -1454,9 +1454,16 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         )
         let config = AppConfiguration(defaults: defaults)
         let protectedDataBaseDirectory = makeTemporaryDirectory("ProtectedDataStartup")
-        let contactsDirectory = makeTemporaryDirectory("ProtectedDataStartupContacts")
+        let documentDirectory = makeTemporaryDirectory("ProtectedDataStartupDocuments")
+        let contactsDirectory = documentDirectory.appendingPathComponent("contacts", isDirectory: true)
+        let legacySelfTestReportsDirectory = documentDirectory.appendingPathComponent("self-test", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: protectedDataBaseDirectory) }
-        defer { try? FileManager.default.removeItem(at: contactsDirectory) }
+        defer { try? FileManager.default.removeItem(at: documentDirectory) }
+        try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: legacySelfTestReportsDirectory, withIntermediateDirectories: true)
+        try Data("legacy self-test report".utf8).write(
+            to: legacySelfTestReportsDirectory.appendingPathComponent("self-test-legacy.txt")
+        )
 
         let storageRoot = AppProtectedDataStorageRoot(baseDirectory: protectedDataBaseDirectory)
         let registryStore = AppProtectedDataRegistryStore(
@@ -1575,8 +1582,10 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             authManager: authManager,
             keyManagement: keyManagement,
             contactService: contactService,
+            selfTestService: selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            appSessionOrchestrator: appSessionOrchestrator
+            appSessionOrchestrator: appSessionOrchestrator,
+            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory
         )
         let container = AppAppContainer(
             authLifecycleTraceStore: nil,
@@ -1608,6 +1617,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             selfTestService: selfTestService,
             localDataResetService: localDataResetService,
             contactsDirectory: contactsDirectory,
+            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             defaultsSuiteName: defaultsSuiteName
         )
 
@@ -1623,6 +1633,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(rightStoreClient.saveWithSecretCallCount, 0)
         XCTAssertEqual(keychain.listItemsCallCount, 0)
         XCTAssertEqual(keychain.loadCallCount, 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacySelfTestReportsDirectory.path))
         XCTAssertEqual(protectedDataSessionCoordinator.frameworkState, AppProtectedDataFrameworkState.sessionLocked)
     }
 
