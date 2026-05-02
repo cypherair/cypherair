@@ -452,6 +452,10 @@ final class SettingsScreenModelTests: XCTestCase {
         defer { cleanup(resetContainer) }
         let restartCoordinator = LocalDataResetRestartCoordinator()
         let model = makeModel(
+            appConfigurationOverride: resetContainer.config,
+            protectedOrdinarySettingsOverride: resetContainer.protectedOrdinarySettingsCoordinator,
+            authManagerOverride: resetContainer.authManager,
+            keyManagementOverride: resetContainer.keyManagement,
             localDataResetService: resetContainer.localDataResetService,
             localDataResetRestartCoordinator: restartCoordinator
         )
@@ -461,7 +465,7 @@ final class SettingsScreenModelTests: XCTestCase {
         model.localDataResetConfirmationPhrase = "RESET"
         model.confirmLocalDataReset()
 
-        await waitUntil("reset restart gate", timeout: 30) {
+        await waitUntil("reset restart gate", timeout: 10) {
             restartCoordinator.restartRequiredAfterLocalDataReset
         }
         XCTAssertFalse(model.showLocalDataResetResultAlert)
@@ -1370,6 +1374,10 @@ final class SettingsScreenModelTests: XCTestCase {
     @MainActor
     private func makeModel(
         configuration: SettingsView.Configuration = .default,
+        appConfigurationOverride: AppConfiguration? = nil,
+        protectedOrdinarySettingsOverride: ProtectedOrdinarySettingsCoordinator? = nil,
+        authManagerOverride: AuthenticationManager? = nil,
+        keyManagementOverride: KeyManagementService? = nil,
         iosPresentationController: IOSPresentationController? = nil,
         macPresentationController: MacPresentationController? = nil,
         localDataResetService: LocalDataResetService? = nil,
@@ -1378,10 +1386,10 @@ final class SettingsScreenModelTests: XCTestCase {
         appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? = nil
     ) -> SettingsScreenModel {
         SettingsScreenModel(
-            config: config,
-            protectedOrdinarySettings: protectedOrdinarySettings,
-            authManager: authManager,
-            keyManagement: stack.keyManagement,
+            config: appConfigurationOverride ?? config,
+            protectedOrdinarySettings: protectedOrdinarySettingsOverride ?? protectedOrdinarySettings,
+            authManager: authManagerOverride ?? authManager,
+            keyManagement: keyManagementOverride ?? stack.keyManagement,
             iosPresentationController: iosPresentationController,
             macPresentationController: macPresentationController,
             configuration: configuration,
