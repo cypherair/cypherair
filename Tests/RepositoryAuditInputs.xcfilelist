@@ -111,6 +111,9 @@ $(SRCROOT)/Sources/Models/ExportableFile.swift
 $(SRCROOT)/Sources/Models/IdentityPresentation.swift
 $(SRCROOT)/Sources/Models/KeyProfile+App.swift
 $(SRCROOT)/Sources/Models/PGPKeyIdentity.swift
+$(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsCoordinator.swift
+$(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsPersistence.swift
+$(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsSnapshot.swift
 $(SRCROOT)/Sources/Models/SignatureVerification.swift
 $(SRCROOT)/Sources/Models/SubkeySelectionOption.swift
 $(SRCROOT)/Sources/Models/UserIdSelectionOption.swift

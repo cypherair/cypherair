@@ -148,19 +148,20 @@ Current ProtectedData scope:
 - `PrivateKeyControlStore` is the private-key control source of truth; current migrated payload scope is `authMode`, rewrap recovery, and modify-expiry recovery
 - `KeyMetadataDomainStore` is the key metadata source of truth; it is recoverable after unlock but must not be silently rebuilt from private-key bundle rows
 - `ProtectedSettingsStore` is the first protected-domain adopter; current migrated payload scope is `clipboardNotice`
+- `ProtectedOrdinarySettingsCoordinator` is the Phase 7 PR 1 source of truth for ordinary-settings availability and loaded snapshots; it reads/writes the legacy ordinary-setting `UserDefaults` keys only after app privacy authentication and a healthy `protected-settings` handoff
 - `ProtectedDataFrameworkSentinelStore` is the second production domain; it contains no user data, telemetry, or UI state, and is created only after another domain is already committed and the shared resource is ready
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`
-- current Phase 1-6 ProtectedData work is implemented; remaining Phase 7 surfaces include ordinary settings beyond `clipboardNotice`, self-test state, and temporary/export/tutorial cleanup and file-protection hardening, while Contacts remains Phase 8
+- current Phase 1-6 ProtectedData work and Phase 7 PR 1 ordinary-settings read-path gating are implemented; remaining Phase 7 surfaces include ordinary-settings payload migration, self-test state, and temporary/export/tutorial cleanup and file-protection hardening, while Contacts remains Phase 8
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
 - AppData phase completion status is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 
 ### Models (`Sources/Models/`)
 
-Pure data types with no side effects. Includes Swift representations of PGP keys, error enums mapping from `PgpError`, user-facing error messages per PRD Section 4.7, configuration types (auth mode, grace period), and shared identity presentation helpers.
+Shared models and small coordinators for app-wide presentation state. Includes Swift representations of PGP keys, error enums mapping from `PgpError`, user-facing error messages per PRD Section 4.7, configuration types, ordinary-settings snapshot/persistence coordination, and shared identity presentation helpers.
 
 | Helper | Responsibility |
 |--------|---------------|
@@ -371,7 +372,7 @@ sequenceDiagram
     Domain->>Domain: unwrap domain DMK and read encrypted payload generation
 ```
 
-Pre-auth startup may classify `ProtectedDataRegistry` and bootstrap metadata only. It must not read the root secret, unwrap a domain master key, or open protected payloads. Post-unlock orchestration currently opens `private-key-control`, `key-metadata`, `protected-settings`, and the framework sentinel when their registry state allows it. If the registry reports pending mutation or framework recovery, domain open is blocked until recovery completes.
+Pre-auth startup may classify `ProtectedDataRegistry` and bootstrap metadata only. It must not read the root secret, unwrap a domain master key, open protected payloads, or read Phase 7 ordinary-setting legacy sources. Post-unlock orchestration currently opens `private-key-control`, `key-metadata`, `protected-settings`, and the framework sentinel when their registry state allows it. After that handoff, `ProtectedOrdinarySettingsCoordinator` may load the ordinary-settings snapshot from legacy persistence only if `protected-settings` is healthy. If the registry reports pending mutation or framework recovery, domain open is blocked until recovery completes.
 
 ## 4. Tightly Coupled Modules
 
@@ -420,12 +421,12 @@ App Sandbox:
 │   └── (UserDefaults)
 │       ├── com.cypherair.preference.authMode              → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.preference.appSessionAuthenticationPolicy → App-session boot auth profile
-│       ├── com.cypherair.preference.gracePeriod            → Int (seconds): 0 / 60 / 180 / 300
-│       ├── com.cypherair.preference.encryptToSelf          → Bool (default true)
+│       ├── com.cypherair.preference.gracePeriod            → Phase 7 PR 1 legacy source loaded only after app auth
+│       ├── com.cypherair.preference.encryptToSelf          → Phase 7 PR 1 legacy source loaded only after app auth
 │       ├── com.cypherair.preference.clipboardNotice        → Legacy Bool used only for ProtectedSettingsStore migration cleanup
-│       ├── com.cypherair.preference.onboardingComplete     → Bool (default false)
-│       ├── com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
-│       ├── com.cypherair.preference.colorTheme             → String (ColorTheme rawValue, default "systemDefault")
+│       ├── com.cypherair.preference.onboardingComplete     → Phase 7 PR 1 legacy source loaded only after app auth
+│       ├── com.cypherair.preference.guidedTutorialCompletedVersion → Phase 7 PR 1 legacy source loaded only after app auth
+│       ├── com.cypherair.preference.colorTheme             → Phase 7 PR 1 legacy source loaded only after app auth
 │       ├── com.cypherair.internal.rewrapInProgress         → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.internal.rewrapTargetMode         → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.internal.modifyExpiryInProgress   → Legacy source removed after private-key-control migration

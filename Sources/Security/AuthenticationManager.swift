@@ -121,14 +121,15 @@ final class AuthenticationManager: AuthenticationEvaluable {
         try? privateKeyControlStore?.requireUnlockedAuthMode()
     }
 
-    /// The current grace period in seconds, persisted in UserDefaults.
+    private var gracePeriodProvider: (() -> Int?)?
+
+    func configureGracePeriodProvider(_ provider: @escaping () -> Int?) {
+        gracePeriodProvider = provider
+    }
+
+    /// The current grace period in seconds after protected ordinary settings open.
     var gracePeriod: Int {
-        let value = defaults.integer(forKey: AuthPreferences.gracePeriodKey)
-        // If never set (returns 0 but user hasn't configured it), use default.
-        if !defaults.contains(key: AuthPreferences.gracePeriodKey) {
-            return AuthPreferences.defaultGracePeriod
-        }
-        return value
+        gracePeriodProvider?() ?? 0
     }
 
     func clearCachedAuthenticationContextAfterLocalDataReset() {

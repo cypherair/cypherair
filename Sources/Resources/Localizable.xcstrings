@@ -2625,6 +2625,22 @@
         }
       }
     },
+    "encrypt.protectedPreferencesLocked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected preferences are locked. Authenticate again before encrypting with the app default."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护的偏好设置已锁定。请重新验证身份后再使用应用默认加密设置。"
+          }
+        }
+      }
+    },
     "encrypt.recipients" : {
       "localizations" : {
         "en" : {
@@ -8493,6 +8509,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请先验证身份以查看和更改此受保护偏好设置。"
+          }
+        }
+      }
+    },
+    "protectedSettings.locked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected Preferences Locked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受保护偏好设置已锁定"
           }
         }
       }

@@ -13,6 +13,7 @@ struct TutorialMirrorShellView: View {
             )
             .environment(tutorialStore)
             .environment(container.config)
+            .environment(container.protectedOrdinarySettingsCoordinator)
             .environment(container.keyManagement)
             .environment(container.contactService)
             .environment(container.encryptionService)

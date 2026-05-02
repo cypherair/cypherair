@@ -9,6 +9,7 @@ final class AppContainer: @unchecked Sendable {
     let keychain: any KeychainManageable
     let authManager: AuthenticationManager
     let config: AppConfiguration
+    let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
     let protectedDataStorageRoot: ProtectedDataStorageRoot
     let protectedDataRegistryStore: ProtectedDataRegistryStore
     let protectedDomainKeyManager: ProtectedDomainKeyManager
@@ -42,6 +43,7 @@ final class AppContainer: @unchecked Sendable {
         keychain: any KeychainManageable,
         authManager: AuthenticationManager,
         config: AppConfiguration,
+        protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator,
         protectedDataStorageRoot: ProtectedDataStorageRoot,
         protectedDataRegistryStore: ProtectedDataRegistryStore,
         protectedDomainKeyManager: ProtectedDomainKeyManager,
@@ -74,6 +76,7 @@ final class AppContainer: @unchecked Sendable {
         self.keychain = keychain
         self.authManager = authManager
         self.config = config
+        self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
         self.protectedDataStorageRoot = protectedDataStorageRoot
         self.protectedDataRegistryStore = protectedDataRegistryStore
         self.protectedDomainKeyManager = protectedDomainKeyManager
@@ -123,6 +126,12 @@ final class AppContainer: @unchecked Sendable {
         )
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
+        let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+        )
+        authManager.configureGracePeriodProvider {
+            protectedOrdinarySettingsCoordinator.gracePeriodForSession
+        }
         let protectedDataStorageRoot = ProtectedDataStorageRoot(traceStore: authLifecycleTraceStore)
         let protectedDomainKeyManager = ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
         let protectedDataRegistryStore = ProtectedDataRegistryStore(
@@ -292,7 +301,9 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
             },
             shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { config.gracePeriod },
+            gracePeriodProvider: {
+                protectedOrdinarySettingsCoordinator.gracePeriodForSession
+            },
             evaluateAppAuthenticationWithSource: { reason, source in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
@@ -312,13 +323,19 @@ final class AppContainer: @unchecked Sendable {
                 } catch {
                     config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
                 }
-                _ = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
+                let postUnlockOutcome = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
                     authenticationContext: authenticationContext,
                     localizedReason: String(
                         localized: "protectedData.postUnlock.reason",
                         defaultValue: "Authenticate to unlock protected app data."
                     ),
                     source: source
+                )
+                protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
+                    protectedSettingsDomainState: Self.protectedSettingsDomainStateForOrdinarySettings(
+                        postUnlockOutcome: postUnlockOutcome,
+                        protectedSettingsStore: protectedSettingsStore
+                    )
                 )
                 config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
                 Self.recoverPrivateKeyControlJournalsAfterPostUnlock(
@@ -327,6 +344,9 @@ final class AppContainer: @unchecked Sendable {
                     config: config,
                     privateKeyControlStore: privateKeyControlStore
                 )
+            },
+            contentClearHandler: {
+                protectedOrdinarySettingsCoordinator.relock()
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
@@ -370,6 +390,7 @@ final class AppContainer: @unchecked Sendable {
             defaults: defaults,
             defaultsDomainName: Bundle.main.bundleIdentifier,
             config: config,
+            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             authManager: authManager,
             keyManagement: keyManagement,
             contactService: contactService,
@@ -389,6 +410,7 @@ final class AppContainer: @unchecked Sendable {
             keychain: keychain,
             authManager: authManager,
             config: config,
+            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             protectedDataStorageRoot: protectedDataStorageRoot,
             protectedDataRegistryStore: protectedDataRegistryStore,
             protectedDomainKeyManager: protectedDomainKeyManager,
@@ -444,6 +466,15 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let config = AppConfiguration(defaults: defaults)
+        let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+        )
+        authManager.configureGracePeriodProvider {
+            protectedOrdinarySettingsCoordinator.gracePeriodForSession
+        }
+        if !requiresManualAuthentication {
+            protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
+        }
         let engine = PgpEngine()
         let contactsDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirUITests-\(UUID().uuidString)", isDirectory: true)
@@ -586,7 +617,9 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
             },
             shouldBypassPrivacyAuthentication: { !requiresManualAuthentication },
-            gracePeriodProvider: { config.gracePeriod },
+            gracePeriodProvider: {
+                protectedOrdinarySettingsCoordinator.gracePeriodForSession
+            },
             evaluateAppAuthenticationWithSource: { reason, source in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
@@ -610,13 +643,19 @@ final class AppContainer: @unchecked Sendable {
                     authenticationContext: authenticationContext,
                     source: source
                 )
-                _ = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
+                let postUnlockOutcome = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
                     authenticationContext: authenticationContext,
                     localizedReason: String(
                         localized: "protectedData.postUnlock.reason",
                         defaultValue: "Authenticate to unlock protected app data."
                     ),
                     source: source
+                )
+                protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
+                    protectedSettingsDomainState: Self.protectedSettingsDomainStateForOrdinarySettings(
+                        postUnlockOutcome: postUnlockOutcome,
+                        protectedSettingsStore: protectedSettingsStore
+                    )
                 )
                 config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
                 Self.recoverPrivateKeyControlJournalsAfterPostUnlock(
@@ -625,6 +664,9 @@ final class AppContainer: @unchecked Sendable {
                     config: config,
                     privateKeyControlStore: privateKeyControlStore
                 )
+            },
+            contentClearHandler: {
+                protectedOrdinarySettingsCoordinator.relock()
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator,
@@ -669,6 +711,7 @@ final class AppContainer: @unchecked Sendable {
             defaults: defaults,
             defaultsDomainName: suiteName,
             config: config,
+            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             authManager: authManager,
             keyManagement: keyManagement,
             contactService: contactService,
@@ -692,6 +735,7 @@ final class AppContainer: @unchecked Sendable {
             keychain: keychain,
             authManager: authManager,
             config: config,
+            protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             protectedDataStorageRoot: protectedDataStorageRoot,
             protectedDataRegistryStore: protectedDataRegistryStore,
             protectedDomainKeyManager: protectedDomainKeyManager,
@@ -743,6 +787,27 @@ final class AppContainer: @unchecked Sendable {
             profile: .universal
         )
         _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+    }
+
+    private static func protectedSettingsDomainStateForOrdinarySettings(
+        postUnlockOutcome: ProtectedDataPostUnlockOutcome,
+        protectedSettingsStore: ProtectedSettingsStore
+    ) -> ProtectedSettingsDomainState {
+        switch postUnlockOutcome {
+        case .opened, .noProtectedDomainPresent, .noRegisteredDomainPresent:
+            protectedSettingsStore.syncPreAuthorizationState()
+            return protectedSettingsStore.domainState
+        case .domainOpenFailed(let domainID) where domainID == ProtectedSettingsStore.domainID:
+            protectedSettingsStore.syncPreAuthorizationState()
+            return protectedSettingsStore.domainState
+        case .noRegisteredOpeners,
+             .noAuthenticatedContext,
+             .pendingMutationRecoveryRequired,
+             .frameworkRecoveryNeeded,
+             .authorizationDenied,
+             .domainOpenFailed:
+            return .frameworkUnavailable
+        }
     }
 
     static func recoverPrivateKeyControlJournalsAfterPostUnlock(

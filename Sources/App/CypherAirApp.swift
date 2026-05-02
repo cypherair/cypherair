@@ -74,7 +74,7 @@ struct CypherAirApp: App {
             container.appSessionOrchestrator.recordAuthentication()
         }
         if launchConfiguration.shouldSkipOnboarding {
-            container.config.hasCompletedOnboarding = true
+            container.protectedOrdinarySettingsCoordinator.applyOnboardingCompletionOverrideForTesting(true)
         }
         container.authLifecycleTraceStore?.record(
             category: .lifecycle,
@@ -364,8 +364,9 @@ struct CypherAirApp: App {
                     tutorialLaunchRelay: macTutorialLaunchRelay,
                     tutorialHostAvailability: macTutorialHostAvailability
                 )
-                .optionalTint(container.config.colorTheme.accentColor)
+                .optionalTint(container.protectedOrdinarySettingsCoordinator.colorTheme.accentColor)
                 .environment(container.config)
+                .environment(container.protectedOrdinarySettingsCoordinator)
                 .environment(container.authManager)
                 .environment(container.keyManagement)
                 .environment(container.selfTestService)
@@ -430,8 +431,9 @@ struct CypherAirApp: App {
                         )
                     }
                     .privacyScreen()
-                    .optionalTint(container.config.colorTheme.accentColor)
+                    .optionalTint(container.protectedOrdinarySettingsCoordinator.colorTheme.accentColor)
                     .environment(container.config)
+                    .environment(container.protectedOrdinarySettingsCoordinator)
                     .environment(container.keyManagement)
                     .environment(container.contactService)
                     .environment(container.encryptionService)
@@ -465,9 +467,9 @@ struct CypherAirApp: App {
         .task {
             presentInitialIOSFlowIfNeeded()
         }
-        .onChange(of: container.config.hasCompletedOnboarding) { _, hasCompletedOnboarding in
+        .onChange(of: container.protectedOrdinarySettingsCoordinator.state) { _, _ in
             guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
-            if !hasCompletedOnboarding,
+            if container.protectedOrdinarySettingsCoordinator.hasCompletedOnboarding == false,
                iosPresentationState.activePresentation == nil {
                 iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
             }
@@ -775,9 +777,13 @@ struct CypherAirApp: App {
                 presentationContext: context
             )
             .environment(container.config)
+            .environment(container.protectedOrdinarySettingsCoordinator)
             .environment(tutorialStore)
             .environment(\.iosPresentationController, iosPresentationControllerValue)
-            .interactiveDismissDisabled(context == .firstRun && !container.config.hasCompletedOnboarding)
+            .interactiveDismissDisabled(
+                context == .firstRun
+                    && container.protectedOrdinarySettingsCoordinator.hasCompletedOnboarding != true
+            )
         }
     }
 
@@ -789,6 +795,7 @@ struct CypherAirApp: App {
                 initialModule: launchConfiguration.root == .tutorial ? launchConfiguration.tutorialModule : nil
             )
                 .environment(container.config)
+                .environment(container.protectedOrdinarySettingsCoordinator)
                 .environment(tutorialStore)
                 .environment(container.appSessionOrchestrator)
                 .environment(\.iosPresentationController, iosPresentationControllerValue)
@@ -817,7 +824,7 @@ struct CypherAirApp: App {
         case .tutorial:
             iosPresentationState.activePresentation = .tutorial(presentationContext: .inApp)
         case .main, .settings:
-            if !container.config.hasCompletedOnboarding {
+            if container.protectedOrdinarySettingsCoordinator.hasCompletedOnboarding == false {
                 iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
             }
         }

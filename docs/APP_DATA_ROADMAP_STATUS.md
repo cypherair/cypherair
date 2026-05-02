@@ -15,7 +15,7 @@
 | Phase 4 | Post-Unlock Multi-Domain Orchestration And Framework Hardening | Implemented | Phase 4 established production wiring for `protected-settings` plus the framework-owned `protected-framework-sentinel` domain. Post-unlock handoff can create/open the sentinel as a second domain after settings is committed, generic recovery dispatch is keyed by `ProtectedDataDomainID`, and second-domain create/delete/recovery plus pending-create continuation coverage live in `ProtectedDataFrameworkTests`. Phase 5 later adds `private-key-control` to the post-unlock opener path. |
 | Phase 5 | Private-Key Control Domain | Implemented | `PrivateKeyControlStore` is wired as the `private-key-control` ProtectedData domain. It migrates `authMode` plus rewrap / modify-expiry recovery journal state out of legacy `UserDefaults` after app authentication, opens through post-unlock orchestration, participates in relock, and is covered by `ProtectedDataFrameworkTests` plus private-key recovery tests. |
 | Phase 6 | Key Metadata Domain | Implemented | `KeyMetadataDomainStore` owns ProtectedData domain `key-metadata` for `PGPKeyIdentity` payloads after app unlock. Migration reads both the transitional metadata account and older default-account metadata rows, cleans source rows only after verified domain creation/open, and preserves private-key material in the existing Keychain / Secure Enclave domain. |
-| Phase 7 | Non-Contacts Protected-After-Unlock Domains | Pending / partial by surface | Ordinary settings other than `clipboardNotice`, self-test state, and temporary/export/tutorial cleanup or file-protection work remain here unless explicitly classified as an exception. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). |
+| Phase 7 | Non-Contacts Protected-After-Unlock Domains | In progress / PR 1 implemented for ordinary-settings read paths | `ProtectedOrdinarySettingsCoordinator` now owns ordinary-settings lock state and removes pre-auth reads for grace period, onboarding, theme, encrypt-to-self, and tutorial completion while those values still persist in legacy `UserDefaults` until a later payload migration. Self-test state and temporary/export/tutorial cleanup or file-protection work remain here unless explicitly classified as an exception. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). |
 | Phase 8 | Contacts Protected Domain | Pending | Contacts migration has not started. Contacts PR1-PR8 belong to Phase 8 and remain gated behind remaining Phase 7 work unless the roadmap is explicitly revised. |
 | Phase 9 | Future Persistent Domains | Pending | Reserved for future app-owned persistent domains not covered by the current inventory. |
 
@@ -46,7 +46,7 @@ Implemented:
 
 Remaining product migrations:
 
-- ordinary settings, contacts, and other protected-after-unlock surfaces remain Phase 7-8 work.
+- ordinary-settings payload migration, contacts, and other protected-after-unlock surfaces remain Phase 7-8 work.
 
 ## 4. Phase 5 Boundary
 
@@ -76,7 +76,19 @@ Phase 6 is complete for the key metadata source of truth:
 
 Phase 6 does not move private-key material. Permanent and pending SE-wrapped private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain.
 
-## 6. Inventory Status Rule
+## 6. Phase 7 PR 1 Boundary
+
+Phase 7 PR 1 is complete for ordinary-settings read-path ownership only:
+
+- `ProtectedOrdinarySettingsCoordinator` is the app-wide source for ordinary-settings `locked`, `loaded(snapshot)`, and `recoveryRequired` state.
+- `AppConfiguration` keeps the early-readable `appSessionAuthenticationPolicy` boot exception plus runtime session state; it no longer owns ordinary settings such as grace period, onboarding completion, theme, encrypt-to-self, or guided tutorial completion.
+- The ordinary-settings coordinator loads legacy `UserDefaults` values only after app privacy authentication and a healthy `protected-settings` domain handoff. If protected settings is in recovery or the framework is unavailable, the coordinator enters `recoveryRequired` and does not read legacy values.
+- Resume grace fails closed to immediate authentication until the coordinator has a loaded snapshot. Relock and content-clear paths clear the loaded snapshot.
+- `ProtectedSettingsHost` remains a Settings UI host for protected-settings section state such as clipboard notice. It is not the ordinary-settings source of truth.
+
+Phase 7 PR 1 does not extend the `protected-settings` payload, delete legacy ordinary-setting keys, move self-test data, or harden temporary/export/tutorial files. Those remain later Phase 7 work.
+
+## 7. Inventory Status Rule
 
 The persistent-state inventory in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) is the row-level tracking table. Every in-scope row must carry:
 

@@ -24,6 +24,7 @@ private actor EncryptOperationGate {
 final class EncryptScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
     private var config: AppConfiguration!
+    private var protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator!
     private var defaultsSuiteName: String!
 
     override func setUp() {
@@ -33,6 +34,10 @@ final class EncryptScreenModelTests: XCTestCase {
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         config = AppConfiguration(defaults: defaults)
+        protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
+            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+        )
+        protectedOrdinarySettings.loadForAuthenticatedTestBypass()
     }
 
     override func tearDown() {
@@ -43,6 +48,7 @@ final class EncryptScreenModelTests: XCTestCase {
         stack.cleanup()
         stack = nil
         config = nil
+        protectedOrdinarySettings = nil
         defaultsSuiteName = nil
         super.tearDown()
     }
@@ -447,6 +453,7 @@ final class EncryptScreenModelTests: XCTestCase {
             keyManagement: stack.keyManagement,
             contactService: stack.contactService,
             config: config,
+            protectedOrdinarySettings: protectedOrdinarySettings,
             configuration: configuration,
             operation: operation,
             textEncryptionAction: textEncryptionAction,

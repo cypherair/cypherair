@@ -363,12 +363,12 @@ Keychain protected-data row: shared app-data root secret
 /Library/Preferences/ (UserDefaults):
   com.cypherair.preference.authMode              → legacy source removed after private-key-control migration
   com.cypherair.preference.appSessionAuthenticationPolicy → boot auth profile
-  com.cypherair.preference.gracePeriod           → Int (0/60/180/300)
-  com.cypherair.preference.encryptToSelf         → Bool (default true)
+  com.cypherair.preference.gracePeriod           → Phase 7 PR 1 legacy source loaded only after app auth
+  com.cypherair.preference.encryptToSelf         → Phase 7 PR 1 legacy source loaded only after app auth
   com.cypherair.preference.clipboardNotice       → Legacy Bool used only for ProtectedSettingsStore migration cleanup
-  com.cypherair.preference.onboardingComplete    → Bool (default false)
-  com.cypherair.preference.guidedTutorialCompletedVersion → Int (default 0)
-  com.cypherair.preference.colorTheme            → String (ColorTheme rawValue, default "systemDefault")
+  com.cypherair.preference.onboardingComplete    → Phase 7 PR 1 legacy source loaded only after app auth
+  com.cypherair.preference.guidedTutorialCompletedVersion → Phase 7 PR 1 legacy source loaded only after app auth
+  com.cypherair.preference.colorTheme            → Phase 7 PR 1 legacy source loaded only after app auth
   com.cypherair.internal.rewrapInProgress        → legacy source removed after private-key-control migration
   com.cypherair.internal.rewrapTargetMode        → legacy source removed after private-key-control migration
   com.cypherair.internal.modifyExpiryInProgress  → legacy source removed after private-key-control migration

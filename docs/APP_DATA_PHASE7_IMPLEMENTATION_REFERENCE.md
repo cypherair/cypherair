@@ -1,7 +1,7 @@
 # AppData Phase 7 Implementation Reference
 
 > **Status:** Active Phase 7 architecture reference.
-> **Purpose:** Define the Phase 7 protection requirements and auditable PR tracks for remaining non-Contacts app-owned data surfaces after AppData Phase 1-6.
+> **Purpose:** Define the Phase 7 protection requirements and auditable PR tracks for remaining non-Contacts app-owned data surfaces after AppData Phase 1-6 and Phase 7 PR 1.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Relationship:** This document is not a symbol-level implementation plan and must not freeze future schema, type, method, or file names. It complements the inventory in [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) and the progress record in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
 > **Last reviewed:** 2026-05-02.
@@ -29,18 +29,18 @@ Contacts remain Phase 8 work unless the roadmap is explicitly revised. This docu
 
 ## 2. Current Baseline
 
-Implemented AppData Phase 1-6 behavior:
+Implemented AppData Phase 1-6 plus Phase 7 PR 1 behavior:
 
 - `ProtectedDataRegistry`, shared root-secret authorization, wrapped-DMK lifecycle, relock, recovery dispatch, and post-unlock domain opening are present.
 - `protected-settings` exists as the first real ProtectedData domain, but its current production scope is narrow: `clipboardNotice` only.
 - `private-key-control` owns `authMode` plus private-key rewrap / modify-expiry recovery journal state after app unlock.
 - `key-metadata` owns `PGPKeyIdentity` payloads after app unlock.
 - ProtectedData storage under `Application Support/ProtectedData/` applies and verifies explicit file protection where supported.
+- `ProtectedOrdinarySettingsCoordinator` owns the Phase 7 ordinary-settings lock state and loads legacy ordinary-setting values only after app privacy authentication and a healthy `protected-settings` handoff.
 
 Current Phase 7 gaps:
 
-- `gracePeriod`, `hasCompletedOnboarding`, `colorTheme`, `encryptToSelf`, and `guidedTutorialCompletedVersion` remain ordinary settings outside ProtectedData.
-- Some of those settings still participate in synchronous, startup, pre-unlock, or immediate UI read paths.
+- `gracePeriod`, `hasCompletedOnboarding`, `colorTheme`, `encryptToSelf`, and `guidedTutorialCompletedVersion` remain ordinary settings outside the protected-settings payload. PR 1 removed their synchronous/pre-auth read paths, but PR 2 still needs to migrate the payload and retire or quarantine legacy ordinary-setting sources after verified cutover.
 - Self-test reports are written under `Documents/self-test/`.
 - `tmp/decrypted/`, `tmp/streaming/`, `tmp/export-*`, `tmp/CypherAirGuidedTutorial-*`, and tutorial-only `UserDefaults` suites have partial cleanup coverage but still need final Phase 7 review.
 
@@ -98,9 +98,10 @@ Temporary, export, and tutorial files:
 Phase 7 should be delivered as multiple reviewable PRs. A later implementation plan may split or combine work only if it preserves these audit boundaries.
 
 1. Startup and synchronous read-path removal
-   - Remove or replace pre-unlock dependencies for targeted settings.
-   - Keep `appSessionAuthenticationPolicy` as the only ordinary settings boot-authentication exception unless a later reviewed design changes that.
-   - Prove pre-auth startup does not fetch the root secret, unwrap a DMK, open protected payloads, or weaken the selected app-session authentication policy.
+   - Status: implemented for ordinary settings by Phase 7 PR 1.
+   - `ProtectedOrdinarySettingsCoordinator` is the app-wide ordinary-settings source of truth for `locked`, `loaded(snapshot)`, and `recoveryRequired`.
+   - `appSessionAuthenticationPolicy` remains the only ordinary settings boot-authentication exception unless a later reviewed design changes that.
+   - Pre-auth startup must not fetch the root secret, unwrap a DMK, open protected payloads, read legacy ordinary-setting sources, or weaken the selected app-session authentication policy.
 
 2. Protected settings expansion
    - Extend the existing protected-settings capability to cover the targeted ordinary settings.

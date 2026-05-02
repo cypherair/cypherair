@@ -24,6 +24,15 @@ struct EncryptView: View {
                 }
             }
 
+            func optionalInitialValue(appDefault: Bool?) -> Bool? {
+                switch self {
+                case .appDefault:
+                    appDefault
+                case .initial(let value), .fixed(let value):
+                    value
+                }
+            }
+
             var isLocked: Bool {
                 if case .fixed = self {
                     return true
@@ -105,6 +114,7 @@ struct EncryptView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(ContactService.self) private var contactService
     @Environment(AppConfiguration.self) private var config
+    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
     @Environment(\.protectedSettingsHost) private var protectedSettingsHost
 
@@ -120,6 +130,7 @@ struct EncryptView: View {
             keyManagement: keyManagement,
             contactService: contactService,
             config: config,
+            protectedOrdinarySettings: protectedOrdinarySettings,
             authLifecycleTraceStore: authLifecycleTraceStore,
             protectedSettingsHost: protectedSettingsHost,
             configuration: configuration
@@ -129,6 +140,7 @@ struct EncryptView: View {
 
 private struct EncryptScreenHostView: View {
     let configuration: EncryptView.Configuration
+    let protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator
 
     @State private var model: EncryptScreenModel
 
@@ -137,17 +149,20 @@ private struct EncryptScreenHostView: View {
         keyManagement: KeyManagementService,
         contactService: ContactService,
         config: AppConfiguration,
+        protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
         authLifecycleTraceStore: AuthLifecycleTraceStore?,
         protectedSettingsHost: ProtectedSettingsHost?,
         configuration: EncryptView.Configuration
     ) {
         self.configuration = configuration
+        self.protectedOrdinarySettings = protectedOrdinarySettings
         _model = State(
             initialValue: EncryptScreenModel(
                 encryptionService: encryptionService,
                 keyManagement: keyManagement,
                 contactService: contactService,
                 config: config,
+                protectedOrdinarySettings: protectedOrdinarySettings,
                 authLifecycleTraceStore: authLifecycleTraceStore,
                 protectedSettingsHost: protectedSettingsHost,
                 configuration: configuration
@@ -229,13 +244,13 @@ private struct EncryptScreenHostView: View {
                 Toggle(
                     String(localized: "encrypt.encryptToSelf", defaultValue: "Encrypt to Self"),
                     isOn: Binding(
-                        get: { model.resolvedEncryptToSelf },
+                        get: { model.encryptToSelfToggleValue },
                         set: { model.encryptToSelf = $0 }
                     )
                 )
-                .disabled(model.configuration.encryptToSelfPolicy.isLocked)
+                .disabled(!model.isEncryptToSelfControlEnabled)
 
-                if model.resolvedEncryptToSelf && model.ownKeys.count > 1 {
+                if model.encryptToSelfToggleValue && model.ownKeys.count > 1 {
                     Picker(
                         String(localized: "encrypt.encryptToSelfKey", defaultValue: "Encrypt to Self With"),
                         selection: $model.encryptToSelfFingerprint
@@ -432,6 +447,9 @@ private struct EncryptScreenHostView: View {
         }
         .onChange(of: runtimeSyncKey) { _, _ in
             model.updateConfiguration(configuration)
+        }
+        .onChange(of: protectedOrdinarySettings.state) { _, _ in
+            model.refreshProtectedOrdinarySettings()
         }
         .onAppear {
             model.handleAppear()
