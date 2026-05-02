@@ -35,7 +35,7 @@ are not part of the standard GitHub workflows.
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
-**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, Phase 7 ordinary-settings coordinator gating plus protected-settings schema v2 migration, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, post-unlock key-metadata domain creation/migration/recovery, protected-settings handoff-only auto-open behavior, private-key-control migration/recovery behavior, and the root-secret SE device-binding envelope through protocol-based mocks. Uses protocol-based mocks for Keychain and SE. v2 `CAPDSEV2` coverage belongs here first: seal/open round trip, field-length validation, HKDF sharedInfo mismatch, AAD mismatch, AAD-version rejection, ephemeral public-key binding, ciphertext/tag/nonce/salt/public-key tampering, v1-to-v2 migration, registry + Keychain `format-floor` downgrade rejection, `legacy-cleanup` deletion after the next successful v2 open, and Reset deleting the SE binding key.
+**What they cover:** Services layer logic, model validation, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, Phase 7 ordinary-settings coordinator gating plus protected-settings schema v2 migration, Phase 7 self-test legacy cleanup and temporary/export/tutorial artifact cleanup, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, post-unlock key-metadata domain creation/migration/recovery, protected-settings handoff-only auto-open behavior, private-key-control migration/recovery behavior, and the root-secret SE device-binding envelope through protocol-based mocks. Uses protocol-based mocks for Keychain and SE. v2 `CAPDSEV2` coverage belongs here first: seal/open round trip, field-length validation, HKDF sharedInfo mismatch, AAD mismatch, AAD-version rejection, ephemeral public-key binding, ciphertext/tag/nonce/salt/public-key tampering, v1-to-v2 migration, registry + Keychain `format-floor` downgrade rejection, `legacy-cleanup` deletion after the next successful v2 open, and Reset deleting the SE binding key.
 
 ```bash
 # Practical local path used in this repository
@@ -96,7 +96,7 @@ ProtectedData device-test isolation rules:
 - clean up by identifier before and after each device test
 - do not call `removeAllRightsWithCompletion()`
 
-Current ProtectedData unit-test expectations for the implemented Phase 1-6 surface:
+Current ProtectedData unit-test expectations for the implemented Phase 1-7 surface:
 
 - verify that pre-auth bootstrap never touches the root-secret store or legacy right-store adapter
 - verify that pre-auth bootstrap does not load key metadata or enumerate private-key Keychain rows
@@ -123,11 +123,16 @@ Current ProtectedData file-protection expectations:
 - verify that fresh-install/reset validation uses the nearest existing parent for volume capability probing when `ProtectedData` does not yet exist, without creating the root during validation
 - keep lock-state readability semantics as manual/device validation; do not treat repository automation as proof of locked-device behavior
 
-Future ProtectedData validation targets:
+Current Phase 7 validation expectations:
 
 - Phase 7 PR 3 covers self-test export-only report state and legacy `Documents/self-test/` cleanup.
 - Phase 7 PR 4 covers temporary/export/tutorial hardening: per-operation streaming/decrypted owner directories, owner cleanup, startup cleanup, Reset All Local Data cleanup, verified complete file protection, export handoff ownership, fixed tutorial defaults cleanup, and legacy tutorial defaults UUID cleanup.
+
+Future ProtectedData validation targets:
+
 - Phase 8 Contacts work must prove legacy source preservation, protected-domain readability, no-silent-reset failure behavior, locked Contacts route states, and Contacts-specific import recovery.
+
+Docs-only AppData status/reference PRs do not require Rust or Xcode test runs unless they touch code, generated files, project files, entitlements, release metadata, or build settings. They should still run documentation consistency checks, link checks for active platform references, and `git diff --check`.
 
 **CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`. The macOS smoke suite also covers tutorial launch paths for generating Alice's sandbox key, opening key-detail follow-up surfaces, opening sandbox QR / backup surfaces, confirming that tutorial-disabled certificate and selective-revocation routes remain visible but unavailable, and tutorial lifecycle coverage for first-run start/skip, leave confirmation, completion finish, Settings replay, and auth-mode helper-modal automation markers.
 

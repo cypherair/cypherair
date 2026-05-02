@@ -4,7 +4,7 @@
 > **Purpose:** Restore and index Phase 7 information that became less visible during the AppData documentation consolidation in `f9bc4dc`.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Last reviewed:** 2026-05-02.
-> **Current authority:** This document is superseded by [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). Current code, [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md), [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md), [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md) outrank this temporary record if they disagree.
+> **Current authority:** This document is superseded by [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). Current code, [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md), [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md), [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md) outrank this temporary record if they disagree. Phase 7 closure status belongs in the implementation reference and roadmap status documents, not this historical record.
 
 ## 1. Scope And Use
 
