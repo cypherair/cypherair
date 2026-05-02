@@ -1,4 +1,8 @@
-# Liquid Glass Adoption Guide
+# Liquid Glass Adoption Guide (Archived)
+
+> Archived: General iOS 26 Liquid Glass implementation guidance is now carried
+> by agent/tooling guidance. Active CypherAir-specific rules live in
+> `docs/CONVENTIONS.md`.
 
 > Purpose: iOS 26 Liquid Glass design language reference and CypherAir-specific cross-platform guidance.
 > Audience: Human developers and AI coding tools.

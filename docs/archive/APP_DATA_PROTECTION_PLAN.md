@@ -2,8 +2,8 @@
 
 > **Status:** Archived historical AppData roadmap snapshot.
 > **Archived on:** 2026-04-28.
-> **Archival reason:** AppData Phase 1-6 implementation details have been absorbed into long-lived current-state documentation; the active AppData stack now keeps only the remaining migration guide and roadmap status.
-> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md)
+> **Archival reason:** AppData implementation details have been absorbed into long-lived current-state documentation, and Phase 8 follow-on work now lives in Contacts-specific docs.
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
 > **Current code and active canonical docs outrank this archived file whenever they disagree.**
 
 Original snapshot metadata follows.
@@ -13,8 +13,8 @@ Original snapshot metadata follows.
 > **Purpose:** Define the migration strategy for introducing a protected app-data layer beside the existing private-key security architecture.  
 > **Audience:** Engineering, security review, QA, and AI coding tools.  
 > **Companion document:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)  
-> **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
-> **Current progress record:** [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md)
+> **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
+> **Current progress record:** [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 > **Related documents:** [SECURITY](../SECURITY.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [TESTING](../TESTING.md) · [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](../SPECIAL_SECURITY_MODE.md)
 
 ## 1. Intent
@@ -162,7 +162,7 @@ See [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1
 
 Use a low-risk domain such as protected-after-unlock settings or recovery/control state as the first concrete adopter. In the current implementation, this phase is limited to `ProtectedSettingsStore` plus the migrated `clipboardNotice` setting; remaining ordinary settings stay in Phase 7.
 
-See [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Section 2.3 and Section 5, plus [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md) for current progress.
+See [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Section 2.3 and Section 5, plus [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) for current progress.
 
 ### Phase 4: Post-Unlock Multi-Domain Orchestration And Framework Hardening
 
@@ -174,13 +174,13 @@ This phase does not migrate Contacts or any private-key-adjacent source of truth
 
 Create the `private-key-control` ProtectedData domain, migrate `authMode` and the private-key recovery journal, and move rewrap / modify-expiry recovery detection out of pre-auth startup without moving private-key material into ProtectedData.
 
-Current status: implemented. See [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md) for the code-backed boundary and remaining downstream work.
+Current status: implemented. See [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) for the code-backed boundary and remaining downstream work.
 
 ### Phase 6: Key Metadata Domain
 
 Create the `key metadata` ProtectedData domain, migrate `PGPKeyIdentity` metadata out of the transitional Keychain metadata account, and avoid empty-key-list flashes during unlock.
 
-Current status: implemented. See [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md) for the code-backed boundary and remaining downstream work.
+Current status: implemented. See [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) for the code-backed boundary and remaining downstream work.
 
 ### Phase 7: Non-Contacts Protected-After-Unlock Domains
 
@@ -214,7 +214,7 @@ See [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) Sections 5.5-5.8 and 7
 
 Implementation planning must maintain a complete inventory of persisted app-owned state in app-data migration scope, with target class, target phase or exception, current status, and migration readiness tracked explicitly and with reviewed private-key-domain exclusions called out explicitly.
 
-The detailed inventory table and first-domain readiness rules live in [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Sections 4-5. Current roadmap status lives in [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md).
+The detailed inventory table and first-domain readiness rules live in [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md) Sections 4-5. Current roadmap status lives in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
 
 ### 5.4 Startup Architecture Impact
 

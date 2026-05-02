@@ -1,9 +1,17 @@
 # AppData Migration Guide
 
-> **Status:** Active current-state, roadmap, and inventory document.
+> **Status:** Archived historical AppData migration and inventory snapshot.
+> **Archived on:** 2026-05-02.
+> **Archival reason:** AppData Phase 1-7 current-state facts have been absorbed into long-lived architecture, security, technical, testing, and review docs. Phase 8 Contacts follow-on work now lives in Contacts-specific docs.
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](../CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+> **Current code and active canonical docs outrank this archived file whenever they disagree.**
+>
+> Original snapshot metadata follows.
+>
+> **Original pre-archive status:** Active current-state, roadmap, and inventory document.
 > **Purpose:** Track completed AppData migration state, keep the persisted-state inventory current, and identify remaining Phase 8+ work after Phase 7 closure.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
-> **Source of truth:** Current implementation details live in [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md). Phase 7 implementation-reference requirements live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). Phase completion status lives in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
+> **Original source of truth:** Current implementation details lived in [ARCHITECTURE](../ARCHITECTURE.md), [SECURITY](../SECURITY.md), [TDD](../TDD.md), and [TESTING](../TESTING.md). Phase 7 implementation-reference requirements lived in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). Phase completion status lived in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
 > **Last reviewed:** 2026-05-02.
 > **Update triggers:** Any ProtectedData domain migration, persistent-state classification change, Contacts protected-domain gate change, or storage/relock/recovery behavior change.
 
@@ -37,7 +45,7 @@ This guide no longer creates Phase 7 implementation work. It records the complet
 | Phase 7 PR 4: Temporary / Export / Tutorial Hardening | Implemented | Streaming/decrypted outputs use per-operation temporary owner directories, export handoff files use verified complete protection, tutorial sandbox directories use verified complete protection, and startup/reset cleanup removes Phase 7 temporary artifacts plus the fixed tutorial defaults suite and legacy UUID tutorial-suite orphans. |
 | Phase 7 PR 5: Documentation And Gate Closure | Implemented | Long-lived docs record Phase 7 as complete, and Phase 8 Contacts is unblocked for its Contacts-specific implementation plan. |
 
-Current ProtectedData implementation details are intentionally not repeated here. Use [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md) for the current technical contract.
+Current ProtectedData implementation details are intentionally not repeated here. Use [ARCHITECTURE](../ARCHITECTURE.md), [SECURITY](../SECURITY.md), [TDD](../TDD.md), and [TESTING](../TESTING.md) for the current technical contract.
 
 ## 3. Remaining Roadmap
 
@@ -62,10 +70,10 @@ The older [APP_DATA_PHASE7_TEMPORARY_RECORD](APP_DATA_PHASE7_TEMPORARY_RECORD.md
 
 Phase 8 remains pending but is unblocked by Phase 7 closure. Contacts work should continue through the Contacts-specific documents:
 
-- [CONTACTS_PRD](CONTACTS_PRD.md)
-- [CONTACTS_TDD](CONTACTS_TDD.md)
-- [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
-- [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+- [CONTACTS_PRD](../CONTACTS_PRD.md)
+- [CONTACTS_TDD](../CONTACTS_TDD.md)
+- [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
+- [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](../CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
 
 Contacts must remain a domain-specific consumer of the shared ProtectedData framework. It must not introduce a second vault architecture or take ownership of registry authority, root-secret lifecycle, wrapped-DMK lifecycle, or app-session grace-window behavior.
 

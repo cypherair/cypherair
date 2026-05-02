@@ -157,7 +157,21 @@ Current ProtectedData scope:
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`
 - current Phase 1-7 ProtectedData work is implemented, including ordinary-settings, self-test export-only, and temporary/export/tutorial hardening; Contacts is unblocked Phase 8 pending implementation
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
-- AppData phase completion status is tracked in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
+- Contacts remains outside ProtectedData until Phase 8 implementation lands; Phase 8 sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+
+Current local-data classification:
+
+| Class | Current surfaces |
+|-------|------------------|
+| Protected after unlock | `protected-settings` schema v2 ordinary settings, `private-key-control`, `key-metadata`, and the framework sentinel under `Application Support/ProtectedData/`. |
+| Early-readable boot exception | `appSessionAuthenticationPolicy` in `UserDefaults`; it selects app-session authentication before ProtectedData opens. |
+| Private-key material exception | Permanent and pending Secure Enclave-wrapped private-key bundle rows remain in the Keychain / Secure Enclave private-key material domain. |
+| Framework bootstrap | Root-secret envelope, device-binding key metadata, registry, and per-domain bootstrap metadata. |
+| Ephemeral with cleanup | Self-test reports in memory, legacy `Documents/self-test/` cleanup, `tmp/decrypted`, `tmp/streaming`, `tmp/export-*`, tutorial directories, and tutorial-only defaults cleanup. |
+| Out of app custody | User-selected export destinations after handoff succeeds. |
+| Pending Phase 8 | Legacy Contacts files under `Documents/contacts/` until Contacts protected-domain migration. |
+
+The canonical row-level classification, current status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
 
 ### Models (`Sources/Models/`)
 

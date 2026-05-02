@@ -123,7 +123,7 @@ Current ProtectedData file-protection expectations:
 - verify that fresh-install/reset validation uses the nearest existing parent for volume capability probing when `ProtectedData` does not yet exist, without creating the root during validation
 - keep lock-state readability semantics as manual/device validation; do not treat repository automation as proof of locked-device behavior
 
-Current Phase 7 validation expectations:
+Completed Phase 7 validation expectations:
 
 - Phase 7 PR 3 covers self-test export-only report state and legacy `Documents/self-test/` cleanup.
 - Phase 7 PR 4 covers temporary/export/tutorial hardening: per-operation streaming/decrypted owner directories, owner cleanup, startup cleanup, Reset All Local Data cleanup, verified complete file protection, export handoff ownership, fixed tutorial defaults cleanup, and legacy tutorial defaults UUID cleanup.
@@ -132,7 +132,7 @@ Future ProtectedData validation targets:
 
 - Phase 8 Contacts work must prove legacy source preservation, protected-domain readability, no-silent-reset failure behavior, locked Contacts route states, and Contacts-specific import recovery.
 
-Docs-only AppData status/reference PRs do not require Rust or Xcode test runs unless they touch code, generated files, project files, entitlements, release metadata, or build settings. They should still run documentation consistency checks, link checks for active platform references, and `git diff --check`.
+Docs-only documentation authority or archive PRs do not require Rust or Xcode test runs unless they touch code, generated files, project files, entitlements, release metadata, or build settings. They should still run documentation consistency checks, link checks for active platform references, and `git diff --check`.
 
 **CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`. The macOS smoke suite also covers tutorial launch paths for generating Alice's sandbox key, opening key-detail follow-up surfaces, opening sandbox QR / backup surfaces, confirming that tutorial-disabled certificate and selective-revocation routes remain visible but unavailable, and tutorial lifecycle coverage for first-run start/skip, leave confirmation, completion finish, Settings replay, and auth-mode helper-modal automation markers.
 

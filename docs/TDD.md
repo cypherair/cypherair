@@ -381,7 +381,7 @@ Keychain protected-data row: shared app-data root secret
 /tmp/CypherAirGuidedTutorial-<UUID>/: tutorial contacts sandbox
 ```
 
-Protected app-data planning covers all CypherAir-owned local data, not only preferences. Current permanent exceptions are limited to the app-session boot authentication profile, private-key material rows protected by Keychain / Secure Enclave, ProtectedData framework bootstrap metadata, test-only or legacy-cleanup state, short-lived temporary files with cleanup requirements, and user-exported files after they leave the app-controlled sandbox. Private-key control state now lives in the post-unlock `private-key-control` ProtectedData domain, and key metadata now lives in the post-unlock `key-metadata` ProtectedData domain.
+Protected app-data planning covers all CypherAir-owned local data, not only preferences. Current permanent exceptions are limited to the app-session boot authentication profile, private-key material rows protected by Keychain / Secure Enclave, ProtectedData framework bootstrap metadata, test-only or legacy-cleanup state, short-lived temporary files with cleanup requirements, and user-exported files after they leave the app-controlled sandbox. Private-key control state now lives in the post-unlock `private-key-control` ProtectedData domain, and key metadata now lives in the post-unlock `key-metadata` ProtectedData domain. The canonical per-surface classification, status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
 
 ### 6.1 ProtectedData Current Contract
 
@@ -410,6 +410,10 @@ Migration and exception rules:
 - Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
 - Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset.
 - Phase 7 temporary artifacts are centralized through `AppTemporaryArtifactStore`: streaming/decrypted outputs use one `op-<UUID>` owner directory per operation, export handoff files use atomic complete-protection writes, tutorial sandbox directories use verified complete protection, and startup/reset cleanup removes `decrypted`, `streaming`, `export-*`, `CypherAirGuidedTutorial-*`, fixed `com.cypherair.tutorial.sandbox` defaults, and orphaned legacy `com.cypherair.tutorial.<UUID>.plist` suites. Contacts remain outside the completed Phase 1-7 scope and are pending unblocked Phase 8 protected-domain implementation.
+- Future protected-domain migrations must preserve readable source state until the protected destination is created/opened and verified through the normal post-auth path.
+- After cutover, legacy sources are cleanup/quarantine only and must not become fallback sources of truth.
+- Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary settings boot-authentication exception.
+- Documentation updates for storage or migration changes belong in `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and affected Contacts docs when Contacts is involved.
 
 ---
 

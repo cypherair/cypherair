@@ -1,0 +1,93 @@
+# Persisted State Inventory
+
+> Status: Canonical current-state.
+> Purpose: Maintain the row-level classification and migration status for CypherAir-owned persisted and local state.
+> Audience: Human developers, security reviewers, QA, and AI coding tools.
+> Source of truth: Current code, with `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, and `TESTING.md` as companion current-state documents. This file owns the exhaustive row-level inventory.
+> Last reviewed: 2026-05-02.
+> Update triggers: Any ProtectedData domain migration, storage/defaults/temp-path change, persistent-state classification change, Contacts protected-domain gate change, or storage/relock/recovery behavior change.
+
+## 1. Scope
+
+The long-term goal is to protect every CypherAir-owned local data surface unless a documented technical or security reason keeps it outside a protected domain.
+
+This inventory tracks current shipped state plus pending classified surfaces. It is not a roadmap narrative. Contacts Phase 8 implementation details live in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), and Contacts access/mutation surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md).
+
+Every in-scope row must carry:
+
+- a target class
+- a target phase or explicit exception
+- a current status
+- migration-readiness detail
+
+`Migration readiness` answers whether the row can move now. `Current status` records whether it has actually moved. A row can be target-classified correctly while still being pending.
+
+## 2. Target Classes
+
+Allowed target classes:
+
+- `protected-after-unlock`
+- `early-readable boot exception`
+- `private-key-control target`
+- `key-metadata-domain target`
+- `private-key-material exception`
+- `framework-bootstrap`
+- `ephemeral-with-cleanup`
+- `out-of-app-custody`
+- `legacy cleanup-only`
+- `test-only exception`
+
+## 3. Inventory
+
+| Item | Current location | Target class | Target phase / exception | Current status | Migration readiness |
+|------|------------------|--------------|--------------------------|----------------|---------------------|
+| `appSessionAuthenticationPolicy` | `UserDefaults` | `early-readable boot exception` | Boot exception | Exception retained | n/a in v1 |
+| `authMode` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | Phase 5 | Implemented | implemented |
+| `gracePeriod` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 7 | Implemented in PR 2 | implemented |
+| `hasCompletedOnboarding` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 7 | Implemented in PR 2 | implemented |
+| `colorTheme` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 7 | Implemented in PR 2 | implemented |
+| `requireAuthOnLaunch` | Retired legacy `UserDefaults` key | `legacy cleanup-only` | Legacy cleanup | Cleanup-only | cleanup only |
+| `encryptToSelf` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 7 | Implemented in PR 2 | implemented |
+| `clipboardNotice` | `ProtectedData/protected-settings`; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 3 | Implemented | implemented |
+| `guidedTutorialCompletedVersion` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | Phase 7 | Implemented in PR 2 | implemented |
+| `uiTestBypassAuthentication` | Test-only `UserDefaults` key | `test-only exception` | Test-only exception | Exception retained | n/a |
+| `rewrapInProgress` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | Phase 5 | Implemented | implemented |
+| `rewrapTargetMode` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | Phase 5 | Implemented | implemented |
+| `modifyExpiryInProgress` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | Phase 5 | Implemented | implemented |
+| `modifyExpiryFingerprint` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | Phase 5 | Implemented | implemented |
+| Permanent SE-wrapped private-key bundle rows | Keychain default account | `private-key-material exception` | Private-key-material exception | Exception retained | n/a |
+| Pending SE-wrapped private-key bundle rows | Keychain default account | `private-key-material exception` | Private-key-material exception | Exception retained | n/a |
+| `PGPKeyIdentity` metadata rows | `ProtectedData/key-metadata`; legacy metadata-account and default-account rows only as migration sources | `key-metadata-domain target` | Phase 6 | Implemented | implemented |
+| Shared app-data root secret | Keychain default account | `framework-bootstrap` | Phase 1 | Implemented with SE device binding | implemented |
+| `ProtectedDataRegistry` | `Application Support/ProtectedData/ProtectedDataRegistry.plist` | `framework-bootstrap` | Phase 1 / Phase 2 | Implemented | framework prerequisite |
+| Per-domain bootstrap metadata | `Application Support/ProtectedData/<domain>/bootstrap.plist` | `framework-bootstrap` | Phase 2 / domain phase | Implemented for existing domains | domain-specific |
+| Protected settings payload | `Application Support/ProtectedData/protected-settings/` | `protected-after-unlock` | Phase 3 | Implemented narrowly | implemented |
+| Private-key control payload | `Application Support/ProtectedData/private-key-control/` | `private-key-control target` | Phase 5 | Implemented | implemented |
+| Key metadata payload | `Application Support/ProtectedData/key-metadata/` | `key-metadata-domain target` | Phase 6 | Implemented | implemented |
+| Framework sentinel payload | `Application Support/ProtectedData/protected-framework-sentinel/` | `framework-bootstrap` | Phase 4 | Implemented | implemented |
+| `Documents/contacts/*.gpg` | App sandbox documents | `protected-after-unlock` | Phase 8 | Pending | no |
+| `Documents/contacts/contact-metadata.json` | App sandbox documents | `protected-after-unlock` | Phase 8 | Pending | no |
+| Self-test reports / legacy `Documents/self-test/` | In-memory export-only report data; legacy app sandbox `Documents/self-test/` cleanup source only | `ephemeral-with-cleanup` / `legacy cleanup-only` | Phase 7 PR 3 | Implemented | implemented |
+| `tmp/decrypted/` | App temporary directory `tmp/decrypted/op-<UUID>/<sanitized output filename>` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
+| `tmp/streaming/` | App temporary directory `tmp/streaming/op-<UUID>/<sanitized input filename>.gpg` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
+| `tmp/export-*` | App temporary directory `tmp/export-<UUID>-<sanitized filename>` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
+| `tmp/CypherAirGuidedTutorial-*` | App temporary directory `tmp/CypherAirGuidedTutorial-<UUID>/` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
+| Tutorial `UserDefaults` suite | App Preferences plist/domain `com.cypherair.tutorial.sandbox`, plus legacy orphan cleanup for `com.cypherair.tutorial.<UUID>.plist` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
+| Files exported to user-selected locations | Outside app-controlled sandbox after export | `out-of-app-custody` | Out-of-app-custody exception | Exception retained | n/a |
+
+## 4. Migration Rules
+
+Every future migration from plaintext, Keychain metadata, or non-uniform local state into a protected domain must:
+
+- preserve readable source state until the protected destination is confirmed valid
+- validate and normalize source state before writing the protected destination
+- verify protected-domain readability before retiring or quarantining source state
+- never silently reset unreadable converted state to empty data
+- make corrupted committed protected state a recovery surface
+- document cleanup or quarantine behavior explicitly
+- update this inventory, [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), [TESTING](TESTING.md), and [CODE_REVIEW](CODE_REVIEW.md) as needed in the same change
+- update [CONTACTS_PRD](CONTACTS_PRD.md), [CONTACTS_TDD](CONTACTS_TDD.md), [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), and [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) when Contacts behavior or Phase 8 surfaces are involved
+
+For Phase 7 settings, no shadow copy may be introduced to preserve pre-unlock behavior. If a setting still controls launch authentication, startup routing, or pre-unlock UI before ProtectedData opens, the implementation must first redesign that read path or keep the setting as an explicit boot exception. The only ordinary-settings boot-auth exception is `appSessionAuthenticationPolicy`.
+
+For Phase 8 Contacts, legacy plaintext sources must remain inactive after cutover, must not be treated as a fallback source of truth, and must be deleted only after a later successful Contacts domain open confirms the protected destination is readable.

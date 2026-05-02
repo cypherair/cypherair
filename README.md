@@ -155,7 +155,7 @@ CypherAir publishes unique edge prerelease XCFrameworks for the current `main` b
 CypherAir's security design centers around several layers of protection:
 
 - **Private Key Storage** — Keys are wrapped by a Secure Enclave P-256 key via self-ECDH + HKDF + AES-GCM, then stored in Keychain. Keys are device-bound and never leave the hardware.
-- **Protected App Data** — Implemented app-data domains open after app privacy authentication through a shared Keychain root-secret gate plus Secure Enclave device binding. Current protected domains cover private-key control state, key metadata, and the `clipboardNotice` setting.
+- **Protected App Data** — Implemented app-data domains open after app privacy authentication through a shared Keychain root-secret gate plus Secure Enclave device binding. Current protected domains cover private-key control state, key metadata, protected settings schema v2, and the framework sentinel; Contacts remains Phase 8 pending implementation.
 - **Two-Phase Decryption** — Phase 1 parses the message header and matches recipient keys without authentication. Phase 2 requires biometric/passcode auth before decryption proceeds.
 - **Authentication Modes** — Standard Mode (Face ID / Touch ID with passcode fallback) or High Security Mode (biometric only, inspired by Apple's Stolen Device Protection).
 - **Memory Safety** — Sensitive data is zeroed from memory after use. MIE (Memory Integrity Enforcement) is enabled via Xcode's Enhanced Security capability, providing hardware memory tagging on A19+ devices.
@@ -182,14 +182,15 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Module breakdown, data flows, storage layout |
 | [SECURITY](docs/SECURITY.md) | Encryption scheme, key lifecycle, threat model |
 | [TESTING](docs/TESTING.md) | Test strategy and coverage |
-| [APP_DATA_MIGRATION_GUIDE](docs/APP_DATA_MIGRATION_GUIDE.md) | Remaining ProtectedData migration roadmap and inventory |
-| [APP_DATA_ROADMAP_STATUS](docs/APP_DATA_ROADMAP_STATUS.md) | Current AppData phase completion status |
+| [CONTACTS_PRD](docs/CONTACTS_PRD.md) | Future Contacts product requirements and Phase 8 scope |
+| [CONTACTS_TDD](docs/CONTACTS_TDD.md) | Future Contacts protected-domain technical design |
+| [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](docs/CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) | Phase 8 Contacts PR sequence and implementation-prep plan |
+| [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](docs/CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) | Contacts access, mutation, and enrichment checklist |
 | [APP_RELEASE_PROCESS](docs/APP_RELEASE_PROCESS.md) | Current app-build release modes, stable asset contract, and App Store candidate ordering |
 | [DOCUMENTATION_GOVERNANCE](docs/DOCUMENTATION_GOVERNANCE.md) | Documentation classes, metadata rules, archive rules, and update triggers |
 | [COMPLIANCE_REMEDIATION_PLAN (Archive)](docs/archive/COMPLIANCE_REMEDIATION_PLAN.md) | Archived remediation plan and close-out history for the licensing/distribution rollout |
 | [POC](docs/archive/POC.md) | Proof-of-concept test plan (archived) |
-| [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards and SwiftUI patterns |
-| [LIQUID_GLASS](docs/LIQUID_GLASS.md) | iOS 26 Liquid Glass and platform-native SwiftUI chrome guidance |
+| [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards, SwiftUI patterns, and current Liquid Glass rules |
 | [CODE_REVIEW](docs/CODE_REVIEW.md) | Code review checklist by change type |
 | [XCFRAMEWORK_RELEASES](docs/XCFRAMEWORK_RELEASES.md) | Current edge, drill, and stable XCFramework release channels and verification |
 | [CHANGELOG](docs/CHANGELOG.md) | PRD revision history |

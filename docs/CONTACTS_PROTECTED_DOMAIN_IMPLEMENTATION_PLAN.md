@@ -6,7 +6,7 @@
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
 > **Primary authority:** [CONTACTS_TDD](CONTACTS_TDD.md) for Contacts design intent and [ARCHITECTURE](ARCHITECTURE.md) / [SECURITY](SECURITY.md) / [TDD](TDD.md) for current shared ProtectedData architecture.
-> **Related documents:** [CONTACTS_PRD](CONTACTS_PRD.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md) · [TESTING](TESTING.md)
+> **Related documents:** [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [TESTING](TESTING.md)
 
 ## 1. Scope And Relationship
 
@@ -25,13 +25,13 @@ If this document conflicts with:
 
 - [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), or [TDD](TDD.md) on current shared-framework architecture or security rules, those long-lived docs win
 - [CONTACTS_TDD](CONTACTS_TDD.md) on Contacts target behavior, the Contacts TDD wins
-- [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) on roadmap order, the migration guide wins unless this document is explicitly used to refine the missing implementation detail needed to realize that order
+- Contacts PR1-PR8 sequencing or inventory ownership, this document is the active authority unless a later Contacts implementation plan replaces it
 
 This document refines implementation sequencing and repository-specific integration detail. It does not create a third architecture.
 
 ## 2. Why This Document Exists
 
-The active Contacts and app-data documents already establish the correct target direction:
+The active Contacts and shared-framework documents already establish the correct target direction:
 
 - Contacts is a protected domain on the shared app-data framework
 - Contacts must be `import-recoverable`
@@ -262,7 +262,7 @@ This implementation plan references the inventory by behavior group rather than 
 
 ## 6. Prerequisites And Planned Contacts PR Sequence
 
-This section freezes the later implementation order and separates completed shared AppData prerequisites from Contacts-internal PRs. Contacts PR1-PR8 remain AppData Phase 8 work and are unblocked now that the Phase 7 roadmap gate is closed.
+This section freezes the later implementation order and separates completed shared AppData prerequisites from Contacts-internal PRs. Contacts PR1-PR8 remain AppData Phase 8 work and are unblocked because Phase 7 is complete.
 
 ### 6.1 Shared AppData Prerequisites
 
@@ -614,7 +614,7 @@ This implementation-prep document is only complete if a later implementer can an
 
 - why Contacts protected-domain adoption needs more than a storage swap
 - why completed shared framework hardening remains a prerequisite rather than a Contacts-internal PR
-- why Contacts PR1-PR8 remain Phase 8 work now that the Phase 7 gate is closed
+- why Contacts PR1-PR8 remain Phase 8 work after Phase 7 completion
 - what the Contacts schema skeleton may define before later behavior PRs
 - why verification contract refactor must happen before lifecycle wiring
 - which Contacts entrypoints are gated and which are only enrichment consumers

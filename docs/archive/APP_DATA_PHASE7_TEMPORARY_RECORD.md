@@ -1,10 +1,18 @@
 # AppData Phase 7 Temporary Recovery Record
 
+> **Status:** Archived temporary Phase 7 recovery record.
+> **Archived on:** 2026-05-02.
+> **Archival reason:** The temporary recovery note was already superseded by the Phase 7 implementation reference; both are now archived because current Phase 7 facts live in long-lived docs and Phase 8 work lives in Contacts docs.
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](../CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+> **Current code and active canonical docs outrank this archived file whenever they disagree.**
+>
+> Original snapshot metadata follows.
+>
 > **Status:** Superseded temporary recovery record.
 > **Purpose:** Restore and index Phase 7 information that became less visible during the AppData documentation consolidation in `f9bc4dc`.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Last reviewed:** 2026-05-02.
-> **Current authority:** This document is superseded by [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). Current code, [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md), [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md), [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md) outrank this temporary record if they disagree. Phase 7 closure status belongs in the implementation reference and roadmap status documents, not this historical record.
+> **Original current authority:** This document was superseded by [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). Current code, [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md), [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md), [ARCHITECTURE](../ARCHITECTURE.md), [SECURITY](../SECURITY.md), [TDD](../TDD.md), and [TESTING](../TESTING.md) outranked this temporary record if they disagreed. Phase 7 closure status belonged in the implementation reference and roadmap status documents, not this historical record.
 
 ## 1. Scope And Use
 
@@ -15,16 +23,16 @@ Use it only as a historical recovery/audit index. Do not treat any row here as r
 Primary source material:
 
 - `f9bc4dc` diff for [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md)
-- [archive/APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](archive/APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md)
-- [archive/APP_DATA_PROTECTION_TDD](archive/APP_DATA_PROTECTION_TDD.md)
-- [archive/APP_DATA_VALIDATION](archive/APP_DATA_VALIDATION.md)
+- [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md)
+- [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)
+- [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
 - the current [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md)
 
 ## 2. Diff Recovery Summary
 
 The `f9bc4dc` consolidation changed the active migration guide from the detailed proposal-era guide into a smaller remaining-roadmap document. In that commit, `docs/APP_DATA_MIGRATION_GUIDE.md` went from 422 lines to 160 lines.
 
-The detailed proposal-era migration guide content was preserved in [archive/APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](archive/APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md). The active guide now keeps only a brief Phase 7 summary, the row-level inventory without detailed notes, and cross-domain migration rules.
+The detailed proposal-era migration guide content was preserved in [APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT](APP_DATA_MIGRATION_GUIDE_PHASE1_6_SNAPSHOT.md). The active guide now keeps only a brief Phase 7 summary, the row-level inventory without detailed notes, and cross-domain migration rules.
 
 This record restores the Phase 7-specific details that were compressed out of the active guide. It does not revert the consolidation and does not change roadmap order.
 

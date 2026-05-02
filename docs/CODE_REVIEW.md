@@ -32,7 +32,7 @@ Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`
 - [ ] Startup diagnostics remain generic and do not leak fingerprints or key identifiers
 - [ ] ProtectedData changes preserve the app-data/private-key-material boundary: no SE-wrapped private-key bundle bytes are copied into ProtectedData payloads
 - [ ] ProtectedData changes preserve registry authority, explicit pending-mutation recovery, no-silent-reset behavior, relock zeroization, and `restartRequired` fail-closed semantics
-- [ ] ProtectedData changes that migrate a persisted surface update `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, `APP_DATA_MIGRATION_GUIDE.md`, and `APP_DATA_ROADMAP_STATUS.md` as needed
+- [ ] ProtectedData changes that migrate a persisted surface update `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed; update `CONTACTS_PRD.md`, `CONTACTS_TDD.md`, `CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md`, and `CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md` when Contacts behavior or Phase 8 surfaces are involved
 
 ## Rust API Changes
 
@@ -51,6 +51,6 @@ Changes to `Sources/App/`.
 - [ ] VoiceOver labels on all interactive elements
 - [ ] Dynamic Type respected (system text styles, no fixed font sizes)
 - [ ] 44×44pt minimum touch targets
-- [ ] Liquid Glass compliance (see [LIQUID_GLASS.md](LIQUID_GLASS.md))
+- [ ] Liquid Glass compliance (see [CONVENTIONS.md](CONVENTIONS.md#liquid-glass))
 - [ ] No business logic in views
 - [ ] If a screen model is introduced, the view retains layout, bindings, and presentation wiring only; workflow state, async actions, importer/exporter state, and cleanup move into the model

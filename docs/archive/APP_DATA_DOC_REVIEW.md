@@ -2,7 +2,7 @@
 
 > Status: Archived review snapshot from 2026-04-20. Kept as historical evidence for one point-in-time review of the App Data proposal stack against the current repository state.
 > Archival reason: The historical `APP_DATA_*` proposal docs absorbed the key follow-up fixes; implemented Phase 1-6 facts now live in long-lived current-state documentation.
-> Successor docs: [ARCHITECTURE](../ARCHITECTURE.md), [SECURITY](../SECURITY.md), [TDD](../TDD.md), [TESTING](../TESTING.md), [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md), and [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md).
+> Successor docs: [ARCHITECTURE](../ARCHITECTURE.md), [SECURITY](../SECURITY.md), [TDD](../TDD.md), [TESTING](../TESTING.md), [CODE_REVIEW](../CODE_REVIEW.md), and Contacts-specific docs for Phase 8.
 > Scope: `APP_DATA_PROTECTION_PLAN.md`, `APP_DATA_PROTECTION_TDD.md`, `APP_DATA_FRAMEWORK_SPEC.md`, `APP_DATA_MIGRATION_GUIDE.md`, and `APP_DATA_VALIDATION.md`, with comparison against archived `archive/APP_DATA_CONTACTS_ALIGNMENT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TESTING.md`, and current code.
 > Current code and active canonical docs outrank this archived file whenever they disagree.
 

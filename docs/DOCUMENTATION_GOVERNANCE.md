@@ -120,7 +120,8 @@ Update the relevant docs in the same change when one of these surfaces changes:
   - Update `docs/SECURITY.md` when the change affects secret-data lifecycle, authentication boundaries, revocation persistence policy, or certificate-signature trust boundaries
 
 - **Storage keys, defaults, temp paths, or startup cleanup changes**
-  - Update `docs/ARCHITECTURE.md` and `docs/TDD.md`
+  - Update `docs/PERSISTED_STATE_INVENTORY.md`, `docs/ARCHITECTURE.md`, and `docs/TDD.md`
+  - Update `docs/SECURITY.md`, `docs/TESTING.md`, and `docs/CODE_REVIEW.md` when classification, migration, recovery, file-protection, or validation expectations change
 
 - **Authentication mode, recovery, or permission-description changes**
   - Update `docs/SECURITY.md`, `docs/PRD.md`, `docs/TDD.md`, and any affected entry docs

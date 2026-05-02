@@ -3,7 +3,7 @@
 > **Status:** Archived historical AppData migration-guide snapshot.
 > **Archived on:** 2026-04-28.
 > **Archival reason:** This snapshot preserves the detailed Phase 1-6 migration material removed from the active migration guide during the AppData documentation consolidation.
-> **Successor documents:** [APP_DATA_MIGRATION_GUIDE](../APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md)
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
 > **Current code and active canonical docs outrank this archived file whenever they disagree.**
 
 Original snapshot metadata follows.
@@ -13,7 +13,7 @@ Original snapshot metadata follows.
 > **Purpose:** Define the phased rollout, adoption sequencing, and migration inventory for the protected app-data proposal.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Primary authority:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) for roadmap intent and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture and security constraints.
-> **Companion documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md)
+> **Companion documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
 > **Related documents:** [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md)
 
 ## 1. Scope And Relationship
@@ -295,7 +295,7 @@ This migration guide documents the remaining handoff points around future protec
 | Content clearing on auth boundary | `AppSessionOrchestrator` + relock participants | Grace-expiry re-auth increments `contentClearGeneration`; ProtectedData participants use relock hooks for domain-local cleanup |
 | Cold-start loading and temp cleanup | `AppStartupCoordinator` | cold start performs ProtectedData bootstrap classification, loads Contacts, and cleans temporary files; key metadata loading is deferred to post-unlock domain open | Future protected-domain loading must not happen merely from startup initialization |
 
-Current implementation progress for these owners lives in [APP_DATA_ROADMAP_STATUS](../APP_DATA_ROADMAP_STATUS.md). Keep that file as the current progress record rather than mixing Phase 1, Phase 3, and Phase 4 status into this migration guide.
+Current implementation progress for these owners lives in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md). Keep that file as the current progress record rather than mixing Phase 1, Phase 3, and Phase 4 status into this migration guide.
 
 ## 4. Persisted-State Classification Inventory
 
