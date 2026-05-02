@@ -120,7 +120,7 @@ final class SettingsScreenModel {
         return true
     }
 
-    var shouldShowProtectedSettingsSection: Bool {
+    var shouldShowClipboardNoticeRow: Bool {
         switch configuration.protectedSettingsHostMode {
         case .mainWindowLive, .settingsSceneProxy, .tutorialSandbox:
             true
