@@ -363,8 +363,13 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
 @Observable
 final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked Sendable {
     struct Payload: Codable, Equatable, Sendable {
-        static let currentSchemaVersion = 1
+        static let currentSchemaVersion = 2
 
+        var clipboardNotice: Bool
+        var ordinarySettings: ProtectedOrdinarySettingsSnapshot
+    }
+
+    private struct PayloadV1: Codable, Equatable, Sendable {
         var clipboardNotice: Bool
     }
 
@@ -373,6 +378,11 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     private struct OpenedSnapshot {
         let payload: Payload
         let generationIdentifier: Int
+        let schemaVersion: Int
+
+        var requiresOrdinarySettingsMigration: Bool {
+            schemaVersion < Payload.currentSchemaVersion
+        }
     }
 
     private let defaults: UserDefaults
@@ -408,8 +418,66 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         payload?.clipboardNotice
     }
 
+    var ordinarySettings: ProtectedOrdinarySettingsSnapshot? {
+        payload?.ordinarySettings
+    }
+
     var hasCommittedDomain: Bool {
         (try? registryStore.loadRegistry().committedMembership[Self.domainID] != nil) ?? false
+    }
+
+    func ordinarySettingsSnapshot() throws -> ProtectedOrdinarySettingsSnapshot {
+        guard domainState == .unlocked,
+              let payload else {
+            throw ProtectedDataError.invalidRegistry(
+                "Protected settings ordinary settings are unavailable while the domain is locked."
+            )
+        }
+        try validateOrdinarySettingsSnapshot(payload.ordinarySettings)
+        return payload.ordinarySettings
+    }
+
+    func updateOrdinarySettingsSnapshot(
+        _ snapshot: ProtectedOrdinarySettingsSnapshot
+    ) throws {
+        guard domainState == .unlocked,
+              let existingPayload = payload else {
+            throw ProtectedDataError.invalidRegistry(
+                "Protected settings ordinary settings cannot be updated while the domain is locked."
+            )
+        }
+
+        var normalized = snapshot
+        normalized.normalize()
+        try validateOrdinarySettingsSnapshot(normalized)
+        guard existingPayload.ordinarySettings != normalized else {
+            return
+        }
+
+        var domainMasterKey = try activeDomainMasterKeyForCurrentSession()
+        defer {
+            domainMasterKey.protectedDataZeroize()
+        }
+
+        let nextGenerationIdentifier = max(unlockedGenerationIdentifier ?? 0, 0) + 1
+        let updatedPayload = Payload(
+            clipboardNotice: existingPayload.clipboardNotice,
+            ordinarySettings: normalized
+        )
+        try writePayloadGeneration(
+            updatedPayload,
+            generationIdentifier: nextGenerationIdentifier,
+            domainMasterKey: domainMasterKey
+        )
+        payload = updatedPayload
+        unlockedGenerationIdentifier = nextGenerationIdentifier
+        domainState = .unlocked
+    }
+
+    func resetOrdinarySettingsRuntimeStateAfterLocalDataReset() {
+        removeLegacySettingsSources()
+        clearUnlockedState()
+        domainState = .locked
     }
 
     func migrationAuthorizationRequirement() -> ProtectedDataMutationAuthorizationRequirement {
@@ -456,19 +524,40 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         }
     }
 
-    func migrateLegacyClipboardNoticeIfNeeded(
+    func ensureCommittedAndMigrateSettingsIfNeeded(
         persistSharedRight: @escaping @Sendable (Data) async throws -> Void,
         firstDomainSharedRightCleaner: ProtectedDataFirstDomainSharedRightCleaner? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) async throws {
         let registry = try registryStore.loadRegistry()
         if registry.committedMembership[Self.domainID] != nil {
+            do {
+                try upgradeCommittedSettingsPayloadIfNeeded(
+                    currentWrappingRootKey: currentWrappingRootKey
+                )
+            } catch {
+                clearUnlockedState()
+                domainState = .recoveryNeeded
+                if registry.committedMembership[Self.domainID] != .recoveryNeeded {
+                    _ = try? await registryStore.updateCommittedDomainState(
+                        domainID: Self.domainID,
+                        to: .recoveryNeeded
+                    )
+                }
+                throw error
+            }
             return
         }
 
         let initialPayload = legacyInitialPayload()
 
         if !registry.committedMembership.isEmpty {
+            if let pendingDomainState = pendingDomainState(for: registry) {
+                domainState = pendingDomainState
+                throw ProtectedDataError.invalidRegistry(
+                    "Protected settings cannot be created while protected-data recovery is pending."
+                )
+            }
             guard registry.sharedResourceLifecycleState == .ready else {
                 throw ProtectedDataError.invalidRegistry(
                     "Protected settings cannot be created while the shared resource is not ready."
@@ -509,7 +598,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                 }
             )
 
-            defaults.removeObject(forKey: AppConfiguration.clipboardNoticeLegacyKey)
+            removeLegacySettingsSources()
             clearUnlockedState()
             domainState = .locked
             return
@@ -566,7 +655,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             }
         )
 
-        defaults.removeObject(forKey: AppConfiguration.clipboardNoticeLegacyKey)
+        removeLegacySettingsSources()
         clearUnlockedState()
         domainState = .locked
     }
@@ -591,13 +680,21 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         }
 
         do {
-            let (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
+            let readResult = try readAuthoritativeSnapshot(
+                wrappingRootKey: wrappingRootKey
+            )
+            var openedSnapshot = readResult.0
+            var unwrappedDomainMasterKey = readResult.1
+            defer {
+                unwrappedDomainMasterKey.protectedDataZeroize()
+            }
+            openedSnapshot = try migrateOpenedSettingsSnapshotIfNeeded(
+                openedSnapshot,
+                domainMasterKey: &unwrappedDomainMasterKey,
                 wrappingRootKey: wrappingRootKey
             )
             let cachedDomainMasterKey = Data(unwrappedDomainMasterKey)
             domainKeyManager.cacheUnlockedDomainMasterKey(cachedDomainMasterKey, for: Self.domainID)
-            var mutableDomainMasterKey = unwrappedDomainMasterKey
-            mutableDomainMasterKey.protectedDataZeroize()
             payload = openedSnapshot.payload
             unlockedGenerationIdentifier = openedSnapshot.generationIdentifier
             domainState = .unlocked
@@ -638,7 +735,10 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         }
 
         let nextGenerationIdentifier = max(unlockedGenerationIdentifier ?? 0, 0) + 1
-        let updatedPayload = Payload(clipboardNotice: isEnabled)
+        let updatedPayload = Payload(
+            clipboardNotice: isEnabled,
+            ordinarySettings: existingPayload.ordinarySettings
+        )
         try writePayloadGeneration(
             updatedPayload,
             generationIdentifier: nextGenerationIdentifier,
@@ -697,8 +797,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
 
         clearUnlockedState()
         domainState = .locked
-        defaults.removeObject(forKey: AppConfiguration.clipboardNoticeLegacyKey)
-        try await migrateLegacyClipboardNoticeIfNeeded(
+        try await ensureCommittedAndMigrateSettingsIfNeeded(
             persistSharedRight: persistSharedRight,
             firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
             currentWrappingRootKey: currentWrappingRootKey
@@ -762,9 +861,13 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     ) throws {
         try storageRoot.ensureDomainDirectoryExists(for: Self.domainID)
 
+        var normalizedPayload = payload
+        normalizedPayload.ordinarySettings.normalize()
+        try validateOrdinarySettingsSnapshot(normalizedPayload.ordinarySettings)
+
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
-        var plaintext = try encoder.encode(payload)
+        var plaintext = try encoder.encode(normalizedPayload)
         defer {
             plaintext.protectedDataZeroize()
         }
@@ -820,6 +923,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             wrappingRootKey: wrappingRootKey
         )
         var candidates: [OpenedSnapshot] = []
+        var highestObservedGenerationIdentifier: Int?
 
         for slot in ProtectedDomainGenerationSlot.allCases {
             let url = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: slot)
@@ -834,14 +938,17 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                     envelope: envelope,
                     domainMasterKey: domainMasterKey
                 )
+                highestObservedGenerationIdentifier = max(
+                    highestObservedGenerationIdentifier ?? envelope.generationIdentifier,
+                    envelope.generationIdentifier
+                )
                 defer {
                     plaintext.protectedDataZeroize()
                 }
-                let payload = try PropertyListDecoder().decode(Payload.self, from: plaintext)
                 candidates.append(
-                    OpenedSnapshot(
-                        payload: payload,
-                        generationIdentifier: envelope.generationIdentifier
+                    try decodeOpenedSnapshot(
+                        plaintext: plaintext,
+                        envelope: envelope
                     )
                 )
             } catch {
@@ -855,6 +962,13 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             domainMasterKey.protectedDataZeroize()
             throw ProtectedDataError.invalidEnvelope(
                 "Protected settings does not contain a readable authoritative generation."
+            )
+        }
+        if let highestObservedGenerationIdentifier,
+           selectedSnapshot.generationIdentifier < highestObservedGenerationIdentifier {
+            domainMasterKey.protectedDataZeroize()
+            throw ProtectedDataError.invalidEnvelope(
+                "Protected settings highest observed generation is not readable."
             )
         }
 
@@ -876,6 +990,144 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             from: wrappedRecord,
             wrappingRootKey: wrappingRootKey
         )
+    }
+
+    private func activeDomainMasterKeyForCurrentSession() throws -> Data {
+        if let cachedKey = domainKeyManager.unlockedDomainMasterKey(for: Self.domainID) {
+            return Data(cachedKey)
+        }
+
+        guard let currentWrappingRootKey else {
+            throw ProtectedDataError.authorizingUnavailable
+        }
+        var wrappingRootKey = try currentWrappingRootKey()
+        defer {
+            wrappingRootKey.protectedDataZeroize()
+        }
+        return try activeDomainMasterKey(wrappingRootKey: wrappingRootKey)
+    }
+
+    private func upgradeCommittedSettingsPayloadIfNeeded(
+        currentWrappingRootKey: (() throws -> Data)? = nil
+    ) throws {
+        let registry = try registryStore.loadRegistry()
+        if let pendingDomainState = pendingDomainState(for: registry) {
+            domainState = pendingDomainState
+            throw ProtectedDataError.invalidRegistry(
+                "Protected settings cannot be upgraded while protected-data recovery is pending."
+            )
+        }
+        guard registry.committedMembership[Self.domainID] != nil else {
+            return
+        }
+        guard registry.sharedResourceLifecycleState == .ready else {
+            throw ProtectedDataError.invalidRegistry(
+                "Protected settings cannot be upgraded while the shared resource is not ready."
+            )
+        }
+
+        let wrappingRootKeyProvider = currentWrappingRootKey ?? self.currentWrappingRootKey
+        guard let wrappingRootKeyProvider else {
+            throw ProtectedDataError.authorizingUnavailable
+        }
+        var wrappingRootKey = try wrappingRootKeyProvider()
+        defer {
+            wrappingRootKey.protectedDataZeroize()
+        }
+
+        let readResult = try readAuthoritativeSnapshot(wrappingRootKey: wrappingRootKey)
+        var openedSnapshot = readResult.0
+        var domainMasterKey = readResult.1
+        defer {
+            domainMasterKey.protectedDataZeroize()
+        }
+        openedSnapshot = try migrateOpenedSettingsSnapshotIfNeeded(
+            openedSnapshot,
+            domainMasterKey: &domainMasterKey,
+            wrappingRootKey: wrappingRootKey
+        )
+        payload = nil
+        unlockedGenerationIdentifier = nil
+        if openedSnapshot.requiresOrdinarySettingsMigration {
+            domainState = .recoveryNeeded
+        } else {
+            domainState = .locked
+        }
+    }
+
+    private func migrateOpenedSettingsSnapshotIfNeeded(
+        _ openedSnapshot: OpenedSnapshot,
+        domainMasterKey: inout Data,
+        wrappingRootKey: Data
+    ) throws -> OpenedSnapshot {
+        guard openedSnapshot.requiresOrdinarySettingsMigration else {
+            removeLegacySettingsSources()
+            return openedSnapshot
+        }
+
+        var upgradedPayload = Payload(
+            clipboardNotice: openedSnapshot.payload.clipboardNotice,
+            ordinarySettings: legacyOrdinarySettingsSnapshot()
+        )
+        upgradedPayload.ordinarySettings.normalize()
+        try validateOrdinarySettingsSnapshot(upgradedPayload.ordinarySettings)
+
+        let nextGenerationIdentifier = max(openedSnapshot.generationIdentifier, 0) + 1
+        try writePayloadGeneration(
+            upgradedPayload,
+            generationIdentifier: nextGenerationIdentifier,
+            domainMasterKey: domainMasterKey
+        )
+
+        let verificationResult = try readAuthoritativeSnapshot(
+            wrappingRootKey: wrappingRootKey
+        )
+        let verifiedSnapshot = verificationResult.0
+        var verifiedDomainMasterKey = verificationResult.1
+        defer {
+            verifiedDomainMasterKey.protectedDataZeroize()
+        }
+        guard verifiedSnapshot.schemaVersion == Payload.currentSchemaVersion,
+              verifiedSnapshot.generationIdentifier == nextGenerationIdentifier,
+              verifiedSnapshot.payload == upgradedPayload else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Protected settings migration verification did not reopen the expected schema v2 payload."
+            )
+        }
+
+        removeLegacySettingsSources()
+        return verifiedSnapshot
+    }
+
+    private func decodeOpenedSnapshot(
+        plaintext: Data,
+        envelope: ProtectedDomainEnvelope
+    ) throws -> OpenedSnapshot {
+        let decoder = PropertyListDecoder()
+        switch envelope.schemaVersion {
+        case 1:
+            let v1Payload = try decoder.decode(PayloadV1.self, from: plaintext)
+            return OpenedSnapshot(
+                payload: Payload(
+                    clipboardNotice: v1Payload.clipboardNotice,
+                    ordinarySettings: .firstRunDefaults
+                ),
+                generationIdentifier: envelope.generationIdentifier,
+                schemaVersion: envelope.schemaVersion
+            )
+        case Payload.currentSchemaVersion:
+            let payload = try decoder.decode(Payload.self, from: plaintext)
+            try validateOrdinarySettingsSnapshot(payload.ordinarySettings)
+            return OpenedSnapshot(
+                payload: payload,
+                generationIdentifier: envelope.generationIdentifier,
+                schemaVersion: envelope.schemaVersion
+            )
+        default:
+            throw ProtectedDataError.invalidEnvelope(
+                "Protected settings payload has unsupported schema version \(envelope.schemaVersion)."
+            )
+        }
     }
 
     private func deleteDomainArtifacts() throws {
@@ -984,7 +1236,36 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         let clipboardNotice = defaults.object(forKey: AppConfiguration.clipboardNoticeLegacyKey) == nil
             ? true
             : defaults.bool(forKey: AppConfiguration.clipboardNoticeLegacyKey)
-        return Payload(clipboardNotice: clipboardNotice)
+        return Payload(
+            clipboardNotice: clipboardNotice,
+            ordinarySettings: legacyOrdinarySettingsSnapshot()
+        )
+    }
+
+    private func legacyOrdinarySettingsSnapshot() -> ProtectedOrdinarySettingsSnapshot {
+        LegacyOrdinarySettingsStore(defaults: defaults).loadSnapshot()
+    }
+
+    private func removeLegacySettingsSources() {
+        defaults.removeObject(forKey: AppConfiguration.clipboardNoticeLegacyKey)
+        for key in LegacyOrdinarySettingsStore.persistentKeys {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    private func validateOrdinarySettingsSnapshot(
+        _ snapshot: ProtectedOrdinarySettingsSnapshot
+    ) throws {
+        guard ProtectedOrdinarySettingsSnapshot.validGracePeriodValues.contains(snapshot.gracePeriod) else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Protected settings ordinary settings contain an invalid grace period."
+            )
+        }
+        guard snapshot.guidedTutorialCompletedVersion >= 0 else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Protected settings ordinary settings contain an invalid guided tutorial version."
+            )
+        }
     }
 
     private func pendingDomainState(

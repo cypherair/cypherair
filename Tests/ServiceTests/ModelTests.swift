@@ -479,7 +479,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(persistence.saveCount, 0)
     }
 
-    func test_protectedOrdinarySettings_loadsOnlyAfterHealthyPostAuthenticationDomain() {
+    func test_protectedOrdinarySettings_loadsOnlyAfterUnlockedPostAuthenticationDomain() {
         let persistence = SpyProtectedOrdinarySettingsPersistence(
             snapshot: ProtectedOrdinarySettingsSnapshot(
                 gracePeriod: 300,
@@ -494,7 +494,7 @@ final class ModelTests: XCTestCase {
         )
 
         coordinator.loadAfterAppAuthentication(
-            protectedSettingsDomainState: .locked
+            protectedSettingsDomainState: .unlocked
         )
 
         XCTAssertEqual(coordinator.snapshot?.gracePeriod, 300)
@@ -502,6 +502,24 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(coordinator.snapshot?.colorTheme, .teal)
         XCTAssertEqual(coordinator.snapshot?.encryptToSelf, false)
         XCTAssertEqual(persistence.loadCount, 1)
+    }
+
+    func test_protectedOrdinarySettings_lockedPostAuthenticationDomainFailsClosed() {
+        let persistence = SpyProtectedOrdinarySettingsPersistence(
+            snapshot: .firstRunDefaults
+        )
+        let coordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: persistence
+        )
+
+        coordinator.loadAfterAppAuthentication(
+            protectedSettingsDomainState: .locked
+        )
+
+        XCTAssertNil(coordinator.snapshot)
+        XCTAssertEqual(coordinator.state, .recoveryRequired)
+        XCTAssertEqual(persistence.loadCount, 0)
+        XCTAssertEqual(persistence.saveCount, 0)
     }
 
     func test_protectedOrdinarySettings_recoveryDoesNotReadPersistence() {

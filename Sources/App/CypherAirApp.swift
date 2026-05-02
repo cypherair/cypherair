@@ -202,8 +202,8 @@ struct CypherAirApp: App {
                     container.protectedSettingsStore.migrationAuthorizationRequirement()
                 )
             },
-            migrateLegacyClipboardNoticeIfNeeded: {
-                try await container.protectedSettingsStore.migrateLegacyClipboardNoticeIfNeeded(
+            ensureCommittedAndMigrateSettingsIfNeeded: {
+                try await container.protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
                     persistSharedRight: { secret in
                         try await container.protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
                     },

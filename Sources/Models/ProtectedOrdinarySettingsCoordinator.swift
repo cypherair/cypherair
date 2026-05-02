@@ -53,10 +53,10 @@ final class ProtectedOrdinarySettingsCoordinator {
         protectedSettingsDomainState: ProtectedSettingsDomainState
     ) {
         switch protectedSettingsDomainState {
-        case .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
-            state = .recoveryRequired
-        case .locked, .unlocked:
+        case .unlocked:
             loadFromPersistence()
+        case .locked, .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
+            state = .recoveryRequired
         }
     }
 
@@ -112,17 +112,30 @@ final class ProtectedOrdinarySettingsCoordinator {
     }
 
     private func loadFromPersistence() {
-        var snapshot = persistence.loadSnapshot()
-        if let pendingOnboardingCompletionOverride {
-            snapshot.hasCompletedOnboarding = pendingOnboardingCompletionOverride
+        do {
+            var snapshot = try persistence.loadSnapshot()
+            let loadedSnapshot = snapshot
+            if let pendingOnboardingCompletionOverride {
+                snapshot.hasCompletedOnboarding = pendingOnboardingCompletionOverride
+            }
+            snapshot.normalize()
+            if snapshot != loadedSnapshot {
+                try persistence.saveSnapshot(snapshot)
+            }
+            state = .loaded(snapshot)
+        } catch {
+            state = .recoveryRequired
         }
-        saveLoadedSnapshot(snapshot)
     }
 
     private func saveLoadedSnapshot(_ snapshot: ProtectedOrdinarySettingsSnapshot) {
         var normalized = snapshot
         normalized.normalize()
-        persistence.saveSnapshot(normalized)
-        state = .loaded(normalized)
+        do {
+            try persistence.saveSnapshot(normalized)
+            state = .loaded(normalized)
+        } catch {
+            state = .recoveryRequired
+        }
     }
 }

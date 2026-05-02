@@ -363,12 +363,12 @@ Keychain protected-data row: shared app-data root secret
 /Library/Preferences/ (UserDefaults):
   com.cypherair.preference.authMode              → legacy source removed after private-key-control migration
   com.cypherair.preference.appSessionAuthenticationPolicy → boot auth profile
-  com.cypherair.preference.gracePeriod           → Phase 7 PR 1 legacy source loaded only after app auth
-  com.cypherair.preference.encryptToSelf         → Phase 7 PR 1 legacy source loaded only after app auth
-  com.cypherair.preference.clipboardNotice       → Legacy Bool used only for ProtectedSettingsStore migration cleanup
-  com.cypherair.preference.onboardingComplete    → Phase 7 PR 1 legacy source loaded only after app auth
-  com.cypherair.preference.guidedTutorialCompletedVersion → Phase 7 PR 1 legacy source loaded only after app auth
-  com.cypherair.preference.colorTheme            → Phase 7 PR 1 legacy source loaded only after app auth
+  com.cypherair.preference.gracePeriod           → legacy cleanup-only after protected-settings schema v2 migration
+  com.cypherair.preference.encryptToSelf         → legacy cleanup-only after protected-settings schema v2 migration
+  com.cypherair.preference.clipboardNotice       → legacy cleanup-only after protected-settings migration
+  com.cypherair.preference.onboardingComplete    → legacy cleanup-only after protected-settings schema v2 migration
+  com.cypherair.preference.guidedTutorialCompletedVersion → legacy cleanup-only after protected-settings schema v2 migration
+  com.cypherair.preference.colorTheme            → legacy cleanup-only after protected-settings schema v2 migration
   com.cypherair.internal.rewrapInProgress        → legacy source removed after private-key-control migration
   com.cypherair.internal.rewrapTargetMode        → legacy source removed after private-key-control migration
   com.cypherair.internal.modifyExpiryInProgress  → legacy source removed after private-key-control migration
@@ -398,7 +398,7 @@ Current production domains:
 
 - `private-key-control`: `settings.authMode` plus rewrap / modify-expiry recovery journal state.
 - `key-metadata`: schema v1 `PGPKeyIdentity` list, migrated from legacy metadata Keychain rows after app unlock.
-- `protected-settings`: currently only `clipboardNotice`; other settings remain Phase 7 work.
+- `protected-settings`: schema v2 stores `clipboardNotice` plus the ordinary-settings snapshot for grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion.
 - `protected-framework-sentinel`: framework-owned schema/purpose marker only, used to exercise multi-domain lifecycle behavior.
 
 Migration and exception rules:
@@ -406,7 +406,7 @@ Migration and exception rules:
 - Legacy `authMode`, rewrap, and modify-expiry `UserDefaults` keys are migration sources only after verified `private-key-control` creation/open.
 - Legacy key metadata rows in the dedicated metadata account and older default-account rows are migration/cleanup sources only after verified `key-metadata` readability.
 - Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
-- Contacts, self-test state, remaining ordinary settings, and temporary/export/tutorial cleanup hardening remain outside the completed Phase 1-6 scope.
+- Contacts, self-test state, and temporary/export/tutorial cleanup hardening remain outside the completed Phase 1-6 and Phase 7 PR 2 ordinary-settings scope.
 
 ---
 

@@ -1,6 +1,6 @@
 import Foundation
 
-struct ProtectedOrdinarySettingsSnapshot: Equatable, Sendable {
+struct ProtectedOrdinarySettingsSnapshot: Codable, Equatable, Sendable {
     var gracePeriod: Int
     var hasCompletedOnboarding: Bool
     var colorTheme: ColorTheme

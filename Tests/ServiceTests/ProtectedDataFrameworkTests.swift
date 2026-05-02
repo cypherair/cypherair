@@ -264,6 +264,10 @@ private actor ThrowingRootSecretFloorRecorder {
 
 @MainActor
 final class ProtectedDataFrameworkTests: XCTestCase {
+    private struct ProtectedSettingsPayloadV1: Codable {
+        var clipboardNotice: Bool
+    }
+
     private let envelopeTestSharedRight = "com.cypherair.tests.protected-data.envelope"
 
     private func makeTemporaryDirectory(_ prefix: String) -> URL {
@@ -295,6 +299,141 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
             expiryDate: nil
+        )
+    }
+
+    private func makeProtectedSettingsHarness(
+        _ prefix: String
+    ) throws -> (
+        storageRoot: AppProtectedDataStorageRoot,
+        registryStore: AppProtectedDataRegistryStore,
+        domainKeyManager: AppProtectedDomainKeyManager,
+        defaults: UserDefaults,
+        defaultsSuiteName: String,
+        store: ProtectedSettingsStore
+    ) {
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory(prefix))
+        let sharedRightIdentifier = "com.cypherair.tests.protected-settings.\(UUID().uuidString)"
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: sharedRightIdentifier
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let defaultsSuiteName = "com.cypherair.tests.protected-settings.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        let store = ProtectedSettingsStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager
+        )
+        return (
+            storageRoot,
+            registryStore,
+            domainKeyManager,
+            defaults,
+            defaultsSuiteName,
+            store
+        )
+    }
+
+    private func createProtectedSettingsDomain(
+        store: ProtectedSettingsStore,
+        domainKeyManager: AppProtectedDomainKeyManager
+    ) async throws -> Data {
+        let capturedSharedSecret = AsyncDataBox()
+        try await store.ensureCommittedAndMigrateSettingsIfNeeded(
+            persistSharedRight: { secret in
+                await capturedSharedSecret.set(secret)
+            }
+        )
+        var rootSecret = await capturedSharedSecret.data()
+        let wrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rootSecret)
+        rootSecret.protectedDataZeroize()
+        return wrappingRootKey
+    }
+
+    private func setLegacyOrdinarySettings(
+        _ snapshot: ProtectedOrdinarySettingsSnapshot,
+        defaults: UserDefaults
+    ) {
+        defaults.set(snapshot.gracePeriod, forKey: ProtectedOrdinarySettingsLegacyKeys.gracePeriod)
+        defaults.set(snapshot.encryptToSelf, forKey: ProtectedOrdinarySettingsLegacyKeys.encryptToSelf)
+        defaults.set(
+            snapshot.hasCompletedOnboarding,
+            forKey: ProtectedOrdinarySettingsLegacyKeys.onboardingComplete
+        )
+        defaults.set(
+            snapshot.guidedTutorialCompletedVersion,
+            forKey: ProtectedOrdinarySettingsLegacyKeys.guidedTutorialCompletedVersion
+        )
+        defaults.set(snapshot.colorTheme.rawValue, forKey: ProtectedOrdinarySettingsLegacyKeys.colorTheme)
+    }
+
+    private func assertLegacyOrdinarySettingsRemoved(
+        defaults: UserDefaults,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertNil(defaults.object(forKey: AppConfiguration.clipboardNoticeLegacyKey), file: file, line: line)
+        for key in LegacyOrdinarySettingsStore.persistentKeys {
+            XCTAssertNil(defaults.object(forKey: key), "Expected \(key) to be removed.", file: file, line: line)
+        }
+    }
+
+    private func writeProtectedSettingsEnvelope<P: Encodable>(
+        payload: P,
+        schemaVersion: Int,
+        generationIdentifier: Int,
+        storageRoot: AppProtectedDataStorageRoot,
+        domainKeyManager: AppProtectedDomainKeyManager,
+        wrappingRootKey: Data
+    ) throws {
+        guard let wrappedRecord = try domainKeyManager.loadWrappedDomainMasterKeyRecord(
+            for: ProtectedSettingsStore.domainID
+        ) else {
+            throw ProtectedDataError.missingWrappedDomainMasterKey(ProtectedSettingsStore.domainID)
+        }
+        var domainMasterKey = try domainKeyManager.unwrapDomainMasterKey(
+            from: wrappedRecord,
+            wrappingRootKey: wrappingRootKey
+        )
+        defer {
+            domainMasterKey.protectedDataZeroize()
+        }
+
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        var plaintext = try encoder.encode(payload)
+        defer {
+            plaintext.protectedDataZeroize()
+        }
+        let envelope = try ProtectedDomainEnvelopeCodec.seal(
+            plaintext: plaintext,
+            domainID: ProtectedSettingsStore.domainID,
+            schemaVersion: schemaVersion,
+            generationIdentifier: generationIdentifier,
+            domainMasterKey: domainMasterKey
+        )
+        let envelopeData = try encoder.encode(envelope)
+        let pendingURL = storageRoot.domainEnvelopeURL(for: ProtectedSettingsStore.domainID, slot: .pending)
+        try storageRoot.writeProtectedData(envelopeData, to: pendingURL)
+        let currentURL = storageRoot.domainEnvelopeURL(for: ProtectedSettingsStore.domainID, slot: .current)
+        let previousURL = storageRoot.domainEnvelopeURL(for: ProtectedSettingsStore.domainID, slot: .previous)
+        if try storageRoot.managedItemExists(at: currentURL) {
+            try storageRoot.promoteStagedFile(from: currentURL, to: previousURL)
+        }
+        try storageRoot.promoteStagedFile(from: pendingURL, to: currentURL)
+        try ProtectedDomainBootstrapStore(storageRoot: storageRoot).saveMetadata(
+            ProtectedDomainBootstrapMetadata(
+                schemaVersion: schemaVersion,
+                expectedCurrentGenerationIdentifier: String(generationIdentifier),
+                coarseRecoveryReason: nil,
+                wrappedDomainMasterKeyRecordVersion: AppWrappedDomainMasterKeyRecord.currentFormatVersion
+            ),
+            for: ProtectedSettingsStore.domainID
         )
     }
 
@@ -1314,13 +1453,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             authenticationPromptCoordinator: authPromptCoordinator
         )
         let config = AppConfiguration(defaults: defaults)
-        let protectedOrdinarySettingsCoordinator = AppProtectedOrdinarySettingsCoordinator(
-            persistence: AppLegacyOrdinarySettingsStore(defaults: defaults)
-        )
-        protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
-        authManager.configureGracePeriodProvider {
-            protectedOrdinarySettingsCoordinator.gracePeriodForSession
-        }
         let protectedDataBaseDirectory = makeTemporaryDirectory("ProtectedDataStartup")
         let contactsDirectory = makeTemporaryDirectory("ProtectedDataStartupContacts")
         defer { try? FileManager.default.removeItem(at: protectedDataBaseDirectory) }
@@ -1349,6 +1481,14 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
+        let protectedOrdinarySettingsCoordinator = AppProtectedOrdinarySettingsCoordinator(
+            persistence: ProtectedSettingsOrdinarySettingsPersistence(
+                protectedSettingsStore: protectedSettingsStore
+            )
+        )
+        authManager.configureGracePeriodProvider {
+            protectedOrdinarySettingsCoordinator.gracePeriodForSession
+        }
         let protectedDataFrameworkSentinelStore = AppProtectedDataFrameworkSentinelStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
@@ -2697,7 +2837,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 try sessionCoordinator.wrappingRootKeyData()
             }
         )
-        try await protectedSettingsStore.migrateLegacyClipboardNoticeIfNeeded(
+        try await protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
             persistSharedRight: { secret in
                 try rootSecretStore.saveRootSecret(
                     secret,
@@ -2935,7 +3075,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
 
         XCTAssertEqual(settingsStore.migrationAuthorizationRequirement(), .wrappingRootKeyRequired)
         do {
-            try await settingsStore.migrateLegacyClipboardNoticeIfNeeded(
+            try await settingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
                 persistSharedRight: { _ in
                     XCTFail("A second ProtectedData domain must reuse the existing shared root.")
                 }
@@ -3470,7 +3610,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             domainKeyManager: keyManager
         )
         let capturedSharedSecret = AsyncDataBox()
-        try await settingsStore.migrateLegacyClipboardNoticeIfNeeded(
+        try await settingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
             persistSharedRight: { secret in
                 await capturedSharedSecret.set(secret)
             }
@@ -3567,6 +3707,230 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(settingsStore.migrationAuthorizationRequirement(), .frameworkRecoveryNeeded)
     }
 
+    func test_protectedSettingsFreshInstallCreatesSchemaV2OrdinarySettingsPayload() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsFreshV2")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        let payload = try await harness.store.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
+        let metadata = try ProtectedDomainBootstrapStore(
+            storageRoot: harness.storageRoot
+        ).loadMetadata(for: ProtectedSettingsStore.domainID)
+
+        XCTAssertEqual(metadata?.schemaVersion, ProtectedSettingsStore.Payload.currentSchemaVersion)
+        XCTAssertEqual(payload.ordinarySettings, .firstRunDefaults)
+
+        let coordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: ProtectedSettingsOrdinarySettingsPersistence(
+                protectedSettingsStore: harness.store
+            )
+        )
+        coordinator.loadAfterAppAuthentication(protectedSettingsDomainState: .unlocked)
+
+        XCTAssertEqual(coordinator.snapshot, .firstRunDefaults)
+    }
+
+    func test_protectedSettingsV1PayloadMigratesOrdinarySettingsAndCleansLegacyAfterVerifiedReadback() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsV1Migration")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        let expectedSnapshot = ProtectedOrdinarySettingsSnapshot(
+            gracePeriod: 300,
+            hasCompletedOnboarding: true,
+            colorTheme: .teal,
+            encryptToSelf: false,
+            guidedTutorialCompletedVersion: GuidedTutorialVersion.current
+        )
+        setLegacyOrdinarySettings(expectedSnapshot, defaults: harness.defaults)
+        harness.defaults.set(true, forKey: AppConfiguration.clipboardNoticeLegacyKey)
+        try writeProtectedSettingsEnvelope(
+            payload: ProtectedSettingsPayloadV1(clipboardNotice: false),
+            schemaVersion: 1,
+            generationIdentifier: 2,
+            storageRoot: harness.storageRoot,
+            domainKeyManager: harness.domainKeyManager,
+            wrappingRootKey: wrappingRootKey
+        )
+
+        let reopenedStore = ProtectedSettingsStore(
+            defaults: harness.defaults,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+        let payload = try await reopenedStore.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
+        let metadata = try ProtectedDomainBootstrapStore(
+            storageRoot: harness.storageRoot
+        ).loadMetadata(for: ProtectedSettingsStore.domainID)
+
+        XCTAssertEqual(metadata?.schemaVersion, ProtectedSettingsStore.Payload.currentSchemaVersion)
+        XCTAssertEqual(payload.clipboardNotice, false)
+        XCTAssertEqual(payload.ordinarySettings, expectedSnapshot)
+        assertLegacyOrdinarySettingsRemoved(defaults: harness.defaults)
+    }
+
+    func test_protectedSettingsV2PayloadWinsOverConflictingLegacyOrdinarySettings() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsV2Authority")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        _ = try await harness.store.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
+        let protectedSnapshot = ProtectedOrdinarySettingsSnapshot(
+            gracePeriod: 60,
+            hasCompletedOnboarding: true,
+            colorTheme: .pink,
+            encryptToSelf: false,
+            guidedTutorialCompletedVersion: GuidedTutorialVersion.current
+        )
+        try harness.store.updateOrdinarySettingsSnapshot(protectedSnapshot)
+        try await harness.store.relockProtectedData()
+
+        setLegacyOrdinarySettings(
+            ProtectedOrdinarySettingsSnapshot(
+                gracePeriod: 300,
+                hasCompletedOnboarding: false,
+                colorTheme: .orange,
+                encryptToSelf: true,
+                guidedTutorialCompletedVersion: 0
+            ),
+            defaults: harness.defaults
+        )
+        harness.defaults.set(false, forKey: AppConfiguration.clipboardNoticeLegacyKey)
+
+        let reopenedStore = ProtectedSettingsStore(
+            defaults: harness.defaults,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+        let payload = try await reopenedStore.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
+
+        XCTAssertEqual(payload.clipboardNotice, true)
+        XCTAssertEqual(payload.ordinarySettings, protectedSnapshot)
+        assertLegacyOrdinarySettingsRemoved(defaults: harness.defaults)
+    }
+
+    func test_protectedSettingsCorruptCommittedPayloadRequiresRecoveryAndLeavesLegacySources() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsCorrupt")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        let legacySnapshot = ProtectedOrdinarySettingsSnapshot(
+            gracePeriod: 180,
+            hasCompletedOnboarding: true,
+            colorTheme: .graphite,
+            encryptToSelf: false,
+            guidedTutorialCompletedVersion: GuidedTutorialVersion.current
+        )
+        setLegacyOrdinarySettings(legacySnapshot, defaults: harness.defaults)
+        harness.defaults.set(false, forKey: AppConfiguration.clipboardNoticeLegacyKey)
+        try writeProtectedSettingsEnvelope(
+            payload: ProtectedSettingsPayloadV1(clipboardNotice: true),
+            schemaVersion: ProtectedSettingsStore.Payload.currentSchemaVersion,
+            generationIdentifier: 2,
+            storageRoot: harness.storageRoot,
+            domainKeyManager: harness.domainKeyManager,
+            wrappingRootKey: wrappingRootKey
+        )
+
+        let reopenedStore = ProtectedSettingsStore(
+            defaults: harness.defaults,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+        do {
+            _ = try await reopenedStore.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
+            XCTFail("Expected corrupt protected settings payload to require recovery.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ProtectedSettingsStore.domainID],
+            .recoveryNeeded
+        )
+        XCTAssertNotNil(harness.defaults.object(forKey: AppConfiguration.clipboardNoticeLegacyKey))
+        XCTAssertNotNil(harness.defaults.object(forKey: ProtectedOrdinarySettingsLegacyKeys.gracePeriod))
+    }
+
+    func test_protectedSettingsOrdinaryMutationsPersistAcrossRelockAndReopen() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsMutationPersistence")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        _ = try await harness.store.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
+        let coordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: ProtectedSettingsOrdinarySettingsPersistence(
+                protectedSettingsStore: harness.store
+            )
+        )
+        coordinator.loadAfterAppAuthentication(protectedSettingsDomainState: .unlocked)
+
+        coordinator.setGracePeriod(300)
+        coordinator.setHasCompletedOnboarding(true)
+        coordinator.setColorTheme(.teal)
+        coordinator.setEncryptToSelf(false)
+        coordinator.markGuidedTutorialCompletedCurrentVersion()
+        let expectedSnapshot = ProtectedOrdinarySettingsSnapshot(
+            gracePeriod: 300,
+            hasCompletedOnboarding: true,
+            colorTheme: .teal,
+            encryptToSelf: false,
+            guidedTutorialCompletedVersion: GuidedTutorialVersion.current
+        )
+        XCTAssertEqual(coordinator.snapshot, expectedSnapshot)
+
+        try await harness.store.relockProtectedData()
+        harness.domainKeyManager.clearUnlockedDomainMasterKeys()
+        coordinator.relock()
+
+        XCTAssertNil(harness.store.payload)
+        XCTAssertNil(coordinator.snapshot)
+        XCTAssertFalse(harness.domainKeyManager.hasUnlockedDomainMasterKeys)
+
+        let reopenedStore = ProtectedSettingsStore(
+            defaults: harness.defaults,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+        _ = try await reopenedStore.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
+        let reloadedCoordinator = ProtectedOrdinarySettingsCoordinator(
+            persistence: ProtectedSettingsOrdinarySettingsPersistence(
+                protectedSettingsStore: reopenedStore
+            )
+        )
+        reloadedCoordinator.loadAfterAppAuthentication(protectedSettingsDomainState: .unlocked)
+
+        XCTAssertEqual(reloadedCoordinator.snapshot, expectedSnapshot)
+    }
+
     func test_protectedSettingsResetRecreatesWithWrappingKeyWhenSentinelRemains() async throws {
         let baseDirectory = makeTemporaryDirectory("ProtectedDataSettingsResetWithKey")
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
@@ -3593,7 +3957,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             }
         )
         let capturedSharedSecret = AsyncDataBox()
-        try await settingsStore.migrateLegacyClipboardNoticeIfNeeded(
+        try await settingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
             persistSharedRight: { secret in
                 await capturedSharedSecret.set(secret)
             }

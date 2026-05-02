@@ -235,18 +235,18 @@ Current protected app-data scope:
 
 - `private-key-control` stores the private-key control source of truth: `settings.authMode` plus the rewrap / modify-expiry `recoveryJournal`.
 - `key-metadata` stores `PGPKeyIdentity` payloads after app unlock. Legacy metadata Keychain rows are migration and cleanup sources only.
-- `protected-settings` stores the first narrow protected setting, currently `clipboardNotice`.
+- `protected-settings` stores protected settings. Schema v2 preserves `clipboardNotice` and adds grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion.
 - `protected-framework-sentinel` is a framework-owned sentinel domain with a schema/purpose marker only. It contains no user data, telemetry, contacts, or UI state.
 
 Current non-goals and pending surfaces:
 
 - Permanent and pending SE-wrapped private-key bundle rows remain in the existing private-key material domain.
 - `appSessionAuthenticationPolicy` remains an early-readable boot-authentication setting.
-- Ordinary-settings payload migration, self-test reports/state, temporary/export/tutorial cleanup hardening, and Contacts remain outside ProtectedData until their later Phase 7 or Phase 8 work lands. Phase 7 PR 1 gates ordinary-setting reads/writes behind app authentication but still uses legacy `UserDefaults` as the persistence source.
+- Self-test reports/state, temporary/export/tutorial cleanup hardening, and Contacts remain outside ProtectedData until their later Phase 7 or Phase 8 work lands. Phase 7 PR 2 moved the targeted ordinary settings into `protected-settings`; legacy ordinary `UserDefaults` keys are cleanup-only after verified schema v2 readback.
 
 Protected app-data authorization uses `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`. `AppSessionOrchestrator` owns launch/resume privacy authentication and the grace window. When app authentication succeeds, it can hand the authenticated `LAContext` to `ProtectedDataSessionCoordinator`, which reads the shared app-data root secret through Keychain with `kSecUseAuthenticationContext`. That same authenticated handoff is reused by post-unlock domain openers so committed registered domains can open without a second Face ID / Touch ID prompt.
 
-`ProtectedOrdinarySettingsCoordinator` owns ordinary-settings availability after Phase 7 PR 1. It loads grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion only after app privacy authentication and a healthy `protected-settings` handoff. If the setting snapshot is unavailable, the resume grace window fails closed to immediate authentication, startup/onboarding routing waits for a loaded snapshot, and encryption does not silently use the app-default encrypt-to-self value for real work.
+`ProtectedOrdinarySettingsCoordinator` owns ordinary-settings availability after Phase 7 PR 2. It loads grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion from `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff. Existing schema v1 payloads are upgraded through an explicit compatibility path using legacy ordinary settings as a migration source; schema v2 payloads are strict, so missing or corrupt ordinary settings enter protected-settings recovery instead of resetting to defaults. If the setting snapshot is unavailable, the resume grace window fails closed to immediate authentication, startup/onboarding routing waits for a loaded snapshot, and encryption does not silently use the app-default encrypt-to-self value for real work.
 
 The shared root secret is not stored as raw bytes in the current format. Keychain stores a v2 `CAPDSEV2` envelope that must also unwrap through the ProtectedData-only Secure Enclave device-binding key described in Section 3. The raw root secret is used only to derive the wrapping root key and is immediately zeroized. Each protected domain has its own random domain master key, persisted only as a wrapped-DMK record under the derived wrapping root key. Unwrapped domain keys and decrypted payloads are session-local and must be cleared on relock.
 
