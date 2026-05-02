@@ -1,9 +1,9 @@
 # AppData Roadmap Status
 
-> **Last reviewed:** 2026-04-28
+> **Last reviewed:** 2026-05-02
 > **Status:** Current progress record for the AppData protection roadmap.
 > **Scope:** Documents code-backed progress for AppData Phase 1-9 and the persistent-state inventory. This file does not change roadmap order or authorize implementation work by itself.
-> **Related documents:** [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md) · [TESTING](TESTING.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
+> **Related documents:** [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md) · [TESTING](TESTING.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
 
 ## 1. Phase Status
 
@@ -15,7 +15,7 @@
 | Phase 4 | Post-Unlock Multi-Domain Orchestration And Framework Hardening | Implemented | Phase 4 established production wiring for `protected-settings` plus the framework-owned `protected-framework-sentinel` domain. Post-unlock handoff can create/open the sentinel as a second domain after settings is committed, generic recovery dispatch is keyed by `ProtectedDataDomainID`, and second-domain create/delete/recovery plus pending-create continuation coverage live in `ProtectedDataFrameworkTests`. Phase 5 later adds `private-key-control` to the post-unlock opener path. |
 | Phase 5 | Private-Key Control Domain | Implemented | `PrivateKeyControlStore` is wired as the `private-key-control` ProtectedData domain. It migrates `authMode` plus rewrap / modify-expiry recovery journal state out of legacy `UserDefaults` after app authentication, opens through post-unlock orchestration, participates in relock, and is covered by `ProtectedDataFrameworkTests` plus private-key recovery tests. |
 | Phase 6 | Key Metadata Domain | Implemented | `KeyMetadataDomainStore` owns ProtectedData domain `key-metadata` for `PGPKeyIdentity` payloads after app unlock. Migration reads both the transitional metadata account and older default-account metadata rows, cleans source rows only after verified domain creation/open, and preserves private-key material in the existing Keychain / Secure Enclave domain. |
-| Phase 7 | Non-Contacts Protected-After-Unlock Domains | Pending / partial by surface | Ordinary settings other than `clipboardNotice`, self-test state, and temporary/export/tutorial cleanup or file-protection work remain here unless explicitly classified as an exception. |
+| Phase 7 | Non-Contacts Protected-After-Unlock Domains | Pending / partial by surface | Ordinary settings other than `clipboardNotice`, self-test state, and temporary/export/tutorial cleanup or file-protection work remain here unless explicitly classified as an exception. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). |
 | Phase 8 | Contacts Protected Domain | Pending | Contacts migration has not started. Contacts PR1-PR8 belong to Phase 8 and remain gated behind remaining Phase 7 work unless the roadmap is explicitly revised. |
 | Phase 9 | Future Persistent Domains | Pending | Reserved for future app-owned persistent domains not covered by the current inventory. |
 

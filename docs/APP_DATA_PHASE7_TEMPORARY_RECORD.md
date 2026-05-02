@@ -1,16 +1,16 @@
 # AppData Phase 7 Temporary Recovery Record
 
-> **Status:** Temporary active recovery record.
+> **Status:** Superseded temporary recovery record.
 > **Purpose:** Restore and index Phase 7 information that became less visible during the AppData documentation consolidation in `f9bc4dc`.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
-> **Last reviewed:** 2026-04-29.
-> **Current authority:** This document is not a Phase 7 implementation plan and does not approve the recovered information as still-correct. Current code, [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md), [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md), [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md) outrank this temporary record if they disagree.
+> **Last reviewed:** 2026-05-02.
+> **Current authority:** This document is superseded by [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). Current code, [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md), [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md), [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md) outrank this temporary record if they disagree.
 
 ## 1. Scope And Use
 
 This file records Phase 7 details recovered from the documentation state before and during `f9bc4dc docs: consolidate AppData phase status docs`.
 
-Use it as a temporary index while a dedicated Phase 7 plan is prepared. Do not treat any row here as reviewed implementation direction until a later Phase 7 planning and security review pass validates it against current code.
+Use it only as a historical recovery/audit index. Do not treat any row here as reviewed implementation direction; use [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md) for active Phase 7 architecture requirements and PR-track guidance.
 
 Primary source material:
 

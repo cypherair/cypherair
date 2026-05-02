@@ -3,8 +3,8 @@
 > **Status:** Active remaining-roadmap and inventory document.
 > **Purpose:** Track the remaining ProtectedData migration work after AppData Phase 1-6, and keep the persisted-state inventory current while Phase 7 and Phase 8 wait for dedicated implementation planning.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
-> **Source of truth:** Current implementation details live in [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md). Phase completion status lives in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
-> **Last reviewed:** 2026-04-28.
+> **Source of truth:** Current implementation details live in [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), and [TESTING](TESTING.md). Phase 7 implementation-reference requirements live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md). Phase completion status lives in [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md).
+> **Last reviewed:** 2026-05-02.
 > **Update triggers:** Any ProtectedData domain migration, persistent-state classification change, Contacts protected-domain gate change, or storage/relock/recovery behavior change.
 
 ## 1. Scope And Relationship
@@ -19,7 +19,7 @@ This guide remains active for:
 - the reviewed persistent-state inventory
 - cross-domain migration rules that future dedicated plans must preserve
 
-This guide does not create the Phase 7 implementation plan. It only records the remaining scope and constraints that a later Phase 7 plan must honor.
+This guide does not create the Phase 7 implementation plan. It records the remaining scope and constraints that later Phase 7 plans must honor. The Phase 7 architecture-level implementation reference lives in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md).
 
 ## 2. Current Foundation Status
 
@@ -38,7 +38,7 @@ Current ProtectedData implementation details are intentionally not repeated here
 
 ### Phase 7: Non-Contacts Protected-After-Unlock Domains
 
-Phase 7 remains pending. It should be planned separately before implementation.
+Phase 7 remains pending. Architecture-level requirements and auditable PR tracks live in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md); individual implementation PRs still need their own focused plans.
 
 Known Phase 7 surfaces:
 
@@ -49,7 +49,7 @@ Known Phase 7 surfaces:
 
 Phase 7 must not move a setting merely because it is user-visible. It must first remove or replace synchronous/pre-unlock read paths and prove launch authentication strength is unchanged.
 
-The temporary [APP_DATA_PHASE7_TEMPORARY_RECORD](APP_DATA_PHASE7_TEMPORARY_RECORD.md) restores Phase 7 notes that were compressed out of this active guide during documentation consolidation. That record is not a reviewed implementation plan; formal Phase 7 planning must validate the recovered notes against current code.
+The older [APP_DATA_PHASE7_TEMPORARY_RECORD](APP_DATA_PHASE7_TEMPORARY_RECORD.md) is superseded by the implementation reference and should be used only as a recovery/audit note for pre-reference material.
 
 ### Phase 8: Contacts Protected Domain
 
