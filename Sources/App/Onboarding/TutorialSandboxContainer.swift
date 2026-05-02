@@ -123,9 +123,6 @@ final class TutorialSandboxContainer {
         self.mockAuthenticator.shouldSucceed = true
         self.mockAuthenticator.biometricsAvailable = true
         self.mockSecureEnclave.simulatedAuthMode = authManager.currentMode ?? .standard
-        self.authManager.configureGracePeriodProvider {
-            protectedOrdinarySettingsCoordinator.gracePeriodForSession
-        }
         try? self.contactService.loadContacts()
     }
 

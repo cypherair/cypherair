@@ -185,9 +185,6 @@ final class AppContainer: @unchecked Sendable {
                 protectedSettingsStore: protectedSettingsStore
             )
         )
-        authManager.configureGracePeriodProvider {
-            protectedOrdinarySettingsCoordinator.gracePeriodForSession
-        }
         let protectedDataFrameworkSentinelStore = ProtectedDataFrameworkSentinelStore(
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
@@ -580,9 +577,6 @@ final class AppContainer: @unchecked Sendable {
                 persistence: LegacyOrdinarySettingsStore(defaults: defaults)
             )
             protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
-        }
-        authManager.configureGracePeriodProvider {
-            protectedOrdinarySettingsCoordinator.gracePeriodForSession
         }
         let protectedDataFrameworkSentinelStore = ProtectedDataFrameworkSentinelStore(
             storageRoot: protectedDataStorageRoot,

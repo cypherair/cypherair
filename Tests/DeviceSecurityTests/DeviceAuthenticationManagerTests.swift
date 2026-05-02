@@ -162,27 +162,6 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         testDefaults.removePersistentDomain(forName: "com.cypherair.test")
     }
 
-    func test_gracePeriod_usesProtectedOrdinarySettingsProvider() {
-        let testDefaults = UserDefaults(suiteName: "com.cypherair.test")!
-        let authManager = makeAuthenticationManager(
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            defaults: testDefaults
-        )
-        XCTAssertEqual(authManager.gracePeriod, 0, "Locked ordinary settings must fail closed to immediate authentication")
-
-        let protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: testDefaults)
-        )
-        protectedOrdinarySettings.loadForAuthenticatedTestBypass()
-        authManager.configureGracePeriodProvider {
-            protectedOrdinarySettings.gracePeriodForSession
-        }
-
-        XCTAssertEqual(authManager.gracePeriod, 180, "Loaded ordinary settings must expose the persisted default")
-        testDefaults.removePersistentDomain(forName: "com.cypherair.test")
-    }
-
     // MARK: - C7.3: Crash Recovery
 
     func test_crashRecovery_oldAndPendingExist_cleansPendingKeepsOld() throws {
