@@ -950,7 +950,7 @@ final class ProtectedSettingsHost {
             sectionState = .frameworkUnavailable
         }
         traceHostEvent(
-            "protectedSettings.sectionState.synced",
+            "protectedSettings.rowState.synced",
             metadata: stateMetadata(liveDependencies)
         )
     }
@@ -964,7 +964,7 @@ final class ProtectedSettingsHost {
             syncSectionStateFromStore(liveDependencies)
         }
         traceHostEvent(
-            "protectedSettings.sectionState.errorSynced",
+            "protectedSettings.rowState.errorSynced",
             metadata: stateMetadata(liveDependencies)
         )
     }
@@ -1113,14 +1113,14 @@ final class ProtectedSettingsHost {
     private var settingsLocalizedReason: String {
         String(
             localized: "protectedSettings.unlock.reason",
-            defaultValue: "Authenticate to access protected preferences."
+            defaultValue: "Authenticate to access Clipboard Safety Notice."
         )
     }
 
     private var clipboardLocalizedReason: String {
         String(
             localized: "protectedSettings.clipboard.reason",
-            defaultValue: "Authenticate to access the protected clipboard preference."
+            defaultValue: "Authenticate to access Clipboard Safety Notice."
         )
     }
 }

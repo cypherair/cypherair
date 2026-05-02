@@ -29,14 +29,14 @@ struct ThemePickerView: View {
             } else {
                 ContentUnavailableView {
                     Label(
-                        String(localized: "protectedSettings.locked.title", defaultValue: "Protected Preferences Locked"),
+                        String(localized: "protectedSettings.locked.title", defaultValue: "Preferences Locked"),
                         systemImage: "lock"
                     )
                 } description: {
                     Text(
                         String(
                             localized: "protectedSettings.locked.message",
-                            defaultValue: "Authenticate to view and change this protected preference."
+                            defaultValue: "Authenticate to view and change this preference."
                         )
                     )
                 }

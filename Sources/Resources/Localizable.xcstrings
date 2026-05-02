@@ -2630,13 +2630,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protected preferences are locked. Authenticate again before encrypting with the app default."
+            "value" : "Preferences are locked. Authenticate again before encrypting with the app default."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "受保护的偏好设置已锁定。请重新验证身份后再使用应用默认加密设置。"
+            "value" : "偏好设置已锁定。请重新验证身份后再使用应用默认加密设置。"
           }
         }
       }
@@ -8454,13 +8454,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Authenticate to access the protected clipboard preference."
+            "value" : "Authenticate to access Clipboard Safety Notice."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请验证身份以访问受保护的剪贴板偏好设置。"
+            "value" : "请验证身份以访问剪贴板安全提示。"
           }
         }
       }
@@ -8470,13 +8470,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protected preferences are unavailable because the protected-data framework is not ready."
+            "value" : "Preferences are unavailable because the protected-data framework is not ready."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "由于受保护数据框架尚未就绪，受保护的偏好设置当前不可用。"
+            "value" : "由于数据保护框架尚未就绪，偏好设置当前不可用。"
           }
         }
       }
@@ -8486,13 +8486,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Loading protected preferences..."
+            "value" : "Loading preferences..."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在加载受保护的偏好设置..."
+            "value" : "正在加载偏好设置..."
           }
         }
       }
@@ -8502,13 +8502,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Authenticate to view and change this protected preference."
+            "value" : "Authenticate to view and change this preference."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请先验证身份以查看和更改此受保护偏好设置。"
+            "value" : "请先验证身份以查看和更改此偏好设置。"
           }
         }
       }
@@ -8518,13 +8518,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protected Preferences Locked"
+            "value" : "Preferences Locked"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "受保护偏好设置已锁定"
+            "value" : "偏好设置已锁定"
           }
         }
       }
@@ -8534,13 +8534,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protected preferences have pending recovery work and are temporarily unavailable."
+            "value" : "Preferences have pending recovery work and are temporarily unavailable."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "受保护的偏好设置仍有待恢复的工作，暂时不可用。"
+            "value" : "偏好设置仍有待恢复的工作，暂时不可用。"
           }
         }
       }
@@ -8550,13 +8550,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protected preferences have unfinished setup work that cannot continue automatically."
+            "value" : "Preferences have unfinished setup work that cannot continue automatically."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "受保护的偏好设置存在未完成的初始化工作，当前无法自动继续。"
+            "value" : "偏好设置存在未完成的初始化工作，当前无法自动继续。"
           }
         }
       }
@@ -8566,13 +8566,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protected preferences can only be viewed and changed from the main window."
+            "value" : "Clipboard Safety Notice can only be viewed and changed from the main window."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "受保护的偏好设置只能在主窗口中查看和修改。"
+            "value" : "剪贴板安全提示只能在主窗口中查看和修改。"
           }
         }
       }
@@ -8598,13 +8598,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Protected preferences could not be opened safely and may need recovery."
+            "value" : "Preferences could not be opened safely and may need recovery."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "受保护的偏好设置无法安全打开，可能需要恢复。"
+            "value" : "偏好设置无法安全打开，可能需要恢复。"
           }
         }
       }
@@ -8614,13 +8614,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reset Protected Preferences"
+            "value" : "Reset Preferences"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重置受保护的偏好设置"
+            "value" : "重置偏好设置"
           }
         }
       }
@@ -8646,13 +8646,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This will delete and rebuild the protected preferences domain. Only protected preferences will be reset."
+            "value" : "This will delete and rebuild the preferences domain. Only these preferences will be reset."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这将删除并重建受保护的偏好设置域。只有受保护的偏好设置会被重置。"
+            "value" : "这将删除并重建偏好设置域。只有这些偏好设置会被重置。"
           }
         }
       }
@@ -8662,13 +8662,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reset Protected Preferences?"
+            "value" : "Reset Preferences?"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重置受保护的偏好设置？"
+            "value" : "重置偏好设置？"
           }
         }
       }
@@ -8689,34 +8689,18 @@
         }
       }
     },
-    "protectedSettings.section" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protected Preferences"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "受保护的偏好设置"
-          }
-        }
-      }
-    },
     "protectedSettings.tutorial.message" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The tutorial sandbox never reads or writes your real protected preferences."
+            "value" : "The tutorial sandbox never reads or writes your real Clipboard Safety Notice."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "教程沙盒不会读取或写入你的真实受保护偏好设置。"
+            "value" : "教程沙盒不会读取或写入你的真实剪贴板安全提示。"
           }
         }
       }
@@ -8742,13 +8726,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Authenticate to access protected preferences."
+            "value" : "Authenticate to access Clipboard Safety Notice."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请验证身份以访问受保护的偏好设置。"
+            "value" : "请验证身份以访问剪贴板安全提示。"
           }
         }
       }
@@ -10262,13 +10246,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This permanently deletes CypherAir keys, contacts, protected preferences, app settings, and temporary files on this device."
+            "value" : "This permanently deletes CypherAir keys, contacts, preferences, app settings, and temporary files on this device."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这会永久删除此设备上的 CypherAir 密钥、联系人、受保护偏好设置、App 设置和临时文件。"
+            "value" : "这会永久删除此设备上的 CypherAir 密钥、联系人、偏好设置、App 设置和临时文件。"
           }
         }
       }
