@@ -1493,9 +1493,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 protectedSettingsStore: protectedSettingsStore
             )
         )
-        authManager.configureGracePeriodProvider {
-            protectedOrdinarySettingsCoordinator.gracePeriodForSession
-        }
         let protectedDataFrameworkSentinelStore = AppProtectedDataFrameworkSentinelStore(
             storageRoot: storageRoot,
             registryStore: registryStore,

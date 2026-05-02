@@ -1053,9 +1053,6 @@ final class CommonHelpersTests: XCTestCase {
             persistence: LegacyOrdinarySettingsStore(defaults: defaults)
         )
         protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
-        authManager.configureGracePeriodProvider {
-            protectedOrdinarySettingsCoordinator.gracePeriodForSession
-        }
         let contactDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirStartupTests-\(UUID().uuidString)", isDirectory: true)
         let legacySelfTestReportsDirectory = contactDirectory
