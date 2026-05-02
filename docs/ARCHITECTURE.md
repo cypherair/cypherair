@@ -171,6 +171,8 @@ Current local-data classification:
 | Out of app custody | User-selected export destinations after handoff succeeds. |
 | Pending Phase 8 | Legacy Contacts files under `Documents/contacts/` until Contacts protected-domain migration. |
 
+The canonical row-level classification, current status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
+
 ### Models (`Sources/Models/`)
 
 Shared models and small coordinators for app-wide presentation state. Includes Swift representations of PGP keys, error enums mapping from `PgpError`, user-facing error messages per PRD Section 4.7, configuration types, ordinary-settings snapshot/persistence coordination, and shared identity presentation helpers.
