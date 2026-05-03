@@ -160,9 +160,9 @@
 				Models/Contacts/ContactIdentity.swift,
 				Models/Contacts/ContactKeyRecord.swift,
 				Models/Contacts/ContactKeyUsageState.swift,
-				Models/Contacts/ContactTag.swift,
 				Models/Contacts/ContactsAvailability.swift,
 				Models/Contacts/ContactsDomainSnapshot.swift,
+				Models/Contacts/ContactTag.swift,
 				Models/Contacts/RecipientList.swift,
 				Models/CypherAirError.swift,
 				Models/DetailedSignatureVerification.swift,
@@ -195,14 +195,14 @@
 				Security/KeyMigrationCoordinator.swift,
 				Security/MemoryInfoProvidable.swift,
 				Security/MemoryZeroingUtility.swift,
-				Security/PrivateKeyModeSwitchAuthenticator.swift,
-				Security/PrivateKeyRewrapRecoveryCoordinator.swift,
-				Security/PrivateKeyRewrapWorkflow.swift,
 				Security/Mocks/MockAuthenticator.swift,
 				Security/Mocks/MockDiskSpace.swift,
 				Security/Mocks/MockKeychain.swift,
 				Security/Mocks/MockMemoryInfo.swift,
 				Security/Mocks/MockSecureEnclave.swift,
+				Security/PrivateKeyModeSwitchAuthenticator.swift,
+				Security/PrivateKeyRewrapRecoveryCoordinator.swift,
+				Security/PrivateKeyRewrapWorkflow.swift,
 				Security/ProtectedData/AppSessionOrchestrator.swift,
 				Security/ProtectedData/ContactsDomainStore.swift,
 				Security/ProtectedData/KeyMetadataDomainStore.swift,
@@ -217,8 +217,8 @@
 				Security/ProtectedData/ProtectedDataRegistryStore.swift,
 				Security/ProtectedData/ProtectedDataRelockParticipant.swift,
 				Security/ProtectedData/ProtectedDataRightStoreClient.swift,
-				Security/ProtectedData/ProtectedDataRootSecretEnvelope.swift,
 				Security/ProtectedData/ProtectedDataRootSecretCoordinator.swift,
+				Security/ProtectedData/ProtectedDataRootSecretEnvelope.swift,
 				Security/ProtectedData/ProtectedDataSessionCoordinator.swift,
 				Security/ProtectedData/ProtectedDataSessionRelockCoordinator.swift,
 				Security/ProtectedData/ProtectedDataStorageRoot.swift,
@@ -233,8 +233,8 @@
 				Services/CertificateSignatureService.swift,
 				Services/ContactImportPublicCertificateValidator.swift,
 				Services/ContactRepository.swift,
-				Services/ContactService.swift,
 				Services/ContactsDomainRepository.swift,
+				Services/ContactService.swift,
 				Services/ContactsLegacyMigrationSource.swift,
 				Services/DecryptionService.swift,
 				Services/DiskSpaceChecker.swift,
@@ -712,7 +712,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 13801;
+				CURRENT_PROJECT_VERSION = 13803;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -937,7 +937,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 13801;
+				CURRENT_PROJECT_VERSION = 13803;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1082,7 +1082,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 13801;
+				CURRENT_PROJECT_VERSION = 13803;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
