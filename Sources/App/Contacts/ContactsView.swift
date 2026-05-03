@@ -17,15 +17,17 @@ struct ContactsView: View {
         }
         .navigationTitle(String(localized: "contacts.title", defaultValue: "Contacts"))
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    routeNavigator.open(.addContact)
-                } label: {
-                    Image(systemName: "plus")
+            if contactService.contactsAvailability.isAvailable {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        routeNavigator.open(.addContact)
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .tutorialAnchor(.contactsAddButton)
+                    .accessibilityIdentifier("contacts.add.toolbar")
+                    .accessibilityLabel(String(localized: "contacts.add", defaultValue: "Add Contact"))
                 }
-                .tutorialAnchor(.contactsAddButton)
-                .accessibilityIdentifier("contacts.add.toolbar")
-                .accessibilityLabel(String(localized: "contacts.add", defaultValue: "Add Contact"))
             }
         }
         .alert(
@@ -81,15 +83,6 @@ struct ContactsView: View {
         } actions: {
             if availability == .opening {
                 ProgressView()
-            } else {
-                Button {
-                    routeNavigator.open(.addContact)
-                } label: {
-                    Text(String(localized: "contacts.add", defaultValue: "Add Contact"))
-                }
-                .buttonStyle(.bordered)
-                .tutorialAnchor(.contactsAddButton)
-                .accessibilityIdentifier("contacts.add")
             }
         }
     }

@@ -238,6 +238,27 @@ final class ContactServiceTests: XCTestCase {
         )
     }
 
+    func test_contactsUnavailableStateDoesNotOfferAddContactAction() throws {
+        let contents = try RepositoryAuditLoader.loadString(
+            relativePath: "Sources/App/Contacts/ContactsView.swift"
+        )
+        let unavailableBlock = try sourceBlock(
+            in: contents,
+            from: "private func contactsUnavailableContent",
+            to: "private var emptyStateContent"
+        )
+        let toolbarBlock = try sourceBlock(
+            in: contents,
+            from: ".toolbar {",
+            to: ".alert("
+        )
+
+        XCTAssertFalse(unavailableBlock.contains("routeNavigator.open(.addContact)"))
+        XCTAssertFalse(unavailableBlock.contains("contacts.add"))
+        XCTAssertTrue(toolbarBlock.contains("if contactService.contactsAvailability.isAvailable"))
+        XCTAssertTrue(toolbarBlock.contains("routeNavigator.open(.addContact)"))
+    }
+
     // MARK: - Load Contacts
 
     func test_loadContacts_emptyDirectory_returnsEmpty() throws {
@@ -1046,6 +1067,40 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertFalse(contactsDomainArtifactsExist(in: container.protectedDataStorageRoot))
     }
 
+    @MainActor
+    func test_makeUITest_authBypassOpensLegacyCompatibilityGateForContacts() throws {
+        let container = AppContainer.makeUITest()
+        defer {
+            cleanup(container)
+        }
+
+        XCTAssertEqual(container.contactService.contactsAvailability, .availableLegacyCompatibility)
+
+        let generated = try container.engine.generateKey(
+            name: "Auth Bypass Contact",
+            email: "auth-bypass@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let result = try container.contactService.addContact(publicKeyData: generated.publicKeyData)
+
+        guard case .added(let contact) = result else {
+            return XCTFail("Expected .added, got \(result)")
+        }
+        XCTAssertEqual(contact.fingerprint, generated.fingerprint)
+    }
+
+    @MainActor
+    func test_makeUITest_manualAuthenticationDoesNotPreopenContactsGate() throws {
+        let container = AppContainer.makeUITest(requiresManualAuthentication: true)
+        defer {
+            cleanup(container)
+        }
+
+        XCTAssertEqual(container.contactService.contactsAvailability, .locked)
+        XCTAssertTrue(container.contactService.availableContacts.isEmpty)
+    }
+
     private func contactsDomainArtifactsExist(in storageRoot: ProtectedDataStorageRoot) -> Bool {
         let fileManager = FileManager.default
         let urls = ProtectedDomainGenerationSlot.allCases.map {
@@ -1055,5 +1110,27 @@ final class ContactServiceTests: XCTestCase {
             storageRoot.stagedWrappedDomainMasterKeyURL(for: ContactsDomainRepository.domainID)
         ]
         return urls.contains { fileManager.fileExists(atPath: $0.path) }
+    }
+
+    private func sourceBlock(
+        in contents: String,
+        from startMarker: String,
+        to endMarker: String
+    ) throws -> String {
+        let start = try XCTUnwrap(contents.range(of: startMarker))
+        let end = try XCTUnwrap(contents.range(of: endMarker, range: start.upperBound..<contents.endIndex))
+        return String(contents[start.lowerBound..<end.lowerBound])
+    }
+
+    private func cleanup(_ container: AppContainer) {
+        try? FileManager.default.removeItem(
+            at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
+        )
+        if let contactsDirectory = container.contactsDirectory {
+            try? FileManager.default.removeItem(at: contactsDirectory.deletingLastPathComponent())
+        }
+        if let defaultsSuiteName = container.defaultsSuiteName {
+            UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
+        }
     }
 }
