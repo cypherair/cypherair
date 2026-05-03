@@ -433,22 +433,6 @@
         }
       }
     },
-    "app.loadWarning.keyMetadataMigration" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Some saved key metadata could not be migrated or cleaned up. Your private keys remain protected; restart CypherAir and unlock again to retry."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "部分已保存的密钥元数据无法迁移或清理。你的私钥仍然受到保护；请重启 CypherAir 并再次解锁以重试。"
-          }
-        }
-      }
-    },
     "app.loadWarning.contactsMigration" : {
       "localizations" : {
         "en" : {
@@ -461,6 +445,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "联系人已从受保护的应用数据中打开，但旧联系人文件未能完全清理。请重启 CypherAir 并再次解锁以重试清理。"
+          }
+        }
+      }
+    },
+    "app.loadWarning.keyMetadataMigration" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some saved key metadata could not be migrated or cleaned up. Your private keys remain protected; restart CypherAir and unlock again to retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分已保存的密钥元数据无法迁移或清理。你的私钥仍然受到保护；请重启 CypherAir 并再次解锁以重试。"
           }
         }
       }
@@ -2289,22 +2289,6 @@
         }
       }
     },
-    "contacts.quarantine.exists" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contacts quarantine already exists."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "联系人隔离目录已存在。"
-          }
-        }
-      }
-    },
     "contacts.notFound" : {
       "localizations" : {
         "en" : {
@@ -2317,6 +2301,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "找不到所选联系人。"
+          }
+        }
+      }
+    },
+    "contacts.quarantine.exists" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacts quarantine already exists."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人隔离目录已存在。"
           }
         }
       }
@@ -3089,22 +3089,6 @@
         }
       }
     },
-    "error.auth.appAccessBiometricsUnavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Biometric authentication is currently unavailable. App Access Protection cannot use Biometrics Only until biometric authentication is restored."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生物认证当前不可用。生物认证恢复前，App 访问保护不能使用仅生物识别。"
-          }
-        }
-      }
-    },
     "error.auth.appAccessBiometricsLockedOut" : {
       "localizations" : {
         "en" : {
@@ -3117,6 +3101,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "生物认证已被系统锁定。生物认证恢复前，App 访问保护不能使用仅生物认证。"
+          }
+        }
+      }
+    },
+    "error.auth.appAccessBiometricsUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometric authentication is currently unavailable. App Access Protection cannot use Biometrics Only until biometric authentication is restored."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生物认证当前不可用。生物认证恢复前，App 访问保护不能使用仅生物识别。"
           }
         }
       }
@@ -10977,22 +10977,6 @@
         }
       }
     },
-    "signature.signerCertificateUnavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signer certificate unavailable — signature could not be verified"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "签名者证书不可用——无法验证签名"
-          }
-        }
-      }
-    },
     "signature.shortKeyId" : {
       "localizations" : {
         "en" : {
@@ -11009,7 +10993,24 @@
         }
       }
     },
+    "signature.signerCertificateUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer certificate unavailable — signature could not be verified"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名者证书不可用——无法验证签名"
+          }
+        }
+      }
+    },
     "signature.unknown" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
