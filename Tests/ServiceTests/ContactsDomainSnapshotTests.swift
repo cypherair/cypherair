@@ -144,6 +144,43 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         XCTAssertNoThrow(try snapshot.validateContract())
     }
 
+    func test_keyRecordCertificationArtifactsMustBelongToSameKey() throws {
+        var snapshot = try makeValidSnapshotWithTwoKeys()
+        snapshot.certificationArtifacts = [
+            ContactCertificationArtifactReference(
+                artifactId: "artifact-for-key-2",
+                keyId: "key-2",
+                userId: "Alice <alice@example.com>",
+                createdAt: referenceDate,
+                storageHint: "placeholder"
+            )
+        ]
+        snapshot.keyRecords[0].certificationArtifactIds = ["artifact-for-key-2"]
+
+        XCTAssertThrowsError(try snapshot.validateContract())
+    }
+
+    func test_keyRecordCertificationProjectionArtifactsMustBelongToSameKey() throws {
+        var snapshot = try makeValidSnapshotWithTwoKeys()
+        snapshot.certificationArtifacts = [
+            ContactCertificationArtifactReference(
+                artifactId: "artifact-for-key-2",
+                keyId: "key-2",
+                userId: "Alice <alice@example.com>",
+                createdAt: referenceDate,
+                storageHint: "placeholder"
+            )
+        ]
+        snapshot.keyRecords[0].certificationProjection = ContactCertificationProjection(
+            status: .revalidationNeeded,
+            artifactIds: ["artifact-for-key-2"],
+            lastValidatedAt: nil,
+            reconciliationMetadata: "placeholder"
+        )
+
+        XCTAssertThrowsError(try snapshot.validateContract())
+    }
+
     private func makeValidSnapshot() throws -> ContactsDomainSnapshot {
         let snapshot = ContactsDomainSnapshot(
             schemaVersion: ContactsDomainSnapshot.currentSchemaVersion,
@@ -171,6 +208,19 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             createdAt: referenceDate,
             updatedAt: referenceDate
         )
+        try snapshot.validateContract()
+        return snapshot
+    }
+
+    private func makeValidSnapshotWithTwoKeys() throws -> ContactsDomainSnapshot {
+        var snapshot = try makeValidSnapshot()
+        var secondKey = try makeKeyRecord(
+            keyId: "key-2",
+            contactId: "contact-1",
+            fingerprint: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        )
+        secondKey.usageState = .additionalActive
+        snapshot.keyRecords.append(secondKey)
         try snapshot.validateContract()
         return snapshot
     }

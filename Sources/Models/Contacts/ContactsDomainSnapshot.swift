@@ -64,7 +64,11 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
         let contactIds = Set(identities.map(\.contactId))
         let tagIds = Set(tags.map(\.tagId))
         let keyIds = Set(keyRecords.map(\.keyId))
-        let artifactIds = Set(certificationArtifacts.map(\.artifactId))
+        let artifactsByID = certificationArtifacts.reduce(
+            into: [String: ContactCertificationArtifactReference]()
+        ) { artifactsByID, artifact in
+            artifactsByID[artifact.artifactId] = artifact
+        }
 
         for identity in identities {
             try Self.validateNonEmpty(identity.contactId, label: "contact identifier")
@@ -99,13 +103,16 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
                 keyRecord.certificationProjection.artifactIds,
                 label: "certification projection artifacts for \(keyRecord.keyId)"
             )
-            let missingRecordArtifacts = keyRecord.certificationArtifactIds.filter { !artifactIds.contains($0) }
-            let missingProjectionArtifacts = keyRecord.certificationProjection.artifactIds.filter { !artifactIds.contains($0) }
-            guard missingRecordArtifacts.isEmpty, missingProjectionArtifacts.isEmpty else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains certification artifact references without matching artifacts."
-                )
-            }
+            try Self.validateArtifactsBelongToKey(
+                keyRecord.certificationArtifactIds,
+                keyId: keyRecord.keyId,
+                artifactsByID: artifactsByID
+            )
+            try Self.validateArtifactsBelongToKey(
+                keyRecord.certificationProjection.artifactIds,
+                keyId: keyRecord.keyId,
+                artifactsByID: artifactsByID
+            )
         }
 
         for recipientList in recipientLists {
@@ -167,6 +174,25 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
             throw ProtectedDataError.invalidEnvelope(
                 "Contacts payload contains duplicate \(label)."
             )
+        }
+    }
+
+    private static func validateArtifactsBelongToKey(
+        _ artifactIDs: [String],
+        keyId: String,
+        artifactsByID: [String: ContactCertificationArtifactReference]
+    ) throws {
+        for artifactID in artifactIDs {
+            guard let artifact = artifactsByID[artifactID] else {
+                throw ProtectedDataError.invalidEnvelope(
+                    "Contacts payload contains certification artifact references without matching artifacts."
+                )
+            }
+            guard artifact.keyId == keyId else {
+                throw ProtectedDataError.invalidEnvelope(
+                    "Contacts payload contains certification artifact references for another key."
+                )
+            }
         }
     }
 }
