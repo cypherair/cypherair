@@ -140,6 +140,7 @@ $(SRCROOT)/Sources/Security/Mocks/MockKeychain.swift
 $(SRCROOT)/Sources/Security/Mocks/MockMemoryInfo.swift
 $(SRCROOT)/Sources/Security/Mocks/MockSecureEnclave.swift
 $(SRCROOT)/Sources/Security/ProtectedData/AppSessionOrchestrator.swift
+$(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainStore.swift
 $(SRCROOT)/Sources/Security/ProtectedData/KeyMetadataDomainStore.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataDeviceBinding.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataDomain.swift
@@ -162,6 +163,8 @@ $(SRCROOT)/Sources/Services/CertificateSignatureService.swift
 $(SRCROOT)/Sources/Services/ContactImportPublicCertificateValidator.swift
 $(SRCROOT)/Sources/Services/ContactRepository.swift
 $(SRCROOT)/Sources/Services/ContactService.swift
+$(SRCROOT)/Sources/Services/ContactsDomainRepository.swift
+$(SRCROOT)/Sources/Services/ContactsLegacyMigrationSource.swift
 $(SRCROOT)/Sources/Services/DecryptionService.swift
 $(SRCROOT)/Sources/Services/DiskSpaceChecker.swift
 $(SRCROOT)/Sources/Services/EncryptionService.swift

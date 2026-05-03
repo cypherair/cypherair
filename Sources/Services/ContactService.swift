@@ -25,10 +25,17 @@ final class ContactService: @unchecked Sendable {
     private let engine: PgpEngine
     private let repository: ContactRepository
     private let domainRepository: ContactsDomainRepository
+    private let legacyMigrationSource: ContactsLegacyMigrationSource
+    private let contactsDomainStore: ContactsDomainStore?
     private(set) var contactsAvailability: ContactsAvailability = .locked
     private var verificationStates: [String: ContactVerificationState] = [:]
+    private(set) var protectedDomainMigrationWarning: String?
 
-    init(engine: PgpEngine, contactsDirectory: URL? = nil) {
+    init(
+        engine: PgpEngine,
+        contactsDirectory: URL? = nil,
+        contactsDomainStore: ContactsDomainStore? = nil
+    ) {
         self.engine = engine
         let resolvedContactsDirectory: URL
         if let contactsDirectory {
@@ -42,6 +49,65 @@ final class ContactService: @unchecked Sendable {
         }
         repository = ContactRepository(contactsDirectory: resolvedContactsDirectory)
         domainRepository = ContactsDomainRepository()
+        legacyMigrationSource = ContactsLegacyMigrationSource(
+            engine: engine,
+            repository: repository
+        )
+        self.contactsDomainStore = contactsDomainStore
+    }
+
+    // MARK: - Post-Auth Contacts Gate
+
+    @discardableResult
+    func openContactsAfterPostUnlock(
+        gateResult: ContactsPostAuthGateResult,
+        wrappingRootKey: () throws -> Data
+    ) async -> ContactsAvailability {
+        guard let contactsDomainStore else {
+            return openLegacyCompatibilityAfterPostUnlock(gateResult: gateResult)
+        }
+        guard gateResult.allowsProtectedDomainOpen else {
+            clearContactsRuntimeState(availability: gateResult.availability)
+            return contactsAvailability
+        }
+
+        clearContactsRuntimeState(availability: .opening)
+        let activeLegacyExistedAtOpenStart = repository.activeLegacySourceExists()
+        let quarantineExistedAtOpenStart = repository.quarantineExists()
+        var contactsDomainCommittedAtOpenStart = true
+        do {
+            var wrappingKey = try wrappingRootKey()
+            defer {
+                wrappingKey.protectedDataZeroize()
+            }
+            contactsDomainCommittedAtOpenStart = try contactsDomainStore.hasCommittedDomain()
+            try await contactsDomainStore.ensureCommittedIfNeeded(
+                wrappingRootKey: wrappingKey,
+                initialSnapshotProvider: {
+                    try legacyMigrationSource.makeInitialSnapshot()
+                }
+            )
+            let openedSnapshot = try await contactsDomainStore.openDomainIfNeeded(
+                wrappingRootKey: wrappingKey
+            )
+            try applyProtectedRuntimeSnapshot(openedSnapshot)
+            retireLegacySourceAfterProtectedOpen(
+                activeLegacyExistedAtOpenStart: activeLegacyExistedAtOpenStart,
+                quarantineExistedAtOpenStart: quarantineExistedAtOpenStart
+            )
+            return contactsAvailability
+        } catch {
+            let contactsDomainCommittedAfterFailure = (try? contactsDomainStore.hasCommittedDomain()) ?? true
+            if !contactsDomainCommittedAtOpenStart,
+               !contactsDomainCommittedAfterFailure,
+               activeLegacyExistedAtOpenStart,
+               !quarantineExistedAtOpenStart,
+               gateResult.allowsLegacyCompatibilityLoad {
+                return openLegacyCompatibilityAfterPostUnlock(gateResult: gateResult)
+            }
+            clearContactsRuntimeState(availability: .recoveryNeeded)
+            return contactsAvailability
+        }
     }
 
     // MARK: - Post-Auth Legacy Compatibility Gate
@@ -105,6 +171,14 @@ final class ContactService: @unchecked Sendable {
         verificationState: ContactVerificationState = .verified
     ) throws -> AddContactResult {
         try requireContactsAvailable()
+        if contactsAvailability == .availableProtectedDomain {
+            return try withProtectedRuntimeRollback {
+                try performAddContact(
+                    publicKeyData: publicKeyData,
+                    verificationState: verificationState
+                )
+            }
+        }
         return try performAddContact(
             publicKeyData: publicKeyData,
             verificationState: verificationState
@@ -145,9 +219,9 @@ final class ContactService: @unchecked Sendable {
                 if contacts[existingIndex].verificationState != resolvedVerificationState {
                     contacts[existingIndex].verificationState = resolvedVerificationState
                     verificationStates[contact.fingerprint] = resolvedVerificationState
-                    try repository.saveVerificationStates(verificationStates)
+                    try saveVerificationStatesIfLegacy(verificationStates)
                 }
-                try refreshCompatibilityProjection()
+                try refreshRuntimeProjectionAfterMutation()
                 return .duplicate(contacts[existingIndex])
 
             case .updated:
@@ -173,14 +247,14 @@ final class ContactService: @unchecked Sendable {
                     )
                 }
 
-                try repository.savePublicKey(
+                try savePublicKeyIfLegacy(
                     mergedResult.mergedCertData,
                     fingerprint: existingContact.fingerprint
                 )
                 verificationStates[updatedContact.fingerprint] = updatedContact.verificationState
-                try repository.saveVerificationStates(verificationStates)
+                try saveVerificationStatesIfLegacy(verificationStates)
                 contacts[existingIndex] = updatedContact
-                try refreshCompatibilityProjection()
+                try refreshRuntimeProjectionAfterMutation()
                 return .updated(updatedContact)
             }
         }
@@ -199,11 +273,11 @@ final class ContactService: @unchecked Sendable {
             )
         }
 
-        try repository.savePublicKey(binaryData, fingerprint: contact.fingerprint)
+        try savePublicKeyIfLegacy(binaryData, fingerprint: contact.fingerprint)
         verificationStates[contact.fingerprint] = contact.verificationState
-        try repository.saveVerificationStates(verificationStates)
+        try saveVerificationStatesIfLegacy(verificationStates)
         contacts.append(contact)
-        try refreshCompatibilityProjection()
+        try refreshRuntimeProjectionAfterMutation()
         return .added(contact)
     }
 
@@ -218,6 +292,14 @@ final class ContactService: @unchecked Sendable {
     @discardableResult
     func confirmKeyUpdate(existingFingerprint: String, keyData: Data) throws -> Contact {
         try requireContactsAvailable()
+        if contactsAvailability == .availableProtectedDomain {
+            return try withProtectedRuntimeRollback {
+                try performConfirmKeyUpdate(
+                    existingFingerprint: existingFingerprint,
+                    keyData: keyData
+                )
+            }
+        }
         return try performConfirmKeyUpdate(
             existingFingerprint: existingFingerprint,
             keyData: keyData
@@ -230,13 +312,13 @@ final class ContactService: @unchecked Sendable {
         let verifiedContact = makeContact(from: validation, verificationState: .verified)
 
         // Write new key first — if this fails, the old contact remains intact
-        try repository.savePublicKey(
+        try savePublicKeyIfLegacy(
             validation.publicCertData,
             fingerprint: verifiedContact.fingerprint
         )
 
         if existingFingerprint != verifiedContact.fingerprint {
-            try repository.removePublicKey(fingerprint: existingFingerprint)
+            try removePublicKeyIfLegacy(fingerprint: existingFingerprint)
             contacts.removeAll { $0.fingerprint == existingFingerprint }
             verificationStates.removeValue(forKey: existingFingerprint)
         }
@@ -249,8 +331,8 @@ final class ContactService: @unchecked Sendable {
             contacts.append(verifiedContact)
         }
 
-        try repository.saveVerificationStates(verificationStates)
-        try refreshCompatibilityProjection()
+        try saveVerificationStatesIfLegacy(verificationStates)
+        try refreshRuntimeProjectionAfterMutation()
         return verifiedContact
     }
 
@@ -259,15 +341,21 @@ final class ContactService: @unchecked Sendable {
     /// Remove a contact and delete their public key file.
     func removeContact(fingerprint: String) throws {
         try requireContactsAvailable()
+        if contactsAvailability == .availableProtectedDomain {
+            try withProtectedRuntimeRollback {
+                try performRemoveContact(fingerprint: fingerprint)
+            }
+            return
+        }
         try performRemoveContact(fingerprint: fingerprint)
     }
 
     private func performRemoveContact(fingerprint: String) throws {
-        try repository.removePublicKey(fingerprint: fingerprint)
+        try removePublicKeyIfLegacy(fingerprint: fingerprint)
         contacts.removeAll { $0.fingerprint == fingerprint }
         verificationStates.removeValue(forKey: fingerprint)
-        try repository.saveVerificationStates(verificationStates)
-        try refreshCompatibilityProjection()
+        try saveVerificationStatesIfLegacy(verificationStates)
+        try refreshRuntimeProjectionAfterMutation()
     }
 
     func setVerificationState(
@@ -275,6 +363,12 @@ final class ContactService: @unchecked Sendable {
         for fingerprint: String
     ) throws {
         try requireContactsAvailable()
+        if contactsAvailability == .availableProtectedDomain {
+            try withProtectedRuntimeRollback {
+                try performSetVerificationState(verificationState, for: fingerprint)
+            }
+            return
+        }
         try performSetVerificationState(verificationState, for: fingerprint)
     }
 
@@ -290,8 +384,8 @@ final class ContactService: @unchecked Sendable {
 
         contacts[index].verificationState = verificationState
         verificationStates[fingerprint] = verificationState
-        try repository.saveVerificationStates(verificationStates)
-        try refreshCompatibilityProjection()
+        try saveVerificationStatesIfLegacy(verificationStates)
+        try refreshRuntimeProjectionAfterMutation()
     }
 
     var contactsAvailabilityForContactsPR1: ContactsAvailability {
@@ -410,38 +504,9 @@ final class ContactService: @unchecked Sendable {
 
     // MARK: - Private
 
-    private struct LegacyCompatibilityRuntimeValues {
-        let contacts: [Contact]
-        let verificationStates: [String: ContactVerificationState]
-    }
-
-    private func loadLegacyCompatibilityRuntimeValues() throws -> LegacyCompatibilityRuntimeValues {
+    private func loadLegacyCompatibilityRuntimeValues() throws -> ContactsLegacyRuntimeValues {
         try repository.ensureDirectoryExists()
-
-        let loadedVerificationStates = try repository.loadVerificationStates()
-        var loadedContacts: [Contact] = []
-        for storedContact in try repository.loadStoredContacts() {
-            let validation = try ContactImportPublicCertificateValidator.validate(
-                storedContact.data,
-                using: engine
-            )
-            let contact = makeContact(
-                from: validation,
-                verificationState: loadedVerificationStates[validation.keyInfo.fingerprint]
-            )
-            loadedContacts.append(contact)
-        }
-
-        let loadedFingerprints = Set(loadedContacts.map(\.fingerprint))
-        let filteredStates = loadedVerificationStates.filter { loadedFingerprints.contains($0.key) }
-        if filteredStates != loadedVerificationStates {
-            try repository.saveVerificationStates(filteredStates)
-        }
-
-        return LegacyCompatibilityRuntimeValues(
-            contacts: loadedContacts,
-            verificationStates: filteredStates
-        )
+        return try legacyMigrationSource.loadRuntimeValues(repairMetadata: true)
     }
 
     private func parseContact(
@@ -510,16 +575,113 @@ final class ContactService: @unchecked Sendable {
         contactsAvailability = .availableLegacyCompatibility
     }
 
+    private func refreshRuntimeProjectionAfterMutation() throws {
+        if contactsAvailability == .availableProtectedDomain {
+            try persistProtectedRuntimeContacts()
+        } else {
+            try refreshCompatibilityProjection()
+        }
+    }
+
+    private func applyProtectedRuntimeSnapshot(_ snapshot: ContactsDomainSnapshot) throws {
+        let projectedContacts = try domainRepository.updateProtectedRuntime(from: snapshot)
+        contacts = projectedContacts
+        verificationStates = Dictionary(
+            uniqueKeysWithValues: projectedContacts.map {
+                ($0.fingerprint, $0.verificationState)
+            }
+        )
+        contactsAvailability = .availableProtectedDomain
+    }
+
+    private func persistProtectedRuntimeContacts() throws {
+        guard let contactsDomainStore else {
+            throw ProtectedDataError.authorizingUnavailable
+        }
+        let snapshot = try domainRepository.makeCompatibilitySnapshot(from: contacts)
+        try contactsDomainStore.replaceSnapshot(snapshot)
+        try applyProtectedRuntimeSnapshot(snapshot)
+    }
+
+    private func retireLegacySourceAfterProtectedOpen(
+        activeLegacyExistedAtOpenStart: Bool,
+        quarantineExistedAtOpenStart: Bool
+    ) {
+        protectedDomainMigrationWarning = nil
+        do {
+            if quarantineExistedAtOpenStart {
+                try repository.deleteQuarantineIfPresent()
+            }
+            if activeLegacyExistedAtOpenStart || repository.activeLegacySourceExists() {
+                try repository.moveActiveLegacySourceToQuarantine()
+            }
+        } catch {
+            protectedDomainMigrationWarning = Self.protectedDomainMigrationWarningMessage()
+        }
+    }
+
+    private func savePublicKeyIfLegacy(_ data: Data, fingerprint: String) throws {
+        guard contactsAvailability != .availableProtectedDomain else {
+            return
+        }
+        try repository.savePublicKey(data, fingerprint: fingerprint)
+    }
+
+    private func removePublicKeyIfLegacy(fingerprint: String) throws {
+        guard contactsAvailability != .availableProtectedDomain else {
+            return
+        }
+        try repository.removePublicKey(fingerprint: fingerprint)
+    }
+
+    private func saveVerificationStatesIfLegacy(
+        _ verificationStates: [String: ContactVerificationState]
+    ) throws {
+        guard contactsAvailability != .availableProtectedDomain else {
+            return
+        }
+        try repository.saveVerificationStates(verificationStates)
+    }
+
+    private func withProtectedRuntimeRollback<T>(_ operation: () throws -> T) throws -> T {
+        let previousContacts = contacts
+        let previousVerificationStates = verificationStates
+        let previousAvailability = contactsAvailability
+        let previousMigrationWarning = protectedDomainMigrationWarning
+
+        do {
+            return try operation()
+        } catch {
+            contacts = previousContacts
+            verificationStates = previousVerificationStates
+            contactsAvailability = previousAvailability
+            protectedDomainMigrationWarning = previousMigrationWarning
+            if let snapshot = contactsDomainStore?.snapshot {
+                try? applyProtectedRuntimeSnapshot(snapshot)
+            }
+            throw error
+        }
+    }
+
     private func clearContactsRuntimeState(availability: ContactsAvailability = .locked) {
         contacts = []
         verificationStates = [:]
         contactsAvailability = availability
+        protectedDomainMigrationWarning = nil
         domainRepository.clearRuntimeState()
+    }
+
+    private static func protectedDomainMigrationWarningMessage() -> String {
+        String(
+            localized: "app.loadWarning.contactsMigration",
+            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir and unlock again to retry cleanup."
+        )
     }
 }
 
 extension ContactService: ProtectedDataRelockParticipant {
     func relockProtectedData() async throws {
         clearContactsRuntimeState()
+        try await contactsDomainStore?.relockProtectedData()
     }
 }

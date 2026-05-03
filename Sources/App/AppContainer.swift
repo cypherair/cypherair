@@ -17,6 +17,7 @@ final class AppContainer: @unchecked Sendable {
     let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     let privateKeyControlStore: PrivateKeyControlStore
     let keyMetadataDomainStore: KeyMetadataDomainStore?
+    let contactsDomainStore: ContactsDomainStore?
     let protectedSettingsStore: ProtectedSettingsStore
     let protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore
     let protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator
@@ -53,6 +54,7 @@ final class AppContainer: @unchecked Sendable {
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         privateKeyControlStore: PrivateKeyControlStore,
         keyMetadataDomainStore: KeyMetadataDomainStore? = nil,
+        contactsDomainStore: ContactsDomainStore? = nil,
         protectedSettingsStore: ProtectedSettingsStore,
         protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore,
         protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator = .noOp,
@@ -88,6 +90,7 @@ final class AppContainer: @unchecked Sendable {
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.privateKeyControlStore = privateKeyControlStore
         self.keyMetadataDomainStore = keyMetadataDomainStore
+        self.contactsDomainStore = contactsDomainStore
         self.protectedSettingsStore = protectedSettingsStore
         self.protectedDataFrameworkSentinelStore = protectedDataFrameworkSentinelStore
         self.protectedDataPostUnlockCoordinator = protectedDataPostUnlockCoordinator
@@ -209,12 +212,34 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
+        let engine = PgpEngine()
+        let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let contactsDirectory = documentDirectory
+            .appendingPathComponent("contacts", isDirectory: true)
+        let legacySelfTestReportsDirectory = documentDirectory
+            .appendingPathComponent("self-test", isDirectory: true)
+        let contactsLegacyRepository = ContactRepository(contactsDirectory: contactsDirectory)
+        let contactsMigrationSource = ContactsLegacyMigrationSource(
+            engine: engine,
+            repository: contactsLegacyRepository
+        )
+        let contactsDomainStore = ContactsDomainStore(
+            storageRoot: protectedDataStorageRoot,
+            registryStore: protectedDataRegistryStore,
+            domainKeyManager: protectedDomainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            },
+            initialSnapshotProvider: {
+                try contactsMigrationSource.makeInitialSnapshot()
+            }
+        )
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(keyMetadataDomainStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(contactsDomainStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
-        let engine = PgpEngine()
         let keyManagement = KeyManagementService(
             engine: engine,
             secureEnclave: secureEnclave,
@@ -227,7 +252,11 @@ final class AppContainer: @unchecked Sendable {
             metadataPersistence: keyMetadataDomainStore
         )
         protectedDataSessionCoordinator.registerRelockParticipant(keyManagement)
-        let contactService = ContactService(engine: engine)
+        let contactService = ContactService(
+            engine: engine,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: contactsDomainStore
+        )
         protectedDataSessionCoordinator.registerRelockParticipant(contactService)
         let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
             currentRegistryProvider: {
@@ -349,11 +378,14 @@ final class AppContainer: @unchecked Sendable {
                     ),
                     source: source
                 )
-                _ = contactService.openLegacyCompatibilityAfterPostUnlock(
+                _ = await contactService.openContactsAfterPostUnlock(
                     gateResult: ContactsPostAuthGateResult(
                         postUnlockOutcome: postUnlockOutcome,
                         frameworkState: protectedDataSessionCoordinator.frameworkState
-                    )
+                    ),
+                    wrappingRootKey: {
+                        try protectedDataSessionCoordinator.wrappingRootKeyData()
+                    }
                 )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
                     protectedSettingsDomainState: Self.protectedSettingsDomainStateForOrdinarySettings(
@@ -406,11 +438,6 @@ final class AppContainer: @unchecked Sendable {
         )
         let qrService = QRService(engine: engine)
         let selfTestService = SelfTestService(engine: engine)
-        let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let contactsDirectory = documentDirectory
-            .appendingPathComponent("contacts", isDirectory: true)
-        let legacySelfTestReportsDirectory = documentDirectory
-            .appendingPathComponent("self-test", isDirectory: true)
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
             legacyRightStoreClient: protectedDataRightStoreClient,
@@ -450,6 +477,7 @@ final class AppContainer: @unchecked Sendable {
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             privateKeyControlStore: privateKeyControlStore,
             keyMetadataDomainStore: keyMetadataDomainStore,
+            contactsDomainStore: contactsDomainStore,
             protectedSettingsStore: protectedSettingsStore,
             protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,
@@ -816,6 +844,7 @@ final class AppContainer: @unchecked Sendable {
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             privateKeyControlStore: privateKeyControlStore,
+            contactsDomainStore: nil,
             protectedSettingsStore: protectedSettingsStore,
             protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,

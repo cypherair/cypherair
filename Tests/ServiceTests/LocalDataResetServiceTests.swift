@@ -65,6 +65,11 @@ final class LocalDataResetServiceTests: XCTestCase {
         try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
         let contactMarker = contactsDirectory.appendingPathComponent("contact.gpg")
         try Data([0x04]).write(to: contactMarker)
+        let contactsQuarantineDirectory = ContactRepository(contactsDirectory: contactsDirectory).quarantineDirectory
+        try FileManager.default.createDirectory(at: contactsQuarantineDirectory, withIntermediateDirectories: true)
+        try Data([0x05]).write(
+            to: contactsQuarantineDirectory.appendingPathComponent("contact.gpg")
+        )
 
         let legacySelfTestReportsDirectory = try XCTUnwrap(container.legacySelfTestReportsDirectory)
         try FileManager.default.createDirectory(
@@ -103,6 +108,7 @@ final class LocalDataResetServiceTests: XCTestCase {
         ))
         XCTAssertFalse(FileManager.default.fileExists(atPath: container.protectedDataStorageRoot.rootURL.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: contactsQuarantineDirectory.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacySelfTestReportsDirectory.path))
         XCTAssertNil(container.protectedOrdinarySettingsCoordinator.snapshot)
         XCTAssertEqual(container.protectedOrdinarySettingsCoordinator.state, .locked)

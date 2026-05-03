@@ -23,6 +23,7 @@ final class LocalDataResetService {
     private let legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)?
     private let protectedDataStorageRoot: ProtectedDataStorageRoot
     private let contactsDirectory: URL
+    private let contactsQuarantineDirectory: URL
     private let defaults: UserDefaults
     private let defaultsDomainName: String?
     private let config: AppConfiguration
@@ -64,6 +65,10 @@ final class LocalDataResetService {
         self.legacyRightStoreClient = legacyRightStoreClient
         self.protectedDataStorageRoot = protectedDataStorageRoot
         self.contactsDirectory = contactsDirectory
+        self.contactsQuarantineDirectory = ContactRepository(
+            contactsDirectory: contactsDirectory,
+            fileManager: fileManager
+        ).quarantineDirectory
         self.defaults = defaults
         self.defaultsDomainName = defaultsDomainName
         self.config = config
@@ -209,6 +214,7 @@ final class LocalDataResetService {
         [
             protectedDataStorageRoot.rootURL,
             contactsDirectory,
+            contactsQuarantineDirectory,
             legacySelfTestReportsDirectory
         ]
     }
@@ -353,6 +359,9 @@ final class LocalDataResetService {
             let hasProtectedArtifacts = try protectedDataStorageRoot.hasProtectedDataArtifacts()
             let rootExists = fileManager.fileExists(atPath: protectedDataStorageRoot.rootURL.path)
             let contactsDirectoryExists = fileManager.fileExists(atPath: contactsDirectory.path)
+            let contactsQuarantineDirectoryExists = fileManager.fileExists(
+                atPath: contactsQuarantineDirectory.path
+            )
             let legacySelfTestReportsDirectoryExists = fileManager.fileExists(
                 atPath: legacySelfTestReportsDirectory.path
             )
@@ -387,6 +396,7 @@ final class LocalDataResetService {
             let hasRemainingData = hasProtectedArtifacts
                 || hasRootSecret
                 || contactsDirectoryExists
+                || contactsQuarantineDirectoryExists
                 || legacySelfTestReportsDirectoryExists
                 || !remainingDefaultAccountServices.isEmpty
                 || !remainingMetadataAccountServices.isEmpty
@@ -405,6 +415,7 @@ final class LocalDataResetService {
                     "hasFormatFloor": hasFormatFloor ? "true" : "false",
                     "hasLegacyCleanup": hasLegacyCleanup ? "true" : "false",
                     "contactsDirectoryExists": contactsDirectoryExists ? "true" : "false",
+                    "contactsQuarantineDirectoryExists": contactsQuarantineDirectoryExists ? "true" : "false",
                     "legacySelfTestReportsDirectoryExists": legacySelfTestReportsDirectoryExists ? "true" : "false",
                     "remainingDefaultKeychainItemCount": String(remainingDefaultAccountServices.count),
                     "remainingMetadataKeychainItemCount": String(remainingMetadataAccountServices.count),
@@ -430,6 +441,9 @@ final class LocalDataResetService {
             }
             if contactsDirectoryExists {
                 failures.append("directory.\(contactsDirectory.lastPathComponent).remaining")
+            }
+            if contactsQuarantineDirectoryExists {
+                failures.append("directory.\(contactsQuarantineDirectory.lastPathComponent).remaining")
             }
             if legacySelfTestReportsDirectoryExists {
                 failures.append("directory.\(legacySelfTestReportsDirectory.lastPathComponent).remaining")

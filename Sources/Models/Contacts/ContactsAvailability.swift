@@ -78,6 +78,7 @@ struct ContactsPostAuthGateResult: Equatable, Sendable {
     let frameworkState: ProtectedDataFrameworkState
     let availability: ContactsAvailability
     let allowsLegacyCompatibilityLoad: Bool
+    let allowsProtectedDomainOpen: Bool
     let clearsRuntime: Bool
 
     init(
@@ -91,12 +92,14 @@ struct ContactsPostAuthGateResult: Equatable, Sendable {
         if frameworkState == .restartRequired {
             availability = .restartRequired
             allowsLegacyCompatibilityLoad = false
+            allowsProtectedDomainOpen = false
             return
         }
 
         if frameworkState == .frameworkRecoveryNeeded {
             availability = .frameworkUnavailable
             allowsLegacyCompatibilityLoad = false
+            allowsProtectedDomainOpen = false
             return
         }
 
@@ -106,20 +109,24 @@ struct ContactsPostAuthGateResult: Equatable, Sendable {
              (.noRegisteredOpeners, .sessionAuthorized):
             availability = .opening
             allowsLegacyCompatibilityLoad = true
+            allowsProtectedDomainOpen = true
 
         case (.pendingMutationRecoveryRequired, _),
              (.frameworkRecoveryNeeded, _),
              (.domainOpenFailed(_), _):
             availability = .frameworkUnavailable
             allowsLegacyCompatibilityLoad = false
+            allowsProtectedDomainOpen = false
 
         case (_, .restartRequired):
             availability = .restartRequired
             allowsLegacyCompatibilityLoad = false
+            allowsProtectedDomainOpen = false
 
         case (_, .frameworkRecoveryNeeded):
             availability = .frameworkUnavailable
             allowsLegacyCompatibilityLoad = false
+            allowsProtectedDomainOpen = false
 
         case (.noProtectedDomainPresent, _),
              (.noAuthenticatedContext, _),
@@ -127,10 +134,12 @@ struct ContactsPostAuthGateResult: Equatable, Sendable {
              (_, .sessionLocked):
             availability = .locked
             allowsLegacyCompatibilityLoad = false
+            allowsProtectedDomainOpen = false
 
         case (_, .sessionAuthorized):
             availability = .locked
             allowsLegacyCompatibilityLoad = false
+            allowsProtectedDomainOpen = false
         }
     }
 }

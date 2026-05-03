@@ -119,6 +119,14 @@ final class ContactsDomainRepository: @unchecked Sendable {
         return snapshot
     }
 
+    @discardableResult
+    func updateProtectedRuntime(from snapshot: ContactsDomainSnapshot) throws -> [Contact] {
+        try snapshot.validateContract()
+        cachedSnapshot = snapshot
+        compatibilityProjection = try makeCompatibilityContacts(from: snapshot)
+        return compatibilityProjection
+    }
+
     func seedRuntimeStateForContactsPR1Tests() {
         serializationScratchBuffer = Data([0x01, 0x02, 0x03])
         searchIndexState = ["alice": ["legacy-contact-alice"]]
