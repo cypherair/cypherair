@@ -3,6 +3,16 @@ import SwiftUI
 /// App-level signature verification result for display in the UI.
 /// Wraps the UniFFI `SignatureStatus` with user-facing information.
 struct SignatureVerification {
+    enum VerificationState: Equatable {
+        case notSigned
+        case verified
+        case invalid
+        case expired
+        case signerCertificateUnavailable
+        case contactsContextUnavailable
+        case signerEvidenceUnavailable
+    }
+
     enum SignerSource: Equatable {
         case contact
         case ownKey
@@ -85,6 +95,9 @@ struct SignatureVerification {
     /// The graded verification result.
     let status: SignatureStatus
 
+    /// App-level verification state that separates crypto verification from Contacts availability.
+    let verificationState: VerificationState
+
     /// Fingerprint of the signer, if known.
     let signerFingerprint: String?
 
@@ -93,15 +106,29 @@ struct SignatureVerification {
 
     let signerIdentity: SignerIdentity?
 
+    let signerEvidence: SignerEvidence?
+
+    let contactsUnavailableReason: ContactsAvailability?
+
+    var requiresContactsContext: Bool {
+        verificationState == .contactsContextUnavailable
+    }
+
     init(
         status: SignatureStatus,
         signerFingerprint: String?,
         signerContact: Contact?,
-        signerIdentity: SignerIdentity? = nil
+        signerIdentity: SignerIdentity? = nil,
+        verificationState: VerificationState? = nil,
+        signerEvidence: SignerEvidence? = nil,
+        contactsUnavailableReason: ContactsAvailability? = nil
     ) {
         self.status = status
+        self.verificationState = verificationState ?? VerificationState(legacyStatus: status)
         self.signerFingerprint = signerFingerprint
         self.signerContact = signerContact
+        self.signerEvidence = signerEvidence
+        self.contactsUnavailableReason = contactsUnavailableReason
         self.signerIdentity = signerIdentity ?? signerContact.map {
             SignerIdentity(
                 source: .contact,
@@ -125,10 +152,12 @@ struct SignatureVerification {
 
     /// SF Symbol name for the status indicator.
     var symbolName: String {
-        switch status {
-        case .valid: "checkmark.seal.fill"
-        case .bad: "xmark.seal.fill"
-        case .unknownSigner: "questionmark.circle.fill"
+        switch verificationState {
+        case .verified: "checkmark.seal.fill"
+        case .invalid: "xmark.seal.fill"
+        case .signerCertificateUnavailable: "person.crop.circle.badge.questionmark"
+        case .contactsContextUnavailable: "lock.badge.clock"
+        case .signerEvidenceUnavailable: "questionmark.circle.fill"
         case .notSigned: "minus.circle"
         case .expired: "clock.badge.exclamationmark"
         }
@@ -136,10 +165,12 @@ struct SignatureVerification {
 
     /// Color for the status indicator.
     var statusColor: Color {
-        switch status {
-        case .valid: .green
-        case .bad: .red
-        case .unknownSigner: .orange
+        switch verificationState {
+        case .verified: .green
+        case .invalid: .red
+        case .signerCertificateUnavailable: .orange
+        case .contactsContextUnavailable: .orange
+        case .signerEvidenceUnavailable: .orange
         case .notSigned: .secondary
         case .expired: .orange
         }
@@ -147,8 +178,8 @@ struct SignatureVerification {
 
     /// User-facing status description.
     var statusDescription: String {
-        switch status {
-        case .valid:
+        switch verificationState {
+        case .verified:
             if let signerIdentity {
                 String(localized: "signature.valid.known",
                        defaultValue: "Valid signature from \(signerIdentity.displayName)")
@@ -158,28 +189,42 @@ struct SignatureVerification {
             } else {
                 String(localized: "signature.valid", defaultValue: "Valid signature")
             }
-        case .bad:
+        case .invalid:
             String(localized: "signature.bad", defaultValue: "Signature verification failed — content may have been modified")
-        case .unknownSigner:
-            String(localized: "signature.unknown", defaultValue: "Signed by an unknown key — signer not in your contacts")
-        case .notSigned:
-            String(localized: "signature.none", defaultValue: "This message was not signed")
         case .expired:
             String(localized: "signature.expired", defaultValue: "Signed by an expired key — ask the sender to update their key")
+        case .signerCertificateUnavailable:
+            String(
+                localized: "signature.signerCertificateUnavailable",
+                defaultValue: "Signer certificate unavailable — signature could not be verified"
+            )
+        case .contactsContextUnavailable:
+            String(
+                localized: "signature.contactsContextUnavailable",
+                defaultValue: "Contacts verification context is unavailable — signer cannot be verified yet"
+            )
+        case .signerEvidenceUnavailable:
+            String(
+                localized: "signature.signerEvidenceUnavailable",
+                defaultValue: "Signer evidence unavailable — signature could not be matched to a key"
+            )
+        case .notSigned:
+            String(localized: "signature.none", defaultValue: "This message was not signed")
         }
     }
 
     /// Whether this status represents a security concern.
     var isWarning: Bool {
-        switch status {
-        case .bad: true
-        case .unknownSigner: true
-        case .expired: true
-        default: false
+        switch verificationState {
+        case .invalid, .expired, .signerCertificateUnavailable,
+             .contactsContextUnavailable, .signerEvidenceUnavailable:
+            true
+        case .verified, .notSigned:
+            false
         }
     }
 
     var shouldShowSignerIdentity: Bool {
-        status != .notSigned && signerIdentity != nil
+        verificationState != .notSigned && signerIdentity != nil
     }
 }

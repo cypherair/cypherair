@@ -189,39 +189,33 @@ final class DecryptionService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        // Gather verification keys (all contacts + own public keys)
-        let verificationKeys = allVerificationKeys()
+        let context = verificationContext()
 
         // Decrypt via Rust engine — off main thread
-        let result: DecryptResult
+        let result: DecryptDetailedResult
         do {
-            result = try await Self.performDecrypt(
+            result = try await Self.performDecryptDetailed(
                 engine: engine,
                 ciphertext: phase1.ciphertext,
                 secretKeys: [secretKey],
-                verificationKeys: verificationKeys
+                verificationKeys: context.verificationKeys
             )
         } catch {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
-        // Build signature verification result
-        let signerContact = result.signerFingerprint.flatMap {
-            contactService.contact(forFingerprint: $0)
-        }
-        let signerIdentity = SignatureVerification.SignerIdentity.resolve(
-            fingerprint: result.signerFingerprint,
-            contacts: contactService.contacts,
-            ownKeys: keyManagement.keys
-        )
-        let sigVerification = SignatureVerification(
-            status: result.signatureStatus ?? .notSigned,
-            signerFingerprint: result.signerFingerprint,
-            signerContact: signerContact,
-            signerIdentity: signerIdentity
+        let verification = DetailedSignatureVerification.from(
+            legacyStatus: result.legacyStatus,
+            legacySignerFingerprint: result.legacySignerFingerprint,
+            summaryState: result.summaryState,
+            summaryEntryIndex: result.summaryEntryIndex,
+            signatures: result.signatures,
+            contacts: context.contacts,
+            ownKeys: keyManagement.keys,
+            contactsAvailability: context.contactsAvailability
         )
 
-        return (plaintext: result.plaintext, signature: sigVerification)
+        return (plaintext: result.plaintext, signature: verification.legacyVerification)
     }
 
     /// Decrypt a message using the matched key from Phase 1 while preserving
@@ -246,7 +240,7 @@ final class DecryptionService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        let verificationKeys = allVerificationKeys()
+        let context = verificationContext()
 
         let result: DecryptDetailedResult
         do {
@@ -254,7 +248,7 @@ final class DecryptionService {
                 engine: engine,
                 ciphertext: phase1.ciphertext,
                 secretKeys: [secretKey],
-                verificationKeys: verificationKeys
+                verificationKeys: context.verificationKeys
             )
         } catch {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
@@ -265,9 +259,12 @@ final class DecryptionService {
             verification: DetailedSignatureVerification.from(
                 legacyStatus: result.legacyStatus,
                 legacySignerFingerprint: result.legacySignerFingerprint,
+                summaryState: result.summaryState,
+                summaryEntryIndex: result.summaryEntryIndex,
                 signatures: result.signatures,
-                contacts: contactService.contacts,
-                ownKeys: keyManagement.keys
+                contacts: context.contacts,
+                ownKeys: keyManagement.keys,
+                contactsAvailability: context.contactsAvailability
             )
         )
     }
@@ -303,21 +300,20 @@ final class DecryptionService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        // Gather verification keys (all contacts + own public keys)
-        let verificationKeys = allVerificationKeys()
+        let context = verificationContext()
 
         let inputFilename = (phase1.inputPath as NSString).lastPathComponent
         let outputArtifact = try temporaryArtifactStore.makeDecryptedArtifact(for: inputFilename)
 
         // Decrypt via Rust engine (streaming) — off main thread
-        let fileResult: FileDecryptResult
+        let fileResult: FileDecryptDetailedResult
         do {
-            fileResult = try await Self.performDecryptFile(
+            fileResult = try await Self.performDecryptFileDetailed(
                 engine: engine,
                 inputPath: phase1.inputPath,
                 outputPath: outputArtifact.fileURL.path,
                 secretKeys: [secretKey],
-                verificationKeys: verificationKeys,
+                verificationKeys: context.verificationKeys,
                 progress: progress
             )
             try temporaryArtifactStore.applyAndVerifyCompleteProtection(to: outputArtifact.fileURL)
@@ -326,23 +322,18 @@ final class DecryptionService {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
         }
 
-        // Build signature verification result
-        let signerContact = fileResult.signerFingerprint.flatMap {
-            contactService.contact(forFingerprint: $0)
-        }
-        let signerIdentity = SignatureVerification.SignerIdentity.resolve(
-            fingerprint: fileResult.signerFingerprint,
-            contacts: contactService.contacts,
-            ownKeys: keyManagement.keys
-        )
-        let sigVerification = SignatureVerification(
-            status: fileResult.signatureStatus ?? .notSigned,
-            signerFingerprint: fileResult.signerFingerprint,
-            signerContact: signerContact,
-            signerIdentity: signerIdentity
+        let verification = DetailedSignatureVerification.from(
+            legacyStatus: fileResult.legacyStatus,
+            legacySignerFingerprint: fileResult.legacySignerFingerprint,
+            summaryState: fileResult.summaryState,
+            summaryEntryIndex: fileResult.summaryEntryIndex,
+            signatures: fileResult.signatures,
+            contacts: context.contacts,
+            ownKeys: keyManagement.keys,
+            contactsAvailability: context.contactsAvailability
         )
 
-        return (artifact: outputArtifact, signature: sigVerification)
+        return (artifact: outputArtifact, signature: verification.legacyVerification)
     }
 
     /// Decrypt a file using streaming I/O while preserving per-signature detailed
@@ -368,7 +359,7 @@ final class DecryptionService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        let verificationKeys = allVerificationKeys()
+        let context = verificationContext()
 
         let inputFilename = (phase1.inputPath as NSString).lastPathComponent
         let outputArtifact = try temporaryArtifactStore.makeDecryptedArtifact(for: inputFilename)
@@ -380,7 +371,7 @@ final class DecryptionService {
                 inputPath: phase1.inputPath,
                 outputPath: outputArtifact.fileURL.path,
                 secretKeys: [secretKey],
-                verificationKeys: verificationKeys,
+                verificationKeys: context.verificationKeys,
                 progress: progress
             )
             try temporaryArtifactStore.applyAndVerifyCompleteProtection(to: outputArtifact.fileURL)
@@ -394,9 +385,12 @@ final class DecryptionService {
             verification: DetailedSignatureVerification.from(
                 legacyStatus: fileResult.legacyStatus,
                 legacySignerFingerprint: fileResult.legacySignerFingerprint,
+                summaryState: fileResult.summaryState,
+                summaryEntryIndex: fileResult.summaryEntryIndex,
                 signatures: fileResult.signatures,
-                contacts: contactService.contacts,
-                ownKeys: keyManagement.keys
+                contacts: context.contacts,
+                ownKeys: keyManagement.keys,
+                contactsAvailability: context.contactsAvailability
             )
         )
     }
@@ -421,29 +415,24 @@ final class DecryptionService {
 
     // MARK: - Private
 
-    /// Collect all public keys for signature verification
-    /// (contacts + own keys).
-    private func allVerificationKeys() -> [Data] {
-        contactService.contacts.map { $0.publicKeyData }
-            + keyManagement.keys.map { $0.publicKeyData }
+    private struct VerificationContext {
+        let verificationKeys: [Data]
+        let contacts: [Contact]
+        let contactsAvailability: ContactsAvailability
+    }
+
+    private func verificationContext() -> VerificationContext {
+        let contactsAvailability = contactService.contactsAvailabilityForContactsPR1
+        let contacts = contactsAvailability.allowsContactsVerification ? contactService.contacts : []
+        return VerificationContext(
+            verificationKeys: contacts.map { $0.publicKeyData }
+                + keyManagement.keys.map { $0.publicKeyData },
+            contacts: contacts,
+            contactsAvailability: contactsAvailability
+        )
     }
 
     // MARK: - Off-Main-Actor Engine Helpers
-
-    /// Run decryption off the main actor.
-    @concurrent
-    private static func performDecrypt(
-        engine: PgpEngine,
-        ciphertext: Data,
-        secretKeys: [Data],
-        verificationKeys: [Data]
-    ) async throws -> DecryptResult {
-        try engine.decrypt(
-            ciphertext: ciphertext,
-            secretKeys: secretKeys,
-            verificationKeys: verificationKeys
-        )
-    }
 
     /// Run detailed decryption off the main actor.
     @concurrent
@@ -457,25 +446,6 @@ final class DecryptionService {
             ciphertext: ciphertext,
             secretKeys: secretKeys,
             verificationKeys: verificationKeys
-        )
-    }
-
-    /// Run streaming file decryption off the main actor.
-    @concurrent
-    private static func performDecryptFile(
-        engine: PgpEngine,
-        inputPath: String,
-        outputPath: String,
-        secretKeys: [Data],
-        verificationKeys: [Data],
-        progress: FileProgressReporter?
-    ) async throws -> FileDecryptResult {
-        try engine.decryptFile(
-            inputPath: inputPath,
-            outputPath: outputPath,
-            secretKeys: secretKeys,
-            verificationKeys: verificationKeys,
-            progress: progress
         )
     }
 

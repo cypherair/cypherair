@@ -5,7 +5,9 @@ use sequoia_openpgp as openpgp;
 
 use crate::decrypt::{is_expired_error, parse_verification_certs, SignatureStatus};
 use crate::error::PgpError;
-use crate::signature_details::{LegacyFoldMode, SignatureCollector, VerifyDetailedResult};
+use crate::signature_details::{
+    state_from_legacy_status, LegacyFoldMode, SignatureCollector, VerifyDetailedResult,
+};
 
 /// Result of signature verification.
 #[derive(uniffi::Record)]
@@ -20,8 +22,10 @@ pub struct VerifyResult {
 
 fn empty_detailed_result(status: SignatureStatus) -> VerifyDetailedResult {
     VerifyDetailedResult {
-        legacy_status: status,
+        legacy_status: status.clone(),
         legacy_signer_fingerprint: None,
+        summary_state: state_from_legacy_status(&status),
+        summary_entry_index: None,
         signatures: Vec::new(),
         content: None,
     }
@@ -76,11 +80,14 @@ pub fn verify_cleartext_detailed(
     })?;
 
     let helper = verifier.into_helper();
-    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
+    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
+        helper.collector.into_parts();
 
     Ok(VerifyDetailedResult {
         legacy_status,
         legacy_signer_fingerprint,
+        summary_state,
+        summary_entry_index,
         signatures,
         content: Some(content),
     })
@@ -133,17 +140,22 @@ pub fn verify_detached_detailed(
         return Ok(VerifyDetailedResult {
             legacy_status: SignatureStatus::Bad,
             legacy_signer_fingerprint: helper.collector.legacy_signer_fingerprint(),
+            summary_state: helper.collector.summary_state(),
+            summary_entry_index: helper.collector.summary_entry_index(),
             signatures: helper.collector.signatures(),
             content: None,
         });
     }
 
     let helper = verifier.into_helper();
-    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
+    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
+        helper.collector.into_parts();
 
     Ok(VerifyDetailedResult {
         legacy_status,
         legacy_signer_fingerprint,
+        summary_state,
+        summary_entry_index,
         signatures,
         content: None,
     })

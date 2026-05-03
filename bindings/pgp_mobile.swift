@@ -352,7 +352,7 @@ private func uniffiTraitInterfaceCallWithError<T, E>(
         callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
     }
 }
-// Initial value and increment amount for handles. 
+// Initial value and increment amount for handles.
 // These ensure that SWIFT handles always have the lowest bit set
 fileprivate let UNIFFI_HANDLEMAP_INITIAL: UInt64 = 1
 fileprivate let UNIFFI_HANDLEMAP_DELTA: UInt64 = 2
@@ -562,68 +562,68 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
  * Thread-safe (Send + Sync).
  */
 public protocol PgpEngineProtocol: AnyObject, Sendable {
-    
+
     /**
      * Armor binary data into ASCII format.
      */
     func armor(data: Data, kind: ArmorKind) throws  -> Data
-    
+
     /**
      * Armor a public key certificate.
      */
     func armorPublicKey(certData: Data) throws  -> Data
-    
+
     /**
      * Dearmor ASCII-armored data into binary format.
      */
     func dearmor(armored: Data) throws  -> Data
-    
+
     /**
      * Decode a QR code URL and extract the public key.
      * Validates the URL format, parses the key, and rejects secret key material.
      * Only public keys should be exchanged via QR codes.
      */
     func decodeQrUrl(url: String) throws  -> Data
-    
+
     /**
      * Decrypt a message (Phase 2 — requires authenticated key access).
      * Handles both SEIPDv1 and SEIPDv2. AEAD/MDC failure → hard-fail.
      */
     func decrypt(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data]) throws  -> DecryptResult
-    
+
     /**
      * Decrypt a message and preserve per-signature detailed results.
      */
     func decryptDetailed(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data]) throws  -> DecryptDetailedResult
-    
+
     /**
      * Decrypt a file using streaming I/O. Phase 2 — requires authenticated key access.
      * Handles both SEIPDv1 and SEIPDv2. AEAD/MDC failure → hard-fail (no partial output).
      */
     func decryptFile(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileDecryptResult
-    
+
     /**
      * Decrypt a file using streaming I/O and preserve per-signature detailed results.
      */
     func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileDecryptDetailedResult
-    
+
     /**
      * Decrypt a password-encrypted message without falling back to recipient-key decryption.
      */
     func decryptWithPassword(ciphertext: Data, password: String, verificationKeys: [Data]) throws  -> PasswordDecryptResult
-    
+
     /**
      * Detect the profile of a key (Universal or Advanced).
      */
     func detectProfile(certData: Data) throws  -> KeyProfile
-    
+
     /**
      * Discover selector-bearing subkey and User ID metadata from binary certificate bytes.
      *
      * This API is binary-only by contract. ASCII-armored certificate input is rejected.
      */
     func discoverCertificateSelectors(certData: Data) throws  -> DiscoveredCertificateSelectors
-    
+
     /**
      * Encode a public key for QR code URL scheme.
      * Format: cypherair://import/v1/<base64url, no padding>
@@ -632,7 +632,7 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * secret key material to prevent accidental private key leakage via QR codes.
      */
     func encodeQrUrl(publicKeyData: Data) throws  -> String
-    
+
     /**
      * Encrypt plaintext for recipients. Returns ASCII-armored ciphertext.
      *
@@ -642,34 +642,34 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * - Mixed → SEIPDv1
      */
     func encrypt(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?) throws  -> Data
-    
+
     /**
      * Encrypt plaintext and return binary ciphertext (.gpg format).
      */
     func encryptBinary(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?) throws  -> Data
-    
+
     /**
      * Encrypt plaintext with a password and return binary ciphertext.
      */
     func encryptBinaryWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?) throws  -> Data
-    
+
     /**
      * Encrypt a file using streaming I/O. Constant memory usage.
      * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
      */
-    func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: ProgressReporter?) throws 
-    
+    func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: ProgressReporter?) throws
+
     /**
      * Encrypt plaintext with a password and return ASCII-armored ciphertext.
      */
     func encryptWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?) throws  -> Data
-    
+
     /**
      * Export a secret key protected with a passphrase (ASCII-armored).
      * Profile A → Iterated+Salted S2K. Profile B → Argon2id.
      */
     func exportSecretKey(certData: Data, passphrase: String, profile: KeyProfile) throws  -> Data
-    
+
     /**
      * Generate a new key pair with the specified profile.
      *
@@ -677,17 +677,17 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * - Profile B (Advanced): v6 key, Ed448+X448, RFC 9580.
      */
     func generateKey(name: String, email: String?, expirySeconds: UInt64?, profile: KeyProfile) throws  -> GeneratedKey
-    
+
     /**
      * Generate a key-level revocation signature from an existing secret certificate.
      */
     func generateKeyRevocation(secretCert: Data) throws  -> Data
-    
+
     /**
      * Generate a subkey-specific revocation signature from an existing secret certificate.
      */
     func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String) throws  -> Data
-    
+
     /**
      * Generate raw certification-signature bytes for a specific User ID on the target certificate.
      *
@@ -695,12 +695,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * this selects the first matching occurrence.
      */
     func generateUserIdCertification(signerSecretCert: Data, targetCert: Data, userIdData: Data, certificationKind: CertificationKind) throws  -> Data
-    
+
     /**
      * Generate raw certification-signature bytes for an explicitly selected User ID occurrence.
      */
     func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind) throws  -> Data
-    
+
     /**
      * Generate a User ID-specific revocation signature from an existing secret certificate.
      *
@@ -708,23 +708,23 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * this selects the first matching occurrence.
      */
     func generateUserIdRevocation(secretCert: Data, userIdData: Data) throws  -> Data
-    
+
     /**
      * Generate a User ID-specific revocation signature using an explicit selector.
      */
     func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: UserIdSelectorInput) throws  -> Data
-    
+
     /**
      * Get the key version from binary certificate data.
      */
     func getKeyVersion(certData: Data) throws  -> UInt8
-    
+
     /**
      * Import a passphrase-protected secret key.
      * Auto-detects S2K mode (Iterated+Salted or Argon2id).
      */
     func importSecretKey(armoredData: Data, passphrase: String) throws  -> Data
-    
+
     /**
      * Match PKESK recipients against local certificates (Phase 1 — no auth needed).
      * Returns primary fingerprints of matching certificates (lowercase hex).
@@ -735,14 +735,14 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Only public key data is needed — no secret keys, no authentication.
      */
     func matchRecipients(ciphertext: Data, localCerts: [Data]) throws  -> [String]
-    
+
     /**
      * Match PKESK recipients from an encrypted file against local certificates (Phase 1).
      * Reads only PKESK headers — does not load the full file into memory.
      * Handles both binary and ASCII-armored input.
      */
     func matchRecipientsFromFile(inputPath: String, localCerts: [Data]) throws  -> [String]
-    
+
     /**
      * Merge same-fingerprint public certificate update material into an existing public certificate.
      *
@@ -750,7 +750,7 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * input and fingerprint mismatches are rejected with `InvalidKeyData`.
      */
     func mergePublicCertificateUpdate(existingCert: Data, incomingCertOrUpdate: Data) throws  -> CertificateMergeResult
-    
+
     /**
      * Modify the expiration time of an existing certificate.
      * Requires the full certificate (with secret key material) to re-sign binding signatures.
@@ -759,12 +759,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * The Swift caller must SE-wrap it immediately and zeroize after wrapping.
      */
     func modifyExpiry(certData: Data, newExpirySeconds: UInt64?) throws  -> ModifyExpiryResult
-    
+
     /**
      * Parse a key and extract information (fingerprint, version, User ID, etc.).
      */
     func parseKeyInfo(keyData: Data) throws  -> KeyInfo
-    
+
     /**
      * Parse recipients of an encrypted message (Phase 1 — no auth needed).
      * Returns recipient key IDs as hex strings.
@@ -773,77 +773,77 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * key fingerprints. For matching against local keys, use `match_recipients` instead.
      */
     func parseRecipients(ciphertext: Data) throws  -> [String]
-    
+
     /**
      * Parse and cryptographically verify a revocation certificate against the target key.
      */
     func parseRevocationCert(revData: Data, certData: Data) throws  -> String
-    
+
     /**
      * Parse S2K parameters from a passphrase-protected key without importing it.
      * Use this to check Argon2id memory requirements before calling import_secret_key.
      * Returns S2K type, memory requirement (KiB), parallelism, and time passes.
      */
     func parseS2kParams(armoredData: Data) throws  -> S2kInfo
-    
+
     /**
      * Create a cleartext signature for text.
      */
     func signCleartext(text: Data, signerCert: Data) throws  -> Data
-    
+
     /**
      * Create a detached signature for data (files).
      */
     func signDetached(data: Data, signerCert: Data) throws  -> Data
-    
+
     /**
      * Create a detached signature for a file using streaming I/O.
      * Returns the ASCII-armored signature.
      */
     func signDetachedFile(inputPath: String, signerCert: Data, progress: ProgressReporter?) throws  -> Data
-    
+
     /**
      * Validate contact-import data as a public certificate and return normalized metadata.
      *
      * Secret-bearing input is rejected with `InvalidKeyData` using a stable reason token.
      */
     func validatePublicCertificate(certData: Data) throws  -> PublicCertificateValidationResult
-    
+
     /**
      * Verify a cleartext-signed message.
      */
     func verifyCleartext(signedMessage: Data, verificationKeys: [Data]) throws  -> VerifyResult
-    
+
     /**
      * Verify a cleartext-signed message and preserve per-signature detailed results.
      */
     func verifyCleartextDetailed(signedMessage: Data, verificationKeys: [Data]) throws  -> VerifyDetailedResult
-    
+
     /**
      * Verify a detached signature.
      */
     func verifyDetached(data: Data, signature: Data, verificationKeys: [Data]) throws  -> VerifyResult
-    
+
     /**
      * Verify a detached signature and preserve per-signature detailed results.
      */
     func verifyDetachedDetailed(data: Data, signature: Data, verificationKeys: [Data]) throws  -> VerifyDetailedResult
-    
+
     /**
      * Verify a detached signature against a file using streaming I/O.
      */
     func verifyDetachedFile(dataPath: String, signature: Data, verificationKeys: [Data], progress: ProgressReporter?) throws  -> VerifyResult
-    
+
     /**
      * Verify a detached file signature using streaming I/O and preserve per-signature details.
      */
     func verifyDetachedFileDetailed(dataPath: String, signature: Data, verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileVerifyDetailedResult
-    
+
     /**
      * Verify a direct-key signature against a target certificate using crypto-only semantics.
      */
     func verifyDirectKeySignature(signature: Data, targetCert: Data, candidateSigners: [Data]) throws  -> CertificateSignatureResult
-    
+
     /**
      * Verify a User ID binding signature against a target certificate using crypto-only semantics.
      *
@@ -851,12 +851,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * this selects the first matching occurrence.
      */
     func verifyUserIdBindingSignature(signature: Data, targetCert: Data, userIdData: Data, candidateSigners: [Data]) throws  -> CertificateSignatureResult
-    
+
     /**
      * Verify a User ID binding signature against an explicitly selected User ID occurrence.
      */
     func verifyUserIdBindingSignatureBySelector(signature: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, candidateSigners: [Data]) throws  -> CertificateSignatureResult
-    
+
 }
 /**
  * The main PGP engine object exposed across the FFI boundary.
@@ -923,9 +923,9 @@ public convenience init() {
         try! rustCall { uniffi_pgp_mobile_fn_free_pgpengine(handle, $0) }
     }
 
-    
 
-    
+
+
     /**
      * Armor binary data into ASCII format.
      */
@@ -938,7 +938,7 @@ open func armor(data: Data, kind: ArmorKind)throws  -> Data  {
     )
 })
 }
-    
+
     /**
      * Armor a public key certificate.
      */
@@ -950,7 +950,7 @@ open func armorPublicKey(certData: Data)throws  -> Data  {
     )
 })
 }
-    
+
     /**
      * Dearmor ASCII-armored data into binary format.
      */
@@ -962,7 +962,7 @@ open func dearmor(armored: Data)throws  -> Data  {
     )
 })
 }
-    
+
     /**
      * Decode a QR code URL and extract the public key.
      * Validates the URL format, parses the key, and rejects secret key material.
@@ -976,7 +976,7 @@ open func decodeQrUrl(url: String)throws  -> Data  {
     )
 })
 }
-    
+
     /**
      * Decrypt a message (Phase 2 — requires authenticated key access).
      * Handles both SEIPDv1 and SEIPDv2. AEAD/MDC failure → hard-fail.
@@ -991,7 +991,7 @@ open func decrypt(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data]
     )
 })
 }
-    
+
     /**
      * Decrypt a message and preserve per-signature detailed results.
      */
@@ -1005,7 +1005,7 @@ open func decryptDetailed(ciphertext: Data, secretKeys: [Data], verificationKeys
     )
 })
 }
-    
+
     /**
      * Decrypt a file using streaming I/O. Phase 2 — requires authenticated key access.
      * Handles both SEIPDv1 and SEIPDv2. AEAD/MDC failure → hard-fail (no partial output).
@@ -1022,7 +1022,7 @@ open func decryptFile(inputPath: String, outputPath: String, secretKeys: [Data],
     )
 })
 }
-    
+
     /**
      * Decrypt a file using streaming I/O and preserve per-signature detailed results.
      */
@@ -1038,7 +1038,7 @@ open func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys:
     )
 })
 }
-    
+
     /**
      * Decrypt a password-encrypted message without falling back to recipient-key decryption.
      */
@@ -1052,7 +1052,7 @@ open func decryptWithPassword(ciphertext: Data, password: String, verificationKe
     )
 })
 }
-    
+
     /**
      * Detect the profile of a key (Universal or Advanced).
      */
@@ -1064,7 +1064,7 @@ open func detectProfile(certData: Data)throws  -> KeyProfile  {
     )
 })
 }
-    
+
     /**
      * Discover selector-bearing subkey and User ID metadata from binary certificate bytes.
      *
@@ -1078,7 +1078,7 @@ open func discoverCertificateSelectors(certData: Data)throws  -> DiscoveredCerti
     )
 })
 }
-    
+
     /**
      * Encode a public key for QR code URL scheme.
      * Format: cypherair://import/v1/<base64url, no padding>
@@ -1094,7 +1094,7 @@ open func encodeQrUrl(publicKeyData: Data)throws  -> String  {
     )
 })
 }
-    
+
     /**
      * Encrypt plaintext for recipients. Returns ASCII-armored ciphertext.
      *
@@ -1114,7 +1114,7 @@ open func encrypt(plaintext: Data, recipients: [Data], signingKey: Data?, encryp
     )
 })
 }
-    
+
     /**
      * Encrypt plaintext and return binary ciphertext (.gpg format).
      */
@@ -1129,7 +1129,7 @@ open func encryptBinary(plaintext: Data, recipients: [Data], signingKey: Data?, 
     )
 })
 }
-    
+
     /**
      * Encrypt plaintext with a password and return binary ciphertext.
      */
@@ -1144,7 +1144,7 @@ open func encryptBinaryWithPassword(plaintext: Data, password: String, format: P
     )
 })
 }
-    
+
     /**
      * Encrypt a file using streaming I/O. Constant memory usage.
      * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
@@ -1161,7 +1161,7 @@ open func encryptFile(inputPath: String, outputPath: String, recipients: [Data],
     )
 }
 }
-    
+
     /**
      * Encrypt plaintext with a password and return ASCII-armored ciphertext.
      */
@@ -1176,7 +1176,7 @@ open func encryptWithPassword(plaintext: Data, password: String, format: Passwor
     )
 })
 }
-    
+
     /**
      * Export a secret key protected with a passphrase (ASCII-armored).
      * Profile A → Iterated+Salted S2K. Profile B → Argon2id.
@@ -1191,7 +1191,7 @@ open func exportSecretKey(certData: Data, passphrase: String, profile: KeyProfil
     )
 })
 }
-    
+
     /**
      * Generate a new key pair with the specified profile.
      *
@@ -1209,7 +1209,7 @@ open func generateKey(name: String, email: String?, expirySeconds: UInt64?, prof
     )
 })
 }
-    
+
     /**
      * Generate a key-level revocation signature from an existing secret certificate.
      */
@@ -1221,7 +1221,7 @@ open func generateKeyRevocation(secretCert: Data)throws  -> Data  {
     )
 })
 }
-    
+
     /**
      * Generate a subkey-specific revocation signature from an existing secret certificate.
      */
@@ -1234,7 +1234,7 @@ open func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String)t
     )
 })
 }
-    
+
     /**
      * Generate raw certification-signature bytes for a specific User ID on the target certificate.
      *
@@ -1252,7 +1252,7 @@ open func generateUserIdCertification(signerSecretCert: Data, targetCert: Data, 
     )
 })
 }
-    
+
     /**
      * Generate raw certification-signature bytes for an explicitly selected User ID occurrence.
      */
@@ -1267,7 +1267,7 @@ open func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCe
     )
 })
 }
-    
+
     /**
      * Generate a User ID-specific revocation signature from an existing secret certificate.
      *
@@ -1283,7 +1283,7 @@ open func generateUserIdRevocation(secretCert: Data, userIdData: Data)throws  ->
     )
 })
 }
-    
+
     /**
      * Generate a User ID-specific revocation signature using an explicit selector.
      */
@@ -1296,7 +1296,7 @@ open func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: U
     )
 })
 }
-    
+
     /**
      * Get the key version from binary certificate data.
      */
@@ -1308,7 +1308,7 @@ open func getKeyVersion(certData: Data)throws  -> UInt8  {
     )
 })
 }
-    
+
     /**
      * Import a passphrase-protected secret key.
      * Auto-detects S2K mode (Iterated+Salted or Argon2id).
@@ -1322,7 +1322,7 @@ open func importSecretKey(armoredData: Data, passphrase: String)throws  -> Data 
     )
 })
 }
-    
+
     /**
      * Match PKESK recipients against local certificates (Phase 1 — no auth needed).
      * Returns primary fingerprints of matching certificates (lowercase hex).
@@ -1341,7 +1341,7 @@ open func matchRecipients(ciphertext: Data, localCerts: [Data])throws  -> [Strin
     )
 })
 }
-    
+
     /**
      * Match PKESK recipients from an encrypted file against local certificates (Phase 1).
      * Reads only PKESK headers — does not load the full file into memory.
@@ -1356,7 +1356,7 @@ open func matchRecipientsFromFile(inputPath: String, localCerts: [Data])throws  
     )
 })
 }
-    
+
     /**
      * Merge same-fingerprint public certificate update material into an existing public certificate.
      *
@@ -1372,7 +1372,7 @@ open func mergePublicCertificateUpdate(existingCert: Data, incomingCertOrUpdate:
     )
 })
 }
-    
+
     /**
      * Modify the expiration time of an existing certificate.
      * Requires the full certificate (with secret key material) to re-sign binding signatures.
@@ -1389,7 +1389,7 @@ open func modifyExpiry(certData: Data, newExpirySeconds: UInt64?)throws  -> Modi
     )
 })
 }
-    
+
     /**
      * Parse a key and extract information (fingerprint, version, User ID, etc.).
      */
@@ -1401,7 +1401,7 @@ open func parseKeyInfo(keyData: Data)throws  -> KeyInfo  {
     )
 })
 }
-    
+
     /**
      * Parse recipients of an encrypted message (Phase 1 — no auth needed).
      * Returns recipient key IDs as hex strings.
@@ -1417,7 +1417,7 @@ open func parseRecipients(ciphertext: Data)throws  -> [String]  {
     )
 })
 }
-    
+
     /**
      * Parse and cryptographically verify a revocation certificate against the target key.
      */
@@ -1430,7 +1430,7 @@ open func parseRevocationCert(revData: Data, certData: Data)throws  -> String  {
     )
 })
 }
-    
+
     /**
      * Parse S2K parameters from a passphrase-protected key without importing it.
      * Use this to check Argon2id memory requirements before calling import_secret_key.
@@ -1444,7 +1444,7 @@ open func parseS2kParams(armoredData: Data)throws  -> S2kInfo  {
     )
 })
 }
-    
+
     /**
      * Create a cleartext signature for text.
      */
@@ -1457,7 +1457,7 @@ open func signCleartext(text: Data, signerCert: Data)throws  -> Data  {
     )
 })
 }
-    
+
     /**
      * Create a detached signature for data (files).
      */
@@ -1470,7 +1470,7 @@ open func signDetached(data: Data, signerCert: Data)throws  -> Data  {
     )
 })
 }
-    
+
     /**
      * Create a detached signature for a file using streaming I/O.
      * Returns the ASCII-armored signature.
@@ -1485,7 +1485,7 @@ open func signDetachedFile(inputPath: String, signerCert: Data, progress: Progre
     )
 })
 }
-    
+
     /**
      * Validate contact-import data as a public certificate and return normalized metadata.
      *
@@ -1499,7 +1499,7 @@ open func validatePublicCertificate(certData: Data)throws  -> PublicCertificateV
     )
 })
 }
-    
+
     /**
      * Verify a cleartext-signed message.
      */
@@ -1512,7 +1512,7 @@ open func verifyCleartext(signedMessage: Data, verificationKeys: [Data])throws  
     )
 })
 }
-    
+
     /**
      * Verify a cleartext-signed message and preserve per-signature detailed results.
      */
@@ -1525,7 +1525,7 @@ open func verifyCleartextDetailed(signedMessage: Data, verificationKeys: [Data])
     )
 })
 }
-    
+
     /**
      * Verify a detached signature.
      */
@@ -1539,7 +1539,7 @@ open func verifyDetached(data: Data, signature: Data, verificationKeys: [Data])t
     )
 })
 }
-    
+
     /**
      * Verify a detached signature and preserve per-signature detailed results.
      */
@@ -1553,7 +1553,7 @@ open func verifyDetachedDetailed(data: Data, signature: Data, verificationKeys: 
     )
 })
 }
-    
+
     /**
      * Verify a detached signature against a file using streaming I/O.
      */
@@ -1568,7 +1568,7 @@ open func verifyDetachedFile(dataPath: String, signature: Data, verificationKeys
     )
 })
 }
-    
+
     /**
      * Verify a detached file signature using streaming I/O and preserve per-signature details.
      */
@@ -1583,7 +1583,7 @@ open func verifyDetachedFileDetailed(dataPath: String, signature: Data, verifica
     )
 })
 }
-    
+
     /**
      * Verify a direct-key signature against a target certificate using crypto-only semantics.
      */
@@ -1597,7 +1597,7 @@ open func verifyDirectKeySignature(signature: Data, targetCert: Data, candidateS
     )
 })
 }
-    
+
     /**
      * Verify a User ID binding signature against a target certificate using crypto-only semantics.
      *
@@ -1615,7 +1615,7 @@ open func verifyUserIdBindingSignature(signature: Data, targetCert: Data, userId
     )
 })
 }
-    
+
     /**
      * Verify a User ID binding signature against an explicitly selected User ID occurrence.
      */
@@ -1630,9 +1630,9 @@ open func verifyUserIdBindingSignatureBySelector(signature: Data, targetCert: Da
     )
 })
 }
-    
 
-    
+
+
 }
 
 
@@ -1688,7 +1688,7 @@ public func FfiConverterTypePgpEngine_lower(_ value: PgpEngine) -> UInt64 {
  * Return `false` from `on_progress` to cancel the operation.
  */
 public protocol ProgressReporter: AnyObject, Sendable {
-    
+
     /**
      * Report progress during a streaming operation.
      *
@@ -1697,7 +1697,7 @@ public protocol ProgressReporter: AnyObject, Sendable {
      * - Returns: `true` to continue, `false` to cancel.
      */
     func onProgress(bytesProcessed: UInt64, totalBytes: UInt64)  -> Bool
-    
+
 }
 /**
  * Foreign trait for progress reporting across the FFI boundary.
@@ -1755,9 +1755,9 @@ open class ProgressReporterImpl: ProgressReporter, @unchecked Sendable {
         try! rustCall { uniffi_pgp_mobile_fn_free_progressreporter(handle, $0) }
     }
 
-    
 
-    
+
+
     /**
      * Report progress during a streaming operation.
      *
@@ -1774,9 +1774,9 @@ open func onProgress(bytesProcessed: UInt64, totalBytes: UInt64) -> Bool  {
     )
 })
 }
-    
 
-    
+
+
 }
 
 
@@ -1821,7 +1821,7 @@ fileprivate struct UniffiCallbackInterfaceProgressReporter {
                 )
             }
 
-            
+
             let writeReturn = { uniffiOutReturn.pointee = FfiConverterBool.lower($0) }
             uniffiTraitInterfaceCall(
                 callStatus: uniffiCallStatus,
@@ -1920,7 +1920,7 @@ public struct CertificateMergeResult: Equatable, Hashable {
     public init(
         /**
          * Merged public certificate bytes in binary OpenPGP format.
-         */mergedCertData: Data, 
+         */mergedCertData: Data,
         /**
          * Whether the merge materially changed the public certificate.
          */outcome: CertificateMergeOutcome) {
@@ -1928,9 +1928,9 @@ public struct CertificateMergeResult: Equatable, Hashable {
         self.outcome = outcome
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -1944,7 +1944,7 @@ public struct FfiConverterTypeCertificateMergeResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertificateMergeResult {
         return
             try CertificateMergeResult(
-                mergedCertData: FfiConverterData.read(from: &buf), 
+                mergedCertData: FfiConverterData.read(from: &buf),
                 outcome: FfiConverterTypeCertificateMergeOutcome.read(from: &buf)
         )
     }
@@ -2002,14 +2002,14 @@ public struct CertificateSignatureResult: Equatable, Hashable {
     public init(
         /**
          * Crypto-only verification status.
-         */status: CertificateSignatureStatus, 
+         */status: CertificateSignatureStatus,
         /**
          * Certification kind for User ID binding signatures.
-         */certificationKind: CertificationKind?, 
+         */certificationKind: CertificationKind?,
         /**
          * Primary fingerprint of the cryptographically confirmed signer
          * certificate. Populated only when `status == Valid`.
-         */signerPrimaryFingerprint: String?, 
+         */signerPrimaryFingerprint: String?,
         /**
          * Signing subkey fingerprint when `status == Valid` and the successful
          * verification path used a non-primary signer key.
@@ -2020,9 +2020,9 @@ public struct CertificateSignatureResult: Equatable, Hashable {
         self.signingKeyFingerprint = signingKeyFingerprint
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2036,9 +2036,9 @@ public struct FfiConverterTypeCertificateSignatureResult: FfiConverterRustBuffer
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertificateSignatureResult {
         return
             try CertificateSignatureResult(
-                status: FfiConverterTypeCertificateSignatureStatus.read(from: &buf), 
-                certificationKind: FfiConverterOptionTypeCertificationKind.read(from: &buf), 
-                signerPrimaryFingerprint: FfiConverterOptionString.read(from: &buf), 
+                status: FfiConverterTypeCertificateSignatureStatus.read(from: &buf),
+                certificationKind: FfiConverterOptionTypeCertificationKind.read(from: &buf),
+                signerPrimaryFingerprint: FfiConverterOptionString.read(from: &buf),
                 signingKeyFingerprint: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -2076,21 +2076,25 @@ public func FfiConverterTypeCertificateSignatureResult_lower(_ value: Certificat
 public struct DecryptDetailedResult: Equatable, Hashable {
     public var legacyStatus: SignatureStatus
     public var legacySignerFingerprint: String?
+    public var summaryState: SignatureVerificationState
+    public var summaryEntryIndex: UInt64?
     public var signatures: [DetailedSignatureEntry]
     public var plaintext: Data
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, signatures: [DetailedSignatureEntry], plaintext: Data) {
+    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry], plaintext: Data) {
         self.legacyStatus = legacyStatus
         self.legacySignerFingerprint = legacySignerFingerprint
+        self.summaryState = summaryState
+        self.summaryEntryIndex = summaryEntryIndex
         self.signatures = signatures
         self.plaintext = plaintext
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2104,9 +2108,11 @@ public struct FfiConverterTypeDecryptDetailedResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DecryptDetailedResult {
         return
             try DecryptDetailedResult(
-                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf), 
-                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf), 
-                signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf), 
+                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf),
+                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf),
+                summaryState: FfiConverterTypeSignatureVerificationState.read(from: &buf),
+                summaryEntryIndex: FfiConverterOptionUInt64.read(from: &buf),
+                signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf),
                 plaintext: FfiConverterData.read(from: &buf)
         )
     }
@@ -2114,6 +2120,8 @@ public struct FfiConverterTypeDecryptDetailedResult: FfiConverterRustBuffer {
     public static func write(_ value: DecryptDetailedResult, into buf: inout [UInt8]) {
         FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
         FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
+        FfiConverterTypeSignatureVerificationState.write(value.summaryState, into: &buf)
+        FfiConverterOptionUInt64.write(value.summaryEntryIndex, into: &buf)
         FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
         FfiConverterData.write(value.plaintext, into: &buf)
     }
@@ -2165,10 +2173,10 @@ public struct DecryptResult: Equatable, Hashable {
     public init(
         /**
          * The decrypted plaintext. MUST be zeroized by the caller after use.
-         */plaintext: Data, 
+         */plaintext: Data,
         /**
          * Signature verification result, if the message was signed.
-         */signatureStatus: SignatureStatus?, 
+         */signatureStatus: SignatureStatus?,
         /**
          * Fingerprint of the signing key, if signed and key is known.
          */signerFingerprint: String?) {
@@ -2177,9 +2185,9 @@ public struct DecryptResult: Equatable, Hashable {
         self.signerFingerprint = signerFingerprint
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2193,8 +2201,8 @@ public struct FfiConverterTypeDecryptResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DecryptResult {
         return
             try DecryptResult(
-                plaintext: FfiConverterData.read(from: &buf), 
-                signatureStatus: FfiConverterOptionTypeSignatureStatus.read(from: &buf), 
+                plaintext: FfiConverterData.read(from: &buf),
+                signatureStatus: FfiConverterOptionTypeSignatureStatus.read(from: &buf),
                 signerFingerprint: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -2228,17 +2236,23 @@ public func FfiConverterTypeDecryptResult_lower(_ value: DecryptResult) -> RustB
 public struct DetailedSignatureEntry: Equatable, Hashable {
     public var status: DetailedSignatureStatus
     public var signerPrimaryFingerprint: String?
+    public var state: SignatureVerificationState
+    public var verificationCertificateFingerprint: String?
+    public var signerEvidence: SignerEvidence
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(status: DetailedSignatureStatus, signerPrimaryFingerprint: String?) {
+    public init(status: DetailedSignatureStatus, signerPrimaryFingerprint: String?, state: SignatureVerificationState, verificationCertificateFingerprint: String?, signerEvidence: SignerEvidence) {
         self.status = status
         self.signerPrimaryFingerprint = signerPrimaryFingerprint
+        self.state = state
+        self.verificationCertificateFingerprint = verificationCertificateFingerprint
+        self.signerEvidence = signerEvidence
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2252,14 +2266,20 @@ public struct FfiConverterTypeDetailedSignatureEntry: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DetailedSignatureEntry {
         return
             try DetailedSignatureEntry(
-                status: FfiConverterTypeDetailedSignatureStatus.read(from: &buf), 
-                signerPrimaryFingerprint: FfiConverterOptionString.read(from: &buf)
+                status: FfiConverterTypeDetailedSignatureStatus.read(from: &buf),
+                signerPrimaryFingerprint: FfiConverterOptionString.read(from: &buf),
+                state: FfiConverterTypeSignatureVerificationState.read(from: &buf),
+                verificationCertificateFingerprint: FfiConverterOptionString.read(from: &buf),
+                signerEvidence: FfiConverterTypeSignerEvidence.read(from: &buf)
         )
     }
 
     public static func write(_ value: DetailedSignatureEntry, into buf: inout [UInt8]) {
         FfiConverterTypeDetailedSignatureStatus.write(value.status, into: &buf)
         FfiConverterOptionString.write(value.signerPrimaryFingerprint, into: &buf)
+        FfiConverterTypeSignatureVerificationState.write(value.state, into: &buf)
+        FfiConverterOptionString.write(value.verificationCertificateFingerprint, into: &buf)
+        FfiConverterTypeSignerEvidence.write(value.signerEvidence, into: &buf)
     }
 }
 
@@ -2301,10 +2321,10 @@ public struct DiscoveredCertificateSelectors: Equatable, Hashable {
     public init(
         /**
          * Primary certificate fingerprint in canonical lowercase hex.
-         */certificateFingerprint: String, 
+         */certificateFingerprint: String,
         /**
          * All subkeys in the certificate's native iteration order.
-         */subkeys: [DiscoveredSubkey], 
+         */subkeys: [DiscoveredSubkey],
         /**
          * All User IDs in the certificate's native iteration order.
          */userIds: [DiscoveredUserId]) {
@@ -2313,9 +2333,9 @@ public struct DiscoveredCertificateSelectors: Equatable, Hashable {
         self.userIds = userIds
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2329,8 +2349,8 @@ public struct FfiConverterTypeDiscoveredCertificateSelectors: FfiConverterRustBu
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiscoveredCertificateSelectors {
         return
             try DiscoveredCertificateSelectors(
-                certificateFingerprint: FfiConverterString.read(from: &buf), 
-                subkeys: FfiConverterSequenceTypeDiscoveredSubkey.read(from: &buf), 
+                certificateFingerprint: FfiConverterString.read(from: &buf),
+                subkeys: FfiConverterSequenceTypeDiscoveredSubkey.read(from: &buf),
                 userIds: FfiConverterSequenceTypeDiscoveredUserId.read(from: &buf)
         )
     }
@@ -2388,16 +2408,16 @@ public struct DiscoveredSubkey: Equatable, Hashable {
     public init(
         /**
          * Subkey fingerprint in canonical lowercase hex.
-         */fingerprint: String, 
+         */fingerprint: String,
         /**
          * Display-oriented algorithm name.
-         */algorithmDisplay: String, 
+         */algorithmDisplay: String,
         /**
          * Whether this subkey is currently transport-encryption capable under StandardPolicy + now.
-         */isCurrentlyTransportEncryptionCapable: Bool, 
+         */isCurrentlyTransportEncryptionCapable: Bool,
         /**
          * Whether this subkey is currently revoked under StandardPolicy + now.
-         */isCurrentlyRevoked: Bool, 
+         */isCurrentlyRevoked: Bool,
         /**
          * Whether this subkey is currently expired under StandardPolicy + now.
          */isCurrentlyExpired: Bool) {
@@ -2408,9 +2428,9 @@ public struct DiscoveredSubkey: Equatable, Hashable {
         self.isCurrentlyExpired = isCurrentlyExpired
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2424,10 +2444,10 @@ public struct FfiConverterTypeDiscoveredSubkey: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiscoveredSubkey {
         return
             try DiscoveredSubkey(
-                fingerprint: FfiConverterString.read(from: &buf), 
-                algorithmDisplay: FfiConverterString.read(from: &buf), 
-                isCurrentlyTransportEncryptionCapable: FfiConverterBool.read(from: &buf), 
-                isCurrentlyRevoked: FfiConverterBool.read(from: &buf), 
+                fingerprint: FfiConverterString.read(from: &buf),
+                algorithmDisplay: FfiConverterString.read(from: &buf),
+                isCurrentlyTransportEncryptionCapable: FfiConverterBool.read(from: &buf),
+                isCurrentlyRevoked: FfiConverterBool.read(from: &buf),
                 isCurrentlyExpired: FfiConverterBool.read(from: &buf)
         )
     }
@@ -2487,16 +2507,16 @@ public struct DiscoveredUserId: Equatable, Hashable {
     public init(
         /**
          * 0-based occurrence index in the certificate's native User ID iteration order.
-         */occurrenceIndex: UInt64, 
+         */occurrenceIndex: UInt64,
         /**
          * Raw User ID packet bytes.
-         */userIdData: Data, 
+         */userIdData: Data,
         /**
          * Display-oriented lossy UTF-8 rendering of `user_id_data`.
-         */displayText: String, 
+         */displayText: String,
         /**
          * Whether this User ID is currently marked primary under StandardPolicy + now.
-         */isCurrentlyPrimary: Bool, 
+         */isCurrentlyPrimary: Bool,
         /**
          * Whether this User ID is currently revoked under StandardPolicy + now.
          */isCurrentlyRevoked: Bool) {
@@ -2507,9 +2527,9 @@ public struct DiscoveredUserId: Equatable, Hashable {
         self.isCurrentlyRevoked = isCurrentlyRevoked
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2523,10 +2543,10 @@ public struct FfiConverterTypeDiscoveredUserId: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiscoveredUserId {
         return
             try DiscoveredUserId(
-                occurrenceIndex: FfiConverterUInt64.read(from: &buf), 
-                userIdData: FfiConverterData.read(from: &buf), 
-                displayText: FfiConverterString.read(from: &buf), 
-                isCurrentlyPrimary: FfiConverterBool.read(from: &buf), 
+                occurrenceIndex: FfiConverterUInt64.read(from: &buf),
+                userIdData: FfiConverterData.read(from: &buf),
+                displayText: FfiConverterString.read(from: &buf),
+                isCurrentlyPrimary: FfiConverterBool.read(from: &buf),
                 isCurrentlyRevoked: FfiConverterBool.read(from: &buf)
         )
     }
@@ -2562,19 +2582,23 @@ public func FfiConverterTypeDiscoveredUserId_lower(_ value: DiscoveredUserId) ->
 public struct FileDecryptDetailedResult: Equatable, Hashable {
     public var legacyStatus: SignatureStatus
     public var legacySignerFingerprint: String?
+    public var summaryState: SignatureVerificationState
+    public var summaryEntryIndex: UInt64?
     public var signatures: [DetailedSignatureEntry]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, signatures: [DetailedSignatureEntry]) {
+    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry]) {
         self.legacyStatus = legacyStatus
         self.legacySignerFingerprint = legacySignerFingerprint
+        self.summaryState = summaryState
+        self.summaryEntryIndex = summaryEntryIndex
         self.signatures = signatures
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2588,8 +2612,10 @@ public struct FfiConverterTypeFileDecryptDetailedResult: FfiConverterRustBuffer 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileDecryptDetailedResult {
         return
             try FileDecryptDetailedResult(
-                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf), 
-                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf), 
+                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf),
+                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf),
+                summaryState: FfiConverterTypeSignatureVerificationState.read(from: &buf),
+                summaryEntryIndex: FfiConverterOptionUInt64.read(from: &buf),
                 signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf)
         )
     }
@@ -2597,6 +2623,8 @@ public struct FfiConverterTypeFileDecryptDetailedResult: FfiConverterRustBuffer 
     public static func write(_ value: FileDecryptDetailedResult, into buf: inout [UInt8]) {
         FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
         FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
+        FfiConverterTypeSignatureVerificationState.write(value.summaryState, into: &buf)
+        FfiConverterOptionUInt64.write(value.summaryEntryIndex, into: &buf)
         FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
     }
 }
@@ -2636,7 +2664,7 @@ public struct FileDecryptResult: Equatable, Hashable {
     public init(
         /**
          * Signature verification status, if the message was signed.
-         */signatureStatus: SignatureStatus?, 
+         */signatureStatus: SignatureStatus?,
         /**
          * Fingerprint of the signing key, if signed and key is known.
          */signerFingerprint: String?) {
@@ -2644,9 +2672,9 @@ public struct FileDecryptResult: Equatable, Hashable {
         self.signerFingerprint = signerFingerprint
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2660,7 +2688,7 @@ public struct FfiConverterTypeFileDecryptResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileDecryptResult {
         return
             try FileDecryptResult(
-                signatureStatus: FfiConverterOptionTypeSignatureStatus.read(from: &buf), 
+                signatureStatus: FfiConverterOptionTypeSignatureStatus.read(from: &buf),
                 signerFingerprint: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -2693,19 +2721,23 @@ public func FfiConverterTypeFileDecryptResult_lower(_ value: FileDecryptResult) 
 public struct FileVerifyDetailedResult: Equatable, Hashable {
     public var legacyStatus: SignatureStatus
     public var legacySignerFingerprint: String?
+    public var summaryState: SignatureVerificationState
+    public var summaryEntryIndex: UInt64?
     public var signatures: [DetailedSignatureEntry]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, signatures: [DetailedSignatureEntry]) {
+    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry]) {
         self.legacyStatus = legacyStatus
         self.legacySignerFingerprint = legacySignerFingerprint
+        self.summaryState = summaryState
+        self.summaryEntryIndex = summaryEntryIndex
         self.signatures = signatures
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2719,8 +2751,10 @@ public struct FfiConverterTypeFileVerifyDetailedResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileVerifyDetailedResult {
         return
             try FileVerifyDetailedResult(
-                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf), 
-                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf), 
+                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf),
+                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf),
+                summaryState: FfiConverterTypeSignatureVerificationState.read(from: &buf),
+                summaryEntryIndex: FfiConverterOptionUInt64.read(from: &buf),
                 signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf)
         )
     }
@@ -2728,6 +2762,8 @@ public struct FfiConverterTypeFileVerifyDetailedResult: FfiConverterRustBuffer {
     public static func write(_ value: FileVerifyDetailedResult, into buf: inout [UInt8]) {
         FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
         FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
+        FfiConverterTypeSignatureVerificationState.write(value.summaryState, into: &buf)
+        FfiConverterOptionUInt64.write(value.summaryEntryIndex, into: &buf)
         FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
     }
 }
@@ -2791,20 +2827,20 @@ public struct GeneratedKey: Equatable, Hashable {
         /**
          * Full certificate (public + secret) in binary OpenPGP format.
          * MUST be zeroized by the caller after SE wrapping.
-         */certData: Data, 
+         */certData: Data,
         /**
          * Public key only in binary OpenPGP format.
-         */publicKeyData: Data, 
+         */publicKeyData: Data,
         /**
          * Revocation certificate in binary OpenPGP format.
          * Should be zeroized after secure storage.
-         */revocationCert: Data, 
+         */revocationCert: Data,
         /**
          * Key fingerprint as lowercase hex string.
-         */fingerprint: String, 
+         */fingerprint: String,
         /**
          * Key version (4 for Profile A, 6 for Profile B).
-         */keyVersion: UInt8, 
+         */keyVersion: UInt8,
         /**
          * The profile used to generate this key.
          */profile: KeyProfile) {
@@ -2816,9 +2852,9 @@ public struct GeneratedKey: Equatable, Hashable {
         self.profile = profile
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2832,11 +2868,11 @@ public struct FfiConverterTypeGeneratedKey: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> GeneratedKey {
         return
             try GeneratedKey(
-                certData: FfiConverterData.read(from: &buf), 
-                publicKeyData: FfiConverterData.read(from: &buf), 
-                revocationCert: FfiConverterData.read(from: &buf), 
-                fingerprint: FfiConverterString.read(from: &buf), 
-                keyVersion: FfiConverterUInt8.read(from: &buf), 
+                certData: FfiConverterData.read(from: &buf),
+                publicKeyData: FfiConverterData.read(from: &buf),
+                revocationCert: FfiConverterData.read(from: &buf),
+                fingerprint: FfiConverterString.read(from: &buf),
+                keyVersion: FfiConverterUInt8.read(from: &buf),
                 profile: FfiConverterTypeKeyProfile.read(from: &buf)
         )
     }
@@ -2917,31 +2953,31 @@ public struct KeyInfo: Equatable, Hashable {
     public init(
         /**
          * Key fingerprint as lowercase hex string.
-         */fingerprint: String, 
+         */fingerprint: String,
         /**
          * Key version (4 or 6).
-         */keyVersion: UInt8, 
+         */keyVersion: UInt8,
         /**
          * Policy-selected primary User ID string for display and identity matching.
-         */userId: String?, 
+         */userId: String?,
         /**
          * Whether the key has a valid encryption subkey.
-         */hasEncryptionSubkey: Bool, 
+         */hasEncryptionSubkey: Bool,
         /**
          * Whether the key is revoked.
-         */isRevoked: Bool, 
+         */isRevoked: Bool,
         /**
          * Whether the key has expired.
-         */isExpired: Bool, 
+         */isExpired: Bool,
         /**
          * Detected profile based on key version and algorithms.
-         */profile: KeyProfile, 
+         */profile: KeyProfile,
         /**
          * Primary key algorithm name (e.g., "Ed25519", "Ed448").
-         */primaryAlgo: String, 
+         */primaryAlgo: String,
         /**
          * Encryption subkey algorithm name (e.g., "X25519", "X448"), if present.
-         */subkeyAlgo: String?, 
+         */subkeyAlgo: String?,
         /**
          * Expiration timestamp as seconds since Unix epoch. None if the key never expires.
          */expiryTimestamp: UInt64?) {
@@ -2957,9 +2993,9 @@ public struct KeyInfo: Equatable, Hashable {
         self.expiryTimestamp = expiryTimestamp
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -2973,15 +3009,15 @@ public struct FfiConverterTypeKeyInfo: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeyInfo {
         return
             try KeyInfo(
-                fingerprint: FfiConverterString.read(from: &buf), 
-                keyVersion: FfiConverterUInt8.read(from: &buf), 
-                userId: FfiConverterOptionString.read(from: &buf), 
-                hasEncryptionSubkey: FfiConverterBool.read(from: &buf), 
-                isRevoked: FfiConverterBool.read(from: &buf), 
-                isExpired: FfiConverterBool.read(from: &buf), 
-                profile: FfiConverterTypeKeyProfile.read(from: &buf), 
-                primaryAlgo: FfiConverterString.read(from: &buf), 
-                subkeyAlgo: FfiConverterOptionString.read(from: &buf), 
+                fingerprint: FfiConverterString.read(from: &buf),
+                keyVersion: FfiConverterUInt8.read(from: &buf),
+                userId: FfiConverterOptionString.read(from: &buf),
+                hasEncryptionSubkey: FfiConverterBool.read(from: &buf),
+                isRevoked: FfiConverterBool.read(from: &buf),
+                isExpired: FfiConverterBool.read(from: &buf),
+                profile: FfiConverterTypeKeyProfile.read(from: &buf),
+                primaryAlgo: FfiConverterString.read(from: &buf),
+                subkeyAlgo: FfiConverterOptionString.read(from: &buf),
                 expiryTimestamp: FfiConverterOptionUInt64.read(from: &buf)
         )
     }
@@ -3044,10 +3080,10 @@ public struct ModifyExpiryResult: Equatable, Hashable {
         /**
          * Updated full certificate (public + secret) in binary OpenPGP format.
          * MUST be zeroized by the caller after SE wrapping.
-         */certData: Data, 
+         */certData: Data,
         /**
          * Updated public key only in binary OpenPGP format.
-         */publicKeyData: Data, 
+         */publicKeyData: Data,
         /**
          * Updated key info with new expiry status.
          */keyInfo: KeyInfo) {
@@ -3056,9 +3092,9 @@ public struct ModifyExpiryResult: Equatable, Hashable {
         self.keyInfo = keyInfo
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -3072,8 +3108,8 @@ public struct FfiConverterTypeModifyExpiryResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ModifyExpiryResult {
         return
             try ModifyExpiryResult(
-                certData: FfiConverterData.read(from: &buf), 
-                publicKeyData: FfiConverterData.read(from: &buf), 
+                certData: FfiConverterData.read(from: &buf),
+                publicKeyData: FfiConverterData.read(from: &buf),
                 keyInfo: FfiConverterTypeKeyInfo.read(from: &buf)
         )
     }
@@ -3112,19 +3148,25 @@ public struct PasswordDecryptResult: Equatable, Hashable {
     public var plaintext: Data?
     public var signatureStatus: SignatureStatus?
     public var signerFingerprint: String?
+    public var summaryState: SignatureVerificationState
+    public var summaryEntryIndex: UInt64?
+    public var signatures: [DetailedSignatureEntry]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(status: PasswordDecryptStatus, plaintext: Data?, signatureStatus: SignatureStatus?, signerFingerprint: String?) {
+    public init(status: PasswordDecryptStatus, plaintext: Data?, signatureStatus: SignatureStatus?, signerFingerprint: String?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry]) {
         self.status = status
         self.plaintext = plaintext
         self.signatureStatus = signatureStatus
         self.signerFingerprint = signerFingerprint
+        self.summaryState = summaryState
+        self.summaryEntryIndex = summaryEntryIndex
+        self.signatures = signatures
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -3138,10 +3180,13 @@ public struct FfiConverterTypePasswordDecryptResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordDecryptResult {
         return
             try PasswordDecryptResult(
-                status: FfiConverterTypePasswordDecryptStatus.read(from: &buf), 
-                plaintext: FfiConverterOptionData.read(from: &buf), 
-                signatureStatus: FfiConverterOptionTypeSignatureStatus.read(from: &buf), 
-                signerFingerprint: FfiConverterOptionString.read(from: &buf)
+                status: FfiConverterTypePasswordDecryptStatus.read(from: &buf),
+                plaintext: FfiConverterOptionData.read(from: &buf),
+                signatureStatus: FfiConverterOptionTypeSignatureStatus.read(from: &buf),
+                signerFingerprint: FfiConverterOptionString.read(from: &buf),
+                summaryState: FfiConverterTypeSignatureVerificationState.read(from: &buf),
+                summaryEntryIndex: FfiConverterOptionUInt64.read(from: &buf),
+                signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf)
         )
     }
 
@@ -3150,6 +3195,9 @@ public struct FfiConverterTypePasswordDecryptResult: FfiConverterRustBuffer {
         FfiConverterOptionData.write(value.plaintext, into: &buf)
         FfiConverterOptionTypeSignatureStatus.write(value.signatureStatus, into: &buf)
         FfiConverterOptionString.write(value.signerFingerprint, into: &buf)
+        FfiConverterTypeSignatureVerificationState.write(value.summaryState, into: &buf)
+        FfiConverterOptionUInt64.write(value.summaryEntryIndex, into: &buf)
+        FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
     }
 }
 
@@ -3191,10 +3239,10 @@ public struct PublicCertificateValidationResult: Equatable, Hashable {
     public init(
         /**
          * Canonical binary OpenPGP public certificate bytes.
-         */publicCertData: Data, 
+         */publicCertData: Data,
         /**
          * Parsed key metadata for the validated public certificate.
-         */keyInfo: KeyInfo, 
+         */keyInfo: KeyInfo,
         /**
          * Detected profile of the validated public certificate.
          */profile: KeyProfile) {
@@ -3203,9 +3251,9 @@ public struct PublicCertificateValidationResult: Equatable, Hashable {
         self.profile = profile
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -3219,8 +3267,8 @@ public struct FfiConverterTypePublicCertificateValidationResult: FfiConverterRus
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PublicCertificateValidationResult {
         return
             try PublicCertificateValidationResult(
-                publicCertData: FfiConverterData.read(from: &buf), 
-                keyInfo: FfiConverterTypeKeyInfo.read(from: &buf), 
+                publicCertData: FfiConverterData.read(from: &buf),
+                keyInfo: FfiConverterTypeKeyInfo.read(from: &buf),
                 profile: FfiConverterTypeKeyProfile.read(from: &buf)
         )
     }
@@ -3275,13 +3323,13 @@ public struct S2kInfo: Equatable, Hashable {
     public init(
         /**
          * S2K type: "iterated-salted" for Profile A, "argon2id" for Profile B, or "unknown".
-         */s2kType: String, 
+         */s2kType: String,
         /**
          * For Argon2id: memory requirement in KiB (2^encoded_m). 0 for non-Argon2id.
-         */memoryKib: UInt64, 
+         */memoryKib: UInt64,
         /**
          * For Argon2id: parallelism lanes. 0 for non-Argon2id.
-         */parallelism: UInt32, 
+         */parallelism: UInt32,
         /**
          * For Argon2id: time passes. 0 for non-Argon2id.
          */timePasses: UInt32) {
@@ -3291,9 +3339,9 @@ public struct S2kInfo: Equatable, Hashable {
         self.timePasses = timePasses
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -3307,9 +3355,9 @@ public struct FfiConverterTypeS2kInfo: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> S2kInfo {
         return
             try S2kInfo(
-                s2kType: FfiConverterString.read(from: &buf), 
-                memoryKib: FfiConverterUInt64.read(from: &buf), 
-                parallelism: FfiConverterUInt32.read(from: &buf), 
+                s2kType: FfiConverterString.read(from: &buf),
+                memoryKib: FfiConverterUInt64.read(from: &buf),
+                parallelism: FfiConverterUInt32.read(from: &buf),
                 timePasses: FfiConverterUInt32.read(from: &buf)
         )
     }
@@ -3339,6 +3387,66 @@ public func FfiConverterTypeS2kInfo_lower(_ value: S2kInfo) -> RustBuffer {
 
 
 /**
+ * Claimed or observed signer evidence available from signature metadata.
+ *
+ * These values are lookup clues only. They are not proof of signer identity unless
+ * `SignatureVerificationState::Verified` is backed by a verification certificate.
+ */
+public struct SignerEvidence: Equatable, Hashable {
+    public var issuerFingerprints: [String]
+    public var issuerKeyIds: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(issuerFingerprints: [String], issuerKeyIds: [String]) {
+        self.issuerFingerprints = issuerFingerprints
+        self.issuerKeyIds = issuerKeyIds
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SignerEvidence: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSignerEvidence: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SignerEvidence {
+        return
+            try SignerEvidence(
+                issuerFingerprints: FfiConverterSequenceString.read(from: &buf),
+                issuerKeyIds: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SignerEvidence, into buf: inout [UInt8]) {
+        FfiConverterSequenceString.write(value.issuerFingerprints, into: &buf)
+        FfiConverterSequenceString.write(value.issuerKeyIds, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSignerEvidence_lift(_ buf: RustBuffer) throws -> SignerEvidence {
+    return try FfiConverterTypeSignerEvidence.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSignerEvidence_lower(_ value: SignerEvidence) -> RustBuffer {
+    return FfiConverterTypeSignerEvidence.lower(value)
+}
+
+
+/**
  * Selector identity for a specific User ID occurrence in a certificate snapshot.
  */
 public struct UserIdSelectorInput: Equatable, Hashable {
@@ -3356,7 +3464,7 @@ public struct UserIdSelectorInput: Equatable, Hashable {
     public init(
         /**
          * Raw User ID packet bytes for the selected occurrence.
-         */userIdData: Data, 
+         */userIdData: Data,
         /**
          * 0-based occurrence index in the certificate's native User ID order.
          */occurrenceIndex: UInt64) {
@@ -3364,9 +3472,9 @@ public struct UserIdSelectorInput: Equatable, Hashable {
         self.occurrenceIndex = occurrenceIndex
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -3380,7 +3488,7 @@ public struct FfiConverterTypeUserIdSelectorInput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UserIdSelectorInput {
         return
             try UserIdSelectorInput(
-                userIdData: FfiConverterData.read(from: &buf), 
+                userIdData: FfiConverterData.read(from: &buf),
                 occurrenceIndex: FfiConverterUInt64.read(from: &buf)
         )
     }
@@ -3413,21 +3521,25 @@ public func FfiConverterTypeUserIdSelectorInput_lower(_ value: UserIdSelectorInp
 public struct VerifyDetailedResult: Equatable, Hashable {
     public var legacyStatus: SignatureStatus
     public var legacySignerFingerprint: String?
+    public var summaryState: SignatureVerificationState
+    public var summaryEntryIndex: UInt64?
     public var signatures: [DetailedSignatureEntry]
     public var content: Data?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, signatures: [DetailedSignatureEntry], content: Data?) {
+    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry], content: Data?) {
         self.legacyStatus = legacyStatus
         self.legacySignerFingerprint = legacySignerFingerprint
+        self.summaryState = summaryState
+        self.summaryEntryIndex = summaryEntryIndex
         self.signatures = signatures
         self.content = content
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -3441,9 +3553,11 @@ public struct FfiConverterTypeVerifyDetailedResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> VerifyDetailedResult {
         return
             try VerifyDetailedResult(
-                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf), 
-                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf), 
-                signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf), 
+                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf),
+                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf),
+                summaryState: FfiConverterTypeSignatureVerificationState.read(from: &buf),
+                summaryEntryIndex: FfiConverterOptionUInt64.read(from: &buf),
+                signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf),
                 content: FfiConverterOptionData.read(from: &buf)
         )
     }
@@ -3451,6 +3565,8 @@ public struct FfiConverterTypeVerifyDetailedResult: FfiConverterRustBuffer {
     public static func write(_ value: VerifyDetailedResult, into buf: inout [UInt8]) {
         FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
         FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
+        FfiConverterTypeSignatureVerificationState.write(value.summaryState, into: &buf)
+        FfiConverterOptionUInt64.write(value.summaryEntryIndex, into: &buf)
         FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
         FfiConverterOptionData.write(value.content, into: &buf)
     }
@@ -3494,10 +3610,10 @@ public struct VerifyResult: Equatable, Hashable {
     public init(
         /**
          * Signature verification status.
-         */status: SignatureStatus, 
+         */status: SignatureStatus,
         /**
          * Fingerprint of the signer key, if known.
-         */signerFingerprint: String?, 
+         */signerFingerprint: String?,
         /**
          * The signed content (for cleartext-signed messages).
          */content: Data?) {
@@ -3506,9 +3622,9 @@ public struct VerifyResult: Equatable, Hashable {
         self.content = content
     }
 
-    
 
-    
+
+
 }
 
 #if compiler(>=6)
@@ -3522,8 +3638,8 @@ public struct FfiConverterTypeVerifyResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> VerifyResult {
         return
             try VerifyResult(
-                status: FfiConverterTypeSignatureStatus.read(from: &buf), 
-                signerFingerprint: FfiConverterOptionString.read(from: &buf), 
+                status: FfiConverterTypeSignatureStatus.read(from: &buf),
+                signerFingerprint: FfiConverterOptionString.read(from: &buf),
                 content: FfiConverterOptionData.read(from: &buf)
         )
     }
@@ -3557,7 +3673,7 @@ public func FfiConverterTypeVerifyResult_lower(_ value: VerifyResult) -> RustBuf
  */
 
 public enum ArmorKind: Equatable, Hashable {
-    
+
     case publicKey
     case secretKey
     case message
@@ -3587,44 +3703,44 @@ public struct FfiConverterTypeArmorKind: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArmorKind {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .publicKey
-        
+
         case 2: return .secretKey
-        
+
         case 3: return .message
-        
+
         case 4: return .signature
-        
+
         case 5: return .unknown
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: ArmorKind, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .publicKey:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .secretKey:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .message:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .signature:
             writeInt(&buf, Int32(4))
-        
-        
+
+
         case .unknown:
             writeInt(&buf, Int32(5))
-        
+
         }
     }
 }
@@ -3652,7 +3768,7 @@ public func FfiConverterTypeArmorKind_lower(_ value: ArmorKind) -> RustBuffer {
  */
 
 public enum CertificateMergeOutcome: Equatable, Hashable {
-    
+
     /**
      * Incoming material was already present; the merged public cert is a no-op.
      */
@@ -3681,26 +3797,26 @@ public struct FfiConverterTypeCertificateMergeOutcome: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertificateMergeOutcome {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .noOp
-        
+
         case 2: return .updated
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: CertificateMergeOutcome, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .noOp:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .updated:
             writeInt(&buf, Int32(2))
-        
+
         }
     }
 }
@@ -3728,7 +3844,7 @@ public func FfiConverterTypeCertificateMergeOutcome_lower(_ value: CertificateMe
  */
 
 public enum CertificateSignatureStatus: Equatable, Hashable {
-    
+
     case valid
     case invalid
     case signerMissing
@@ -3752,32 +3868,32 @@ public struct FfiConverterTypeCertificateSignatureStatus: FfiConverterRustBuffer
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertificateSignatureStatus {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .valid
-        
+
         case 2: return .invalid
-        
+
         case 3: return .signerMissing
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: CertificateSignatureStatus, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .valid:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .invalid:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .signerMissing:
             writeInt(&buf, Int32(3))
-        
+
         }
     }
 }
@@ -3805,7 +3921,7 @@ public func FfiConverterTypeCertificateSignatureStatus_lower(_ value: Certificat
  */
 
 public enum CertificationKind: Equatable, Hashable {
-    
+
     case generic
     case persona
     case casual
@@ -3830,38 +3946,38 @@ public struct FfiConverterTypeCertificationKind: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CertificationKind {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .generic
-        
+
         case 2: return .persona
-        
+
         case 3: return .casual
-        
+
         case 4: return .positive
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: CertificationKind, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .generic:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .persona:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .casual:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .positive:
             writeInt(&buf, Int32(4))
-        
+
         }
     }
 }
@@ -3889,7 +4005,7 @@ public func FfiConverterTypeCertificationKind_lower(_ value: CertificationKind) 
  */
 
 public enum DetailedSignatureStatus: Equatable, Hashable {
-    
+
     case valid
     case unknownSigner
     case bad
@@ -3914,38 +4030,38 @@ public struct FfiConverterTypeDetailedSignatureStatus: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DetailedSignatureStatus {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .valid
-        
+
         case 2: return .unknownSigner
-        
+
         case 3: return .bad
-        
+
         case 4: return .expired
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: DetailedSignatureStatus, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .valid:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .unknownSigner:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .bad:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .expired:
             writeInt(&buf, Int32(4))
-        
+
         }
     }
 }
@@ -3975,7 +4091,7 @@ public func FfiConverterTypeDetailedSignatureStatus_lower(_ value: DetailedSigna
  */
 
 public enum KeyProfile: Equatable, Hashable {
-    
+
     /**
      * Profile A: Universal compatible. v4 keys, GnuPG compatible.
      */
@@ -4004,26 +4120,26 @@ public struct FfiConverterTypeKeyProfile: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeyProfile {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .universal
-        
+
         case 2: return .advanced
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: KeyProfile, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .universal:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .advanced:
             writeInt(&buf, Int32(2))
-        
+
         }
     }
 }
@@ -4051,7 +4167,7 @@ public func FfiConverterTypeKeyProfile_lower(_ value: KeyProfile) -> RustBuffer 
  */
 
 public enum PasswordDecryptStatus: Equatable, Hashable {
-    
+
     case decrypted
     case noSkesk
     case passwordRejected
@@ -4075,32 +4191,32 @@ public struct FfiConverterTypePasswordDecryptStatus: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordDecryptStatus {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .decrypted
-        
+
         case 2: return .noSkesk
-        
+
         case 3: return .passwordRejected
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: PasswordDecryptStatus, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .decrypted:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .noSkesk:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .passwordRejected:
             writeInt(&buf, Int32(3))
-        
+
         }
     }
 }
@@ -4128,7 +4244,7 @@ public func FfiConverterTypePasswordDecryptStatus_lower(_ value: PasswordDecrypt
  */
 
 public enum PasswordMessageFormat: Equatable, Hashable {
-    
+
     case seipdv1
     case seipdv2
 
@@ -4151,26 +4267,26 @@ public struct FfiConverterTypePasswordMessageFormat: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordMessageFormat {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .seipdv1
-        
+
         case 2: return .seipdv2
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: PasswordMessageFormat, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .seipdv1:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .seipdv2:
             writeInt(&buf, Int32(2))
-        
+
         }
     }
 }
@@ -4199,8 +4315,8 @@ public func FfiConverterTypePasswordMessageFormat_lower(_ value: PasswordMessage
  */
 public enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
-    
-    
+
+
     /**
      * Key generation failed.
      */
@@ -4311,15 +4427,15 @@ public enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedErro
     case KeyTooLargeForQr(sizeBytes: UInt64, maxBytes: UInt64
     )
 
-    
 
-    
 
-    
+
+
+
     public var errorDescription: String? {
         String(reflecting: self)
     }
-    
+
 }
 
 #if compiler(>=6)
@@ -4336,9 +4452,9 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
 
-        
 
-        
+
+
         case 1: return .KeyGenerationFailed(
             reason: try FfiConverterString.read(from: &buf)
             )
@@ -4384,7 +4500,7 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
             reason: try FfiConverterString.read(from: &buf)
             )
         case 21: return .KeyTooLargeForQr(
-            sizeBytes: try FfiConverterUInt64.read(from: &buf), 
+            sizeBytes: try FfiConverterUInt64.read(from: &buf),
             maxBytes: try FfiConverterUInt64.read(from: &buf)
             )
 
@@ -4395,107 +4511,107 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
     public static func write(_ value: PgpError, into buf: inout [UInt8]) {
         switch value {
 
-        
 
-        
-        
+
+
+
         case let .KeyGenerationFailed(reason):
             writeInt(&buf, Int32(1))
             FfiConverterString.write(reason, into: &buf)
-            
-        
+
+
         case let .InvalidKeyData(reason):
             writeInt(&buf, Int32(2))
             FfiConverterString.write(reason, into: &buf)
-            
-        
+
+
         case .NoMatchingKey:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .AeadAuthenticationFailed:
             writeInt(&buf, Int32(4))
-        
-        
+
+
         case .IntegrityCheckFailed:
             writeInt(&buf, Int32(5))
-        
-        
+
+
         case .BadSignature:
             writeInt(&buf, Int32(6))
-        
-        
+
+
         case .UnknownSigner:
             writeInt(&buf, Int32(7))
-        
-        
+
+
         case .KeyExpired:
             writeInt(&buf, Int32(8))
-        
-        
+
+
         case let .UnsupportedAlgorithm(algo):
             writeInt(&buf, Int32(9))
             FfiConverterString.write(algo, into: &buf)
-            
-        
+
+
         case let .CorruptData(reason):
             writeInt(&buf, Int32(10))
             FfiConverterString.write(reason, into: &buf)
-            
-        
+
+
         case .WrongPassphrase:
             writeInt(&buf, Int32(11))
-        
-        
+
+
         case let .EncryptionFailed(reason):
             writeInt(&buf, Int32(12))
             FfiConverterString.write(reason, into: &buf)
-            
-        
+
+
         case let .SigningFailed(reason):
             writeInt(&buf, Int32(13))
             FfiConverterString.write(reason, into: &buf)
-            
-        
+
+
         case let .ArmorError(reason):
             writeInt(&buf, Int32(14))
             FfiConverterString.write(reason, into: &buf)
-            
-        
+
+
         case let .S2kError(reason):
             writeInt(&buf, Int32(15))
             FfiConverterString.write(reason, into: &buf)
-            
-        
+
+
         case let .Argon2idMemoryExceeded(requiredMb):
             writeInt(&buf, Int32(16))
             FfiConverterUInt64.write(requiredMb, into: &buf)
-            
-        
+
+
         case let .RevocationError(reason):
             writeInt(&buf, Int32(17))
             FfiConverterString.write(reason, into: &buf)
-            
-        
+
+
         case let .InternalError(reason):
             writeInt(&buf, Int32(18))
             FfiConverterString.write(reason, into: &buf)
-            
-        
+
+
         case .OperationCancelled:
             writeInt(&buf, Int32(19))
-        
-        
+
+
         case let .FileIoError(reason):
             writeInt(&buf, Int32(20))
             FfiConverterString.write(reason, into: &buf)
-            
-        
+
+
         case let .KeyTooLargeForQr(sizeBytes,maxBytes):
             writeInt(&buf, Int32(21))
             FfiConverterUInt64.write(sizeBytes, into: &buf)
             FfiConverterUInt64.write(maxBytes, into: &buf)
-            
+
         }
     }
 }
@@ -4522,7 +4638,7 @@ public func FfiConverterTypePgpError_lower(_ value: PgpError) -> RustBuffer {
  */
 
 public enum SignatureStatus: Equatable, Hashable {
-    
+
     /**
      * Signature is valid and the signer key is known.
      */
@@ -4564,44 +4680,44 @@ public struct FfiConverterTypeSignatureStatus: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SignatureStatus {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .valid
-        
+
         case 2: return .unknownSigner
-        
+
         case 3: return .bad
-        
+
         case 4: return .notSigned
-        
+
         case 5: return .expired
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: SignatureStatus, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .valid:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .unknownSigner:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .bad:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .notSigned:
             writeInt(&buf, Int32(4))
-        
-        
+
+
         case .expired:
             writeInt(&buf, Int32(5))
-        
+
         }
     }
 }
@@ -4619,6 +4735,104 @@ public func FfiConverterTypeSignatureStatus_lift(_ buf: RustBuffer) throws -> Si
 #endif
 public func FfiConverterTypeSignatureStatus_lower(_ value: SignatureStatus) -> RustBuffer {
     return FfiConverterTypeSignatureStatus.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Certificate-backed verification state for a signature entry or summary.
+ */
+
+public enum SignatureVerificationState: Equatable, Hashable {
+
+    case notSigned
+    case verified
+    case invalid
+    case expired
+    case signerCertificateUnavailable
+    case signerEvidenceUnavailable
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SignatureVerificationState: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSignatureVerificationState: FfiConverterRustBuffer {
+    typealias SwiftType = SignatureVerificationState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SignatureVerificationState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .notSigned
+
+        case 2: return .verified
+
+        case 3: return .invalid
+
+        case 4: return .expired
+
+        case 5: return .signerCertificateUnavailable
+
+        case 6: return .signerEvidenceUnavailable
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SignatureVerificationState, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .notSigned:
+            writeInt(&buf, Int32(1))
+
+
+        case .verified:
+            writeInt(&buf, Int32(2))
+
+
+        case .invalid:
+            writeInt(&buf, Int32(3))
+
+
+        case .expired:
+            writeInt(&buf, Int32(4))
+
+
+        case .signerCertificateUnavailable:
+            writeInt(&buf, Int32(5))
+
+
+        case .signerEvidenceUnavailable:
+            writeInt(&buf, Int32(6))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSignatureVerificationState_lift(_ buf: RustBuffer) throws -> SignatureVerificationState {
+    return try FfiConverterTypeSignatureVerificationState.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSignatureVerificationState_lower(_ value: SignatureVerificationState) -> RustBuffer {
+    return FfiConverterTypeSignatureVerificationState.lower(value)
 }
 
 

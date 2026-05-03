@@ -99,6 +99,7 @@ final class SigningServiceTests: XCTestCase {
         let result = try await stack.signingService.verifyCleartext(signed)
         XCTAssertEqual(result.verification.status, .valid,
                        "Valid signature should verify as .valid")
+        XCTAssertEqual(result.verification.verificationState, .verified)
     }
 
     func test_verifyCleartext_profileB_validSignature_returnsValid() async throws {
@@ -131,6 +132,7 @@ final class SigningServiceTests: XCTestCase {
         let result = try await stack.signingService.verifyCleartext(signed)
         XCTAssertEqual(result.verification.status, .bad,
                        "Tampered message should verify as .bad")
+        XCTAssertEqual(result.verification.verificationState, .invalid)
     }
 
     func test_verifyCleartext_profileB_tamperedMessage_returnsBad() async throws {
@@ -173,6 +175,10 @@ final class SigningServiceTests: XCTestCase {
         let result = try await stack.signingService.verifyCleartext(strangerSigned)
         XCTAssertEqual(result.verification.status, .unknownSigner,
                        "Unknown signer should be flagged")
+        XCTAssertEqual(result.verification.verificationState, .contactsContextUnavailable)
+        XCTAssertTrue(result.verification.requiresContactsContext)
+        XCTAssertEqual(result.verification.contactsUnavailableReason, .locked)
+        XCTAssertEqual(result.verification.signerEvidence?.hasSignerEvidence, true)
     }
 
     func test_verifyCleartext_profileB_unknownSigner_returnsUnknownSigner() async throws {
@@ -193,6 +199,8 @@ final class SigningServiceTests: XCTestCase {
         let result = try await stack.signingService.verifyCleartext(strangerSigned)
         XCTAssertEqual(result.verification.status, .unknownSigner,
                        "Unknown Profile B signer should be flagged")
+        XCTAssertEqual(result.verification.verificationState, .contactsContextUnavailable)
+        XCTAssertTrue(result.verification.requiresContactsContext)
     }
 
     // MARK: - Detached Verification

@@ -10,7 +10,7 @@ use pgp_mobile::decrypt::{self, SignatureStatus};
 use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, GeneratedKey, KeyProfile};
-use pgp_mobile::signature_details::DetailedSignatureStatus;
+use pgp_mobile::signature_details::{DetailedSignatureStatus, SignatureVerificationState};
 use pgp_mobile::{streaming, verify};
 use sequoia_openpgp as openpgp;
 use tempfile::NamedTempFile;
@@ -151,6 +151,8 @@ fn test_verify_cleartext_detailed_multi_signature_all_valid() {
     .expect("legacy verification should succeed");
 
     assert_eq!(detailed.legacy_status, legacy.status);
+    assert_eq!(detailed.summary_state, SignatureVerificationState::Verified);
+    assert_eq!(detailed.summary_entry_index, Some(0));
     assert_eq!(
         detailed.legacy_signer_fingerprint,
         legacy.signer_fingerprint
@@ -164,6 +166,10 @@ fn test_verify_cleartext_detailed_multi_signature_all_valid() {
         .signatures
         .iter()
         .all(|entry| entry.status == DetailedSignatureStatus::Valid));
+    assert!(detailed
+        .signatures
+        .iter()
+        .all(|entry| entry.state == SignatureVerificationState::Verified));
     let observed_fingerprints: Vec<String> = detailed
         .signatures
         .iter()
@@ -194,6 +200,7 @@ fn test_verify_cleartext_detailed_expired_signer_matches_legacy_and_preserves_en
         .expect("expired legacy verification should still grade");
 
     assert_eq!(detailed.legacy_status, SignatureStatus::Expired);
+    assert_eq!(detailed.summary_state, SignatureVerificationState::Expired);
     assert_eq!(
         detailed.legacy_signer_fingerprint,
         legacy.signer_fingerprint
@@ -215,6 +222,7 @@ fn test_verify_detached_detailed_repeated_signer_preserves_repeated_entries() {
         .expect("detailed detached verification should succeed");
 
     assert_eq!(detailed.legacy_status, SignatureStatus::Valid);
+    assert_eq!(detailed.summary_state, SignatureVerificationState::Verified);
     assert_eq!(detailed.signatures.len(), 2);
     assert_eq!(
         detailed.signatures[0].status,
@@ -245,6 +253,7 @@ fn test_verify_detached_detailed_known_plus_unknown_preserves_unknown_nil_finger
         .expect("detailed detached verification should succeed");
 
     assert_eq!(detailed.legacy_status, SignatureStatus::Valid);
+    assert_eq!(detailed.summary_state, SignatureVerificationState::Verified);
     assert_eq!(detailed.signatures.len(), 2);
     assert!(detailed
         .signatures
@@ -253,7 +262,10 @@ fn test_verify_detached_detailed_known_plus_unknown_preserves_unknown_nil_finger
             && entry.signer_primary_fingerprint == Some(signer_a.fingerprint.clone())));
     assert!(detailed.signatures.iter().any(|entry| entry.status
         == DetailedSignatureStatus::UnknownSigner
-        && entry.signer_primary_fingerprint.is_none()));
+        && entry.signer_primary_fingerprint.is_none()
+        && entry.state == SignatureVerificationState::SignerCertificateUnavailable
+        && (!entry.signer_evidence.issuer_fingerprints.is_empty()
+            || !entry.signer_evidence.issuer_key_ids.is_empty())));
 }
 
 #[test]
@@ -272,6 +284,7 @@ fn test_verify_detached_detailed_tampered_data_matches_legacy_bad() {
         .expect("tampered legacy verification should grade");
 
     assert_eq!(detailed.legacy_status, SignatureStatus::Bad);
+    assert_eq!(detailed.summary_state, SignatureVerificationState::Invalid);
     assert_eq!(detailed.legacy_status, legacy.status);
     assert_eq!(
         detailed.legacy_signer_fingerprint,
@@ -306,18 +319,33 @@ fn test_verify_detached_file_detailed_matches_in_memory_and_legacy_fields() {
     )
     .expect("legacy file verification should succeed");
 
-    assert_eq!(file_detailed.legacy_status, in_memory_detailed.legacy_status);
+    assert_eq!(
+        file_detailed.legacy_status,
+        in_memory_detailed.legacy_status
+    );
+    assert_eq!(
+        file_detailed.summary_state,
+        in_memory_detailed.summary_state
+    );
+    assert_eq!(
+        file_detailed.summary_entry_index,
+        in_memory_detailed.summary_entry_index
+    );
     assert_eq!(
         file_detailed.legacy_signer_fingerprint,
         in_memory_detailed.legacy_signer_fingerprint
     );
     assert_eq!(file_detailed.signatures, in_memory_detailed.signatures);
     assert_eq!(file_detailed.legacy_status, legacy.status);
-    assert_eq!(file_detailed.legacy_signer_fingerprint, legacy.signer_fingerprint);
+    assert_eq!(
+        file_detailed.legacy_signer_fingerprint,
+        legacy.signer_fingerprint
+    );
     assert_eq!(file_detailed.signatures.len(), 2);
     assert!(file_detailed.signatures.iter().any(|entry| {
         entry.status == DetailedSignatureStatus::UnknownSigner
             && entry.signer_primary_fingerprint.is_none()
+            && entry.state == SignatureVerificationState::SignerCertificateUnavailable
     }));
 }
 
@@ -350,14 +378,24 @@ fn test_verify_detached_file_detailed_tampered_data_matches_in_memory_bad() {
     .expect("legacy file verification should grade");
 
     assert_eq!(file_detailed.legacy_status, SignatureStatus::Bad);
-    assert_eq!(file_detailed.legacy_status, in_memory_detailed.legacy_status);
+    assert_eq!(
+        file_detailed.summary_state,
+        SignatureVerificationState::Invalid
+    );
+    assert_eq!(
+        file_detailed.legacy_status,
+        in_memory_detailed.legacy_status
+    );
     assert_eq!(
         file_detailed.legacy_signer_fingerprint,
         in_memory_detailed.legacy_signer_fingerprint
     );
     assert_eq!(file_detailed.signatures, in_memory_detailed.signatures);
     assert_eq!(file_detailed.legacy_status, legacy.status);
-    assert_eq!(file_detailed.legacy_signer_fingerprint, legacy.signer_fingerprint);
+    assert_eq!(
+        file_detailed.legacy_signer_fingerprint,
+        legacy.signer_fingerprint
+    );
 }
 
 #[test]
@@ -389,6 +427,7 @@ fn test_decrypt_detailed_multi_signature_matches_legacy_and_preserves_entries() 
     .expect("legacy decrypt should succeed");
 
     assert_eq!(detailed.legacy_status, legacy.signature_status.unwrap());
+    assert_eq!(detailed.summary_state, SignatureVerificationState::Verified);
     assert_eq!(
         detailed.legacy_signer_fingerprint,
         legacy.signer_fingerprint
@@ -420,6 +459,11 @@ fn test_decrypt_detailed_unsigned_returns_empty_signatures_and_not_signed() {
         .expect("unsigned detailed decrypt should succeed");
 
     assert_eq!(detailed.legacy_status, SignatureStatus::NotSigned);
+    assert_eq!(
+        detailed.summary_state,
+        SignatureVerificationState::NotSigned
+    );
+    assert_eq!(detailed.summary_entry_index, None);
     assert!(detailed.signatures.is_empty());
 }
 
@@ -454,6 +498,11 @@ fn test_decrypt_file_detailed_unsigned_returns_empty_signatures_and_not_signed()
     .expect("file detailed decrypt should succeed");
 
     assert_eq!(detailed.legacy_status, SignatureStatus::NotSigned);
+    assert_eq!(
+        detailed.summary_state,
+        SignatureVerificationState::NotSigned
+    );
+    assert_eq!(detailed.summary_entry_index, None);
     assert!(detailed.signatures.is_empty());
 }
 

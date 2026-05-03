@@ -21,6 +21,7 @@ use pgp_mobile::decrypt::SignatureStatus;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::password::{self, PasswordDecryptStatus, PasswordMessageFormat};
+use pgp_mobile::signature_details::SignatureVerificationState;
 use sequoia_openpgp as openpgp;
 
 fn gen_key(name: &str, profile: KeyProfile) -> keys::GeneratedKey {
@@ -301,6 +302,8 @@ fn test_password_encrypt_decrypt_armored_seipdv1_round_trip_unsigned() {
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
     assert_eq!(result.signature_status, Some(SignatureStatus::NotSigned));
+    assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
+    assert!(result.signatures.is_empty());
 }
 
 #[test]
@@ -327,6 +330,57 @@ fn test_password_encrypt_decrypt_armored_seipdv2_round_trip_signed() {
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
     assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
     assert_eq!(result.signer_fingerprint, Some(signer.fingerprint));
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
+    assert_eq!(result.summary_entry_index, Some(0));
+    assert_eq!(result.signatures.len(), 1);
+    assert_eq!(
+        result.signatures[0].state,
+        SignatureVerificationState::Verified
+    );
+}
+
+#[test]
+fn test_password_decrypt_signed_without_verification_cert_preserves_signer_evidence() {
+    let password: Password = "password missing verification cert".into();
+    let signer = gen_key("Password Missing Signer", KeyProfile::Universal);
+    let plaintext = b"Password signed message without verification cert.";
+
+    let ciphertext = password::encrypt_binary(
+        plaintext,
+        &password,
+        PasswordMessageFormat::Seipdv1,
+        Some(&signer.cert_data),
+    )
+    .expect("password encryption should succeed");
+
+    let result =
+        password::decrypt(&ciphertext, &password, &[]).expect("password decryption should succeed");
+    assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
+    assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
+    assert_eq!(
+        result.signature_status,
+        Some(SignatureStatus::UnknownSigner)
+    );
+    assert_eq!(
+        result.summary_state,
+        SignatureVerificationState::SignerCertificateUnavailable
+    );
+    assert_eq!(result.summary_entry_index, Some(0));
+    assert_eq!(result.signatures.len(), 1);
+    assert_eq!(
+        result.signatures[0].state,
+        SignatureVerificationState::SignerCertificateUnavailable
+    );
+    assert!(
+        !result.signatures[0]
+            .signer_evidence
+            .issuer_fingerprints
+            .is_empty()
+            || !result.signatures[0]
+                .signer_evidence
+                .issuer_key_ids
+                .is_empty()
+    );
 }
 
 #[test]
@@ -349,6 +403,7 @@ fn test_password_encrypt_decrypt_binary_seipdv1_round_trip_signed() {
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
     assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
     assert_eq!(result.signer_fingerprint, Some(signer.fingerprint));
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
 #[test]
@@ -365,6 +420,8 @@ fn test_password_encrypt_decrypt_binary_seipdv2_round_trip_unsigned() {
     assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
     assert_eq!(result.plaintext.as_deref(), Some(&plaintext[..]));
     assert_eq!(result.signature_status, Some(SignatureStatus::NotSigned));
+    assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
+    assert!(result.signatures.is_empty());
 }
 
 #[test]

@@ -75,9 +75,13 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
         XCTAssertEqual(detailed.signatures.count, 2)
         XCTAssertEqual(detailed.signatures[0].status, .unknownSigner)
+        XCTAssertEqual(detailed.signatures[0].verificationState, .signerCertificateUnavailable)
+        XCTAssertEqual(detailed.signatures[0].signerEvidence.hasSignerEvidence, true)
+        XCTAssertNil(detailed.signatures[0].contactsUnavailableReason)
         XCTAssertNil(detailed.signatures[0].signerPrimaryFingerprint)
         XCTAssertNil(detailed.signatures[0].signerIdentity)
         XCTAssertEqual(detailed.signatures[1].status, .valid)
+        XCTAssertEqual(detailed.signatures[1].verificationState, .verified)
         XCTAssertEqual(
             detailed.signatures[1].signerPrimaryFingerprint,
             signerAInfo.fingerprint
@@ -178,9 +182,12 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         XCTAssertEqual(detailed.legacyStatus, .expired)
         XCTAssertEqual(detailed.signatures.count, 2)
         XCTAssertEqual(detailed.signatures[0].status, .unknownSigner)
+        XCTAssertEqual(detailed.signatures[0].verificationState, .signerCertificateUnavailable)
+        XCTAssertEqual(detailed.signatures[0].signerEvidence.hasSignerEvidence, true)
         XCTAssertNil(detailed.signatures[0].signerPrimaryFingerprint)
         XCTAssertNil(detailed.signatures[0].signerIdentity)
         XCTAssertEqual(detailed.signatures[1].status, .expired)
+        XCTAssertEqual(detailed.signatures[1].verificationState, .expired)
         XCTAssertEqual(
             detailed.signatures[1].signerPrimaryFingerprint,
             expiredInfo.fingerprint
@@ -316,10 +323,12 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
         XCTAssertEqual(detailed.verification.signatures.count, 1)
         XCTAssertEqual(detailed.verification.signatures[0].status, .valid)
+        XCTAssertEqual(detailed.verification.signatures[0].verificationState, .verified)
         XCTAssertEqual(
             detailed.verification.signatures[0].signerPrimaryFingerprint,
             identity.fingerprint
         )
+        XCTAssertEqual(detailed.verification.signatures[0].signerIdentity?.source, .ownKey)
         assertLegacyVerificationEquivalent(
             detailed.verification.legacyVerification,
             legacy.verification

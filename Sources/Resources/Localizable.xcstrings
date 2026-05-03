@@ -10593,6 +10593,22 @@
         }
       }
     },
+    "signature.contactsContextUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacts verification context is unavailable — signer cannot be verified yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人验证上下文不可用——暂时无法验证签名者"
+          }
+        }
+      }
+    },
     "signature.expired" : {
       "localizations" : {
         "en" : {
@@ -10717,6 +10733,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此消息未签名"
+          }
+        }
+      }
+    },
+    "signature.signerCertificateUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer certificate unavailable — signature could not be verified"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名者证书不可用——无法验证签名"
+          }
+        }
+      }
+    },
+    "signature.signerEvidenceUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signer evidence unavailable — signature could not be matched to a key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "签名者证据不可用——无法将签名匹配到密钥"
           }
         }
       }
