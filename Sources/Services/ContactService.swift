@@ -18,12 +18,14 @@ enum AddContactResult {
 ///
 /// No Keychain access needed — contacts are public keys only.
 @Observable
-final class ContactService {
+final class ContactService: @unchecked Sendable {
     /// All imported contacts.
     private(set) var contacts: [Contact] = []
 
     private let engine: PgpEngine
     private let repository: ContactRepository
+    private let domainRepository: ContactsDomainRepository
+    private var contactsAvailability: ContactsAvailability = .locked
     private var verificationStates: [String: ContactVerificationState] = [:]
 
     init(engine: PgpEngine, contactsDirectory: URL? = nil) {
@@ -39,6 +41,7 @@ final class ContactService {
             )
         }
         repository = ContactRepository(contactsDirectory: resolvedContactsDirectory)
+        domainRepository = ContactsDomainRepository()
     }
 
     // MARK: - Load Contacts
@@ -66,11 +69,11 @@ final class ContactService {
             verificationStates = filteredStates
             try repository.saveVerificationStates(verificationStates)
         }
+        try refreshCompatibilityProjection()
     }
 
     func resetInMemoryStateAfterLocalDataReset() {
-        contacts = []
-        verificationStates = [:]
+        clearContactsRuntimeState()
     }
 
     // MARK: - Add Contact
@@ -121,6 +124,7 @@ final class ContactService {
                     verificationStates[contact.fingerprint] = resolvedVerificationState
                     try repository.saveVerificationStates(verificationStates)
                 }
+                try refreshCompatibilityProjection()
                 return .duplicate(contacts[existingIndex])
 
             case .updated:
@@ -153,6 +157,7 @@ final class ContactService {
                 verificationStates[updatedContact.fingerprint] = updatedContact.verificationState
                 try repository.saveVerificationStates(verificationStates)
                 contacts[existingIndex] = updatedContact
+                try refreshCompatibilityProjection()
                 return .updated(updatedContact)
             }
         }
@@ -175,6 +180,7 @@ final class ContactService {
         verificationStates[contact.fingerprint] = contact.verificationState
         try repository.saveVerificationStates(verificationStates)
         contacts.append(contact)
+        try refreshCompatibilityProjection()
         return .added(contact)
     }
 
@@ -212,6 +218,7 @@ final class ContactService {
         }
 
         try repository.saveVerificationStates(verificationStates)
+        try refreshCompatibilityProjection()
         return verifiedContact
     }
 
@@ -223,6 +230,7 @@ final class ContactService {
         contacts.removeAll { $0.fingerprint == fingerprint }
         verificationStates.removeValue(forKey: fingerprint)
         try repository.saveVerificationStates(verificationStates)
+        try refreshCompatibilityProjection()
     }
 
     func setVerificationState(
@@ -238,6 +246,32 @@ final class ContactService {
         contacts[index].verificationState = verificationState
         verificationStates[fingerprint] = verificationState
         try repository.saveVerificationStates(verificationStates)
+        try refreshCompatibilityProjection()
+    }
+
+    var contactsAvailabilityForContactsPR1: ContactsAvailability {
+        contactsAvailability
+    }
+
+    func currentCompatibilitySnapshotForContactsPR1() throws -> ContactsDomainSnapshot {
+        try domainRepository.makeCompatibilitySnapshot(from: contacts)
+    }
+
+    func compatibilityContactsForContactsPR1(
+        from snapshot: ContactsDomainSnapshot
+    ) throws -> [Contact] {
+        try domainRepository.makeCompatibilityContacts(from: snapshot)
+    }
+
+    func seedContactsDomainRuntimeStateForContactsPR1Tests() {
+        domainRepository.seedRuntimeStateForContactsPR1Tests()
+    }
+
+    var contactsDomainRuntimeStateIsClearedForContactsPR1Tests: Bool {
+        contacts.isEmpty &&
+        verificationStates.isEmpty &&
+        contactsAvailability == .locked &&
+        domainRepository.runtimeStateIsClearedForContactsPR1Tests
     }
 
     // MARK: - Lookup
@@ -331,5 +365,23 @@ final class ContactService {
         return contacts.first {
             $0.userId == userId && $0.fingerprint != fingerprint
         }
+    }
+
+    private func refreshCompatibilityProjection() throws {
+        _ = try domainRepository.updateCompatibilityRuntime(from: contacts)
+        contactsAvailability = .availableLegacyCompatibility
+    }
+
+    private func clearContactsRuntimeState() {
+        contacts = []
+        verificationStates = [:]
+        contactsAvailability = .locked
+        domainRepository.clearRuntimeState()
+    }
+}
+
+extension ContactService: ProtectedDataRelockParticipant {
+    func relockProtectedData() async throws {
+        clearContactsRuntimeState()
     }
 }

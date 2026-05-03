@@ -369,6 +369,7 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let contactService = ContactService(engine: engine)
+        protectedDataSessionCoordinator.registerRelockParticipant(contactService)
         let temporaryArtifactStore = AppTemporaryArtifactStore()
         let encryptionService = EncryptionService(
             engine: engine,
@@ -727,6 +728,7 @@ final class AppContainer: @unchecked Sendable {
             engine: engine,
             contactsDirectory: contactsDirectory
         )
+        protectedDataSessionCoordinator.registerRelockParticipant(contactService)
         let temporaryArtifactStore = AppTemporaryArtifactStore()
         let encryptionService = EncryptionService(
             engine: engine,
