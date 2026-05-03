@@ -449,6 +449,22 @@
         }
       }
     },
+    "app.loadWarning.contactsMigration" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir and unlock again to retry cleanup."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人已从受保护的应用数据中打开，但旧联系人文件未能完全清理。请重启 CypherAir 并再次解锁以重试清理。"
+          }
+        }
+      }
+    },
     "app.loadWarning.legacyMetadataMigration" : {
       "localizations" : {
         "en" : {
@@ -2269,6 +2285,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法读取联系人元数据。"
+          }
+        }
+      }
+    },
+    "contacts.quarantine.exists" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacts quarantine already exists."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人隔离目录已存在。"
           }
         }
       }

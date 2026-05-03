@@ -38,6 +38,7 @@ final class ContactServiceTests: XCTestCase {
             let frameworkState: ProtectedDataFrameworkState
             let availability: ContactsAvailability
             let allowsLegacyLoad: Bool
+            let allowsProtectedOpen: Bool
         }
 
         let settingsDomain = ProtectedDataDomainID(rawValue: "settings")
@@ -47,84 +48,96 @@ final class ContactServiceTests: XCTestCase {
                 outcome: .opened([settingsDomain]),
                 frameworkState: .restartRequired,
                 availability: .restartRequired,
-                allowsLegacyLoad: false
+                allowsLegacyLoad: false,
+                allowsProtectedOpen: false
             ),
             MappingCase(
                 name: "framework recovery override",
                 outcome: .opened([settingsDomain]),
                 frameworkState: .frameworkRecoveryNeeded,
                 availability: .frameworkUnavailable,
-                allowsLegacyLoad: false
+                allowsLegacyLoad: false,
+                allowsProtectedOpen: false
             ),
             MappingCase(
                 name: "opened authorized",
                 outcome: .opened([settingsDomain]),
                 frameworkState: .sessionAuthorized,
                 availability: .opening,
-                allowsLegacyLoad: true
+                allowsLegacyLoad: true,
+                allowsProtectedOpen: true
             ),
             MappingCase(
                 name: "no registered domain authorized",
                 outcome: .noRegisteredDomainPresent,
                 frameworkState: .sessionAuthorized,
                 availability: .opening,
-                allowsLegacyLoad: true
+                allowsLegacyLoad: true,
+                allowsProtectedOpen: true
             ),
             MappingCase(
                 name: "no registered openers authorized",
                 outcome: .noRegisteredOpeners,
                 frameworkState: .sessionAuthorized,
                 availability: .opening,
-                allowsLegacyLoad: true
+                allowsLegacyLoad: true,
+                allowsProtectedOpen: true
             ),
             MappingCase(
                 name: "no protected domain",
                 outcome: .noProtectedDomainPresent,
                 frameworkState: .sessionAuthorized,
                 availability: .locked,
-                allowsLegacyLoad: false
+                allowsLegacyLoad: false,
+                allowsProtectedOpen: false
             ),
             MappingCase(
                 name: "no authenticated context",
                 outcome: .noAuthenticatedContext,
                 frameworkState: .sessionAuthorized,
                 availability: .locked,
-                allowsLegacyLoad: false
+                allowsLegacyLoad: false,
+                allowsProtectedOpen: false
             ),
             MappingCase(
                 name: "authorization denied",
                 outcome: .authorizationDenied,
                 frameworkState: .sessionAuthorized,
                 availability: .locked,
-                allowsLegacyLoad: false
+                allowsLegacyLoad: false,
+                allowsProtectedOpen: false
             ),
             MappingCase(
                 name: "pending mutation recovery",
                 outcome: .pendingMutationRecoveryRequired,
                 frameworkState: .sessionAuthorized,
                 availability: .frameworkUnavailable,
-                allowsLegacyLoad: false
+                allowsLegacyLoad: false,
+                allowsProtectedOpen: false
             ),
             MappingCase(
                 name: "framework recovery outcome",
                 outcome: .frameworkRecoveryNeeded,
                 frameworkState: .sessionAuthorized,
                 availability: .frameworkUnavailable,
-                allowsLegacyLoad: false
+                allowsLegacyLoad: false,
+                allowsProtectedOpen: false
             ),
             MappingCase(
                 name: "domain open failed",
                 outcome: .domainOpenFailed(settingsDomain),
                 frameworkState: .sessionAuthorized,
                 availability: .frameworkUnavailable,
-                allowsLegacyLoad: false
+                allowsLegacyLoad: false,
+                allowsProtectedOpen: false
             ),
             MappingCase(
                 name: "locked framework state",
                 outcome: .opened([settingsDomain]),
                 frameworkState: .sessionLocked,
                 availability: .locked,
-                allowsLegacyLoad: false
+                allowsLegacyLoad: false,
+                allowsProtectedOpen: false
             ),
         ]
 
@@ -136,6 +149,7 @@ final class ContactServiceTests: XCTestCase {
 
             XCTAssertEqual(result.availability, testCase.availability, testCase.name)
             XCTAssertEqual(result.allowsLegacyCompatibilityLoad, testCase.allowsLegacyLoad, testCase.name)
+            XCTAssertEqual(result.allowsProtectedDomainOpen, testCase.allowsProtectedOpen, testCase.name)
             XCTAssertTrue(result.clearsRuntime, testCase.name)
         }
     }
@@ -189,6 +203,259 @@ final class ContactServiceTests: XCTestCase {
                 return XCTFail("Expected contactsUnavailable(.locked), got \(error)")
             }
         }
+    }
+
+    func test_contactsPR4MigratesLegacyIntoProtectedDomainAndDeletesQuarantineOnLaterOpen() async throws {
+        let generated = try engine.generateKey(
+            name: "PR4 Migration",
+            email: "pr4-migration@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try contactService.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .unverified
+        )
+        let quarantineDirectory = ContactRepository(contactsDirectory: tempDir).quarantineDirectory
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4Migration",
+            contactsDirectory: tempDir
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: harness.store
+        )
+
+        let availability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .availableProtectedDomain)
+        XCTAssertEqual(protectedService.availableContacts.map(\.fingerprint), [generated.fingerprint])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: quarantineDirectory.path))
+
+        try await protectedService.relockProtectedData()
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey },
+            initialSnapshotProvider: {
+                XCTFail("Committed Contacts domain should not rebuild from legacy quarantine.")
+                return ContactsDomainSnapshot.empty()
+            }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: reopenedStore
+        )
+
+        let reopenedAvailability = await reopenedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(reopenedAvailability, .availableProtectedDomain)
+        XCTAssertEqual(reopenedService.availableContacts.map(\.fingerprint), [generated.fingerprint])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: quarantineDirectory.path))
+    }
+
+    func test_contactsPR4FreshInstallCreatesEmptyProtectedDomainWithoutLegacyDirectory() async throws {
+        let documentDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirContactsFresh-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: documentDirectory) }
+        let contactsDirectory = documentDirectory.appendingPathComponent("contacts", isDirectory: true)
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4Fresh",
+            contactsDirectory: contactsDirectory
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: harness.store
+        )
+
+        let availability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .availableProtectedDomain)
+        XCTAssertTrue(protectedService.availableContacts.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: ContactRepository(contactsDirectory: contactsDirectory).quarantineDirectory.path
+        ))
+    }
+
+    func test_contactsPR4CorruptLegacySourceDoesNotPartiallyCutOver() async throws {
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        try Data("not-a-public-certificate".utf8).write(
+            to: tempDir.appendingPathComponent("corrupt.gpg")
+        )
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4CorruptLegacy",
+            contactsDirectory: tempDir
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: harness.store
+        )
+
+        let availability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .recoveryNeeded)
+        XCTAssertTrue(protectedService.availableContacts.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: tempDir.path))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: ContactRepository(contactsDirectory: tempDir).quarantineDirectory.path
+        ))
+        XCTAssertNil(try harness.registryStore.loadRegistry().committedMembership[ContactsDomainRepository.domainID])
+    }
+
+    func test_contactsPR4CorruptProtectedDomainAfterCutoverRequiresRecoveryAndDoesNotReadQuarantine() async throws {
+        let generated = try engine.generateKey(
+            name: "PR4 Corruption",
+            email: "pr4-corruption@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        let repository = ContactRepository(contactsDirectory: tempDir)
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4CorruptProtected",
+            contactsDirectory: tempDir
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: harness.store
+        )
+        let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+        XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+        try harness.storageRoot.writeProtectedData(
+            Data("not-a-readable-contacts-envelope".utf8),
+            to: harness.storageRoot.domainEnvelopeURL(
+                for: ContactsDomainRepository.domainID,
+                slot: .current
+            )
+        )
+
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey },
+            initialSnapshotProvider: {
+                XCTFail("Corrupt committed Contacts domain must not rebuild from quarantine.")
+                return ContactsDomainSnapshot.empty()
+            }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: reopenedStore
+        )
+
+        let availability = await reopenedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .recoveryNeeded)
+        XCTAssertTrue(reopenedService.availableContacts.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+    }
+
+    func test_contactsPR4ProtectedMutationsPersistWithoutWritingActiveLegacy() async throws {
+        let documentDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirContactsMutation-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: documentDirectory) }
+        let contactsDirectory = documentDirectory.appendingPathComponent("contacts", isDirectory: true)
+        let repository = ContactRepository(contactsDirectory: contactsDirectory)
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4Mutation",
+            contactsDirectory: contactsDirectory
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: harness.store
+        )
+        let initialAvailability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+        XCTAssertEqual(initialAvailability, .availableProtectedDomain)
+        let generated = try engine.generateKey(
+            name: "Protected Mutation",
+            email: "protected-mutation@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        _ = try protectedService.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .unverified
+        )
+
+        XCTAssertEqual(protectedService.availableContacts.map(\.fingerprint), [generated.fingerprint])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+        try await protectedService.relockProtectedData()
+        XCTAssertTrue(protectedService.contactsDomainRuntimeStateIsClearedForContactsPR1Tests)
+
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: reopenedStore
+        )
+
+        let reopenedAvailability = await reopenedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+        XCTAssertEqual(reopenedAvailability, .availableProtectedDomain)
+        XCTAssertEqual(reopenedService.availableContacts.map(\.fingerprint), [generated.fingerprint])
+        XCTAssertEqual(reopenedService.availableContacts.first?.verificationState, .unverified)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
     }
 
     func test_productionContactsCallsitesUseGatedAccessors() throws {
@@ -1110,6 +1377,62 @@ final class ContactServiceTests: XCTestCase {
             storageRoot.stagedWrappedDomainMasterKeyURL(for: ContactsDomainRepository.domainID)
         ]
         return urls.contains { fileManager.fileExists(atPath: $0.path) }
+    }
+
+    private func makeContactsProtectedHarness(
+        prefix: String,
+        contactsDirectory: URL
+    ) throws -> (
+        storageRoot: ProtectedDataStorageRoot,
+        registryStore: ProtectedDataRegistryStore,
+        domainKeyManager: ProtectedDomainKeyManager,
+        wrappingRootKey: Data,
+        store: ContactsDomainStore
+    ) {
+        let storageRoot = ProtectedDataStorageRoot(
+            baseDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)
+        )
+        let registryStore = ProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.contacts.\(UUID().uuidString)"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        var registry = try registryStore.loadRegistry()
+        registry.sharedResourceLifecycleState = .ready
+        registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
+        try registryStore.saveRegistry(registry)
+
+        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot)
+        let wrappingRootKey = Data(repeating: 0xA4, count: 32)
+        let migrationSource = ContactsLegacyMigrationSource(
+            engine: engine,
+            repository: ContactRepository(contactsDirectory: contactsDirectory)
+        )
+        let store = ContactsDomainStore(
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey },
+            initialSnapshotProvider: {
+                try migrationSource.makeInitialSnapshot()
+            }
+        )
+
+        return (
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            wrappingRootKey: wrappingRootKey,
+            store: store
+        )
+    }
+
+    private func authorizedContactsGate() -> ContactsPostAuthGateResult {
+        ContactsPostAuthGateResult(
+            postUnlockOutcome: .opened([ProtectedSettingsStore.domainID]),
+            frameworkState: .sessionAuthorized
+        )
     }
 
     private func sourceBlock(

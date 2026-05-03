@@ -302,6 +302,9 @@ struct CypherAirApp: App {
         if let keyMetadataDomainStore = container.keyMetadataDomainStore {
             recoveryHandlers.append(keyMetadataDomainStore)
         }
+        if let contactsDomainStore = container.contactsDomainStore {
+            recoveryHandlers.append(contactsDomainStore)
+        }
         let outcome = try await container.protectedDomainRecoveryCoordinator.recoverPendingMutation(
             handlers: recoveryHandlers,
             authenticationContext: authenticationContext,

@@ -33,6 +33,14 @@ struct ContactRepository {
         )
     }
 
+    func activeLegacySourceExists() -> Bool {
+        fileManager.fileExists(atPath: contactsDirectory.path)
+    }
+
+    func quarantineExists() -> Bool {
+        fileManager.fileExists(atPath: quarantineDirectory.path)
+    }
+
     func loadStoredContacts() throws -> [StoredContactRecord] {
         try fileManager.contentsOfDirectory(
             at: contactsDirectory,
@@ -45,6 +53,13 @@ struct ContactRepository {
                 data: try Data(contentsOf: url)
             )
         }
+    }
+
+    func loadStoredContactsIfDirectoryExists() throws -> [StoredContactRecord] {
+        guard activeLegacySourceExists() else {
+            return []
+        }
+        return try loadStoredContacts()
     }
 
     func loadVerificationStates() throws -> [String: ContactVerificationState] {
@@ -65,7 +80,15 @@ struct ContactRepository {
         }
     }
 
+    func loadVerificationStatesIfDirectoryExists() throws -> [String: ContactVerificationState] {
+        guard activeLegacySourceExists() else {
+            return [:]
+        }
+        return try loadVerificationStates()
+    }
+
     func saveVerificationStates(_ verificationStates: [String: ContactVerificationState]) throws {
+        try ensureDirectoryExists()
         let manifest = ContactMetadataManifest(verificationStates: verificationStates)
         let data = try JSONEncoder().encode(manifest)
         try data.write(to: metadataURL, options: .atomic)
@@ -88,8 +111,36 @@ struct ContactRepository {
         try fileManager.removeItem(at: fileURL)
     }
 
+    func moveActiveLegacySourceToQuarantine() throws {
+        guard activeLegacySourceExists() else {
+            return
+        }
+        guard !quarantineExists() else {
+            throw CypherAirError.internalError(
+                reason: String(
+                    localized: "contacts.quarantine.exists",
+                    defaultValue: "Contacts quarantine already exists."
+                )
+            )
+        }
+        try fileManager.moveItem(at: contactsDirectory, to: quarantineDirectory)
+    }
+
+    func deleteQuarantineIfPresent() throws {
+        guard quarantineExists() else {
+            return
+        }
+        try fileManager.removeItem(at: quarantineDirectory)
+    }
+
     private var metadataURL: URL {
         contactsDirectory.appendingPathComponent("contact-metadata.json")
+    }
+
+    var quarantineDirectory: URL {
+        contactsDirectory
+            .deletingLastPathComponent()
+            .appendingPathComponent("\(contactsDirectory.lastPathComponent).quarantine", isDirectory: true)
     }
 
     private func publicKeyURL(for fingerprint: String) -> URL {
