@@ -200,7 +200,17 @@ pgp-mobile/
 ├── Cargo.toml        # sequoia-openpgp 2.2 + crypto-openssl + uniffi
 ├── src/
 │   ├── lib.rs        # UniFFI proc-macros, public API surface
-│   ├── keys.rs       # Profile-aware generation (Cv25519/RFC4880 vs Cv448/RFC9580)
+│   ├── keys.rs       # Key module root: UniFFI records, shared helpers, internal re-exports
+│   ├── keys/
+│   │   ├── generation.rs          # Profile-aware generation (Cv25519/RFC4880 vs Cv448/RFC9580)
+│   │   ├── key_info.rs            # KeyInfo parsing and display metadata
+│   │   ├── selector_discovery.rs  # Subkey/User ID selector discovery
+│   │   ├── public_certificates.rs # Public certificate validation and merge/update
+│   │   ├── secret_transfer.rs     # Secret key export/import/extract and S2K encryption
+│   │   ├── revocation.rs          # Key, subkey, User ID, and revocation certificate handling
+│   │   ├── profile.rs             # Key version and profile detection
+│   │   ├── s2k.rs                 # Passphrase-protected secret-key S2K inspection
+│   │   └── expiry.rs              # Secret certificate expiry mutation
 │   ├── encrypt.rs    # Auto format selection by recipient key version
 │   ├── decrypt.rs    # SEIPDv1 + SEIPDv2 (OCB/GCM), AEAD hard-fail
 │   ├── password.rs   # Password / SKESK message encrypt/decrypt

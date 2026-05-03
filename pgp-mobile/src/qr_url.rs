@@ -10,11 +10,10 @@ const QR_MAX_BYTES: usize = 2953;
 
 pub(crate) fn encode_qr_url(public_key_data: Vec<u8>) -> Result<String, PgpError> {
     // Validate input is a valid OpenPGP certificate.
-    let cert = openpgp::Cert::from_bytes(&public_key_data).map_err(|e| {
-        PgpError::InvalidKeyData {
+    let cert =
+        openpgp::Cert::from_bytes(&public_key_data).map_err(|e| PgpError::InvalidKeyData {
             reason: format!("Invalid key data for QR encoding: {e}"),
-        }
-    })?;
+        })?;
 
     // Reject secret key material: only public keys should be shared via QR.
     if cert.is_tsk() {
@@ -59,7 +58,9 @@ pub(crate) fn decode_qr_url(url: &str) -> Result<Vec<u8>, PgpError> {
     // Reject secret key material: QR exchange should only contain public keys.
     if cert.is_tsk() {
         return Err(PgpError::InvalidKeyData {
-            reason: "QR code contains secret key material. Only public keys should be shared via QR.".to_string(),
+            reason:
+                "QR code contains secret key material. Only public keys should be shared via QR."
+                    .to_string(),
         });
     }
 

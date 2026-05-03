@@ -277,24 +277,28 @@ make Rust key capability families and the untrusted QR URL boundary auditable
 without changing the exported `PgpEngine` surface by default.
 
 Status:
-partially complete. Rust QR URL encode/decode implementation now lives in
+completed on 2026-05-03. Rust QR URL encode/decode implementation now lives in
 `pgp-mobile/src/qr_url.rs`; `PgpEngine.encode_qr_url` and
 `PgpEngine.decode_qr_url` remain the unchanged UniFFI facade methods. Rust key
-capability families in `keys.rs` remain unsplit.
+capability families now live behind internal `crate::keys` submodules for
+generation, key info, selector discovery, public certificate validation/merge,
+secret transfer, revocation, profile detection, S2K inspection, and expiry
+mutation. Existing UniFFI method names and Swift call sites still route through
+the same `PgpEngine` facade.
 
 TODO:
 
-- [ ] Split `keys.rs` internally by capability family: generation, key info,
+- [x] Split `keys.rs` internally by capability family: generation, key info,
   selector discovery, public certificate validation/merge, secret
   import/export, revocation, profile/S2K helpers, and expiry mutation.
-- [ ] Keep re-export or module wiring internal so existing UniFFI method names
+- [x] Keep re-export or module wiring internal so existing UniFFI method names
   and Swift call sites remain unchanged.
 - [x] Move QR URL encode/decode implementation out of the `lib.rs` facade into
   a dedicated Rust module.
 - [x] Keep Swift `QRService` as the app-facing service for URL routing,
   display metadata, and Swift-side input checks.
-- [ ] If a future PR intentionally changes QR validation ownership, document the
-  Swift/Rust contract before implementation.
+- [x] No QR validation ownership change was made; the existing Swift/Rust
+  contract remains unchanged.
 
 Acceptance standards:
 
