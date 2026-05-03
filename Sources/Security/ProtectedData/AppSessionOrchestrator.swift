@@ -11,6 +11,7 @@ final class AppSessionOrchestrator {
     private let postAuthenticationHandler: (LAContext?, String) async -> Void
     private let contentClearHandler: () -> Void
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
+    private let protectedDataAccessGateClassifier: ProtectedDataAccessGateClassifier
     private let traceStore: AuthLifecycleTraceStore?
 
     private var hasAppearedOnce = false
@@ -70,6 +71,12 @@ final class AppSessionOrchestrator {
         self.contentClearHandler = contentClearHandler
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
+        self.protectedDataAccessGateClassifier = ProtectedDataAccessGateClassifier(
+            currentRegistryProvider: currentRegistryProvider,
+            frameworkStateProvider: {
+                protectedDataSessionCoordinator.frameworkState
+            }
+        )
         self.traceStore = traceStore
     }
 
@@ -492,46 +499,10 @@ final class AppSessionOrchestrator {
         startupBootstrapOutcome: ProtectedDataBootstrapOutcome,
         isFirstProtectedAccessInCurrentProcess: Bool
     ) -> ProtectedDataAccessGateDecision {
-        let bootstrapOutcome: ProtectedDataBootstrapOutcome
-        if isFirstProtectedAccessInCurrentProcess {
-            bootstrapOutcome = startupBootstrapOutcome
-        } else {
-            do {
-                let registry = try currentRegistryProvider()
-                bootstrapOutcome = .loadedRegistry(
-                    registry: registry,
-                    recoveryDisposition: registry.classifyRecoveryDisposition()
-                )
-            } catch {
-                return .frameworkRecoveryNeeded
-            }
-        }
-
-        switch bootstrapOutcome {
-        case .frameworkRecoveryNeeded:
-            return .frameworkRecoveryNeeded
-        case .emptySteadyState:
-            return .noProtectedDomainPresent
-        case .loadedRegistry(let registry, let recoveryDisposition):
-            switch recoveryDisposition {
-            case .frameworkRecoveryNeeded:
-                return .frameworkRecoveryNeeded
-            case .continuePendingMutation:
-                return .pendingMutationRecoveryRequired
-            case .resumeSteadyState:
-                if registry.committedMembership.isEmpty && registry.sharedResourceLifecycleState == .absent {
-                    return .noProtectedDomainPresent
-                }
-                switch protectedDataSessionCoordinator.frameworkState {
-                case .frameworkRecoveryNeeded, .restartRequired:
-                    return .frameworkRecoveryNeeded
-                case .sessionAuthorized:
-                    return .alreadyAuthorized(registry: registry)
-                case .sessionLocked:
-                    return .authorizationRequired(registry: registry)
-                }
-            }
-        }
+        protectedDataAccessGateClassifier.evaluate(
+            startupBootstrapOutcome: startupBootstrapOutcome,
+            isFirstProtectedAccessInCurrentProcess: isFirstProtectedAccessInCurrentProcess
+        )
     }
 
     private func replacePendingAuthenticatedContext(with context: LAContext?, reason: String) {

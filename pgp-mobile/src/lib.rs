@@ -11,6 +11,7 @@ pub mod encrypt;
 pub mod error;
 pub mod keys;
 pub mod password;
+mod qr_url;
 pub mod sign;
 pub mod signature_details;
 pub mod streaming;
@@ -637,78 +638,14 @@ impl PgpEngine {
     /// SECURITY: Validates that the input is a valid OpenPGP public key and rejects
     /// secret key material to prevent accidental private key leakage via QR codes.
     pub fn encode_qr_url(&self, public_key_data: Vec<u8>) -> Result<String, PgpError> {
-        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-        use base64::Engine;
-        use sequoia_openpgp::parse::Parse;
-
-        // Validate input is a valid OpenPGP certificate
-        let cert = sequoia_openpgp::Cert::from_bytes(&public_key_data).map_err(|e| {
-            PgpError::InvalidKeyData {
-                reason: format!("Invalid key data for QR encoding: {e}"),
-            }
-        })?;
-
-        // Reject secret key material — only public keys should be shared via QR
-        if cert.is_tsk() {
-            return Err(PgpError::InvalidKeyData {
-                reason: "Cannot encode secret key material in QR code. Only public keys should be shared via QR.".to_string(),
-            });
-        }
-
-        let encoded = URL_SAFE_NO_PAD.encode(&public_key_data);
-        let url = format!("cypherair://import/v1/{encoded}");
-
-        // QR code capacity at Level L (lowest error correction) is ~2953 binary bytes.
-        // If the URL exceeds this, no standard QR code can encode it.
-        const QR_MAX_BYTES: usize = 2953;
-        if url.len() > QR_MAX_BYTES {
-            return Err(PgpError::KeyTooLargeForQr {
-                size_bytes: public_key_data.len() as u64,
-                max_bytes: QR_MAX_BYTES as u64,
-            });
-        }
-
-        Ok(url)
+        qr_url::encode_qr_url(public_key_data)
     }
 
     /// Decode a QR code URL and extract the public key.
     /// Validates the URL format, parses the key, and rejects secret key material.
     /// Only public keys should be exchanged via QR codes.
     pub fn decode_qr_url(&self, url: String) -> Result<Vec<u8>, PgpError> {
-        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-        use base64::Engine;
-        use sequoia_openpgp::parse::Parse;
-
-        let prefix = "cypherair://import/v1/";
-        if !url.starts_with(prefix) {
-            return Err(PgpError::CorruptData {
-                reason: "Not a valid CypherAir URL. Expected cypherair://import/v1/...".to_string(),
-            });
-        }
-
-        let b64_data = &url[prefix.len()..];
-        let key_bytes = URL_SAFE_NO_PAD
-            .decode(b64_data)
-            .map_err(|e| PgpError::CorruptData {
-                reason: format!("Invalid base64url data: {e}"),
-            })?;
-
-        // Single parse: validate it's a valid OpenPGP key and check for secret material.
-        // (Previously this parsed the key twice — once in parse_key_info and again for is_tsk.)
-        let cert = sequoia_openpgp::Cert::from_bytes(&key_bytes).map_err(|e| {
-            PgpError::InvalidKeyData {
-                reason: format!("Invalid key data: {e}"),
-            }
-        })?;
-
-        // Reject secret key material — QR exchange should only contain public keys.
-        if cert.is_tsk() {
-            return Err(PgpError::InvalidKeyData {
-                reason: "QR code contains secret key material. Only public keys should be shared via QR.".to_string(),
-            });
-        }
-
-        Ok(key_bytes)
+        qr_url::decode_qr_url(&url)
     }
 }
 

@@ -388,10 +388,6 @@ final class ContactService: @unchecked Sendable {
         try refreshRuntimeProjectionAfterMutation()
     }
 
-    var contactsAvailabilityForContactsPR1: ContactsAvailability {
-        contactsAvailability
-    }
-
     var availableContacts: [Contact] {
         guard contactsAvailability.isAvailable else {
             return []
@@ -409,26 +405,26 @@ final class ContactService: @unchecked Sendable {
         }
     }
 
-    func currentCompatibilitySnapshotForContactsPR1() throws -> ContactsDomainSnapshot {
+    func currentCompatibilitySnapshot() throws -> ContactsDomainSnapshot {
         try requireContactsAvailable()
         return try domainRepository.makeCompatibilitySnapshot(from: contacts)
     }
 
-    func compatibilityContactsForContactsPR1(
+    func compatibilityContacts(
         from snapshot: ContactsDomainSnapshot
     ) throws -> [Contact] {
         try domainRepository.makeCompatibilityContacts(from: snapshot)
     }
 
-    func seedContactsDomainRuntimeStateForContactsPR1Tests() {
-        domainRepository.seedRuntimeStateForContactsPR1Tests()
+    func seedContactsDomainRuntimeStateForTests() {
+        domainRepository.seedRuntimeStateForTests()
     }
 
-    var contactsDomainRuntimeStateIsClearedForContactsPR1Tests: Bool {
+    var contactsDomainRuntimeStateIsClearedForTests: Bool {
         contacts.isEmpty &&
         verificationStates.isEmpty &&
         contactsAvailability == .locked &&
-        domainRepository.runtimeStateIsClearedForContactsPR1Tests
+        domainRepository.runtimeStateIsClearedForTests
     }
 
     // MARK: - Lookup

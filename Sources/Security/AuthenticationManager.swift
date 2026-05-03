@@ -2,12 +2,6 @@ import Foundation
 import LocalAuthentication
 import Security
 
-// MARK: - Localized Strings
-
-private enum AuthStrings {
-    static let switchModeReason = String(localized: "auth.switchMode.reason", defaultValue: "Authenticate to change security mode")
-}
-
 // LAContext may reply off-main; this box only forwards that single callback.
 private final class LocalAuthenticationPolicyReplyBox: @unchecked Sendable {
     private let reply: (Bool, Error?) -> Void
@@ -99,6 +93,9 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private let defaults: UserDefaults
     private let bundleStore: KeyBundleStore
     private let migrationCoordinator: KeyMigrationCoordinator
+    private let modeSwitchAuthenticator: PrivateKeyModeSwitchAuthenticator
+    private let rewrapRecoveryCoordinator: PrivateKeyRewrapRecoveryCoordinator
+    private let rewrapWorkflow: PrivateKeyRewrapWorkflow
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
     private let localAuthenticationPolicyEvaluator: (
@@ -155,8 +152,19 @@ final class AuthenticationManager: AuthenticationEvaluable {
         self.localAuthenticationPolicyEvaluator = localAuthenticationPolicyEvaluator
         self.privateKeyControlStore = privateKeyControlStore
         let bundleStore = KeyBundleStore(keychain: keychain)
+        let migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
         self.bundleStore = bundleStore
-        self.migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
+        self.migrationCoordinator = migrationCoordinator
+        self.modeSwitchAuthenticator = PrivateKeyModeSwitchAuthenticator(traceStore: traceStore)
+        self.rewrapRecoveryCoordinator = PrivateKeyRewrapRecoveryCoordinator(
+            bundleStore: bundleStore,
+            migrationCoordinator: migrationCoordinator
+        )
+        self.rewrapWorkflow = PrivateKeyRewrapWorkflow(
+            secureEnclave: secureEnclave,
+            bundleStore: bundleStore,
+            traceStore: traceStore
+        )
     }
 
     func configurePrivateKeyControlStore(_ store: any PrivateKeyControlStoreProtocol) {
@@ -730,242 +738,18 @@ final class AuthenticationManager: AuthenticationEvaluable {
         }
 
         // Step 0: Authenticate under the CURRENT mode before any Keychain modification.
-        traceStore?.record(
-            category: .prompt,
-            name: "privateKeyProtection.switch.auth.start",
-            metadata: [
-                "mode": oldMode.rawValue,
-                "targetMode": newMode.rawValue,
-                "source": "privateKeyProtection.switch"
-            ]
+        try await modeSwitchAuthenticator.authenticateCurrentMode(
+            oldMode,
+            targetMode: newMode,
+            authenticator: authenticator
         )
-        let authenticated: Bool
-        do {
-            if let tracedAuthenticator = authenticator as? AuthenticationManager {
-                authenticated = try await tracedAuthenticator.evaluate(
-                    mode: oldMode,
-                    reason: AuthStrings.switchModeReason,
-                    source: "privateKeyProtection.switch"
-                )
-            } else {
-                authenticated = try await authenticator.evaluate(
-                    mode: oldMode,
-                    reason: AuthStrings.switchModeReason
-                )
-            }
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKeyProtection.switch.auth.finish",
-                metadata: [
-                    "result": authenticated ? "success" : "failed",
-                    "mode": oldMode.rawValue,
-                    "source": "privateKeyProtection.switch"
-                ]
-            )
-        } catch {
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKeyProtection.switch.auth.finish",
-                metadata: traceErrorMetadata(
-                    error,
-                    extra: [
-                        "result": "error",
-                        "mode": oldMode.rawValue,
-                        "source": "privateKeyProtection.switch"
-                    ]
-                )
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: traceErrorMetadata(
-                    error,
-                    extra: ["result": "authError", "targetMode": newMode.rawValue]
-                )
-            )
-            throw error
-        }
-        guard authenticated else {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: ["result": "authFailed", "targetMode": newMode.rawValue]
-            )
-            throw AuthenticationError.failed
-        }
 
-        // Step 1: Write protected rewrap journal before any Keychain modifications.
-        try privateKeyControlStore.beginRewrap(targetMode: newMode)
-
-        // Phase A: Create all pending items (Steps 2-3).
-        // If anything fails here, old items are intact — safe to clean up pending and abort.
-        do {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseA.start",
-                metadata: ["keyCount": String(fingerprints.count), "targetMode": newMode.rawValue]
-            )
-            let newAccessControl = try createAccessControl(for: newMode)
-
-            // Step 2: Re-wrap each identity under temporary Keychain names.
-            for (index, fingerprint) in fingerprints.enumerated() {
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKeyProtection.switch.phaseA.key.start",
-                    metadata: ["index": String(index), "keyCount": String(fingerprints.count)]
-                )
-                // 2a. Load existing wrapped bundle from permanent Keychain items.
-                let existingBundle = try bundleStore.loadBundle(fingerprint: fingerprint)
-
-                // 2b. Reconstruct SE key. Passes the pre-authenticated LAContext from
-                // Step 0 to avoid triggering another Face ID prompt for each key.
-                let existingHandle = try secureEnclave.reconstructKey(
-                    from: existingBundle.seKeyData,
-                    authenticationContext: authenticator.lastEvaluatedContext
-                )
-
-                // 2c. Unwrap to get raw private key bytes.
-                var rawKeyBytes = try secureEnclave.unwrap(
-                    bundle: existingBundle,
-                    using: existingHandle,
-                    fingerprint: fingerprint
-                )
-
-                defer {
-                    // 2e. Zeroize raw key bytes regardless of success or failure.
-                    rawKeyBytes.resetBytes(in: rawKeyBytes.startIndex..<rawKeyBytes.endIndex)
-                }
-
-                // 2d. Generate new SE key with new access control flags and re-wrap.
-                // Pass pre-authenticated LAContext so the new key's first ECDH operation
-                // (in wrap()) reuses the existing Face ID session instead of prompting again.
-                let newHandle = try secureEnclave.generateWrappingKey(
-                    accessControl: newAccessControl,
-                    authenticationContext: authenticator.lastEvaluatedContext
-                )
-                let newBundle = try secureEnclave.wrap(
-                    privateKey: rawKeyBytes,
-                    using: newHandle,
-                    fingerprint: fingerprint
-                )
-
-                // 2d. Store new items under TEMPORARY (pending-*) Keychain names.
-                try bundleStore.saveBundle(
-                    newBundle,
-                    fingerprint: fingerprint,
-                    namespace: .pending
-                )
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKeyProtection.switch.phaseA.key.finish",
-                    metadata: ["index": String(index), "result": "success"]
-                )
-            }
-
-            // Step 3: Verify all new items stored successfully by loading each one.
-            for fingerprint in fingerprints {
-                _ = try bundleStore.loadBundle(
-                    fingerprint: fingerprint,
-                    namespace: .pending
-                )
-            }
-
-            // From this point forward Phase B may delete permanent items, so the
-            // target mode must survive even if the final protected write fails.
-            try privateKeyControlStore.markRewrapCommitRequired()
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseA.finish",
-                metadata: ["result": "success", "keyCount": String(fingerprints.count)]
-            )
-        } catch {
-            // Phase A failed: old items are intact. Safe to clean up pending and abort.
-            fingerprints.forEach { bundleStore.cleanupPendingBundle(fingerprint: $0) }
-            try? privateKeyControlStore.clearRewrapJournal()
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseA.finish",
-                metadata: traceErrorMetadata(error, extra: ["result": "failed"])
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: traceErrorMetadata(error, extra: ["result": "phaseAFailed"])
-            )
-            throw AuthenticationError.modeSwitchFailed(underlying: error)
-        }
-
-        // Phase B: Delete old items and promote pending (Steps 4-7).
-        // At this point all pending items are confirmed stored. If anything fails here,
-        // we must NOT clean up pending items — they may be the only copy of some keys.
-        // Instead, leave the rewrapInProgress flag set so crash recovery can handle it.
-        do {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseB.start",
-                metadata: ["keyCount": String(fingerprints.count), "targetMode": newMode.rawValue]
-            )
-            // Step 4: Delete OLD Keychain items. All new items are confirmed stored.
-            for (index, fingerprint) in fingerprints.enumerated() {
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKeyProtection.switch.phaseB.delete.start",
-                    metadata: ["index": String(index)]
-                )
-                try bundleStore.deleteBundle(fingerprint: fingerprint)
-            }
-
-            // Step 5: Rename temporary items to permanent names (load + save + delete).
-            // The SE key item is saved without Keychain-level access control because
-            // the primary enforcement is at the SE level: the SE key was generated
-            // in Phase A with the correct biometric/passcode flags, and
-            // reconstructKey(from:) enforces those flags in hardware.
-            for (index, fingerprint) in fingerprints.enumerated() {
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKeyProtection.switch.phaseB.promote.start",
-                    metadata: ["index": String(index)]
-                )
-                try bundleStore.promotePendingToPermanent(
-                    fingerprint: fingerprint,
-                    seKeyAccessControl: nil
-                )
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKeyProtection.switch.phaseB.promote.finish",
-                    metadata: ["index": String(index), "result": "success"]
-                )
-            }
-
-            // Step 6: Persist the new mode and clear the protected rewrap journal.
-            try privateKeyControlStore.completeRewrap(targetMode: newMode)
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseB.finish",
-                metadata: ["result": "success", "keyCount": String(fingerprints.count)]
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: ["result": "success", "targetMode": newMode.rawValue]
-            )
-
-        } catch {
-            // Phase B failed: some old items may already be deleted.
-            // Do NOT clean up pending items — they are the only remaining copy.
-            // Leave rewrapInProgress flag set so crash recovery runs on next launch.
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseB.finish",
-                metadata: traceErrorMetadata(error, extra: ["result": "failed"])
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: traceErrorMetadata(error, extra: ["result": "phaseBFailed"])
-            )
-            throw AuthenticationError.modeSwitchFailed(underlying: error)
-        }
+        try rewrapWorkflow.run(
+            targetMode: newMode,
+            fingerprints: fingerprints,
+            authenticator: authenticator,
+            privateKeyControlStore: privateKeyControlStore
+        )
     }
 
     private func traceErrorMetadata(
@@ -995,105 +779,10 @@ final class AuthenticationManager: AuthenticationEvaluable {
     func checkAndRecoverFromInterruptedRewrap(
         fingerprints: [String]
     ) -> KeyMigrationRecoverySummary? {
-        guard let privateKeyControlStore,
-              let journal = try? privateKeyControlStore.recoveryJournal(),
-              let targetMode = journal.rewrapTargetMode else {
-            return nil
-        }
-
-        // If the metadata set is empty but a recovery flag was present, we cannot
-        // identify which bundles need recovery. Treat that as unrecoverable.
-        let effectiveSummary: KeyMigrationRecoverySummary
-        if fingerprints.isEmpty {
-            effectiveSummary = KeyMigrationRecoverySummary(outcomes: [.unrecoverable])
-        } else {
-            effectiveSummary = recoverInterruptedRewrapMigrations(
-                for: fingerprints,
-                phase: journal.rewrapPhase
-            )
-        }
-
-        // Persist target mode only when the selected phase strategy proves all
-        // recoverable bundles are aligned with the target ACL.
-        let shouldCompleteRewrap: Bool
-        if journal.rewrapPhase == .commitRequired {
-            shouldCompleteRewrap = effectiveSummary.isRewrapTargetCommitSafe
-        } else {
-            shouldCompleteRewrap = effectiveSummary.shouldUpdateAuthMode
-        }
-
-        if shouldCompleteRewrap {
-            do {
-                try privateKeyControlStore.completeRewrap(targetMode: targetMode)
-            } catch {
-                return effectiveSummary.appendingRetryableFailure()
-            }
-        } else if effectiveSummary.shouldClearRecoveryFlag {
-            try? privateKeyControlStore.clearRewrapJournal()
-        }
-
-        return effectiveSummary
-    }
-
-    private func recoverInterruptedRewrapMigrations(
-        for fingerprints: [String],
-        phase: PrivateKeyControlRewrapPhase?
-    ) -> KeyMigrationRecoverySummary {
-        guard phase == .commitRequired else {
-            return migrationCoordinator.recoverInterruptedMigrations(
-                for: fingerprints,
-                seKeyAccessControl: nil
-            )
-        }
-
-        return KeyMigrationRecoverySummary(
-            outcomes: fingerprints.map(recoverCommitRequiredRewrapMigration)
+        rewrapRecoveryCoordinator.checkAndRecoverFromInterruptedRewrap(
+            fingerprints: fingerprints,
+            privateKeyControlStore: privateKeyControlStore
         )
-    }
-
-    private func recoverCommitRequiredRewrapMigration(
-        for fingerprint: String
-    ) -> KeyMigrationRecoveryOutcome {
-        let permanentState = bundleStore.bundleState(
-            fingerprint: fingerprint,
-            namespace: .permanent
-        )
-        let pendingState = bundleStore.bundleState(
-            fingerprint: fingerprint,
-            namespace: .pending
-        )
-
-        switch (permanentState, pendingState) {
-        case (.complete, .missing):
-            return .noActionSafe
-        case (.complete, .complete), (.partial, .complete):
-            do {
-                try bundleStore.replacePermanentWithPending(
-                    fingerprint: fingerprint,
-                    seKeyAccessControl: nil
-                )
-                return .promotedPendingSafe
-            } catch {
-                return .retryableFailure
-            }
-        case (.missing, .complete):
-            do {
-                try bundleStore.promotePendingToPermanent(
-                    fingerprint: fingerprint,
-                    seKeyAccessControl: nil
-                )
-                return .promotedPendingSafe
-            } catch {
-                return .retryableFailure
-            }
-        case (.complete, .partial):
-            return .retryableFailure
-        case (.partial, .missing),
-             (.partial, .partial),
-             (.missing, .partial),
-             (.missing, .missing):
-            return .unrecoverable
-        }
     }
 
 }

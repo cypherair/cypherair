@@ -590,7 +590,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
         try await protectedService.relockProtectedData()
-        XCTAssertTrue(protectedService.contactsDomainRuntimeStateIsClearedForContactsPR1Tests)
+        XCTAssertTrue(protectedService.contactsDomainRuntimeStateIsClearedForTests)
 
         let reopenedStore = ContactsDomainStore(
             storageRoot: harness.storageRoot,
@@ -1622,7 +1622,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertTrue(contactService.availableContact(forFingerprint: upgradedContact.fingerprint)?.isVerified == true)
     }
 
-    func test_contactsPR1CompatibilitySnapshot_roundTripsLegacyContactProjection() throws {
+    func test_protectedDomainCompatibilitySnapshot_roundTripsLegacyContactProjection() throws {
         let generated = try engine.generateKey(
             name: "Projection", email: "projection@example.com",
             expirySeconds: nil, profile: .universal
@@ -1635,13 +1635,13 @@ final class ContactServiceTests: XCTestCase {
             return XCTFail("Expected .added")
         }
 
-        let snapshot = try contactService.currentCompatibilitySnapshotForContactsPR1()
+        let snapshot = try contactService.currentCompatibilitySnapshot()
         XCTAssertEqual(snapshot.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
         XCTAssertEqual(snapshot.identities.map(\.contactId), ["legacy-contact-\(contact.fingerprint)"])
         XCTAssertEqual(snapshot.keyRecords.map(\.keyId), ["legacy-key-\(contact.fingerprint)"])
         XCTAssertEqual(snapshot.keyRecords.first?.usageState, .preferred)
 
-        let projectedContacts = try contactService.compatibilityContactsForContactsPR1(from: snapshot)
+        let projectedContacts = try contactService.compatibilityContacts(from: snapshot)
         let projected = try XCTUnwrap(projectedContacts.first)
         XCTAssertEqual(projectedContacts.count, 1)
         XCTAssertEqual(projected.fingerprint, contact.fingerprint)
@@ -1652,7 +1652,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertFalse(projected.isVerified)
     }
 
-    func test_contactsPR1CompatibilitySnapshot_marksNonEncryptableLegacyContactHistorical() throws {
+    func test_protectedDomainCompatibilitySnapshot_marksNonEncryptableLegacyContactHistorical() throws {
         let repository = ContactsDomainRepository()
         let contact = Contact(
             fingerprint: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -1674,7 +1674,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertNoThrow(try snapshot.validateContract())
     }
 
-    func test_contactsPR1RelockClearsContactsRuntimeState() async throws {
+    func test_protectedDomainRelockClearsContactsRuntimeState() async throws {
         let generated = try engine.generateKey(
             name: "Relock", email: "relock@example.com",
             expirySeconds: nil, profile: .universal
@@ -1683,20 +1683,20 @@ final class ContactServiceTests: XCTestCase {
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
-        contactService.seedContactsDomainRuntimeStateForContactsPR1Tests()
+        contactService.seedContactsDomainRuntimeStateForTests()
 
         XCTAssertFalse(contactService.availableContacts.isEmpty)
-        XCTAssertEqual(contactService.contactsAvailabilityForContactsPR1, .availableLegacyCompatibility)
+        XCTAssertEqual(contactService.contactsAvailability, .availableLegacyCompatibility)
 
         try await contactService.relockProtectedData()
 
         XCTAssertTrue(contactService.availableContacts.isEmpty)
-        XCTAssertEqual(contactService.contactsAvailabilityForContactsPR1, .locked)
-        XCTAssertTrue(contactService.contactsDomainRuntimeStateIsClearedForContactsPR1Tests)
+        XCTAssertEqual(contactService.contactsAvailability, .locked)
+        XCTAssertTrue(contactService.contactsDomainRuntimeStateIsClearedForTests)
     }
 
     @MainActor
-    func test_contactsPR1AppContainerRelockClearsContactsWithoutCreatingDomainArtifacts() async throws {
+    func test_protectedDomainAppContainerRelockClearsContactsWithoutCreatingDomainArtifacts() async throws {
         let container = AppContainer.makeUITest(preloadContact: true)
         defer {
             try? FileManager.default.removeItem(
@@ -1716,7 +1716,7 @@ final class ContactServiceTests: XCTestCase {
         await container.protectedDataSessionCoordinator.relockCurrentSession()
 
         XCTAssertTrue(container.contactService.availableContacts.isEmpty)
-        XCTAssertTrue(container.contactService.contactsDomainRuntimeStateIsClearedForContactsPR1Tests)
+        XCTAssertTrue(container.contactService.contactsDomainRuntimeStateIsClearedForTests)
         XCTAssertFalse(contactsDomainArtifactsExist(in: container.protectedDataStorageRoot))
     }
 
