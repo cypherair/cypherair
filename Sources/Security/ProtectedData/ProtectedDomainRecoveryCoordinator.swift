@@ -385,6 +385,23 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         }
     }
 
+    private enum CommittedSettingsUpgradeFailure: Error {
+        case retryable(underlying: Error, state: ProtectedSettingsDomainState)
+        case recoveryRequired(underlying: Error)
+
+        var underlyingError: Error {
+            switch self {
+            case .retryable(let underlying, _),
+                 .recoveryRequired(let underlying):
+                underlying
+            }
+        }
+    }
+
+    private struct ProtectedSettingsStorageReadFailure: Error {
+        let underlying: Error
+    }
+
     private let defaults: UserDefaults
     private let storageRoot: ProtectedDataStorageRoot
     private let registryStore: ProtectedDataRegistryStore
@@ -536,15 +553,22 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                     currentWrappingRootKey: currentWrappingRootKey
                 )
             } catch {
+                let failure = committedSettingsUpgradeFailure(for: error)
                 clearUnlockedState()
-                domainState = .recoveryNeeded
-                if registry.committedMembership[Self.domainID] != .recoveryNeeded {
-                    _ = try? await registryStore.updateCommittedDomainState(
-                        domainID: Self.domainID,
-                        to: .recoveryNeeded
-                    )
+                switch failure {
+                case .retryable(let underlying, let state):
+                    domainState = state
+                    throw underlying
+                case .recoveryRequired(let underlying):
+                    domainState = .recoveryNeeded
+                    if registry.committedMembership[Self.domainID] != .recoveryNeeded {
+                        _ = try? await registryStore.updateCommittedDomainState(
+                            domainID: Self.domainID,
+                            to: .recoveryNeeded
+                        )
+                    }
+                    throw underlying
                 }
-                throw error
             }
             return
         }
@@ -716,7 +740,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                     to: .recoveryNeeded
                 )
             }
-            throw error
+            throw externallyVisibleProtectedSettingsError(error)
         }
     }
 
@@ -922,6 +946,13 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             from: wrappedRecord,
             wrappingRootKey: wrappingRootKey
         )
+        var shouldReturnDomainMasterKey = false
+        defer {
+            if !shouldReturnDomainMasterKey {
+                domainMasterKey.protectedDataZeroize()
+            }
+        }
+
         var candidates: [OpenedSnapshot] = []
         var highestObservedGenerationIdentifier: Int?
 
@@ -931,16 +962,22 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                 continue
             }
 
+            let data: Data
             do {
-                let data = try storageRoot.readManagedData(at: url)
+                data = try storageRoot.readManagedData(at: url)
+            } catch {
+                throw ProtectedSettingsStorageReadFailure(underlying: error)
+            }
+
+            do {
                 let envelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
-                var plaintext = try ProtectedDomainEnvelopeCodec.open(
-                    envelope: envelope,
-                    domainMasterKey: domainMasterKey
-                )
                 highestObservedGenerationIdentifier = max(
                     highestObservedGenerationIdentifier ?? envelope.generationIdentifier,
                     envelope.generationIdentifier
+                )
+                var plaintext = try ProtectedDomainEnvelopeCodec.open(
+                    envelope: envelope,
+                    domainMasterKey: domainMasterKey
                 )
                 defer {
                     plaintext.protectedDataZeroize()
@@ -959,19 +996,18 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         guard let selectedSnapshot = candidates.max(by: {
             $0.generationIdentifier < $1.generationIdentifier
         }) else {
-            domainMasterKey.protectedDataZeroize()
             throw ProtectedDataError.invalidEnvelope(
                 "Protected settings does not contain a readable authoritative generation."
             )
         }
         if let highestObservedGenerationIdentifier,
            selectedSnapshot.generationIdentifier < highestObservedGenerationIdentifier {
-            domainMasterKey.protectedDataZeroize()
             throw ProtectedDataError.invalidEnvelope(
                 "Protected settings highest observed generation is not readable."
             )
         }
 
+        shouldReturnDomainMasterKey = true
         return (selectedSnapshot, domainMasterKey)
     }
 
@@ -1013,22 +1049,31 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         let registry = try registryStore.loadRegistry()
         if let pendingDomainState = pendingDomainState(for: registry) {
             domainState = pendingDomainState
-            throw ProtectedDataError.invalidRegistry(
-                "Protected settings cannot be upgraded while protected-data recovery is pending."
+            throw CommittedSettingsUpgradeFailure.retryable(
+                underlying: ProtectedDataError.invalidRegistry(
+                    "Protected settings cannot be upgraded while protected-data recovery is pending."
+                ),
+                state: pendingDomainState
             )
         }
         guard registry.committedMembership[Self.domainID] != nil else {
             return
         }
         guard registry.sharedResourceLifecycleState == .ready else {
-            throw ProtectedDataError.invalidRegistry(
-                "Protected settings cannot be upgraded while the shared resource is not ready."
+            throw CommittedSettingsUpgradeFailure.retryable(
+                underlying: ProtectedDataError.invalidRegistry(
+                    "Protected settings cannot be upgraded while the shared resource is not ready."
+                ),
+                state: .frameworkUnavailable
             )
         }
 
         let wrappingRootKeyProvider = currentWrappingRootKey ?? self.currentWrappingRootKey
         guard let wrappingRootKeyProvider else {
-            throw ProtectedDataError.authorizingUnavailable
+            throw CommittedSettingsUpgradeFailure.retryable(
+                underlying: ProtectedDataError.authorizingUnavailable,
+                state: .locked
+            )
         }
         var wrappingRootKey = try wrappingRootKeyProvider()
         defer {
@@ -1053,6 +1098,67 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         } else {
             domainState = .locked
         }
+    }
+
+    private func committedSettingsUpgradeFailure(
+        for error: Error
+    ) -> CommittedSettingsUpgradeFailure {
+        if let failure = error as? CommittedSettingsUpgradeFailure {
+            return failure
+        }
+        if let storageReadFailure = error as? ProtectedSettingsStorageReadFailure {
+            return .retryable(underlying: storageReadFailure.underlying, state: .frameworkUnavailable)
+        }
+        if let protectedDataError = error as? ProtectedDataError {
+            switch protectedDataError {
+            case .missingWrappingRootKey, .authorizingUnavailable:
+                return .retryable(underlying: error, state: .locked)
+            case .storageRootOutsideApplicationSupport,
+                 .fileProtectionUnsupported,
+                 .fileProtectionVerificationFailed,
+                 .protectedFileWriteFailed,
+                 .registryMissingWithArtifacts,
+                 .missingPersistedRight,
+                 .restartRequired,
+                 .internalFailure:
+                return .retryable(underlying: error, state: .frameworkUnavailable)
+            case .invalidRegistry(let reason):
+                if reason.hasPrefix("Unsupported WrappedDomainMasterKeyRecord") {
+                    return .recoveryRequired(underlying: error)
+                }
+                return .retryable(underlying: error, state: .frameworkUnavailable)
+            case .missingWrappedDomainMasterKey(let domainID):
+                if domainID == Self.domainID {
+                    return .recoveryRequired(underlying: error)
+                }
+                return .retryable(underlying: error, state: .frameworkUnavailable)
+            case .invalidDomainMasterKeyLength,
+                 .invalidNonceLength,
+                 .invalidAuthenticationTagLength,
+                 .invalidCiphertextLength,
+                 .invalidEnvelope:
+                return .recoveryRequired(underlying: error)
+            }
+        }
+        if isFoundationStorageError(error) {
+            return .retryable(underlying: error, state: .frameworkUnavailable)
+        }
+        return .recoveryRequired(underlying: error)
+    }
+
+    private func externallyVisibleProtectedSettingsError(_ error: Error) -> Error {
+        if let failure = error as? CommittedSettingsUpgradeFailure {
+            return failure.underlyingError
+        }
+        if let storageReadFailure = error as? ProtectedSettingsStorageReadFailure {
+            return storageReadFailure.underlying
+        }
+        return error
+    }
+
+    private func isFoundationStorageError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == NSCocoaErrorDomain || nsError.domain == NSPOSIXErrorDomain
     }
 
     private func migrateOpenedSettingsSnapshotIfNeeded(

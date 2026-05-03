@@ -3833,6 +3833,182 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         assertLegacyOrdinarySettingsRemoved(defaults: harness.defaults)
     }
 
+    func test_protectedSettingsCommittedUpgradeMissingWrappingKeyDoesNotPersistRecovery() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsCommittedMissingWrappingKey")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+        _ = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        let reopenedStore = ProtectedSettingsStore(
+            defaults: harness.defaults,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: {
+                throw ProtectedDataError.missingWrappingRootKey
+            }
+        )
+
+        do {
+            try await reopenedStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                persistSharedRight: { _ in
+                    XCTFail("Committed settings upgrade must not provision a new shared right.")
+                }
+            )
+            XCTFail("Expected committed settings upgrade to require the wrapping root key.")
+        } catch ProtectedDataError.missingWrappingRootKey {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .locked)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ProtectedSettingsStore.domainID],
+            .active
+        )
+    }
+
+    func test_protectedSettingsCommittedUpgradePendingMutationDoesNotPersistRecovery() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsCommittedPendingMutation")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        var registry = try harness.registryStore.loadRegistry()
+        registry.pendingMutation = .createDomain(
+            targetDomainID: AppProtectedDataFrameworkSentinelStore.domainID,
+            phase: .journaled
+        )
+        try harness.registryStore.saveRegistry(registry)
+        let reopenedStore = ProtectedSettingsStore(
+            defaults: harness.defaults,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+
+        do {
+            try await reopenedStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                persistSharedRight: { _ in
+                    XCTFail("Committed settings upgrade must not provision a new shared right.")
+                }
+            )
+            XCTFail("Expected committed settings upgrade to stop for pending mutation.")
+        } catch ProtectedDataError.invalidRegistry(_) {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .pendingRetryRequired)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ProtectedSettingsStore.domainID],
+            .active
+        )
+    }
+
+    func test_protectedSettingsCommittedUpgradeStorageReadFailureDoesNotPersistRecovery() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsCommittedStorageReadFailure")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        try writeProtectedSettingsEnvelope(
+            payload: ProtectedSettingsStore.Payload(
+                clipboardNotice: true,
+                ordinarySettings: .firstRunDefaults
+            ),
+            schemaVersion: ProtectedSettingsStore.Payload.currentSchemaVersion,
+            generationIdentifier: 2,
+            storageRoot: harness.storageRoot,
+            domainKeyManager: harness.domainKeyManager,
+            wrappingRootKey: wrappingRootKey
+        )
+        let currentURL = harness.storageRoot.domainEnvelopeURL(
+            for: ProtectedSettingsStore.domainID,
+            slot: .current
+        )
+        let previousURL = harness.storageRoot.domainEnvelopeURL(
+            for: ProtectedSettingsStore.domainID,
+            slot: .previous
+        )
+        XCTAssertTrue(try harness.storageRoot.managedItemExists(at: previousURL))
+        try FileManager.default.removeItem(at: currentURL)
+        try FileManager.default.createDirectory(at: currentURL, withIntermediateDirectories: false)
+        let reopenedStore = ProtectedSettingsStore(
+            defaults: harness.defaults,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+
+        do {
+            try await reopenedStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                persistSharedRight: { _ in
+                    XCTFail("Committed settings upgrade must not provision a new shared right.")
+                }
+            )
+            XCTFail("Expected committed settings upgrade to fail on storage read.")
+        } catch ProtectedDataError.invalidEnvelope(_) {
+            XCTFail("Storage read failure must not be folded into invalidEnvelope.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .frameworkUnavailable)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ProtectedSettingsStore.domainID],
+            .active
+        )
+    }
+
+    func test_protectedSettingsCommittedUpgradeCorruptPayloadPersistsRecovery() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsCommittedCorruptUpgrade")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        try writeProtectedSettingsEnvelope(
+            payload: ProtectedSettingsPayloadV1(clipboardNotice: true),
+            schemaVersion: ProtectedSettingsStore.Payload.currentSchemaVersion,
+            generationIdentifier: 2,
+            storageRoot: harness.storageRoot,
+            domainKeyManager: harness.domainKeyManager,
+            wrappingRootKey: wrappingRootKey
+        )
+        let reopenedStore = ProtectedSettingsStore(
+            defaults: harness.defaults,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+
+        do {
+            try await reopenedStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                persistSharedRight: { _ in
+                    XCTFail("Committed settings upgrade must not provision a new shared right.")
+                }
+            )
+            XCTFail("Expected corrupt committed settings payload to require recovery.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ProtectedSettingsStore.domainID],
+            .recoveryNeeded
+        )
+    }
+
     func test_protectedSettingsCorruptCommittedPayloadRequiresRecoveryAndLeavesLegacySources() async throws {
         let harness = try makeProtectedSettingsHarness("ProtectedSettingsCorrupt")
         defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
