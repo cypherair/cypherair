@@ -55,6 +55,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				App/AppContainer.swift,
+				App/AppLaunchConfiguration.swift,
 				App/AppRoute.swift,
 				App/AppShellComposition.swift,
 				App/AppStartupCoordinator.swift,
@@ -74,6 +75,7 @@
 				App/Contacts/ContactCertificateSignaturesView.swift,
 				App/Contacts/ContactDetailView.swift,
 				App/Contacts/ContactsView.swift,
+				App/Contacts/Import/AppSceneIncomingURLRouter.swift,
 				App/Contacts/Import/ContactImportWorkflow.swift,
 				App/Contacts/Import/IncomingURLImportCoordinator.swift,
 				App/Contacts/Import/PublicKeyImportLoader.swift,
@@ -122,6 +124,7 @@
 				App/Settings/AuthMode/SettingsAuthModeRequestBuilder.swift,
 				App/Settings/LicenseDetailView.swift,
 				App/Settings/LicenseListView.swift,
+				App/Settings/LocalDataResetRestartAction.swift,
 				App/Settings/LocalDataResetRestartCoordinator.swift,
 				App/Settings/LocalDataResetService.swift,
 				App/Settings/OpenSourceNotice.swift,

@@ -42,10 +42,14 @@ SwiftUI views, navigation routing, onboarding, and application composition. View
 
 Key files:
 
-- `CypherAirApp.swift` — app entry point and scene configuration
-- `AppContainer.swift` — centralized dependency construction
+- `CypherAirApp.swift` — app entry point, scene wiring, environment injection, and presentation modifiers
+- `AppLaunchConfiguration.swift` — launch and UI-test environment parsing
+- `AppLoadWarningCoordinator.swift` — load-warning pending/presentation gate state
+- `AppContainer.swift` — centralized dependency construction with shared graph helpers for common default/UI-test wiring
 - `AppStartupCoordinator.swift` — synchronous pre-auth bootstrap, cold-start loading, crash recovery, temporary file cleanup, startup warning aggregation
 - `LocalDataResetService.swift` — destructive reset workflow for CypherAir-owned Keychain items, ProtectedData files, contacts, defaults, temporary files, and in-memory session state
+- `LocalDataResetRestartAction.swift` — platform restart/termination action after local-data reset
+- `AppSceneIncomingURLRouter.swift` — scene-level URL handoff into the incoming contact-import coordinator
 - `ProtectedSettingsAccessCoordinator.swift` — protected-settings access, migration, open-domain, reset, retry, and clipboard-notice mutation authorization workflow policy
 - `ProtectedSettingsHost.swift` — SwiftUI-facing protected-settings host, section-state projection, environment injection, and presentation trace metadata
 - `ContentView.swift` — root navigation
@@ -62,6 +66,9 @@ Shared presentation-layer infrastructure used across multiple views.
 | `SecurityScopedFileAccess` | Uniform wrapper around security-scoped file URL access |
 | `FileExportController` | Shared `fileExporter` state for exporting generated data or existing files |
 | `PrivacyScreenModifier` | Background blur + re-authentication gating as a thin UI adapter over `AppSessionOrchestrator` |
+| `AuthenticationShieldCoordinator` | Authentication shield prompt depth, pending-dismissal timing, lifecycle observations, and trace state transitions |
+| `AuthenticationShieldHost` | SwiftUI environment key, host modifier, and platform lifecycle adapter for the authentication shield |
+| `AuthenticationShieldOverlayView` | Authentication shield overlay/card rendering and animation |
 
 ### Services Layer (`Sources/Services/`)
 

@@ -1,30 +1,8 @@
 import LocalAuthentication
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 #if os(iOS)
 import UIKit
 #endif
-
-struct LoadWarningPresentationState: Equatable {
-    let isShieldVisible: Bool
-    let isAuthenticating: Bool
-    let isPrivacyScreenBlurred: Bool
-    let hasAuthenticatedSession: Bool
-    let allowsPreAuthenticationPresentation: Bool
-}
-
-enum LoadWarningPresentationGate {
-    static func canPresent(_ state: LoadWarningPresentationState) -> Bool {
-        guard !state.isShieldVisible,
-              !state.isAuthenticating,
-              !state.isPrivacyScreenBlurred else {
-            return false
-        }
-        return state.hasAuthenticatedSession || state.allowsPreAuthenticationPresentation
-    }
-}
 
 @main
 struct CypherAirApp: App {
@@ -37,8 +15,7 @@ struct CypherAirApp: App {
 
     @State private var container: AppContainer
 
-    @State private var loadError: String?
-    @State private var pendingLoadError: String?
+    @State private var loadWarningCoordinator: AppLoadWarningCoordinator
     @State private var startupSnapshot: AppStartupCoordinator.AppStartupBootstrapSnapshot
     @State private var protectedSettingsHost: ProtectedSettingsHost
     @State private var localDataResetRestartCoordinator: LocalDataResetRestartCoordinator
@@ -267,8 +244,7 @@ struct CypherAirApp: App {
 
         _launchConfiguration = State(initialValue: launchConfiguration)
         _container = State(initialValue: container)
-        _loadError = State(initialValue: nil)
-        _pendingLoadError = State(initialValue: startupSnapshot.loadError)
+        _loadWarningCoordinator = State(initialValue: AppLoadWarningCoordinator(initialWarning: startupSnapshot.loadError))
         _startupSnapshot = State(initialValue: startupSnapshot)
         _protectedSettingsHost = State(initialValue: protectedSettingsHost)
         _localDataResetRestartCoordinator = State(initialValue: LocalDataResetRestartCoordinator())
@@ -361,7 +337,7 @@ struct CypherAirApp: App {
         Settings {
             LocalDataResetRestartGate(
                 coordinator: localDataResetRestartCoordinator,
-                terminateAction: terminateAfterLocalDataReset
+                terminateAction: LocalDataResetRestartAction.terminateCurrentProcess
             ) {
                 MacSettingsRootView(
                     tutorialLaunchRelay: macTutorialLaunchRelay,
@@ -419,7 +395,7 @@ struct CypherAirApp: App {
     private var mainWindowSceneContent: some View {
         LocalDataResetRestartGate(
             coordinator: localDataResetRestartCoordinator,
-            terminateAction: terminateAfterLocalDataReset
+            terminateAction: LocalDataResetRestartAction.terminateCurrentProcess
         ) {
             ImportConfirmationSheetHost(coordinator: incomingURLImportCoordinator.importConfirmationCoordinator) {
                 mainWindowContent
@@ -429,7 +405,7 @@ struct CypherAirApp: App {
                             name: "mainWindow.content.appear",
                             metadata: [
                                 "root": launchConfiguration.root.rawValue,
-                                "hasLoadWarning": loadError == nil ? "false" : "true"
+                                "hasLoadWarning": loadWarningCoordinator.presentedWarning == nil ? "false" : "true"
                             ]
                         )
                     }
@@ -530,22 +506,22 @@ struct CypherAirApp: App {
         .alert(
             String(localized: "app.loadError.title", defaultValue: "Load Warning"),
             isPresented: Binding(
-                get: { loadError != nil },
-                set: { if !$0 { loadError = nil } }
+                get: { loadWarningCoordinator.presentedWarning != nil },
+                set: { if !$0 { loadWarningCoordinator.dismissPresentedWarning() } }
             )
         ) {
             Button(String(localized: "error.ok", defaultValue: "OK")) {
-                loadError = nil
+                loadWarningCoordinator.dismissPresentedWarning()
             }
         } message: {
-            if let loadError {
-                Text(loadError)
+            if let presentedWarning = loadWarningCoordinator.presentedWarning {
+                Text(presentedWarning)
             }
         }
         .onAppear {
             presentPendingLoadWarningIfPossible(source: "initialState")
         }
-        .onChange(of: loadError != nil) { _, isPresented in
+        .onChange(of: loadWarningCoordinator.presentedWarning != nil) { _, isPresented in
             container.authLifecycleTraceStore?.record(
                 category: .lifecycle,
                 name: isPresented ? "loadWarning.presented" : "loadWarning.dismissed",
@@ -557,13 +533,13 @@ struct CypherAirApp: App {
         }
         .onChange(of: container.keyManagement.legacyMetadataMigrationLoadWarning) { _, warning in
             guard let warning else { return }
-            pendingLoadError = warning
+            loadWarningCoordinator.enqueue(warning)
             container.keyManagement.clearLegacyMetadataMigrationLoadWarning()
             presentPendingLoadWarningIfPossible(source: "legacyMetadataMigration")
         }
         .onChange(of: container.config.postUnlockRecoveryLoadWarning) { _, warning in
             guard let warning else { return }
-            pendingLoadError = warning
+            loadWarningCoordinator.enqueue(warning)
             container.config.clearPostUnlockRecoveryLoadWarning()
             presentPendingLoadWarningIfPossible(source: "postUnlockRecovery")
         }
@@ -573,11 +549,7 @@ struct CypherAirApp: App {
             handlesLifecycleEvents: true
         )
         .onOpenURL { url in
-            guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
-            incomingURLImportCoordinator.handleIncomingURL(
-                url,
-                isTutorialPresentationActive: tutorialStore.isTutorialPresentationActive
-            )
+            incomingURLRouter.handle(url)
         }
         #if os(macOS)
         .onAppear {
@@ -595,7 +567,7 @@ struct CypherAirApp: App {
         .onChange(of: incomingURLImportCoordinator.isTutorialImportBlocked) { _, _ in
             syncMacTutorialHostAvailability()
         }
-        .onChange(of: loadError != nil) { _, _ in
+        .onChange(of: loadWarningCoordinator.presentedWarning != nil) { _, _ in
             syncMacTutorialHostAvailability()
         }
         #endif
@@ -706,27 +678,20 @@ struct CypherAirApp: App {
     }
 
     private func presentPendingLoadWarningIfPossible(source: String) {
-        guard !localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset else { return }
-        guard loadError == nil, let pendingLoadError else { return }
-        let presentationState = loadWarningPresentationState
-        guard LoadWarningPresentationGate.canPresent(presentationState) else {
-            container.authLifecycleTraceStore?.record(
-                category: .lifecycle,
-                name: "loadWarning.pending",
-                metadata: [
-                    "source": source,
-                    "shieldVisible": presentationState.isShieldVisible ? "true" : "false",
-                    "isAuthenticating": presentationState.isAuthenticating ? "true" : "false",
-                    "privacyBlurred": presentationState.isPrivacyScreenBlurred ? "true" : "false",
-                    "hasAuthenticatedSession": presentationState.hasAuthenticatedSession ? "true" : "false",
-                    "allowsPreAuthenticationPresentation": presentationState.allowsPreAuthenticationPresentation ? "true" : "false"
-                ]
-            )
-            return
-        }
+        loadWarningCoordinator.presentPendingIfPossible(
+            source: source,
+            presentationState: loadWarningPresentationState,
+            isRestartRequiredAfterLocalDataReset: localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset,
+            traceStore: container.authLifecycleTraceStore
+        )
+    }
 
-        self.pendingLoadError = nil
-        loadError = pendingLoadError
+    private var incomingURLRouter: AppSceneIncomingURLRouter {
+        AppSceneIncomingURLRouter(
+            incomingURLImportCoordinator: incomingURLImportCoordinator,
+            tutorialStore: tutorialStore,
+            localDataResetRestartCoordinator: localDataResetRestartCoordinator
+        )
     }
 
     #if os(iOS) || os(visionOS)
@@ -834,12 +799,6 @@ struct CypherAirApp: App {
     }
     #endif
 
-    private func terminateAfterLocalDataReset() {
-        #if os(macOS)
-        NSApplication.shared.terminate(nil)
-        #endif
-    }
-
     #if os(macOS)
     private func syncMacTutorialHostAvailability() {
         macTutorialHostAvailability.setAppLevelBlocker(
@@ -860,7 +819,7 @@ struct CypherAirApp: App {
         )
         macTutorialHostAvailability.setAppLevelBlocker(
             .loadWarningAlert,
-            isActive: loadError != nil
+            isActive: loadWarningCoordinator.presentedWarning != nil
         )
     }
     #endif
@@ -900,57 +859,6 @@ struct CypherAirApp: App {
         }
     }
 
-}
-
-struct AppLaunchConfiguration {
-    enum Root: String {
-        case main
-        case settings
-        case tutorial
-    }
-
-    let root: Root
-    let shouldSkipOnboarding: Bool
-    let tutorialModule: TutorialModuleID?
-    let isUITestMode: Bool
-    let isXCTestHost: Bool
-    let requiresManualAuthentication: Bool
-    let opensAuthModeConfirmation: Bool
-    let preloadsUITestContact: Bool
-    let isAuthTraceEnabled: Bool
-
-    init(processInfo: ProcessInfo = .processInfo) {
-        let environment = processInfo.environment
-        self.root = Root(rawValue: environment["UITEST_ROOT"] ?? "main") ?? .main
-        self.isUITestMode = environment["UITEST_ROOT"] != nil || environment["UITEST_SKIP_ONBOARDING"] != nil
-        self.isXCTestHost = Self.detectXCTestHost(processInfo: processInfo)
-        self.requiresManualAuthentication = environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
-        self.opensAuthModeConfirmation = environment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] == "1"
-        self.preloadsUITestContact = environment["UITEST_PRELOAD_CONTACT"] == "1"
-        self.isAuthTraceEnabled = environment["CYPHERAIR_DEBUG_AUTH_TRACE"] == "1"
-        self.shouldSkipOnboarding = environment["UITEST_SKIP_ONBOARDING"] == "1" || root != .main
-        self.tutorialModule = environment["UITEST_TUTORIAL_TASK"].flatMap { value in
-            switch value {
-            case "understandSandbox", "sandbox": .sandbox
-            case "generateAliceKey", "createDemoIdentity": .createDemoIdentity
-            case "importBobKey", "addDemoContact": .addDemoContact
-            case "composeAndEncryptMessage", "encryptDemoMessage": .encryptDemoMessage
-            case "parseRecipients", "decryptMessage", "decryptAndVerify": .decryptAndVerify
-            case "exportBackup", "backupKey": .backupKey
-            case "enableHighSecurity": .enableHighSecurity
-            default: nil
-            }
-        }
-    }
-
-    private static func detectXCTestHost(processInfo: ProcessInfo) -> Bool {
-        if processInfo.environment["XCTestConfigurationFilePath"] != nil {
-            return true
-        }
-        return Bundle.allBundles.contains { bundle in
-            bundle.bundlePath.hasSuffix(".xctest")
-        }
-    }
 }
 
 #if os(iOS)

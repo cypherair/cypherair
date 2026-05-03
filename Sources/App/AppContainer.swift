@@ -112,12 +112,25 @@ final class AppContainer: @unchecked Sendable {
         self.defaultsSuiteName = defaultsSuiteName
     }
 
-    static func makeDefault(
-        authTraceEnabled: Bool = false
-    ) -> AppContainer {
+    private struct AuthenticationPromptStack {
+        let authLifecycleTraceStore: AuthLifecycleTraceStore
+        let authenticationShieldCoordinator: AuthenticationShieldCoordinator
+        let authPromptCoordinator: AuthenticationPromptCoordinator
+    }
+
+    private struct PgpServiceGraph {
+        let temporaryArtifactStore: AppTemporaryArtifactStore
+        let encryptionService: EncryptionService
+        let decryptionService: DecryptionService
+        let passwordMessageService: PasswordMessageService
+        let signingService: SigningService
+        let certificateSignatureService: CertificateSignatureService
+        let qrService: QRService
+        let selfTestService: SelfTestService
+    }
+
+    private static func makeAuthenticationPromptStack(authTraceEnabled: Bool) -> AuthenticationPromptStack {
         let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
-        let secureEnclave = HardwareSecureEnclave(traceStore: authLifecycleTraceStore)
-        let keychain = SystemKeychain(traceStore: authLifecycleTraceStore)
         let authenticationShieldCoordinator = AuthenticationShieldCoordinator(
             traceStore: authLifecycleTraceStore
         )
@@ -127,6 +140,164 @@ final class AppContainer: @unchecked Sendable {
             ),
             traceStore: authLifecycleTraceStore
         )
+        return AuthenticationPromptStack(
+            authLifecycleTraceStore: authLifecycleTraceStore,
+            authenticationShieldCoordinator: authenticationShieldCoordinator,
+            authPromptCoordinator: authPromptCoordinator
+        )
+    }
+
+    private static func makeProtectedDataSessionCoordinator(
+        rootSecretStore: any ProtectedDataRootSecretStoreProtocol,
+        legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)?,
+        domainKeyManager: ProtectedDomainKeyManager,
+        registryStore: ProtectedDataRegistryStore,
+        config: AppConfiguration,
+        authPromptCoordinator: AuthenticationPromptCoordinator,
+        traceStore: AuthLifecycleTraceStore?
+    ) -> ProtectedDataSessionCoordinator {
+        ProtectedDataSessionCoordinator(
+            rootSecretStore: rootSecretStore,
+            legacyRightStoreClient: legacyRightStoreClient,
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
+            recordRootSecretEnvelopeMinimumVersion: { version in
+                try await registryStore.recordRootSecretEnvelopeMinimumVersion(version)
+            },
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: traceStore
+        )
+    }
+
+    private static func makeFirstDomainSharedRightCleaner(
+        storageRoot: ProtectedDataStorageRoot,
+        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
+        traceStore: AuthLifecycleTraceStore?
+    ) -> ProtectedDataFirstDomainSharedRightCleaner {
+        ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: storageRoot,
+            hasPersistedSharedRight: { identifier in
+                protectedDataSessionCoordinator.hasPersistedRootSecret(identifier: identifier)
+            },
+            removePersistedSharedRight: { identifier in
+                try await protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
+            },
+            traceStore: traceStore
+        )
+    }
+
+    private static func makePrivateKeyControlPostUnlockOpener(
+        privateKeyControlStore: PrivateKeyControlStore
+    ) -> ProtectedDataPostUnlockDomainOpener {
+        ProtectedDataPostUnlockDomainOpener(
+            domainID: PrivateKeyControlStore.domainID,
+            ensureCommittedIfNeeded: { wrappingRootKey in
+                try await privateKeyControlStore.ensureCommittedIfNeeded(
+                    wrappingRootKey: wrappingRootKey
+                )
+            },
+            open: { wrappingRootKey in
+                _ = try await privateKeyControlStore.openDomainIfNeeded(
+                    wrappingRootKey: wrappingRootKey
+                )
+            }
+        )
+    }
+
+    private static func makeProtectedSettingsPostUnlockOpener(
+        protectedSettingsStore: ProtectedSettingsStore,
+        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
+        firstDomainSharedRightCleaner: ProtectedDataFirstDomainSharedRightCleaner
+    ) -> ProtectedDataPostUnlockDomainOpener {
+        ProtectedDataPostUnlockDomainOpener(
+            domainID: ProtectedSettingsStore.domainID,
+            ensureCommittedIfNeeded: { wrappingRootKey in
+                try await protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                    persistSharedRight: { secret in
+                        try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
+                    },
+                    firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
+                    currentWrappingRootKey: {
+                        wrappingRootKey
+                    }
+                )
+            },
+            open: { wrappingRootKey in
+                _ = try await protectedSettingsStore.openDomainIfNeeded(
+                    wrappingRootKey: wrappingRootKey
+                )
+            }
+        )
+    }
+
+    private static func makeProtectedDataFrameworkSentinelPostUnlockOpener(
+        protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore
+    ) -> ProtectedDataPostUnlockDomainOpener {
+        ProtectedDataPostUnlockDomainOpener(
+            domainID: ProtectedDataFrameworkSentinelStore.domainID,
+            ensureCommittedIfNeeded: { wrappingRootKey in
+                try await protectedDataFrameworkSentinelStore.ensureCommittedIfNeeded(
+                    wrappingRootKey: wrappingRootKey
+                )
+            },
+            open: { wrappingRootKey in
+                _ = try await protectedDataFrameworkSentinelStore.openDomainIfNeeded(
+                    wrappingRootKey: wrappingRootKey
+                )
+            }
+        )
+    }
+
+    private static func makePgpServiceGraph(
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        contactService: ContactService
+    ) -> PgpServiceGraph {
+        let temporaryArtifactStore = AppTemporaryArtifactStore()
+        return PgpServiceGraph(
+            temporaryArtifactStore: temporaryArtifactStore,
+            encryptionService: EncryptionService(
+                engine: engine,
+                keyManagement: keyManagement,
+                contactService: contactService,
+                temporaryArtifactStore: temporaryArtifactStore
+            ),
+            decryptionService: DecryptionService(
+                engine: engine,
+                keyManagement: keyManagement,
+                contactService: contactService,
+                temporaryArtifactStore: temporaryArtifactStore
+            ),
+            passwordMessageService: PasswordMessageService(
+                engine: engine,
+                keyManagement: keyManagement,
+                contactService: contactService
+            ),
+            signingService: SigningService(
+                engine: engine,
+                keyManagement: keyManagement,
+                contactService: contactService
+            ),
+            certificateSignatureService: CertificateSignatureService(
+                engine: engine,
+                keyManagement: keyManagement,
+                contactService: contactService
+            ),
+            qrService: QRService(engine: engine),
+            selfTestService: SelfTestService(engine: engine)
+        )
+    }
+
+    static func makeDefault(
+        authTraceEnabled: Bool = false
+    ) -> AppContainer {
+        let authentication = makeAuthenticationPromptStack(authTraceEnabled: authTraceEnabled)
+        let authLifecycleTraceStore = authentication.authLifecycleTraceStore
+        let authenticationShieldCoordinator = authentication.authenticationShieldCoordinator
+        let authPromptCoordinator = authentication.authPromptCoordinator
+        let secureEnclave = HardwareSecureEnclave(traceStore: authLifecycleTraceStore)
+        let keychain = SystemKeychain(traceStore: authLifecycleTraceStore)
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
@@ -146,26 +317,18 @@ final class AppContainer: @unchecked Sendable {
             registryStore: protectedDataRegistryStore
         )
         let protectedDataRightStoreClient = ProtectedDataRightStoreClient(traceStore: authLifecycleTraceStore)
-        let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
+        let protectedDataSessionCoordinator = makeProtectedDataSessionCoordinator(
             rootSecretStore: KeychainProtectedDataRootSecretStore(traceStore: authLifecycleTraceStore),
             legacyRightStoreClient: protectedDataRightStoreClient,
             domainKeyManager: protectedDomainKeyManager,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
-            appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
-            recordRootSecretEnvelopeMinimumVersion: { version in
-                try await protectedDataRegistryStore.recordRootSecretEnvelopeMinimumVersion(version)
-            },
-            authenticationPromptCoordinator: authPromptCoordinator,
+            registryStore: protectedDataRegistryStore,
+            config: config,
+            authPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
-        let firstDomainSharedRightCleaner = ProtectedDataFirstDomainSharedRightCleaner(
+        let firstDomainSharedRightCleaner = makeFirstDomainSharedRightCleaner(
             storageRoot: protectedDataStorageRoot,
-            hasPersistedSharedRight: { identifier in
-                protectedDataSessionCoordinator.hasPersistedRootSecret(identifier: identifier)
-            },
-            removePersistedSharedRight: { identifier in
-                try await protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
-            },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             traceStore: authLifecycleTraceStore
         )
         let privateKeyControlStore = PrivateKeyControlStore(
@@ -264,18 +427,8 @@ final class AppContainer: @unchecked Sendable {
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             domainOpeners: [
-                ProtectedDataPostUnlockDomainOpener(
-                    domainID: PrivateKeyControlStore.domainID,
-                    ensureCommittedIfNeeded: { wrappingRootKey in
-                        try await privateKeyControlStore.ensureCommittedIfNeeded(
-                            wrappingRootKey: wrappingRootKey
-                        )
-                    },
-                    open: { wrappingRootKey in
-                        _ = try await privateKeyControlStore.openDomainIfNeeded(
-                            wrappingRootKey: wrappingRootKey
-                        )
-                    }
+                makePrivateKeyControlPostUnlockOpener(
+                    privateKeyControlStore: privateKeyControlStore
                 ),
                 ProtectedDataPostUnlockDomainOpener(
                     domainID: KeyMetadataDomainStore.domainID,
@@ -308,37 +461,13 @@ final class AppContainer: @unchecked Sendable {
                         }
                     }
                 ),
-                ProtectedDataPostUnlockDomainOpener(
-                    domainID: ProtectedSettingsStore.domainID,
-                    ensureCommittedIfNeeded: { wrappingRootKey in
-                        try await protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
-                            persistSharedRight: { secret in
-                                try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
-                            },
-                            firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
-                            currentWrappingRootKey: {
-                                wrappingRootKey
-                            }
-                        )
-                    },
-                    open: { wrappingRootKey in
-                        _ = try await protectedSettingsStore.openDomainIfNeeded(
-                            wrappingRootKey: wrappingRootKey
-                        )
-                    }
+                makeProtectedSettingsPostUnlockOpener(
+                    protectedSettingsStore: protectedSettingsStore,
+                    protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+                    firstDomainSharedRightCleaner: firstDomainSharedRightCleaner
                 ),
-                ProtectedDataPostUnlockDomainOpener(
-                    domainID: ProtectedDataFrameworkSentinelStore.domainID,
-                    ensureCommittedIfNeeded: { wrappingRootKey in
-                        try await protectedDataFrameworkSentinelStore.ensureCommittedIfNeeded(
-                            wrappingRootKey: wrappingRootKey
-                        )
-                    },
-                    open: { wrappingRootKey in
-                        _ = try await protectedDataFrameworkSentinelStore.openDomainIfNeeded(
-                            wrappingRootKey: wrappingRootKey
-                        )
-                    }
+                makeProtectedDataFrameworkSentinelPostUnlockOpener(
+                    protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore
                 )
             ],
             traceStore: authLifecycleTraceStore
@@ -411,36 +540,11 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
-        let temporaryArtifactStore = AppTemporaryArtifactStore()
-        let encryptionService = EncryptionService(
-            engine: engine,
-            keyManagement: keyManagement,
-            contactService: contactService,
-            temporaryArtifactStore: temporaryArtifactStore
-        )
-        let decryptionService = DecryptionService(
-            engine: engine,
-            keyManagement: keyManagement,
-            contactService: contactService,
-            temporaryArtifactStore: temporaryArtifactStore
-        )
-        let passwordMessageService = PasswordMessageService(
+        let pgpServices = makePgpServiceGraph(
             engine: engine,
             keyManagement: keyManagement,
             contactService: contactService
         )
-        let signingService = SigningService(
-            engine: engine,
-            keyManagement: keyManagement,
-            contactService: contactService
-        )
-        let certificateSignatureService = CertificateSignatureService(
-            engine: engine,
-            keyManagement: keyManagement,
-            contactService: contactService
-        )
-        let qrService = QRService(engine: engine)
-        let selfTestService = SelfTestService(engine: engine)
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
             legacyRightStoreClient: protectedDataRightStoreClient,
@@ -453,10 +557,10 @@ final class AppContainer: @unchecked Sendable {
             authManager: authManager,
             keyManagement: keyManagement,
             contactService: contactService,
-            selfTestService: selfTestService,
+            selfTestService: pgpServices.selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
-            temporaryArtifactStore: temporaryArtifactStore,
+            temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
@@ -488,14 +592,14 @@ final class AppContainer: @unchecked Sendable {
             engine: engine,
             keyManagement: keyManagement,
             contactService: contactService,
-            encryptionService: encryptionService,
-            decryptionService: decryptionService,
-            passwordMessageService: passwordMessageService,
-            signingService: signingService,
-            certificateSignatureService: certificateSignatureService,
-            qrService: qrService,
-            selfTestService: selfTestService,
-            temporaryArtifactStore: temporaryArtifactStore,
+            encryptionService: pgpServices.encryptionService,
+            decryptionService: pgpServices.decryptionService,
+            passwordMessageService: pgpServices.passwordMessageService,
+            signingService: pgpServices.signingService,
+            certificateSignatureService: pgpServices.certificateSignatureService,
+            qrService: pgpServices.qrService,
+            selfTestService: pgpServices.selfTestService,
+            temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             localDataResetService: localDataResetService,
             contactsDirectory: contactsDirectory,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory
@@ -507,18 +611,12 @@ final class AppContainer: @unchecked Sendable {
         preloadContact: Bool = false,
         authTraceEnabled: Bool = false
     ) -> AppContainer {
+        let authentication = makeAuthenticationPromptStack(authTraceEnabled: authTraceEnabled)
+        let authLifecycleTraceStore = authentication.authLifecycleTraceStore
+        let authenticationShieldCoordinator = authentication.authenticationShieldCoordinator
+        let authPromptCoordinator = authentication.authPromptCoordinator
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
-        let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
-        let authenticationShieldCoordinator = AuthenticationShieldCoordinator(
-            traceStore: authLifecycleTraceStore
-        )
-        let authPromptCoordinator = AuthenticationPromptCoordinator(
-            shieldEventHandler: makeShieldEventHandler(
-                coordinator: authenticationShieldCoordinator
-            ),
-            traceStore: authLifecycleTraceStore
-        )
         let suiteName = "com.cypherair.uitests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)
@@ -569,26 +667,18 @@ final class AppContainer: @unchecked Sendable {
             registryStore: protectedDataRegistryStore
         )
         let protectedDataRightStoreClient = ProtectedDataRightStoreClient(traceStore: authLifecycleTraceStore)
-        let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
+        let protectedDataSessionCoordinator = makeProtectedDataSessionCoordinator(
             rootSecretStore: MockProtectedDataRootSecretStore(),
             legacyRightStoreClient: protectedDataRightStoreClient,
             domainKeyManager: protectedDomainKeyManager,
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
-            appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
-            recordRootSecretEnvelopeMinimumVersion: { version in
-                try await protectedDataRegistryStore.recordRootSecretEnvelopeMinimumVersion(version)
-            },
-            authenticationPromptCoordinator: authPromptCoordinator,
+            registryStore: protectedDataRegistryStore,
+            config: config,
+            authPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
-        let firstDomainSharedRightCleaner = ProtectedDataFirstDomainSharedRightCleaner(
+        let firstDomainSharedRightCleaner = makeFirstDomainSharedRightCleaner(
             storageRoot: protectedDataStorageRoot,
-            hasPersistedSharedRight: { identifier in
-                protectedDataSessionCoordinator.hasPersistedRootSecret(identifier: identifier)
-            },
-            removePersistedSharedRight: { identifier in
-                try await protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
-            },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             traceStore: authLifecycleTraceStore
         )
         let privateKeyControlStore = PrivateKeyControlStore(
@@ -642,50 +732,16 @@ final class AppContainer: @unchecked Sendable {
             },
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             domainOpeners: [
-                ProtectedDataPostUnlockDomainOpener(
-                    domainID: PrivateKeyControlStore.domainID,
-                    ensureCommittedIfNeeded: { wrappingRootKey in
-                        try await privateKeyControlStore.ensureCommittedIfNeeded(
-                            wrappingRootKey: wrappingRootKey
-                        )
-                    },
-                    open: { wrappingRootKey in
-                        _ = try await privateKeyControlStore.openDomainIfNeeded(
-                            wrappingRootKey: wrappingRootKey
-                        )
-                    }
+                makePrivateKeyControlPostUnlockOpener(
+                    privateKeyControlStore: privateKeyControlStore
                 ),
-                ProtectedDataPostUnlockDomainOpener(
-                    domainID: ProtectedSettingsStore.domainID,
-                    ensureCommittedIfNeeded: { wrappingRootKey in
-                        try await protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
-                            persistSharedRight: { secret in
-                                try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
-                            },
-                            firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
-                            currentWrappingRootKey: {
-                                wrappingRootKey
-                            }
-                        )
-                    },
-                    open: { wrappingRootKey in
-                        _ = try await protectedSettingsStore.openDomainIfNeeded(
-                            wrappingRootKey: wrappingRootKey
-                        )
-                    }
+                makeProtectedSettingsPostUnlockOpener(
+                    protectedSettingsStore: protectedSettingsStore,
+                    protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+                    firstDomainSharedRightCleaner: firstDomainSharedRightCleaner
                 ),
-                ProtectedDataPostUnlockDomainOpener(
-                    domainID: ProtectedDataFrameworkSentinelStore.domainID,
-                    ensureCommittedIfNeeded: { wrappingRootKey in
-                        try await protectedDataFrameworkSentinelStore.ensureCommittedIfNeeded(
-                            wrappingRootKey: wrappingRootKey
-                        )
-                    },
-                    open: { wrappingRootKey in
-                        _ = try await protectedDataFrameworkSentinelStore.openDomainIfNeeded(
-                            wrappingRootKey: wrappingRootKey
-                        )
-                    }
+                makeProtectedDataFrameworkSentinelPostUnlockOpener(
+                    protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore
                 )
             ],
             traceStore: authLifecycleTraceStore
@@ -775,36 +831,11 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
-        let temporaryArtifactStore = AppTemporaryArtifactStore()
-        let encryptionService = EncryptionService(
-            engine: engine,
-            keyManagement: keyManagement,
-            contactService: contactService,
-            temporaryArtifactStore: temporaryArtifactStore
-        )
-        let decryptionService = DecryptionService(
-            engine: engine,
-            keyManagement: keyManagement,
-            contactService: contactService,
-            temporaryArtifactStore: temporaryArtifactStore
-        )
-        let passwordMessageService = PasswordMessageService(
+        let pgpServices = makePgpServiceGraph(
             engine: engine,
             keyManagement: keyManagement,
             contactService: contactService
         )
-        let signingService = SigningService(
-            engine: engine,
-            keyManagement: keyManagement,
-            contactService: contactService
-        )
-        let certificateSignatureService = CertificateSignatureService(
-            engine: engine,
-            keyManagement: keyManagement,
-            contactService: contactService
-        )
-        let qrService = QRService(engine: engine)
-        let selfTestService = SelfTestService(engine: engine)
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
             legacyRightStoreClient: nil,
@@ -817,10 +848,10 @@ final class AppContainer: @unchecked Sendable {
             authManager: authManager,
             keyManagement: keyManagement,
             contactService: contactService,
-            selfTestService: selfTestService,
+            selfTestService: pgpServices.selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
-            temporaryArtifactStore: temporaryArtifactStore,
+            temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
@@ -855,14 +886,14 @@ final class AppContainer: @unchecked Sendable {
             engine: engine,
             keyManagement: keyManagement,
             contactService: contactService,
-            encryptionService: encryptionService,
-            decryptionService: decryptionService,
-            passwordMessageService: passwordMessageService,
-            signingService: signingService,
-            certificateSignatureService: certificateSignatureService,
-            qrService: qrService,
-            selfTestService: selfTestService,
-            temporaryArtifactStore: temporaryArtifactStore,
+            encryptionService: pgpServices.encryptionService,
+            decryptionService: pgpServices.decryptionService,
+            passwordMessageService: pgpServices.passwordMessageService,
+            signingService: pgpServices.signingService,
+            certificateSignatureService: pgpServices.certificateSignatureService,
+            qrService: pgpServices.qrService,
+            selfTestService: pgpServices.selfTestService,
+            temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             localDataResetService: localDataResetService,
             contactsDirectory: contactsDirectory,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,

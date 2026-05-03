@@ -385,12 +385,21 @@ presentation wiring.
 
 Status:
 
-partially completed on 2026-05-03. `ProtectedSettingsAccessCoordinator.swift`
-now owns protected-settings access-gate evaluation, migration authorization,
+completed on 2026-05-03. `ProtectedSettingsAccessCoordinator.swift` now owns
+protected-settings access-gate evaluation, migration authorization,
 shared-right authorization, open-domain, pending-recovery retry, reset, and
-clipboard-notice mutation policy. `ProtectedSettingsHost.swift` still owns the
+clipboard-notice mutation policy. `ProtectedSettingsHost.swift` owns the
 observable mode and section state, domain-to-section projection, environment
-key, and host trace metadata.
+key, and host trace metadata. `AuthenticationShieldCoordinator.swift` owns
+shield state transitions and tracing; `AuthenticationShieldHost.swift` owns the
+environment/modifier/lifecycle adapter; `AuthenticationShieldOverlayView.swift`
+owns overlay rendering and animation. `AppLaunchConfiguration.swift`,
+`AppLoadWarningCoordinator.swift`, `AppSceneIncomingURLRouter.swift`, and
+`LocalDataResetRestartAction.swift` move launch, load-warning, URL handoff, and
+restart actions out of the scene body. `AppContainer.swift` now shares common
+auth prompt, ProtectedData session/first-domain cleaner, post-unlock opener,
+and PGP-service construction helpers while preserving default versus UI-test
+differences.
 
 TODO:
 
@@ -398,12 +407,12 @@ TODO:
   the SwiftUI-facing host into a focused model/coordinator.
 - [x] Keep protected-settings UI state, section state mapping, and view
   environment injection presentation-oriented.
-- [ ] Split authentication shield state transitions from overlay rendering and
+- [x] Split authentication shield state transitions from overlay rendering and
   platform lifecycle adapters.
-- [ ] Split app launch configuration, incoming URL import orchestration,
+- [x] Split app launch configuration, incoming URL import orchestration,
   load-warning presentation, and reset restart behavior from the scene body
   where practical.
-- [ ] Reduce duplicated dependency wiring between default and UI-test
+- [x] Reduce duplicated dependency wiring between default and UI-test
   containers by extracting shared construction helpers that do not hide test
   differences.
 
