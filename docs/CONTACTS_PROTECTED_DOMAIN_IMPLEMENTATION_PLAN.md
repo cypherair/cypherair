@@ -1,7 +1,7 @@
 # Contacts Protected Domain Implementation Plan
 
-> **Version:** Draft v0.1
-> **Status:** Draft implementation-prep plan for unblocked Phase 8 work. This document does not describe current shipped behavior.
+> **Version:** Draft v0.2
+> **Status:** Draft implementation-prep plan for unblocked Phase 8 work, updated with Contacts PR3 implementation constraints and coverage notes.
 > **Purpose:** Bridge the gap between the current shared ProtectedData framework, the active Contacts documents, and the Phase 8 Contacts protected-domain work so the later implementation can proceed through a stable, reviewable PR sequence.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
@@ -41,7 +41,7 @@ The active Contacts and shared-framework documents already establish the correct
 
 The repository, however, still has material current-state behavior that must be unwound before that target can land safely. The biggest gaps are not only storage-related:
 
-- startup still loads plaintext Contacts before protected-domain root-secret activation and Contacts domain unlock
+- pre-PR3 startup loaded plaintext Contacts before protected-domain root-secret activation and Contacts domain unlock
 - verification-capable services still use Contacts as direct cryptographic verification input
 - Contacts access and mutation entrypoints are scattered across app surfaces and service helpers
 - local reset and tutorial/test sandbox paths must be explicitly classified so they do not bypass or pollute the real Contacts domain
@@ -55,14 +55,16 @@ This section records the current repository facts that materially change impleme
 
 ### 3.1 Startup And Source-Of-Truth Delta
 
-Current code still treats Contacts as startup-readable plaintext content:
+The pre-PR3 baseline treated Contacts as startup-readable plaintext content:
 
-- `AppStartupCoordinator.performPreAuthBootstrap(...)` calls `contactService.loadContacts()`
-- `ContactService` persists `Documents/contacts/*.gpg`
-- `ContactService` persists `Documents/contacts/contact-metadata.json`
-- `ContactsView` still calls `loadContacts()` directly on `.task`
+- `AppStartupCoordinator.performPreAuthBootstrap(...)` loaded Contacts during pre-auth bootstrap.
+- `ContactService` persisted `Documents/contacts/*.gpg`.
+- `ContactService` persisted `Documents/contacts/contact-metadata.json`.
+- `ContactsView` opened the legacy source from a route `.task`.
 
-This conflicts with the Contacts TDD rule that Contacts payload generations must not be opened before shared app-data root-secret retrieval succeeds and the Contacts domain DMK unlocks. Contacts protected-domain adoption therefore requires both storage migration and startup sequencing migration.
+Contacts PR3 removes that pre-auth ordinary read path. Startup now records the load as deferred, and normal app use opens the legacy compatibility source only after the shared post-auth protected-data gate reports an eligible state.
+
+The legacy files remain the PR3 authoritative compatibility source until PR4 migrates and cuts over to the protected Contacts domain. That source is now behind the same post-auth lifecycle surface as later protected-domain reads, so PR4 can swap the implementation without re-opening route and service callsites.
 
 ### 3.2 Verification Contract Delta
 
@@ -322,7 +324,7 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 - add the `ContactsAvailability` type shape
 - add a domain repository layer under `ContactService`
 - preserve a compatibility projection so existing UI and service consumers can still operate during the migration sequence
-- keep ordinary runtime reads on the legacy plaintext source through Contacts PR3; compatibility projection exists to preserve consumers, not to switch source of truth early
+- keep ordinary runtime reads on the gated legacy compatibility source through Contacts PR3; compatibility projection exists to preserve consumers, not to switch source of truth early
 - register Contacts as a `ProtectedDataRelockParticipant`
 - clear decrypted snapshot state, serialization scratch buffers, search index state, signer-recognition state, and all `ContactService`-exposed runtime / compatibility projection state on relock
 
@@ -405,6 +407,50 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 - gate certificate-signature verification-time candidate signer reads so `CertificateSignatureService` cannot consume Contacts-backed `candidateSigners` while the Contacts domain is locked
 - implement route-level opening / locked / recovery-needed / framework-unavailable behavior
 
+**Gate Input Contract**
+
+Contacts PR3 does not derive `ContactsAvailability` from `ProtectedDataPostUnlockOutcome` alone. The gate input is a dedicated `ContactsPostAuthGateResult` built from:
+
+- `ProtectedDataPostUnlockOutcome`
+- `ProtectedDataSessionCoordinator.frameworkState`
+
+`frameworkState == .restartRequired` takes priority over all post-unlock outcomes and maps to `ContactsAvailability.restartRequired`. `frameworkState == .frameworkRecoveryNeeded` takes priority next and maps to `ContactsAvailability.frameworkUnavailable`.
+
+Contacts is intentionally not registered as a post-unlock protected-domain opener in PR3. Eligible outcomes therefore mean the shared app-data session is authorized enough to read the current legacy compatibility source, not that a Contacts protected-domain payload has been opened or committed.
+
+**Outcome Mapping**
+
+| Gate input | Availability | Clear runtime | Allow legacy load | UI / behavior |
+| --- | --- | --- | --- | --- |
+| `frameworkState == .restartRequired` | `.restartRequired` | yes | no | Restart required |
+| `frameworkState == .frameworkRecoveryNeeded` | `.frameworkUnavailable` | yes | no | Protected-data framework unavailable |
+| `.opened(_) + .sessionAuthorized` | `.opening` -> success `.availableLegacyCompatibility` / failure `.recoveryNeeded` | yes, before load | yes | Loading, then list or recovery |
+| `.noRegisteredDomainPresent + .sessionAuthorized` | `.opening` -> success `.availableLegacyCompatibility` / failure `.recoveryNeeded` | yes, before load | yes | Uses authorized app-data session; Contacts is not an opener in PR3 |
+| `.noRegisteredOpeners + .sessionAuthorized` | `.opening` -> success `.availableLegacyCompatibility` / failure `.recoveryNeeded` | yes, before load | yes | Test / degraded path only; production should not normally hit it |
+| `.noProtectedDomainPresent` | `.locked` | yes | no | Protected-data gate unavailable |
+| `.noAuthenticatedContext` | `.locked` | yes | no | No authenticated context |
+| `.authorizationDenied` | `.locked` | yes | no | User canceled or denied authentication |
+| `.pendingMutationRecoveryRequired` | `.frameworkUnavailable` | yes | no | Pending mutation recovery blocks Contacts |
+| `.frameworkRecoveryNeeded` | `.frameworkUnavailable` | yes | no | Framework recovery blocks Contacts |
+| `.domainOpenFailed(_)` | `.frameworkUnavailable` | yes | no | Contacts is not an opener; any protected-domain open failure blocks PR3 Contacts load |
+| Any other outcome + `.sessionLocked` | `.locked` | yes | no | Session locked |
+
+**Gated API Rule**
+
+Production code must not call raw legacy loading or direct runtime storage. It must use `ContactService` gated accessors such as availability, available snapshots/lookups, recipient key resolution, and gated mutation methods. Raw legacy load and raw mutation implementation details remain private to `ContactService`; tests and tutorial sandbox code may use explicit helper entrypoints only.
+
+Contacts PR3 includes a source audit test to prevent production `Sources` callsites from reintroducing `contactService.loadContacts()`, direct `contactService.contacts` reads, direct raw lookup, or private raw implementation calls outside the allowed implementation/sandbox files.
+
+**Atomic Legacy Load**
+
+`openLegacyCompatibilityAfterPostUnlock(gateResult:)` is fail-closed:
+
+- clear contacts, verification states, and compatibility projection before entering `.opening`
+- read legacy files, validate certificates, filter verification state, and rebuild compatibility projection into local values first
+- publish runtime state only after the whole load succeeds
+- on any read, validation, projection, or save failure, clear all runtime state again and set `.recoveryNeeded`
+- relock and local data reset continue clearing runtime state and returning to `.locked`
+
 **Required Outcomes**
 
 - Contacts-dependent surfaces are normally available after successful app authentication and the post-auth Contacts gate finishes loading the current authoritative source for that stage
@@ -430,7 +476,9 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 **Validation**
 
 - macOS route and UI smoke coverage
-- unit coverage for lock-state mapping across the gated surfaces
+- table-driven unit coverage for every gate outcome and framework-state override
+- unit coverage for authorized legacy load, fail-closed load failure, relock cleanup, locked mutation blocking, and production source audit
+- macOS route and UI smoke coverage for Contacts opening / locked / recovery / framework / restart states and Encrypt recipient locked state
 
 ### 6.5 Contacts PR4 — Legacy Contacts Migration, Quarantine, And Cutover
 

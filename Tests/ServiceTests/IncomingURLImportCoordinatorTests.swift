@@ -59,8 +59,8 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
 
         XCTAssertNil(coordinator.importConfirmationCoordinator.request)
         XCTAssertNil(coordinator.importError)
-        XCTAssertEqual(stack.contactService.contacts.count, 1)
-        XCTAssertNotNil(stack.contactService.contact(forFingerprint: generated.fingerprint))
+        XCTAssertEqual(stack.contactService.availableContacts.count, 1)
+        XCTAssertNotNil(stack.contactService.availableContact(forFingerprint: generated.fingerprint))
     }
 
     @MainActor
@@ -91,9 +91,9 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         coordinator.confirmPendingKeyUpdate()
 
         XCTAssertNil(coordinator.pendingKeyUpdateRequest)
-        XCTAssertEqual(stack.contactService.contacts.count, 1)
-        XCTAssertNil(stack.contactService.contact(forFingerprint: firstKey.fingerprint))
-        XCTAssertNotNil(stack.contactService.contact(forFingerprint: secondKey.fingerprint))
+        XCTAssertEqual(stack.contactService.availableContacts.count, 1)
+        XCTAssertNil(stack.contactService.availableContact(forFingerprint: firstKey.fingerprint))
+        XCTAssertNotNil(stack.contactService.availableContact(forFingerprint: secondKey.fingerprint))
     }
 
     @MainActor
@@ -123,9 +123,9 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         coordinator.cancelPendingKeyUpdate()
 
         XCTAssertNil(coordinator.pendingKeyUpdateRequest)
-        XCTAssertEqual(stack.contactService.contacts.count, 1)
-        XCTAssertNotNil(stack.contactService.contact(forFingerprint: firstKey.fingerprint))
-        XCTAssertNil(stack.contactService.contact(forFingerprint: secondKey.fingerprint))
+        XCTAssertEqual(stack.contactService.availableContacts.count, 1)
+        XCTAssertNotNil(stack.contactService.availableContact(forFingerprint: firstKey.fingerprint))
+        XCTAssertNil(stack.contactService.availableContact(forFingerprint: secondKey.fingerprint))
     }
 
     @MainActor
@@ -144,7 +144,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.isTutorialImportBlocked)
         XCTAssertNil(coordinator.importConfirmationCoordinator.request)
         XCTAssertNil(coordinator.importError)
-        XCTAssertTrue(stack.contactService.contacts.isEmpty)
+        XCTAssertTrue(stack.contactService.availableContacts.isEmpty)
     }
 
     @MainActor

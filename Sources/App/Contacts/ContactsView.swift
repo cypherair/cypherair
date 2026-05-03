@@ -8,28 +8,11 @@ struct ContactsView: View {
     @State private var showDeleteError = false
 
     var body: some View {
-        List {
-            ForEach(contactService.contacts) { contact in
-                NavigationLink(value: AppRoute.contactDetail(fingerprint: contact.fingerprint)) {
-                    ContactRowView(contact: contact)
-                }
-                .accessibilityIdentifier("contacts.row")
-            }
-            .onDelete { indexSet in
-                for index in indexSet {
-                    let contact = contactService.contacts[index]
-                    do {
-                        try contactService.removeContact(fingerprint: contact.fingerprint)
-                    } catch {
-                        deleteError = error.localizedDescription
-                        showDeleteError = true
-                    }
-                }
-            }
-        }
-        .overlay {
-            if contactService.contacts.isEmpty {
-                emptyStateContent
+        Group {
+            if contactService.contactsAvailability.isAvailable {
+                contactsList
+            } else {
+                contactsUnavailableContent(contactService.contactsAvailability)
             }
         }
         .navigationTitle(String(localized: "contacts.title", defaultValue: "Contacts"))
@@ -45,9 +28,6 @@ struct ContactsView: View {
                 .accessibilityLabel(String(localized: "contacts.add", defaultValue: "Add Contact"))
             }
         }
-        .task {
-            try? contactService.loadContacts()
-        }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
             isPresented: $showDeleteError
@@ -56,6 +36,60 @@ struct ContactsView: View {
         } message: {
             if let deleteError {
                 Text(deleteError)
+            }
+        }
+    }
+
+    private var contactsList: some View {
+        let contacts = contactService.availableContacts
+
+        return List {
+            ForEach(contacts) { contact in
+                NavigationLink(value: AppRoute.contactDetail(fingerprint: contact.fingerprint)) {
+                    ContactRowView(contact: contact)
+                }
+                .accessibilityIdentifier("contacts.row")
+            }
+            .onDelete { indexSet in
+                deleteContacts(at: indexSet, from: contacts)
+            }
+        }
+        .overlay {
+            if contacts.isEmpty {
+                emptyStateContent
+            }
+        }
+    }
+
+    private func deleteContacts(at indexSet: IndexSet, from contacts: [Contact]) {
+        for index in indexSet {
+            let contact = contacts[index]
+            do {
+                try contactService.removeContact(fingerprint: contact.fingerprint)
+            } catch {
+                deleteError = error.localizedDescription
+                showDeleteError = true
+            }
+        }
+    }
+
+    private func contactsUnavailableContent(_ availability: ContactsAvailability) -> some View {
+        ContentUnavailableView {
+            Label(availability.unavailableTitle, systemImage: systemImage(for: availability))
+        } description: {
+            Text(availability.unavailableDescription)
+        } actions: {
+            if availability == .opening {
+                ProgressView()
+            } else {
+                Button {
+                    routeNavigator.open(.addContact)
+                } label: {
+                    Text(String(localized: "contacts.add", defaultValue: "Add Contact"))
+                }
+                .buttonStyle(.bordered)
+                .tutorialAnchor(.contactsAddButton)
+                .accessibilityIdentifier("contacts.add")
             }
         }
     }
@@ -77,6 +111,23 @@ struct ContactsView: View {
             .buttonStyle(.borderedProminent)
             .tutorialAnchor(.contactsAddButton)
             .accessibilityIdentifier("contacts.add")
+        }
+    }
+
+    private func systemImage(for availability: ContactsAvailability) -> String {
+        switch availability {
+        case .opening:
+            "lock.open"
+        case .locked:
+            "lock"
+        case .recoveryNeeded:
+            "exclamationmark.triangle"
+        case .frameworkUnavailable:
+            "externaldrive.badge.exclamationmark"
+        case .restartRequired:
+            "arrow.clockwise"
+        case .availableLegacyCompatibility, .availableProtectedDomain:
+            "person.2"
         }
     }
 }

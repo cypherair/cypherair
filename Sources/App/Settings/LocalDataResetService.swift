@@ -383,6 +383,7 @@ final class LocalDataResetService {
                 failures: &failures
             )
             let remainingTemporaryTargets = temporaryResetTargetsRemaining()
+            let remainingContactRuntimeCount = contactService.runtimeContactCountForDiagnostics
             let hasRemainingData = hasProtectedArtifacts
                 || hasRootSecret
                 || contactsDirectoryExists
@@ -391,7 +392,7 @@ final class LocalDataResetService {
                 || !remainingMetadataAccountServices.isEmpty
                 || !remainingTemporaryTargets.isEmpty
                 || !keyManagement.keys.isEmpty
-                || !contactService.contacts.isEmpty
+                || remainingContactRuntimeCount > 0
             traceStore?.record(
                 category: .operation,
                 name: "localDataReset.validation.finish",
@@ -409,7 +410,7 @@ final class LocalDataResetService {
                     "remainingMetadataKeychainItemCount": String(remainingMetadataAccountServices.count),
                     "remainingTemporaryTargetCount": String(remainingTemporaryTargets.count),
                     "keyCount": String(keyManagement.keys.count),
-                    "contactCount": String(contactService.contacts.count)
+                    "contactCount": String(remainingContactRuntimeCount)
                 ]
             )
             if hasProtectedArtifacts {
@@ -445,8 +446,8 @@ final class LocalDataResetService {
             if !keyManagement.keys.isEmpty {
                 failures.append("memory.keys.remaining.\(keyManagement.keys.count)")
             }
-            if !contactService.contacts.isEmpty {
-                failures.append("memory.contacts.remaining.\(contactService.contacts.count)")
+            if remainingContactRuntimeCount > 0 {
+                failures.append("memory.contacts.remaining.\(remainingContactRuntimeCount)")
             }
         } catch {
             traceStore?.record(

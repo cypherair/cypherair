@@ -108,7 +108,7 @@ final class LocalDataResetServiceTests: XCTestCase {
         XCTAssertEqual(container.protectedOrdinarySettingsCoordinator.state, .locked)
         XCTAssertNil(container.selfTestService.latestReport)
         XCTAssertTrue(container.keyManagement.keys.isEmpty)
-        XCTAssertTrue(container.contactService.contacts.isEmpty)
+        XCTAssertTrue(container.contactService.availableContacts.isEmpty)
 
         let traceNames = container.authLifecycleTraceStore?.recentEntries.map(\.name) ?? []
         XCTAssertTrue(traceNames.contains("localDataReset.start"))

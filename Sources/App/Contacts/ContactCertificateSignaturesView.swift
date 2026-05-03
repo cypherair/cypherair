@@ -60,7 +60,13 @@ private struct ContactCertificateSignaturesHostView: View {
         let exportController = model.exportController
 
         Group {
-            if model.contact == nil {
+            if !model.contactsAvailability.isAvailable {
+                ContentUnavailableView {
+                    Label(model.contactsAvailability.unavailableTitle, systemImage: "lock")
+                } description: {
+                    Text(model.contactsAvailability.unavailableDescription)
+                }
+            } else if model.contact == nil {
                 ContentUnavailableView(
                     String(
                         localized: "contactcertsig.notFound.title",

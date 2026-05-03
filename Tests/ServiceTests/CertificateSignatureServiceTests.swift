@@ -433,7 +433,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
         )
         _ = try stack.contactService.addContact(publicKeyData: signer.publicKeyData)
 
-        let candidates = stack.certificateSignatureService.candidateSignerCertificates()
+        let candidates = try stack.certificateSignatureService.candidateSignerCertificates()
 
         XCTAssertEqual(candidates.count, 2)
         XCTAssertEqual(candidates[0], signer.publicKeyData)

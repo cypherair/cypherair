@@ -172,6 +172,7 @@ final class SigningServiceTests: XCTestCase {
         )
 
         // Verify on the original stack — the signer is not known
+        try await stack.contactService.relockProtectedData()
         let result = try await stack.signingService.verifyCleartext(strangerSigned)
         XCTAssertEqual(result.verification.status, .unknownSigner,
                        "Unknown signer should be flagged")
@@ -195,6 +196,7 @@ final class SigningServiceTests: XCTestCase {
             signerFingerprint: otherIdentity.fingerprint
         )
 
+        try await stack.contactService.relockProtectedData()
         let result = try await stack.signingService.verifyCleartext(strangerSigned)
         XCTAssertEqual(result.verification.status, .unknownSigner,
                        "Unknown Profile B signer should be flagged")

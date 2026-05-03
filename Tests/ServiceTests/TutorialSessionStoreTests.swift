@@ -15,7 +15,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
         )
         XCTAssertEqual(container.authManager.currentMode, .standard)
-        XCTAssertEqual(container.contactService.contacts.count, 0)
+        XCTAssertEqual(container.contactService.availableContacts.count, 0)
         XCTAssertEqual(container.keyManagement.keys.count, 0)
         XCTAssertFalse(container.contactsDirectory.path.contains("/Documents/contacts"))
         XCTAssertNotNil(container.securitySimulationStack.authManager)
@@ -875,7 +875,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             "EncryptView should not directly own FileExportController"
         )
         XCTAssertFalse(
-            encryptViewContents.contains("contactService.contacts.filter"),
+            encryptViewContents.contains("contactService.availableContacts.filter"),
             "EncryptView should bind to screen-model contact state instead of querying contacts inline"
         )
         XCTAssertTrue(

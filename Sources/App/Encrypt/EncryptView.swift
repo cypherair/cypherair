@@ -200,45 +200,54 @@ private struct EncryptScreenHostView: View {
             }
 
             Section {
-                ForEach(model.encryptableContacts) { contact in
-                    Toggle(isOn: Binding(
-                        get: { model.selectedRecipients.contains(contact.fingerprint) },
-                        set: { isOn in
-                            model.toggleRecipient(contact.fingerprint, isOn: isOn)
-                        }
-                    )) {
-                        HStack {
-                            compatibilityIndicator(for: contact)
-                            VStack(alignment: .leading) {
-                                Text(contact.displayName)
-                                HStack(spacing: 6) {
-                                    Text(contact.profile.displayName)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    if !contact.isVerified {
-                                        Text(String(localized: "encrypt.contact.unverified", defaultValue: "Unverified"))
-                                            .font(.caption2.weight(.semibold))
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(Color.orange.opacity(0.14), in: Capsule())
-                                            .foregroundStyle(.orange)
+                if model.contactsAvailability.isAvailable {
+                    ForEach(model.encryptableContacts) { contact in
+                        Toggle(isOn: Binding(
+                            get: { model.selectedRecipients.contains(contact.fingerprint) },
+                            set: { isOn in
+                                model.toggleRecipient(contact.fingerprint, isOn: isOn)
+                            }
+                        )) {
+                            HStack {
+                                compatibilityIndicator(for: contact)
+                                VStack(alignment: .leading) {
+                                    Text(contact.displayName)
+                                    HStack(spacing: 6) {
+                                        Text(contact.profile.displayName)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        if !contact.isVerified {
+                                            Text(String(localized: "encrypt.contact.unverified", defaultValue: "Unverified"))
+                                                .font(.caption2.weight(.semibold))
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(Color.orange.opacity(0.14), in: Capsule())
+                                                .foregroundStyle(.orange)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
 
-                if !model.selectedUnverifiedContacts.isEmpty {
+                    if !model.selectedUnverifiedContacts.isEmpty {
+                        Label(
+                            String(
+                                localized: "encrypt.unverified.warning",
+                                defaultValue: "One or more selected recipients are still unverified. Verify their fingerprints before relying on them."
+                            ),
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                    }
+                } else {
                     Label(
-                        String(
-                            localized: "encrypt.unverified.warning",
-                            defaultValue: "One or more selected recipients are still unverified. Verify their fingerprints before relying on them."
-                        ),
-                        systemImage: "exclamationmark.triangle.fill"
+                        model.contactsAvailability.unavailableDescription,
+                        systemImage: "lock"
                     )
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.secondary)
                 }
             } header: {
                 Text(String(localized: "encrypt.recipients", defaultValue: "Recipients"))
