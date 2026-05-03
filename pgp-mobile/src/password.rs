@@ -6,9 +6,10 @@ use openpgp::types::{AEADAlgorithm, SymmetricAlgorithm};
 use sequoia_openpgp as openpgp;
 
 use crate::armor;
-use crate::decrypt::{self, DecryptResult, SignatureStatus};
+use crate::decrypt::{self, SignatureStatus};
 use crate::encrypt;
 use crate::error::PgpError;
+use crate::signature_details::{DetailedSignatureEntry, SignatureVerificationState};
 
 /// Message format for password-encrypted messages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -35,6 +36,9 @@ pub struct PasswordDecryptResult {
     pub plaintext: Option<Vec<u8>>,
     pub signature_status: Option<SignatureStatus>,
     pub signer_fingerprint: Option<String>,
+    pub summary_state: SignatureVerificationState,
+    pub summary_entry_index: Option<u64>,
+    pub signatures: Vec<DetailedSignatureEntry>,
 }
 
 /// Encrypt plaintext with a password and return ASCII-armored ciphertext.
@@ -71,6 +75,9 @@ pub fn decrypt(
             plaintext: None,
             signature_status: None,
             signer_fingerprint: None,
+            summary_state: SignatureVerificationState::NotSigned,
+            summary_entry_index: None,
+            signatures: Vec::new(),
         });
     }
 
@@ -92,22 +99,21 @@ pub fn decrypt(
             }
         };
 
-        match decrypt::decrypt_with_fixed_session_key(
+        match decrypt::decrypt_with_fixed_session_key_detailed(
             &normalized,
             session_key_algo,
             session_key,
             &verifier_certs,
         ) {
-            Ok(DecryptResult {
-                plaintext,
-                signature_status,
-                signer_fingerprint,
-            }) => {
+            Ok(result) => {
                 return Ok(PasswordDecryptResult {
                     status: PasswordDecryptStatus::Decrypted,
-                    plaintext: Some(plaintext),
-                    signature_status,
-                    signer_fingerprint,
+                    plaintext: Some(result.plaintext),
+                    signature_status: Some(result.legacy_status),
+                    signer_fingerprint: result.legacy_signer_fingerprint,
+                    summary_state: result.summary_state,
+                    summary_entry_index: result.summary_entry_index,
+                    signatures: result.signatures,
                 });
             }
             Err(error @ PgpError::AeadAuthenticationFailed)
@@ -131,6 +137,9 @@ pub fn decrypt(
         plaintext: None,
         signature_status: None,
         signer_fingerprint: None,
+        summary_state: SignatureVerificationState::NotSigned,
+        summary_entry_index: None,
+        signatures: Vec::new(),
     })
 }
 

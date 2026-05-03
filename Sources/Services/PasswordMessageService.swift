@@ -61,8 +61,7 @@ final class PasswordMessageService {
     }
 
     func decryptMessage(ciphertext: Data, password: String) async throws -> DecryptOutcome {
-        let verificationKeys = contactService.contacts.map { $0.publicKeyData }
-            + keyManagement.keys.map { $0.publicKeyData }
+        let context = verificationContext()
 
         let result: PasswordDecryptResult
         do {
@@ -70,7 +69,7 @@ final class PasswordMessageService {
                 engine: engine,
                 ciphertext: ciphertext,
                 password: password,
-                verificationKeys: verificationKeys
+                verificationKeys: context.verificationKeys
             )
         } catch {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
@@ -84,21 +83,17 @@ final class PasswordMessageService {
                 )
             }
 
-            let signerContact = result.signerFingerprint.flatMap {
-                contactService.contact(forFingerprint: $0)
-            }
-            let signerIdentity = SignatureVerification.SignerIdentity.resolve(
-                fingerprint: result.signerFingerprint,
-                contacts: contactService.contacts,
-                ownKeys: keyManagement.keys
+            let verification = DetailedSignatureVerification.from(
+                legacyStatus: result.signatureStatus ?? .notSigned,
+                legacySignerFingerprint: result.signerFingerprint,
+                summaryState: result.summaryState,
+                summaryEntryIndex: result.summaryEntryIndex,
+                signatures: result.signatures,
+                contacts: context.contacts,
+                ownKeys: keyManagement.keys,
+                contactsAvailability: context.contactsAvailability
             )
-            let signature = SignatureVerification(
-                status: result.signatureStatus ?? .notSigned,
-                signerFingerprint: result.signerFingerprint,
-                signerContact: signerContact,
-                signerIdentity: signerIdentity
-            )
-            return .decrypted(plaintext: plaintext, signature: signature)
+            return .decrypted(plaintext: plaintext, signature: verification.legacyVerification)
 
         case .noSkesk:
             return .noSkesk
@@ -151,6 +146,23 @@ final class PasswordMessageService {
         }
 
         return result
+    }
+
+    private struct VerificationContext {
+        let verificationKeys: [Data]
+        let contacts: [Contact]
+        let contactsAvailability: ContactsAvailability
+    }
+
+    private func verificationContext() -> VerificationContext {
+        let contactsAvailability = contactService.contactsAvailabilityForContactsPR1
+        let contacts = contactsAvailability.allowsContactsVerification ? contactService.contacts : []
+        return VerificationContext(
+            verificationKeys: contacts.map { $0.publicKeyData }
+                + keyManagement.keys.map { $0.publicKeyData },
+            contacts: contacts,
+            contactsAvailability: contactsAvailability
+        )
     }
 
     @concurrent

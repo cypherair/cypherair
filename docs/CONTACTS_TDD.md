@@ -461,18 +461,17 @@ Required behavior:
 Decrypt is split into:
 
 - core decryption
-- signature packet / claimed or observed signer evidence extraction when the lower layer can determine it
+- signature packet detection
 - certificate-backed signature verification when a suitable verification certificate is available
 - contacts-aware signer recognition and trust/certification enrichment
 
-Signer evidence extracted without a suitable verification certificate is only a lookup clue. It must not be represented as a verified signer identity, and Contacts enrichment must not turn claimed or observed issuer evidence into a certificate-backed verification result.
+Issuer/key-handle metadata from a signature packet is not a Contacts identity clue. Contacts enrichment uses only certificate-backed signer fingerprints and must not turn unverified signature metadata into a signer identity.
 
 If Contacts verification context is unavailable because Contacts is locked, opening, recovering, or framework-unavailable:
 
 - core plaintext decryption may complete
 - signer recognition may remain unavailable
 - signature verification must not be reported as completed unless a suitable verification certificate was actually available
-- verified signer fingerprints remain distinct from claimed or observed signer evidence that has not been certificate-verified
 - UI shows the most precise state available, such as Contacts context unavailable, signer certificate unavailable, or verification pending protected-data unlock
 - there is no silent fallback to `unknown signer`
 

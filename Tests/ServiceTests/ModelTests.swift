@@ -372,6 +372,31 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(verification.isWarning)
     }
 
+    func test_detailedSignatureVerification_missingCertificateMapsToUnavailableCertificate() {
+        let entry = DetailedSignatureEntry(
+            status: .unknownSigner,
+            signerPrimaryFingerprint: nil,
+            state: .signerCertificateUnavailable,
+            verificationCertificateFingerprint: nil
+        )
+
+        let detailed = DetailedSignatureVerification.from(
+            legacyStatus: .unknownSigner,
+            legacySignerFingerprint: nil,
+            summaryState: .signerCertificateUnavailable,
+            summaryEntryIndex: 0,
+            signatures: [entry],
+            contacts: [],
+            ownKeys: [],
+            contactsAvailability: .availableLegacyCompatibility
+        )
+
+        XCTAssertEqual(detailed.summaryState, .signerCertificateUnavailable)
+        XCTAssertEqual(detailed.signatures[0].verificationState, .signerCertificateUnavailable)
+        XCTAssertFalse(detailed.legacyVerification.requiresContactsContext)
+        XCTAssertNil(detailed.legacyVerification.contactsUnavailableReason)
+    }
+
     // MARK: - SignatureVerification: statusColor
 
     func test_signatureVerification_statusColor_validIsGreen() {

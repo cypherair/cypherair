@@ -107,7 +107,46 @@ final class PasswordMessageServiceTests: XCTestCase {
 
         XCTAssertEqual(String(data: plaintext, encoding: .utf8), "Signed password service message")
         XCTAssertEqual(signature.status, .valid)
+        XCTAssertEqual(signature.verificationState, .verified)
         XCTAssertEqual(signature.signerFingerprint, signer.fingerprint)
+        XCTAssertEqual(signature.signerIdentity?.source, .contact)
+    }
+
+    func test_decryptMessage_signedByUnknownSignerWithLockedContactsKeepsContextUnavailable()
+        async throws
+    {
+        let otherStack = TestHelpers.makeServiceStack()
+        defer { otherStack.cleanup() }
+
+        let signer = try await TestHelpers.generateAndStoreKey(
+            service: otherStack.keyManagement,
+            profile: .universal,
+            name: "Password Stranger"
+        )
+        let ciphertext = try await otherStack.passwordMessageService.encryptText(
+            "Password message from unknown signer",
+            password: "unknown-signer-password",
+            format: .seipdv1,
+            signWithFingerprint: signer.fingerprint
+        )
+
+        let outcome = try await stack.passwordMessageService.decryptMessage(
+            ciphertext: ciphertext,
+            password: "unknown-signer-password"
+        )
+
+        guard case let .decrypted(plaintext, signature) = outcome else {
+            return XCTFail("Expected decrypted outcome")
+        }
+
+        XCTAssertEqual(
+            String(data: plaintext, encoding: .utf8),
+            "Password message from unknown signer"
+        )
+        XCTAssertEqual(signature.status, .unknownSigner)
+        XCTAssertEqual(signature.verificationState, .contactsContextUnavailable)
+        XCTAssertTrue(signature.requiresContactsContext)
+        XCTAssertEqual(signature.contactsUnavailableReason, .locked)
     }
 
     func test_decryptMessage_noSkesk_returnsNoSkesk() async throws {

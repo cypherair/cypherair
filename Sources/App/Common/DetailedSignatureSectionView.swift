@@ -74,7 +74,9 @@ private extension SignatureVerification {
             status: SignatureStatus(from: entry.status),
             signerFingerprint: entry.signerPrimaryFingerprint,
             signerContact: nil,
-            signerIdentity: entry.signerIdentity
+            signerIdentity: entry.signerIdentity,
+            verificationState: entry.verificationState,
+            contactsUnavailableReason: entry.contactsUnavailableReason
         )
     }
 }

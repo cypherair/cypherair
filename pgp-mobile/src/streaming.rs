@@ -12,8 +12,8 @@
 //! - Cancellation via `ProgressReporter::on_progress() → false` returns
 //!   `PgpError::OperationCancelled` and cleans up partial output.
 
-use std::fs::{self, File, OpenOptions};
 use std::fmt;
+use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::sync::Arc;
 
@@ -31,7 +31,9 @@ use crate::decrypt::{
 use crate::encrypt;
 use crate::error::PgpError;
 use crate::sign;
-use crate::signature_details::{FileDecryptDetailedResult, FileVerifyDetailedResult};
+use crate::signature_details::{
+    state_from_legacy_status, FileDecryptDetailedResult, FileVerifyDetailedResult,
+};
 use crate::verify::{VerifyHelper, VerifyResult};
 
 /// Buffer size for streaming copy operations.
@@ -181,8 +183,7 @@ fn zeroing_copy<R: Read, W: Write>(
     loop {
         let n = reader.read(&mut buf).map_err(|e| {
             if e.kind() == std::io::ErrorKind::Interrupted
-                || e
-                    .get_ref()
+                || e.get_ref()
                     .and_then(|inner| inner.downcast_ref::<StreamingCancelled>())
                     .is_some()
             {
@@ -482,11 +483,14 @@ pub fn decrypt_file_detailed<K: AsRef<[u8]>>(
         }
     })?;
 
-    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
+    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
+        helper.collector.into_parts();
 
     Ok(FileDecryptDetailedResult {
         legacy_status,
         legacy_signer_fingerprint,
+        summary_state,
+        summary_entry_index,
         signatures,
     })
 }
@@ -644,8 +648,10 @@ pub fn verify_detached_file_detailed(
                 SignatureStatus::Bad
             };
             return Ok(FileVerifyDetailedResult {
-                legacy_status: status,
+                legacy_status: status.clone(),
                 legacy_signer_fingerprint: None,
+                summary_state: state_from_legacy_status(&status),
+                summary_entry_index: None,
                 signatures: Vec::new(),
             });
         }
@@ -666,16 +672,21 @@ pub fn verify_detached_file_detailed(
         return Ok(FileVerifyDetailedResult {
             legacy_status: SignatureStatus::Bad,
             legacy_signer_fingerprint: helper.collector.legacy_signer_fingerprint(),
+            summary_state: helper.collector.summary_state(),
+            summary_entry_index: helper.collector.summary_entry_index(),
             signatures: helper.collector.signatures(),
         });
     }
 
     let helper = verifier.into_helper();
-    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
+    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
+        helper.collector.into_parts();
 
     Ok(FileVerifyDetailedResult {
         legacy_status,
         legacy_signer_fingerprint,
+        summary_state,
+        summary_entry_index,
         signatures,
     })
 }

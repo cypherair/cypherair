@@ -197,6 +197,7 @@ patch_generated_swift_bindings() {
         return
     fi
     perl -0pi -e 's/\n    static let vtablePtr: UnsafePointer<(UniffiVTableCallbackInterface[A-Za-z0-9_]+)> = \{/\n    nonisolated(unsafe) static let vtablePtr: UnsafePointer<$1> = {/g' "$swift_file"
+    perl -pi -e 's/[ \t]+$//' "$swift_file"
 }
 
 sync_file_if_changed() {

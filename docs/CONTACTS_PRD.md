@@ -400,18 +400,17 @@ The prompt is immediate, but the choice is not mandatory.
 Decrypt is split into:
 
 - core content decryption
-- signature packet / claimed or observed signer evidence extraction when the lower layer can determine it
+- signature packet detection
 - certificate-backed signature verification using available certificates
 - contacts-aware signer recognition and trust/certification enrichment
 
-Signer evidence that is not backed by a suitable verification certificate is only a lookup clue. The app must not present claimed or observed signer evidence as a verified signer identity.
+Issuer/key-handle metadata from a signature packet is not used as a user identity clue. The app only resolves signer identity from a suitable verification certificate and must not present unverified signature metadata as a signer.
 
 If Contacts verification context is unavailable because Contacts is locked, recovering, or framework-unavailable:
 
 - content decryption may still complete
 - the signature area must state exactly what is known and what is missing
 - the app must not claim that cryptographic signature verification completed unless a suitable verification certificate was actually available
-- claimed or observed signer evidence must remain distinct from a verified signer fingerprint
 - the UI may direct the user to complete app-data authorization when that can make Contacts verification context available
 - the app must not silently degrade to `unknown signer`
 

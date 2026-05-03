@@ -265,32 +265,16 @@ pub fn decrypt_detailed<K: AsRef<[u8]>>(
     }
 
     let helper = decryptor.into_helper();
-    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
+    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
+        helper.collector.into_parts();
 
     Ok(DecryptDetailedResult {
         legacy_status,
         legacy_signer_fingerprint,
+        summary_state,
+        summary_entry_index,
         signatures,
         plaintext,
-    })
-}
-
-pub(crate) fn decrypt_with_fixed_session_key(
-    ciphertext: &[u8],
-    session_key_algo: Option<SymmetricAlgorithm>,
-    session_key: SessionKey,
-    verifier_certs: &[openpgp::Cert],
-) -> Result<DecryptResult, PgpError> {
-    let detailed = decrypt_with_fixed_session_key_detailed(
-        ciphertext,
-        session_key_algo,
-        session_key,
-        verifier_certs,
-    )?;
-    Ok(DecryptResult {
-        plaintext: detailed.plaintext,
-        signature_status: Some(detailed.legacy_status),
-        signer_fingerprint: detailed.legacy_signer_fingerprint,
     })
 }
 
@@ -322,11 +306,14 @@ pub(crate) fn decrypt_with_fixed_session_key_detailed(
     }
 
     let helper = decryptor.into_helper();
-    let (legacy_status, legacy_signer_fingerprint, signatures) = helper.collector.into_parts();
+    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
+        helper.collector.into_parts();
 
     Ok(DecryptDetailedResult {
         legacy_status,
         legacy_signer_fingerprint,
+        summary_state,
+        summary_entry_index,
         signatures,
         plaintext,
     })

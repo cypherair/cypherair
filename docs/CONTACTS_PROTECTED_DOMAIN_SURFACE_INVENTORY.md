@@ -128,7 +128,7 @@ These repository behaviors remain important, but they are not ordinary Contacts 
 |---------|--------|
 | Pre-auth registry bootstrap | May inspect only framework-readable metadata, never Contacts payload content or the root-secret Keychain item |
 | Public-key inspection before import commit | Examines incoming key bytes, not existing Contacts domain state |
-| Plaintext decrypt and low-level claimed/observed signer evidence extraction | May remain meaningful without Contacts, but signature verification must not be reported complete without a suitable verification certificate |
+| Plaintext decrypt and signature packet detection | May remain meaningful without Contacts, but signature verification and signer identity must not be reported complete without a suitable verification certificate |
 
 ## 7. Inventory Acceptance Criteria
 
