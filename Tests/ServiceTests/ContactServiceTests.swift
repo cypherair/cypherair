@@ -332,6 +332,44 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertNil(try harness.registryStore.loadRegistry().committedMembership[ContactsDomainRepository.domainID])
     }
 
+    func test_contactsPR4PreCutoverProtectedCreateFailureFallsBackToActiveLegacy() async throws {
+        let generated = try engine.generateKey(
+            name: "PR4 Pre Cutover Fallback",
+            email: "pr4-pre-cutover-fallback@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4PreCutoverFallback",
+            contactsDirectory: tempDir
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        var registry = try harness.registryStore.loadRegistry()
+        registry.pendingMutation = .createDomain(
+            targetDomainID: ContactsDomainRepository.domainID,
+            phase: .journaled
+        )
+        try harness.registryStore.saveRegistry(registry)
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: harness.store
+        )
+
+        let availability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .availableLegacyCompatibility)
+        XCTAssertEqual(protectedService.availableContacts.map(\.fingerprint), [generated.fingerprint])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: tempDir.path))
+        XCTAssertNil(try harness.registryStore.loadRegistry().committedMembership[ContactsDomainRepository.domainID])
+    }
+
     func test_contactsPR4CorruptProtectedDomainAfterCutoverRequiresRecoveryAndDoesNotReadQuarantine() async throws {
         let generated = try engine.generateKey(
             name: "PR4 Corruption",
@@ -392,6 +430,124 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertTrue(reopenedService.availableContacts.isEmpty)
         XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+    }
+
+    func test_contactsPR4CommittedDomainIgnoresCorruptRecreatedActiveLegacy() async throws {
+        let generated = try engine.generateKey(
+            name: "PR4 Stale Legacy",
+            email: "pr4-stale-legacy@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        let repository = ContactRepository(contactsDirectory: tempDir)
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4CommittedIgnoresLegacy",
+            contactsDirectory: tempDir
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: harness.store
+        )
+        let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+        XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        try Data("not-a-public-certificate".utf8).write(
+            to: tempDir.appendingPathComponent("corrupt.gpg")
+        )
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: reopenedStore
+        )
+
+        let availability = await reopenedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .availableProtectedDomain)
+        XCTAssertEqual(reopenedService.availableContacts.map(\.fingerprint), [generated.fingerprint])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+    }
+
+    func test_contactsPR4CommittedProtectedFailureDoesNotFallbackToActiveLegacy() async throws {
+        let generated = try engine.generateKey(
+            name: "PR4 No Fallback",
+            email: "pr4-no-fallback@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        let repository = ContactRepository(contactsDirectory: tempDir)
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4CommittedNoFallback",
+            contactsDirectory: tempDir
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: harness.store
+        )
+        let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+        XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
+        try harness.storageRoot.writeProtectedData(
+            Data("not-a-readable-contacts-envelope".utf8),
+            to: harness.storageRoot.domainEnvelopeURL(
+                for: ContactsDomainRepository.domainID,
+                slot: .current
+            )
+        )
+
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: reopenedStore
+        )
+
+        let availability = await reopenedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .recoveryNeeded)
+        XCTAssertTrue(reopenedService.availableContacts.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: tempDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ContactsDomainRepository.domainID],
+            .recoveryNeeded
+        )
     }
 
     func test_contactsPR4ProtectedMutationsPersistWithoutWritingActiveLegacy() async throws {

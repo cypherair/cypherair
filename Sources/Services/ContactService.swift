@@ -74,15 +74,18 @@ final class ContactService: @unchecked Sendable {
         clearContactsRuntimeState(availability: .opening)
         let activeLegacyExistedAtOpenStart = repository.activeLegacySourceExists()
         let quarantineExistedAtOpenStart = repository.quarantineExists()
+        var contactsDomainCommittedAtOpenStart = true
         do {
             var wrappingKey = try wrappingRootKey()
             defer {
                 wrappingKey.protectedDataZeroize()
             }
-            let initialSnapshot = try legacyMigrationSource.makeInitialSnapshot()
+            contactsDomainCommittedAtOpenStart = try contactsDomainStore.hasCommittedDomain()
             try await contactsDomainStore.ensureCommittedIfNeeded(
                 wrappingRootKey: wrappingKey,
-                initialSnapshot: initialSnapshot
+                initialSnapshotProvider: {
+                    try legacyMigrationSource.makeInitialSnapshot()
+                }
             )
             let openedSnapshot = try await contactsDomainStore.openDomainIfNeeded(
                 wrappingRootKey: wrappingKey
@@ -94,7 +97,10 @@ final class ContactService: @unchecked Sendable {
             )
             return contactsAvailability
         } catch {
-            if activeLegacyExistedAtOpenStart,
+            let contactsDomainCommittedAfterFailure = (try? contactsDomainStore.hasCommittedDomain()) ?? true
+            if !contactsDomainCommittedAtOpenStart,
+               !contactsDomainCommittedAfterFailure,
+               activeLegacyExistedAtOpenStart,
                !quarantineExistedAtOpenStart,
                gateResult.allowsLegacyCompatibilityLoad {
                 return openLegacyCompatibilityAfterPostUnlock(gateResult: gateResult)

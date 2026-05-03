@@ -48,7 +48,7 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
 
     func ensureCommittedIfNeeded(
         wrappingRootKey: Data,
-        initialSnapshot: ContactsDomainSnapshot
+        initialSnapshotProvider: () throws -> ContactsDomainSnapshot
     ) async throws {
         let registry = try registryStore.loadRegistry()
         if registry.committedMembership[Self.domainID] != nil {
@@ -66,6 +66,7 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
             return
         }
 
+        let initialSnapshot = try initialSnapshotProvider()
         try initialSnapshot.validateContract()
         let wrappingRootKeyBox = SensitiveBytesBox(data: wrappingRootKey)
         defer {
@@ -100,6 +101,10 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
 
         clearUnlockedState()
         domainState = .locked
+    }
+
+    func hasCommittedDomain() throws -> Bool {
+        try registryStore.loadRegistry().committedMembership[Self.domainID] != nil
     }
 
     @discardableResult
