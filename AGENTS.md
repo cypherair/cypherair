@@ -223,6 +223,7 @@ If `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION` has changed in any way, trea
 At minimum after meaningful code changes:
 
 ```bash
+# Run when changes touch `pgp-mobile/`
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
