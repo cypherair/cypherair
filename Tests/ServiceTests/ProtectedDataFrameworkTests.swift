@@ -9,6 +9,7 @@ private typealias AppAppContainer = CypherAir.AppContainer
 private typealias AppAppSessionOrchestrator = CypherAir.AppSessionOrchestrator
 private typealias AppAppStartupCoordinator = CypherAir.AppStartupCoordinator
 private typealias AppProtectedDataBootstrapState = CypherAir.ProtectedDataBootstrapState
+private typealias AppProtectedDataAccessGateClassifier = CypherAir.ProtectedDataAccessGateClassifier
 private typealias AppProtectedDataFrameworkState = CypherAir.ProtectedDataFrameworkState
 private typealias AppProtectedDataPersistedRightHandle = CypherAir.ProtectedDataPersistedRightHandle
 private typealias AppProtectedDataRegistryStore = CypherAir.ProtectedDataRegistryStore
@@ -16,6 +17,7 @@ private typealias AppProtectedDataRelockParticipant = CypherAir.ProtectedDataRel
 private typealias AppProtectedDataRightStoreClientProtocol = CypherAir.ProtectedDataRightStoreClientProtocol
 private typealias AppProtectedDataRightIdentifiers = CypherAir.ProtectedDataRightIdentifiers
 private typealias AppProtectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator
+private typealias AppProtectedDataSessionRelockCoordinator = CypherAir.ProtectedDataSessionRelockCoordinator
 private typealias AppProtectedDataPostUnlockCoordinator = CypherAir.ProtectedDataPostUnlockCoordinator
 private typealias AppProtectedDataPostUnlockDomainOpener = CypherAir.ProtectedDataPostUnlockDomainOpener
 private typealias AppProtectedDataPostUnlockOutcome = CypherAir.ProtectedDataPostUnlockOutcome
@@ -1191,6 +1193,23 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(coordinator.frameworkState, .sessionLocked)
         XCTAssertFalse(coordinator.hasActiveWrappingRootKey)
         XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
+    }
+
+    func test_sessionRelockCoordinatorDeduplicatesParticipantsAndReportsFailures() async throws {
+        let relockCoordinator = AppProtectedDataSessionRelockCoordinator()
+        let successfulParticipant = MockProtectedDataRelockParticipant()
+        let failingParticipant = MockProtectedDataRelockParticipant()
+        failingParticipant.shouldThrow = true
+
+        relockCoordinator.register(successfulParticipant)
+        relockCoordinator.register(successfulParticipant)
+        relockCoordinator.register(failingParticipant)
+
+        let participantErrorOccurred = await relockCoordinator.relockParticipants()
+
+        XCTAssertTrue(participantErrorOccurred)
+        XCTAssertEqual(successfulParticipant.relockCallCount, 1)
+        XCTAssertEqual(failingParticipant.relockCallCount, 1)
     }
 
     func test_sessionCoordinator_removePersistedSharedRightClearsWrappingRootKeyAndUnlockedDomainKeys() async throws {
@@ -2385,6 +2404,120 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertNotNil(orchestrator.lastAuthenticationDate)
         XCTAssertFalse(orchestrator.authFailed)
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    func test_accessGateClassifier_classifiesBootstrapAndSessionStates() throws {
+        let sharedRightIdentifier = "com.cypherair.tests.protected-data.gate.classifier"
+        let emptyRegistry = ProtectedDataRegistry.emptySteadyState(
+            sharedRightIdentifier: sharedRightIdentifier
+        )
+        let pendingRegistry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: sharedRightIdentifier,
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(targetDomainID: "contacts", phase: .journaled)
+        )
+        let readyRegistry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: sharedRightIdentifier,
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["contacts": .active],
+            pendingMutation: nil
+        )
+
+        XCTAssertEqual(
+            AppProtectedDataAccessGateClassifier.evaluate(
+                bootstrapOutcome: .emptySteadyState(registry: emptyRegistry, didBootstrap: false),
+                frameworkState: .sessionLocked
+            ),
+            .noProtectedDomainPresent
+        )
+        XCTAssertEqual(
+            AppProtectedDataAccessGateClassifier.evaluate(
+                bootstrapOutcome: .loadedRegistry(registry: pendingRegistry, recoveryDisposition: .continuePendingMutation),
+                frameworkState: .sessionLocked
+            ),
+            .pendingMutationRecoveryRequired
+        )
+        XCTAssertEqual(
+            AppProtectedDataAccessGateClassifier.evaluate(
+                bootstrapOutcome: .loadedRegistry(registry: readyRegistry, recoveryDisposition: .frameworkRecoveryNeeded),
+                frameworkState: .sessionLocked
+            ),
+            .frameworkRecoveryNeeded
+        )
+        XCTAssertEqual(
+            AppProtectedDataAccessGateClassifier.evaluate(
+                bootstrapOutcome: .loadedRegistry(registry: readyRegistry, recoveryDisposition: .resumeSteadyState),
+                frameworkState: .sessionLocked
+            ),
+            .authorizationRequired(registry: readyRegistry)
+        )
+        XCTAssertEqual(
+            AppProtectedDataAccessGateClassifier.evaluate(
+                bootstrapOutcome: .loadedRegistry(registry: readyRegistry, recoveryDisposition: .resumeSteadyState),
+                frameworkState: .sessionAuthorized
+            ),
+            .alreadyAuthorized(registry: readyRegistry)
+        )
+        XCTAssertEqual(
+            AppProtectedDataAccessGateClassifier.evaluate(
+                bootstrapOutcome: .loadedRegistry(registry: readyRegistry, recoveryDisposition: .resumeSteadyState),
+                frameworkState: .restartRequired
+            ),
+            .frameworkRecoveryNeeded
+        )
+    }
+
+    func test_accessGateClassifier_afterFirstAccessReloadsCurrentRegistry() throws {
+        let sharedRightIdentifier = "com.cypherair.tests.protected-data.gate.classifier-reload"
+        let startupRegistry = ProtectedDataRegistry.emptySteadyState(
+            sharedRightIdentifier: sharedRightIdentifier
+        )
+        let currentRegistry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: sharedRightIdentifier,
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["contacts": .active],
+            pendingMutation: nil
+        )
+        var currentRegistryLookupCount = 0
+        let classifier = AppProtectedDataAccessGateClassifier(
+            currentRegistryProvider: {
+                currentRegistryLookupCount += 1
+                return currentRegistry
+            },
+            frameworkStateProvider: { .sessionLocked }
+        )
+
+        let decision = classifier.evaluate(
+            startupBootstrapOutcome: .emptySteadyState(registry: startupRegistry, didBootstrap: true),
+            isFirstProtectedAccessInCurrentProcess: false
+        )
+
+        XCTAssertEqual(currentRegistryLookupCount, 1)
+        XCTAssertEqual(decision, .authorizationRequired(registry: currentRegistry))
+    }
+
+    func test_accessGateClassifier_currentRegistryLookupFailureFailsClosed() throws {
+        let sharedRightIdentifier = "com.cypherair.tests.protected-data.gate.classifier-failure"
+        let startupRegistry = ProtectedDataRegistry.emptySteadyState(
+            sharedRightIdentifier: sharedRightIdentifier
+        )
+        let classifier = AppProtectedDataAccessGateClassifier(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Registry unavailable")
+            },
+            frameworkStateProvider: { .sessionAuthorized }
+        )
+
+        let decision = classifier.evaluate(
+            startupBootstrapOutcome: .emptySteadyState(registry: startupRegistry, didBootstrap: true),
+            isFirstProtectedAccessInCurrentProcess: false
+        )
+
+        XCTAssertEqual(decision, .frameworkRecoveryNeeded)
     }
 
     func test_accessGate_emptySteadyState_returnsNoProtectedDomainPresent() throws {

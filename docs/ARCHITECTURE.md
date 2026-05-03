@@ -42,10 +42,16 @@ SwiftUI views, navigation routing, onboarding, and application composition. View
 
 Key files:
 
-- `CypherAirApp.swift` — app entry point and scene configuration
-- `AppContainer.swift` — centralized dependency construction
+- `CypherAirApp.swift` — app entry point, scene wiring, environment injection, and presentation modifiers
+- `AppLaunchConfiguration.swift` — launch and UI-test environment parsing
+- `AppLoadWarningCoordinator.swift` — load-warning pending/presentation gate state
+- `AppContainer.swift` — centralized dependency construction with shared graph helpers for common default/UI-test wiring
 - `AppStartupCoordinator.swift` — synchronous pre-auth bootstrap, cold-start loading, crash recovery, temporary file cleanup, startup warning aggregation
 - `LocalDataResetService.swift` — destructive reset workflow for CypherAir-owned Keychain items, ProtectedData files, contacts, defaults, temporary files, and in-memory session state
+- `LocalDataResetRestartAction.swift` — platform restart/termination action after local-data reset
+- `AppSceneIncomingURLRouter.swift` — scene-level URL handoff into the incoming contact-import coordinator
+- `ProtectedSettingsAccessCoordinator.swift` — protected-settings access, migration, open-domain, reset, retry, and clipboard-notice mutation authorization workflow policy
+- `ProtectedSettingsHost.swift` — SwiftUI-facing protected-settings host, section-state projection, environment injection, and presentation trace metadata
 - `ContentView.swift` — root navigation
 - `OnboardingView.swift` — first-run flow and guided tutorial decision page
 - `Onboarding/Tutorial*` — sandboxed guided tutorial host, session store, shell, and page-configuration seams
@@ -60,6 +66,9 @@ Shared presentation-layer infrastructure used across multiple views.
 | `SecurityScopedFileAccess` | Uniform wrapper around security-scoped file URL access |
 | `FileExportController` | Shared `fileExporter` state for exporting generated data or existing files |
 | `PrivacyScreenModifier` | Background blur + re-authentication gating as a thin UI adapter over `AppSessionOrchestrator` |
+| `AuthenticationShieldCoordinator` | Authentication shield prompt depth, pending-dismissal timing, lifecycle observations, and trace state transitions |
+| `AuthenticationShieldHost` | SwiftUI environment key, host modifier, and platform lifecycle adapter for the authentication shield |
+| `AuthenticationShieldOverlayView` | Authentication shield overlay/card rendering and animation |
 
 ### Services Layer (`Sources/Services/`)
 
@@ -73,7 +82,7 @@ Orchestrates user-facing operations by coordinating the Security layer and the R
 | `SigningService` | Cleartext text signatures, detached file signatures, legacy verification summaries, and detailed signature-result service APIs used by the current verify workflows |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, and selective revocation export through focused internal key-management helpers |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
-| `ContactService` | Public key storage, same-fingerprint public update absorption, different-fingerprint replacement detection, flat list management |
+| `ContactService` | App/UI-facing Contacts facade for availability, public-key import/update, verification state, lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing. **Security-critical: parses untrusted external input.** |
 | `SelfTestService` | One-tap diagnostic covering **both profiles**: key gen → encrypt/decrypt → sign/verify → tamper test → QR round-trip |
 | `FileProgressReporter` | Bridges Rust streaming progress callbacks to SwiftUI `@Observable` state. Implements UniFFI `ProgressReporter` protocol. Thread-safe via `OSAllocatedUnfairLock`. |
@@ -114,7 +123,10 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `SecureEnclaveManager` | P-256 key generation in SE, self-ECDH + HKDF + AES-GCM wrapping/unwrapping, key deletion. Same wrapping scheme for Ed25519/X25519/Ed448/X448. |
 | `KeychainManager` | CRUD for Keychain items (SE key blob, salt, sealed box), access control flag configuration |
 | `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, and post-unlock auth-mode crash recovery |
-| `ProtectedDataSessionCoordinator` | Shared Keychain-protected v2 root-secret envelope retrieval through authenticated `LAContext`, SE device-bound unwrap, wrapping-root-key derivation, relock, and `restartRequired` latching for protected app-data domains |
+| `PrivateKeyModeSwitchAuthenticator` | Current-mode authentication gate for private-key mode switching before any rewrap journal or Keychain mutation |
+| `PrivateKeyRewrapWorkflow` | Phase-A and phase-B private-key rewrap workflow: pending bundle creation/verification, commit-required marking, permanent deletion, pending promotion, cleanup, and final auth-mode commit |
+| `PrivateKeyRewrapRecoveryCoordinator` | Phase-aware interrupted private-key rewrap recovery using permanent/pending Keychain bundle state and protected `private-key-control` journal state |
+| `ProtectedDataSessionCoordinator` | ProtectedData session state owner for authenticated root-secret access, wrapping-root-key derivation, relock, secret clearing, and `restartRequired` latching for protected app-data domains |
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, staged wrapped-DMK validation/promotion, and unlocked-domain-key zeroization |
 | `PrivateKeyControlStore` | ProtectedData `private-key-control` domain for `authMode` and private-key rewrap / modify-expiry recovery journal state. Private-key material remains in the existing Keychain / Secure Enclave domain. |
 | ProtectedData device-binding layer | Secure Enclave device-bound root-secret envelope layer. It adds a silent P-256 SE factor under the existing Keychain / `LAContext` app-data gate and does not replace app privacy authentication. |
@@ -131,6 +143,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 
 - `ProtectedDataStorageRoot.swift` — resolves `Application Support/ProtectedData/`, file-protection application, and registry/domain metadata paths
 - `ProtectedDataRegistry.swift` / `ProtectedDataRegistryStore.swift` — registry manifest, consistency validation, recovery classification, empty-registry bootstrap, and bootstrap outcome construction
+- `ProtectedDataRootSecretCoordinator.swift` — root-secret save/load/reprotect/delete orchestration, legacy right-store migration handoff, envelope-floor recording, and root-secret operation tracing
 - `KeychainProtectedDataRootSecretStore` (`ProtectedDataRightStoreClient.swift`) — Keychain storage for the shared app-data root-secret v2 envelope, legacy raw-secret migration, and anti-downgrade enforcement
 - `ProtectedDataDeviceBinding.swift` — ProtectedData-only Secure Enclave P-256 device-binding key plus mockable provider and format-floor marker store
 - `ProtectedDataRootSecretEnvelope.swift` — binary-plist `CAPDSEV2` codec, HKDF/AAD binding data, and AES-GCM open/seal validation
@@ -150,7 +163,10 @@ Current ProtectedData scope:
 - `ProtectedSettingsStore` is the first protected-domain adopter; schema v2 preserves `clipboardNotice` and owns the ordinary-settings snapshot for grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion
 - `ProtectedOrdinarySettingsCoordinator` is the Phase 7 source of truth for ordinary-settings availability and loaded snapshots; production reads/writes `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff
 - `ProtectedDataFrameworkSentinelStore` is the second production domain; it contains no user data, telemetry, or UI state, and is created only after another domain is already committed and the shared resource is ready
-- `ContactsDomainStore` is the Contacts source of truth after PR4 cutover; it opens the protected `contacts` domain post-auth, migrates active legacy contacts once, quarantines legacy plaintext, and never reads quarantine for ordinary routes
+- `ContactService` is the only app/UI-facing Contacts facade. It owns Contacts availability, query APIs, mutation APIs, rollback behavior, verification state, migration/quarantine cleanup warnings, and relock cleanup.
+- `ContactsDomainStore` is the Contacts protected-domain persistence owner after PR4 cutover; it opens the protected `contacts` domain post-auth, migrates active legacy contacts once, quarantines legacy plaintext, and never reads quarantine for ordinary routes.
+- `ContactsDomainRepository` owns Contacts schema serialization, flat compatibility projection, and runtime scratch/search/signer state clearing. Schema evolution remains in the Contacts implementation plan and surface inventory.
+- `AppContainer` assembles the Contacts store, migration source, relock participants, and post-unlock call sites only; Contacts availability and mutation policy stay inside `ContactService`.
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
@@ -191,10 +207,21 @@ pgp-mobile/
 ├── Cargo.toml        # sequoia-openpgp 2.2 + crypto-openssl + uniffi
 ├── src/
 │   ├── lib.rs        # UniFFI proc-macros, public API surface
-│   ├── keys.rs       # Profile-aware generation (Cv25519/RFC4880 vs Cv448/RFC9580)
+│   ├── keys.rs       # Key module root: UniFFI records, shared helpers, internal re-exports
+│   ├── keys/
+│   │   ├── generation.rs          # Profile-aware generation (Cv25519/RFC4880 vs Cv448/RFC9580)
+│   │   ├── key_info.rs            # KeyInfo parsing and display metadata
+│   │   ├── selector_discovery.rs  # Subkey/User ID selector discovery
+│   │   ├── public_certificates.rs # Public certificate validation and merge/update
+│   │   ├── secret_transfer.rs     # Secret key export/import/extract and S2K encryption
+│   │   ├── revocation.rs          # Key, subkey, User ID, and revocation certificate handling
+│   │   ├── profile.rs             # Key version and profile detection
+│   │   ├── s2k.rs                 # Passphrase-protected secret-key S2K inspection
+│   │   └── expiry.rs              # Secret certificate expiry mutation
 │   ├── encrypt.rs    # Auto format selection by recipient key version
 │   ├── decrypt.rs    # SEIPDv1 + SEIPDv2 (OCB/GCM), AEAD hard-fail
 │   ├── password.rs   # Password / SKESK message encrypt/decrypt
+│   ├── qr_url.rs     # QR URL scheme encode/decode validation
 │   ├── sign.rs       # Signing (cleartext + detached)
 │   ├── verify.rs     # Signature verification with graded results
 │   ├── streaming.rs  # File-path-based streaming I/O with progress reporting and cancellation

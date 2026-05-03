@@ -113,21 +113,29 @@ Evidence source:
 recovery, generic post-unlock opening, and the concrete `protected-settings`
 store.
 
+Status:
+completed on 2026-05-03. Generic pending-mutation recovery remains in
+`ProtectedDomainRecoveryCoordinator.swift`, post-unlock domain opening now lives
+in `ProtectedDataPostUnlockCoordinator.swift`, and the concrete
+`protected-settings` domain store now lives in `ProtectedSettingsStore.swift`.
+The split was file-organization-only: no ProtectedData schema, storage path,
+authorization rule, relock behavior, zeroization path, or public API changed.
+
 Goal:
 make framework-level recovery and post-unlock coordination reviewable without
 requiring the reader to inspect a specific product-domain store.
 
 TODO:
 
-- [ ] Split the generic recovery protocol and dispatcher from concrete
+- [x] Split the generic recovery protocol and dispatcher from concrete
   domain-store code.
-- [ ] Split post-unlock domain-opening context, opener, outcome, and
+- [x] Split post-unlock domain-opening context, opener, outcome, and
   coordinator into a focused framework file.
-- [ ] Move `ProtectedSettingsStore` and its recovery conformance into
+- [x] Move `ProtectedSettingsStore` and its recovery conformance into
   protected-settings-owned files.
-- [ ] Keep protected-settings schema, ordinary-settings migration,
+- [x] Keep protected-settings schema, ordinary-settings migration,
   payload encryption, domain state, and relock behavior unchanged.
-- [ ] Add focused tests if any split exposes missing coverage around pending
+- [x] Add focused tests if any split exposes missing coverage around pending
   create/delete recovery, post-unlock open outcomes, or protected-settings
   recovery classification.
 
@@ -157,17 +165,36 @@ Goal:
 separate root-secret lifecycle from app-session presentation state and make
 ProtectedData access-gate classification independently testable.
 
+Status:
+completed on 2026-05-03. `ProtectedDataAccessGateClassifier.swift` now owns
+ProtectedData access-gate classification, with focused unit coverage for empty
+steady state, pending mutation recovery, framework recovery, locked session,
+authorized session, restart-required fail-closed behavior, post-first-access
+registry reload, and registry lookup failure.
+`ProtectedDataSessionRelockCoordinator.swift` now owns relock participant
+registration and fan-out, while `ProtectedDataSessionCoordinator.swift` still
+owns framework state transitions, wrapping-root-key zeroization, unlocked
+domain-key clearing, and `restartRequired` latching.
+`ProtectedDataRootSecretCoordinator.swift` now owns root-secret save, load,
+reprotect, delete, envelope-floor recording, tracing, and legacy right-store
+migration handoff. `ProtectedDataSessionCoordinator.swift` still creates or
+borrows the authenticated `LAContext`, marks handoff contexts noninteractive,
+derives the wrapping-root-key, zeroizes loaded secret data on success and
+helper-side floor-record failure, and maps authorization failures to framework
+state. App resume / privacy presentation state remains in
+`AppSessionOrchestrator.swift`.
+
 TODO:
 
-- [ ] Extract root-secret load/save/reprotect and legacy migration helpers from
+- [x] Extract root-secret load/save/reprotect and legacy migration helpers from
   the session coordinator while preserving its public coordination role.
-- [ ] Extract relock participant registration and relock fan-out into a focused
+- [x] Extract relock participant registration and relock fan-out into a focused
   session teardown component or helper.
-- [ ] Extract ProtectedData access-gate classification from app privacy-screen
+- [x] Extract ProtectedData access-gate classification from app privacy-screen
   presentation state.
-- [ ] Keep authenticated-context consume/borrow semantics explicit and
+- [x] Keep authenticated-context consume/borrow semantics explicit and
   single-owner.
-- [ ] Preserve resume, grace-period, content-clear, post-auth handler, relock,
+- [x] Preserve resume, grace-period, content-clear, post-auth handler, relock,
   and failure-state behavior.
 
 Acceptance standards:
@@ -194,17 +221,34 @@ Goal:
 make authentication evaluation, mode-switch orchestration, Keychain bundle
 rewrap, and interrupted-rewrap recovery independently reviewable.
 
+Status:
+completed on 2026-05-03. `PrivateKeyModeSwitchAuthenticator.swift` now owns the
+current-mode authentication gate that runs before private-key rewrap begins,
+including existing switch-auth trace events and auth-error/failure finish
+classification. `AuthenticationManager.switchMode` still owns rewrap
+precondition checks and delegates the current-mode authentication gate to
+`PrivateKeyModeSwitchAuthenticator.swift`. `PrivateKeyRewrapWorkflow.swift`
+now owns the protected rewrap journal start, phase-A pending bundle creation
+and verification, commit-required marking, phase-B permanent deletion,
+pending-bundle promotion, pending cleanup on phase-A failure, and final
+auth-mode commit. `PrivateKeyRewrapRecoveryCoordinator.swift` now owns
+interrupted-rewrap recovery, including preparing-vs-commit-required recovery
+classification, pending-bundle promotion/replacement, and target-mode commit
+criteria. Existing service, trace, recovery, and device-security tests cover
+the listed negative paths, so no additional test cases were required for this
+file-organization refactor.
+
 TODO:
 
-- [ ] Separate LAContext evaluation and policy mapping from mode-switch
+- [x] Separate LAContext evaluation and policy mapping from mode-switch
   mutation logic.
-- [ ] Extract the rewrap phase workflow into a focused component that owns
+- [x] Extract the rewrap phase workflow into a focused component that owns
   pending namespace creation, verification, deletion, promotion, and cleanup.
-- [ ] Extract interrupted rewrap recovery into a focused component or helper
+- [x] Extract interrupted rewrap recovery into a focused component or helper
   with explicit phase-aware outcomes.
-- [ ] Keep `AuthenticationManager` as the app-facing coordinator unless a later
+- [x] Keep `AuthenticationManager` as the app-facing coordinator unless a later
   PR explicitly introduces a reviewed facade.
-- [ ] Add negative tests for phase-A failure, phase-B failure, missing pending
+- [x] Add negative tests for phase-A failure, phase-B failure, missing pending
   bundle, partial pending bundle, and commit-required recovery where current
   coverage is insufficient.
 
@@ -232,19 +276,29 @@ Goal:
 make Rust key capability families and the untrusted QR URL boundary auditable
 without changing the exported `PgpEngine` surface by default.
 
+Status:
+completed on 2026-05-03. Rust QR URL encode/decode implementation now lives in
+`pgp-mobile/src/qr_url.rs`; `PgpEngine.encode_qr_url` and
+`PgpEngine.decode_qr_url` remain the unchanged UniFFI facade methods. Rust key
+capability families now live behind internal `crate::keys` submodules for
+generation, key info, selector discovery, public certificate validation/merge,
+secret transfer, revocation, profile detection, S2K inspection, and expiry
+mutation. Existing UniFFI method names and Swift call sites still route through
+the same `PgpEngine` facade.
+
 TODO:
 
-- [ ] Split `keys.rs` internally by capability family: generation, key info,
+- [x] Split `keys.rs` internally by capability family: generation, key info,
   selector discovery, public certificate validation/merge, secret
   import/export, revocation, profile/S2K helpers, and expiry mutation.
-- [ ] Keep re-export or module wiring internal so existing UniFFI method names
+- [x] Keep re-export or module wiring internal so existing UniFFI method names
   and Swift call sites remain unchanged.
-- [ ] Move QR URL encode/decode implementation out of the `lib.rs` facade into
+- [x] Move QR URL encode/decode implementation out of the `lib.rs` facade into
   a dedicated Rust module.
-- [ ] Keep Swift `QRService` as the app-facing service for URL routing,
+- [x] Keep Swift `QRService` as the app-facing service for URL routing,
   display metadata, and Swift-side input checks.
-- [ ] If a future PR intentionally changes QR validation ownership, document the
-  Swift/Rust contract before implementation.
+- [x] No QR validation ownership change was made; the existing Swift/Rust
+  contract remains unchanged.
 
 Acceptance standards:
 
@@ -273,18 +327,29 @@ make Contacts availability, migration, mutation persistence, protected-domain
 storage, and cleanup ownership answerable from one app-facing facade and one
 protected-domain source of truth.
 
+Status:
+completed on 2026-05-03. Production helper names no longer carry `ContactsPR1`
+staging labels; compatibility snapshot and runtime-state test helpers now use
+neutral protected-domain naming. Current `ARCHITECTURE.md` documents the
+Contacts ownership split: `ContactService` is the app/UI-facing facade for
+availability, query APIs, mutations, rollback, verification state, migration
+warnings, and relock cleanup; `ContactsDomainStore` owns protected-domain
+persistence/recovery; `ContactsDomainRepository` owns schema projection and
+runtime scratch state; and `AppContainer` assembles dependencies and
+post-unlock call sites only.
+
 TODO:
 
-- [ ] Keep `ContactService` as the only UI/app-facing Contacts facade.
-- [ ] Document or extract the internal ownership split between availability,
+- [x] Keep `ContactService` as the only UI/app-facing Contacts facade.
+- [x] Document or extract the internal ownership split between availability,
   query APIs, mutation APIs, migration/quarantine cleanup, protected-domain
   persistence, and relock cleanup.
-- [ ] Remove production helper names that include PR-stage labels such as
+- [x] Remove production helper names that include PR-stage labels such as
   `ContactsPR1`.
-- [ ] Keep Contacts schema decisions aligned with the Contacts implementation
+- [x] Keep Contacts schema decisions aligned with the Contacts implementation
   plan and surface inventory; do not redefine schema in this architecture
   refactor.
-- [ ] Keep `AppContainer` responsible for dependency assembly only, not Contacts
+- [x] Keep `AppContainer` responsible for dependency assembly only, not Contacts
   domain policy.
 
 Acceptance standards:
@@ -318,18 +383,36 @@ make app-layer files thinner by moving workflow policy into dedicated models or
 coordinators while keeping views responsible for layout, bindings, and
 presentation wiring.
 
+Status:
+
+completed on 2026-05-03. `ProtectedSettingsAccessCoordinator.swift` now owns
+protected-settings access-gate evaluation, migration authorization,
+shared-right authorization, open-domain, pending-recovery retry, reset, and
+clipboard-notice mutation policy. `ProtectedSettingsHost.swift` owns the
+observable mode and section state, domain-to-section projection, environment
+key, and host trace metadata. `AuthenticationShieldCoordinator.swift` owns
+shield state transitions and tracing; `AuthenticationShieldHost.swift` owns the
+environment/modifier/lifecycle adapter; `AuthenticationShieldOverlayView.swift`
+owns overlay rendering and animation. `AppLaunchConfiguration.swift`,
+`AppLoadWarningCoordinator.swift`, `AppSceneIncomingURLRouter.swift`, and
+`LocalDataResetRestartAction.swift` move launch, load-warning, URL handoff, and
+restart actions out of the scene body. `AppContainer.swift` now shares common
+auth prompt, ProtectedData session/first-domain cleaner, post-unlock opener,
+and PGP-service construction helpers while preserving default versus UI-test
+differences.
+
 TODO:
 
-- [ ] Extract protected-settings access and mutation authorization policy from
+- [x] Extract protected-settings access and mutation authorization policy from
   the SwiftUI-facing host into a focused model/coordinator.
-- [ ] Keep protected-settings UI state, section state mapping, and view
+- [x] Keep protected-settings UI state, section state mapping, and view
   environment injection presentation-oriented.
-- [ ] Split authentication shield state transitions from overlay rendering and
+- [x] Split authentication shield state transitions from overlay rendering and
   platform lifecycle adapters.
-- [ ] Split app launch configuration, incoming URL import orchestration,
+- [x] Split app launch configuration, incoming URL import orchestration,
   load-warning presentation, and reset restart behavior from the scene body
   where practical.
-- [ ] Reduce duplicated dependency wiring between default and UI-test
+- [x] Reduce duplicated dependency wiring between default and UI-test
   containers by extracting shared construction helpers that do not hide test
   differences.
 

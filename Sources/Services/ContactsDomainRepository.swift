@@ -127,13 +127,13 @@ final class ContactsDomainRepository: @unchecked Sendable {
         return compatibilityProjection
     }
 
-    func seedRuntimeStateForContactsPR1Tests() {
+    func seedRuntimeStateForTests() {
         serializationScratchBuffer = Data([0x01, 0x02, 0x03])
         searchIndexState = ["alice": ["legacy-contact-alice"]]
         signerRecognitionState = ["fingerprint": "legacy-contact-alice"]
     }
 
-    var runtimeStateIsClearedForContactsPR1Tests: Bool {
+    var runtimeStateIsClearedForTests: Bool {
         cachedSnapshot == nil &&
         compatibilityProjection.isEmpty &&
         serializationScratchBuffer.isEmpty &&
