@@ -107,9 +107,9 @@ Allowed outcomes:
 
 | Surface | Current entrypoints | Type | Target unlock requirement | Framework gate | Locked-state target behavior | Planned PR | Notes |
 |---------|---------------------|------|---------------------------|----------------|------------------------------|------------|-------|
-| Contact Detail single-contact export | future Contact Detail export action | package | yes | yes | Requires unlocked Contacts plus fresh authentication immediately before export | Contacts PR7 | Exports one contact into `.cypherair-contacts` |
-| Contacts list multi-select export | future Contacts list selection mode | package | yes | yes | Requires unlocked Contacts plus fresh authentication immediately before export | Contacts PR7 | Exports one or more selected contacts into one package |
-| Contact package import preview | future package import route / file importer | package | no | conditional | Parse and preview without Contacts mutation; framework gate is required only for later commit | Contacts PR7 | Reject malformed packages before preview |
+| Contact Detail single-contact export | future Contact Detail export action | package | yes | yes | Requires unlocked Contacts plus fresh authentication immediately before export | Contacts PR7 | Exports one contact into `.cypherair-contacts`; public-derived labels are default, local relationship/custom labels require explicit default-off selection |
+| Contacts list multi-select export | future Contacts list selection mode | package | yes | yes | Requires unlocked Contacts plus fresh authentication immediately before export | Contacts PR7 | Exports one or more selected contacts into one package; local relationship/custom labels require explicit default-off selection |
+| Contact package import preview | future package import route / file importer | package | no | conditional | Parse and preview without Contacts mutation; framework gate is required only for later commit | Contacts PR7 | Reject malformed packages before preview; imported labels are untrusted preview hints |
 | Contact package import commit | future package import confirmation | package | yes | yes | Commit blocked until Contacts domain is available | Contacts PR7 | Creates/updates contacts through protected-domain write path; never whole-domain restore |
 | Certification projection revalidation on unlock | Contacts unlock flow + revalidation helper | maintenance | yes | yes | Runs after open as needed; failures must not be misrepresented as empty Contacts state | Contacts PR6 | Separate from raw crypto verification |
 | Certification projection revalidation on package import | package import commit finalization | maintenance | yes | yes | Rebuild projected state deterministically after commit | Contacts PR6, Contacts PR7 | Import and certification responsibilities meet here |
@@ -128,7 +128,7 @@ These repository behaviors remain important, but they are not ordinary Contacts 
 |---------|--------|
 | Pre-auth registry bootstrap | May inspect only framework-readable metadata, never Contacts payload content or the root-secret Keychain item |
 | Public-key inspection before import commit | Examines incoming key bytes, not existing Contacts domain state |
-| Plaintext decrypt and low-level signer evidence extraction | May remain meaningful without Contacts, but signature verification must not be reported complete without a suitable verification certificate |
+| Plaintext decrypt and low-level claimed/observed signer evidence extraction | May remain meaningful without Contacts, but signature verification must not be reported complete without a suitable verification certificate |
 
 ## 7. Inventory Acceptance Criteria
 

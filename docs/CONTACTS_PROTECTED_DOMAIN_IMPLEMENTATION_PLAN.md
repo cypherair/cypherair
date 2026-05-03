@@ -99,7 +99,7 @@ Because these surfaces are distributed, Contacts protected-domain adoption requi
 
 Whole-domain Contacts backup, replace-domain restore, and empty-install Contacts restore are no longer in scope for Phase 8.
 
-The target package feature instead exports and imports selected contact public material through a `.cypherair-contacts` package. That package may contain one or more contacts and optional saved certification signature artifacts, but it must not transport local protected-domain state, manual verification state, tags, notes, recipient lists, root-secret material, wrapped-DMK records, registry state, or source-device authorization material.
+The target package feature instead exports and imports selected contact public material through a `.cypherair-contacts` package. That package may contain one or more contacts, public-certificate-derived display labels, optional explicitly selected local relationship / custom labels, and optional saved certification signature artifacts, but it must not transport local protected-domain state, manual verification state, tags, notes, recipient lists, root-secret material, wrapped-DMK records, registry state, or source-device authorization material.
 
 Current reset and sandbox paths are also relevant implementation deltas:
 
@@ -136,9 +136,10 @@ Future verification-capable services must split:
 - **core decrypt / packet evidence**
   - plaintext delivery after authenticated decryption succeeds
   - packet parsing
-  - signer fingerprint or equivalent key-handle level evidence only when the lower layer can determine it without a Contacts-provided certificate
+  - claimed or observed signer fingerprint / key-handle evidence only when the lower layer can determine it without a Contacts-provided certificate
 - **certificate-backed signature verification**
   - signature verification outcome only when a suitable verification certificate is available
+  - verified signer fingerprint only when certificate-backed verification actually succeeded
   - explicit unavailable state when the signer certificate or Contacts verification context is missing
 - **Contacts enrichment**
   - matching signer identity to `ContactIdentity`
@@ -148,10 +149,13 @@ Future verification-capable services must split:
 
 This separation is required for accuracy. Contacts can be unavailable while plaintext decryption or low-level signer evidence remains meaningful, but the app must not claim completed cryptographic signature verification without the verification certificate that made that claim possible.
 
+Lower-level signer evidence is only a lookup clue unless it has been tied to a suitable verification certificate. UI and service code must not present claimed or observed issuer evidence as a certificate-backed verified signer.
+
 Verification output must distinguish:
 
 - verified signature
 - invalid signature
+- claimed or observed signer evidence that is not itself a verified signer identity
 - signer certificate unavailable
 - Contacts verification context unavailable
 - signer evidence unavailable
@@ -323,7 +327,7 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 - preserve a compatibility projection so existing UI and service consumers can still operate during the migration sequence
 - keep ordinary runtime reads on the legacy plaintext source through Contacts PR3; compatibility projection exists to preserve consumers, not to switch source of truth early
 - register Contacts as a `ProtectedDataRelockParticipant`
-- clear decrypted snapshot state, serialization scratch buffers, search index state, and signer-recognition state on relock
+- clear decrypted snapshot state, serialization scratch buffers, search index state, signer-recognition state, and all `ContactService`-exposed runtime / compatibility projection state on relock
 
 **Not In Scope**
 
@@ -342,19 +346,19 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 
 - snapshot encode/decode and schema validation
 - compatibility-projection tests
-- relock cleanup assertions for snapshot, scratch-buffer, search-index, and signer-recognition teardown
+- relock cleanup assertions for snapshot, scratch-buffer, search-index, signer-recognition, and `ContactService` runtime projection teardown
 
 ### 6.3 Contacts PR2 — Verification Accuracy Refactor
 
 **Goals**
 
-- make decrypt / verify outputs accurately distinguish plaintext delivery, signer evidence, certificate-backed signature verification, and Contacts enrichment
+- make decrypt / verify outputs accurately distinguish plaintext delivery, claimed or observed signer evidence, certificate-backed signature verification, and Contacts enrichment
 - remove the assumption that missing Contacts certificates can be represented as generic `.unknownSigner`
 - stop claiming completed signature verification when no suitable verification certificate was available
 
 **Key Changes**
 
-- extend Rust verification results and UniFFI surfaces only as needed to expose signer evidence when the lower layer can determine it without a Contacts certificate
+- extend Rust verification results and UniFFI surfaces only as needed to expose claimed or observed signer evidence when the lower layer can determine it without a Contacts certificate
 - refactor `DecryptionService`
 - refactor `SigningService`
 - refactor `PasswordMessageService`
@@ -365,9 +369,9 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 
 - Decrypt-capable flows can return plaintext while signature verification remains unavailable
 - signature verification is reported as completed only when a suitable verification certificate was used
-- Rust/UniFFI exposes signer fingerprint or equivalent key-handle evidence only when available from the lower-level operation
+- Rust/UniFFI exposes claimed or observed signer fingerprint / key-handle evidence only when available from the lower-level operation, and Swift does not treat that evidence as a verified signer identity by itself
 - Verify-capable flows expose enough contract surface for route policy to decide whether required verification context is missing
-- Contacts enrichment maps signer evidence into identity/contact/projection state, but it does not invent a verification result
+- Contacts enrichment maps claimed or observed signer evidence into identity/contact/projection state, but it does not invent a verification result
 
 **Not In Scope**
 
@@ -392,21 +396,21 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 
 - stop all ordinary Contacts route access and mutations from bypassing shared protected-domain lifecycle rules
 - remove pre-auth Contacts loading from startup and direct route tasks
-- open Contacts through shared post-auth / post-unlock domain orchestration in normal app use
+- move Contacts availability behind shared post-auth / post-unlock gating in normal app use without cutting over the source of truth
 
 **Key Changes**
 
 - remove startup-time Contacts payload loading before shared root-secret activation and Contacts domain unlock
-- register Contacts as a post-unlock protected-domain opener
+- introduce the `ContactsAvailability` lifecycle surface consumed by Contacts-dependent routes and services
 - reuse the app-authenticated `LAContext` for root-secret retrieval when available
-- open or ensure committed Contacts domain state through the shared framework path after app authentication
+- place the legacy plaintext compatibility source behind the post-auth Contacts gate until the PR4 migration and cutover move the source of truth into the protected Contacts domain
 - gate Contacts list, detail, import commit, delete, manual verification, Encrypt recipient resolution, and certificate-signature entry through `ContactsAvailability`
 - gate certificate-signature verification-time candidate signer reads so `CertificateSignatureService` cannot consume Contacts-backed `candidateSigners` while the Contacts domain is locked
 - implement route-level opening / locked / recovery-needed / framework-unavailable behavior
 
 **Required Outcomes**
 
-- Contacts is normally available after successful app authentication and post-unlock domain opening
+- Contacts-dependent surfaces are normally available after successful app authentication and the post-auth Contacts gate finishes loading the current authoritative source for that stage
 - import inspection can remain pre-commit, but import commit requires the Contacts domain path
 - Decrypt route can show plaintext with explicit missing verification context when needed
 - Verify route requires required verification context for its final contacts-aware result
@@ -414,6 +418,7 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 **Not In Scope**
 
 - no legacy plaintext cutover
+- no protected Contacts source-of-truth cutover
 - no projection persistence yet
 
 **Inventory Coverage**
@@ -436,6 +441,7 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 
 - move existing plaintext Contacts into the protected Contacts domain
 - preserve deterministic rollback behavior during cutover
+- make the protected Contacts domain the authoritative Contacts source only after readability is proven
 
 **Key Changes**
 
@@ -544,7 +550,7 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 **Key Changes**
 
 - Apple Archive-backed `.cypherair-contacts` package generation
-- package manifest with `contacts[]`, key file references, selector metadata, and optional certification signature references
+- package manifest with `contacts[]`, public-certificate-derived labels, optional explicitly selected local relationship / custom labels, key file references, selector metadata, and optional certification signature references
 - selected-contact export through the existing protected temporary export/fileExporter pattern
 - package import parser and preview model
 - package commit through `ContactService` / `ContactsDomainRepository`
@@ -571,7 +577,7 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 - package preview without mutation
 - package commit into protected Contacts state
 - malformed package rejection tests
-- package export omits private keys, manual verification state, tags, notes, recipient lists, root-secret material, wrapped-DMK records, registry state, and source-device authorization state
+- package export omits private keys, manual verification state, tags, notes, recipient lists, root-secret material, wrapped-DMK records, registry state, and source-device authorization state; local relationship / custom labels are exported only when explicitly selected and default to off
 
 ### 6.9 Contacts PR8 — Search, Tags, Recipient Lists, And UI Finish
 
@@ -614,6 +620,7 @@ The later implementation PRs must collectively satisfy the following scenario se
   - signature verification reported as unavailable when no suitable verification certificate is available
   - Contacts enrichment unavailable or pending, not silently downgraded to generic unknown-signer behavior
 - locked Contacts, missing signer certificate, and truly absent signer evidence remain distinguishable
+- claimed or observed signer evidence is not presented as a verified signer identity unless certificate-backed verification succeeded
 - Verify route requiring Contacts context or signer certificate:
   - prompts for app-data unlock only when it can make the required context available
   - reports required verification context unavailable when unlock is denied or canceled

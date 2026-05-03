@@ -400,14 +400,18 @@ The prompt is immediate, but the choice is not mandatory.
 Decrypt is split into:
 
 - core content decryption
-- signature packet / signer evidence extraction when the lower layer can determine it
-- contacts-aware signer recognition and signature verification using available certificates
+- signature packet / claimed or observed signer evidence extraction when the lower layer can determine it
+- certificate-backed signature verification using available certificates
+- contacts-aware signer recognition and trust/certification enrichment
+
+Signer evidence that is not backed by a suitable verification certificate is only a lookup clue. The app must not present claimed or observed signer evidence as a verified signer identity.
 
 If Contacts verification context is unavailable because Contacts is locked, recovering, or framework-unavailable:
 
 - content decryption may still complete
 - the signature area must state exactly what is known and what is missing
 - the app must not claim that cryptographic signature verification completed unless a suitable verification certificate was actually available
+- claimed or observed signer evidence must remain distinct from a verified signer fingerprint
 - the UI may direct the user to complete app-data authorization when that can make Contacts verification context available
 - the app must not silently degrade to `unknown signer`
 
@@ -495,9 +499,11 @@ The exact package structure is a TDD concern, but product-level expectations are
 - the export requires a fresh authentication immediately before package generation
 - the export produces an Apple Archive-backed custom package, not a standard ZIP and not raw local protected-domain files
 - the export is delivered through the system file export/share flow so the user chooses where the offline contact package is stored
-- the export may include public certificates, public key update material, public User ID selector metadata, and user-selected saved OpenPGP certification signature artifacts
+- the export may include public certificates, public key update material, public User ID selector metadata, public-certificate-derived display labels, and user-selected saved OpenPGP certification signature artifacts
+- local relationship labels or custom display labels are privacy-sensitive and may be exported only through an explicit user selection that defaults off
 - the export does not include private keys, the shared app-data root secret, wrapped DMK records, registry state, source-device authorization state, tags, notes, recipient lists, or manual verification state
 - the import preview never mutates Contacts data
+- imported display labels are untrusted preview hints and never create local manual verification, certification, or trust state by themselves
 - the import commit requires the protected Contacts domain to be available and writes fresh local Contacts state
 - package import is not a whole-domain restore and must not be presented as a remedy for framework-level protected-data recovery
 
@@ -572,13 +578,13 @@ This initiative is product-complete only if all of the following are true:
 2. User selects one or more contacts.
 3. App requires a fresh authentication before package generation.
 4. App writes a `.cypherair-contacts` package through the system file export/share flow.
-5. The package includes only export-safe public contact material and selected certification signatures.
+5. The package includes only export-safe public contact material, public-certificate-derived labels, optional explicitly selected local labels, and selected certification signatures.
 
 ### Scenario E: Import A Contacts Package
 
 1. User opens a `.cypherair-contacts` package.
 2. App validates the package and presents an import preview without mutating Contacts.
-3. User chooses which contacts or keys to import.
+3. User reviews untrusted package labels as preview hints and chooses which contacts or keys to import.
 4. Commit requires the protected Contacts domain to be available.
 5. Imported data becomes fresh local Contacts state and does not transport source-device authorization material.
 
