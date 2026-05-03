@@ -3968,6 +3968,83 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         )
     }
 
+    func test_protectedSettingsCommittedUpgradeWrappedDMKStorageReadFailureDoesNotPersistRecovery() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsCommittedWrappedDMKStorageReadFailure")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        let wrappedDMKURL = harness.storageRoot.committedWrappedDomainMasterKeyURL(
+            for: ProtectedSettingsStore.domainID
+        )
+        try FileManager.default.removeItem(at: wrappedDMKURL)
+        try FileManager.default.createDirectory(at: wrappedDMKURL, withIntermediateDirectories: false)
+        let reopenedStore = ProtectedSettingsStore(
+            defaults: harness.defaults,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+
+        do {
+            try await reopenedStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                persistSharedRight: { _ in
+                    XCTFail("Committed settings upgrade must not provision a new shared right.")
+                }
+            )
+            XCTFail("Expected committed settings upgrade to fail on wrapped DMK storage read.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .frameworkUnavailable)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ProtectedSettingsStore.domainID],
+            .active
+        )
+    }
+
+    func test_protectedSettingsCommittedUpgradeCorruptWrappedDMKPersistsRecovery() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsCommittedCorruptWrappedDMK")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        defer { harness.defaults.removePersistentDomain(forName: harness.defaultsSuiteName) }
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        try harness.storageRoot.writeProtectedData(
+            Data("not a plist wrapped DMK".utf8),
+            to: harness.storageRoot.committedWrappedDomainMasterKeyURL(
+                for: ProtectedSettingsStore.domainID
+            )
+        )
+        let reopenedStore = ProtectedSettingsStore(
+            defaults: harness.defaults,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+
+        do {
+            try await reopenedStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                persistSharedRight: { _ in
+                    XCTFail("Committed settings upgrade must not provision a new shared right.")
+                }
+            )
+            XCTFail("Expected corrupt committed wrapped DMK to require recovery.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ProtectedSettingsStore.domainID],
+            .recoveryNeeded
+        )
+    }
+
     func test_protectedSettingsCommittedUpgradeCorruptPayloadPersistsRecovery() async throws {
         let harness = try makeProtectedSettingsHarness("ProtectedSettingsCommittedCorruptUpgrade")
         defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }

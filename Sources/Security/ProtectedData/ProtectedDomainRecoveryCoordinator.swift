@@ -936,11 +936,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     private func readAuthoritativeSnapshot(
         wrappingRootKey: Data
     ) throws -> (OpenedSnapshot, Data) {
-        guard let wrappedRecord = try domainKeyManager.loadWrappedDomainMasterKeyRecord(
-            for: Self.domainID
-        ) else {
-            throw ProtectedDataError.missingWrappedDomainMasterKey(Self.domainID)
-        }
+        let wrappedRecord = try loadProtectedSettingsWrappedDomainMasterKeyRecord()
 
         var domainMasterKey = try domainKeyManager.unwrapDomainMasterKey(
             from: wrappedRecord,
@@ -1016,16 +1012,30 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             return Data(cachedKey)
         }
 
-        guard let wrappedRecord = try domainKeyManager.loadWrappedDomainMasterKeyRecord(
-            for: Self.domainID
-        ) else {
-            throw ProtectedDataError.missingWrappedDomainMasterKey(Self.domainID)
-        }
+        let wrappedRecord = try loadProtectedSettingsWrappedDomainMasterKeyRecord()
 
         return try domainKeyManager.unwrapDomainMasterKey(
             from: wrappedRecord,
             wrappingRootKey: wrappingRootKey
         )
+    }
+
+    private func loadProtectedSettingsWrappedDomainMasterKeyRecord() throws -> WrappedDomainMasterKeyRecord {
+        try storageRoot.validatePersistentStorageContract()
+        let url = storageRoot.committedWrappedDomainMasterKeyURL(for: Self.domainID)
+        guard try storageRoot.managedItemExists(at: url) else {
+            throw ProtectedDataError.missingWrappedDomainMasterKey(Self.domainID)
+        }
+
+        let data: Data
+        do {
+            data = try storageRoot.readManagedData(at: url)
+        } catch {
+            throw ProtectedSettingsStorageReadFailure(underlying: error)
+        }
+        let record = try PropertyListDecoder().decode(WrappedDomainMasterKeyRecord.self, from: data)
+        try record.validateContract()
+        return record
     }
 
     private func activeDomainMasterKeyForCurrentSession() throws -> Data {
@@ -1140,7 +1150,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                 return .recoveryRequired(underlying: error)
             }
         }
-        if isFoundationStorageError(error) {
+        if isFoundationFileIOError(error) {
             return .retryable(underlying: error, state: .frameworkUnavailable)
         }
         return .recoveryRequired(underlying: error)
@@ -1156,9 +1166,34 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         return error
     }
 
-    private func isFoundationStorageError(_ error: Error) -> Bool {
+    private func isFoundationFileIOError(_ error: Error) -> Bool {
         let nsError = error as NSError
-        return nsError.domain == NSCocoaErrorDomain || nsError.domain == NSPOSIXErrorDomain
+        if nsError.domain == NSPOSIXErrorDomain {
+            return true
+        }
+        guard nsError.domain == NSCocoaErrorDomain else {
+            return false
+        }
+        switch CocoaError.Code(rawValue: nsError.code) {
+        case .fileNoSuchFile,
+             .fileLocking,
+             .fileReadUnknown,
+             .fileReadNoPermission,
+             .fileReadInvalidFileName,
+             .fileReadNoSuchFile,
+             .fileReadTooLarge,
+             .fileWriteUnknown,
+             .fileWriteNoPermission,
+             .fileWriteInvalidFileName,
+             .fileWriteFileExists,
+             .fileWriteInapplicableStringEncoding,
+             .fileWriteUnsupportedScheme,
+             .fileWriteOutOfSpace,
+             .fileWriteVolumeReadOnly:
+            return true
+        default:
+            return false
+        }
     }
 
     private func migrateOpenedSettingsSnapshotIfNeeded(
