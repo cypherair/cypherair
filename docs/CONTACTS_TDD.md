@@ -418,6 +418,8 @@ Contacts access follows this order:
 
 Completing launch/resume authentication alone does not imply that Contacts is available unless root-secret retrieval, wrapping-root-key derivation, and Contacts domain open also succeeded.
 
+During PR1-PR3 compatibility work before protected-domain cutover, this same route-level contract gates any legacy compatibility projection that `ContactService` exposes. Legacy compatibility reads are not a protected Contacts source of truth and do not replace the PR4 migration/readability/cutover boundary.
+
 Ordinary Contacts browsing, search, tag/list management, and recipient selection reuse the active shared app-data session and do not trigger a Contacts-specific second prompt.
 
 ### 8.3 Relock And Cleanup
@@ -430,6 +432,7 @@ On relock, Contacts must register a `ProtectedDataRelockParticipant` that clears
 - serialization scratch buffers that held plaintext snapshot bytes
 - in-memory search indexes
 - contacts-aware signer-recognition lookup state
+- all `ContactService`-exposed runtime state, including any PR1-PR3 compatibility projection, manual-verification runtime map, and derived lookup/cache state
 
 The framework owns:
 
@@ -458,15 +461,18 @@ Required behavior:
 Decrypt is split into:
 
 - core decryption
-- signature packet / signer evidence extraction when the lower layer can determine it
+- signature packet / claimed or observed signer evidence extraction when the lower layer can determine it
 - certificate-backed signature verification when a suitable verification certificate is available
 - contacts-aware signer recognition and trust/certification enrichment
+
+Signer evidence extracted without a suitable verification certificate is only a lookup clue. It must not be represented as a verified signer identity, and Contacts enrichment must not turn claimed or observed issuer evidence into a certificate-backed verification result.
 
 If Contacts verification context is unavailable because Contacts is locked, opening, recovering, or framework-unavailable:
 
 - core plaintext decryption may complete
 - signer recognition may remain unavailable
 - signature verification must not be reported as completed unless a suitable verification certificate was actually available
+- verified signer fingerprints remain distinct from claimed or observed signer evidence that has not been certificate-verified
 - UI shows the most precise state available, such as Contacts context unavailable, signer certificate unavailable, or verification pending protected-data unlock
 - there is no silent fallback to `unknown signer`
 
@@ -605,7 +611,8 @@ Required manifest fields:
 - package format version
 - producer app identifier and package creation timestamp
 - `contacts[]`
-- per-contact display label
+- per-contact public-certificate-derived display label
+- optional per-contact local relationship / custom display label only when explicitly selected for export
 - per-contact exported key fingerprints and file references
 - per-key public User ID / selector metadata needed for preview and certification validation
 - per-contact certification signature references when included
@@ -618,6 +625,7 @@ Package payload rules:
 - certification signature artifacts are optional and user-selectable
 - private keys are never included
 - local manual verification state is never included
+- local relationship labels or custom display labels are privacy-sensitive, default to not exported, and may appear only when the user explicitly selects them for a package
 - tags, notes, recipient lists, local contact IDs, protected-domain generation IDs, wrapped-DMK records, registry state, root-secret state, and source-device authorization state are never included
 
 ### 12.2 Export Flow
@@ -627,7 +635,7 @@ Export flow:
 1. require a currently unlocked Contacts domain inside an available app-data session
 2. require a fresh authentication immediately before package generation
 3. collect one selected contact from Contact Detail or one or more selected contacts from Contacts list selection mode
-4. build a package manifest from export-safe contact data
+4. build a package manifest from export-safe contact data, using public-certificate-derived labels by default and local relationship / custom labels only when explicitly selected
 5. write armored public certificates and optional saved certification signature artifacts into the package
 6. write a temporary protected export file for the system file exporter / Share Sheet
 7. delete temporary export material after completion or cancellation
@@ -640,7 +648,7 @@ Import flow:
 2. validate the package container and manifest before reading referenced payload entries
 3. reject path traversal, absolute paths, parent directory references, symlinks, hard links, duplicate logical paths, unknown required features, excessive file counts, excessive total size, and excessive per-entry size
 4. parse public certificates and certification signatures through the existing OpenPGP validation layer
-5. build an import preview without mutating Contacts
+5. build an import preview without mutating Contacts; imported labels are untrusted display hints only
 6. let the user choose which contacts, keys, and valid certification artifacts to commit
 7. require framework availability and an unlocked Contacts domain for commit
 8. merge committed data through `ContactService` / `ContactsDomainRepository`
@@ -741,7 +749,7 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 - shared-resource or registry failure enters framework-level recovery and blocks Contacts
 - startup recovery from framework-managed `pending / current / previous` state is deterministic
 - unreadable Contacts state never silently resets to an empty dataset
-- relock clears Contacts in-memory search and signer-recognition state through relock-participant cleanup
+- relock clears Contacts in-memory search, signer-recognition, and `ContactService` runtime / compatibility projection state through relock-participant cleanup
 - `restartRequired` is treated as framework-level blocked state, not as Contacts data loss
 
 ### 14.6 Migration And Contact Package Exchange
@@ -756,6 +764,7 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 - `.cypherair-contacts` import previews before commit and never replaces the Contacts domain wholesale
 - package import rejects path traversal, link entries, duplicate logical paths, excessive size/count, bad manifests, bad certificates, and bad certification signatures
 - package export/import never transports private keys, manual verification state, tags, notes, recipient lists, the shared root secret, wrapped-DMK record, registry state, or source-device authorization state
+- package export includes public-certificate-derived labels by default; local relationship / custom labels require explicit default-off selection
 
 ### 14.7 Search And Tags
 
