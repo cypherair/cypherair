@@ -372,14 +372,12 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(verification.isWarning)
     }
 
-    func test_detailedSignatureVerification_missingCertificateWithoutEvidenceMapsSeparately() {
-        let evidence = SignerEvidence(issuerFingerprints: [], issuerKeyIds: [])
+    func test_detailedSignatureVerification_missingCertificateMapsToUnavailableCertificate() {
         let entry = DetailedSignatureEntry(
             status: .unknownSigner,
             signerPrimaryFingerprint: nil,
             state: .signerCertificateUnavailable,
-            verificationCertificateFingerprint: nil,
-            signerEvidence: evidence
+            verificationCertificateFingerprint: nil
         )
 
         let detailed = DetailedSignatureVerification.from(
@@ -393,8 +391,8 @@ final class ModelTests: XCTestCase {
             contactsAvailability: .availableLegacyCompatibility
         )
 
-        XCTAssertEqual(detailed.summaryState, .signerEvidenceUnavailable)
-        XCTAssertEqual(detailed.signatures[0].verificationState, .signerEvidenceUnavailable)
+        XCTAssertEqual(detailed.summaryState, .signerCertificateUnavailable)
+        XCTAssertEqual(detailed.signatures[0].verificationState, .signerCertificateUnavailable)
         XCTAssertFalse(detailed.legacyVerification.requiresContactsContext)
         XCTAssertNil(detailed.legacyVerification.contactsUnavailableReason)
     }

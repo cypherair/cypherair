@@ -15,7 +15,6 @@ struct DetailedSignatureVerification: Equatable {
         let verificationState: SignatureVerification.VerificationState
         let signerPrimaryFingerprint: String?
         let verificationCertificateFingerprint: String?
-        let signerEvidence: SignerEvidence
         let contactsUnavailableReason: ContactsAvailability?
         let signerIdentity: SignatureVerification.SignerIdentity?
 
@@ -24,7 +23,6 @@ struct DetailedSignatureVerification: Equatable {
             verificationState: SignatureVerification.VerificationState,
             signerPrimaryFingerprint: String?,
             verificationCertificateFingerprint: String?,
-            signerEvidence: SignerEvidence = SignerEvidence(issuerFingerprints: [], issuerKeyIds: []),
             contactsUnavailableReason: ContactsAvailability? = nil,
             signerIdentity: SignatureVerification.SignerIdentity?
         ) {
@@ -32,7 +30,6 @@ struct DetailedSignatureVerification: Equatable {
             self.verificationState = verificationState
             self.signerPrimaryFingerprint = signerPrimaryFingerprint
             self.verificationCertificateFingerprint = verificationCertificateFingerprint
-            self.signerEvidence = signerEvidence
             self.contactsUnavailableReason = contactsUnavailableReason
             self.signerIdentity = signerIdentity
         }
@@ -88,19 +85,8 @@ struct DetailedSignatureVerification: Equatable {
             signerContact: legacySignerContact,
             signerIdentity: legacySignerIdentity,
             verificationState: summaryState,
-            signerEvidence: summaryEntry?.signerEvidence,
             contactsUnavailableReason: contactsUnavailableReason
         )
-    }
-
-    private var summaryEntry: Entry? {
-        guard let summaryEntryIndex,
-              let index = Int(exactly: summaryEntryIndex),
-              signatures.indices.contains(index)
-        else {
-            return nil
-        }
-        return signatures[index]
     }
 
     static func from(
@@ -127,7 +113,6 @@ struct DetailedSignatureVerification: Equatable {
         let mappedEntries = signatures.map { entry in
             let appState = SignatureVerification.VerificationState(
                 ffiState: entry.state,
-                signerEvidence: entry.signerEvidence,
                 contactsAvailability: contactsAvailability
             )
             return Entry(
@@ -135,7 +120,6 @@ struct DetailedSignatureVerification: Equatable {
                 verificationState: appState,
                 signerPrimaryFingerprint: entry.signerPrimaryFingerprint,
                 verificationCertificateFingerprint: entry.verificationCertificateFingerprint,
-                signerEvidence: entry.signerEvidence,
                 contactsUnavailableReason: appState == .contactsContextUnavailable ? unavailableReason : nil,
                 signerIdentity: SignatureVerification.SignerIdentity.resolve(
                     fingerprint: entry.verificationCertificateFingerprint,
@@ -145,12 +129,8 @@ struct DetailedSignatureVerification: Equatable {
             )
         }
 
-        let summaryEvidence = summaryEntryIndex
-            .flatMap { Int(exactly: $0) }
-            .flatMap { mappedEntries.indices.contains($0) ? mappedEntries[$0].signerEvidence : nil }
         let appSummaryState = SignatureVerification.VerificationState(
             ffiState: summaryState,
-            signerEvidence: summaryEvidence ?? SignerEvidence(issuerFingerprints: [], issuerKeyIds: []),
             contactsAvailability: contactsAvailability
         )
 
@@ -196,7 +176,6 @@ extension SignatureVerification.VerificationState {
 
     init(
         ffiState: SignatureVerificationState,
-        signerEvidence: SignerEvidence,
         contactsAvailability: ContactsAvailability
     ) {
         switch ffiState {
@@ -209,15 +188,11 @@ extension SignatureVerification.VerificationState {
         case .expired:
             self = .expired
         case .signerCertificateUnavailable:
-            if !signerEvidence.hasSignerEvidence {
-                self = .signerEvidenceUnavailable
-            } else if contactsAvailability.allowsContactsVerification {
+            if contactsAvailability.allowsContactsVerification {
                 self = .signerCertificateUnavailable
             } else {
                 self = .contactsContextUnavailable
             }
-        case .signerEvidenceUnavailable:
-            self = .signerEvidenceUnavailable
         }
     }
 
@@ -232,12 +207,6 @@ extension SignatureVerification.VerificationState {
         case .expired:
             self = .expired
         }
-    }
-}
-
-extension SignerEvidence {
-    var hasSignerEvidence: Bool {
-        !issuerFingerprints.isEmpty || !issuerKeyIds.isEmpty
     }
 }
 

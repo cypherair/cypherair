@@ -133,32 +133,29 @@ The following decisions are fixed by this document and should not be reopened du
 
 Future verification-capable services must split:
 
-- **core decrypt / packet evidence**
+- **core decrypt / signature packet detection**
   - plaintext delivery after authenticated decryption succeeds
   - packet parsing
-  - claimed or observed signer fingerprint / key-handle evidence only when the lower layer can determine it without a Contacts-provided certificate
 - **certificate-backed signature verification**
   - signature verification outcome only when a suitable verification certificate is available
   - verified signer fingerprint only when certificate-backed verification actually succeeded
   - explicit unavailable state when the signer certificate or Contacts verification context is missing
 - **Contacts enrichment**
   - matching signer identity to `ContactIdentity`
-  - mapping signer evidence into contact / own-key recognition state
+  - mapping certificate-backed signer fingerprints into contact / own-key recognition state
   - surfacing manual verification and certification projection
   - mapping historical / preferred / additional keys to the same person record
 
-This separation is required for accuracy. Contacts can be unavailable while plaintext decryption or low-level signer evidence remains meaningful, but the app must not claim completed cryptographic signature verification without the verification certificate that made that claim possible.
+This separation is required for accuracy. Contacts can be unavailable while plaintext decryption remains meaningful, but the app must not claim completed cryptographic signature verification or signer identity without the verification certificate that made that claim possible.
 
-Lower-level signer evidence is only a lookup clue unless it has been tied to a suitable verification certificate. UI and service code must not present claimed or observed issuer evidence as a certificate-backed verified signer.
+Issuer/key-handle metadata from a signature packet is intentionally not a user identity clue. UI and service code only resolve signer identity from certificate-backed verification results.
 
 Verification output must distinguish:
 
 - verified signature
 - invalid signature
-- claimed or observed signer evidence that is not itself a verified signer identity
 - signer certificate unavailable
 - Contacts verification context unavailable
-- signer evidence unavailable
 
 Route policy after the split:
 
@@ -352,26 +349,26 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 
 **Goals**
 
-- make decrypt / verify outputs accurately distinguish plaintext delivery, claimed or observed signer evidence, certificate-backed signature verification, and Contacts enrichment
+- make decrypt / verify outputs accurately distinguish plaintext delivery, certificate-backed signature verification, and Contacts enrichment
 - remove the assumption that missing Contacts certificates can be represented as generic `.unknownSigner`
 - stop claiming completed signature verification when no suitable verification certificate was available
 
 **Key Changes**
 
-- extend Rust verification results and UniFFI surfaces only as needed to expose claimed or observed signer evidence when the lower layer can determine it without a Contacts certificate
+- extend Rust verification results and UniFFI surfaces only as needed to separate detailed signature state from legacy unknown-signer folding
 - refactor `DecryptionService`
 - refactor `SigningService`
 - refactor `PasswordMessageService`
-- change Swift verification-capable services to return explicit statuses for signer certificate unavailable, Contacts context unavailable, signer evidence unavailable, verified, and invalid
+- change Swift verification-capable services to return explicit statuses for signer certificate unavailable, Contacts context unavailable, verified, expired, and invalid
 - rewrite test baselines around accurate verification / enrichment semantics
 
 **Required Outcomes**
 
 - Decrypt-capable flows can return plaintext while signature verification remains unavailable
 - signature verification is reported as completed only when a suitable verification certificate was used
-- Rust/UniFFI exposes claimed or observed signer fingerprint / key-handle evidence only when available from the lower-level operation, and Swift does not treat that evidence as a verified signer identity by itself
+- Rust/UniFFI exposes certificate-backed verification fingerprints only when a suitable verification certificate was used
 - Verify-capable flows expose enough contract surface for route policy to decide whether required verification context is missing
-- Contacts enrichment maps claimed or observed signer evidence into identity/contact/projection state, but it does not invent a verification result
+- Contacts enrichment maps certificate-backed signer fingerprints into identity/contact/projection state, but it does not invent a verification result
 
 **Not In Scope**
 
@@ -387,7 +384,7 @@ No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation s
 **Validation**
 
 - updated Rust, UniFFI-surface, and decrypt/signing/password-message tests
-- explicit regression tests for signer certificate unavailable vs Contacts context unavailable vs absent signer evidence
+- explicit regression tests for signer certificate unavailable vs Contacts context unavailable
 - explicit regression tests that no path claims signature verification without an available verification certificate
 
 ### 6.4 Contacts PR3 — Contacts Post-Auth Lifecycle And Surface Availability
@@ -619,8 +616,8 @@ The later implementation PRs must collectively satisfy the following scenario se
   - plaintext delivered
   - signature verification reported as unavailable when no suitable verification certificate is available
   - Contacts enrichment unavailable or pending, not silently downgraded to generic unknown-signer behavior
-- locked Contacts, missing signer certificate, and truly absent signer evidence remain distinguishable
-- claimed or observed signer evidence is not presented as a verified signer identity unless certificate-backed verification succeeded
+- locked Contacts and missing signer certificate remain distinguishable
+- unverified signature issuer/key-handle metadata is not presented as signer identity
 - Verify route requiring Contacts context or signer certificate:
   - prompts for app-data unlock only when it can make the required context available
   - reports required verification context unavailable when unlock is denied or canceled

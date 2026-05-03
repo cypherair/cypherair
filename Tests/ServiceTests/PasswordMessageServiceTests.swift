@@ -147,7 +147,6 @@ final class PasswordMessageServiceTests: XCTestCase {
         XCTAssertEqual(signature.verificationState, .contactsContextUnavailable)
         XCTAssertTrue(signature.requiresContactsContext)
         XCTAssertEqual(signature.contactsUnavailableReason, .locked)
-        XCTAssertEqual(signature.signerEvidence?.hasSignerEvidence, true)
     }
 
     func test_decryptMessage_noSkesk_returnsNoSkesk() async throws {

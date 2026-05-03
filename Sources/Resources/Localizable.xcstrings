@@ -10753,22 +10753,6 @@
         }
       }
     },
-    "signature.signerEvidenceUnavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signer evidence unavailable — signature could not be matched to a key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "签名者证据不可用——无法将签名匹配到密钥"
-          }
-        }
-      }
-    },
     "signature.shortKeyId" : {
       "localizations" : {
         "en" : {

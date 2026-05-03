@@ -178,7 +178,6 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.verificationState, .contactsContextUnavailable)
         XCTAssertTrue(result.verification.requiresContactsContext)
         XCTAssertEqual(result.verification.contactsUnavailableReason, .locked)
-        XCTAssertEqual(result.verification.signerEvidence?.hasSignerEvidence, true)
     }
 
     func test_verifyCleartext_profileB_unknownSigner_returnsUnknownSigner() async throws {

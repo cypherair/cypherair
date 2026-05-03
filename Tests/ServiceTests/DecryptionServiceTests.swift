@@ -690,7 +690,6 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(detailed.verification.signatures[0].status, .unknownSigner)
         XCTAssertEqual(detailed.verification.signatures[0].verificationState, .contactsContextUnavailable)
         XCTAssertEqual(detailed.verification.signatures[0].contactsUnavailableReason, .locked)
-        XCTAssertEqual(detailed.verification.signatures[0].signerEvidence.hasSignerEvidence, true)
         XCTAssertNil(detailed.verification.signatures[0].signerPrimaryFingerprint)
         XCTAssertNil(detailed.verification.signatures[0].signerIdentity)
     }
@@ -928,7 +927,6 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(detailed.verification.signatures.count, 1)
         XCTAssertEqual(detailed.verification.signatures[0].status, .unknownSigner)
         XCTAssertEqual(detailed.verification.signatures[0].verificationState, .contactsContextUnavailable)
-        XCTAssertEqual(detailed.verification.signatures[0].signerEvidence.hasSignerEvidence, true)
         XCTAssertNil(detailed.verification.signatures[0].signerPrimaryFingerprint)
         XCTAssertNil(detailed.verification.signatures[0].signerIdentity)
     }

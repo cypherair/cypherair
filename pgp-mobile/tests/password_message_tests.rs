@@ -340,7 +340,7 @@ fn test_password_encrypt_decrypt_armored_seipdv2_round_trip_signed() {
 }
 
 #[test]
-fn test_password_decrypt_signed_without_verification_cert_preserves_signer_evidence() {
+fn test_password_decrypt_signed_without_verification_cert_reports_missing_certificate() {
     let password: Password = "password missing verification cert".into();
     let signer = gen_key("Password Missing Signer", KeyProfile::Universal);
     let plaintext = b"Password signed message without verification cert.";
@@ -370,16 +370,6 @@ fn test_password_decrypt_signed_without_verification_cert_preserves_signer_evide
     assert_eq!(
         result.signatures[0].state,
         SignatureVerificationState::SignerCertificateUnavailable
-    );
-    assert!(
-        !result.signatures[0]
-            .signer_evidence
-            .issuer_fingerprints
-            .is_empty()
-            || !result.signatures[0]
-                .signer_evidence
-                .issuer_key_ids
-                .is_empty()
     );
 }
 

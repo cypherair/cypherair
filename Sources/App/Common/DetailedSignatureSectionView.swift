@@ -76,7 +76,6 @@ private extension SignatureVerification {
             signerContact: nil,
             signerIdentity: entry.signerIdentity,
             verificationState: entry.verificationState,
-            signerEvidence: entry.signerEvidence,
             contactsUnavailableReason: entry.contactsUnavailableReason
         )
     }

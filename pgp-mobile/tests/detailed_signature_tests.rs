@@ -263,9 +263,7 @@ fn test_verify_detached_detailed_known_plus_unknown_preserves_unknown_nil_finger
     assert!(detailed.signatures.iter().any(|entry| entry.status
         == DetailedSignatureStatus::UnknownSigner
         && entry.signer_primary_fingerprint.is_none()
-        && entry.state == SignatureVerificationState::SignerCertificateUnavailable
-        && (!entry.signer_evidence.issuer_fingerprints.is_empty()
-            || !entry.signer_evidence.issuer_key_ids.is_empty())));
+        && entry.state == SignatureVerificationState::SignerCertificateUnavailable));
 }
 
 #[test]

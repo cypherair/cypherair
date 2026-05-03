@@ -10,7 +10,6 @@ struct SignatureVerification {
         case expired
         case signerCertificateUnavailable
         case contactsContextUnavailable
-        case signerEvidenceUnavailable
     }
 
     enum SignerSource: Equatable {
@@ -106,8 +105,6 @@ struct SignatureVerification {
 
     let signerIdentity: SignerIdentity?
 
-    let signerEvidence: SignerEvidence?
-
     let contactsUnavailableReason: ContactsAvailability?
 
     var requiresContactsContext: Bool {
@@ -120,14 +117,12 @@ struct SignatureVerification {
         signerContact: Contact?,
         signerIdentity: SignerIdentity? = nil,
         verificationState: VerificationState? = nil,
-        signerEvidence: SignerEvidence? = nil,
         contactsUnavailableReason: ContactsAvailability? = nil
     ) {
         self.status = status
         self.verificationState = verificationState ?? VerificationState(legacyStatus: status)
         self.signerFingerprint = signerFingerprint
         self.signerContact = signerContact
-        self.signerEvidence = signerEvidence
         self.contactsUnavailableReason = contactsUnavailableReason
         self.signerIdentity = signerIdentity ?? signerContact.map {
             SignerIdentity(
@@ -157,7 +152,6 @@ struct SignatureVerification {
         case .invalid: "xmark.seal.fill"
         case .signerCertificateUnavailable: "person.crop.circle.badge.questionmark"
         case .contactsContextUnavailable: "lock.badge.clock"
-        case .signerEvidenceUnavailable: "questionmark.circle.fill"
         case .notSigned: "minus.circle"
         case .expired: "clock.badge.exclamationmark"
         }
@@ -170,7 +164,6 @@ struct SignatureVerification {
         case .invalid: .red
         case .signerCertificateUnavailable: .orange
         case .contactsContextUnavailable: .orange
-        case .signerEvidenceUnavailable: .orange
         case .notSigned: .secondary
         case .expired: .orange
         }
@@ -203,11 +196,6 @@ struct SignatureVerification {
                 localized: "signature.contactsContextUnavailable",
                 defaultValue: "Contacts verification context is unavailable — signer cannot be verified yet"
             )
-        case .signerEvidenceUnavailable:
-            String(
-                localized: "signature.signerEvidenceUnavailable",
-                defaultValue: "Signer evidence unavailable — signature could not be matched to a key"
-            )
         case .notSigned:
             String(localized: "signature.none", defaultValue: "This message was not signed")
         }
@@ -217,7 +205,7 @@ struct SignatureVerification {
     var isWarning: Bool {
         switch verificationState {
         case .invalid, .expired, .signerCertificateUnavailable,
-             .contactsContextUnavailable, .signerEvidenceUnavailable:
+             .contactsContextUnavailable:
             true
         case .verified, .notSigned:
             false

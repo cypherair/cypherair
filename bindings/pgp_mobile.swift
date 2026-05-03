@@ -2238,16 +2238,14 @@ public struct DetailedSignatureEntry: Equatable, Hashable {
     public var signerPrimaryFingerprint: String?
     public var state: SignatureVerificationState
     public var verificationCertificateFingerprint: String?
-    public var signerEvidence: SignerEvidence
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(status: DetailedSignatureStatus, signerPrimaryFingerprint: String?, state: SignatureVerificationState, verificationCertificateFingerprint: String?, signerEvidence: SignerEvidence) {
+    public init(status: DetailedSignatureStatus, signerPrimaryFingerprint: String?, state: SignatureVerificationState, verificationCertificateFingerprint: String?) {
         self.status = status
         self.signerPrimaryFingerprint = signerPrimaryFingerprint
         self.state = state
         self.verificationCertificateFingerprint = verificationCertificateFingerprint
-        self.signerEvidence = signerEvidence
     }
 
 
@@ -2269,8 +2267,7 @@ public struct FfiConverterTypeDetailedSignatureEntry: FfiConverterRustBuffer {
                 status: FfiConverterTypeDetailedSignatureStatus.read(from: &buf),
                 signerPrimaryFingerprint: FfiConverterOptionString.read(from: &buf),
                 state: FfiConverterTypeSignatureVerificationState.read(from: &buf),
-                verificationCertificateFingerprint: FfiConverterOptionString.read(from: &buf),
-                signerEvidence: FfiConverterTypeSignerEvidence.read(from: &buf)
+                verificationCertificateFingerprint: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -2279,7 +2276,6 @@ public struct FfiConverterTypeDetailedSignatureEntry: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.signerPrimaryFingerprint, into: &buf)
         FfiConverterTypeSignatureVerificationState.write(value.state, into: &buf)
         FfiConverterOptionString.write(value.verificationCertificateFingerprint, into: &buf)
-        FfiConverterTypeSignerEvidence.write(value.signerEvidence, into: &buf)
     }
 }
 
@@ -3383,66 +3379,6 @@ public func FfiConverterTypeS2kInfo_lift(_ buf: RustBuffer) throws -> S2kInfo {
 #endif
 public func FfiConverterTypeS2kInfo_lower(_ value: S2kInfo) -> RustBuffer {
     return FfiConverterTypeS2kInfo.lower(value)
-}
-
-
-/**
- * Claimed or observed signer evidence available from signature metadata.
- *
- * These values are lookup clues only. They are not proof of signer identity unless
- * `SignatureVerificationState::Verified` is backed by a verification certificate.
- */
-public struct SignerEvidence: Equatable, Hashable {
-    public var issuerFingerprints: [String]
-    public var issuerKeyIds: [String]
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(issuerFingerprints: [String], issuerKeyIds: [String]) {
-        self.issuerFingerprints = issuerFingerprints
-        self.issuerKeyIds = issuerKeyIds
-    }
-
-
-
-
-}
-
-#if compiler(>=6)
-extension SignerEvidence: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeSignerEvidence: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SignerEvidence {
-        return
-            try SignerEvidence(
-                issuerFingerprints: FfiConverterSequenceString.read(from: &buf),
-                issuerKeyIds: FfiConverterSequenceString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: SignerEvidence, into buf: inout [UInt8]) {
-        FfiConverterSequenceString.write(value.issuerFingerprints, into: &buf)
-        FfiConverterSequenceString.write(value.issuerKeyIds, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeSignerEvidence_lift(_ buf: RustBuffer) throws -> SignerEvidence {
-    return try FfiConverterTypeSignerEvidence.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeSignerEvidence_lower(_ value: SignerEvidence) -> RustBuffer {
-    return FfiConverterTypeSignerEvidence.lower(value)
 }
 
 
@@ -4751,7 +4687,6 @@ public enum SignatureVerificationState: Equatable, Hashable {
     case invalid
     case expired
     case signerCertificateUnavailable
-    case signerEvidenceUnavailable
 
 
 
@@ -4783,8 +4718,6 @@ public struct FfiConverterTypeSignatureVerificationState: FfiConverterRustBuffer
 
         case 5: return .signerCertificateUnavailable
 
-        case 6: return .signerEvidenceUnavailable
-
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -4811,10 +4744,6 @@ public struct FfiConverterTypeSignatureVerificationState: FfiConverterRustBuffer
 
         case .signerCertificateUnavailable:
             writeInt(&buf, Int32(5))
-
-
-        case .signerEvidenceUnavailable:
-            writeInt(&buf, Int32(6))
 
         }
     }
