@@ -168,8 +168,10 @@ Snapshot date: 2026-05-03
 ## Latest LLVM Workaround-Shrink Validation
 
 - Date: 2026-05-03.
-- App worktree: `/Users/tianren/coding/cypherair-main`, branch `main`, commit
-  `ea37581`.
+- Local app worktree validation: `/Users/tianren/coding/cypherair-main`, branch
+  `main`, commit `ea37581`.
+- GitHub-hosted app validation: `cypherair/cypherair` branch `main`, commit
+  `b50b211`.
 - Rust carry validation source:
   `/Users/tianren/coding/rust:carry/cypherair-arm64e-toolchain` commit
   `b402b926a05`, which keeps Rust-side ptrauth cleanup only for `callbr` and
@@ -196,6 +198,17 @@ Snapshot date: 2026-05-03
   - iOS simulator: `arm64`
   - visionOS simulator: `arm64`
 - Generated UniFFI Swift/header files were unchanged in the tracked worktree.
+- GitHub-hosted `XCFramework Edge Release` run `25292443961` passed and
+  published
+  `pgpmobile-edge-20260503T222049Z-b50b211-r25292443961-a1`. The published
+  `PgpMobile.arm64e-build-manifest.json` records Rust stage1 tag
+  `rust-arm64e-stage1-20260503T220008Z-b402b92-r25291584825-a1`, source and
+  checked-out commit `b402b926a05317680538f34e5d06495572b8b3cf`, freshness
+  level `error` with `isFresh: true`, and all required XCFramework slices.
+- GitHub-hosted `PR Checks` run `25292443966` passed `rust-full-tests` and
+  `xcframework-package`. The overall workflow conclusion was failure only
+  because `swift-unit-tests-hosted-preview` ran on hosted macOS 26.3 while
+  `CypherAirTests` requires macOS 26.4.
 
 ## Update Rules
 
