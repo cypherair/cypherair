@@ -14,9 +14,9 @@ enum AddContactResult {
 }
 
 /// Manages contacts (imported public keys).
-/// Public keys are stored as binary .gpg files in the Documents/contacts/ directory.
-///
-/// No Keychain access needed — contacts are public keys only.
+/// Production persistence lives in the protected contacts app-data domain after post-auth unlock.
+/// The legacy Documents/contacts repository is retained only for migration, compatibility fallback,
+/// quarantine, and cleanup.
 @Observable
 final class ContactService: @unchecked Sendable {
     /// All imported contacts.

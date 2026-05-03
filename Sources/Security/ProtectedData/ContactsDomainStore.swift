@@ -285,50 +285,83 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
             throw ProtectedDataError.missingWrappedDomainMasterKey(Self.domainID)
         }
 
+        let expectedCurrentGenerationIdentifier = try expectedCurrentGenerationIdentifier()
         var domainMasterKey = try domainKeyManager.unwrapDomainMasterKey(
             from: wrappedRecord,
             wrappingRootKey: wrappingRootKey
         )
-        var candidates: [OpenedSnapshot] = []
+        do {
+            var candidates: [OpenedSnapshot] = []
+            var highestObservedGenerationIdentifier: Int?
 
-        for slot in ProtectedDomainGenerationSlot.allCases {
-            let url = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: slot)
-            guard try storageRoot.managedItemExists(at: url) else {
-                continue
-            }
-
-            do {
-                let data = try storageRoot.readManagedData(at: url)
-                let envelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
-                var plaintext = try ProtectedDomainEnvelopeCodec.open(
-                    envelope: envelope,
-                    domainMasterKey: domainMasterKey
-                )
-                defer {
-                    plaintext.protectedDataZeroize()
+            for slot in ProtectedDomainGenerationSlot.allCases {
+                let url = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: slot)
+                guard try storageRoot.managedItemExists(at: url) else {
+                    continue
                 }
-                let decodedSnapshot = try snapshotRepository.decodeSnapshot(plaintext)
-                candidates.append(
-                    OpenedSnapshot(
-                        snapshot: decodedSnapshot,
-                        generationIdentifier: envelope.generationIdentifier
-                    )
-                )
-            } catch {
-                continue
-            }
-        }
 
-        guard let selectedSnapshot = candidates.max(by: {
-            $0.generationIdentifier < $1.generationIdentifier
-        }) else {
+                do {
+                    let data = try storageRoot.readManagedData(at: url)
+                    let envelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
+                    highestObservedGenerationIdentifier = max(
+                        highestObservedGenerationIdentifier ?? envelope.generationIdentifier,
+                        envelope.generationIdentifier
+                    )
+                    var plaintext = try ProtectedDomainEnvelopeCodec.open(
+                        envelope: envelope,
+                        domainMasterKey: domainMasterKey
+                    )
+                    defer {
+                        plaintext.protectedDataZeroize()
+                    }
+                    let decodedSnapshot = try snapshotRepository.decodeSnapshot(plaintext)
+                    candidates.append(
+                        OpenedSnapshot(
+                            snapshot: decodedSnapshot,
+                            generationIdentifier: envelope.generationIdentifier
+                        )
+                    )
+                } catch {
+                    continue
+                }
+            }
+
+            guard let selectedSnapshot = candidates.max(by: {
+                $0.generationIdentifier < $1.generationIdentifier
+            }) else {
+                throw ProtectedDataError.invalidEnvelope(
+                    "Contacts domain does not contain a readable authoritative generation."
+                )
+            }
+            if selectedSnapshot.generationIdentifier < expectedCurrentGenerationIdentifier {
+                throw ProtectedDataError.invalidEnvelope(
+                    "Contacts expected current generation is not readable."
+                )
+            }
+            if let highestObservedGenerationIdentifier,
+               selectedSnapshot.generationIdentifier < highestObservedGenerationIdentifier {
+                throw ProtectedDataError.invalidEnvelope(
+                    "Contacts highest observed generation is not readable."
+                )
+            }
+
+            return (selectedSnapshot, domainMasterKey)
+        } catch {
             domainMasterKey.protectedDataZeroize()
+            throw error
+        }
+    }
+
+    private func expectedCurrentGenerationIdentifier() throws -> Int {
+        guard let metadata = try bootstrapStore.loadMetadata(for: Self.domainID),
+              let value = metadata.expectedCurrentGenerationIdentifier,
+              let generationIdentifier = Int(value),
+              generationIdentifier > 0 else {
             throw ProtectedDataError.invalidEnvelope(
-                "Contacts domain does not contain a readable authoritative generation."
+                "Contacts bootstrap metadata is missing expected current generation."
             )
         }
-
-        return (selectedSnapshot, domainMasterKey)
+        return generationIdentifier
     }
 
     private func activeDomainMasterKey() throws -> Data {

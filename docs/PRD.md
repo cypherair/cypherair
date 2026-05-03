@@ -208,8 +208,9 @@ Current protected app-data scope:
 - `clipboardNotice` is stored in protected settings.
 - Private-key control state, including the selected auth mode and rewrap / modify-expiry recovery journal, is stored in `private-key-control`.
 - Key-list metadata (`PGPKeyIdentity`) is stored in `key-metadata` and loads after app unlock.
+- Contacts flat compatibility state is stored in the protected `contacts` domain after app unlock.
 
-Ordinary protected settings are migrated into `protected-settings`, and self-test reports are short-lived export-only data rather than a protected diagnostics domain. Temporary/export/tutorial cleanup hardening and Contacts are not yet migrated into protected app-data domains. Contacts remains a later protected-domain rollout and is not part of the current App Protection user surface.
+Ordinary protected settings are migrated into `protected-settings`, and self-test reports are short-lived export-only data rather than a protected diagnostics domain. Temporary/export/tutorial cleanup hardening is complete, and Contacts PR4 moved the legacy compatibility snapshot into protected app data. Remaining person-centered Contacts features stay in the Contacts follow-on plan and are not part of the current App Protection user surface.
 
 **Authentication Mode**
 

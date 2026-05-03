@@ -614,6 +614,236 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
     }
 
+    func test_contactsPR4CorruptCurrentGenerationAfterMutationRequiresRecovery() async throws {
+        let documentDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirContactsCorruptCurrent-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: documentDirectory) }
+        let contactsDirectory = documentDirectory.appendingPathComponent("contacts", isDirectory: true)
+        let repository = ContactRepository(contactsDirectory: contactsDirectory)
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4CorruptCurrent",
+            contactsDirectory: contactsDirectory
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: harness.store
+        )
+        let initialAvailability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+        XCTAssertEqual(initialAvailability, .availableProtectedDomain)
+        let generated = try engine.generateKey(
+            name: "Corrupt Current",
+            email: "corrupt-current@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try protectedService.addContact(publicKeyData: generated.publicKeyData)
+        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: harness.storageRoot.domainEnvelopeURL(
+                for: ContactsDomainRepository.domainID,
+                slot: .previous
+            ).path
+        ))
+        try harness.storageRoot.writeProtectedData(
+            Data("not-a-readable-contacts-envelope".utf8),
+            to: harness.storageRoot.domainEnvelopeURL(
+                for: ContactsDomainRepository.domainID,
+                slot: .current
+            )
+        )
+
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: reopenedStore
+        )
+
+        let availability = await reopenedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .recoveryNeeded)
+        XCTAssertTrue(reopenedService.availableContacts.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: contactsDirectory.path))
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ContactsDomainRepository.domainID],
+            .recoveryNeeded
+        )
+    }
+
+    func test_contactsPR4MissingCurrentGenerationAfterMutationRequiresRecovery() async throws {
+        let documentDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirContactsMissingCurrent-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: documentDirectory) }
+        let contactsDirectory = documentDirectory.appendingPathComponent("contacts", isDirectory: true)
+        let repository = ContactRepository(contactsDirectory: contactsDirectory)
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4MissingCurrent",
+            contactsDirectory: contactsDirectory
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: harness.store
+        )
+        let initialAvailability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+        XCTAssertEqual(initialAvailability, .availableProtectedDomain)
+        let generated = try engine.generateKey(
+            name: "Missing Current",
+            email: "missing-current@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try protectedService.addContact(publicKeyData: generated.publicKeyData)
+        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
+        let currentURL = harness.storageRoot.domainEnvelopeURL(
+            for: ContactsDomainRepository.domainID,
+            slot: .current
+        )
+        let previousURL = harness.storageRoot.domainEnvelopeURL(
+            for: ContactsDomainRepository.domainID,
+            slot: .previous
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: previousURL.path))
+        try FileManager.default.removeItem(at: currentURL)
+
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: reopenedStore
+        )
+
+        let availability = await reopenedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .recoveryNeeded)
+        XCTAssertTrue(reopenedService.availableContacts.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: contactsDirectory.path))
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ContactsDomainRepository.domainID],
+            .recoveryNeeded
+        )
+    }
+
+    func test_contactsPR4MissingBootstrapMetadataRequiresRecoveryWithoutLegacyFallback() async throws {
+        let generated = try engine.generateKey(
+            name: "Missing Bootstrap",
+            email: "missing-bootstrap@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        let repository = ContactRepository(contactsDirectory: tempDir)
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsPR4MissingBootstrap",
+            contactsDirectory: tempDir
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let protectedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: harness.store
+        )
+        let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+        XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+        try ProtectedDomainBootstrapStore(
+            storageRoot: harness.storageRoot
+        ).removeMetadata(for: ContactsDomainRepository.domainID)
+        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
+
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey },
+            initialSnapshotProvider: {
+                XCTFail("Committed Contacts domain must not rebuild from legacy when bootstrap metadata is missing.")
+                return ContactsDomainSnapshot.empty()
+            }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDirectory: tempDir,
+            contactsDomainStore: reopenedStore
+        )
+
+        let availability = await reopenedService.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .recoveryNeeded)
+        XCTAssertTrue(reopenedService.availableContacts.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: tempDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ContactsDomainRepository.domainID],
+            .recoveryNeeded
+        )
+    }
+
+    func test_contactsPR4AuthoritativeReadValidatesBootstrapBeforeUnwrappingDMK() throws {
+        let contents = try RepositoryAuditLoader.loadString(
+            relativePath: "Sources/Security/ProtectedData/ContactsDomainStore.swift"
+        )
+        let method = try sourceBlock(
+            in: contents,
+            from: "private func readAuthoritativeSnapshot",
+            to: "private func expectedCurrentGenerationIdentifier"
+        )
+        let expectedGenerationRead = try XCTUnwrap(method.range(
+            of: "let expectedCurrentGenerationIdentifier = try expectedCurrentGenerationIdentifier()"
+        ))
+        let dmkUnwrap = try XCTUnwrap(method.range(
+            of: "var domainMasterKey = try domainKeyManager.unwrapDomainMasterKey"
+        ))
+
+        XCTAssertTrue(expectedGenerationRead.lowerBound < dmkUnwrap.lowerBound)
+        XCTAssertTrue(method.contains("""
+        catch {
+                    domainMasterKey.protectedDataZeroize()
+                    throw error
+                }
+        """))
+    }
+
     func test_productionContactsCallsitesUseGatedAccessors() throws {
         let sourcesRoot = try RepositoryAuditLoader.sourcesRootURL()
         let allowedRelativePaths: Set<String> = [

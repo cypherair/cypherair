@@ -870,6 +870,49 @@ final class CommonHelpersTests: XCTestCase {
         ))
     }
 
+    func test_postUnlockRecoveryWarningAppend_surfacesContactsCleanupWarningAndClears() {
+        let suiteName = "com.cypherair.postUnlockContactsWarning.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let config = AppConfiguration(defaults: defaults)
+        let contactsWarning = String(
+            localized: "app.loadWarning.contactsMigration",
+            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir and unlock again to retry cleanup."
+        )
+
+        config.appendPostUnlockRecoveryLoadWarning(contactsWarning)
+
+        XCTAssertEqual(config.postUnlockRecoveryLoadWarning, contactsWarning)
+        config.clearPostUnlockRecoveryLoadWarning()
+        XCTAssertNil(config.postUnlockRecoveryLoadWarning)
+    }
+
+    func test_postUnlockRecoveryWarningAppend_preservesContactsAndKeyWarningsWithoutDuplicates() throws {
+        let suiteName = "com.cypherair.postUnlockCombinedWarning.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let config = AppConfiguration(defaults: defaults)
+        let contactsWarning = String(
+            localized: "app.loadWarning.contactsMigration",
+            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir and unlock again to retry cleanup."
+        )
+        let keyWarning = AppContainer.postUnlockRecoveryLoadWarning(
+            rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.retryableFailure]),
+            modifyExpiryOutcome: nil
+        )
+
+        config.appendPostUnlockRecoveryLoadWarning(contactsWarning)
+        config.appendPostUnlockRecoveryLoadWarning(keyWarning)
+        config.appendPostUnlockRecoveryLoadWarning(contactsWarning)
+
+        let warning = try XCTUnwrap(config.postUnlockRecoveryLoadWarning)
+        XCTAssertTrue(warning.contains(contactsWarning))
+        XCTAssertTrue(warning.contains("retry"))
+        XCTAssertEqual(warning.components(separatedBy: "\n").count, 2)
+    }
+
     func test_postUnlockRecovery_resyncsConfigAfterRewrapCompletes() async throws {
         let suiteName = "com.cypherair.postUnlockSync.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

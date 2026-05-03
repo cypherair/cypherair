@@ -65,8 +65,9 @@ Allowed target classes:
 | Private-key control payload | `Application Support/ProtectedData/private-key-control/` | `private-key-control target` | Phase 5 | Implemented | implemented |
 | Key metadata payload | `Application Support/ProtectedData/key-metadata/` | `key-metadata-domain target` | Phase 6 | Implemented | implemented |
 | Framework sentinel payload | `Application Support/ProtectedData/protected-framework-sentinel/` | `framework-bootstrap` | Phase 4 | Implemented | implemented |
-| `Documents/contacts/*.gpg` | App sandbox documents | `protected-after-unlock` | Phase 8 | Pending | no |
-| `Documents/contacts/contact-metadata.json` | App sandbox documents | `protected-after-unlock` | Phase 8 | Pending | no |
+| Contacts payload | `Application Support/ProtectedData/contacts/` | `protected-after-unlock` | Phase 8 / Contacts PR4 | Implemented | implemented |
+| Legacy contacts public-key files | `Documents/contacts/*.gpg` and `Documents/contacts.quarantine/*.gpg` | `legacy cleanup-only` | Phase 8 / Contacts PR4 | Cutover source only; inactive after protected open | cleanup only |
+| Legacy contacts metadata | `Documents/contacts/contact-metadata.json` and quarantine copy | `legacy cleanup-only` | Phase 8 / Contacts PR4 | Cutover source only; inactive after protected open | cleanup only |
 | Self-test reports / legacy `Documents/self-test/` | In-memory export-only report data; legacy app sandbox `Documents/self-test/` cleanup source only | `ephemeral-with-cleanup` / `legacy cleanup-only` | Phase 7 PR 3 | Implemented | implemented |
 | `tmp/decrypted/` | App temporary directory `tmp/decrypted/op-<UUID>/<sanitized output filename>` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |
 | `tmp/streaming/` | App temporary directory `tmp/streaming/op-<UUID>/<sanitized input filename>.gpg` | `ephemeral-with-cleanup` | Phase 7 PR 4 | Implemented | implemented |

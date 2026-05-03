@@ -387,6 +387,9 @@ final class AppContainer: @unchecked Sendable {
                         try protectedDataSessionCoordinator.wrappingRootKeyData()
                     }
                 )
+                config.appendPostUnlockRecoveryLoadWarning(
+                    contactService.protectedDomainMigrationWarning
+                )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
                     protectedSettingsDomainState: Self.protectedSettingsDomainStateForOrdinarySettings(
                         postUnlockOutcome: postUnlockOutcome,
@@ -935,7 +938,7 @@ final class AppContainer: @unchecked Sendable {
             rewrapSummary: rewrapSummary,
             modifyExpiryOutcome: modifyExpiryOutcome
         ) {
-            config.postUnlockRecoveryLoadWarning = warning
+            config.appendPostUnlockRecoveryLoadWarning(warning)
         }
     }
 

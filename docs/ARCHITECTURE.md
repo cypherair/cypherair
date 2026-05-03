@@ -150,26 +150,27 @@ Current ProtectedData scope:
 - `ProtectedSettingsStore` is the first protected-domain adopter; schema v2 preserves `clipboardNotice` and owns the ordinary-settings snapshot for grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion
 - `ProtectedOrdinarySettingsCoordinator` is the Phase 7 source of truth for ordinary-settings availability and loaded snapshots; production reads/writes `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff
 - `ProtectedDataFrameworkSentinelStore` is the second production domain; it contains no user data, telemetry, or UI state, and is created only after another domain is already committed and the shared resource is ready
+- `ContactsDomainStore` is the Contacts source of truth after PR4 cutover; it opens the protected `contacts` domain post-auth, migrates active legacy contacts once, quarantines legacy plaintext, and never reads quarantine for ordinary routes
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
-- app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`
-- current Phase 1-7 ProtectedData work is implemented, including ordinary-settings, self-test export-only, and temporary/export/tutorial hardening; Contacts is unblocked Phase 8 pending implementation
+- app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`; Contacts then joins the authorized session through its dedicated post-auth open path
+- current Phase 1-7 ProtectedData work is implemented, including ordinary-settings, self-test export-only, and temporary/export/tutorial hardening; Contacts PR4 adds the protected `contacts` domain while preserving the flat compatibility snapshot
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
-- Contacts remains outside ProtectedData until Phase 8 implementation lands; Phase 8 sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+- later Contacts person-centered modeling and package import/export remain in the Contacts follow-on plan; sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
 
 Current local-data classification:
 
 | Class | Current surfaces |
 |-------|------------------|
-| Protected after unlock | `protected-settings` schema v2 ordinary settings, `private-key-control`, `key-metadata`, and the framework sentinel under `Application Support/ProtectedData/`. |
+| Protected after unlock | `protected-settings` schema v2 ordinary settings, `private-key-control`, `key-metadata`, `contacts`, and the framework sentinel under `Application Support/ProtectedData/`. |
 | Early-readable boot exception | `appSessionAuthenticationPolicy` in `UserDefaults`; it selects app-session authentication before ProtectedData opens. |
 | Private-key material exception | Permanent and pending Secure Enclave-wrapped private-key bundle rows remain in the Keychain / Secure Enclave private-key material domain. |
 | Framework bootstrap | Root-secret envelope, device-binding key metadata, registry, and per-domain bootstrap metadata. |
 | Ephemeral with cleanup | Self-test reports in memory, legacy `Documents/self-test/` cleanup, `tmp/decrypted`, `tmp/streaming`, `tmp/export-*`, tutorial directories, and tutorial-only defaults cleanup. |
 | Out of app custody | User-selected export destinations after handoff succeeds. |
-| Pending Phase 8 | Legacy Contacts files under `Documents/contacts/` until Contacts protected-domain migration. |
+| Legacy migration cleanup | Legacy Contacts files under `Documents/contacts/` and `Documents/contacts.quarantine/` after Contacts protected-domain cutover. |
 
 The canonical row-level classification, current status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
 

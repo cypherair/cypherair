@@ -236,13 +236,14 @@ Current protected app-data scope:
 - `private-key-control` stores the private-key control source of truth: `settings.authMode` plus the rewrap / modify-expiry `recoveryJournal`.
 - `key-metadata` stores `PGPKeyIdentity` payloads after app unlock. Legacy metadata Keychain rows are migration and cleanup sources only.
 - `protected-settings` stores protected settings. Schema v2 preserves `clipboardNotice` and adds grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion.
+- `contacts` stores the PR4 compatibility Contacts snapshot after app unlock. Legacy `Documents/contacts` and `Documents/contacts.quarantine` are migration and cleanup sources only after protected cutover.
 - `protected-framework-sentinel` is a framework-owned sentinel domain with a schema/purpose marker only. It contains no user data, telemetry, contacts, or UI state.
 
 Current non-goals and pending surfaces:
 
 - Permanent and pending SE-wrapped private-key bundle rows remain in the existing private-key material domain.
 - `appSessionAuthenticationPolicy` remains an early-readable boot-authentication setting.
-- Self-test reports are short-lived export-only data held in memory until explicit user export, reset, or app exit; legacy `Documents/self-test/` content is cleanup-only on startup and local-data reset. Decrypted, streaming, export handoff, and tutorial artifacts are Phase 7 `ephemeral-with-cleanup` state: CypherAir-owned temporary files/directories use verified complete file protection where created by the app, per-operation or owner cleanup, startup cleanup, and Reset All Local Data cleanup. Phase 7 is complete. Contacts remain outside ProtectedData until unblocked Phase 8 implementation lands. Phase 7 PR 2 moved the targeted ordinary settings into `protected-settings`; legacy ordinary `UserDefaults` keys are cleanup-only after verified schema v2 readback.
+- Self-test reports are short-lived export-only data held in memory until explicit user export, reset, or app exit; legacy `Documents/self-test/` content is cleanup-only on startup and local-data reset. Decrypted, streaming, export handoff, and tutorial artifacts are Phase 7 `ephemeral-with-cleanup` state: CypherAir-owned temporary files/directories use verified complete file protection where created by the app, per-operation or owner cleanup, startup cleanup, and Reset All Local Data cleanup. Phase 7 is complete. Phase 7 PR 2 moved the targeted ordinary settings into `protected-settings`; legacy ordinary `UserDefaults` keys are cleanup-only after verified schema v2 readback. Contacts PR4 moved Contacts into the protected `contacts` domain; legacy Contacts directories are migration/quarantine cleanup sources and are never the source of truth after protected cutover.
 
 The exhaustive row-level local-data classification, current status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This security model records the rules and invariants; the inventory records each surface.
 
