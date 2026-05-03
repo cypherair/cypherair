@@ -1,6 +1,6 @@
 # CypherAir Apple arm64e Status
 
-Snapshot date: 2026-04-26
+Snapshot date: 2026-05-03
 
 ## Repo Identity
 
@@ -45,7 +45,7 @@ Snapshot date: 2026-04-26
     stable commands such as `cargo +stable`
   - local Rust fork path: `/Users/tianren/coding/rust`
   - Rust stage1 carry branch: `carry/cypherair-arm64e-toolchain`
-  - current Rust stage1 carry head: `ea0b2a66c4cc`
+  - current Rust stage1 carry head: `577e43d4af8`
   - Rust upstream-prep branch:
     `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`
   - current Rust upstream-prep head: `77e2e3639785`
@@ -67,10 +67,10 @@ Snapshot date: 2026-04-26
   - arm64e builds call the patched compiler through explicit `RUSTC` while
     using nightly Cargo as the driver for `-Zbuild-std`
   - latest verified stage1 prerelease:
-    `rust-arm64e-stage1-20260425T235339Z-ea0b2a6-r24943370755-a1`
+    `rust-arm64e-stage1-20260503T182149Z-577e43d-r25286755069-a1`
   - latest verified stage1 source ref: `carry/cypherair-arm64e-toolchain`
-  - latest verified stage1 source commit: `ea0b2a66c4cc`
-  - latest verified stage1 workflow run: `24943370755`
+  - latest verified stage1 source commit: `577e43d4af8`
+  - latest verified stage1 workflow run: `25286755069`
   - latest verified stage1 manifest declares `includedRustSrc: true` and
     includes host `std`/`proc_macro`, so GitHub-hosted app builds can run
     `cargo -Zbuild-std` without relying on a runner-local Rust source tree

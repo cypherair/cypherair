@@ -5139,7 +5139,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_merge_public_certificate_update() != 44096) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry() != 7301) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry() != 31305) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_key_info() != 6277) {
@@ -5151,7 +5151,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_revocation_cert() != 24404) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_s2k_params() != 17727) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_s2k_params() != 51523) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext() != 29260) {
