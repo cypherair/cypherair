@@ -1,9 +1,13 @@
 $(SRCROOT)/Sources/App/AppContainer.swift
+$(SRCROOT)/Sources/App/AppLaunchConfiguration.swift
+$(SRCROOT)/Sources/App/AppLoadWarningCoordinator.swift
 $(SRCROOT)/Sources/App/AppRoute.swift
 $(SRCROOT)/Sources/App/AppShellComposition.swift
 $(SRCROOT)/Sources/App/AppStartupCoordinator.swift
 $(SRCROOT)/Sources/App/Common/AuthLifecycleTraceEnvironment.swift
+$(SRCROOT)/Sources/App/Common/AuthenticationShieldCoordinator.swift
 $(SRCROOT)/Sources/App/Common/AuthenticationShieldHost.swift
+$(SRCROOT)/Sources/App/Common/AuthenticationShieldOverlayView.swift
 $(SRCROOT)/Sources/App/Common/CypherMultilineTextInput.swift
 $(SRCROOT)/Sources/App/Common/DetailedSignatureSectionView.swift
 $(SRCROOT)/Sources/App/Common/FileExportController.swift
@@ -21,6 +25,7 @@ $(SRCROOT)/Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/ContactCertificateSignaturesView.swift
 $(SRCROOT)/Sources/App/Contacts/ContactDetailView.swift
 $(SRCROOT)/Sources/App/Contacts/ContactsView.swift
+$(SRCROOT)/Sources/App/Contacts/Import/AppSceneIncomingURLRouter.swift
 $(SRCROOT)/Sources/App/Contacts/Import/ContactImportWorkflow.swift
 $(SRCROOT)/Sources/App/Contacts/Import/IncomingURLImportCoordinator.swift
 $(SRCROOT)/Sources/App/Contacts/Import/PublicKeyImportLoader.swift
@@ -69,6 +74,7 @@ $(SRCROOT)/Sources/App/Settings/AuthMode/AuthModeChangeConfirmation.swift
 $(SRCROOT)/Sources/App/Settings/AuthMode/SettingsAuthModeRequestBuilder.swift
 $(SRCROOT)/Sources/App/Settings/LicenseDetailView.swift
 $(SRCROOT)/Sources/App/Settings/LicenseListView.swift
+$(SRCROOT)/Sources/App/Settings/LocalDataResetRestartAction.swift
 $(SRCROOT)/Sources/App/Settings/LocalDataResetService.swift
 $(SRCROOT)/Sources/App/Settings/OpenSourceNotice.swift
 $(SRCROOT)/Sources/App/Settings/OpenSourceNoticeStore.swift
