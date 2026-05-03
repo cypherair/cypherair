@@ -53,6 +53,7 @@ enum TestHelpers {
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
         let service = ContactService(engine: engine, contactsDirectory: tempDir)
+        try? service.openLegacyCompatibilityForTests()
         return (service, tempDir)
     }
 

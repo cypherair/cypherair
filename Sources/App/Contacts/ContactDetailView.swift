@@ -29,12 +29,14 @@ struct ContactDetailView: View {
     @State private var showDeleteError = false
 
     private var contact: Contact? {
-        contactService.contact(forFingerprint: fingerprint)
+        contactService.availableContact(forFingerprint: fingerprint)
     }
 
     var body: some View {
         Group {
-            if let contact {
+            if !contactService.contactsAvailability.isAvailable {
+                contactsUnavailableContent(contactService.contactsAvailability)
+            } else if let contact {
                 List {
                     Section {
                         if !contact.isVerified {
@@ -182,6 +184,35 @@ struct ContactDetailView: View {
             if let deleteError {
                 Text(deleteError)
             }
+        }
+    }
+
+    private func contactsUnavailableContent(_ availability: ContactsAvailability) -> some View {
+        ContentUnavailableView {
+            Label(availability.unavailableTitle, systemImage: systemImage(for: availability))
+        } description: {
+            Text(availability.unavailableDescription)
+        } actions: {
+            if availability == .opening {
+                ProgressView()
+            }
+        }
+    }
+
+    private func systemImage(for availability: ContactsAvailability) -> String {
+        switch availability {
+        case .opening:
+            "lock.open"
+        case .locked:
+            "lock"
+        case .recoveryNeeded:
+            "exclamationmark.triangle"
+        case .frameworkUnavailable:
+            "externaldrive.badge.exclamationmark"
+        case .restartRequired:
+            "arrow.clockwise"
+        case .availableLegacyCompatibility, .availableProtectedDomain:
+            "person"
         }
     }
 }

@@ -127,7 +127,7 @@ final class TutorialSandboxContainer {
         self.mockAuthenticator.shouldSucceed = true
         self.mockAuthenticator.biometricsAvailable = true
         self.mockSecureEnclave.simulatedAuthMode = authManager.currentMode ?? .standard
-        try? self.contactService.loadContacts()
+        try? self.contactService.openLegacyCompatibilityForTests()
     }
 
     func cleanup() {

@@ -104,7 +104,7 @@ final class AddContactScreenModelTests: XCTestCase {
 
         XCTAssertEqual(dismissCount, 1)
         XCTAssertEqual(completedContact?.fingerprint, generated.fingerprint)
-        XCTAssertEqual(stack.contactService.contacts.count, 1)
+        XCTAssertEqual(stack.contactService.availableContacts.count, 1)
     }
 
     @MainActor
@@ -150,8 +150,8 @@ final class AddContactScreenModelTests: XCTestCase {
         XCTAssertFalse(model.showKeyUpdateAlert)
         XCTAssertNil(model.pendingKeyUpdateRequest)
         XCTAssertEqual(completedContact?.fingerprint, secondKey.fingerprint)
-        XCTAssertEqual(stack.contactService.contacts.count, 1)
-        XCTAssertNotNil(stack.contactService.contact(forFingerprint: secondKey.fingerprint))
+        XCTAssertEqual(stack.contactService.availableContacts.count, 1)
+        XCTAssertNotNil(stack.contactService.availableContact(forFingerprint: secondKey.fingerprint))
     }
 
     @MainActor

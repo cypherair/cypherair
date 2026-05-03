@@ -149,7 +149,11 @@ final class ContactCertificateSignaturesScreenModel {
     }
 
     var contact: Contact? {
-        contactService.contact(forFingerprint: fingerprint)
+        contactService.availableContact(forFingerprint: fingerprint)
+    }
+
+    var contactsAvailability: ContactsAvailability {
+        contactService.contactsAvailability
     }
 
     var userIds: [UserIdSelectionOption] {
@@ -438,6 +442,13 @@ final class ContactCertificateSignaturesScreenModel {
     }
 
     private func loadCatalog() {
+        guard contactsAvailability.isAvailable else {
+            catalog = nil
+            loadError = .contactsUnavailable(contactsAvailability)
+            loadState = .failed
+            return
+        }
+
         guard let targetCert = contact?.publicKeyData else {
             loadState = .loaded
             return

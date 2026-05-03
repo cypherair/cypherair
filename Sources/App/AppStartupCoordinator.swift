@@ -83,22 +83,14 @@ struct AppStartupCoordinator {
             ]
         )
 
-        traceStore?.record(category: .lifecycle, name: "startup.contacts.load.start")
-        do {
-            try container.contactService.loadContacts()
-            traceStore?.record(
-                category: .lifecycle,
-                name: "startup.contacts.load.finish",
-                metadata: ["result": "success", "contactCount": String(container.contactService.contacts.count)]
-            )
-        } catch {
-            traceStore?.record(
-                category: .lifecycle,
-                name: "startup.contacts.load.finish",
-                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failed"])
-            )
-            errors.append(error.localizedDescription)
-        }
+        traceStore?.record(
+            category: .lifecycle,
+            name: "startup.contacts.load.deferred",
+            metadata: [
+                "reason": "protectedDataPostUnlock",
+                "availability": container.contactService.contactsAvailability.rawValue
+            ]
+        )
 
         traceStore?.record(category: .lifecycle, name: "startup.temporaryCleanup.start")
         cleanupTemporaryFiles(

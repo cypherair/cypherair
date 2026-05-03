@@ -147,17 +147,6 @@ struct DetailedSignatureVerification: Equatable {
     }
 }
 
-extension ContactsAvailability {
-    var allowsContactsVerification: Bool {
-        switch self {
-        case .availableLegacyCompatibility, .availableProtectedDomain:
-            true
-        case .opening, .locked, .recoveryNeeded, .frameworkUnavailable, .restartRequired:
-            false
-        }
-    }
-}
-
 extension SignatureVerification.VerificationState {
     init(legacyStatus: SignatureStatus) {
         switch legacyStatus {

@@ -206,6 +206,8 @@ final class ModelTests: XCTestCase {
             .operationCancelled,
             .insufficientDiskSpace(fileSizeMB: 50, requiredMB: 100, availableMB: 30),
             .duplicateKey,
+            .keyTooLargeForQr,
+            .contactsUnavailable(.locked),
         ]
 
         for error in errors {

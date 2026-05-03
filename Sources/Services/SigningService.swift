@@ -322,8 +322,9 @@ final class SigningService {
     }
 
     private func verificationContext() -> VerificationContext {
-        let contactsAvailability = contactService.contactsAvailabilityForContactsPR1
-        let contacts = contactsAvailability.allowsContactsVerification ? contactService.contacts : []
+        let contactsContext = contactService.contactsForVerificationContext()
+        let contactsAvailability = contactsContext.availability
+        let contacts = contactsContext.contacts
         return VerificationContext(
             verificationKeys: contacts.map { $0.publicKeyData }
                 + keyManagement.keys.map { $0.publicKeyData },

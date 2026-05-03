@@ -47,13 +47,22 @@ struct ContactRepository {
         }
     }
 
-    func loadVerificationStates() -> [String: ContactVerificationState] {
-        guard let data = try? Data(contentsOf: metadataURL),
-              let manifest = try? JSONDecoder().decode(ContactMetadataManifest.self, from: data) else {
+    func loadVerificationStates() throws -> [String: ContactVerificationState] {
+        guard fileManager.fileExists(atPath: metadataURL.path) else {
             return [:]
         }
 
-        return manifest.verificationStates
+        do {
+            let data = try Data(contentsOf: metadataURL)
+            return try JSONDecoder().decode(ContactMetadataManifest.self, from: data).verificationStates
+        } catch {
+            throw CypherAirError.corruptData(
+                reason: String(
+                    localized: "contacts.metadata.corrupt",
+                    defaultValue: "Contacts metadata could not be read safely."
+                )
+            )
+        }
     }
 
     func saveVerificationStates(_ verificationStates: [String: ContactVerificationState]) throws {

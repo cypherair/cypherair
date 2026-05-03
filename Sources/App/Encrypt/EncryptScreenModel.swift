@@ -124,7 +124,11 @@ final class EncryptScreenModel {
     }
 
     var encryptableContacts: [Contact] {
-        contactService.contacts.filter(\.canEncryptTo)
+        contactService.availableContacts.filter(\.canEncryptTo)
+    }
+
+    var contactsAvailability: ContactsAvailability {
+        contactService.contactsAvailability
     }
 
     var ownKeys: [PGPKeyIdentity] {
@@ -136,7 +140,7 @@ final class EncryptScreenModel {
     }
 
     var selectedUnverifiedContacts: [Contact] {
-        contactService.contacts.filter { contact in
+        contactService.availableContacts.filter { contact in
             selectedRecipients.contains(contact.fingerprint) && !contact.isVerified
         }
     }
@@ -146,6 +150,9 @@ final class EncryptScreenModel {
             return true
         }
         if selectedRecipients.isEmpty {
+            return true
+        }
+        if !contactsAvailability.isAvailable {
             return true
         }
         if resolvedEncryptToSelf == nil {
@@ -246,6 +253,11 @@ final class EncryptScreenModel {
     }
 
     func requestEncrypt() {
+        guard contactsAvailability.isAvailable else {
+            operation.present(error: .contactsUnavailable(contactsAvailability))
+            return
+        }
+
         if !selectedUnverifiedContacts.isEmpty {
             showUnverifiedRecipientsWarning = true
             return

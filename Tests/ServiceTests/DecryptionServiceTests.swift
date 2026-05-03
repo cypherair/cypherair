@@ -594,6 +594,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
         let phase1 = try makePhase1(matchedKey: recipient, ciphertext: ciphertext)
 
+        try await stack.contactService.relockProtectedData()
         let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
         let legacy = try await stack.decryptionService.decrypt(phase1: phase1)
 
@@ -678,6 +679,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
         let phase1 = try makePhase1(matchedKey: recipient, ciphertext: ciphertext)
 
+        try await stack.contactService.relockProtectedData()
         let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
         XCTAssertEqual(detailed.plaintext, plaintext)
@@ -912,6 +914,7 @@ final class DecryptionServiceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
         let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: inputURL)
+        try await stack.contactService.relockProtectedData()
         let detailed = try await stack.decryptionService.decryptFileStreamingDetailed(
             phase1: phase1,
             progress: nil

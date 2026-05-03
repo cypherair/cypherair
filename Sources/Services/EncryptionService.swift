@@ -128,17 +128,7 @@ final class EncryptionService {
         // Validate disk space before starting
         try diskSpaceChecker.validateForEncryption(inputFileSize: fileSize)
 
-        // Gather recipient public keys
-        let recipientKeys = recipientFingerprints.compactMap { fp in
-            contactService.contact(forFingerprint: fp)?.publicKeyData
-        }
-
-        guard recipientKeys.count == recipientFingerprints.count else {
-            throw CypherAirError.invalidKeyData(
-                reason: String(localized: "error.recipientNotFound",
-                               defaultValue: "One or more recipients could not be found in contacts.")
-            )
-        }
+        let recipientKeys = try contactService.publicKeysForRecipientFingerprints(recipientFingerprints)
 
         // Get signing key if requested (requires SE unwrap → Face ID)
         var signingKey: Data?
@@ -212,17 +202,7 @@ final class EncryptionService {
             throw CypherAirError.noRecipientsSelected
         }
 
-        // Gather recipient public keys
-        let recipientKeys = recipientFingerprints.compactMap { fp in
-            contactService.contact(forFingerprint: fp)?.publicKeyData
-        }
-
-        guard recipientKeys.count == recipientFingerprints.count else {
-            throw CypherAirError.invalidKeyData(
-                reason: String(localized: "error.recipientNotFound",
-                               defaultValue: "One or more recipients could not be found in contacts.")
-            )
-        }
+        let recipientKeys = try contactService.publicKeysForRecipientFingerprints(recipientFingerprints)
 
         // Get signing key if requested (requires SE unwrap → Face ID)
         var signingKey: Data?

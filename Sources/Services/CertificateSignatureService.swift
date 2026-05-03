@@ -36,7 +36,7 @@ final class CertificateSignatureService {
                 engine: engine,
                 signature: signature,
                 targetCert: targetCert,
-                candidateSigners: candidateSignerCertificates()
+                candidateSigners: try candidateSignerCertificates()
             )
         } catch {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
@@ -62,7 +62,7 @@ final class CertificateSignatureService {
                 signature: signature,
                 targetCert: targetCert,
                 userIdSelector: selectorInput,
-                candidateSigners: candidateSignerCertificates()
+                candidateSigners: try candidateSignerCertificates()
             )
         } catch {
             throw CypherAirError.from(error) { .corruptData(reason: $0) }
@@ -125,8 +125,9 @@ final class CertificateSignatureService {
         }
     }
 
-    func candidateSignerCertificates() -> [Data] {
-        contactService.contacts.map(\.publicKeyData)
+    func candidateSignerCertificates() throws -> [Data] {
+        try contactService.requireContactsAvailable()
+        return contactService.availableContacts.map(\.publicKeyData)
             + keyManagement.keys.map(\.publicKeyData)
     }
 
@@ -135,7 +136,7 @@ final class CertificateSignatureService {
     ) -> CertificateSignatureSignerIdentity? {
         CertificateSignatureSignerIdentity.resolve(
             fingerprint: primaryFingerprint,
-            contacts: contactService.contacts,
+            contacts: contactService.contactsForVerificationContext().contacts,
             ownKeys: keyManagement.keys
         )
     }

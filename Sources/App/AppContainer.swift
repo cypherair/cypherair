@@ -227,6 +227,8 @@ final class AppContainer: @unchecked Sendable {
             metadataPersistence: keyMetadataDomainStore
         )
         protectedDataSessionCoordinator.registerRelockParticipant(keyManagement)
+        let contactService = ContactService(engine: engine)
+        protectedDataSessionCoordinator.registerRelockParticipant(contactService)
         let protectedDataPostUnlockCoordinator = ProtectedDataPostUnlockCoordinator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -347,6 +349,12 @@ final class AppContainer: @unchecked Sendable {
                     ),
                     source: source
                 )
+                _ = contactService.openLegacyCompatibilityAfterPostUnlock(
+                    gateResult: ContactsPostAuthGateResult(
+                        postUnlockOutcome: postUnlockOutcome,
+                        frameworkState: protectedDataSessionCoordinator.frameworkState
+                    )
+                )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
                     protectedSettingsDomainState: Self.protectedSettingsDomainStateForOrdinarySettings(
                         postUnlockOutcome: postUnlockOutcome,
@@ -368,8 +376,6 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
-        let contactService = ContactService(engine: engine)
-        protectedDataSessionCoordinator.registerRelockParticipant(contactService)
         let temporaryArtifactStore = AppTemporaryArtifactStore()
         let encryptionService = EncryptionService(
             engine: engine,
@@ -664,6 +670,14 @@ final class AppContainer: @unchecked Sendable {
             authLifecycleTraceStore: authLifecycleTraceStore
         )
         try? keyManagement.loadKeys()
+        let contactService = ContactService(
+            engine: engine,
+            contactsDirectory: contactsDirectory
+        )
+        protectedDataSessionCoordinator.registerRelockParticipant(contactService)
+        if !requiresManualAuthentication {
+            try? contactService.openLegacyCompatibilityForTests()
+        }
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -703,6 +717,12 @@ final class AppContainer: @unchecked Sendable {
                     ),
                     source: source
                 )
+                _ = contactService.openLegacyCompatibilityAfterPostUnlock(
+                    gateResult: ContactsPostAuthGateResult(
+                        postUnlockOutcome: postUnlockOutcome,
+                        frameworkState: protectedDataSessionCoordinator.frameworkState
+                    )
+                )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
                     protectedSettingsDomainState: Self.protectedSettingsDomainStateForOrdinarySettings(
                         postUnlockOutcome: postUnlockOutcome,
@@ -724,11 +744,6 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
-        let contactService = ContactService(
-            engine: engine,
-            contactsDirectory: contactsDirectory
-        )
-        protectedDataSessionCoordinator.registerRelockParticipant(contactService)
         let temporaryArtifactStore = AppTemporaryArtifactStore()
         let encryptionService = EncryptionService(
             engine: engine,
@@ -841,6 +856,7 @@ final class AppContainer: @unchecked Sendable {
         engine: PgpEngine,
         contactService: ContactService
     ) throws {
+        try contactService.openLegacyCompatibilityForTests()
         let generated = try engine.generateKey(
             name: "UITest Contact",
             email: "uitest-contact@example.invalid",

@@ -256,8 +256,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertTrue(names.contains("startup.protectedDataBootstrap.start"))
         XCTAssertTrue(names.contains("startup.protectedDataBootstrap.finish"))
         XCTAssertTrue(names.contains("startup.keyMetadata.load.deferred"))
-        XCTAssertTrue(names.contains("startup.contacts.load.start"))
-        XCTAssertTrue(names.contains("startup.contacts.load.finish"))
+        XCTAssertTrue(names.contains("startup.contacts.load.deferred"))
         XCTAssertTrue(names.contains("startup.loadWarning.computed"))
     }
 

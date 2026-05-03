@@ -42,6 +42,7 @@ enum CypherAirError: Error, LocalizedError {
     case biometricsUnavailable
     case duplicateKey
     case keyTooLargeForQr
+    case contactsUnavailable(ContactsAvailability)
 
     /// User-facing error description per PRD Section 4.7.
     var errorDescription: String? {
@@ -114,6 +115,8 @@ enum CypherAirError: Error, LocalizedError {
             String(localized: "error.duplicateKey", defaultValue: "A key with this fingerprint already exists on this device.")
         case .keyTooLargeForQr:
             String(localized: "error.keyTooLargeForQr", defaultValue: "This key contains too much data to display as a QR code. Please share your public key via file or text instead.")
+        case .contactsUnavailable(let availability):
+            availability.unavailableDescription
         }
     }
 

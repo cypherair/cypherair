@@ -20,12 +20,12 @@ enum AddContactResult {
 @Observable
 final class ContactService: @unchecked Sendable {
     /// All imported contacts.
-    private(set) var contacts: [Contact] = []
+    private var contacts: [Contact] = []
 
     private let engine: PgpEngine
     private let repository: ContactRepository
     private let domainRepository: ContactsDomainRepository
-    private var contactsAvailability: ContactsAvailability = .locked
+    private(set) var contactsAvailability: ContactsAvailability = .locked
     private var verificationStates: [String: ContactVerificationState] = [:]
 
     init(engine: PgpEngine, contactsDirectory: URL? = nil) {
@@ -44,36 +44,47 @@ final class ContactService: @unchecked Sendable {
         domainRepository = ContactsDomainRepository()
     }
 
-    // MARK: - Load Contacts
+    // MARK: - Post-Auth Legacy Compatibility Gate
 
-    /// Load all contacts from the contacts directory.
-    func loadContacts() throws {
-        try repository.ensureDirectoryExists()
-
-        verificationStates = repository.loadVerificationStates()
-
-        var loadedContacts: [Contact] = []
-        for storedContact in try repository.loadStoredContacts() {
-            let data = storedContact.data
-            if let validation = try? ContactImportPublicCertificateValidator.validate(data, using: engine) {
-                let contact = makeContact(from: validation)
-                loadedContacts.append(contact)
-            }
+    @discardableResult
+    func openLegacyCompatibilityAfterPostUnlock(
+        gateResult: ContactsPostAuthGateResult
+    ) -> ContactsAvailability {
+        guard gateResult.allowsLegacyCompatibilityLoad else {
+            clearContactsRuntimeState(availability: gateResult.availability)
+            return contactsAvailability
         }
 
-        contacts = loadedContacts
-
-        let loadedFingerprints = Set(loadedContacts.map(\.fingerprint))
-        let filteredStates = verificationStates.filter { loadedFingerprints.contains($0.key) }
-        if filteredStates != verificationStates {
-            verificationStates = filteredStates
-            try repository.saveVerificationStates(verificationStates)
+        clearContactsRuntimeState(availability: .opening)
+        do {
+            let runtime = try loadLegacyCompatibilityRuntimeValues()
+            contacts = runtime.contacts
+            verificationStates = runtime.verificationStates
+            try refreshCompatibilityProjection()
+            return contactsAvailability
+        } catch {
+            clearContactsRuntimeState(availability: .recoveryNeeded)
+            return contactsAvailability
         }
-        try refreshCompatibilityProjection()
+    }
+
+    @discardableResult
+    func openLegacyCompatibilityForTests() throws -> ContactsAvailability {
+        clearContactsRuntimeState(availability: .opening)
+        do {
+            let runtime = try loadLegacyCompatibilityRuntimeValues()
+            contacts = runtime.contacts
+            verificationStates = runtime.verificationStates
+            try refreshCompatibilityProjection()
+            return contactsAvailability
+        } catch {
+            clearContactsRuntimeState(availability: .recoveryNeeded)
+            throw error
+        }
     }
 
     func resetInMemoryStateAfterLocalDataReset() {
-        clearContactsRuntimeState()
+        clearContactsRuntimeState(availability: .locked)
     }
 
     // MARK: - Add Contact
@@ -90,6 +101,18 @@ final class ContactService: @unchecked Sendable {
     /// - Returns: The result of the add operation.
     @discardableResult
     func addContact(
+        publicKeyData: Data,
+        verificationState: ContactVerificationState = .verified
+    ) throws -> AddContactResult {
+        try requireContactsAvailable()
+        return try performAddContact(
+            publicKeyData: publicKeyData,
+            verificationState: verificationState
+        )
+    }
+
+    @discardableResult
+    private func performAddContact(
         publicKeyData: Data,
         verificationState: ContactVerificationState = .verified
     ) throws -> AddContactResult {
@@ -194,6 +217,15 @@ final class ContactService: @unchecked Sendable {
     /// - Returns: The authoritative verified contact rebuilt from validated public bytes.
     @discardableResult
     func confirmKeyUpdate(existingFingerprint: String, keyData: Data) throws -> Contact {
+        try requireContactsAvailable()
+        return try performConfirmKeyUpdate(
+            existingFingerprint: existingFingerprint,
+            keyData: keyData
+        )
+    }
+
+    @discardableResult
+    private func performConfirmKeyUpdate(existingFingerprint: String, keyData: Data) throws -> Contact {
         let validation = try ContactImportPublicCertificateValidator.validate(keyData, using: engine)
         let verifiedContact = makeContact(from: validation, verificationState: .verified)
 
@@ -226,6 +258,11 @@ final class ContactService: @unchecked Sendable {
 
     /// Remove a contact and delete their public key file.
     func removeContact(fingerprint: String) throws {
+        try requireContactsAvailable()
+        try performRemoveContact(fingerprint: fingerprint)
+    }
+
+    private func performRemoveContact(fingerprint: String) throws {
         try repository.removePublicKey(fingerprint: fingerprint)
         contacts.removeAll { $0.fingerprint == fingerprint }
         verificationStates.removeValue(forKey: fingerprint)
@@ -234,6 +271,14 @@ final class ContactService: @unchecked Sendable {
     }
 
     func setVerificationState(
+        _ verificationState: ContactVerificationState,
+        for fingerprint: String
+    ) throws {
+        try requireContactsAvailable()
+        try performSetVerificationState(verificationState, for: fingerprint)
+    }
+
+    private func performSetVerificationState(
         _ verificationState: ContactVerificationState,
         for fingerprint: String
     ) throws {
@@ -253,8 +298,26 @@ final class ContactService: @unchecked Sendable {
         contactsAvailability
     }
 
+    var availableContacts: [Contact] {
+        guard contactsAvailability.isAvailable else {
+            return []
+        }
+        return contacts
+    }
+
+    var runtimeContactCountForDiagnostics: Int {
+        contacts.count
+    }
+
+    func requireContactsAvailable() throws {
+        guard contactsAvailability.isAvailable else {
+            throw CypherAirError.contactsUnavailable(contactsAvailability)
+        }
+    }
+
     func currentCompatibilitySnapshotForContactsPR1() throws -> ContactsDomainSnapshot {
-        try domainRepository.makeCompatibilitySnapshot(from: contacts)
+        try requireContactsAvailable()
+        return try domainRepository.makeCompatibilitySnapshot(from: contacts)
     }
 
     func compatibilityContactsForContactsPR1(
@@ -277,8 +340,17 @@ final class ContactService: @unchecked Sendable {
     // MARK: - Lookup
 
     /// Find a contact by fingerprint.
-    func contact(forFingerprint fingerprint: String) -> Contact? {
-        contacts.first { $0.fingerprint == fingerprint }
+    func availableContact(forFingerprint fingerprint: String) -> Contact? {
+        guard contactsAvailability.isAvailable else {
+            return nil
+        }
+
+        return contacts.first { $0.fingerprint == fingerprint }
+    }
+
+    func requireAvailableContact(forFingerprint fingerprint: String) throws -> Contact? {
+        try requireContactsAvailable()
+        return contacts.first { $0.fingerprint == fingerprint }
     }
 
     /// Find contacts whose fingerprints match the given key IDs.
@@ -290,8 +362,12 @@ final class ContactService: @unchecked Sendable {
     /// instead, which performs correct subkey-to-certificate resolution via Sequoia.
     /// This method currently has zero callers and is retained for potential future use
     /// with pre-resolved primary fingerprints only.
-    func contacts(matchingKeyIds keyIds: [String]) -> [Contact] {
-        contacts.filter { contact in
+    func availableContacts(matchingKeyIds keyIds: [String]) -> [Contact] {
+        guard contactsAvailability.isAvailable else {
+            return []
+        }
+
+        return contacts.filter { contact in
             keyIds.contains { keyId in
                 contact.fingerprint.hasSuffix(keyId.lowercased()) ||
                 contact.fingerprint == keyId.lowercased()
@@ -300,11 +376,73 @@ final class ContactService: @unchecked Sendable {
     }
 
     /// Get public key data for a list of contacts.
-    func publicKeys(for selectedContacts: [Contact]) -> [Data] {
-        selectedContacts.map { $0.publicKeyData }
+    func publicKeys(for selectedContacts: [Contact]) throws -> [Data] {
+        try requireContactsAvailable()
+        return selectedContacts.map { $0.publicKeyData }
+    }
+
+    func publicKeysForRecipientFingerprints(_ recipientFingerprints: [String]) throws -> [Data] {
+        try requireContactsAvailable()
+        let contactsByFingerprint = Dictionary(uniqueKeysWithValues: contacts.map { ($0.fingerprint, $0) })
+        let recipientKeys = recipientFingerprints.compactMap { fingerprint in
+            contactsByFingerprint[fingerprint]?.publicKeyData
+        }
+
+        guard recipientKeys.count == recipientFingerprints.count else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(
+                    localized: "error.recipientNotFound",
+                    defaultValue: "One or more recipients could not be found in contacts."
+                )
+            )
+        }
+
+        return recipientKeys
+    }
+
+    func contactsForVerificationContext() -> (contacts: [Contact], availability: ContactsAvailability) {
+        let availability = contactsAvailability
+        guard availability.allowsContactsVerification else {
+            return ([], availability)
+        }
+        return (contacts, availability)
     }
 
     // MARK: - Private
+
+    private struct LegacyCompatibilityRuntimeValues {
+        let contacts: [Contact]
+        let verificationStates: [String: ContactVerificationState]
+    }
+
+    private func loadLegacyCompatibilityRuntimeValues() throws -> LegacyCompatibilityRuntimeValues {
+        try repository.ensureDirectoryExists()
+
+        let loadedVerificationStates = try repository.loadVerificationStates()
+        var loadedContacts: [Contact] = []
+        for storedContact in try repository.loadStoredContacts() {
+            let validation = try ContactImportPublicCertificateValidator.validate(
+                storedContact.data,
+                using: engine
+            )
+            let contact = makeContact(
+                from: validation,
+                verificationState: loadedVerificationStates[validation.keyInfo.fingerprint]
+            )
+            loadedContacts.append(contact)
+        }
+
+        let loadedFingerprints = Set(loadedContacts.map(\.fingerprint))
+        let filteredStates = loadedVerificationStates.filter { loadedFingerprints.contains($0.key) }
+        if filteredStates != loadedVerificationStates {
+            try repository.saveVerificationStates(filteredStates)
+        }
+
+        return LegacyCompatibilityRuntimeValues(
+            contacts: loadedContacts,
+            verificationStates: filteredStates
+        )
+    }
 
     private func parseContact(
         from binaryData: Data,
@@ -372,10 +510,10 @@ final class ContactService: @unchecked Sendable {
         contactsAvailability = .availableLegacyCompatibility
     }
 
-    private func clearContactsRuntimeState() {
+    private func clearContactsRuntimeState(availability: ContactsAvailability = .locked) {
         contacts = []
         verificationStates = [:]
-        contactsAvailability = .locked
+        contactsAvailability = availability
         domainRepository.clearRuntimeState()
     }
 }

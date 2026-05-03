@@ -130,6 +130,7 @@ final class PasswordMessageServiceTests: XCTestCase {
             signWithFingerprint: signer.fingerprint
         )
 
+        try await stack.contactService.relockProtectedData()
         let outcome = try await stack.passwordMessageService.decryptMessage(
             ciphertext: ciphertext,
             password: "unknown-signer-password"
