@@ -45,7 +45,7 @@ Snapshot date: 2026-05-03
     stable commands such as `cargo +stable`
   - local Rust fork path: `/Users/tianren/coding/rust`
   - Rust stage1 carry branch: `carry/cypherair-arm64e-toolchain`
-  - current Rust stage1 carry head: `577e43d4af8`
+  - current Rust stage1 carry head: `b402b926a05`
   - Rust upstream-prep branch:
     `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`
   - current Rust upstream-prep head: `77e2e3639785`
@@ -74,6 +74,10 @@ Snapshot date: 2026-05-03
   - latest verified stage1 manifest declares `includedRustSrc: true` and
     includes host `std`/`proc_macro`, so GitHub-hosted app builds can run
     `cargo -Zbuild-std` without relying on a runner-local Rust source tree
+  - latest local LLVM-workaround-shrink validation used
+    `/Users/tianren/coding/rust/build/aarch64-apple-darwin/stage1/bin/rustc`
+    from Rust carry commit `b402b926a05` and recorded
+    `rustStage1.source: local` in `PgpMobile.arm64e-build-manifest.json`
 - XCFramework packaging posture:
   - iOS/macOS/visionOS device artifacts are merged from stable `arm64` and
     patched `arm64e` archives
@@ -159,6 +163,39 @@ Snapshot date: 2026-05-03
 - App-side documentation should record the current dependency chain and current
   level of app-side functionality without implying the OpenSSL carry chain is
   upstreamed.
+
+## Latest Local LLVM Workaround-Shrink Validation
+
+- Date: 2026-05-03.
+- App worktree: `/Users/tianren/coding/cypherair-main`, branch `main`, commit
+  `d4aae41`.
+- Rust carry validation source:
+  `/Users/tianren/coding/rust:carry/cypherair-arm64e-toolchain` commit
+  `b402b926a05`, which keeps Rust-side ptrauth cleanup only for `callbr` and
+  no longer strips direct function calls carrying `"ptrauth"` operand bundles.
+- Rust-consumed LLVM source:
+  `/Users/tianren/coding/cypherair-arm64e-llvm-workspaces/cypherair-llvm-from-rust-lang-integration:cypherair-arm64e-ptrauth-rust-llvm`
+  commit `d41e5725c`.
+- Local command:
+  - `env ARM64E_STAGE1_DIR=/Users/tianren/coding/rust/build/aarch64-apple-darwin/stage1
+    ARM64E_RUSTC=/Users/tianren/coding/rust/build/aarch64-apple-darwin/stage1/bin/rustc
+    ARM64E_DEPENDENCY_FRESHNESS_LEVEL=warn ./build-xcframework.sh --release`
+- Result: passed. The build produced `PgpMobile.xcframework` and
+  `PgpMobile.arm64e-build-manifest.json`; the manifest reports
+  `xcframework.requiredSlicesPresent: true`, fresh OpenSSL carry-chain
+  dependencies, and local stage1 provenance.
+- Verified slices:
+  - iOS device: `arm64 arm64e`
+  - macOS: `arm64 arm64e`
+  - visionOS device: `arm64 arm64e`
+  - iOS simulator: `arm64`
+  - visionOS simulator: `arm64`
+- Generated UniFFI Swift/header files were unchanged in the tracked worktree.
+
+This is a local validation of the Rust/LLVM workaround-shrink path. The latest
+published Rust stage1 prerelease listed above still points at commit
+`577e43d4af8`; hosted app validation should publish or otherwise consume a
+stage1 built from `b402b926a05` before treating the shrink as release-proven.
 
 ## Update Rules
 
