@@ -11009,23 +11009,6 @@
         }
       }
     },
-    "signature.unknown" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signed by an unknown key — signer not in your contacts"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "由未知密钥签名——签名者不在你的通讯录中"
-          }
-        }
-      }
-    },
     "signature.valid" : {
       "localizations" : {
         "en" : {
