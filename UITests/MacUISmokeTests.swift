@@ -211,6 +211,16 @@ final class MacUISmokeTests: XCTestCase {
         element("tutorial.close").tap()
         waitForScreenReady("tutorial.leave.ready")
         XCTAssertTrue(element("tutorial.modalGuidance").exists)
+        let leaveSheet = app.sheets.firstMatch
+        XCTAssertTrue(leaveSheet.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            isFullyVisible(element("tutorial.leave.continue"), in: leaveSheet),
+            "Expected Continue Tutorial to be fully visible in the leave confirmation sheet."
+        )
+        XCTAssertTrue(
+            isFullyVisible(element("tutorial.leave.confirm"), in: leaveSheet),
+            "Expected Leave Tutorial to be fully visible in the leave confirmation sheet."
+        )
 
         element("tutorial.leave.continue").tap()
         waitForScreenReady("tutorial.hub.ready")

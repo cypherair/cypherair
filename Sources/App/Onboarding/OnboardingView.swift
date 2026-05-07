@@ -92,7 +92,11 @@ struct OnboardingPageOne: View {
             Spacer()
             Spacer()
         }
-        .cypherMacReadableContent(maxWidth: MacPresentationWidth.onboarding, alignment: .center)
+        .cypherMacReadableContent(
+            maxWidth: MacPresentationWidth.onboarding,
+            alignment: .center,
+            outerAlignment: .center
+        )
     }
 }
 
@@ -119,7 +123,11 @@ struct OnboardingPageTwo: View {
             Spacer()
             Spacer()
         }
-        .cypherMacReadableContent(maxWidth: MacPresentationWidth.onboarding, alignment: .center)
+        .cypherMacReadableContent(
+            maxWidth: MacPresentationWidth.onboarding,
+            alignment: .center,
+            outerAlignment: .center
+        )
     }
 }
 
@@ -174,7 +182,11 @@ struct OnboardingPageThree: View {
 
             Spacer()
         }
-        .cypherMacReadableContent(maxWidth: MacPresentationWidth.onboarding, alignment: .center)
+        .cypherMacReadableContent(
+            maxWidth: MacPresentationWidth.onboarding,
+            alignment: .center,
+            outerAlignment: .center
+        )
         .screenReady(TutorialAutomationContract.onboardingDecisionReadyMarker)
     }
 

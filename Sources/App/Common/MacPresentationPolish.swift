@@ -131,12 +131,13 @@ extension View {
     @ViewBuilder
     func cypherMacReadableContent(
         maxWidth: CGFloat = MacPresentationWidth.standard,
-        alignment: Alignment = .topLeading
+        alignment: Alignment = .topLeading,
+        outerAlignment: Alignment = .top
     ) -> some View {
         #if os(macOS)
         self
             .frame(maxWidth: maxWidth, alignment: alignment)
-            .frame(maxWidth: .infinity, alignment: alignment)
+            .frame(maxWidth: .infinity, alignment: outerAlignment)
         #else
         self
         #endif
