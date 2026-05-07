@@ -25,6 +25,7 @@ struct ThemePickerView: View {
                         }
                     }
                     .padding()
+                    .cypherMacReadableContent(maxWidth: MacPresentationWidth.themeGrid)
                 }
             } else {
                 ContentUnavailableView {
@@ -65,9 +66,9 @@ private struct ThemeCell: View {
                 ZStack(alignment: .bottomTrailing) {
                     swatch
                         .frame(width: 56, height: 56)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: swatchCornerRadius, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: swatchCornerRadius, style: .continuous)
                                 .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2.5)
                         )
 
@@ -89,6 +90,14 @@ private struct ThemeCell: View {
         .buttonStyle(.plain)
         .accessibilityLabel(theme.displayName)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var swatchCornerRadius: CGFloat {
+        #if os(macOS)
+        8
+        #else
+        14
+        #endif
     }
 
     @ViewBuilder

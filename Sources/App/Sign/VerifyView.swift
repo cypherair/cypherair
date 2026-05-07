@@ -98,10 +98,10 @@ private struct VerifyScreenHostView: View {
                                 }
                             }
                         }
-                        .frame(maxWidth: .infinity)
+                        .cypherPrimaryActionLabelFrame()
                     } else {
                         Text(String(localized: "verify.button", defaultValue: "Verify"))
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -127,8 +127,12 @@ private struct VerifyScreenHostView: View {
 
             if model.verifyMode == .cleartext, let cleartextOriginalText = model.cleartextOriginalText {
                 Section {
-                    Text(cleartextOriginalText)
-                        .textSelection(.enabled)
+                    CypherOutputTextBlock(
+                        text: cleartextOriginalText,
+                        font: .body,
+                        minHeight: 80,
+                        maxHeight: 220
+                    )
                 } header: {
                     Text(String(localized: "verify.originalText", defaultValue: "Original Message"))
                 }
@@ -146,6 +150,7 @@ private struct VerifyScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "verify.title", defaultValue: "Verify"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
@@ -214,16 +219,11 @@ private struct VerifyScreenHostView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer()
-                    Button {
+                    CypherClearImportedFileButton(
+                        accessibilityLabel: String(localized: "verify.clearImportedFile", defaultValue: "Clear imported file")
+                    ) {
                         model.clearImportedCleartext()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(String(localized: "verify.clearImportedFile", defaultValue: "Clear imported file"))
                 }
             }
         } header: {

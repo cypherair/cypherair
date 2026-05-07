@@ -33,6 +33,7 @@ struct SourceComplianceView: View {
         #if os(macOS)
         .listStyle(.inset)
         #endif
+        .cypherMacReadableContent()
         .accessibilityIdentifier("sourcecompliance.root")
         .screenReady("sourcecompliance.ready")
         .navigationTitle(

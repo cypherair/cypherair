@@ -72,10 +72,12 @@ struct LicenseDetailView: View {
 
             Section(String(localized: "license.detail.text", defaultValue: "License Text")) {
                 if let licenseText {
-                    Text(verbatim: licenseText)
-                        .font(.system(.callout, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    CypherOutputTextBlock(
+                        text: licenseText,
+                        font: .system(.callout, design: .monospaced),
+                        minHeight: 220,
+                        maxHeight: 520
+                    )
                 } else if let loadError {
                     Text(loadError)
                         .foregroundStyle(.secondary)
@@ -88,6 +90,7 @@ struct LicenseDetailView: View {
         #if os(macOS)
         .listStyle(.inset)
         #endif
+        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(notice.displayName)
         .task {
             guard licenseText == nil, loadError == nil else { return }

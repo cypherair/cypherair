@@ -79,6 +79,7 @@ struct HomeView: View {
                 quickActionsGrid
             }
             .padding()
+            .cypherMacReadableContent()
         }
     }
 
@@ -112,7 +113,7 @@ struct HomeView: View {
                     )
                 }
                 .padding()
-                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: defaultKeyCornerRadius, style: .continuous))
             }
         }
     }
@@ -173,5 +174,13 @@ struct HomeView: View {
         .tint(tint)
         .accessibilityLabel(title)
         .tutorialAnchor(anchor)
+    }
+
+    private var defaultKeyCornerRadius: CGFloat {
+        #if os(macOS)
+        8
+        #else
+        12
+        #endif
     }
 }

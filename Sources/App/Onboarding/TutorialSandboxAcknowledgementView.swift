@@ -58,10 +58,13 @@ struct TutorialSandboxAcknowledgementView: View {
                     ) {
                         tutorialStore.confirmSandboxAcknowledgement()
                     }
-                    .frame(maxWidth: .infinity)
+                    .cypherPrimaryActionLabelFrame(minWidth: 220)
                     .accessibilityIdentifier(TutorialModuleID.sandbox.launchControlIdentifier)
                 }
             }
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle(
                 String(
                     localized: "guidedTutorial.sandbox.confirm.title",

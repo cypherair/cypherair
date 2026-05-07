@@ -154,6 +154,7 @@ struct ContactDetailView: View {
         #if os(macOS)
         .listStyle(.inset)
         #endif
+        .cypherMacReadableContent()
         .accessibilityIdentifier("contactdetail.root")
         .screenReady("contactdetail.ready")
         .navigationTitle(String(localized: "contactdetail.title", defaultValue: "Contact"))

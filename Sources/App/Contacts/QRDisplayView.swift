@@ -14,6 +14,7 @@ struct QRDisplayView: View {
     var body: some View {
         qrContent
             .padding()
+            .cypherMacReadableContent(maxWidth: MacPresentationWidth.qrContent, alignment: .center)
         .accessibilityIdentifier("qr.root")
         .screenReady("qr.ready")
         .navigationTitle(String(localized: "qr.title", defaultValue: "My Public Key"))

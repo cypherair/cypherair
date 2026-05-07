@@ -54,6 +54,7 @@ struct MyKeysView: View {
                 .tutorialAnchor(.keyRow(fingerprint: key.fingerprint))
             }
         }
+        .cypherMacReadableContent()
     }
 
     private var actionsMenu: some View {
@@ -121,32 +122,26 @@ private struct KeyRowView: View {
     let key: PGPKeyIdentity
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(key.userId ?? key.shortKeyId)
-                        .font(.body.weight(.medium))
-                    if key.isDefault {
-                        Text(String(localized: "keys.default", defaultValue: "Default"))
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.tint.opacity(0.15), in: Capsule())
-                    }
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(key.userId ?? key.shortKeyId)
+                    .font(.body.weight(.medium))
+                if key.isDefault {
+                    CypherStatusBadge(
+                        title: String(localized: "keys.default", defaultValue: "Default"),
+                        color: .accentColor
+                    )
                 }
-                Text(key.profile.displayName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if !key.isBackedUp {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+                        .accessibilityLabel(String(localized: "keys.notBackedUp", defaultValue: "Not backed up"))
+                }
             }
-
-            Spacer()
-
-            if !key.isBackedUp {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .font(.caption)
-                    .accessibilityLabel(String(localized: "keys.notBackedUp", defaultValue: "Not backed up"))
-            }
+            Text(key.profile.displayName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

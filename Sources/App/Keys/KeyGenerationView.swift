@@ -123,10 +123,10 @@ struct KeyGenerationView: View {
                 } label: {
                     if isGenerating {
                         ProgressView()
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                     } else {
                         Text(String(localized: "keygen.generate", defaultValue: "Generate Key"))
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -138,6 +138,7 @@ struct KeyGenerationView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .cypherMacReadableContent()
         .accessibilityIdentifier("keygen.root")
         .screenReady("keygen.ready")
         .navigationTitle(String(localized: "keygen.title", defaultValue: "Generate Key"))

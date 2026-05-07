@@ -157,7 +157,7 @@ struct ImportConfirmView: View {
         VStack(spacing: 12) {
             Button(action: onImportVerified) {
                 Text(String(localized: "import.addVerified", defaultValue: "Verify and Add to Contacts"))
-                    .frame(maxWidth: .infinity)
+                    .cypherPrimaryActionLabelFrame(minWidth: 260)
             }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("importconfirm.verified")
@@ -165,7 +165,7 @@ struct ImportConfirmView: View {
             if let onImportUnverified {
                 Button(action: onImportUnverified) {
                     Text(String(localized: "import.addUnverified", defaultValue: "Add as Unverified"))
-                        .frame(maxWidth: .infinity)
+                        .cypherPrimaryActionLabelFrame(minWidth: 260)
                 }
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("importconfirm.unverified")

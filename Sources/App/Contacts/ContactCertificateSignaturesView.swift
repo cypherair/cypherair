@@ -81,6 +81,7 @@ private struct ContactCertificateSignaturesHostView: View {
                 #if os(macOS)
                 .formStyle(.grouped)
                 #endif
+                .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
                 .scrollDismissesKeyboardInteractivelyIfAvailable()
             }
         }
@@ -287,21 +288,14 @@ private struct ContactCertificateSignaturesHostView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer()
-                    Button {
-                        model.clearImportedSignature()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        String(
+                    CypherClearImportedFileButton(
+                        accessibilityLabel: String(
                             localized: "contactcertsig.clearImportedFile",
                             defaultValue: "Clear imported signature file"
                         )
-                    )
+                    ) {
+                        model.clearImportedSignature()
+                    }
                 }
             }
         } header: {
@@ -579,10 +573,10 @@ private struct ContactCertificateActionButtonLabel: View {
                 ProgressView()
                 Text(String(localized: "common.working", defaultValue: "Working..."))
             }
-            .frame(maxWidth: .infinity)
+            .cypherPrimaryActionLabelFrame(minWidth: 240)
         } else {
             Text(title)
-                .frame(maxWidth: .infinity)
+                .cypherPrimaryActionLabelFrame(minWidth: 240)
         }
     }
 }
@@ -660,11 +654,6 @@ private struct ContactCertificateStatusBadge: View {
     let color: Color
 
     var body: some View {
-        Text(title)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.14), in: Capsule())
-            .foregroundStyle(color)
+        CypherStatusBadge(title: title, color: color)
     }
 }

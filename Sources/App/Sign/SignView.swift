@@ -142,10 +142,10 @@ private struct SignScreenHostView: View {
                                 }
                             }
                         }
-                        .frame(maxWidth: .infinity)
+                        .cypherPrimaryActionLabelFrame()
                     } else {
                         Text(String(localized: "sign.button", defaultValue: "Sign"))
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -171,9 +171,10 @@ private struct SignScreenHostView: View {
 
             if model.signMode == .text, let signedMessage = model.signedMessage {
                 Section {
-                    Text(signedMessage)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
+                    CypherOutputTextBlock(
+                        text: signedMessage,
+                        font: .system(.caption, design: .monospaced)
+                    )
 
                     Button {
                         model.copySignedMessageToClipboard()
@@ -223,6 +224,7 @@ private struct SignScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "sign.title", defaultValue: "Sign"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

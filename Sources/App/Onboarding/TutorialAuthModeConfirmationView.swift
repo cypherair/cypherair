@@ -30,11 +30,15 @@ struct TutorialAuthModeConfirmationView: View {
                     request.onConfirm()
                 }
                 .disabled(request.requiresRiskAcknowledgement && !riskAcknowledged)
-                .frame(maxWidth: .infinity)
+                .cypherPrimaryActionLabelFrame()
                 .accessibilityIdentifier(TutorialAutomationContract.authModeConfirmIdentifier)
                 .tutorialAnchor(.settingsModeConfirmButton)
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
+        .cypherMacReadableContent()
         .navigationTitle(request.title)
         .screenReady(TutorialAutomationContract.authModeConfirmationReadyMarker)
         #if canImport(UIKit)
@@ -69,16 +73,20 @@ struct TutorialLeaveConfirmationView: View {
                 Button(String(localized: "guidedTutorial.leave.continue", defaultValue: "Continue Tutorial")) {
                     request.onContinue()
                 }
-                .frame(maxWidth: .infinity)
+                .cypherPrimaryActionLabelFrame()
                 .accessibilityIdentifier(TutorialAutomationContract.leaveContinueIdentifier)
 
                 Button(String(localized: "guidedTutorial.leave.confirm", defaultValue: "Leave Tutorial"), role: .destructive) {
                     request.onLeave()
                 }
-                .frame(maxWidth: .infinity)
+                .cypherPrimaryActionLabelFrame()
                 .accessibilityIdentifier(TutorialAutomationContract.leaveConfirmIdentifier)
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
+        .cypherMacReadableContent()
         .navigationTitle(String(localized: "guidedTutorial.leave.title", defaultValue: "Leave Tutorial"))
         .screenReady(TutorialAutomationContract.leaveConfirmationReadyMarker)
         #if canImport(UIKit)

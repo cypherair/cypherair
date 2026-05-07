@@ -41,6 +41,7 @@ struct LicenseListView: View {
                 #if os(macOS)
                 .listStyle(.inset)
                 #endif
+                .cypherMacReadableContent()
             }
         }
         .searchable(

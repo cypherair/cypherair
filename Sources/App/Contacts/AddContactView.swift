@@ -171,7 +171,7 @@ private struct AddContactScreenHostView: View {
                     model.addContact(actions: hostActions)
                 } label: {
                     Text(String(localized: "addcontact.add", defaultValue: "Add Contact"))
-                        .frame(maxWidth: .infinity)
+                        .cypherPrimaryActionLabelFrame()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.addButtonDisabled)
@@ -182,6 +182,7 @@ private struct AddContactScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "addcontact.title", defaultValue: "Add Contact"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
@@ -289,16 +290,11 @@ private struct AddContactScreenHostView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer()
-                    Button {
+                    CypherClearImportedFileButton(
+                        accessibilityLabel: String(localized: "addcontact.clearFile", defaultValue: "Clear file")
+                    ) {
                         model.clearImportedFile()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(String(localized: "addcontact.clearFile", defaultValue: "Clear file"))
                 }
             }
         } header: {
