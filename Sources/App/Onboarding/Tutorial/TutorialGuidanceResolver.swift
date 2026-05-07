@@ -59,6 +59,20 @@ struct TutorialGuidanceResolver {
             )
 
         case .encryptDemoMessage:
+            if visibleRoute == .encrypt {
+                return payload(
+                    module,
+                    body: String(localized: "guidedTutorial.encrypt.form", defaultValue: "Bob is preselected. Review the draft and encrypt the message."),
+                    target: nil
+                )
+            }
+            if selectedTab == .home, visibleRoute == nil {
+                return payload(
+                    module,
+                    body: String(localized: "guidedTutorial.home.encrypt", defaultValue: "Use the real Encrypt shortcut to open the message form."),
+                    target: .homeEncryptAction
+                )
+            }
             if sizeClass == .compact {
                 if selectedTab != .home {
                     return payload(
@@ -88,6 +102,27 @@ struct TutorialGuidanceResolver {
             )
 
         case .decryptAndVerify:
+            if visibleRoute == .decrypt {
+                if session.artifacts.parseResult == nil {
+                    return payload(
+                        module,
+                        body: String(localized: "guidedTutorial.decrypt.parse", defaultValue: "Check the recipients first and make sure the message matches your sandbox key."),
+                        target: nil
+                    )
+                }
+                return payload(
+                    module,
+                    body: String(localized: "guidedTutorial.decrypt.form", defaultValue: "Decrypt the sandbox message and review the signature result."),
+                    target: nil
+                )
+            }
+            if selectedTab == .home, visibleRoute == nil {
+                return payload(
+                    module,
+                    body: String(localized: "guidedTutorial.home.decrypt", defaultValue: "Use the real Decrypt shortcut to inspect the encrypted message."),
+                    target: .homeDecryptAction
+                )
+            }
             if sizeClass == .compact {
                 if selectedTab != .home {
                     return payload(

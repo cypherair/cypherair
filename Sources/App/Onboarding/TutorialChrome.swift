@@ -12,16 +12,24 @@ private struct TutorialCardChromeModifier: ViewModifier {
     func body(content: Content) -> some View {
         switch chrome {
         case .hero:
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius(fallback: 24), style: .continuous))
         case .standard:
             #if canImport(UIKit)
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius(fallback: 20), style: .continuous))
             #else
-            content.background(.background.secondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            content.background(.background.secondary, in: RoundedRectangle(cornerRadius: cornerRadius(fallback: 20), style: .continuous))
             #endif
         case .overlay:
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius(fallback: 18), style: .continuous))
         }
+    }
+
+    private func cornerRadius(fallback radius: CGFloat) -> CGFloat {
+        #if os(macOS)
+        8
+        #else
+        radius
+        #endif
     }
 }
 

@@ -57,6 +57,7 @@ private struct SelectiveRevocationScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .accessibilityIdentifier("selectiverevocation.root")
         .screenReady("selectiverevocation.ready")
         .navigationTitle(String(localized: "selectiverevocation.title", defaultValue: "Selective Revocation"))
@@ -252,9 +253,12 @@ private struct SelectiveSubkeyRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(subkey.algorithmDisplay.isEmpty ? String(localized: "selectiverevocation.subkey", defaultValue: "Subkey") : subkey.algorithmDisplay)
                     .font(.headline)
-                Text(IdentityPresentation.formattedFingerprint(subkey.fingerprint))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                FingerprintView(
+                    fingerprint: subkey.fingerprint,
+                    font: .system(.caption, design: .monospaced),
+                    foregroundColor: .secondary,
+                    expandsHorizontally: false
+                )
                 HStack {
                     if subkey.isCurrentlyTransportEncryptionCapable {
                         StatusBadge(
@@ -337,10 +341,10 @@ private struct ExportButtonLabel: View {
                 ProgressView()
                 Text(String(localized: "common.exporting", defaultValue: "Exporting..."))
             }
-            .frame(maxWidth: .infinity)
+            .cypherPrimaryActionLabelFrame(minWidth: 240)
         } else {
             Text(title)
-                .frame(maxWidth: .infinity)
+                .cypherPrimaryActionLabelFrame(minWidth: 240)
         }
     }
 }
@@ -350,11 +354,6 @@ private struct StatusBadge: View {
     let color: Color
 
     var body: some View {
-        Text(title)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.14), in: Capsule())
-            .foregroundStyle(color)
+        CypherStatusBadge(title: title, color: color)
     }
 }

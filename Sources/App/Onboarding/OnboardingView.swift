@@ -92,6 +92,11 @@ struct OnboardingPageOne: View {
             Spacer()
             Spacer()
         }
+        .cypherMacReadableContent(
+            maxWidth: MacPresentationWidth.onboarding,
+            alignment: .center,
+            outerAlignment: .center
+        )
     }
 }
 
@@ -118,6 +123,11 @@ struct OnboardingPageTwo: View {
             Spacer()
             Spacer()
         }
+        .cypherMacReadableContent(
+            maxWidth: MacPresentationWidth.onboarding,
+            alignment: .center,
+            outerAlignment: .center
+        )
     }
 }
 
@@ -152,7 +162,7 @@ struct OnboardingPageThree: View {
                 presentTutorial()
             } label: {
                 Text(String(localized: "guidedTutorial.onboarding.enterTutorial", defaultValue: "Close Onboarding and Enter Tutorial"))
-                    .frame(maxWidth: .infinity)
+                    .cypherPrimaryActionLabelFrame(minWidth: 280)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -163,7 +173,7 @@ struct OnboardingPageThree: View {
                 skipTutorial()
             } label: {
                 Text(String(localized: "onboarding.skip.enterApp", defaultValue: "Skip Tutorial and Enter App"))
-                    .frame(maxWidth: .infinity)
+                    .cypherPrimaryActionLabelFrame(minWidth: 280)
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
@@ -172,6 +182,11 @@ struct OnboardingPageThree: View {
 
             Spacer()
         }
+        .cypherMacReadableContent(
+            maxWidth: MacPresentationWidth.onboarding,
+            alignment: .center,
+            outerAlignment: .center
+        )
         .screenReady(TutorialAutomationContract.onboardingDecisionReadyMarker)
     }
 

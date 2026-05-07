@@ -90,6 +90,7 @@ struct SelfTestView: View {
         #if os(macOS)
         .listStyle(.inset)
         #endif
+        .cypherMacReadableContent()
         .accessibilityIdentifier("selftest.root")
         .screenReady("selftest.ready")
         .navigationTitle(String(localized: "selftest.title", defaultValue: "Self-Test"))

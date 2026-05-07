@@ -61,6 +61,7 @@ struct ContactsView: View {
                 emptyStateContent
             }
         }
+        .cypherMacReadableContent()
     }
 
     private func deleteContacts(at indexSet: IndexSet, from contacts: [Contact]) {
@@ -130,26 +131,25 @@ private struct ContactRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            HStack(spacing: 6) {
                 Text(contact.displayName)
                     .font(.body.weight(.medium))
                 if !contact.isVerified {
-                    Text(String(localized: "contacts.unverified", defaultValue: "Unverified"))
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.orange.opacity(0.14), in: Capsule())
-                        .foregroundStyle(.orange)
+                    CypherStatusBadge(
+                        title: String(localized: "contacts.unverified", defaultValue: "Unverified"),
+                        color: .orange
+                    )
                 }
-                Spacer()
+            }
+            HStack(spacing: 8) {
                 Text(contact.profile.displayName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-            if let email = contact.email {
-                Text(email)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let email = contact.email {
+                    Text(email)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .accessibilityIdentifier("contacts.row")

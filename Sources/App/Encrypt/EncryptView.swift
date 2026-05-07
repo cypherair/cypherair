@@ -217,12 +217,10 @@ private struct EncryptScreenHostView: View {
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                         if !contact.isVerified {
-                                            Text(String(localized: "encrypt.contact.unverified", defaultValue: "Unverified"))
-                                                .font(.caption2.weight(.semibold))
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(Color.orange.opacity(0.14), in: Capsule())
-                                                .foregroundStyle(.orange)
+                                            CypherStatusBadge(
+                                                title: String(localized: "encrypt.contact.unverified", defaultValue: "Unverified"),
+                                                color: .orange
+                                            )
                                         }
                                     }
                                 }
@@ -317,10 +315,10 @@ private struct EncryptScreenHostView: View {
                                 }
                             }
                         }
-                        .frame(maxWidth: .infinity)
+                        .cypherPrimaryActionLabelFrame()
                     } else {
                         Text(String(localized: "encrypt.button", defaultValue: "Encrypt"))
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -346,9 +344,10 @@ private struct EncryptScreenHostView: View {
 
             if model.encryptMode == .text, let ciphertextString = model.ciphertextString {
                 Section {
-                    Text(ciphertextString)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
+                    CypherOutputTextBlock(
+                        text: ciphertextString,
+                        font: .system(.caption, design: .monospaced)
+                    )
 
                     Button {
                         model.copyCiphertextToClipboard()
@@ -392,6 +391,7 @@ private struct EncryptScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "encrypt.title", defaultValue: "Encrypt"))
         .fileImporter(
             isPresented: $model.showFileImporter,
@@ -548,7 +548,7 @@ private struct EncryptScreenHostView: View {
         #if canImport(UIKit)
         (110, 160, 240)
         #else
-        (150, 220, 320)
+        (120, 170, 240)
         #endif
     }
 

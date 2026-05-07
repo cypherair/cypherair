@@ -20,22 +20,12 @@ struct ImportKeyView: View {
         Form {
             Section {
                 if let fileName = importedFileName, importedKeyData != nil {
-                    HStack {
-                        Label(fileName, systemImage: "doc.fill")
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer()
-                        Button {
-                            importedKeyData = nil
-                            importedFileName = nil
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                                .frame(minWidth: 44, minHeight: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(String(localized: "import.clearFile", defaultValue: "Clear file"))
+                    CypherImportedFileRow(
+                        fileName: fileName,
+                        clearAccessibilityLabel: String(localized: "import.clearFile", defaultValue: "Clear file")
+                    ) {
+                        importedKeyData = nil
+                        importedFileName = nil
                     }
                 } else {
                     CypherMultilineTextInput(
@@ -85,10 +75,10 @@ struct ImportKeyView: View {
                 } label: {
                     if isImporting {
                         ProgressView()
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                     } else {
                         Text(String(localized: "import.button", defaultValue: "Import Key"))
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -99,6 +89,7 @@ struct ImportKeyView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "import.title", defaultValue: "Import Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
@@ -129,7 +120,7 @@ struct ImportKeyView: View {
         #if canImport(UIKit)
         return (120, 170, 250)
         #else
-        return (140, 210, 300)
+        return (120, 170, 240)
         #endif
     }
 

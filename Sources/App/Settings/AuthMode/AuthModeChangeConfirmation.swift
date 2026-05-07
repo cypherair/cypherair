@@ -59,9 +59,13 @@ struct SettingsAuthModeConfirmationSheetView: View {
                 .accessibilityIdentifier("settings.mode.confirm")
                 .tutorialAnchor(.settingsModeConfirmButton)
                 .disabled(request.requiresRiskAcknowledgement && !riskAcknowledged)
-                .frame(maxWidth: .infinity)
+                .cypherPrimaryActionLabelFrame()
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
+        .cypherMacReadableContent()
         .screenReady("settings.authmode.ready")
         .navigationTitle(request.title)
         #if canImport(UIKit)

@@ -312,7 +312,7 @@ struct CypherAirApp: App {
         ) {
             mainWindowSceneContent
         }
-        .defaultSize(width: 900, height: 650)
+        .defaultSize(width: 900, height: 560)
         .windowResizability(.contentMinSize)
         .commands {
             // Disable File > New Window on macOS.

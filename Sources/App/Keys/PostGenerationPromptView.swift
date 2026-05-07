@@ -64,6 +64,7 @@ struct PostGenerationPromptView: View {
                 Text(String(localized: "postgen.nextSteps", defaultValue: "Next Steps"))
             }
         }
+        .cypherMacReadableContent()
         .accessibilityIdentifier("postgen.root")
         .screenReady("postgen.ready")
         .navigationTitle(String(localized: "postgen.title", defaultValue: "Key Ready"))

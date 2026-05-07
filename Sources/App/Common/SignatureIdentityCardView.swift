@@ -7,12 +7,10 @@ struct SignatureIdentityCardView: View {
         if let signerIdentity = verification.signerIdentity {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top) {
-                    Text(signerIdentity.sourceLabel)
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(badgeBackgroundColor(for: signerIdentity), in: Capsule())
-                        .foregroundStyle(badgeForegroundColor(for: signerIdentity))
+                    CypherStatusBadge(
+                        title: signerIdentity.sourceLabel,
+                        color: badgeColor(for: signerIdentity)
+                    )
 
                     Spacer()
                 }
@@ -56,20 +54,7 @@ struct SignatureIdentityCardView: View {
         }
     }
 
-    private func badgeBackgroundColor(for signerIdentity: SignatureVerification.SignerIdentity) -> Color {
-        switch signerIdentity.source {
-        case .contact:
-            return signerIdentity.isVerifiedContact
-                ? Color.secondary.opacity(0.12)
-                : Color.orange.opacity(0.16)
-        case .ownKey:
-            return Color.blue.opacity(0.14)
-        case .unknown:
-            return Color.orange.opacity(0.16)
-        }
-    }
-
-    private func badgeForegroundColor(for signerIdentity: SignatureVerification.SignerIdentity) -> Color {
+    private func badgeColor(for signerIdentity: SignatureVerification.SignerIdentity) -> Color {
         switch signerIdentity.source {
         case .contact:
             return signerIdentity.isVerifiedContact ? .secondary : .orange

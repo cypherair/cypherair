@@ -38,6 +38,7 @@ struct AboutView: View {
         #if os(macOS)
         .listStyle(.inset)
         #endif
+        .cypherMacReadableContent()
         .accessibilityIdentifier("about.root")
         .screenReady("about.ready")
         .navigationTitle(String(localized: "about.title", defaultValue: "About"))

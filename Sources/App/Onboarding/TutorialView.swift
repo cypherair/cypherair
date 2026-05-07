@@ -81,6 +81,7 @@ struct TutorialView: View {
                     moduleMapCard
                 }
                 .padding()
+                .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
             }
             .navigationTitle(String(localized: "guidedTutorial.title", defaultValue: "Guided Tutorial"))
             .toolbar {
@@ -269,6 +270,7 @@ struct TutorialView: View {
                     .tutorialCardChrome(.standard)
                 }
                 .padding()
+                .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
             }
             .navigationTitle(String(localized: "guidedTutorial.title", defaultValue: "Guided Tutorial"))
             .toolbar {
@@ -420,7 +422,7 @@ struct TutorialView: View {
                 }
             }
             #if os(macOS)
-            .frame(minWidth: 480, idealWidth: 520, minHeight: 260, idealHeight: 320)
+            .frame(minWidth: 520, idealWidth: 560, minHeight: 420, idealHeight: 460)
             #endif
             #if canImport(UIKit)
             .presentationDetents([.medium])

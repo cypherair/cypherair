@@ -161,10 +161,10 @@ private struct DecryptScreenHostView: View {
                             ProgressView()
                             Text(String(localized: "decrypt.parse.checking", defaultValue: "Checking recipients..."))
                         }
-                        .frame(maxWidth: .infinity)
+                        .cypherPrimaryActionLabelFrame()
                     } else {
                         Text(String(localized: "decrypt.parse.button", defaultValue: "Check Recipients"))
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -215,10 +215,10 @@ private struct DecryptScreenHostView: View {
                                     }
                                 }
                             }
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                         } else {
                             Text(String(localized: "decrypt.button", defaultValue: "Decrypt with \(matchedKey.userId ?? matchedKey.shortKeyId)"))
-                                .frame(maxWidth: .infinity)
+                                .cypherPrimaryActionLabelFrame(minWidth: 240)
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -245,8 +245,12 @@ private struct DecryptScreenHostView: View {
 
             if model.decryptMode == .text, let decryptedText = model.decryptedText {
                 Section {
-                    Text(decryptedText)
-                        .textSelection(.enabled)
+                    CypherOutputTextBlock(
+                        text: decryptedText,
+                        font: .body,
+                        minHeight: 80,
+                        maxHeight: 220
+                    )
                 } header: {
                     Text(String(localized: "decrypt.result", defaultValue: "Decrypted Message"))
                 }
@@ -278,6 +282,7 @@ private struct DecryptScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "decrypt.title", defaultValue: "Decrypt"))
         .fileImporter(
             isPresented: $model.showFileImporter,
@@ -378,21 +383,11 @@ private struct DecryptScreenHostView: View {
 
             if let importedFileName = model.importedCiphertext.fileName,
                model.importedCiphertext.hasImportedFile {
-                HStack {
-                    Label(importedFileName, systemImage: "doc.fill")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    Button {
-                        model.clearImportedCiphertext()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(String(localized: "decrypt.clearImportedFile", defaultValue: "Clear imported file"))
+                CypherImportedFileRow(
+                    fileName: importedFileName,
+                    clearAccessibilityLabel: String(localized: "decrypt.clearImportedFile", defaultValue: "Clear imported file")
+                ) {
+                    model.clearImportedCiphertext()
                 }
             }
         } header: {
@@ -442,7 +437,7 @@ private struct DecryptScreenHostView: View {
         #if canImport(UIKit)
         (110, 160, 240)
         #else
-        (150, 220, 320)
+        (120, 170, 240)
         #endif
     }
 

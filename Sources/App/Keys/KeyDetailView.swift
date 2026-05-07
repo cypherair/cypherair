@@ -273,6 +273,7 @@ private struct KeyDetailScreenHostView: View {
         #if os(macOS)
         .listStyle(.inset)
         #endif
+        .cypherMacReadableContent()
         .accessibilityIdentifier("keydetail.root")
         .screenReady("keydetail.ready")
         .navigationTitle(String(localized: "keydetail.title", defaultValue: "Key Detail"))

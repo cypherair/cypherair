@@ -284,6 +284,7 @@ private struct SettingsScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .cypherMacReadableContent()
         .accessibilityIdentifier("settings.root")
         .screenReady("settings.ready")
         .navigationTitle(String(localized: "settings.title", defaultValue: "Settings"))
@@ -478,6 +479,10 @@ private struct SettingsScreenHostView: View {
                 .accessibilityIdentifier("settings.resetAll.phrase")
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
+        .cypherMacReadableContent()
         .navigationTitle(String(localized: "settings.resetAll.title", defaultValue: "Reset All Local Data?"))
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {

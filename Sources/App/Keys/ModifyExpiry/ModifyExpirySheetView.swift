@@ -58,6 +58,10 @@ struct ModifyExpirySheetView: View {
                 }
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
+        .cypherMacReadableContent()
         .accessibilityIdentifier("modifyexpiry.root")
         .screenReady("modifyexpiry.ready")
         .navigationTitle(String(localized: "keydetail.expiry.title", defaultValue: "Modify Expiry"))

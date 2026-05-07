@@ -12,7 +12,7 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
                 #if os(macOS)
-                if isActiveSandboxTab {
+                if showsMacOSTopChrome {
                     macOSTopChrome
                 }
                 #endif
@@ -40,6 +40,7 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
         guard isActiveSandboxTab else { return nil }
         guard tutorialStore.activeModal == nil else { return nil }
         guard tutorialStore.currentModule != nil else { return nil }
+        guard visibleCompletionPromptModule == nil else { return nil }
 
         return TutorialGuidanceResolver().guidance(
             session: tutorialStore.session,
@@ -57,6 +58,12 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
     }
 
     #if os(macOS)
+    private var showsMacOSTopChrome: Bool {
+        guard isActiveSandboxTab else { return false }
+        guard visibleCompletionPromptModule == nil else { return false }
+        return !(tutorialStore.isInspectorPresented && currentGuidance != nil)
+    }
+
     private var macOSTopChrome: some View {
         HStack {
             Button {
@@ -116,6 +123,7 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .tutorialBannerChrome()
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(TutorialAutomationContract.completionPromptIdentifier)
     }
 
@@ -145,6 +153,7 @@ private struct TutorialSandboxChromeModifier: ViewModifier {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .tutorialCardChrome(.overlay)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(TutorialAutomationContract.completionPromptIdentifier)
     }
 

@@ -22,6 +22,7 @@ struct CypherMultilineTextInput: View {
         TextEditor(text: $text)
             .font(font)
             .applyMacWritingToolsPolicy()
+            .cypherMacTextEditorChrome()
         #endif
     }
 

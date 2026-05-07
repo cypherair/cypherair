@@ -85,10 +85,10 @@ struct BackupKeyView: View {
                 } label: {
                     if isExporting {
                         ProgressView()
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                     } else {
                         Text(String(localized: "backup.export", defaultValue: "Export Backup"))
-                            .frame(maxWidth: .infinity)
+                            .cypherPrimaryActionLabelFrame()
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -99,10 +99,12 @@ struct BackupKeyView: View {
                let exportedData,
                let exportedString = String(data: exportedData, encoding: .utf8) {
                 Section {
-                    Text(exportedString)
-                        .font(.system(.footnote, design: .monospaced))
-                        .textSelection(.enabled)
-                        .lineLimit(10)
+                    CypherOutputTextBlock(
+                        text: exportedString,
+                        font: .system(.footnote, design: .monospaced),
+                        minHeight: 100,
+                        maxHeight: 220
+                    )
                 } header: {
                     Text(String(localized: "backup.ready", defaultValue: "Backup Ready"))
                 }
@@ -125,6 +127,7 @@ struct BackupKeyView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        .cypherMacReadableContent()
         .accessibilityIdentifier("backup.root")
         .screenReady("backup.ready")
         .navigationTitle(String(localized: "backup.title", defaultValue: "Backup Key"))

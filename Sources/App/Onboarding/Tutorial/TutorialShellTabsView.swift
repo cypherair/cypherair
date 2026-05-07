@@ -20,6 +20,9 @@ struct TutorialShellTabsView: View {
             return nil
         }
         guard tutorialStore.currentModule != nil else { return nil }
+        if tutorialStore.pendingCompletionPromptModule == tutorialStore.currentModule {
+            return nil
+        }
 
         let guidance = TutorialGuidanceResolver().guidance(
             session: tutorialStore.session,
