@@ -258,7 +258,7 @@ Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biomet
 
 ### 5.5 App Protection
 
-Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected domains cover `clipboardNotice`, private-key control state, and key metadata; remaining non-Contacts app data and Contacts stay on the documented roadmap. Content lifecycle. Tmp cleanup. Background tasks.
+Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, Contacts flat compatibility state, self-test export-only behavior, and temporary/export/tutorial cleanup. Contacts feature enhancements such as person-centered modeling, search, tags, recipient lists, merge, and richer package exchange remain in the Contacts follow-on plan.
 
 ---
 
@@ -407,9 +407,3 @@ Share Extension. Post-quantum cryptography (pending IETF PQC standard). Interop 
 **Scenario 10: Contact Key Update** — Alice regenerates her key (same UID, new fingerprint). She sends her new public key. Bob's App detects same UID but different fingerprint → warning → Bob verifies with Alice → confirms update.
 
 **Scenario 11: High-Risk User** — A journalist enables High Security Mode in Settings and generates a Profile B key. The App warns about backup necessity and requires Face ID confirmation. From this point, all decryption and signing requires biometric authentication only — even if someone obtains the device passcode, they cannot access encrypted messages. The journalist's private keys are protected by both Secure Enclave hardware binding and biometric-only access control. Messages use AEAD (OCB) encryption. Argon2id protects key backups.
-
----
-
-## Appendix B: Revision Log
-
-Full revision history: [CHANGELOG.md](CHANGELOG.md)

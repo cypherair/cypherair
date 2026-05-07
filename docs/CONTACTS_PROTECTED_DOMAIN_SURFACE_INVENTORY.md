@@ -1,7 +1,7 @@
 # Contacts Protected Domain Surface Inventory
 
 > **Version:** Draft v0.2
-> **Status:** Draft implementation-prep checklist, updated with Contacts PR3 coverage notes.
+> **Status:** Draft implementation-prep checklist, updated with Contacts PR4 protected-domain security/storage cutover coverage notes.
 > **Purpose:** Enumerate all Contacts-required access and mutation surfaces that must be accounted for during Contacts protected-domain implementation.
 > **Audience:** Engineering, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
@@ -147,7 +147,7 @@ Future implementation PRs should update this document whenever:
 - a locked-state behavior becomes more specific
 - a row moves from current-state inventory to implemented coverage notes
 
-## 8. Contacts PR3 Coverage Notes
+## 8. Contacts PR3-PR4 Coverage Notes
 
 Contacts PR3 covers the lifecycle and access-gating rows without changing the source of truth:
 
@@ -159,4 +159,6 @@ Contacts PR3 covers the lifecycle and access-gating rows without changing the so
 - Decrypt, password decrypt, and Verify-style service flows preserve plaintext or parse results where appropriate while reporting Contacts context unavailable for Contacts-backed verification/enrichment
 - legacy compatibility load is atomic and fail-closed: any load, validation, projection, or metadata-save failure clears contacts, verification states, and compatibility projection before setting `.recoveryNeeded`
 
-Contacts PR3 intentionally does not migrate legacy files into protected Contacts payloads, register Contacts as a protected-domain opener, write `.cypherair-contacts` packages, or implement person-centered preferred/additional/historical key semantics.
+Contacts PR4 then moves the flat compatibility snapshot into the protected `contacts` domain, migrates and quarantines legacy plaintext, prevents ordinary reads from falling back to legacy or quarantine after cutover, deletes quarantine only after a later successful protected-domain open, and preserves Contacts runtime/projection cleanup on relock and reset.
+
+Remaining follow-on work still includes `.cypherair-contacts` packages and person-centered preferred/additional/historical key semantics, search, tags, recipient lists, and merge behavior.

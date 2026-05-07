@@ -1,8 +1,8 @@
 # Contacts Protected Domain Implementation Plan
 
 > **Version:** Draft v0.2
-> **Status:** Draft implementation-prep plan for unblocked Phase 8 work, updated with Contacts PR3 implementation constraints and coverage notes.
-> **Purpose:** Bridge the gap between the current shared ProtectedData framework, the active Contacts documents, and the Phase 8 Contacts protected-domain work so the later implementation can proceed through a stable, reviewable PR sequence.
+> **Status:** Draft implementation-prep plan for remaining Contacts feature work, updated with Contacts PR4 protected-domain security/storage cutover coverage notes.
+> **Purpose:** Bridge the gap between the current shared ProtectedData framework, implemented Contacts protected-domain security/storage behavior, and the remaining Contacts feature work so later implementation can proceed through a stable, reviewable PR sequence.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
 > **Primary authority:** [CONTACTS_TDD](CONTACTS_TDD.md) for Contacts design intent and [ARCHITECTURE](ARCHITECTURE.md) / [SECURITY](SECURITY.md) / [TDD](TDD.md) for current shared ProtectedData architecture.
@@ -10,14 +10,14 @@
 
 ## 1. Scope And Relationship
 
-This document is an implementation-prep companion for the Contacts protected-domain phase. It exists because the repository has landed the shared ProtectedData foundation plus completed Phase 7 non-Contacts work, while Contacts still needs a current-state implementation path.
+This document is an implementation-prep companion for the Contacts follow-on phase. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, and the Contacts PR4 protected-domain security/storage cutover, while person-centered Contacts features still need a stable implementation path.
 
 This document specifies:
 
 - the current-state deltas that materially affect implementation planning
 - the implementation decisions that must be frozen before code work starts
-- the PR sequence and dependency order for Contacts protected-domain adoption
-- the validation and migration scenarios that each future PR must satisfy
+- the PR sequence and dependency order for remaining Contacts feature adoption
+- the validation and migration scenarios that remaining feature PRs must satisfy
 
 This document does not replace the existing formal specs.
 
@@ -62,9 +62,9 @@ The pre-PR3 baseline treated Contacts as startup-readable plaintext content:
 - `ContactService` persisted `Documents/contacts/contact-metadata.json`.
 - `ContactsView` opened the legacy source from a route `.task`.
 
-Contacts PR3 removes that pre-auth ordinary read path. Startup now records the load as deferred, and normal app use opens the legacy compatibility source only after the shared post-auth protected-data gate reports an eligible state.
+Contacts PR3 removed that pre-auth ordinary read path. Startup records the load as deferred, and normal app use opens Contacts only after the shared post-auth protected-data gate reports an eligible state.
 
-The legacy files remain the PR3 authoritative compatibility source until PR4 migrates and cuts over to the protected Contacts domain. That source is now behind the same post-auth lifecycle surface as later protected-domain reads, so PR4 can swap the implementation without re-opening route and service callsites.
+Contacts PR4 then migrated the flat compatibility source into the protected Contacts domain. Legacy files and quarantine are now migration/cleanup sources only, while ordinary route and service callsites continue to use the same post-auth lifecycle surface.
 
 ### 3.2 Verification Contract Delta
 
@@ -294,7 +294,7 @@ This implementation plan references the inventory by behavior group rather than 
 
 ## 6. Prerequisites And Planned Contacts PR Sequence
 
-This section freezes the later implementation order and separates completed shared AppData prerequisites from Contacts-internal PRs. Contacts PR1-PR8 remain AppData Phase 8 work and are unblocked because Phase 7 is complete.
+This section records completed shared AppData prerequisites, the implemented Contacts PR4 security/storage cutover, and the remaining Contacts-internal feature order.
 
 ### 6.1 Shared AppData Prerequisites
 
@@ -307,8 +307,9 @@ Completed prerequisites:
 - Phase 5 `private-key-control` is implemented for `authMode` and private-key recovery journal state.
 - Phase 6 `key-metadata` is implemented for `PGPKeyIdentity` payloads.
 - Phase 7 non-Contacts protected-after-unlock domains and local file/static-protection cleanup are implemented and closed through PR 5 documentation/gate closure.
+- Contacts PR4 protected-domain security/storage cutover is implemented for the flat compatibility snapshot, including migration/quarantine, no legacy fallback after cutover, recovery states, and relock cleanup.
 
-No remaining Phase 7 prerequisite blocks Contacts PR1. Contacts implementation still follows the PR1-PR8 sequence below and does not start from this document alone.
+No remaining Phase 7 prerequisite blocks Contacts feature work. Later Contacts implementation still follows the remaining PR sequence below and does not start from this document alone.
 
 ### 6.2 Contacts PR1 — Contacts Schema Skeleton And Compatibility Facade
 
@@ -481,6 +482,8 @@ Contacts PR3 includes a source audit test to prevent production `Sources` callsi
 - macOS route and UI smoke coverage for Contacts opening / locked / recovery / framework / restart states and Encrypt recipient locked state
 
 ### 6.5 Contacts PR4 — Legacy Contacts Migration, Quarantine, And Cutover
+
+Status: implemented for the flat compatibility snapshot security/storage cutover. Later sections still describe remaining feature work.
 
 **Goals**
 
@@ -722,7 +725,7 @@ This implementation-prep document is only complete if a later implementer can an
 
 - why Contacts protected-domain adoption needs more than a storage swap
 - why completed shared framework hardening remains a prerequisite rather than a Contacts-internal PR
-- why Contacts PR1-PR8 remain Phase 8 work after Phase 7 completion
+- which Contacts security/storage pieces are already implemented by PR4 and which feature pieces remain
 - what the Contacts schema skeleton may define before later behavior PRs
 - why verification contract refactor must happen before lifecycle wiring
 - which Contacts entrypoints are gated and which are only enrichment consumers
@@ -735,9 +738,9 @@ The companion inventory document must also be detailed enough that an implemente
 
 ## 9. Assumptions
 
-- This document prepares implementation. It does not authorize direct code changes by itself.
+- This document prepares remaining feature implementation. It does not authorize direct code changes by itself.
 - Current shared-framework docs and existing Contacts docs remain the architecture and product authorities.
-- Future implementation proceeds with conservative, smaller PRs rather than a single large Contacts protected-domain rollout.
+- Future implementation proceeds with conservative, smaller PRs rather than a single large Contacts feature rollout.
 - Verification accuracy refactor is a dedicated earlier PR.
 - Certification projection, saved signature artifacts, and UX redesign are a dedicated capability PR.
 - `.cypherair-contacts` package export/import is selected-contact exchange, not whole-domain recovery.
