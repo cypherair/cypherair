@@ -125,7 +125,7 @@ struct ImportKeyView: View {
         #if canImport(UIKit)
         return (120, 170, 250)
         #else
-        return (140, 210, 300)
+        return (120, 170, 240)
         #endif
     }
 

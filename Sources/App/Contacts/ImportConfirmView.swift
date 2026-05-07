@@ -37,7 +37,7 @@ struct ImportConfirmView: View {
                 }
             }
             #if os(macOS)
-            .frame(minWidth: 560, idealWidth: 600, maxWidth: 680, minHeight: 620, idealHeight: 700)
+            .frame(minWidth: 560, idealWidth: 600, maxWidth: 680, minHeight: 500, idealHeight: 560)
             #endif
         }
     }

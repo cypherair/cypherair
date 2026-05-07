@@ -239,11 +239,11 @@ private struct AddContactScreenHostView: View {
                 text: $model.armoredText,
                 mode: .machineText
             )
-                #if canImport(UIKit)
-                .frame(minHeight: 120)
-                #else
-                .frame(minHeight: 200)
-                #endif
+            #if canImport(UIKit)
+            .frame(minHeight: 120)
+            #else
+            .frame(minHeight: 160, idealHeight: 220, maxHeight: 280)
+            #endif
         } header: {
             Text(String(localized: "addcontact.paste.header", defaultValue: "Paste public key (armored or binary)"))
         }

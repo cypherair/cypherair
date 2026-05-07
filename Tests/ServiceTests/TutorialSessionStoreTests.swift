@@ -671,6 +671,124 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNil(payload)
     }
 
+    func test_tutorialGuidanceResolver_encryptHomeSurface_pointsAtShortcut() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.markCompletedForTesting(.createDemoIdentity)
+        store.markCompletedForTesting(.addDemoContact)
+        await store.openModule(.encryptDemoMessage)
+
+        let payload = try XCTUnwrap(
+            TutorialGuidanceResolver().guidance(
+                session: store.session,
+                navigation: store.navigation,
+                sizeClass: nil,
+                selectedTab: store.selectedTab
+            )
+        )
+
+        XCTAssertEqual(payload.module, .encryptDemoMessage)
+        XCTAssertEqual(payload.target, .homeEncryptAction)
+        XCTAssertEqual(
+            payload.body,
+            String(localized: "guidedTutorial.home.encrypt", defaultValue: "Use the real Encrypt shortcut to open the message form.")
+        )
+    }
+
+    func test_tutorialGuidanceResolver_encryptRoute_showsFormGuidance() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.markCompletedForTesting(.createDemoIdentity)
+        store.markCompletedForTesting(.addDemoContact)
+        await store.openModule(.encryptDemoMessage)
+        store.setRoutePath([.encrypt], for: .home)
+
+        let payload = try XCTUnwrap(
+            TutorialGuidanceResolver().guidance(
+                session: store.session,
+                navigation: store.navigation,
+                sizeClass: nil,
+                selectedTab: store.selectedTab
+            )
+        )
+
+        XCTAssertEqual(payload.module, .encryptDemoMessage)
+        XCTAssertNil(payload.target)
+        XCTAssertEqual(
+            payload.body,
+            String(localized: "guidedTutorial.encrypt.form", defaultValue: "Bob is preselected. Review the draft and encrypt the message.")
+        )
+    }
+
+    func test_tutorialGuidanceResolver_decryptHomeSurface_pointsAtShortcut() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.markCompletedForTesting(.createDemoIdentity)
+        store.markCompletedForTesting(.addDemoContact)
+        store.markCompletedForTesting(.encryptDemoMessage)
+        await store.openModule(.decryptAndVerify)
+
+        let payload = try XCTUnwrap(
+            TutorialGuidanceResolver().guidance(
+                session: store.session,
+                navigation: store.navigation,
+                sizeClass: nil,
+                selectedTab: store.selectedTab
+            )
+        )
+
+        XCTAssertEqual(payload.module, .decryptAndVerify)
+        XCTAssertEqual(payload.target, .homeDecryptAction)
+        XCTAssertEqual(
+            payload.body,
+            String(localized: "guidedTutorial.home.decrypt", defaultValue: "Use the real Decrypt shortcut to inspect the encrypted message.")
+        )
+    }
+
+    func test_tutorialGuidanceResolver_decryptRoute_switchesAfterRecipientParse() async throws {
+        let store = TutorialSessionStore()
+        await startTutorialSession(store)
+        store.markCompletedForTesting(.createDemoIdentity)
+        store.markCompletedForTesting(.addDemoContact)
+        store.markCompletedForTesting(.encryptDemoMessage)
+        await store.openModule(.decryptAndVerify)
+        store.setRoutePath([.decrypt], for: .home)
+
+        var payload = try XCTUnwrap(
+            TutorialGuidanceResolver().guidance(
+                session: store.session,
+                navigation: store.navigation,
+                sizeClass: nil,
+                selectedTab: store.selectedTab
+            )
+        )
+
+        XCTAssertEqual(payload.module, .decryptAndVerify)
+        XCTAssertNil(payload.target)
+        XCTAssertEqual(
+            payload.body,
+            String(localized: "guidedTutorial.decrypt.parse", defaultValue: "Check the recipients first and make sure the message matches your sandbox key.")
+        )
+
+        store.noteParsed(makePhase1Result())
+
+        payload = try XCTUnwrap(
+            TutorialGuidanceResolver().guidance(
+                session: store.session,
+                navigation: store.navigation,
+                sizeClass: nil,
+                selectedTab: store.selectedTab
+            )
+        )
+
+        XCTAssertEqual(payload.module, .decryptAndVerify)
+        XCTAssertNil(payload.target)
+        XCTAssertEqual(
+            payload.body,
+            String(localized: "guidedTutorial.decrypt.form", defaultValue: "Decrypt the sandbox message and review the signature result.")
+        )
+    }
+
     func test_tutorialGuidanceResolver_importModal_returnsModalGuidance() async throws {
         let store = TutorialSessionStore()
         await startTutorialSession(store)
@@ -1073,6 +1191,14 @@ final class TutorialSessionStoreTests: XCTestCase {
             onImportVerified: {},
             onImportUnverified: {},
             onCancel: {}
+        )
+    }
+
+    private func makePhase1Result() -> DecryptionService.Phase1Result {
+        DecryptionService.Phase1Result(
+            recipientKeyIds: ["ABCD1234"],
+            matchedKey: nil,
+            ciphertext: Data("ciphertext".utf8)
         )
     }
 

@@ -292,7 +292,7 @@ private struct VerifyScreenHostView: View {
         #if canImport(UIKit)
         return (110, 160, 240)
         #else
-        return (150, 220, 320)
+        return (120, 170, 240)
         #endif
     }
 }

@@ -442,7 +442,7 @@ private struct DecryptScreenHostView: View {
         #if canImport(UIKit)
         (110, 160, 240)
         #else
-        (150, 220, 320)
+        (120, 170, 240)
         #endif
     }
 

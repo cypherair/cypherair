@@ -82,7 +82,7 @@ final class MacUISmokeTests: XCTestCase {
     func test_settingsRoot_opensThemePicker() throws {
         launchSettings()
 
-        element("settings.theme").tap()
+        tapSettingsRow("settings.theme")
 
         waitForScreenReady("theme.ready")
     }
@@ -90,7 +90,7 @@ final class MacUISmokeTests: XCTestCase {
     func test_settingsRoot_opensSelfTest() throws {
         launchSettings()
 
-        element("settings.selfTest").tap()
+        tapSettingsRow("settings.selfTest")
 
         waitForScreenReady("selftest.ready")
     }
@@ -98,7 +98,7 @@ final class MacUISmokeTests: XCTestCase {
     func test_settingsRoot_opensAbout() throws {
         launchSettings()
 
-        element("settings.about").tap()
+        tapSettingsRow("settings.about")
 
         waitForScreenReady("about.ready")
     }
@@ -106,7 +106,7 @@ final class MacUISmokeTests: XCTestCase {
     func test_settingsRoot_aboutOpensSourceCompliance() throws {
         launchSettings()
 
-        element("settings.about").tap()
+        tapSettingsRow("settings.about")
         waitForScreenReady("about.ready")
 
         element("about.sourceCompliance").tap()
@@ -252,6 +252,53 @@ final class MacUISmokeTests: XCTestCase {
         XCTAssertTrue(element("tutorial.authMode.cancel").exists)
     }
 
+    func test_tutorial_workspaceGuidance_usesSingleReturnSurface() throws {
+        launchTutorial(task: "generateAliceKey")
+
+        if element("tutorial.hub.ready").waitForExistence(timeout: 2) {
+            element("tutorial.primaryAction").tap()
+        }
+        if element("tutorial.sandbox.ready").waitForExistence(timeout: 2) {
+            element("tutorial.module.0.open").tap()
+        }
+        waitForScreenReady("tutorial.module.1.ready")
+
+        XCTAssertEqual(
+            matchingElementCount("tutorial.return"),
+            1,
+            "The macOS tutorial workspace should not show duplicate return controls while the guidance rail is visible."
+        )
+
+        element("keys.generate").tap()
+        waitForScreenReady("keygen.ready")
+        app.buttons["Generate Key"].tap()
+        waitForScreenReady("postgen.ready", timeout: 15)
+        XCTAssertTrue(element("tutorial.completionPrompt.primary").waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            matchingElementCount("tutorial.return"),
+            0,
+            "The completion prompt should be the only tutorial action surface after a task completes."
+        )
+    }
+
+    func test_tutorial_addContactPrefilledPaste_keepsAddActionHittable() throws {
+        launchTutorial(task: "generateAliceKey")
+        generateTutorialKey()
+        completeCurrentTutorialTaskFromPrompt()
+
+        waitForScreenReady("tutorial.hub.ready")
+        element("tutorial.primaryAction").tap()
+        waitForScreenReady("tutorial.module.2.ready")
+
+        element("contacts.add").tap()
+        let addContactButton = element("addcontact.add")
+        XCTAssertTrue(addContactButton.waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            addContactButton.isHittable,
+            "The prefilled Bob public key editor should not push Add Contact offscreen in the tutorial."
+        )
+    }
+
     // MARK: - Launch Helpers
 
     private func launchMain(
@@ -377,12 +424,67 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("postgen.ready", timeout: 15)
     }
 
+    private func completeCurrentTutorialTaskFromPrompt() {
+        let primaryPromptAction = element("tutorial.completionPrompt.primary")
+        if primaryPromptAction.waitForExistence(timeout: 5) {
+            primaryPromptAction.tap()
+            return
+        }
+
+        let fallback = app.buttons["Return to Tutorial Overview"].firstMatch
+        XCTAssertTrue(fallback.waitForExistence(timeout: 5))
+        fallback.tap()
+    }
+
     // MARK: - Element Helpers
 
     private func element(_ identifier: String) -> XCUIElement {
         app.descendants(matching: .any)
             .matching(identifier: identifier)
             .firstMatch
+    }
+
+    private func matchingElementCount(_ identifier: String) -> Int {
+        app.descendants(matching: .any)
+            .matching(identifier: identifier)
+            .count
+    }
+
+    private func tapSettingsRow(_ identifier: String) {
+        let row = element(identifier)
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+
+        let settingsRoot = element("settings.root")
+        XCTAssertTrue(settingsRoot.waitForExistence(timeout: 5))
+        scroll(row, fullyInto: settingsRoot)
+
+        XCTAssertTrue(
+            isFullyVisible(row, in: settingsRoot),
+            "Expected \(identifier) to be fully visible in the Settings scroll area before tapping."
+        )
+        XCTAssertTrue(row.isHittable, "Expected \(identifier) to be hittable before tapping.")
+        row.tap()
+    }
+
+    private func scroll(_ row: XCUIElement, fullyInto scrollArea: XCUIElement) {
+        for _ in 0..<6 where !isFullyVisible(row, in: scrollArea) {
+            if row.frame.midY < scrollArea.frame.midY {
+                scrollArea.swipeDown()
+            } else {
+                scrollArea.swipeUp()
+            }
+        }
+    }
+
+    private func isFullyVisible(_ row: XCUIElement, in scrollArea: XCUIElement) -> Bool {
+        guard row.exists, scrollArea.exists else { return false }
+
+        let rowFrame = row.frame
+        let visibleFrame = scrollArea.frame.insetBy(dx: 0, dy: 4)
+        return rowFrame.minX >= visibleFrame.minX
+            && rowFrame.maxX <= visibleFrame.maxX
+            && rowFrame.minY >= visibleFrame.minY
+            && rowFrame.maxY <= visibleFrame.maxY
     }
 
     private func waitForLaunchReadiness(rootReadyID: String) {

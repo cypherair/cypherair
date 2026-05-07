@@ -44,8 +44,8 @@ struct AppRouteHost<Root: View>: View {
             MacSheetSizing(
                 minWidth: 640,
                 idealWidth: 720,
-                minHeight: 560,
-                idealHeight: 640
+                minHeight: 500,
+                idealHeight: 560
             )
         }
     }
