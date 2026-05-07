@@ -81,48 +81,23 @@ private struct VerifyScreenHostView: View {
                 Button {
                     model.verify()
                 } label: {
-                    if operation.isRunning {
-                        HStack {
-                            if model.verifyMode == .detached, let progress = operation.progress {
-                                ProgressView(value: progress.fractionCompleted)
-                                    .progressViewStyle(.linear)
-                                Text(
-                                    operation.isCancelling
-                                        ? String(localized: "common.cancelling", defaultValue: "Cancelling...")
-                                        : String(localized: "verify.verifying", defaultValue: "Verifying...")
-                                )
-                            } else {
-                                ProgressView()
-                                if operation.isCancelling {
-                                    Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
-                                }
-                            }
-                        }
-                        .cypherPrimaryActionLabelFrame()
-                    } else {
-                        Text(String(localized: "verify.button", defaultValue: "Verify"))
-                            .cypherPrimaryActionLabelFrame()
-                    }
+                    CypherOperationButtonLabel(
+                        idleTitle: String(localized: "verify.button", defaultValue: "Verify"),
+                        runningTitle: String(localized: "verify.verifying", defaultValue: "Verifying..."),
+                        isRunning: operation.isRunning,
+                        isCancelling: operation.isCancelling,
+                        progressFraction: model.verifyMode == .detached ? operation.progress?.fractionCompleted : nil
+                    )
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.verifyButtonDisabled)
             }
 
             if model.showsDetachedCancelAction {
-                Section {
-                    if operation.isCancelling {
-                        LabeledContent {
-                            Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
-                                .foregroundStyle(.secondary)
-                        } label: {
-                            Text(String(localized: "common.cancel", defaultValue: "Cancel"))
-                        }
-                    } else {
-                        Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                            operation.cancel()
-                        }
-                    }
-                }
+                CypherOperationCancelSection(
+                    isCancelling: operation.isCancelling,
+                    cancel: operation.cancel
+                )
             }
 
             if model.verifyMode == .cleartext, let cleartextOriginalText = model.cleartextOriginalText {

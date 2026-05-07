@@ -298,48 +298,23 @@ private struct EncryptScreenHostView: View {
                 Button {
                     model.requestEncrypt()
                 } label: {
-                    if operation.isRunning {
-                        HStack {
-                            if model.encryptMode == .file, let progress = operation.progress {
-                                ProgressView(value: progress.fractionCompleted)
-                                    .progressViewStyle(.linear)
-                                Text(
-                                    operation.isCancelling
-                                        ? String(localized: "common.cancelling", defaultValue: "Cancelling...")
-                                        : String(localized: "fileEncrypt.encrypting", defaultValue: "Encrypting...")
-                                )
-                            } else {
-                                ProgressView()
-                                if operation.isCancelling {
-                                    Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
-                                }
-                            }
-                        }
-                        .cypherPrimaryActionLabelFrame()
-                    } else {
-                        Text(String(localized: "encrypt.button", defaultValue: "Encrypt"))
-                            .cypherPrimaryActionLabelFrame()
-                    }
+                    CypherOperationButtonLabel(
+                        idleTitle: String(localized: "encrypt.button", defaultValue: "Encrypt"),
+                        runningTitle: String(localized: "fileEncrypt.encrypting", defaultValue: "Encrypting..."),
+                        isRunning: operation.isRunning,
+                        isCancelling: operation.isCancelling,
+                        progressFraction: model.encryptMode == .file ? operation.progress?.fractionCompleted : nil
+                    )
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.encryptButtonDisabled)
             }
 
             if model.showsFileCancelAction {
-                Section {
-                    if operation.isCancelling {
-                        LabeledContent {
-                            Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
-                                .foregroundStyle(.secondary)
-                        } label: {
-                            Text(String(localized: "common.cancel", defaultValue: "Cancel"))
-                        }
-                    } else {
-                        Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                            operation.cancel()
-                        }
-                    }
-                }
+                CypherOperationCancelSection(
+                    isCancelling: operation.isCancelling,
+                    cancel: operation.cancel
+                )
             }
 
             if model.encryptMode == .text, let ciphertextString = model.ciphertextString {

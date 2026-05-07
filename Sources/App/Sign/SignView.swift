@@ -125,48 +125,23 @@ private struct SignScreenHostView: View {
                 Button {
                     model.sign()
                 } label: {
-                    if operation.isRunning {
-                        HStack {
-                            if model.signMode == .file, let progress = operation.progress {
-                                ProgressView(value: progress.fractionCompleted)
-                                    .progressViewStyle(.linear)
-                                Text(
-                                    operation.isCancelling
-                                        ? String(localized: "common.cancelling", defaultValue: "Cancelling...")
-                                        : String(localized: "sign.signing", defaultValue: "Signing...")
-                                )
-                            } else {
-                                ProgressView()
-                                if operation.isCancelling {
-                                    Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
-                                }
-                            }
-                        }
-                        .cypherPrimaryActionLabelFrame()
-                    } else {
-                        Text(String(localized: "sign.button", defaultValue: "Sign"))
-                            .cypherPrimaryActionLabelFrame()
-                    }
+                    CypherOperationButtonLabel(
+                        idleTitle: String(localized: "sign.button", defaultValue: "Sign"),
+                        runningTitle: String(localized: "sign.signing", defaultValue: "Signing..."),
+                        isRunning: operation.isRunning,
+                        isCancelling: operation.isCancelling,
+                        progressFraction: model.signMode == .file ? operation.progress?.fractionCompleted : nil
+                    )
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.signButtonDisabled)
             }
 
             if model.showsFileCancelAction {
-                Section {
-                    if operation.isCancelling {
-                        LabeledContent {
-                            Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
-                                .foregroundStyle(.secondary)
-                        } label: {
-                            Text(String(localized: "common.cancel", defaultValue: "Cancel"))
-                        }
-                    } else {
-                        Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                            operation.cancel()
-                        }
-                    }
-                }
+                CypherOperationCancelSection(
+                    isCancelling: operation.isCancelling,
+                    cancel: operation.cancel
+                )
             }
 
             if model.signMode == .text, let signedMessage = model.signedMessage {

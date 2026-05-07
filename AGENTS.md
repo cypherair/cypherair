@@ -186,6 +186,8 @@ Mode switching requires re-wrapping all Secure Enclave protected keys.
 - Keep changes scoped to the user request.
   This means only make changes that are directly required to complete the requested task; it is not permission to normalize, revert, or clean up unrelated local changes that are already in the worktree.
 - Do not add “nice to have” refactors unless they directly support the requested work.
+- Let the intended architecture determine the shape of the change. Keep source layout, ownership boundaries, and project wiring aligned with the design; do not hide new behavior in unrelated places to make a diff look smaller or avoid configuration work.
+  Example: Shared Swift components should live in dedicated files in the right feature or shared area. Xcode file-system sync, target membership, and test-target exclusions should reflect that structure; do not tuck reusable code into unrelated existing files to dodge that wiring.
 - In Plan mode only, for build-system, Xcode-project, packaging, or other high-coupling changes where toolchain behavior is a material risk, prefer validating the approach first in an isolated temporary copy or other disposable prototype environment before editing the real workspace.
 - Prefer small, reviewable diffs.
 - Maintain existing user-visible behavior unless the task explicitly changes it.

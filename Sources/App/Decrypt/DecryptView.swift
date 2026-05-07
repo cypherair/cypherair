@@ -156,16 +156,13 @@ private struct DecryptScreenHostView: View {
                         model.parseRecipientsFile()
                     }
                 } label: {
-                    if operation.isRunning && !model.hasPhase1Result {
-                        HStack {
-                            ProgressView()
-                            Text(String(localized: "decrypt.parse.checking", defaultValue: "Checking recipients..."))
-                        }
-                        .cypherPrimaryActionLabelFrame()
-                    } else {
-                        Text(String(localized: "decrypt.parse.button", defaultValue: "Check Recipients"))
-                            .cypherPrimaryActionLabelFrame()
-                    }
+                    CypherOperationButtonLabel(
+                        idleTitle: String(localized: "decrypt.parse.button", defaultValue: "Check Recipients"),
+                        runningTitle: String(localized: "decrypt.parse.checking", defaultValue: "Checking recipients..."),
+                        isRunning: operation.isRunning && !model.hasPhase1Result,
+                        isCancelling: operation.isCancelling,
+                        progressFraction: nil
+                    )
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.decryptButtonDisabled || model.hasPhase1Result)
@@ -198,48 +195,24 @@ private struct DecryptScreenHostView: View {
                             model.decryptFile()
                         }
                     } label: {
-                        if operation.isRunning {
-                            HStack {
-                                if model.decryptMode == .file, let progress = operation.progress {
-                                    ProgressView(value: progress.fractionCompleted)
-                                        .progressViewStyle(.linear)
-                                    Text(
-                                        operation.isCancelling
-                                            ? String(localized: "common.cancelling", defaultValue: "Cancelling...")
-                                            : String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting...")
-                                    )
-                                } else {
-                                    ProgressView()
-                                    if operation.isCancelling {
-                                        Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
-                                    }
-                                }
-                            }
-                            .cypherPrimaryActionLabelFrame()
-                        } else {
-                            Text(String(localized: "decrypt.button", defaultValue: "Decrypt with \(matchedKey.userId ?? matchedKey.shortKeyId)"))
-                                .cypherPrimaryActionLabelFrame(minWidth: 240)
-                        }
+                        CypherOperationButtonLabel(
+                            idleTitle: String(localized: "decrypt.button", defaultValue: "Decrypt with \(matchedKey.userId ?? matchedKey.shortKeyId)"),
+                            runningTitle: String(localized: "fileDecrypt.decrypting", defaultValue: "Decrypting..."),
+                            isRunning: operation.isRunning,
+                            isCancelling: operation.isCancelling,
+                            progressFraction: model.decryptMode == .file ? operation.progress?.fractionCompleted : nil,
+                            minWidth: 240
+                        )
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(operation.isRunning)
                 }
 
                 if model.showsFileDecryptCancelAction {
-                    Section {
-                        if operation.isCancelling {
-                            LabeledContent {
-                                Text(String(localized: "common.cancelling", defaultValue: "Cancelling..."))
-                                    .foregroundStyle(.secondary)
-                            } label: {
-                                Text(String(localized: "common.cancel", defaultValue: "Cancel"))
-                            }
-                        } else {
-                            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .destructive) {
-                                operation.cancel()
-                            }
-                        }
-                    }
+                    CypherOperationCancelSection(
+                        isCancelling: operation.isCancelling,
+                        cancel: operation.cancel
+                    )
                 }
             }
 

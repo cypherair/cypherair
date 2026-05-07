@@ -174,6 +174,7 @@ struct HomeView: View {
         .tint(tint)
         .accessibilityLabel(title)
         .tutorialAnchor(anchor)
+        .cypherPressFeedback()
     }
 
     private var defaultKeyCornerRadius: CGFloat {
