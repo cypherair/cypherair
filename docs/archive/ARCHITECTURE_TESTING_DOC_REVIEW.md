@@ -2,7 +2,7 @@
 
 > Status: Archived review snapshot from 2026-04-16. Kept as historical evidence for one point-in-time verification pass against architecture and testing documentation.
 > Archival reason: The affected canonical docs have since been updated, so this file is no longer an active guidance document.
-> Successor docs: [ARCHITECTURE](../ARCHITECTURE.md), [TESTING](../TESTING.md), [DOCUMENTATION_GOVERNANCE](../DOCUMENTATION_GOVERNANCE.md), and [CHANGELOG](../CHANGELOG.md).
+> Successor docs: [ARCHITECTURE](../ARCHITECTURE.md), [TESTING](../TESTING.md), and [DOCUMENTATION_GOVERNANCE](../DOCUMENTATION_GOVERNANCE.md).
 > Current code and active canonical docs outrank this archived file whenever they disagree.
 
 ## Executive Summary

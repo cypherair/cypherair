@@ -1,7 +1,7 @@
 # Contacts Technical Design Document (TDD)
 
 > **Version:** Draft v1.1  
-> **Status:** Draft future technical spec. This document does not describe current shipped Contacts implementation.  
+> **Status:** Draft future Contacts feature spec. Current protected-domain security/storage behavior is owned by the current-state architecture, security, TDD, and testing docs.
 > **Purpose:** Technical design for implementing the Contacts enhancement initiative as a Contacts domain on the shared protected app-data framework.  
 > **Audience:** Engineering, QA, and AI coding tools.  
 > **Companion document:** [CONTACTS_PRD](CONTACTS_PRD.md)  
@@ -11,7 +11,7 @@
 
 ## 1. Technical Scope
 
-This document defines the implementation design for the Contacts enhancement initiative. It assumes the product direction in [CONTACTS_PRD](CONTACTS_PRD.md) is approved and fixed, and it assumes the shared ProtectedData framework documented in the current architecture, security, TDD, and testing guides already exists before Contacts adoption begins.
+This document defines the implementation design for the Contacts enhancement initiative. It assumes the product direction in [CONTACTS_PRD](CONTACTS_PRD.md) is approved and fixed, and it assumes the shared ProtectedData framework plus the Contacts PR4 protected-domain security/storage cutover documented in the current architecture, security, TDD, and testing guides already exist before remaining Contacts feature work begins.
 
 This TDD covers:
 
@@ -553,15 +553,15 @@ Legacy source:
 
 ### 11.2 Migration Phases
 
-Contacts migration occurs after the earlier shared-framework prerequisites are already satisfied, including protected app-data framework setup, post-unlock multi-domain hardening, `private-key-control`, `key metadata`, and completed non-Contacts protected-after-unlock work. Phase 1-7 prerequisites are complete; Phase 8 Contacts remains pending implementation and follows the Contacts-specific implementation plan.
+Contacts security/storage migration occurs after the earlier shared-framework prerequisites are already satisfied, including protected app-data framework setup, post-unlock multi-domain hardening, `private-key-control`, `key metadata`, and completed non-Contacts protected-after-unlock work. Those prerequisites are complete, and Contacts PR4 has implemented the protected `contacts` domain cutover for the flat compatibility snapshot. Remaining person-centered Contacts features still follow the Contacts-specific implementation plan.
 
-The cutover trigger is the first post-auth protected-domain open after the Contacts protected-domain adoption point is reached. This may occur during launch/resume post-unlock orchestration. Migration must not be triggered merely by process launch or service initialization before app-data authorization.
+The implemented PR4 cutover trigger is the first post-auth Contacts domain open with an authorized ProtectedData session. This may occur during launch/resume post-unlock orchestration. Migration must not be triggered merely by process launch or service initialization before app-data authorization.
 
 Migration sequence:
 
 1. confirm the shared protected app-data framework, file-protection baseline, and first low-risk domain are already present
 2. read legacy files
-3. build the new person-centered graph and canonical Contacts snapshot
+3. build the canonical Contacts snapshot; the implemented PR4 path preserves the flat compatibility model, while later feature work expands the person-centered graph
 4. create or write the Contacts domain through the shared framework create/write path
 5. validate target Contacts domain readability through the normal post-auth open path
 6. switch source of truth to the Contacts domain
@@ -753,7 +753,7 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 
 ### 14.6 Migration And Contact Package Exchange
 
-- Contacts adoption occurs after AppData Phase 1-7 prerequisites are complete; Phase 8 is unblocked but still follows the Contacts-specific implementation plan
+- Contacts PR4 protected-domain security/storage cutover occurs after AppData Phase 1-7 prerequisites are complete; remaining person-centered feature work still follows the Contacts-specific implementation plan
 - Contacts migration is triggered by post-auth protected-domain open, not by process launch or service initialization before app-data authorization
 - target Contacts domain is validated before legacy source retirement
 - quarantine storage is inactive for normal Contacts resolution

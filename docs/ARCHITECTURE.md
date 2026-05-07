@@ -174,7 +174,7 @@ Current ProtectedData scope:
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`; Contacts then joins the authorized session through its dedicated post-auth open path
 - current Phase 1-7 ProtectedData work is implemented, including ordinary-settings, self-test export-only, and temporary/export/tutorial hardening; Contacts PR4 adds the protected `contacts` domain while preserving the flat compatibility snapshot
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
-- later Contacts person-centered modeling and package import/export remain in the Contacts follow-on plan; sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+- Contacts security/storage lifecycle is current: post-auth gating, protected-domain persistence, migration/quarantine, no legacy fallback after cutover, recovery states, and relock cleanup are implemented. Later Contacts person-centered modeling and package import/export remain in the Contacts follow-on plan; sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
 
 Current local-data classification:
 
@@ -458,6 +458,7 @@ App Sandbox:
 │       ├── private-key-control/           → Auth mode + private-key recovery journal envelopes
 │       ├── key-metadata/                  → PGPKeyIdentity metadata envelopes
 │       ├── protected-settings/              → Protected settings envelopes; schema v2 clipboardNotice + ordinary settings
+│       ├── contacts/                        → Contacts flat compatibility snapshot envelopes
 │       └── protected-framework-sentinel/    → Framework sentinel envelopes; schema/purpose marker only
 ├── Library/Preferences/
 │   └── (UserDefaults)

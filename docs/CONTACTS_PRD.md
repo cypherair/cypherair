@@ -13,7 +13,7 @@
 
 CypherAir's current Contacts capability is sufficient for a small number of imported public keys, but it is not yet structured for real-world relationship management, recurring recipient workflows, or social-graph-sensitive privacy requirements.
 
-This document defines the product requirements for the next-generation Contacts capability. The shared ProtectedData framework and Phase 1-7 non-Contacts domains have landed. Contacts protected-domain adoption is now unblocked as Phase 8, with implementation sequencing owned by [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage owned by [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md).
+This document defines the product requirements for the next-generation Contacts capability. The shared ProtectedData framework, Phase 1-7 non-Contacts domains, and Contacts PR4 protected-domain security/storage cutover have landed. Remaining Contacts feature sequencing is owned by [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), and surface coverage is owned by [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md).
 
 The Contacts enhancement initiative covers four user-facing capability areas:
 

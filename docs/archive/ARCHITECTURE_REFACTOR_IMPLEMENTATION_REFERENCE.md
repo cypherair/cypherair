@@ -1,18 +1,18 @@
 # Architecture Refactor Implementation Reference
 
-> Status: Draft implementation reference for future architecture refactor planning.
+> Status: archived implementation reference retained as historical evidence.
 > Purpose: Convert the architecture refactor audit into a boundary-first,
 > reviewable implementation roadmap with explicit goals, TODOs, and acceptance
 > standards.
 > Audience: Engineering, security review, QA, and AI coding tools.
 > Companion document: [ARCHITECTURE_REFACTOR_AUDIT](ARCHITECTURE_REFACTOR_AUDIT.md).
-> Primary authorities: [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md),
-> [TESTING](TESTING.md), [CONVENTIONS](CONVENTIONS.md), and
-> [CODE_REVIEW](CODE_REVIEW.md).
+> Primary authorities: [ARCHITECTURE](../ARCHITECTURE.md), [SECURITY](../SECURITY.md),
+> [TESTING](../TESTING.md), [CONVENTIONS](../CONVENTIONS.md), and
+> [CODE_REVIEW](../CODE_REVIEW.md).
 > Related Contacts references:
-> [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
+> [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
 > and
-> [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md).
+> [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](../CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md).
 > Last reviewed: 2026-05-03.
 
 Current code and active canonical docs outrank this future-facing reference.

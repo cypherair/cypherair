@@ -193,7 +193,6 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards, SwiftUI patterns, and current Liquid Glass rules |
 | [CODE_REVIEW](docs/CODE_REVIEW.md) | Code review checklist by change type |
 | [XCFRAMEWORK_RELEASES](docs/XCFRAMEWORK_RELEASES.md) | Current edge, drill, and stable XCFramework release channels and verification |
-| [CHANGELOG](docs/CHANGELOG.md) | PRD revision history |
 
 ## License
 

@@ -1,6 +1,6 @@
 # Architecture Refactor Audit
 
-> Status: architecture audit for future refactor planning.
+> Status: archived architecture audit retained as historical evidence.
 > Scope: oversized non-generated files, mixed responsibilities, and unclear
 > boundaries in production code. This document is evidence only; refactor
 > requirements and implementation tasks belong in follow-up documents.

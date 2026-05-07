@@ -239,6 +239,8 @@ Current protected app-data scope:
 - `contacts` stores the PR4 compatibility Contacts snapshot after app unlock. Legacy `Documents/contacts` and `Documents/contacts.quarantine` are migration and cleanup sources only after protected cutover.
 - `protected-framework-sentinel` is a framework-owned sentinel domain with a schema/purpose marker only. It contains no user data, telemetry, contacts, or UI state.
 
+Contacts PR4 covers the protected-domain security, storage, migration/quarantine, recovery, and relock lifecycle for the flat compatibility snapshot. It does not include the later Contacts feature expansion for person-centered modeling, search, tags, recipient lists, merge, or richer package exchange.
+
 Current non-goals and pending surfaces:
 
 - Permanent and pending SE-wrapped private-key bundle rows remain in the existing private-key material domain.
