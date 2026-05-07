@@ -214,16 +214,11 @@ private struct VerifyScreenHostView: View {
 
             if let importedFileName = model.importedCleartext.fileName,
                model.importedCleartext.hasImportedFile {
-                HStack {
-                    Label(importedFileName, systemImage: "doc.fill")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    CypherClearImportedFileButton(
-                        accessibilityLabel: String(localized: "verify.clearImportedFile", defaultValue: "Clear imported file")
-                    ) {
-                        model.clearImportedCleartext()
-                    }
+                CypherImportedFileRow(
+                    fileName: importedFileName,
+                    clearAccessibilityLabel: String(localized: "verify.clearImportedFile", defaultValue: "Clear imported file")
+                ) {
+                    model.clearImportedCleartext()
                 }
             }
         } header: {

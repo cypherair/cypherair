@@ -211,7 +211,6 @@ struct ImportConfirmView: View {
 
             Text(value)
                 .font(monospaced ? .system(.body, design: .monospaced) : .body)
-                .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         }

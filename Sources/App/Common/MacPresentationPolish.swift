@@ -2,6 +2,9 @@ import SwiftUI
 #if canImport(AppKit)
 import AppKit
 #endif
+#if canImport(UIKit)
+import UIKit
+#endif
 
 enum MacPresentationWidth {
     static let standard: CGFloat = 760
@@ -22,7 +25,6 @@ struct CypherStatusBadge: View {
             .padding(.vertical, 3)
             .background(color.opacity(0.14), in: Capsule())
             .foregroundStyle(color)
-            .lineLimit(1)
     }
 }
 
@@ -54,7 +56,6 @@ struct CypherOutputTextBlock: View {
     var maxHeight: CGFloat = 260
 
     var body: some View {
-        #if os(macOS)
         ScrollView {
             Text(text)
                 .font(font)
@@ -63,27 +64,67 @@ struct CypherOutputTextBlock: View {
                 .padding(10)
         }
         .frame(minHeight: minHeight, maxHeight: maxHeight)
-        .background(macTextSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(outputTextSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         }
-        #else
-        Text(text)
-            .font(font)
-            .textSelection(.enabled)
-        #endif
     }
 
-    #if os(macOS)
-    private var macTextSurface: Color {
+    private var outputTextSurface: Color {
         #if canImport(AppKit)
         Color(nsColor: .textBackgroundColor)
+        #elseif canImport(UIKit)
+        Color(uiColor: .secondarySystemGroupedBackground)
         #else
-        Color.clear
+        Color.primary.opacity(0.04)
         #endif
     }
-    #endif
+}
+
+struct CypherScrollableTextLine: View {
+    let text: String
+    var font: Font = .system(.footnote, design: .monospaced)
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: true) {
+            Text(verbatim: text)
+                .font(font)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.vertical, 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct CypherImportedFileRow: View {
+    let fileName: String
+    let clearAccessibilityLabel: String
+    let clearAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.fill")
+                        .accessibilityHidden(true)
+                    Text(verbatim: fileName)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                .padding(.vertical, 2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(fileName)
+
+            CypherClearImportedFileButton(
+                accessibilityLabel: clearAccessibilityLabel,
+                action: clearAction
+            )
+        }
+    }
 }
 
 extension View {

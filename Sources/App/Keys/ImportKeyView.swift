@@ -20,17 +20,12 @@ struct ImportKeyView: View {
         Form {
             Section {
                 if let fileName = importedFileName, importedKeyData != nil {
-                    HStack {
-                        Label(fileName, systemImage: "doc.fill")
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer()
-                        CypherClearImportedFileButton(
-                            accessibilityLabel: String(localized: "import.clearFile", defaultValue: "Clear file")
-                        ) {
-                            importedKeyData = nil
-                            importedFileName = nil
-                        }
+                    CypherImportedFileRow(
+                        fileName: fileName,
+                        clearAccessibilityLabel: String(localized: "import.clearFile", defaultValue: "Clear file")
+                    ) {
+                        importedKeyData = nil
+                        importedFileName = nil
                     }
                 } else {
                     CypherMultilineTextInput(

@@ -239,11 +239,11 @@ private struct AddContactScreenHostView: View {
                 text: $model.armoredText,
                 mode: .machineText
             )
-            #if canImport(UIKit)
-            .frame(minHeight: 120)
-            #else
-            .frame(minHeight: 160, idealHeight: 220, maxHeight: 280)
-            #endif
+            .frame(
+                minHeight: pasteEditorHeightRange.min,
+                idealHeight: pasteEditorHeightRange.ideal,
+                maxHeight: pasteEditorHeightRange.max
+            )
         } header: {
             Text(String(localized: "addcontact.paste.header", defaultValue: "Paste public key (armored or binary)"))
         }
@@ -285,16 +285,11 @@ private struct AddContactScreenHostView: View {
             }
 
             if let fileName = model.importedFileName, model.importedKeyData != nil {
-                HStack {
-                    Label(fileName, systemImage: "doc.fill")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    CypherClearImportedFileButton(
-                        accessibilityLabel: String(localized: "addcontact.clearFile", defaultValue: "Clear file")
-                    ) {
-                        model.clearImportedFile()
-                    }
+                CypherImportedFileRow(
+                    fileName: fileName,
+                    clearAccessibilityLabel: String(localized: "addcontact.clearFile", defaultValue: "Clear file")
+                ) {
+                    model.clearImportedFile()
                 }
             }
         } header: {
@@ -329,5 +324,13 @@ private struct AddContactScreenHostView: View {
 
     private var runtimeSyncKey: AddContactView.RuntimeSyncKey {
         AddContactView.RuntimeSyncKey(configuration: configuration)
+    }
+
+    private var pasteEditorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
+        #if canImport(UIKit)
+        (110, 160, 240)
+        #else
+        (160, 220, 280)
+        #endif
     }
 }

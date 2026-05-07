@@ -84,7 +84,9 @@ private struct ThemeCell: View {
                 Text(theme.displayName)
                     .font(.caption)
                     .foregroundStyle(isSelected ? .primary : .secondary)
-                    .lineLimit(1)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(minHeight: 30, alignment: .top)
             }
         }
         .buttonStyle(.plain)

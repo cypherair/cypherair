@@ -40,9 +40,7 @@ struct LicenseDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    Text(verbatim: notice.repositoryURL)
-                        .font(.system(.footnote, design: .monospaced))
-                        .textSelection(.enabled)
+                    CypherScrollableTextLine(text: notice.repositoryURL)
 
                     Button {
                         didCopy = repositoryURLCopyAction.copyIfPresent(notice.repositoryURL)
@@ -62,10 +60,7 @@ struct LicenseDetailView: View {
             if !notice.licenseSourceItems.isEmpty {
                 Section(String(localized: "license.detail.sourceItems", defaultValue: "Source Details")) {
                     ForEach(notice.licenseSourceItems, id: \.self) { item in
-                        Text(verbatim: item)
-                            .font(.system(.footnote, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        CypherScrollableTextLine(text: item)
                     }
                 }
             }

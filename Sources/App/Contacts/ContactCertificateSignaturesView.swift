@@ -261,11 +261,11 @@ private struct ContactCertificateSignaturesHostView: View {
                 ),
                 mode: .machineText
             )
-            #if canImport(UIKit)
-            .frame(minHeight: 120)
-            #else
-            .frame(minHeight: 200)
-            #endif
+            .frame(
+                minHeight: signatureEditorHeightRange.min,
+                idealHeight: signatureEditorHeightRange.ideal,
+                maxHeight: signatureEditorHeightRange.max
+            )
             .disabled(model.isOperationLocked)
 
             Button {
@@ -283,19 +283,14 @@ private struct ContactCertificateSignaturesHostView: View {
 
             if let importedFileName = model.signatureFileName,
                model.importedSignature.hasImportedFile {
-                HStack {
-                    Label(importedFileName, systemImage: "doc.fill")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    CypherClearImportedFileButton(
-                        accessibilityLabel: String(
-                            localized: "contactcertsig.clearImportedFile",
-                            defaultValue: "Clear imported signature file"
-                        )
-                    ) {
-                        model.clearImportedSignature()
-                    }
+                CypherImportedFileRow(
+                    fileName: importedFileName,
+                    clearAccessibilityLabel: String(
+                        localized: "contactcertsig.clearImportedFile",
+                        defaultValue: "Clear imported signature file"
+                    )
+                ) {
+                    model.clearImportedSignature()
                 }
             }
         } header: {
@@ -457,13 +452,22 @@ private struct ContactCertificateSignaturesHostView: View {
             }
 
             if let signingKeyFingerprint = verification.signingKeyFingerprint {
-                LabeledContent(
-                    String(
-                        localized: "contactcertsig.result.signingKey",
-                        defaultValue: "Signing Key"
-                    ),
-                    value: IdentityPresentation.formattedFingerprint(signingKeyFingerprint)
-                )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        String(
+                            localized: "contactcertsig.result.signingKey",
+                            defaultValue: "Signing Key"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    FingerprintView(
+                        fingerprint: signingKeyFingerprint,
+                        font: .system(.body, design: .monospaced),
+                        textSelectionEnabled: true
+                    )
+                }
             }
 
             if let signerIdentity = verification.signerIdentity {
@@ -483,6 +487,14 @@ private struct ContactCertificateSignaturesHostView: View {
         case .certifyUserId:
             !model.canCertifyUserId
         }
+    }
+
+    private var signatureEditorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
+        #if canImport(UIKit)
+        (110, 160, 240)
+        #else
+        (120, 170, 240)
+        #endif
     }
 
     private var actionTitle: String {
@@ -603,9 +615,13 @@ private struct ContactCertificateSignerIdentityCard: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text(IdentityPresentation.formattedFingerprint(identity.fingerprint))
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
+            FingerprintView(
+                fingerprint: identity.fingerprint,
+                font: .system(.caption, design: .monospaced),
+                foregroundColor: .secondary,
+                textSelectionEnabled: true,
+                expandsHorizontally: false
+            )
 
             HStack {
                 ContactCertificateStatusBadge(

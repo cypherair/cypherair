@@ -253,9 +253,12 @@ private struct SelectiveSubkeyRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(subkey.algorithmDisplay.isEmpty ? String(localized: "selectiverevocation.subkey", defaultValue: "Subkey") : subkey.algorithmDisplay)
                     .font(.headline)
-                Text(IdentityPresentation.formattedFingerprint(subkey.fingerprint))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                FingerprintView(
+                    fingerprint: subkey.fingerprint,
+                    font: .system(.caption, design: .monospaced),
+                    foregroundColor: .secondary,
+                    expandsHorizontally: false
+                )
                 HStack {
                     if subkey.isCurrentlyTransportEncryptionCapable {
                         StatusBadge(

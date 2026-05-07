@@ -134,9 +134,7 @@ struct SourceComplianceView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-                Text(verbatim: releaseURLText(info))
-                    .font(.system(.footnote, design: .monospaced))
-                    .textSelection(.enabled)
+                CypherScrollableTextLine(text: releaseURLText(info))
                     .accessibilityIdentifier("sourcecompliance.url")
 
                 Button {

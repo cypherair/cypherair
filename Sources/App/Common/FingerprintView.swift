@@ -23,7 +23,6 @@ struct FingerprintView: View {
     private var configuredText: some View {
         let text = Text(IdentityPresentation.formattedFingerprint(fingerprint))
             .font(font)
-            .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
             .multilineTextAlignment(multilineTextAlignment)
 

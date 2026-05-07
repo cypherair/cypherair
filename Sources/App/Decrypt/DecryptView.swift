@@ -383,16 +383,11 @@ private struct DecryptScreenHostView: View {
 
             if let importedFileName = model.importedCiphertext.fileName,
                model.importedCiphertext.hasImportedFile {
-                HStack {
-                    Label(importedFileName, systemImage: "doc.fill")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    CypherClearImportedFileButton(
-                        accessibilityLabel: String(localized: "decrypt.clearImportedFile", defaultValue: "Clear imported file")
-                    ) {
-                        model.clearImportedCiphertext()
-                    }
+                CypherImportedFileRow(
+                    fileName: importedFileName,
+                    clearAccessibilityLabel: String(localized: "decrypt.clearImportedFile", defaultValue: "Clear imported file")
+                ) {
+                    model.clearImportedCiphertext()
                 }
             }
         } header: {
