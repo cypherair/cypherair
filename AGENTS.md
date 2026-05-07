@@ -155,10 +155,10 @@ Pause and explicitly call out the intended change before editing these areas:
 - `Sources/Services/DecryptionService.swift` — Phase 1/Phase 2 authentication boundary
 - `Sources/Services/QRService.swift` — external URL input parsing (untrusted data)
 - `pgp-mobile/src/` — any Rust cryptographic code
-- `CypherAir.xcodeproj/project.pbxproj` and other Xcode project files — adding files, targets, build settings, or test wiring
-- `CypherAir.entitlements` — capability entitlements
-- `CypherAirMacOS.entitlements` — macOS capability entitlements
-- `CypherAir-Info.plist` — permission descriptions (only `NSFaceIDUsageDescription` permitted)
+- `CypherAir.xcodeproj/project.pbxproj` and other Xcode project files
+- `CypherAir.entitlements`
+- `CypherAirMacOS.entitlements`
+- `CypherAir-Info.plist`
 
 These areas define security invariants and failure behavior.
 
