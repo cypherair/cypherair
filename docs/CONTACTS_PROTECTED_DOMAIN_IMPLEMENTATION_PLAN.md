@@ -39,21 +39,20 @@ The active Contacts and shared-framework documents already establish the correct
 - `ProtectedDataSessionCoordinator` owns shared app-data root-secret retrieval
 - Contacts must not invent a second vault architecture
 
-The repository, however, still has material current-state behavior that must be unwound before that target can land safely. The biggest gaps are not only storage-related:
+The repository has already resolved the major PR3 / PR4 security-storage deltas that used to block protected Contacts. The remaining gaps are feature and verification-contract work rather than a missing protected-domain cutover:
 
-- pre-PR3 startup loaded plaintext Contacts before protected-domain root-secret activation and Contacts domain unlock
-- verification-capable services still use Contacts as direct cryptographic verification input
-- Contacts access and mutation entrypoints are scattered across app surfaces and service helpers
-- local reset and tutorial/test sandbox paths must be explicitly classified so they do not bypass or pollute the real Contacts domain
-- certification support exists as a crypto workflow, but not as Contacts-owned projected state with saved signature artifacts and redesigned UX
+- PR3 removed pre-auth plaintext Contacts startup loading and moved ordinary Contacts access behind the shared post-auth lifecycle surface
+- PR4 migrated the flat compatibility snapshot into the protected `contacts` domain, quarantined legacy plaintext, and made legacy/quarantine storage cleanup-only after cutover
+- verification-capable services still need the planned contract split between cryptographic verification and Contacts enrichment
+- remaining feature work still includes Contacts-owned certification projection, selected-contact package exchange, person-centered modeling, search, tags, recipient lists, and merge behavior
 
-This document turns those deltas into a concrete PR sequence with explicit dependencies and validation gates.
+This document preserves the historical PR sequence for review context and turns the remaining work into explicit dependencies and validation gates.
 
 ## 3. Current-State Delta To Freeze
 
 This section records the current repository facts that materially change implementation planning.
 
-### 3.1 Startup And Source-Of-Truth Delta
+### 3.1 Resolved Startup And Source-Of-Truth Delta
 
 The pre-PR3 baseline treated Contacts as startup-readable plaintext content:
 
@@ -66,7 +65,7 @@ Contacts PR3 removed that pre-auth ordinary read path. Startup records the load 
 
 Contacts PR4 then migrated the flat compatibility source into the protected Contacts domain. Legacy files and quarantine are now migration/cleanup sources only, while ordinary route and service callsites continue to use the same post-auth lifecycle surface.
 
-### 3.2 Verification Contract Delta
+### 3.2 Remaining Verification Contract Delta
 
 Current verification-capable services still consume Contacts as direct verification input rather than as optional post-verification enrichment:
 
@@ -79,11 +78,11 @@ Current tests also encode the old semantics:
 - when a signer is not present in Contacts or own keys, verification degrades to `.unknownSigner`
 - this behavior is currently asserted in decrypt and signing tests
 
-This means Contacts protected-domain adoption cannot be achieved by UI-layer locked-state handling alone. The service contract itself must be refactored first.
+This means remaining Contacts feature work cannot rely only on UI-layer locked-state handling. The service contract itself still needs the planned verification/enrichment refactor.
 
 Because the current Rust/UniFFI layer only exposes signer fingerprint information when a provided verification key is already known, that refactor must include lower-level verification contract expansion rather than a Swift-only output reshaping.
 
-### 3.3 Access / Mutation Surface Delta
+### 3.3 Access / Mutation Surface Inventory
 
 Contacts access and mutation is not centralized in a single route boundary today. In addition to the obvious Contacts list and detail routes, current code directly reaches `ContactService` from:
 
@@ -95,11 +94,11 @@ Contacts access and mutation is not centralized in a single route boundary today
 - decrypt / verify signer identity enrichment
 - certificate-signature workflows
 
-Because these surfaces are distributed, Contacts protected-domain adoption requires an explicit inventory and PR-by-PR coverage checklist rather than relying on memory or a short prose summary.
+Because these surfaces are distributed, remaining Contacts feature work still requires an explicit inventory and PR-by-PR coverage checklist rather than relying on memory or a short prose summary.
 
 ### 3.4 Package Export / Import And Maintenance Delta
 
-Whole-domain Contacts backup, replace-domain restore, and empty-install Contacts restore are no longer in scope for Phase 8.
+Whole-domain Contacts backup, replace-domain restore, and empty-install Contacts restore are no longer in scope for the remaining Contacts feature plan.
 
 The target package feature instead exports and imports selected contact public material through a `.cypherair-contacts` package. That package may contain one or more contacts, public-certificate-derived display labels, optional explicitly selected local relationship / custom labels, and optional saved certification signature artifacts, but it must not transport local protected-domain state, manual verification state, tags, notes, recipient lists, root-secret material, wrapped-DMK records, registry state, or source-device authorization material.
 
@@ -205,9 +204,9 @@ Internal implementation may split into:
 
 But those remain behind the `ContactService` facade.
 
-### 4.4 Contacts Snapshot Schema Freezes Early
+### 4.4 Contacts Snapshot Schema Was Frozen Early
 
-Before any migration or cutover PR, the Contacts protected-domain implementation must freeze the first meaningful Contacts domain snapshot shape as a compatibility skeleton, including placeholders or initial fields for:
+Before PR4 migration/cutover, the Contacts protected-domain implementation froze the first meaningful Contacts domain snapshot shape as a compatibility skeleton, including placeholders or initial fields for:
 
 - `ContactsDomainSnapshot`
 - `ContactIdentity`
@@ -313,21 +312,23 @@ No remaining Phase 7 prerequisite blocks Contacts feature work. Later Contacts i
 
 ### 6.2 Contacts PR1 — Contacts Schema Skeleton And Compatibility Facade
 
+Status: implemented as the schema/facade foundation for the protected Contacts cutover.
+
 **Goals**
 
-- introduce the first concrete Contacts protected-domain foundation without cutting over any user-visible source of truth
-- freeze the initial Contacts snapshot schema skeleton and `ContactService` facade direction
+- introduced the first concrete Contacts protected-domain foundation without cutting over any user-visible source of truth
+- froze the initial Contacts snapshot schema skeleton and `ContactService` facade direction
 
 **Key Changes**
 
-- add `ContactsDomainSnapshot`
-- add `ContactIdentity`, `ContactKeyRecord`, and `RecipientList`
-- add the `ContactsAvailability` type shape
-- add a domain repository layer under `ContactService`
-- preserve a compatibility projection so existing UI and service consumers can still operate during the migration sequence
-- keep ordinary runtime reads on the gated legacy compatibility source through Contacts PR3; compatibility projection exists to preserve consumers, not to switch source of truth early
-- register Contacts as a `ProtectedDataRelockParticipant`
-- clear decrypted snapshot state, serialization scratch buffers, search index state, signer-recognition state, and all `ContactService`-exposed runtime / compatibility projection state on relock
+- added `ContactsDomainSnapshot`
+- added `ContactIdentity`, `ContactKeyRecord`, and `RecipientList`
+- added the `ContactsAvailability` type shape
+- added a domain repository layer under `ContactService`
+- preserved a compatibility projection so existing UI and service consumers could operate during the migration sequence
+- kept ordinary runtime reads on the gated legacy compatibility source through Contacts PR3; compatibility projection existed to preserve consumers, not to switch source of truth early
+- registered Contacts as a `ProtectedDataRelockParticipant`
+- cleared decrypted snapshot state, serialization scratch buffers, search index state, signer-recognition state, and all `ContactService`-exposed runtime / compatibility projection state on relock
 
 **Not In Scope**
 
@@ -392,21 +393,23 @@ No remaining Phase 7 prerequisite blocks Contacts feature work. Later Contacts i
 
 ### 6.4 Contacts PR3 — Contacts Post-Auth Lifecycle And Surface Availability
 
+Status: implemented as the lifecycle/access-gating bridge before PR4 protected-domain cutover.
+
 **Goals**
 
-- stop all ordinary Contacts route access and mutations from bypassing shared protected-domain lifecycle rules
-- remove pre-auth Contacts loading from startup and direct route tasks
-- move Contacts availability behind shared post-auth / post-unlock gating in normal app use without cutting over the source of truth
+- stopped all ordinary Contacts route access and mutations from bypassing shared protected-domain lifecycle rules
+- removed pre-auth Contacts loading from startup and direct route tasks
+- moved Contacts availability behind shared post-auth / post-unlock gating in normal app use without cutting over the source of truth
 
 **Key Changes**
 
-- remove startup-time Contacts payload loading before shared root-secret activation and Contacts domain unlock
-- introduce the `ContactsAvailability` lifecycle surface consumed by Contacts-dependent routes and services
-- reuse the app-authenticated `LAContext` for root-secret retrieval when available
-- place the legacy plaintext compatibility source behind the post-auth Contacts gate until the PR4 migration and cutover move the source of truth into the protected Contacts domain
-- gate Contacts list, detail, import commit, delete, manual verification, Encrypt recipient resolution, and certificate-signature entry through `ContactsAvailability`
-- gate certificate-signature verification-time candidate signer reads so `CertificateSignatureService` cannot consume Contacts-backed `candidateSigners` while the Contacts domain is locked
-- implement route-level opening / locked / recovery-needed / framework-unavailable behavior
+- removed startup-time Contacts payload loading before shared root-secret activation and Contacts domain unlock
+- introduced the `ContactsAvailability` lifecycle surface consumed by Contacts-dependent routes and services
+- reused the app-authenticated `LAContext` for root-secret retrieval when available
+- placed the legacy plaintext compatibility source behind the post-auth Contacts gate during PR3; PR4 later moved the source of truth into the protected Contacts domain
+- gated Contacts list, detail, import commit, delete, manual verification, Encrypt recipient resolution, and certificate-signature entry through `ContactsAvailability`
+- gated certificate-signature verification-time candidate signer reads so `CertificateSignatureService` could not consume Contacts-backed `candidateSigners` while Contacts was unavailable
+- implemented route-level opening / locked / recovery-needed / framework-unavailable behavior
 
 **Gate Input Contract**
 
@@ -417,7 +420,7 @@ Contacts PR3 does not derive `ContactsAvailability` from `ProtectedDataPostUnloc
 
 `frameworkState == .restartRequired` takes priority over all post-unlock outcomes and maps to `ContactsAvailability.restartRequired`. `frameworkState == .frameworkRecoveryNeeded` takes priority next and maps to `ContactsAvailability.frameworkUnavailable`.
 
-Contacts is intentionally not registered as a post-unlock protected-domain opener in PR3. Eligible outcomes therefore mean the shared app-data session is authorized enough to read the current legacy compatibility source, not that a Contacts protected-domain payload has been opened or committed.
+Historical PR3 note: this stage used the authorized shared app-data session to read the then-current legacy compatibility source. It did not open or commit a Contacts protected-domain payload.
 
 **Outcome Mapping**
 
@@ -426,14 +429,14 @@ Contacts is intentionally not registered as a post-unlock protected-domain opene
 | `frameworkState == .restartRequired` | `.restartRequired` | yes | no | Restart required |
 | `frameworkState == .frameworkRecoveryNeeded` | `.frameworkUnavailable` | yes | no | Protected-data framework unavailable |
 | `.opened(_) + .sessionAuthorized` | `.opening` -> success `.availableLegacyCompatibility` / failure `.recoveryNeeded` | yes, before load | yes | Loading, then list or recovery |
-| `.noRegisteredDomainPresent + .sessionAuthorized` | `.opening` -> success `.availableLegacyCompatibility` / failure `.recoveryNeeded` | yes, before load | yes | Uses authorized app-data session; Contacts is not an opener in PR3 |
+| `.noRegisteredDomainPresent + .sessionAuthorized` | `.opening` -> success `.availableLegacyCompatibility` / failure `.recoveryNeeded` | yes, before load | yes | Historical PR3 path using the authorized shared app-data session |
 | `.noRegisteredOpeners + .sessionAuthorized` | `.opening` -> success `.availableLegacyCompatibility` / failure `.recoveryNeeded` | yes, before load | yes | Test / degraded path only; production should not normally hit it |
 | `.noProtectedDomainPresent` | `.locked` | yes | no | Protected-data gate unavailable |
 | `.noAuthenticatedContext` | `.locked` | yes | no | No authenticated context |
 | `.authorizationDenied` | `.locked` | yes | no | User canceled or denied authentication |
 | `.pendingMutationRecoveryRequired` | `.frameworkUnavailable` | yes | no | Pending mutation recovery blocks Contacts |
 | `.frameworkRecoveryNeeded` | `.frameworkUnavailable` | yes | no | Framework recovery blocks Contacts |
-| `.domainOpenFailed(_)` | `.frameworkUnavailable` | yes | no | Contacts is not an opener; any protected-domain open failure blocks PR3 Contacts load |
+| `.domainOpenFailed(_)` | `.frameworkUnavailable` | yes | no | Historical PR3 path where any protected-domain open failure blocked Contacts load |
 | Any other outcome + `.sessionLocked` | `.locked` | yes | no | Session locked |
 
 **Gated API Rule**
@@ -723,7 +726,7 @@ The later implementation PRs must collectively satisfy the following scenario se
 
 This implementation-prep document is only complete if a later implementer can answer all of the following without inventing new architecture:
 
-- why Contacts protected-domain adoption needs more than a storage swap
+- why the remaining Contacts feature work needs more than a storage swap
 - why completed shared framework hardening remains a prerequisite rather than a Contacts-internal PR
 - which Contacts security/storage pieces are already implemented by PR4 and which feature pieces remain
 - what the Contacts schema skeleton may define before later behavior PRs
@@ -744,4 +747,4 @@ The companion inventory document must also be detailed enough that an implemente
 - Verification accuracy refactor is a dedicated earlier PR.
 - Certification projection, saved signature artifacts, and UX redesign are a dedicated capability PR.
 - `.cypherair-contacts` package export/import is selected-contact exchange, not whole-domain recovery.
-- Empty-install restore is out of scope for Contacts Phase 8.
+- Empty-install restore is out of scope for the remaining Contacts feature plan.
