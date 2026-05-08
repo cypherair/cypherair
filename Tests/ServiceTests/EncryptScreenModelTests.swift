@@ -71,7 +71,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Recipient"
         )
-        let recipientContactId = legacyContactId(for: recipientIdentity)
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
 
         var configuration = EncryptView.Configuration()
         configuration.prefilledPlaintext = "Prefilled message"
@@ -117,7 +117,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Recipient"
         )
-        let recipientContactId = legacyContactId(for: recipientIdentity)
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
 
         let model = makeModel()
         model.plaintext = "User edited plaintext"
@@ -152,7 +152,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Recipient"
         )
-        let recipientContactId = legacyContactId(for: recipientIdentity)
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
 
         let model = makeModel()
         model.plaintext = "User edited plaintext"
@@ -186,6 +186,35 @@ final class EncryptScreenModelTests: XCTestCase {
         model.updateConfiguration(configuration)
 
         XCTAssertEqual(model.selectedRecipients, ["contact-id-primary"])
+    }
+
+    @MainActor
+    func test_handleAppear_ignoresStaleInitialRecipientFingerprints() async throws {
+        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+            service: stack.keyManagement,
+            name: "Stale Recipient"
+        )
+
+        var configuration = EncryptView.Configuration()
+        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+
+        let model = makeModel(configuration: configuration)
+        model.handleAppear()
+
+        XCTAssertTrue(model.selectedRecipients.isEmpty)
+    }
+
+    @MainActor
+    func test_updateConfiguration_clearsSelectionForStaleCompatibilityFingerprint() {
+        let model = makeModel()
+        model.selectedRecipients = ["manual-recipient"]
+
+        var configuration = EncryptView.Configuration()
+        configuration.initialRecipientFingerprints = ["stale-fingerprint"]
+
+        model.updateConfiguration(configuration)
+
+        XCTAssertTrue(model.selectedRecipients.isEmpty)
     }
 
     @MainActor
@@ -602,8 +631,9 @@ final class EncryptScreenModelTests: XCTestCase {
         )
     }
 
-    private func legacyContactId(for identity: PGPKeyIdentity) -> String {
-        "legacy-contact-\(identity.fingerprint)"
+    private func importContactAndResolveContactId(for identity: PGPKeyIdentity) throws -> String {
+        _ = try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        return try XCTUnwrap(stack.contactService.contactId(forFingerprint: identity.fingerprint))
     }
 
     private func makeOpenedProtectedContactService(

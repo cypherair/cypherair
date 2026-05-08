@@ -72,6 +72,10 @@ struct ContactImportWorkflow {
                  .updated(let contact), .duplicate(let contact):
                 onSuccess(contact)
             case .keyUpdateDetected(let newContact, let existingContact, let replacementKeyData):
+                guard contactService.contactsAvailability != .availableProtectedDomain else {
+                    onFailure(.contactKeyReplacementUnsupported)
+                    return
+                }
                 let pendingUpdate = PendingContactKeyUpdate(
                     newContact: newContact,
                     existingContact: existingContact,

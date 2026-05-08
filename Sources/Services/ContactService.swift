@@ -11,8 +11,9 @@ enum AddContactResult {
     case duplicate(Contact)
     /// Existing same-fingerprint contact absorbed new public update material.
     case updated(Contact)
-    /// Same userId but different fingerprint detected. The caller must confirm
-    /// before the old key is replaced. Call `confirmKeyUpdate` to proceed.
+    /// Legacy flat Contacts only: same userId but different fingerprint detected.
+    /// The caller must confirm before the old key is replaced. Protected-domain
+    /// Contacts import different fingerprints as separate identities instead.
     case keyUpdateDetected(newContact: Contact, existingContact: Contact, keyData: Data)
 }
 
@@ -167,10 +168,11 @@ final class ContactService: @unchecked Sendable {
     /// Import a public key and add it as a contact.
     /// Handles both binary and ASCII-armored input.
     ///
-    /// Returns `.keyUpdateDetected` if the parsed userId conflicts with another
-    /// contact's fingerprint, including after a same-fingerprint merge/update.
-    /// In that case, the caller must present a warning and call `confirmKeyUpdate`
-    /// if the user approves.
+    /// In legacy flat Contacts runtime, returns `.keyUpdateDetected` if the parsed
+    /// userId conflicts with another contact's fingerprint, including after a
+    /// same-fingerprint merge/update. Protected-domain runtime imports related
+    /// different-fingerprint keys as separate identities and returns candidates
+    /// for optional later merge.
     ///
     /// - Parameter publicKeyData: The public key data (binary or armored).
     /// - Returns: The result of the add operation.
@@ -323,9 +325,10 @@ final class ContactService: @unchecked Sendable {
         }
     }
 
-    /// Apply a user-confirmed key replacement after `addContact` returns
-    /// `.keyUpdateDetected`. Supports both classic different-fingerprint replacement
-    /// and same-fingerprint merged updates that now conflict with another contact.
+    /// Legacy flat Contacts compatibility only: apply a user-confirmed key
+    /// replacement after `addContact` returns `.keyUpdateDetected`. Protected-domain
+    /// Contacts does not support replacement; import the new key separately and
+    /// merge identities if needed.
     ///
     /// - Parameters:
     ///   - existingFingerprint: Fingerprint of the contact being removed/replaced.
@@ -335,12 +338,7 @@ final class ContactService: @unchecked Sendable {
     func confirmKeyUpdate(existingFingerprint: String, keyData: Data) throws -> Contact {
         try requireContactsAvailable()
         if contactsAvailability == .availableProtectedDomain {
-            return try withProtectedRuntimeRollback {
-                try performConfirmKeyUpdate(
-                    existingFingerprint: existingFingerprint,
-                    keyData: keyData
-                )
-            }
+            throw CypherAirError.contactKeyReplacementUnsupported
         }
         return try performConfirmKeyUpdate(
             existingFingerprint: existingFingerprint,
@@ -567,8 +565,10 @@ final class ContactService: @unchecked Sendable {
            let keyRecord = runtimeSnapshot.keyRecords.first(where: { $0.fingerprint == fingerprint }) {
             return keyRecord.contactId
         }
-        return contacts.first(where: { $0.fingerprint == fingerprint })?.contactId
-            ?? "legacy-contact-\(fingerprint)"
+        guard let contact = contacts.first(where: { $0.fingerprint == fingerprint }) else {
+            return nil
+        }
+        return contact.contactId ?? "legacy-contact-\(fingerprint)"
     }
 
     func availableKey(fingerprint: String) -> ContactKeySummary? {

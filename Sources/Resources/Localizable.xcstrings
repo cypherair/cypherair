@@ -3665,6 +3665,22 @@
         }
       }
     },
+    "error.contactKeyReplacementUnsupported" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key replacement is only available for legacy contacts. Import the new key as a separate contact, then merge contacts if needed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥替换仅适用于旧版联系人。请将新密钥作为单独联系人导入，然后按需合并联系人。"
+          }
+        }
+      }
+    },
     "error.corruptData" : {
       "localizations" : {
         "en" : {

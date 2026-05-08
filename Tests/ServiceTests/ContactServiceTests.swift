@@ -919,6 +919,25 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertTrue(toolbarBlock.contains("routeNavigator.open(.addContact)"))
     }
 
+    func test_contactIdForFingerprint_requiresExistingContactBeforeSynthesizingLegacyId() throws {
+        XCTAssertNil(contactService.contactId(forFingerprint: "stale-fingerprint"))
+
+        let generated = try engine.generateKey(
+            name: "Legacy Lookup",
+            email: "legacy-lookup@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+
+        XCTAssertEqual(
+            contactService.contactId(forFingerprint: generated.fingerprint),
+            "legacy-contact-\(generated.fingerprint)"
+        )
+        XCTAssertNil(contactService.contactId(forFingerprint: "missing-\(generated.fingerprint)"))
+    }
+
     func test_pr5ProductionRecipientResolutionUsesContactIdsOutsideCompatibilitySeams() throws {
         let sourcesRoot = try RepositoryAuditLoader.sourcesRootURL()
         let allowedRelativePaths: Set<String> = [
@@ -1210,6 +1229,50 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(candidate.strength, .weak)
         XCTAssertEqual(candidate.contactIds, [try XCTUnwrap(firstContact.contactId)])
         XCTAssertNotEqual(firstContact.contactId, secondContact.contactId)
+        XCTAssertEqual(service.availableContactIdentities.count, 2)
+    }
+
+    func test_pr5ProtectedConfirmKeyUpdateFailsClosedAndPreservesSnapshot() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR5ConfirmReplacement")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let firstKey = try engine.generateKey(
+            name: "Protected Replacement",
+            email: "protected-replacement@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let secondKey = try engine.generateKey(
+            name: "Protected Replacement",
+            email: "protected-replacement@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        let firstResult = try service.addContact(publicKeyData: firstKey.publicKeyData)
+        guard case .added(let firstContact) = firstResult else {
+            return XCTFail("Expected .added, got \(firstResult)")
+        }
+        let secondResult = try service.addContact(publicKeyData: secondKey.publicKeyData)
+        guard case .addedWithCandidate = secondResult else {
+            return XCTFail("Expected .addedWithCandidate, got \(secondResult)")
+        }
+
+        let beforeSnapshot = try service.currentCompatibilitySnapshot()
+        XCTAssertThrowsError(
+            try service.confirmKeyUpdate(
+                existingFingerprint: firstContact.fingerprint,
+                keyData: secondKey.publicKeyData
+            )
+        ) { error in
+            guard let cypherError = error as? CypherAirError,
+                  case .contactKeyReplacementUnsupported = cypherError else {
+                return XCTFail("Expected .contactKeyReplacementUnsupported, got \(error)")
+            }
+        }
+        XCTAssertEqual(try service.currentCompatibilitySnapshot(), beforeSnapshot)
         XCTAssertEqual(service.availableContactIdentities.count, 2)
     }
 
