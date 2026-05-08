@@ -43,11 +43,11 @@ struct ContactsView: View {
     }
 
     private var contactsList: some View {
-        let contacts = contactService.availableContacts
+        let contacts = contactService.availableContactIdentities
 
         return List {
             ForEach(contacts) { contact in
-                NavigationLink(value: AppRoute.contactDetail(fingerprint: contact.fingerprint)) {
+                NavigationLink(value: AppRoute.contactDetail(contactId: contact.contactId)) {
                     ContactRowView(contact: contact)
                 }
                 .accessibilityIdentifier("contacts.row")
@@ -64,11 +64,11 @@ struct ContactsView: View {
         .cypherMacReadableContent()
     }
 
-    private func deleteContacts(at indexSet: IndexSet, from contacts: [Contact]) {
+    private func deleteContacts(at indexSet: IndexSet, from contacts: [ContactIdentitySummary]) {
         for index in indexSet {
             let contact = contacts[index]
             do {
-                try contactService.removeContact(fingerprint: contact.fingerprint)
+                try contactService.removeContactIdentity(contactId: contact.contactId)
             } catch {
                 deleteError = error.localizedDescription
                 showDeleteError = true
@@ -127,25 +127,36 @@ struct ContactsView: View {
 }
 
 private struct ContactRowView: View {
-    let contact: Contact
+    let contact: ContactIdentitySummary
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text(contact.displayName)
                     .font(.body.weight(.medium))
-                if !contact.isVerified {
+                if contact.hasUnverifiedKeys {
                     CypherStatusBadge(
                         title: String(localized: "contacts.unverified", defaultValue: "Unverified"),
                         color: .orange
                     )
                 }
+                if !contact.canEncryptTo {
+                    CypherStatusBadge(
+                        title: String(localized: "contacts.noPreferredKey", defaultValue: "Needs Key"),
+                        color: .red
+                    )
+                }
             }
             HStack(spacing: 8) {
-                Text(contact.profile.displayName)
+                Text(contact.keyCountDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if let email = contact.email {
+                if let preferredKey = contact.preferredKey {
+                    Text(preferredKey.profile.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let email = contact.primaryEmail {
                     Text(email)
                         .font(.caption)
                         .foregroundStyle(.secondary)

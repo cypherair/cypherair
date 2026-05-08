@@ -1,7 +1,7 @@
 # Contacts Protected Domain Implementation Plan
 
-> **Version:** Draft v0.2
-> **Status:** Draft implementation-prep plan for remaining Contacts feature work, updated with Contacts PR4 protected-domain security/storage cutover coverage notes.
+> **Version:** Draft v0.3
+> **Status:** Draft implementation-prep plan for remaining Contacts feature work, updated with Contacts PR5 person-centered model coverage notes.
 > **Purpose:** Bridge the gap between the current shared ProtectedData framework, implemented Contacts protected-domain security/storage behavior, and the remaining Contacts feature work so later implementation can proceed through a stable, reviewable PR sequence.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
@@ -10,7 +10,7 @@
 
 ## 1. Scope And Relationship
 
-This document is an implementation-prep companion for the Contacts follow-on phase. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, and the Contacts PR4 protected-domain security/storage cutover, while person-centered Contacts features still need a stable implementation path.
+This document is an implementation-prep companion for the Contacts follow-on phase. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, the Contacts PR4 protected-domain security/storage cutover, and the Contacts PR5 person-centered runtime model, while certification projection, package exchange, and organization/search surfaces still need a stable implementation path.
 
 This document specifies:
 
@@ -44,7 +44,7 @@ The repository has already resolved the major PR3 / PR4 security-storage deltas 
 - PR3 removed pre-auth plaintext Contacts startup loading and moved ordinary Contacts access behind the shared post-auth lifecycle surface
 - PR4 migrated the flat compatibility snapshot into the protected `contacts` domain, quarantined legacy plaintext, and made legacy/quarantine storage cleanup-only after cutover
 - verification-capable services still need the planned contract split between cryptographic verification and Contacts enrichment
-- remaining feature work still includes Contacts-owned certification projection, selected-contact package exchange, person-centered modeling, search, tags, recipient lists, and merge behavior
+- remaining feature work still includes Contacts-owned certification projection, selected-contact package exchange, search, tags, recipient-list UI, and organization workflows
 
 This document preserves the historical PR sequence for review context and turns the remaining work into explicit dependencies and validation gates.
 
@@ -522,6 +522,8 @@ Status: implemented for the flat compatibility snapshot security/storage cutover
 
 ### 6.6 Contacts PR5 — Person-Centered Contacts Model And Multi-Key Behavior
 
+Status: implemented as a Swift-only Contacts feature PR on top of the PR4 protected `contacts` domain.
+
 **Goals**
 
 - complete the semantic shift from flat public-key records to person-centered Contacts
@@ -529,27 +531,31 @@ Status: implemented for the flat compatibility snapshot security/storage cutover
 
 **Key Changes**
 
-- preferred / additional / historical key state
-- explicit merge behavior
-- signer recognition across historical keys
-- recipient resolution by contact identity instead of flat fingerprint list
+- `ContactService` now exposes identity and key-summary DTOs while keeping flat `Contact` as a compatibility projection
+- protected-domain import updates same-fingerprint key records in place, creates new identities for same-email different-fingerprint imports, and returns strong/weak candidate matches for optional later merge
+- Contact Detail and Contacts list are identity-centered; certificate-signature entry remains key-specific through fingerprint routes
+- merge reassigns source keys to the surviving target identity, unions tags and recipient-list memberships, and preserves per-key manual verification plus certification projection/artifact references
+- preferred / additional / historical key state is enforced for protected-domain mutations; historical keys stay visible for signer recognition and are excluded from encryption recipient resolution
+- Encrypt selection stores contact IDs, resolves compatibility initial fingerprints to contact IDs on appear, and encrypts through preferred-key recipient resolution
+- source audits forbid production fingerprint-recipient resolution outside compatibility seams
 
 **Not In Scope**
 
 - no search / tags / recipient-list UI finish yet
+- no certification projection persistence/UX redesign beyond preserving the existing reserved per-key fields
 
 **Inventory Coverage**
 
-- merge rows
-- preferred-key management rows
-- signer-recognition rows
-- recipient-resolution semantics rows
+- merge rows are covered by Contact Detail merge entry and `ContactService.mergeContact(sourceContactId:into:)`
+- preferred-key management rows are covered by `setPreferredKey` and `setKeyUsageState`
+- signer-recognition rows are covered by verification context returning preferred, additional, and historical key projections
+- recipient-resolution semantics rows are covered by contact-ID resolution through preferred encryptable keys
 
 **Validation**
 
-- merge invariants
-- preferred-key fallback rules
-- historical-key signer recognition
+- protected import candidate matching, same-fingerprint key-record stability, merge invariants, tag/list union, preferred-key persistence/fail-closed behavior, historical-key exclusion from encryption, and historical-key signer recognition are covered by `ContactServiceTests`
+- snapshot invariants cover one-preferred maximum, active-key encryptability, historical non-encryptable validity, and zero-preferred unresolved runtime state
+- Encrypt model tests cover contact-ID selection and compatibility fingerprint bridging
 
 ### 6.7 Contacts PR6 — Certification Projection Persistence And UX Redesign
 

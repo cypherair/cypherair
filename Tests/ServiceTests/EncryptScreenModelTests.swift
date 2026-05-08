@@ -63,6 +63,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Recipient"
         )
+        let recipientContactId = legacyContactId(for: recipientIdentity)
 
         var configuration = EncryptView.Configuration()
         configuration.prefilledPlaintext = "Prefilled message"
@@ -75,7 +76,7 @@ final class EncryptScreenModelTests: XCTestCase {
         model.handleAppear()
 
         XCTAssertEqual(model.plaintext, "Prefilled message")
-        XCTAssertEqual(model.selectedRecipients, [recipientIdentity.fingerprint])
+        XCTAssertEqual(model.selectedRecipients, [recipientContactId])
         XCTAssertEqual(model.signerFingerprint, signerIdentity.fingerprint)
         XCTAssertEqual(model.encryptToSelfFingerprint, signerIdentity.fingerprint)
         XCTAssertFalse(model.signMessage)
@@ -91,7 +92,7 @@ final class EncryptScreenModelTests: XCTestCase {
         model.handleAppear()
 
         XCTAssertEqual(model.plaintext, "User edited plaintext")
-        XCTAssertEqual(model.selectedRecipients, [recipientIdentity.fingerprint])
+        XCTAssertEqual(model.selectedRecipients, [recipientContactId])
         XCTAssertEqual(model.signerFingerprint, signerIdentity.fingerprint)
         XCTAssertEqual(model.encryptToSelfFingerprint, signerIdentity.fingerprint)
         XCTAssertFalse(model.signMessage)
@@ -108,6 +109,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Recipient"
         )
+        let recipientContactId = legacyContactId(for: recipientIdentity)
 
         let model = makeModel()
         model.plaintext = "User edited plaintext"
@@ -128,7 +130,7 @@ final class EncryptScreenModelTests: XCTestCase {
         model.updateConfiguration(configuration)
 
         XCTAssertEqual(model.plaintext, "User edited plaintext")
-        XCTAssertEqual(model.selectedRecipients, [recipientIdentity.fingerprint])
+        XCTAssertEqual(model.selectedRecipients, [recipientContactId])
         XCTAssertEqual(model.signerFingerprint, signerIdentity.fingerprint)
         XCTAssertEqual(model.encryptToSelfFingerprint, signerIdentity.fingerprint)
         XCTAssertFalse(model.signMessage)
@@ -142,6 +144,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Recipient"
         )
+        let recipientContactId = legacyContactId(for: recipientIdentity)
 
         let model = makeModel()
         model.plaintext = "User edited plaintext"
@@ -153,12 +156,28 @@ final class EncryptScreenModelTests: XCTestCase {
         model.updateConfiguration(activeConfiguration)
 
         XCTAssertEqual(model.plaintext, "User edited plaintext")
-        XCTAssertEqual(model.selectedRecipients, [recipientIdentity.fingerprint])
+        XCTAssertEqual(model.selectedRecipients, [recipientContactId])
 
         model.updateConfiguration(.default)
 
         XCTAssertEqual(model.plaintext, "User edited plaintext")
         XCTAssertTrue(model.selectedRecipients.isEmpty)
+    }
+
+    @MainActor
+    func test_initialRecipientContactIdsTakePrecedenceOverCompatibilityFingerprints() async throws {
+        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+        let model = makeModel()
+        var configuration = EncryptView.Configuration()
+        configuration.initialRecipientContactIds = ["contact-id-primary"]
+        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+
+        model.updateConfiguration(configuration)
+
+        XCTAssertEqual(model.selectedRecipients, ["contact-id-primary"])
     }
 
     @MainActor
@@ -506,6 +525,10 @@ final class EncryptScreenModelTests: XCTestCase {
             textEncryptionAction: textEncryptionAction,
             fileEncryptionAction: fileEncryptionAction
         )
+    }
+
+    private func legacyContactId(for identity: PGPKeyIdentity) -> String {
+        "legacy-contact-\(identity.fingerprint)"
     }
 
     private func makeTemporaryFile(named name: String, contents: Data) throws -> URL {

@@ -160,6 +160,7 @@
 				Models/Contacts/ContactIdentity.swift,
 				Models/Contacts/ContactKeyRecord.swift,
 				Models/Contacts/ContactKeyUsageState.swift,
+				Models/Contacts/ContactRuntimeModels.swift,
 				Models/Contacts/ContactsAvailability.swift,
 				Models/Contacts/ContactsDomainSnapshot.swift,
 				Models/Contacts/ContactTag.swift,

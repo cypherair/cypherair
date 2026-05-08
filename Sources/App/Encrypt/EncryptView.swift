@@ -42,6 +42,7 @@ struct EncryptView: View {
         }
 
         var prefilledPlaintext: String?
+        var initialRecipientContactIds: [String] = []
         var initialRecipientFingerprints: [String] = []
         var initialSignerFingerprint: String?
         var signingPolicy: TogglePolicy = .initial(true)
@@ -59,6 +60,7 @@ struct EncryptView: View {
 
     struct RuntimeSyncKey: Equatable {
         let prefilledPlaintext: String?
+        let initialRecipientContactIds: [String]
         let initialRecipientFingerprints: [String]
         let initialSignerFingerprint: String?
         let signingPolicy: Configuration.TogglePolicy
@@ -77,6 +79,7 @@ struct EncryptView: View {
             // When adding configuration fields, evaluate whether they should
             // participate in runtime host-to-model sync.
             prefilledPlaintext = configuration.prefilledPlaintext
+            initialRecipientContactIds = configuration.initialRecipientContactIds
             initialRecipientFingerprints = configuration.initialRecipientFingerprints
             initialSignerFingerprint = configuration.initialSignerFingerprint
             signingPolicy = configuration.signingPolicy
@@ -203,9 +206,9 @@ private struct EncryptScreenHostView: View {
                 if model.contactsAvailability.isAvailable {
                     ForEach(model.encryptableContacts) { contact in
                         Toggle(isOn: Binding(
-                            get: { model.selectedRecipients.contains(contact.fingerprint) },
+                            get: { model.selectedRecipients.contains(contact.contactId) },
                             set: { isOn in
-                                model.toggleRecipient(contact.fingerprint, isOn: isOn)
+                                model.toggleRecipient(contact.contactId, isOn: isOn)
                             }
                         )) {
                             HStack {
@@ -213,10 +216,10 @@ private struct EncryptScreenHostView: View {
                                 VStack(alignment: .leading) {
                                     Text(contact.displayName)
                                     HStack(spacing: 6) {
-                                        Text(contact.profile.displayName)
+                                        Text(contact.preferredKey?.profile.displayName ?? "")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
-                                        if !contact.isVerified {
+                                        if contact.hasUnverifiedKeys {
                                             CypherStatusBadge(
                                                 title: String(localized: "encrypt.contact.unverified", defaultValue: "Unverified"),
                                                 color: .orange
@@ -501,13 +504,13 @@ private struct EncryptScreenHostView: View {
         }
     }
 
-    private func compatibilityIndicator(for contact: Contact) -> some View {
+    private func compatibilityIndicator(for contact: ContactIdentitySummary) -> some View {
         Group {
-            if contact.isExpired || contact.isRevoked {
+            if contact.preferredKey == nil {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.red)
-                    .accessibilityLabel(String(localized: "encrypt.compat.expired", defaultValue: "Key expired or revoked"))
-            } else if model.defaultKeyVersion == 6 && contact.keyVersion == 4 {
+                    .accessibilityLabel(String(localized: "encrypt.compat.noPreferred", defaultValue: "No preferred encryption key"))
+            } else if model.defaultKeyVersion == 6 && contact.preferredKey?.keyVersion == 4 {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .accessibilityLabel(String(localized: "encrypt.compat.downgrade", defaultValue: "Format downgrade to SEIPDv1"))

@@ -107,11 +107,11 @@ struct TutorialRouteDestinationView: View {
                     )
                 }
             )
-        case .contactDetail(let fingerprint):
+        case .contactDetail(let contactId):
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {
                     ContactDetailView(
-                        fingerprint: fingerprint,
+                        contactId: contactId,
                         configuration: factory.contactDetailConfiguration()
                     )
                 }

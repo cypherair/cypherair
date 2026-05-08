@@ -32,15 +32,33 @@ final class EncryptionService {
 
     // MARK: - Text Encryption
 
-    /// Encrypt text for the specified recipients.
+    /// Encrypt text for the specified contact identities.
     /// Returns ASCII-armored ciphertext.
     ///
     /// - Parameters:
     ///   - plaintext: The text to encrypt.
-    ///   - recipientFingerprints: Fingerprints of recipients to encrypt to.
+    ///   - recipientContactIds: Contact identity identifiers to encrypt to.
     ///   - signWithFingerprint: Fingerprint of the signing key (nil = don't sign).
     ///   - encryptToSelf: Whether to also encrypt to the sender's own key.
     /// - Returns: ASCII-armored ciphertext data.
+    func encryptText(
+        _ plaintext: String,
+        recipientContactIds: [String],
+        signWithFingerprint: String?,
+        encryptToSelf: Bool,
+        encryptToSelfFingerprint: String? = nil
+    ) async throws -> Data {
+        let plaintextData = Data(plaintext.utf8)
+        return try await encrypt(
+            plaintext: plaintextData,
+            recipientContactIds: recipientContactIds,
+            signWithFingerprint: signWithFingerprint,
+            encryptToSelf: encryptToSelf,
+            encryptToSelfFingerprint: encryptToSelfFingerprint,
+            binary: false
+        )
+    }
+
     func encryptText(
         _ plaintext: String,
         recipientFingerprints: [String],
@@ -61,17 +79,39 @@ final class EncryptionService {
 
     // MARK: - File Encryption
 
-    /// Encrypt file data for the specified recipients.
+    /// Encrypt file data for the specified contact identities.
     /// Returns binary .gpg ciphertext.
     ///
     /// File size is validated against the 100 MB limit.
     ///
     /// - Parameters:
     ///   - fileData: The file content to encrypt.
-    ///   - recipientFingerprints: Fingerprints of recipients.
+    ///   - recipientContactIds: Contact identity identifiers to encrypt to.
     ///   - signWithFingerprint: Fingerprint of the signing key (nil = don't sign).
     ///   - encryptToSelf: Whether to also encrypt to the sender's own key.
     /// - Returns: Binary ciphertext data (.gpg format).
+    func encryptFile(
+        _ fileData: Data,
+        recipientContactIds: [String],
+        signWithFingerprint: String?,
+        encryptToSelf: Bool,
+        encryptToSelfFingerprint: String? = nil
+    ) async throws -> Data {
+        let maxSize = 100 * 1024 * 1024
+        guard fileData.count <= maxSize else {
+            throw CypherAirError.fileTooLarge(sizeMB: (fileData.count + 1024 * 1024 - 1) / (1024 * 1024))
+        }
+
+        return try await encrypt(
+            plaintext: fileData,
+            recipientContactIds: recipientContactIds,
+            signWithFingerprint: signWithFingerprint,
+            encryptToSelf: encryptToSelf,
+            encryptToSelfFingerprint: encryptToSelfFingerprint,
+            binary: true
+        )
+    }
+
     func encryptFile(
         _ fileData: Data,
         recipientFingerprints: [String],
@@ -103,11 +143,29 @@ final class EncryptionService {
     ///
     /// - Parameters:
     ///   - inputURL: URL of the plaintext file.
-    ///   - recipientFingerprints: Fingerprints of recipients to encrypt to.
+    ///   - recipientContactIds: Contact identity identifiers to encrypt to.
     ///   - signWithFingerprint: Fingerprint of the signing key (nil = don't sign).
     ///   - encryptToSelf: Whether to also encrypt to the sender's own key.
     ///   - progress: Progress reporter for UI updates and cancellation.
     /// - Returns: App-owned encrypted output artifact (.gpg).
+    func encryptFileStreaming(
+        inputURL: URL,
+        recipientContactIds: [String],
+        signWithFingerprint: String?,
+        encryptToSelf: Bool,
+        encryptToSelfFingerprint: String? = nil,
+        progress: FileProgressReporter?
+    ) async throws -> AppTemporaryArtifact {
+        try await encryptFileStreaming(
+            inputURL: inputURL,
+            recipientKeys: try contactService.publicKeysForRecipientContactIDs(recipientContactIds),
+            signWithFingerprint: signWithFingerprint,
+            encryptToSelf: encryptToSelf,
+            encryptToSelfFingerprint: encryptToSelfFingerprint,
+            progress: progress
+        )
+    }
+
     func encryptFileStreaming(
         inputURL: URL,
         recipientFingerprints: [String],
@@ -119,7 +177,27 @@ final class EncryptionService {
         guard !recipientFingerprints.isEmpty else {
             throw CypherAirError.noRecipientsSelected
         }
+        return try await encryptFileStreaming(
+            inputURL: inputURL,
+            recipientKeys: try contactService.publicKeysForRecipientFingerprints(recipientFingerprints),
+            signWithFingerprint: signWithFingerprint,
+            encryptToSelf: encryptToSelf,
+            encryptToSelfFingerprint: encryptToSelfFingerprint,
+            progress: progress
+        )
+    }
 
+    private func encryptFileStreaming(
+        inputURL: URL,
+        recipientKeys: [Data],
+        signWithFingerprint: String?,
+        encryptToSelf: Bool,
+        encryptToSelfFingerprint: String? = nil,
+        progress: FileProgressReporter?
+    ) async throws -> AppTemporaryArtifact {
+        guard !recipientKeys.isEmpty else {
+            throw CypherAirError.noRecipientsSelected
+        }
         // Get file size for disk space check
         let inputPath = inputURL.path
         let attrs = try FileManager.default.attributesOfItem(atPath: inputPath)
@@ -127,8 +205,6 @@ final class EncryptionService {
 
         // Validate disk space before starting
         try diskSpaceChecker.validateForEncryption(inputFileSize: fileSize)
-
-        let recipientKeys = try contactService.publicKeysForRecipientFingerprints(recipientFingerprints)
 
         // Get signing key if requested (requires SE unwrap → Face ID)
         var signingKey: Data?
@@ -192,6 +268,28 @@ final class EncryptionService {
 
     private func encrypt(
         plaintext: Data,
+        recipientContactIds: [String],
+        signWithFingerprint: String?,
+        encryptToSelf: Bool,
+        encryptToSelfFingerprint: String? = nil,
+        binary: Bool
+    ) async throws -> Data {
+        guard !recipientContactIds.isEmpty else {
+            throw CypherAirError.noRecipientsSelected
+        }
+
+        return try await encrypt(
+            plaintext: plaintext,
+            recipientKeys: try contactService.publicKeysForRecipientContactIDs(recipientContactIds),
+            signWithFingerprint: signWithFingerprint,
+            encryptToSelf: encryptToSelf,
+            encryptToSelfFingerprint: encryptToSelfFingerprint,
+            binary: binary
+        )
+    }
+
+    private func encrypt(
+        plaintext: Data,
         recipientFingerprints: [String],
         signWithFingerprint: String?,
         encryptToSelf: Bool,
@@ -202,7 +300,27 @@ final class EncryptionService {
             throw CypherAirError.noRecipientsSelected
         }
 
-        let recipientKeys = try contactService.publicKeysForRecipientFingerprints(recipientFingerprints)
+        return try await encrypt(
+            plaintext: plaintext,
+            recipientKeys: try contactService.publicKeysForRecipientFingerprints(recipientFingerprints),
+            signWithFingerprint: signWithFingerprint,
+            encryptToSelf: encryptToSelf,
+            encryptToSelfFingerprint: encryptToSelfFingerprint,
+            binary: binary
+        )
+    }
+
+    private func encrypt(
+        plaintext: Data,
+        recipientKeys: [Data],
+        signWithFingerprint: String?,
+        encryptToSelf: Bool,
+        encryptToSelfFingerprint: String? = nil,
+        binary: Bool
+    ) async throws -> Data {
+        guard !recipientKeys.isEmpty else {
+            throw CypherAirError.noRecipientsSelected
+        }
 
         // Get signing key if requested (requires SE unwrap → Face ID)
         var signingKey: Data?
