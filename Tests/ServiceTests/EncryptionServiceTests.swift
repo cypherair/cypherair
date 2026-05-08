@@ -52,6 +52,20 @@ final class EncryptionServiceTests: XCTestCase {
         XCTAssertTrue(header?.hasPrefix("-----BEGIN PGP") == true)
     }
 
+    func test_encryptText_contactIdRecipient_producesNonEmptyCiphertext() async throws {
+        let identity = try await generateKeyAndContact(profile: .universal)
+        let contactId = try XCTUnwrap(stack.contactService.contactId(forFingerprint: identity.fingerprint))
+
+        let ciphertext = try await stack.encryptionService.encryptText(
+            "Hello, contact ID recipient!",
+            recipientContactIds: [contactId],
+            signWithFingerprint: nil,
+            encryptToSelf: false
+        )
+
+        XCTAssertFalse(ciphertext.isEmpty)
+    }
+
     // MARK: - Text Encryption: Profile B
 
     func test_encryptText_profileB_producesNonEmptyCiphertext() async throws {

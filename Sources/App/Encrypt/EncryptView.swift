@@ -216,10 +216,10 @@ private struct EncryptScreenHostView: View {
                                 VStack(alignment: .leading) {
                                     Text(contact.displayName)
                                     HStack(spacing: 6) {
-                                        Text(contact.preferredKey?.profile.displayName ?? "")
+                                        Text(contact.preferredKey.profile.displayName)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
-                                        if contact.hasUnverifiedKeys {
+                                        if !contact.isPreferredKeyVerified {
                                             CypherStatusBadge(
                                                 title: String(localized: "encrypt.contact.unverified", defaultValue: "Unverified"),
                                                 color: .orange
@@ -504,13 +504,9 @@ private struct EncryptScreenHostView: View {
         }
     }
 
-    private func compatibilityIndicator(for contact: ContactIdentitySummary) -> some View {
+    private func compatibilityIndicator(for contact: ContactRecipientSummary) -> some View {
         Group {
-            if contact.preferredKey == nil {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.red)
-                    .accessibilityLabel(String(localized: "encrypt.compat.noPreferred", defaultValue: "No preferred encryption key"))
-            } else if model.defaultKeyVersion == 6 && contact.preferredKey?.keyVersion == 4 {
+            if model.defaultKeyVersion == 6 && contact.preferredKey.keyVersion == 4 {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .accessibilityLabel(String(localized: "encrypt.compat.downgrade", defaultValue: "Format downgrade to SEIPDv1"))

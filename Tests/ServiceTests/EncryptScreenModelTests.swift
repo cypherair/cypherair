@@ -22,6 +22,14 @@ private actor EncryptOperationGate {
 }
 
 final class EncryptScreenModelTests: XCTestCase {
+    private typealias ContactsProtectedHarness = (
+        storageRoot: ProtectedDataStorageRoot,
+        registryStore: ProtectedDataRegistryStore,
+        domainKeyManager: ProtectedDomainKeyManager,
+        wrappingRootKey: Data,
+        store: ContactsDomainStore
+    )
+
     private var stack: TestHelpers.ServiceStack!
     private var config: AppConfiguration!
     private var protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator!
@@ -266,6 +274,73 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertEqual(encryptCount, 1)
         XCTAssertEqual(model.ciphertext, Data("ciphertext".utf8))
         XCTAssertEqual(callbackCiphertext, Data("ciphertext".utf8))
+    }
+
+    @MainActor
+    func test_requestEncrypt_verifiedPreferredWithUnverifiedHistoricalKeyDoesNotWarn() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptPreferredVerification")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let preferred = try stack.engine.generateKey(
+            name: "Preferred Recipient",
+            email: "preferred-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let historical = try stack.engine.generateKey(
+            name: "Historical Recipient",
+            email: "historical-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+        try opened.service.addContact(publicKeyData: preferred.publicKeyData, verificationState: .verified)
+        try opened.service.addContact(publicKeyData: historical.publicKeyData, verificationState: .unverified)
+        let targetContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: preferred.fingerprint))
+        let sourceContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: historical.fingerprint))
+        _ = try opened.service.mergeContact(sourceContactId: sourceContactId, into: targetContactId)
+        try opened.service.setKeyUsageState(.historical, fingerprint: historical.fingerprint)
+
+        let mergedIdentity = try XCTUnwrap(opened.service.availableContactIdentity(forContactID: targetContactId))
+        XCTAssertTrue(mergedIdentity.hasUnverifiedKeys)
+
+        var encryptCount = 0
+        var configuration = EncryptView.Configuration()
+        configuration.initialRecipientContactIds = [targetContactId]
+        let encryptionService = EncryptionService(
+            engine: stack.engine,
+            keyManagement: stack.keyManagement,
+            contactService: opened.service
+        )
+        let model = EncryptScreenModel(
+            encryptionService: encryptionService,
+            keyManagement: stack.keyManagement,
+            contactService: opened.service,
+            config: config,
+            protectedOrdinarySettings: protectedOrdinarySettings,
+            configuration: configuration,
+            textEncryptionAction: { _, _, _, _, _ in
+                encryptCount += 1
+                return Data("ciphertext".utf8)
+            }
+        )
+        model.plaintext = "Secret"
+        model.handleAppear()
+
+        XCTAssertTrue(model.selectedUnverifiedContacts.isEmpty)
+        model.requestEncrypt()
+
+        await waitUntil("preferred-only encryption to finish") {
+            model.operation.isRunning == false
+        }
+
+        XCTAssertFalse(model.showUnverifiedRecipientsWarning)
+        XCTAssertEqual(encryptCount, 1)
+        XCTAssertEqual(model.ciphertext, Data("ciphertext".utf8))
     }
 
     @MainActor
@@ -529,6 +604,81 @@ final class EncryptScreenModelTests: XCTestCase {
 
     private func legacyContactId(for identity: PGPKeyIdentity) -> String {
         "legacy-contact-\(identity.fingerprint)"
+    }
+
+    private func makeOpenedProtectedContactService(
+        prefix: String
+    ) async throws -> (
+        service: ContactService,
+        harness: ContactsProtectedHarness,
+        contactsDirectory: URL
+    ) {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(prefix)-contacts-\(UUID().uuidString)", isDirectory: true)
+        let harness = try makeContactsProtectedHarness(
+            prefix: prefix,
+            contactsDirectory: directory
+        )
+        let service = ContactService(
+            engine: stack.engine,
+            contactsDirectory: directory,
+            contactsDomainStore: harness.store
+        )
+        let availability = await service.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+        XCTAssertEqual(availability, .availableProtectedDomain)
+        return (service, harness, directory)
+    }
+
+    private func makeContactsProtectedHarness(
+        prefix: String,
+        contactsDirectory: URL
+    ) throws -> ContactsProtectedHarness {
+        let storageRoot = ProtectedDataStorageRoot(
+            baseDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)
+        )
+        let registryStore = ProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.encrypt.\(UUID().uuidString)"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        var registry = try registryStore.loadRegistry()
+        registry.sharedResourceLifecycleState = .ready
+        registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
+        try registryStore.saveRegistry(registry)
+
+        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot)
+        let wrappingRootKey = Data(repeating: 0xB5, count: 32)
+        let migrationSource = ContactsLegacyMigrationSource(
+            engine: stack.engine,
+            repository: ContactRepository(contactsDirectory: contactsDirectory)
+        )
+        let store = ContactsDomainStore(
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey },
+            initialSnapshotProvider: {
+                try migrationSource.makeInitialSnapshot()
+            }
+        )
+        return (
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            wrappingRootKey: wrappingRootKey,
+            store: store
+        )
+    }
+
+    private func authorizedContactsGate() -> ContactsPostAuthGateResult {
+        ContactsPostAuthGateResult(
+            postUnlockOutcome: .opened([ProtectedSettingsStore.domainID]),
+            frameworkState: .sessionAuthorized
+        )
     }
 
     private func makeTemporaryFile(named name: String, contents: Data) throws -> URL {

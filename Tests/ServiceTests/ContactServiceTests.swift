@@ -925,12 +925,14 @@ final class ContactServiceTests: XCTestCase {
             "App/Encrypt/EncryptScreenModel.swift",
             "App/Encrypt/EncryptView.swift",
             "App/Onboarding/Tutorial/TutorialConfigurationFactory.swift",
+            "Services/ContactRecipientResolver.swift",
             "Services/ContactService.swift",
             "Services/EncryptionService.swift",
         ]
         let forbiddenPatterns: [(label: String, regex: String)] = [
             ("fingerprint recipient parameter", #"recipientFingerprints\s*:"#),
             ("fingerprint recipient resolver", #"publicKeysForRecipientFingerprints\s*\("#),
+            ("legacy fingerprint recipient resolver", #"legacyPublicKeysForRecipientFingerprints\s*\("#),
         ]
         var violations: [String] = []
 
@@ -965,6 +967,177 @@ final class ContactServiceTests: XCTestCase {
     }
 
     // MARK: - PR5 Contact Identities
+
+    func test_pr5ImportMatcher_sameFingerprintDoesNotReturnCandidate() throws {
+        var snapshot = ContactsDomainSnapshot.empty()
+        let mutator = ContactSnapshotMutator(engine: engine)
+        let matcher = ContactImportMatcher()
+        let generated = try engine.generateKey(
+            name: "Matcher Same Fingerprint",
+            email: "matcher-same@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        _ = try mutator.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .verified,
+            in: &snapshot
+        )
+        let validation = try ContactImportPublicCertificateValidator.validate(
+            generated.publicKeyData,
+            using: engine
+        )
+
+        XCTAssertNil(matcher.candidateMatch(for: validation, in: snapshot))
+    }
+
+    func test_pr5SnapshotMutator_sameFingerprintUpdatePreservesCanonicalIds() throws {
+        var snapshot = ContactsDomainSnapshot.empty()
+        let mutator = ContactSnapshotMutator(engine: engine)
+        let generated = try engine.generateKey(
+            name: "Mutator Stable Key",
+            email: "mutator-stable@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let refreshed = try engine.modifyExpiry(
+            certData: generated.certData,
+            newExpirySeconds: 60 * 60 * 24 * 365
+        )
+
+        _ = try mutator.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .verified,
+            in: &snapshot
+        )
+        let beforeRecord = try XCTUnwrap(snapshot.keyRecords.first)
+
+        let update = try mutator.addContact(
+            publicKeyData: refreshed.publicKeyData,
+            verificationState: .verified,
+            in: &snapshot
+        )
+
+        guard case .updated(let fingerprint) = update.output else {
+            return XCTFail("Expected .updated, got \(update.output)")
+        }
+        let afterRecord = try XCTUnwrap(snapshot.keyRecords.first)
+        XCTAssertEqual(fingerprint, beforeRecord.fingerprint)
+        XCTAssertEqual(afterRecord.contactId, beforeRecord.contactId)
+        XCTAssertEqual(afterRecord.keyId, beforeRecord.keyId)
+    }
+
+    func test_pr5RecipientResolver_usesPreferredKeyAndLegacyExactFingerprintRows() throws {
+        var snapshot = ContactsDomainSnapshot.empty()
+        let mutator = ContactSnapshotMutator(engine: engine)
+        let resolver = ContactRecipientResolver()
+        let firstKey = try engine.generateKey(
+            name: "Resolver One",
+            email: "resolver-one@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let secondKey = try engine.generateKey(
+            name: "Resolver Two",
+            email: "resolver-two@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        _ = try mutator.addContact(
+            publicKeyData: firstKey.publicKeyData,
+            verificationState: .verified,
+            in: &snapshot
+        )
+        _ = try mutator.addContact(
+            publicKeyData: secondKey.publicKeyData,
+            verificationState: .verified,
+            in: &snapshot
+        )
+        let targetContactId = try XCTUnwrap(
+            snapshot.keyRecords.first { $0.fingerprint == firstKey.fingerprint }?.contactId
+        )
+        let sourceContactId = try XCTUnwrap(
+            snapshot.keyRecords.first { $0.fingerprint == secondKey.fingerprint }?.contactId
+        )
+        _ = try mutator.mergeContact(
+            sourceContactId: sourceContactId,
+            into: targetContactId,
+            in: &snapshot
+        )
+
+        XCTAssertEqual(
+            try resolver.publicKeysForRecipientContactIDs([targetContactId], in: snapshot),
+            [firstKey.publicKeyData]
+        )
+        XCTAssertEqual(
+            try resolver.legacyPublicKeysForRecipientFingerprints(
+                [secondKey.fingerprint],
+                contacts: try ContactsDomainRepository().makeCompatibilityContacts(from: snapshot)
+            ),
+            [secondKey.publicKeyData]
+        )
+        XCTAssertThrowsError(
+            try resolver.legacyPublicKeysForRecipientFingerprints(
+                [targetContactId],
+                contacts: try ContactsDomainRepository().makeCompatibilityContacts(from: snapshot)
+            )
+        )
+    }
+
+    func test_pr5SummaryProjector_recipientRowsUsePreferredKeyVerificationOnly() throws {
+        var snapshot = ContactsDomainSnapshot.empty()
+        let mutator = ContactSnapshotMutator(engine: engine)
+        let projector = ContactSummaryProjector()
+        let preferredKey = try engine.generateKey(
+            name: "Projector Preferred",
+            email: "projector-preferred@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let historicalKey = try engine.generateKey(
+            name: "Projector Historical",
+            email: "projector-historical@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        _ = try mutator.addContact(
+            publicKeyData: preferredKey.publicKeyData,
+            verificationState: .verified,
+            in: &snapshot
+        )
+        _ = try mutator.addContact(
+            publicKeyData: historicalKey.publicKeyData,
+            verificationState: .unverified,
+            in: &snapshot
+        )
+        let targetContactId = try XCTUnwrap(
+            snapshot.keyRecords.first { $0.fingerprint == preferredKey.fingerprint }?.contactId
+        )
+        let sourceContactId = try XCTUnwrap(
+            snapshot.keyRecords.first { $0.fingerprint == historicalKey.fingerprint }?.contactId
+        )
+        _ = try mutator.mergeContact(
+            sourceContactId: sourceContactId,
+            into: targetContactId,
+            in: &snapshot
+        )
+        _ = try mutator.setKeyUsageState(
+            .historical,
+            fingerprint: historicalKey.fingerprint,
+            in: &snapshot
+        )
+
+        let identity = try XCTUnwrap(projector.identitySummary(contactId: targetContactId, in: snapshot))
+        let recipient = try XCTUnwrap(
+            projector.recipientSummaries(from: snapshot).first { $0.contactId == targetContactId }
+        )
+        XCTAssertTrue(identity.hasUnverifiedKeys)
+        XCTAssertEqual(recipient.preferredKey.fingerprint, preferredKey.fingerprint)
+        XCTAssertTrue(recipient.isPreferredKeyVerified)
+    }
 
     func test_pr5ProtectedImport_sameEmailDifferentFingerprintCreatesNewIdentityAndStrongCandidate() async throws {
         let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR5StrongCandidate")

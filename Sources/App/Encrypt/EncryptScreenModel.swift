@@ -123,7 +123,7 @@ final class EncryptScreenModel {
         }
     }
 
-    var encryptableContacts: [ContactIdentitySummary] {
+    var encryptableContacts: [ContactRecipientSummary] {
         contactService.availableRecipientContacts
     }
 
@@ -139,9 +139,9 @@ final class EncryptScreenModel {
         keyManagement.defaultKey.map(\.keyVersion)
     }
 
-    var selectedUnverifiedContacts: [ContactIdentitySummary] {
-        contactService.availableContactIdentities.filter { contact in
-            selectedRecipients.contains(contact.contactId) && contact.hasUnverifiedKeys
+    var selectedUnverifiedContacts: [ContactRecipientSummary] {
+        contactService.availableRecipientContacts.filter { contact in
+            selectedRecipients.contains(contact.contactId) && !contact.isPreferredKeyVerified
         }
     }
 

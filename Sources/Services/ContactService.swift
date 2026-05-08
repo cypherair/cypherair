@@ -30,6 +30,10 @@ final class ContactService: @unchecked Sendable {
     private let domainRepository: ContactsDomainRepository
     private let legacyMigrationSource: ContactsLegacyMigrationSource
     private let contactsDomainStore: ContactsDomainStore?
+    private let importMatcher = ContactImportMatcher()
+    private let recipientResolver = ContactRecipientResolver()
+    private let summaryProjector = ContactSummaryProjector()
+    private let snapshotMutator: ContactSnapshotMutator
     private(set) var contactsAvailability: ContactsAvailability = .locked
     private var verificationStates: [String: ContactVerificationState] = [:]
     private var runtimeSnapshot: ContactsDomainSnapshot?
@@ -57,6 +61,7 @@ final class ContactService: @unchecked Sendable {
             engine: engine,
             repository: repository
         )
+        snapshotMutator = ContactSnapshotMutator(engine: engine)
         self.contactsDomainStore = contactsDomainStore
     }
 
@@ -238,9 +243,10 @@ final class ContactService: @unchecked Sendable {
                     verificationState: resolvedVerificationState
                 )
 
-                if let conflictingContact = conflictingContact(
+                if let conflictingContact = importMatcher.conflictingLegacyContact(
                     forUserId: updatedContact.userId,
-                    excludingFingerprint: updatedContact.fingerprint
+                    excludingFingerprint: updatedContact.fingerprint,
+                    contacts: contacts
                 ) {
                     var replacementContact = updatedContact
                     replacementContact.verificationState = .verified
@@ -264,9 +270,10 @@ final class ContactService: @unchecked Sendable {
         }
 
         // Check for same userId but different fingerprint (key update)
-        if let existingContact = conflictingContact(
+        if let existingContact = importMatcher.conflictingLegacyContact(
             forUserId: contact.userId,
-            excludingFingerprint: contact.fingerprint
+            excludingFingerprint: contact.fingerprint,
+            contacts: contacts
         ) {
             contact.verificationState = .verified
             // Different fingerprint = key regenerated — caller must confirm before replacing.
@@ -290,104 +297,30 @@ final class ContactService: @unchecked Sendable {
         publicKeyData: Data,
         verificationState: ContactVerificationState = .verified
     ) throws -> AddContactResult {
-        let validation = try ContactImportPublicCertificateValidator.validate(
-            publicKeyData,
-            using: engine
-        )
-        let binaryData = validation.publicCertData
         var snapshot = try mutableRuntimeSnapshot()
-        let now = Date()
-
-        if let existingIndex = snapshot.keyRecords.firstIndex(where: {
-            $0.fingerprint == validation.keyInfo.fingerprint
-        }) {
-            let existingRecord = snapshot.keyRecords[existingIndex]
-            let mergedResult: CertificateMergeResult
-            do {
-                mergedResult = try engine.mergePublicCertificateUpdate(
-                    existingCert: existingRecord.publicKeyData,
-                    incomingCertOrUpdate: binaryData
-                )
-            } catch {
-                throw ContactImportPublicCertificateValidator.mapError(error)
-            }
-
-            let resolvedVerificationState: ContactVerificationState =
-                (existingRecord.manualVerificationState.isVerified || verificationState == .verified)
-                ? .verified
-                : existingRecord.manualVerificationState
-
-            switch mergedResult.outcome {
-            case .noOp:
-                if snapshot.keyRecords[existingIndex].manualVerificationState != resolvedVerificationState {
-                    snapshot.keyRecords[existingIndex].manualVerificationState = resolvedVerificationState
-                    snapshot.keyRecords[existingIndex].updatedAt = now
-                    snapshot.updatedAt = now
-                    try normalizeKeyUsage(in: &snapshot, updatedAt: now)
-                    try persistProtectedRuntimeSnapshot(snapshot)
-                }
-                let contact = try compatibilityContact(
-                    forFingerprint: existingRecord.fingerprint,
-                    in: snapshot
-                )
-                return .duplicate(contact)
-
-            case .updated:
-                let updatedValidation = try ContactImportPublicCertificateValidator.validate(
-                    mergedResult.mergedCertData,
-                    using: engine
-                )
-                snapshot.keyRecords[existingIndex] = updatedKeyRecord(
-                    preserving: existingRecord,
-                    from: updatedValidation,
-                    publicKeyData: mergedResult.mergedCertData,
-                    verificationState: resolvedVerificationState,
-                    now: now
-                )
-                updateIdentityDisplayIfNeeded(
-                    contactId: existingRecord.contactId,
-                    from: snapshot.keyRecords[existingIndex],
-                    in: &snapshot,
-                    now: now
-                )
-                snapshot.updatedAt = now
-                try normalizeKeyUsage(in: &snapshot, updatedAt: now)
-                try persistProtectedRuntimeSnapshot(snapshot)
-                let contact = try compatibilityContact(
-                    forFingerprint: updatedValidation.keyInfo.fingerprint,
-                    in: snapshot
-                )
-                return .updated(contact)
-            }
-        }
-
-        let candidateMatch = candidateMatch(for: validation, in: snapshot)
-        let identity = makeIdentity(from: validation, now: now)
-        let keyRecord = makeKeyRecord(
-            from: validation,
-            contactId: identity.contactId,
+        let mutation = try snapshotMutator.addContact(
+            publicKeyData: publicKeyData,
             verificationState: verificationState,
-            usageState: validation.keyInfo.hasEncryptionSubkey
-                && !validation.keyInfo.isRevoked
-                && !validation.keyInfo.isExpired
-                ? .preferred
-                : .historical,
-            now: now
+            in: &snapshot
         )
-        snapshot.identities.append(identity)
-        snapshot.keyRecords.append(keyRecord)
-        snapshot.updatedAt = now
-        try normalizeKeyUsage(in: &snapshot, updatedAt: now)
-        try persistProtectedRuntimeSnapshot(snapshot)
-
-        let contact = try compatibilityContact(
-            forFingerprint: validation.keyInfo.fingerprint,
-            in: snapshot
-        )
-        if let candidateMatch {
-            return .addedWithCandidate(contact, candidateMatch)
+        if mutation.didMutate {
+            try persistProtectedRuntimeSnapshot(snapshot)
         }
-        return .added(contact)
+
+        switch mutation.output {
+        case .duplicate(let fingerprint):
+            let contact = try compatibilityContact(forFingerprint: fingerprint, in: snapshot)
+            return .duplicate(contact)
+        case .updated(let fingerprint):
+            let contact = try compatibilityContact(forFingerprint: fingerprint, in: snapshot)
+            return .updated(contact)
+        case .added(let fingerprint, let candidateMatch):
+            let contact = try compatibilityContact(forFingerprint: fingerprint, in: snapshot)
+            if let candidateMatch {
+                return .addedWithCandidate(contact, candidateMatch)
+            }
+            return .added(contact)
+        }
     }
 
     /// Apply a user-confirmed key replacement after `addContact` returns
@@ -464,22 +397,13 @@ final class ContactService: @unchecked Sendable {
         if contactsAvailability == .availableProtectedDomain {
             try withProtectedRuntimeRollback {
                 var snapshot = try mutableRuntimeSnapshot()
-                let removedFingerprints = Set(
-                    snapshot.keyRecords
-                        .filter { $0.contactId == contactId }
-                        .map(\.fingerprint)
+                let mutation = snapshotMutator.removeContactIdentity(
+                    contactId: contactId,
+                    in: &snapshot
                 )
-                snapshot.identities.removeAll { $0.contactId == contactId }
-                snapshot.keyRecords.removeAll { $0.contactId == contactId }
-                for listIndex in snapshot.recipientLists.indices {
-                    snapshot.recipientLists[listIndex].memberContactIds.removeAll { $0 == contactId }
-                    snapshot.recipientLists[listIndex].updatedAt = Date()
+                if mutation.didMutate {
+                    try persistProtectedRuntimeSnapshot(snapshot)
                 }
-                snapshot.updatedAt = Date()
-                for fingerprint in removedFingerprints {
-                    verificationStates.removeValue(forKey: fingerprint)
-                }
-                try persistProtectedRuntimeSnapshot(snapshot)
             }
             return
         }
@@ -535,34 +459,25 @@ final class ContactService: @unchecked Sendable {
         for fingerprint: String
     ) throws {
         var snapshot = try mutableRuntimeSnapshot()
-        guard let index = snapshot.keyRecords.firstIndex(where: { $0.fingerprint == fingerprint }) else {
-            throw CypherAirError.internalError(
-                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
-            )
+        let mutation = try snapshotMutator.setVerificationState(
+            verificationState,
+            for: fingerprint,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistProtectedRuntimeSnapshot(snapshot)
         }
-        snapshot.keyRecords[index].manualVerificationState = verificationState
-        snapshot.keyRecords[index].updatedAt = Date()
-        snapshot.updatedAt = Date()
-        try persistProtectedRuntimeSnapshot(snapshot)
     }
 
     private func performProtectedRemoveKey(fingerprint: String) throws {
         var snapshot = try mutableRuntimeSnapshot()
-        guard let keyRecord = snapshot.keyRecords.first(where: { $0.fingerprint == fingerprint }) else {
-            return
+        let mutation = try snapshotMutator.removeKey(
+            fingerprint: fingerprint,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistProtectedRuntimeSnapshot(snapshot)
         }
-        snapshot.keyRecords.removeAll { $0.fingerprint == fingerprint }
-        if !snapshot.keyRecords.contains(where: { $0.contactId == keyRecord.contactId }) {
-            snapshot.identities.removeAll { $0.contactId == keyRecord.contactId }
-            for listIndex in snapshot.recipientLists.indices {
-                snapshot.recipientLists[listIndex].memberContactIds.removeAll { $0 == keyRecord.contactId }
-                snapshot.recipientLists[listIndex].updatedAt = Date()
-            }
-        }
-        verificationStates.removeValue(forKey: fingerprint)
-        snapshot.updatedAt = Date()
-        try normalizeKeyUsage(in: &snapshot, updatedAt: Date())
-        try persistProtectedRuntimeSnapshot(snapshot)
     }
 
     var availableContacts: [Contact] {
@@ -577,11 +492,15 @@ final class ContactService: @unchecked Sendable {
               let runtimeSnapshot else {
             return []
         }
-        return contactIdentitySummaries(from: runtimeSnapshot)
+        return summaryProjector.identitySummaries(from: runtimeSnapshot)
     }
 
-    var availableRecipientContacts: [ContactIdentitySummary] {
-        availableContactIdentities.filter(\.canEncryptTo)
+    var availableRecipientContacts: [ContactRecipientSummary] {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return []
+        }
+        return summaryProjector.recipientSummaries(from: runtimeSnapshot)
     }
 
     var runtimeContactCountForDiagnostics: Int {
@@ -637,8 +556,7 @@ final class ContactService: @unchecked Sendable {
               let runtimeSnapshot else {
             return nil
         }
-        return contactIdentitySummaries(from: runtimeSnapshot)
-            .first { $0.contactId == contactId }
+        return summaryProjector.identitySummary(contactId: contactId, in: runtimeSnapshot)
     }
 
     func contactId(forFingerprint fingerprint: String) -> String? {
@@ -655,11 +573,10 @@ final class ContactService: @unchecked Sendable {
 
     func availableKey(fingerprint: String) -> ContactKeySummary? {
         guard contactsAvailability.isAvailable,
-              let runtimeSnapshot,
-              let keyRecord = runtimeSnapshot.keyRecords.first(where: { $0.fingerprint == fingerprint }) else {
+              let runtimeSnapshot else {
             return nil
         }
-        return makeKeySummary(from: keyRecord)
+        return summaryProjector.keySummary(fingerprint: fingerprint, in: runtimeSnapshot)
     }
 
     func requireAvailableContact(forFingerprint fingerprint: String) throws -> Contact? {
@@ -695,23 +612,17 @@ final class ContactService: @unchecked Sendable {
         return selectedContacts.map { $0.publicKeyData }
     }
 
+    @available(*, deprecated, message: "Use contact ID recipient APIs; this remains only for legacy compatibility.")
     func publicKeysForRecipientFingerprints(_ recipientFingerprints: [String]) throws -> [Data] {
+        try legacyPublicKeysForRecipientFingerprints(recipientFingerprints)
+    }
+
+    func legacyPublicKeysForRecipientFingerprints(_ recipientFingerprints: [String]) throws -> [Data] {
         try requireContactsAvailable()
-        let contactsByFingerprint = Dictionary(uniqueKeysWithValues: contacts.map { ($0.fingerprint, $0) })
-        let recipientKeys = recipientFingerprints.compactMap { fingerprint in
-            contactsByFingerprint[fingerprint]?.publicKeyData
-        }
-
-        guard recipientKeys.count == recipientFingerprints.count else {
-            throw CypherAirError.invalidKeyData(
-                reason: String(
-                    localized: "error.recipientNotFound",
-                    defaultValue: "One or more recipients could not be found in contacts."
-                )
-            )
-        }
-
-        return recipientKeys
+        return try recipientResolver.legacyPublicKeysForRecipientFingerprints(
+            recipientFingerprints,
+            contacts: contacts
+        )
     }
 
     func publicKeysForRecipientContactIDs(_ recipientContactIds: [String]) throws -> [Data] {
@@ -719,25 +630,10 @@ final class ContactService: @unchecked Sendable {
         guard let runtimeSnapshot else {
             throw CypherAirError.contactsUnavailable(contactsAvailability)
         }
-
-        var recipientKeys: [Data] = []
-        for contactId in recipientContactIds {
-            guard let preferredKey = runtimeSnapshot.keyRecords.first(where: {
-                $0.contactId == contactId
-                    && $0.usageState == .preferred
-                    && $0.canEncryptTo
-            }) else {
-                throw CypherAirError.invalidKeyData(
-                    reason: String(
-                        localized: "error.recipientPreferredKeyMissing",
-                        defaultValue: "One or more selected contacts do not have a preferred encryption key."
-                    )
-                )
-            }
-            recipientKeys.append(preferredKey.publicKeyData)
-        }
-
-        return recipientKeys
+        return try recipientResolver.publicKeysForRecipientContactIDs(
+            recipientContactIds,
+            in: runtimeSnapshot
+        )
     }
 
     func contactsForVerificationContext() -> (contacts: [Contact], availability: ContactsAvailability) {
@@ -753,36 +649,14 @@ final class ContactService: @unchecked Sendable {
         if contactsAvailability == .availableProtectedDomain {
             try withProtectedRuntimeRollback {
                 var snapshot = try mutableRuntimeSnapshot()
-                guard let preferredIndex = snapshot.keyRecords.firstIndex(where: {
-                    $0.contactId == contactId && $0.fingerprint == fingerprint
-                }) else {
-                    throw CypherAirError.internalError(
-                        reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
-                    )
+                let mutation = try snapshotMutator.setPreferredKey(
+                    fingerprint: fingerprint,
+                    for: contactId,
+                    in: &snapshot
+                )
+                if mutation.didMutate {
+                    try persistProtectedRuntimeSnapshot(snapshot)
                 }
-                guard snapshot.keyRecords[preferredIndex].canEncryptTo else {
-                    throw CypherAirError.invalidKeyData(
-                        reason: String(
-                            localized: "contacts.preferredKey.notEncryptable",
-                            defaultValue: "The selected key cannot receive encrypted messages."
-                        )
-                    )
-                }
-
-                let now = Date()
-                for index in snapshot.keyRecords.indices where snapshot.keyRecords[index].contactId == contactId {
-                    if index == preferredIndex {
-                        snapshot.keyRecords[index].usageState = .preferred
-                    } else if snapshot.keyRecords[index].usageState == .preferred {
-                        snapshot.keyRecords[index].usageState = snapshot.keyRecords[index].canEncryptTo
-                            ? .additionalActive
-                            : .historical
-                    }
-                    snapshot.keyRecords[index].updatedAt = now
-                }
-                snapshot.updatedAt = now
-                try normalizeKeyUsage(in: &snapshot, updatedAt: now)
-                try persistProtectedRuntimeSnapshot(snapshot)
             }
         } else {
             try requireContactsAvailable()
@@ -797,24 +671,14 @@ final class ContactService: @unchecked Sendable {
         if contactsAvailability == .availableProtectedDomain {
             try withProtectedRuntimeRollback {
                 var snapshot = try mutableRuntimeSnapshot()
-                guard let index = snapshot.keyRecords.firstIndex(where: { $0.fingerprint == fingerprint }) else {
-                    throw CypherAirError.internalError(
-                        reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
-                    )
+                let mutation = try snapshotMutator.setKeyUsageState(
+                    usageState,
+                    fingerprint: fingerprint,
+                    in: &snapshot
+                )
+                if mutation.didMutate {
+                    try persistProtectedRuntimeSnapshot(snapshot)
                 }
-                if usageState != .historical && !snapshot.keyRecords[index].canEncryptTo {
-                    throw CypherAirError.invalidKeyData(
-                        reason: String(
-                            localized: "contacts.activeKey.notEncryptable",
-                            defaultValue: "The selected key cannot be active because it cannot receive encrypted messages."
-                        )
-                    )
-                }
-                snapshot.keyRecords[index].usageState = usageState
-                snapshot.keyRecords[index].updatedAt = Date()
-                snapshot.updatedAt = Date()
-                try normalizeKeyUsage(in: &snapshot, updatedAt: Date())
-                try persistProtectedRuntimeSnapshot(snapshot)
             }
         } else {
             try requireContactsAvailable()
@@ -839,50 +703,21 @@ final class ContactService: @unchecked Sendable {
         if contactsAvailability == .availableProtectedDomain {
             return try withProtectedRuntimeRollback {
                 var snapshot = try mutableRuntimeSnapshot()
-                guard snapshot.identities.contains(where: { $0.contactId == sourceContactId }),
-                      snapshot.identities.contains(where: { $0.contactId == targetContactId }) else {
-                    throw CypherAirError.internalError(
-                        reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
-                    )
+                let mutation = try snapshotMutator.mergeContact(
+                    sourceContactId: sourceContactId,
+                    into: targetContactId,
+                    in: &snapshot
+                )
+                if mutation.didMutate {
+                    try persistProtectedRuntimeSnapshot(snapshot)
                 }
-
-                let now = Date()
-                let sourceIdentity = snapshot.identities.first { $0.contactId == sourceContactId }
-                if let targetIndex = snapshot.identities.firstIndex(where: { $0.contactId == targetContactId }),
-                   let sourceIdentity {
-                    snapshot.identities[targetIndex].tagIds = Array(
-                        Set(snapshot.identities[targetIndex].tagIds)
-                            .union(sourceIdentity.tagIds)
-                    ).sorted()
-                    snapshot.identities[targetIndex].updatedAt = now
-                }
-
-                for index in snapshot.keyRecords.indices where snapshot.keyRecords[index].contactId == sourceContactId {
-                    snapshot.keyRecords[index].contactId = targetContactId
-                    if snapshot.keyRecords[index].usageState == .preferred {
-                        snapshot.keyRecords[index].usageState = snapshot.keyRecords[index].canEncryptTo
-                            ? .additionalActive
-                            : .historical
-                    }
-                    snapshot.keyRecords[index].updatedAt = now
-                }
-                for listIndex in snapshot.recipientLists.indices {
-                    if snapshot.recipientLists[listIndex].memberContactIds.contains(sourceContactId),
-                       !snapshot.recipientLists[listIndex].memberContactIds.contains(targetContactId) {
-                        snapshot.recipientLists[listIndex].memberContactIds.append(targetContactId)
-                    }
-                    snapshot.recipientLists[listIndex].memberContactIds.removeAll { $0 == sourceContactId }
-                    snapshot.recipientLists[listIndex].updatedAt = now
-                }
-                snapshot.identities.removeAll { $0.contactId == sourceContactId }
-                snapshot.updatedAt = now
-                try normalizeKeyUsage(in: &snapshot, updatedAt: now)
-                try persistProtectedRuntimeSnapshot(snapshot)
-
-                let surviving = try contactSummaryOrThrow(targetContactId, in: snapshot)
+                let surviving = try contactSummaryOrThrow(
+                    mutation.output.targetContactId,
+                    in: snapshot
+                )
                 return ContactMergeResult(
                     survivingContact: surviving,
-                    removedContactId: sourceContactId,
+                    removedContactId: mutation.output.sourceContactId,
                     preferredKeyNeedsSelection: surviving.preferredKey == nil
                         && surviving.keys.contains(where: { $0.usageState == .additionalActive })
                 )
@@ -946,279 +781,11 @@ final class ContactService: @unchecked Sendable {
         return contact
     }
 
-    private func makeIdentity(
-        from validation: PublicCertificateValidationResult,
-        now: Date
-    ) -> ContactIdentity {
-        ContactIdentity(
-            contactId: "contact-\(UUID().uuidString)",
-            displayName: IdentityPresentation.displayName(from: validation.keyInfo.userId),
-            primaryEmail: IdentityPresentation.email(from: validation.keyInfo.userId),
-            tagIds: [],
-            notes: nil,
-            createdAt: now,
-            updatedAt: now
-        )
-    }
-
-    private func makeKeyRecord(
-        from validation: PublicCertificateValidationResult,
-        contactId: String,
-        verificationState: ContactVerificationState,
-        usageState: ContactKeyUsageState,
-        now: Date
-    ) -> ContactKeyRecord {
-        ContactKeyRecord(
-            keyId: "key-\(UUID().uuidString)",
-            contactId: contactId,
-            fingerprint: validation.keyInfo.fingerprint,
-            primaryUserId: validation.keyInfo.userId,
-            displayName: IdentityPresentation.displayName(from: validation.keyInfo.userId),
-            email: IdentityPresentation.email(from: validation.keyInfo.userId),
-            keyVersion: validation.keyInfo.keyVersion,
-            profile: validation.profile,
-            primaryAlgo: validation.keyInfo.primaryAlgo,
-            subkeyAlgo: validation.keyInfo.subkeyAlgo,
-            hasEncryptionSubkey: validation.keyInfo.hasEncryptionSubkey,
-            isRevoked: validation.keyInfo.isRevoked,
-            isExpired: validation.keyInfo.isExpired,
-            manualVerificationState: verificationState,
-            usageState: usageState,
-            certificationProjection: .empty,
-            certificationArtifactIds: [],
-            publicKeyData: validation.publicCertData,
-            createdAt: now,
-            updatedAt: now
-        )
-    }
-
-    private func updatedKeyRecord(
-        preserving existingRecord: ContactKeyRecord,
-        from validation: PublicCertificateValidationResult,
-        publicKeyData: Data,
-        verificationState: ContactVerificationState,
-        now: Date
-    ) -> ContactKeyRecord {
-        var updatedRecord = existingRecord
-        updatedRecord.primaryUserId = validation.keyInfo.userId
-        updatedRecord.displayName = IdentityPresentation.displayName(from: validation.keyInfo.userId)
-        updatedRecord.email = IdentityPresentation.email(from: validation.keyInfo.userId)
-        updatedRecord.keyVersion = validation.keyInfo.keyVersion
-        updatedRecord.profile = validation.profile
-        updatedRecord.primaryAlgo = validation.keyInfo.primaryAlgo
-        updatedRecord.subkeyAlgo = validation.keyInfo.subkeyAlgo
-        updatedRecord.hasEncryptionSubkey = validation.keyInfo.hasEncryptionSubkey
-        updatedRecord.isRevoked = validation.keyInfo.isRevoked
-        updatedRecord.isExpired = validation.keyInfo.isExpired
-        updatedRecord.manualVerificationState = verificationState
-        updatedRecord.publicKeyData = publicKeyData
-        updatedRecord.updatedAt = now
-        if !updatedRecord.canEncryptTo {
-            updatedRecord.usageState = .historical
-        }
-        return updatedRecord
-    }
-
-    private func updateIdentityDisplayIfNeeded(
-        contactId: String,
-        from keyRecord: ContactKeyRecord,
-        in snapshot: inout ContactsDomainSnapshot,
-        now: Date
-    ) {
-        guard let identityIndex = snapshot.identities.firstIndex(where: {
-            $0.contactId == contactId
-        }) else {
-            return
-        }
-        if snapshot.identities[identityIndex].displayName.isEmpty ||
-            snapshot.identities[identityIndex].displayName == IdentityPresentation.displayName(from: nil) {
-            snapshot.identities[identityIndex].displayName = keyRecord.displayName
-        }
-        if snapshot.identities[identityIndex].primaryEmail == nil {
-            snapshot.identities[identityIndex].primaryEmail = keyRecord.email
-        }
-        snapshot.identities[identityIndex].updatedAt = now
-    }
-
-    private func normalizeKeyUsage(
-        in snapshot: inout ContactsDomainSnapshot,
-        updatedAt: Date
-    ) throws {
-        let contactIds = snapshot.identities.map(\.contactId)
-        for contactId in contactIds {
-            let keyIndices = snapshot.keyRecords.indices.filter {
-                snapshot.keyRecords[$0].contactId == contactId
-            }
-            for index in keyIndices where snapshot.keyRecords[index].usageState != .historical
-                && !snapshot.keyRecords[index].canEncryptTo {
-                snapshot.keyRecords[index].usageState = .historical
-                snapshot.keyRecords[index].updatedAt = updatedAt
-            }
-
-            let preferredIndices = keyIndices.filter {
-                snapshot.keyRecords[$0].usageState == .preferred
-            }
-            if preferredIndices.count > 1 {
-                for index in preferredIndices.dropFirst() {
-                    snapshot.keyRecords[index].usageState = snapshot.keyRecords[index].canEncryptTo
-                        ? .additionalActive
-                        : .historical
-                    snapshot.keyRecords[index].updatedAt = updatedAt
-                }
-            }
-
-            let hasPreferred = keyIndices.contains {
-                snapshot.keyRecords[$0].usageState == .preferred
-                    && snapshot.keyRecords[$0].canEncryptTo
-            }
-            if !hasPreferred {
-                let activeEncryptable = keyIndices.filter {
-                    snapshot.keyRecords[$0].usageState == .additionalActive
-                        && snapshot.keyRecords[$0].canEncryptTo
-                }
-                if activeEncryptable.count == 1, let index = activeEncryptable.first {
-                    snapshot.keyRecords[index].usageState = .preferred
-                    snapshot.keyRecords[index].updatedAt = updatedAt
-                }
-            }
-        }
-        try snapshot.validateContract()
-    }
-
-    private func candidateMatch(
-        for validation: PublicCertificateValidationResult,
-        in snapshot: ContactsDomainSnapshot
-    ) -> ContactCandidateMatch? {
-        let incomingEmail = normalizedEmail(validation.keyInfo.userId)
-        if let incomingEmail {
-            let strongMatches = snapshot.identities.filter {
-                normalizedEmail($0.primaryEmail) == incomingEmail
-            }
-            if strongMatches.count == 1, let match = strongMatches.first {
-                return ContactCandidateMatch(
-                    strength: .strong,
-                    contactIds: [match.contactId],
-                    displayName: match.displayName,
-                    primaryEmail: match.primaryEmail
-                )
-            }
-            if strongMatches.count > 1 {
-                return ContactCandidateMatch(
-                    strength: .ambiguousStrong,
-                    contactIds: strongMatches.map(\.contactId),
-                    displayName: String(
-                        localized: "contacts.candidate.multiple",
-                        defaultValue: "Multiple Contacts"
-                    ),
-                    primaryEmail: incomingEmail
-                )
-            }
-        }
-
-        guard let incomingUserId = validation.keyInfo.userId else {
-            return nil
-        }
-        if let weakKey = snapshot.keyRecords.first(where: {
-            $0.primaryUserId == incomingUserId
-                && $0.fingerprint != validation.keyInfo.fingerprint
-        }),
-           let identity = snapshot.identities.first(where: { $0.contactId == weakKey.contactId }) {
-            return ContactCandidateMatch(
-                strength: .weak,
-                contactIds: [identity.contactId],
-                displayName: identity.displayName,
-                primaryEmail: identity.primaryEmail
-            )
-        }
-
-        return nil
-    }
-
-    private func normalizedEmail(_ userIdOrEmail: String?) -> String? {
-        let email = IdentityPresentation.email(from: userIdOrEmail) ?? userIdOrEmail
-        guard let normalized = email?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased(),
-              !normalized.isEmpty,
-              normalized.contains("@") else {
-            return nil
-        }
-        return normalized
-    }
-
-    private func contactIdentitySummaries(
-        from snapshot: ContactsDomainSnapshot
-    ) -> [ContactIdentitySummary] {
-        let keysByContactId = Dictionary(grouping: snapshot.keyRecords, by: \.contactId)
-        return snapshot.identities
-            .sorted { lhs, rhs in
-                let lhsName = lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName)
-                if lhsName == .orderedSame {
-                    return lhs.contactId < rhs.contactId
-                }
-                return lhsName == .orderedAscending
-            }
-            .map { identity in
-                let keys = (keysByContactId[identity.contactId] ?? [])
-                    .sorted(by: contactKeySort)
-                    .map(makeKeySummary(from:))
-                return ContactIdentitySummary(
-                    contactId: identity.contactId,
-                    displayName: identity.displayName,
-                    primaryEmail: identity.primaryEmail,
-                    tagIds: identity.tagIds,
-                    notes: identity.notes,
-                    keys: keys
-                )
-            }
-    }
-
-    private func contactKeySort(_ lhs: ContactKeyRecord, _ rhs: ContactKeyRecord) -> Bool {
-        let lhsRank = usageSortRank(lhs.usageState)
-        let rhsRank = usageSortRank(rhs.usageState)
-        if lhsRank != rhsRank {
-            return lhsRank < rhsRank
-        }
-        return lhs.fingerprint < rhs.fingerprint
-    }
-
-    private func usageSortRank(_ usageState: ContactKeyUsageState) -> Int {
-        switch usageState {
-        case .preferred:
-            0
-        case .additionalActive:
-            1
-        case .historical:
-            2
-        }
-    }
-
-    private func makeKeySummary(from keyRecord: ContactKeyRecord) -> ContactKeySummary {
-        ContactKeySummary(
-            keyId: keyRecord.keyId,
-            contactId: keyRecord.contactId,
-            fingerprint: keyRecord.fingerprint,
-            primaryUserId: keyRecord.primaryUserId,
-            displayName: keyRecord.displayName,
-            email: keyRecord.email,
-            keyVersion: keyRecord.keyVersion,
-            profile: keyRecord.profile,
-            primaryAlgo: keyRecord.primaryAlgo,
-            subkeyAlgo: keyRecord.subkeyAlgo,
-            hasEncryptionSubkey: keyRecord.hasEncryptionSubkey,
-            isRevoked: keyRecord.isRevoked,
-            isExpired: keyRecord.isExpired,
-            manualVerificationState: keyRecord.manualVerificationState,
-            usageState: keyRecord.usageState
-        )
-    }
-
     private func contactSummaryOrThrow(
         _ contactId: String,
         in snapshot: ContactsDomainSnapshot
     ) throws -> ContactIdentitySummary {
-        guard let summary = contactIdentitySummaries(from: snapshot)
-            .first(where: { $0.contactId == contactId }) else {
+        guard let summary = summaryProjector.identitySummary(contactId: contactId, in: snapshot) else {
             throw CypherAirError.internalError(
                 reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
             )
@@ -1277,19 +844,6 @@ final class ContactService: @unchecked Sendable {
             primaryAlgo: validation.keyInfo.primaryAlgo,
             subkeyAlgo: validation.keyInfo.subkeyAlgo
         )
-    }
-
-    private func conflictingContact(
-        forUserId userId: String?,
-        excludingFingerprint fingerprint: String
-    ) -> Contact? {
-        guard let userId else {
-            return nil
-        }
-
-        return contacts.first {
-            $0.userId == userId && $0.fingerprint != fingerprint
-        }
     }
 
     private func refreshCompatibilityProjection() throws {
