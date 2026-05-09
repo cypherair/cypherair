@@ -204,6 +204,45 @@ private struct EncryptScreenHostView: View {
 
             Section {
                 if model.contactsAvailability.isAvailable {
+                    if !model.recipientLists.isEmpty {
+                        ForEach(model.recipientLists) { recipientList in
+                            Toggle(isOn: Binding(
+                                get: { model.selectedRecipientListIds.contains(recipientList.recipientListId) },
+                                set: { isOn in
+                                    model.toggleRecipientList(recipientList.recipientListId, isOn: isOn)
+                                }
+                            )) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Label(recipientList.name, systemImage: "person.3")
+                                        if !recipientList.canEncryptToAll {
+                                            CypherStatusBadge(
+                                                title: recipientList.memberCount == 0
+                                                    ? String(localized: "recipientLists.emptyList", defaultValue: "Empty")
+                                                    : String(localized: "recipientLists.cannotEncrypt", defaultValue: "Needs Keys"),
+                                                color: .orange
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        String.localizedStringWithFormat(
+                                            String(localized: "recipientLists.memberCount", defaultValue: "%d members"),
+                                            recipientList.memberCount
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                            }
+                            .disabled(!recipientList.canEncryptToAll)
+                        }
+                    }
+
+                    if model.encryptableContacts.isEmpty {
+                        Text(String(localized: "encrypt.recipients.noMatches", defaultValue: "No matching recipients"))
+                            .foregroundStyle(.secondary)
+                    }
+
                     ForEach(model.encryptableContacts) { contact in
                         Toggle(isOn: Binding(
                             get: { model.selectedRecipients.contains(contact.contactId) },
@@ -229,6 +268,15 @@ private struct EncryptScreenHostView: View {
                                 }
                             }
                         }
+                    }
+
+                    if model.selectedRecipientListsContainInvalidMembers {
+                        Label(
+                            String(localized: "encrypt.recipientLists.invalidSelection", defaultValue: "A selected list now needs preferred keys before it can be used."),
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
                     }
 
                     if !model.selectedUnverifiedContacts.isEmpty {
@@ -371,6 +419,11 @@ private struct EncryptScreenHostView: View {
         #endif
         .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "encrypt.title", defaultValue: "Encrypt"))
+        .searchable(
+            text: $model.recipientSearchText,
+            placement: .automatic,
+            prompt: String(localized: "encrypt.search.prompt", defaultValue: "Recipients, tags, fingerprints")
+        )
         .fileImporter(
             isPresented: $model.showFileImporter,
             allowedContentTypes: [.data],

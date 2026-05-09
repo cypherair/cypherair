@@ -185,6 +185,18 @@ struct TutorialUnsafeRouteBlocklist {
                 ),
                 systemImage: "checkmark.seal"
             )
+        case .recipientLists, .recipientListDetail:
+            TutorialBlockedSurface(
+                title: String(
+                    localized: "guidedTutorial.blocked.recipientLists.title",
+                    defaultValue: "Recipient Lists Unavailable"
+                ),
+                message: String(
+                    localized: "guidedTutorial.blocked.recipientLists.body",
+                    defaultValue: "Recipient list management is outside the guided tutorial sandbox."
+                ),
+                systemImage: "person.3"
+            )
         default:
             nil
         }

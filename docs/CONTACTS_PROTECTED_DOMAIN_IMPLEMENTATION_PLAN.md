@@ -10,7 +10,7 @@
 
 ## 1. Scope And Relationship
 
-This document is an implementation-prep companion for the Contacts follow-on phase. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, the Contacts PR4 protected-domain security/storage cutover, the Contacts PR5 person-centered runtime model, and Contacts PR6 certification persistence/UX work, while organization/search surfaces still need a stable implementation path and the earlier Contacts package-exchange plan has been withdrawn.
+This document is an implementation-prep companion for the Contacts follow-on phase. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, the Contacts PR4 protected-domain security/storage cutover, the Contacts PR5 person-centered runtime model, Contacts PR6 certification persistence/UX work, and the Contacts PR8 organization/search finish, while the earlier Contacts package-exchange plan has been withdrawn.
 
 This document specifies:
 
@@ -45,7 +45,7 @@ The repository has already resolved the major PR3 / PR4 security-storage deltas 
 - PR3 removed pre-auth plaintext Contacts startup loading and moved ordinary Contacts access behind the shared post-auth lifecycle surface
 - PR4 migrated the flat compatibility snapshot into the protected `contacts` domain, quarantined legacy plaintext, and made legacy/quarantine storage cleanup-only after cutover
 - verification-capable services still need the planned contract split between cryptographic verification and Contacts enrichment
-- remaining feature work still includes search, tags, recipient-list UI, and organization workflows
+- the remaining organization feature work covered by Contacts PR8 is now implemented over the existing protected `contacts` domain
 
 This document preserves the historical PR sequence for review context and turns the remaining work into explicit dependencies and validation gates.
 
@@ -244,7 +244,7 @@ It is intentionally separated from:
 
 - the early schema skeleton / facade PR
 - the withdrawn package export/import PR
-- the final search / tags / recipient-list finish PR
+- the final search / tags / recipient-list finish PR, now implemented as Contacts PR8
 
 This keeps the sequence stable:
 
@@ -628,33 +628,37 @@ Status: implemented as a Swift-only Contacts feature PR on top of the PR4 protec
 
 ### 6.9 Contacts PR8 — Search, Tags, Recipient Lists, And UI Finish
 
+Status: implemented.
+
 **Goals**
 
 - complete the remaining Contacts product capabilities once lifecycle, migration, model semantics, and certification persistence are already stable
 
 **Key Changes**
 
-- Contacts and Encrypt search
-- tag normalization, filtering, and suggestions
+- Contacts and Encrypt search through an unlocked-only in-memory `ContactsSearchIndex`
+- tag normalization, filtering, suggestions, duplicate suppression, and unused-tag pruning
 - recipient lists bound to `ContactIdentity`
-- final UI surfaces for multi-key management and organization workflows
+- Contacts list/detail, recipient-list management, and Encrypt recipient-list selection UI surfaces
 
 **Not In Scope**
 
 - no new core security architecture
+- no ProtectedData schema version bump
+- no Contacts package exchange, system Contacts integration, or notes-editing expansion
 
 **Inventory Coverage**
 
-- search rows
-- tag rows
-- recipient-list rows
-- final Contacts detail / management rows
+- search rows implemented through `ContactService.contactIdentities(matching:tagFilterIds:)` and `recipientContacts(matching:tagFilterIds:)`
+- tag rows implemented through `ContactService.addTag/removeTag`, `contactTagSummaries`, and `tagSuggestions`
+- recipient-list rows implemented through `ContactService` list CRUD/member APIs plus current-member resolution for Encrypt
+- final Contacts detail / management rows implemented through `ContactsScreenModel`, `ContactsView`, `ContactDetailView`, `RecipientListsView`, `RecipientListDetailView`, and `EncryptScreenModel`
 
 **Validation**
 
 - search relevance and tie-break behavior
-- tag normalization and duplicate suppression
-- recipient-list resolution via preferred encryptable key
+- tag normalization, duplicate suppression, persistence after reopen, and unused-tag pruning
+- recipient-list CRUD/member editing, contact deletion pruning, merge membership union, preferred-key resolution, historical-key exclusion, and missing-preferred fail-closed behavior
 
 ## 7. Validation And Scenario Matrix
 
@@ -735,11 +739,11 @@ The companion inventory document must also be detailed enough that an implemente
 
 ## 9. Assumptions
 
-- This document prepares remaining feature implementation. It does not authorize direct code changes by itself.
+- This document records the Contacts follow-on implementation sequence and PR8 finish state. It does not authorize unrelated direct code changes by itself.
 - Current shared-framework docs and existing Contacts docs remain the architecture and product authorities.
-- Future implementation proceeds with conservative, smaller PRs rather than a single large Contacts feature rollout.
+- Future Contacts expansion beyond PR8 still proceeds with conservative, smaller PRs rather than a single large feature rollout.
 - Verification accuracy refactor is a dedicated earlier PR.
 - Certification projection, saved signature artifacts, and UX redesign are a dedicated capability PR.
 - Contacts PR7 package export/import is withdrawn and must not be implemented from this plan.
-- Empty-install restore is out of scope for the remaining Contacts feature plan.
+- Empty-install restore is out of scope for the completed Contacts PR8 feature plan.
 - Future complete Contacts backup or device migration is out of scope for this plan and must be mandatory encrypted if specified later.

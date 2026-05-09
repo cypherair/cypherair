@@ -126,6 +126,18 @@ struct TutorialRouteDestinationView: View {
                     )
                 }
             )
+        case .recipientLists:
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    RecipientListsView()
+                }
+            )
+        case .recipientListDetail(let recipientListId):
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    RecipientListDetailView(recipientListId: recipientListId)
+                }
+            )
         case .qrDisplay(let publicKeyData, let displayName):
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { QRDisplayView(publicKeyData: publicKeyData, displayName: displayName) })
         case .importKey:

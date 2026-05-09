@@ -38,6 +38,7 @@ final class ContactService: @unchecked Sendable {
     private(set) var contactsAvailability: ContactsAvailability = .locked
     private var verificationStates: [String: ContactVerificationState] = [:]
     private var runtimeSnapshot: ContactsDomainSnapshot?
+    private var contactsSearchIndex: ContactsSearchIndex?
     private(set) var protectedDomainMigrationWarning: String?
 
     init(
@@ -490,19 +491,69 @@ final class ContactService: @unchecked Sendable {
     }
 
     var availableContactIdentities: [ContactIdentitySummary] {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
-            return []
-        }
-        return summaryProjector.identitySummaries(from: runtimeSnapshot)
+        contactIdentities(matching: "", tagFilterIds: [])
     }
 
     var availableRecipientContacts: [ContactRecipientSummary] {
+        recipientContacts(matching: "", tagFilterIds: [])
+    }
+
+    func contactIdentities(
+        matching query: String,
+        tagFilterIds: Set<String> = []
+    ) -> [ContactIdentitySummary] {
         guard contactsAvailability.isAvailable,
               let runtimeSnapshot else {
             return []
         }
-        return summaryProjector.recipientSummaries(from: runtimeSnapshot)
+        let summaries = summaryProjector.identitySummaries(from: runtimeSnapshot)
+        return searchIndex(for: runtimeSnapshot).filterContacts(
+            summaries,
+            matching: query,
+            tagFilterIds: tagFilterIds,
+            contactId: \.contactId
+        )
+    }
+
+    func recipientContacts(
+        matching query: String,
+        tagFilterIds: Set<String> = []
+    ) -> [ContactRecipientSummary] {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return []
+        }
+        let summaries = summaryProjector.recipientSummaries(from: runtimeSnapshot)
+        return searchIndex(for: runtimeSnapshot).filterContacts(
+            summaries,
+            matching: query,
+            tagFilterIds: tagFilterIds,
+            contactId: \.contactId
+        )
+    }
+
+    func contactTagSummaries() -> [ContactTagSummary] {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return []
+        }
+        return summaryProjector.tagSummaries(from: runtimeSnapshot)
+    }
+
+    func recipientListSummaries() -> [RecipientListSummary] {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return []
+        }
+        return summaryProjector.recipientListSummaries(from: runtimeSnapshot)
+    }
+
+    func tagSuggestions(matching query: String) -> [ContactTagSummary] {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return []
+        }
+        return searchIndex(for: runtimeSnapshot).tagSuggestions(matching: query)
     }
 
     var runtimeContactCountForDiagnostics: Int {
@@ -538,6 +589,7 @@ final class ContactService: @unchecked Sendable {
         contacts.isEmpty &&
         verificationStates.isEmpty &&
         runtimeSnapshot == nil &&
+        contactsSearchIndex == nil &&
         contactsAvailability == .locked &&
         domainRepository.runtimeStateIsClearedForTests
     }
@@ -858,6 +910,171 @@ final class ContactService: @unchecked Sendable {
     }
 
     @discardableResult
+    func addTag(
+        named name: String,
+        toContactId contactId: String
+    ) throws -> ContactTagSummary {
+        try requireProtectedContactsAvailableForOrganization()
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.addTag(
+                named: name,
+                toContactId: contactId,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
+        }
+    }
+
+    func removeTag(
+        tagId: String,
+        fromContactId contactId: String
+    ) throws {
+        try requireProtectedContactsAvailableForOrganization()
+        try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.removeTag(
+                tagId: tagId,
+                fromContactId: contactId,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+        }
+    }
+
+    @discardableResult
+    func createRecipientList(
+        named name: String,
+        memberContactIds: [String] = []
+    ) throws -> RecipientListSummary {
+        try requireProtectedContactsAvailableForOrganization()
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.createRecipientList(
+                named: name,
+                memberContactIds: memberContactIds,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return try recipientListSummaryOrThrow(mutation.output.recipientListId, in: snapshot)
+        }
+    }
+
+    @discardableResult
+    func renameRecipientList(
+        _ recipientListId: String,
+        to name: String
+    ) throws -> RecipientListSummary {
+        try requireProtectedContactsAvailableForOrganization()
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.renameRecipientList(
+                recipientListId,
+                to: name,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return try recipientListSummaryOrThrow(mutation.output.recipientListId, in: snapshot)
+        }
+    }
+
+    func deleteRecipientList(_ recipientListId: String) throws {
+        try requireProtectedContactsAvailableForOrganization()
+        try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.deleteRecipientList(
+                recipientListId,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+        }
+    }
+
+    @discardableResult
+    func setRecipientListMembers(
+        _ recipientListId: String,
+        memberContactIds: [String]
+    ) throws -> RecipientListSummary {
+        try requireProtectedContactsAvailableForOrganization()
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.setRecipientListMembers(
+                recipientListId,
+                memberContactIds: memberContactIds,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return try recipientListSummaryOrThrow(mutation.output.recipientListId, in: snapshot)
+        }
+    }
+
+    @discardableResult
+    func addContact(
+        _ contactId: String,
+        toRecipientList recipientListId: String
+    ) throws -> RecipientListSummary {
+        try requireProtectedContactsAvailableForOrganization()
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.addContact(
+                contactId,
+                toRecipientList: recipientListId,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return try recipientListSummaryOrThrow(mutation.output.recipientListId, in: snapshot)
+        }
+    }
+
+    @discardableResult
+    func removeContact(
+        _ contactId: String,
+        fromRecipientList recipientListId: String
+    ) throws -> RecipientListSummary {
+        try requireProtectedContactsAvailableForOrganization()
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.removeContact(
+                contactId,
+                fromRecipientList: recipientListId,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return try recipientListSummaryOrThrow(mutation.output.recipientListId, in: snapshot)
+        }
+    }
+
+    func recipientContactIds(forRecipientListId recipientListId: String) throws -> [String] {
+        try requireContactsAvailable()
+        guard let runtimeSnapshot,
+              let recipientList = runtimeSnapshot.recipientLists.first(where: {
+                  $0.recipientListId == recipientListId
+              }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.recipientList.notFound", defaultValue: "The selected recipient list could not be found.")
+            )
+        }
+        return recipientList.memberContactIds
+    }
+
+    @discardableResult
     func mergeContact(
         sourceContactId: String,
         into targetContactId: String
@@ -965,6 +1182,50 @@ final class ContactService: @unchecked Sendable {
         return summary
     }
 
+    private func tagSummaryOrThrow(
+        _ tagId: String,
+        in snapshot: ContactsDomainSnapshot
+    ) throws -> ContactTagSummary {
+        guard let summary = summaryProjector.tagSummaries(from: snapshot).first(where: {
+            $0.tagId == tagId
+        }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+        return summary
+    }
+
+    private func recipientListSummaryOrThrow(
+        _ recipientListId: String,
+        in snapshot: ContactsDomainSnapshot
+    ) throws -> RecipientListSummary {
+        guard let summary = summaryProjector.recipientListSummaries(from: snapshot).first(where: {
+            $0.recipientListId == recipientListId
+        }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.recipientList.notFound", defaultValue: "The selected recipient list could not be found.")
+            )
+        }
+        return summary
+    }
+
+    private func requireProtectedContactsAvailableForOrganization() throws {
+        try requireContactsAvailable()
+        guard contactsAvailability == .availableProtectedDomain else {
+            throw CypherAirError.contactsUnavailable(contactsAvailability)
+        }
+    }
+
+    private func searchIndex(for snapshot: ContactsDomainSnapshot) -> ContactsSearchIndex {
+        if let contactsSearchIndex {
+            return contactsSearchIndex
+        }
+        let index = ContactsSearchIndex(snapshot: snapshot)
+        contactsSearchIndex = index
+        return index
+    }
+
     private func loadLegacyCompatibilityRuntimeValues() throws -> ContactsLegacyRuntimeValues {
         try repository.ensureDirectoryExists()
         return try legacyMigrationSource.loadRuntimeValues(repairMetadata: true)
@@ -1020,6 +1281,7 @@ final class ContactService: @unchecked Sendable {
 
     private func refreshCompatibilityProjection() throws {
         runtimeSnapshot = try domainRepository.updateCompatibilityRuntime(from: contacts)
+        contactsSearchIndex = runtimeSnapshot.map(ContactsSearchIndex.init(snapshot:))
         contactsAvailability = .availableLegacyCompatibility
     }
 
@@ -1035,6 +1297,7 @@ final class ContactService: @unchecked Sendable {
         let projectedContacts = try domainRepository.updateProtectedRuntime(from: snapshot)
         contacts = projectedContacts
         runtimeSnapshot = snapshot
+        contactsSearchIndex = ContactsSearchIndex(snapshot: snapshot)
         verificationStates = Dictionary(
             uniqueKeysWithValues: projectedContacts.map {
                 ($0.fingerprint, $0.verificationState)
@@ -1102,6 +1365,7 @@ final class ContactService: @unchecked Sendable {
         let previousVerificationStates = verificationStates
         let previousAvailability = contactsAvailability
         let previousRuntimeSnapshot = runtimeSnapshot
+        let previousSearchIndex = contactsSearchIndex
         let previousMigrationWarning = protectedDomainMigrationWarning
 
         do {
@@ -1111,6 +1375,7 @@ final class ContactService: @unchecked Sendable {
             verificationStates = previousVerificationStates
             contactsAvailability = previousAvailability
             runtimeSnapshot = previousRuntimeSnapshot
+            contactsSearchIndex = previousSearchIndex
             protectedDomainMigrationWarning = previousMigrationWarning
             if let snapshot = contactsDomainStore?.snapshot {
                 try? applyProtectedRuntimeSnapshot(snapshot)
@@ -1124,6 +1389,7 @@ final class ContactService: @unchecked Sendable {
         verificationStates = [:]
         contactsAvailability = availability
         runtimeSnapshot = nil
+        contactsSearchIndex = nil
         protectedDomainMigrationWarning = nil
         domainRepository.clearRuntimeState()
     }

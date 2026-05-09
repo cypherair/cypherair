@@ -904,8 +904,8 @@ final class ContactServiceTests: XCTestCase {
         )
         let unavailableBlock = try sourceBlock(
             in: contents,
-            from: "private func contactsUnavailableContent",
-            to: "private var emptyStateContent"
+            from: "func contactsUnavailableContent",
+            to: "var emptyStateContent"
         )
         let toolbarBlock = try sourceBlock(
             in: contents,
@@ -915,7 +915,7 @@ final class ContactServiceTests: XCTestCase {
 
         XCTAssertFalse(unavailableBlock.contains("routeNavigator.open(.addContact)"))
         XCTAssertFalse(unavailableBlock.contains("contacts.add"))
-        XCTAssertTrue(toolbarBlock.contains("if contactService.contactsAvailability.isAvailable"))
+        XCTAssertTrue(toolbarBlock.contains("if model.contactsAvailability.isAvailable"))
         XCTAssertTrue(toolbarBlock.contains("routeNavigator.open(.addContact)"))
     }
 
@@ -1621,6 +1621,232 @@ final class ContactServiceTests: XCTestCase {
                 return XCTFail("Expected invalidKeyData for missing preferred key, got \(error)")
             }
         }
+    }
+
+    func test_pr8ProtectedTagsNormalizeDedupePersistAndPrune() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8Tags")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "Tagged Contact",
+            email: "tagged@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+
+        let firstTag = try service.addTag(named: "  Work   Legal  ", toContactId: contactId)
+        let duplicateTag = try service.addTag(named: "work legal", toContactId: contactId)
+
+        XCTAssertEqual(firstTag.tagId, duplicateTag.tagId)
+        XCTAssertEqual(firstTag.displayName, "Work Legal")
+        XCTAssertEqual(service.contactTagSummaries().map(\.displayName), ["Work Legal"])
+        XCTAssertEqual(
+            service.contactIdentities(matching: "work legal").map(\.contactId),
+            [contactId]
+        )
+
+        try await service.relockProtectedData()
+        let reopened = await reopenProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory
+        )
+        let reopenedService = reopened.service
+        XCTAssertEqual(reopenedService.contactTagSummaries().map(\.displayName), ["Work Legal"])
+
+        try reopenedService.removeTag(tagId: firstTag.tagId, fromContactId: contactId)
+        XCTAssertTrue(reopenedService.contactTagSummaries().isEmpty)
+        XCTAssertTrue(
+            try XCTUnwrap(reopenedService.availableContactIdentity(forContactID: contactId))
+                .tagIds
+                .isEmpty
+        )
+    }
+
+    func test_pr8SearchRanksAndMatchesTagsFingerprintAndShortKeyId() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8Search")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let exact = try engine.generateKey(
+            name: "Alpha",
+            email: "alpha@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let prefix = try engine.generateKey(
+            name: "Alphabet Soup",
+            email: "prefix@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let substring = try engine.generateKey(
+            name: "Team Alpha Member",
+            email: "substring@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        _ = try service.addContact(publicKeyData: substring.publicKeyData)
+        _ = try service.addContact(publicKeyData: prefix.publicKeyData)
+        _ = try service.addContact(publicKeyData: exact.publicKeyData)
+        let exactContactId = try XCTUnwrap(service.contactId(forFingerprint: exact.fingerprint))
+        let prefixContactId = try XCTUnwrap(service.contactId(forFingerprint: prefix.fingerprint))
+        let substringContactId = try XCTUnwrap(service.contactId(forFingerprint: substring.fingerprint))
+
+        _ = try service.addTag(named: "Operations", toContactId: substringContactId)
+
+        XCTAssertEqual(
+            service.contactIdentities(matching: "Alpha").map(\.contactId),
+            [exactContactId, prefixContactId, substringContactId]
+        )
+        XCTAssertEqual(
+            service.contactIdentities(matching: "operations").map(\.contactId),
+            [substringContactId]
+        )
+        XCTAssertEqual(
+            service.contactIdentities(matching: prefix.fingerprint).map(\.contactId),
+            [prefixContactId]
+        )
+        XCTAssertEqual(
+            service.contactIdentities(
+                matching: IdentityPresentation.shortKeyId(from: substring.fingerprint)
+            ).map(\.contactId),
+            [substringContactId]
+        )
+        XCTAssertEqual(
+            service.contactIdentities(matching: "", tagFilterIds: [try XCTUnwrap(service.contactTagSummaries().first?.tagId)])
+                .map(\.contactId),
+            [substringContactId]
+        )
+    }
+
+    @MainActor
+    func test_pr8ContactsScreenModelSearchAndTagFiltersVisibleContacts() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8ScreenModel")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let work = try engine.generateKey(
+            name: "Work Person",
+            email: "work-person@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let personal = try engine.generateKey(
+            name: "Personal Person",
+            email: "personal-person@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        _ = try service.addContact(publicKeyData: work.publicKeyData)
+        _ = try service.addContact(publicKeyData: personal.publicKeyData)
+        let workContactId = try XCTUnwrap(service.contactId(forFingerprint: work.fingerprint))
+        let personalContactId = try XCTUnwrap(service.contactId(forFingerprint: personal.fingerprint))
+        let workTag = try service.addTag(named: "Work", toContactId: workContactId)
+        _ = try service.addTag(named: "Personal", toContactId: personalContactId)
+
+        let model = ContactsScreenModel(contactService: service)
+        model.searchText = "person"
+        XCTAssertEqual(Set(model.visibleContacts.map(\.contactId)), Set([workContactId, personalContactId]))
+
+        model.toggleTagFilter(workTag.tagId)
+        XCTAssertEqual(model.visibleContacts.map(\.contactId), [workContactId])
+        XCTAssertEqual(model.selectedTagFilters.map(\.tagId), [workTag.tagId])
+
+        model.clearTagFilters()
+        model.searchText = "personal"
+        XCTAssertEqual(model.visibleContacts.map(\.contactId), [personalContactId])
+    }
+
+    func test_pr8RecipientListsEditPruneAndFailClosedWhenPreferredKeyMissing() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8RecipientLists")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let first = try engine.generateKey(
+            name: "List First",
+            email: "list-first@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let second = try engine.generateKey(
+            name: "List Second",
+            email: "list-second@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        _ = try service.addContact(publicKeyData: first.publicKeyData)
+        _ = try service.addContact(publicKeyData: second.publicKeyData)
+        let firstContactId = try XCTUnwrap(service.contactId(forFingerprint: first.fingerprint))
+        let secondContactId = try XCTUnwrap(service.contactId(forFingerprint: second.fingerprint))
+
+        let emptyList = try service.createRecipientList(named: "Draft", memberContactIds: [])
+        XCTAssertFalse(emptyList.canEncryptToAll)
+        XCTAssertEqual(emptyList.memberCount, 0)
+
+        let list = try service.createRecipientList(
+            named: "Team",
+            memberContactIds: [firstContactId, secondContactId, firstContactId]
+        )
+        XCTAssertEqual(list.memberContactIds, [firstContactId, secondContactId])
+        XCTAssertTrue(list.canEncryptToAll)
+        XCTAssertEqual(
+            try service.recipientContactIds(forRecipientListId: list.recipientListId),
+            [firstContactId, secondContactId]
+        )
+
+        let renamed = try service.renameRecipientList(list.recipientListId, to: "  Team A  ")
+        XCTAssertEqual(renamed.name, "Team A")
+        _ = try service.removeContact(secondContactId, fromRecipientList: list.recipientListId)
+        XCTAssertEqual(
+            try service.recipientContactIds(forRecipientListId: list.recipientListId),
+            [firstContactId]
+        )
+        _ = try service.addContact(secondContactId, toRecipientList: list.recipientListId)
+
+        var snapshot = try service.currentCompatibilitySnapshot()
+        for index in snapshot.keyRecords.indices
+            where snapshot.keyRecords[index].contactId == secondContactId {
+            snapshot.keyRecords[index].usageState = .historical
+        }
+        try opened.harness.store.replaceSnapshot(snapshot)
+        try await service.relockProtectedData()
+        let reopened = await reopenProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory
+        )
+        let reopenedService = reopened.service
+
+        let failClosedSummary = try XCTUnwrap(
+            reopenedService.recipientListSummaries().first {
+                $0.recipientListId == list.recipientListId
+            }
+        )
+        XCTAssertFalse(failClosedSummary.canEncryptToAll)
+        XCTAssertEqual(failClosedSummary.missingPreferredContactIds, [secondContactId])
+        XCTAssertThrowsError(
+            try reopenedService.publicKeysForRecipientContactIDs(failClosedSummary.memberContactIds)
+        ) { error in
+            guard case .invalidKeyData = error as? CypherAirError else {
+                return XCTFail("Expected invalidKeyData for missing preferred list member, got \(error)")
+            }
+        }
+
+        try reopenedService.removeContactIdentity(contactId: secondContactId)
+        XCTAssertEqual(
+            try reopenedService.recipientContactIds(forRecipientListId: list.recipientListId),
+            [firstContactId]
+        )
     }
 
     // MARK: - Load Contacts

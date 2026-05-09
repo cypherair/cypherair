@@ -461,6 +461,121 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_pr8RecipientListSelectionExpandsDedupesAndSearchesRecipients() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptPR8Lists")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let first = try stack.engine.generateKey(
+            name: "List First",
+            email: "encrypt-list-first@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let second = try stack.engine.generateKey(
+            name: "List Second",
+            email: "encrypt-list-second@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+        try opened.service.addContact(publicKeyData: first.publicKeyData, verificationState: .verified)
+        try opened.service.addContact(publicKeyData: second.publicKeyData, verificationState: .verified)
+        let firstContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: first.fingerprint))
+        let secondContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: second.fingerprint))
+        let list = try opened.service.createRecipientList(
+            named: "Team",
+            memberContactIds: [firstContactId, secondContactId]
+        )
+
+        var capturedRecipients: [String] = []
+        let model = makeModel(
+            contactService: opened.service,
+            textEncryptionAction: { _, recipients, _, _, _ in
+                capturedRecipients = recipients
+                return Data("ciphertext".utf8)
+            }
+        )
+        model.plaintext = "Secret"
+        model.selectedRecipients = [firstContactId]
+        model.toggleRecipientList(list.recipientListId, isOn: true)
+
+        XCTAssertEqual(Set(model.effectiveRecipientContactIds), Set([firstContactId, secondContactId]))
+
+        model.recipientSearchText = "Second"
+        XCTAssertEqual(model.encryptableContacts.map(\.contactId), [secondContactId])
+
+        model.requestEncrypt()
+        await waitUntil("recipient-list encryption to finish") {
+            model.operation.isRunning == false
+        }
+        XCTAssertEqual(Set(capturedRecipients), Set([firstContactId, secondContactId]))
+    }
+
+    @MainActor
+    func test_pr8RecipientListSelectionWarnsForUnverifiedMembersAndRejectsInvalidLists() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptPR8ListWarnings")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let unverified = try stack.engine.generateKey(
+            name: "Unverified List Member",
+            email: "unverified-list@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let missingPreferred = try stack.engine.generateKey(
+            name: "Missing Preferred List Member",
+            email: "missing-preferred-list@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+        try opened.service.addContact(publicKeyData: unverified.publicKeyData, verificationState: .unverified)
+        try opened.service.addContact(publicKeyData: missingPreferred.publicKeyData, verificationState: .verified)
+        let unverifiedContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: unverified.fingerprint))
+        let missingPreferredContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: missingPreferred.fingerprint))
+        let warningList = try opened.service.createRecipientList(
+            named: "Warning Team",
+            memberContactIds: [unverifiedContactId]
+        )
+        let invalidList = try opened.service.createRecipientList(
+            named: "Invalid Team",
+            memberContactIds: [missingPreferredContactId]
+        )
+
+        var snapshot = try opened.service.currentCompatibilitySnapshot()
+        for index in snapshot.keyRecords.indices
+            where snapshot.keyRecords[index].contactId == missingPreferredContactId {
+            snapshot.keyRecords[index].usageState = .historical
+        }
+        try opened.harness.store.replaceSnapshot(snapshot)
+        try await opened.service.relockProtectedData()
+        let reopened = await makeReopenedProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory
+        )
+
+        let model = makeModel(contactService: reopened.service)
+        model.plaintext = "Secret"
+        model.toggleRecipientList(warningList.recipientListId, isOn: true)
+        model.toggleRecipientList(invalidList.recipientListId, isOn: true)
+
+        XCTAssertTrue(model.selectedRecipientListIds.contains(warningList.recipientListId))
+        XCTAssertFalse(model.selectedRecipientListIds.contains(invalidList.recipientListId))
+        XCTAssertEqual(model.selectedUnverifiedContacts.map(\.contactId), [unverifiedContactId])
+
+        model.requestEncrypt()
+        XCTAssertTrue(model.showUnverifiedRecipientsWarning)
+    }
+
+    @MainActor
     func test_encryptText_routesClipboardAndExportThroughInterceptionPolicy() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
         let recipientIdentity = try await TestHelpers.generateProfileBKey(
@@ -783,6 +898,33 @@ final class EncryptScreenModelTests: XCTestCase {
         )
         XCTAssertEqual(availability, .availableProtectedDomain)
         return (service, harness, directory)
+    }
+
+    private func makeReopenedProtectedContactService(
+        harness: ContactsProtectedHarness,
+        contactsDirectory: URL
+    ) async -> (service: ContactService, store: ContactsDomainStore) {
+        let store = ContactsDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey },
+            initialSnapshotProvider: {
+                XCTFail("Committed Contacts domain should not rebuild from legacy source.")
+                return ContactsDomainSnapshot.empty()
+            }
+        )
+        let service = ContactService(
+            engine: stack.engine,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: store
+        )
+        let availability = await service.openContactsAfterPostUnlock(
+            gateResult: authorizedContactsGate(),
+            wrappingRootKey: { harness.wrappingRootKey }
+        )
+        XCTAssertEqual(availability, .availableProtectedDomain)
+        return (service, store)
     }
 
     private func makeContactsProtectedHarness(

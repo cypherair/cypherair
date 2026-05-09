@@ -5,27 +5,26 @@ struct ContactSummaryProjector {
         from snapshot: ContactsDomainSnapshot
     ) -> [ContactIdentitySummary] {
         let keysByContactId = Dictionary(grouping: snapshot.keyRecords, by: \.contactId)
+        let tagSummariesByID = Dictionary(
+            uniqueKeysWithValues: tagSummaries(from: snapshot).map { ($0.tagId, $0) }
+        )
         return snapshot.identities
-            .sorted { lhs, rhs in
-                let lhsName = lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName)
-                if lhsName == .orderedSame {
-                    return lhs.contactId < rhs.contactId
-                }
-                return lhsName == .orderedAscending
-            }
             .map { identity in
                 let keys = (keysByContactId[identity.contactId] ?? [])
                     .sorted(by: contactKeySort)
                     .map(makeKeySummary)
+                let tags = identity.tagIds.compactMap { tagSummariesByID[$0] }
                 return ContactIdentitySummary(
                     contactId: identity.contactId,
                     displayName: identity.displayName,
                     primaryEmail: identity.primaryEmail,
                     tagIds: identity.tagIds,
+                    tags: tags,
                     notes: identity.notes,
                     keys: keys
                 )
             }
+            .sorted(by: identitySummarySort)
     }
 
     func recipientSummaries(
@@ -40,9 +39,71 @@ struct ContactSummaryProjector {
                 contactId: identity.contactId,
                 displayName: identity.displayName,
                 primaryEmail: identity.primaryEmail,
+                tagIds: identity.tagIds,
                 preferredKey: preferredKey
             )
         }
+    }
+
+    func tagSummaries(
+        from snapshot: ContactsDomainSnapshot
+    ) -> [ContactTagSummary] {
+        let contactCountsByTagId = snapshot.identities.reduce(
+            into: [String: Int]()
+        ) { counts, identity in
+            for tagId in identity.tagIds {
+                counts[tagId, default: 0] += 1
+            }
+        }
+
+        return snapshot.tags
+            .map { tag in
+                ContactTagSummary(
+                    tagId: tag.tagId,
+                    displayName: tag.displayName,
+                    normalizedName: tag.normalizedName,
+                    contactCount: contactCountsByTagId[tag.tagId, default: 0]
+                )
+            }
+            .sorted { lhs, rhs in
+                let nameOrder = lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName)
+                if nameOrder != .orderedSame {
+                    return nameOrder == .orderedAscending
+                }
+                return lhs.tagId < rhs.tagId
+            }
+    }
+
+    func recipientListSummaries(
+        from snapshot: ContactsDomainSnapshot
+    ) -> [RecipientListSummary] {
+        let preferredEncryptableContactIds = Set(
+            snapshot.keyRecords
+                .filter { $0.usageState == .preferred && $0.canEncryptTo }
+                .map(\.contactId)
+        )
+
+        return snapshot.recipientLists
+            .map { list in
+                let missingPreferredContactIds = list.memberContactIds.filter {
+                    !preferredEncryptableContactIds.contains($0)
+                }
+                return RecipientListSummary(
+                    recipientListId: list.recipientListId,
+                    name: list.name,
+                    memberContactIds: list.memberContactIds,
+                    memberCount: list.memberContactIds.count,
+                    canEncryptToAll: !list.memberContactIds.isEmpty && missingPreferredContactIds.isEmpty,
+                    missingPreferredContactIds: missingPreferredContactIds
+                )
+            }
+            .sorted { lhs, rhs in
+                let nameOrder = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
+                if nameOrder != .orderedSame {
+                    return nameOrder == .orderedAscending
+                }
+                return lhs.recipientListId < rhs.recipientListId
+            }
     }
 
     func identitySummary(
@@ -105,5 +166,27 @@ struct ContactSummaryProjector {
         case .historical:
             2
         }
+    }
+
+    private func identitySummarySort(_ lhs: ContactIdentitySummary, _ rhs: ContactIdentitySummary) -> Bool {
+        let lhsName = lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName)
+        if lhsName != .orderedSame {
+            return lhsName == .orderedAscending
+        }
+
+        let lhsEmail = lhs.primaryEmail ?? ""
+        let rhsEmail = rhs.primaryEmail ?? ""
+        let emailOrder = lhsEmail.localizedCaseInsensitiveCompare(rhsEmail)
+        if emailOrder != .orderedSame {
+            return emailOrder == .orderedAscending
+        }
+
+        let lhsShortKeyId = lhs.preferredKey?.shortKeyId ?? lhs.keys.first?.shortKeyId ?? ""
+        let rhsShortKeyId = rhs.preferredKey?.shortKeyId ?? rhs.keys.first?.shortKeyId ?? ""
+        if lhsShortKeyId != rhsShortKeyId {
+            return lhsShortKeyId < rhsShortKeyId
+        }
+
+        return lhs.contactId < rhs.contactId
     }
 }
