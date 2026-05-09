@@ -2710,6 +2710,150 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(snapshot.certificationArtifacts.count, 1)
     }
 
+    func test_pr6CertificationProjectionRecomputeMarksStaleDigestInvalidOrStale() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6RecomputeStaleDigest")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "PR6 Recompute Stale Digest",
+            email: "pr6-recompute-stale@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let keyRecord = try XCTUnwrap(
+            service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
+        )
+        var snapshot = try service.currentCompatibilitySnapshot()
+        let lastValidatedAt = Date(timeIntervalSince1970: 10)
+        let updatedAt = Date(timeIntervalSince1970: 20)
+        let artifact = makeValidCertificationArtifact(
+            artifactId: "artifact-pr6-recompute-stale-digest",
+            keyRecord: keyRecord,
+            signatureData: Data([0x44, 0x55])
+        ) {
+            $0.targetCertificateDigest = ContactCertificationArtifactReference.sha256Hex(
+                for: Data("old target certificate".utf8)
+            )
+            $0.lastValidatedAt = lastValidatedAt
+        }
+        snapshot.certificationArtifacts.append(artifact)
+
+        let didMutate = try ContactSnapshotMutator(engine: engine).recomputeCertificationProjections(
+            in: &snapshot,
+            updatedAt: updatedAt
+        )
+
+        let normalizedArtifact = try XCTUnwrap(
+            snapshot.certificationArtifacts.first { $0.artifactId == artifact.artifactId }
+        )
+        let projectedKey = try XCTUnwrap(
+            snapshot.keyRecords.first { $0.keyId == keyRecord.keyId }
+        )
+        XCTAssertTrue(didMutate)
+        XCTAssertEqual(normalizedArtifact.validationStatus, .invalidOrStale)
+        XCTAssertEqual(normalizedArtifact.updatedAt, updatedAt)
+        XCTAssertEqual(normalizedArtifact.lastValidatedAt, lastValidatedAt)
+        XCTAssertEqual(projectedKey.certificationProjection.status, .invalidOrStale)
+        XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [artifact.artifactId])
+    }
+
+    func test_pr6CertificationProjectionRecomputeReturnsTrueWhenOnlyArtifactStatusChanges() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6RecomputeArtifactOnly")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "PR6 Recompute Artifact Only",
+            email: "pr6-recompute-artifact@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let keyRecord = try XCTUnwrap(
+            service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
+        )
+        var snapshot = try service.currentCompatibilitySnapshot()
+        let lastValidatedAt = Date(timeIntervalSince1970: 30)
+        let updatedAt = Date(timeIntervalSince1970: 40)
+        let artifact = makeValidCertificationArtifact(
+            artifactId: "artifact-pr6-recompute-artifact-only",
+            keyRecord: keyRecord,
+            signatureData: Data([0x66, 0x77])
+        ) {
+            $0.targetCertificateDigest = ContactCertificationArtifactReference.sha256Hex(
+                for: Data("previous target certificate".utf8)
+            )
+            $0.lastValidatedAt = lastValidatedAt
+        }
+        snapshot.certificationArtifacts.append(artifact)
+        let keyIndex = try XCTUnwrap(snapshot.keyRecords.firstIndex { $0.keyId == keyRecord.keyId })
+        snapshot.keyRecords[keyIndex].certificationArtifactIds = [artifact.artifactId]
+        snapshot.keyRecords[keyIndex].certificationProjection = ContactCertificationProjection(
+            status: .invalidOrStale,
+            artifactIds: [artifact.artifactId],
+            lastValidatedAt: lastValidatedAt,
+            reconciliationMetadata: nil
+        )
+        let keyRecordsBefore = snapshot.keyRecords
+
+        let didMutate = try ContactSnapshotMutator(engine: engine).recomputeCertificationProjections(
+            in: &snapshot,
+            updatedAt: updatedAt
+        )
+
+        XCTAssertTrue(didMutate)
+        XCTAssertEqual(snapshot.keyRecords, keyRecordsBefore)
+        XCTAssertEqual(snapshot.certificationArtifacts.first?.validationStatus, .invalidOrStale)
+        XCTAssertEqual(snapshot.certificationArtifacts.first?.updatedAt, updatedAt)
+    }
+
+    func test_pr6CertificationProjectionRecomputeKeepsCurrentDigestValidCertified() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6RecomputeValidDigest")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "PR6 Recompute Valid Digest",
+            email: "pr6-recompute-valid@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let keyRecord = try XCTUnwrap(
+            service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
+        )
+        var snapshot = try service.currentCompatibilitySnapshot()
+        let artifact = makeValidCertificationArtifact(
+            artifactId: "artifact-pr6-recompute-valid-digest",
+            keyRecord: keyRecord,
+            signatureData: Data([0x88, 0x99])
+        )
+        snapshot.certificationArtifacts.append(artifact)
+
+        let didMutate = try ContactSnapshotMutator(engine: engine).recomputeCertificationProjections(
+            in: &snapshot
+        )
+
+        let normalizedArtifact = try XCTUnwrap(
+            snapshot.certificationArtifacts.first { $0.artifactId == artifact.artifactId }
+        )
+        let projectedKey = try XCTUnwrap(
+            snapshot.keyRecords.first { $0.keyId == keyRecord.keyId }
+        )
+        XCTAssertTrue(didMutate)
+        XCTAssertEqual(normalizedArtifact.validationStatus, .valid)
+        XCTAssertEqual(projectedKey.certificationProjection.status, .certified)
+        XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [artifact.artifactId])
+    }
+
     private func contactsDomainArtifactsExist(in storageRoot: ProtectedDataStorageRoot) -> Bool {
         let fileManager = FileManager.default
         let urls = ProtectedDomainGenerationSlot.allCases.map {

@@ -461,7 +461,12 @@ struct ContactSnapshotMutator {
         in snapshot: inout ContactsDomainSnapshot,
         updatedAt: Date = Date()
     ) throws -> Bool {
-        let before = snapshot.keyRecords
+        let beforeKeyRecords = snapshot.keyRecords
+        let beforeCertificationArtifacts = snapshot.certificationArtifacts
+        markValidCertificationArtifactsStaleIfTargetDigestChanged(
+            in: &snapshot,
+            updatedAt: updatedAt
+        )
         let artifactsByKeyId = Dictionary(grouping: snapshot.certificationArtifacts, by: \.keyId)
 
         for index in snapshot.keyRecords.indices {
@@ -491,7 +496,8 @@ struct ContactSnapshotMutator {
         }
 
         try snapshot.validateContract()
-        return snapshot.keyRecords != before
+        return snapshot.keyRecords != beforeKeyRecords ||
+            snapshot.certificationArtifacts != beforeCertificationArtifacts
     }
 
     private func makeIdentity(
@@ -615,6 +621,27 @@ struct ContactSnapshotMutator {
             }
             snapshot.certificationArtifacts[index].validationStatus = .invalidOrStale
             snapshot.certificationArtifacts[index].updatedAt = now
+        }
+    }
+
+    private func markValidCertificationArtifactsStaleIfTargetDigestChanged(
+        in snapshot: inout ContactsDomainSnapshot,
+        updatedAt: Date
+    ) {
+        let keyRecordsById = Dictionary(uniqueKeysWithValues: snapshot.keyRecords.map { ($0.keyId, $0) })
+        for index in snapshot.certificationArtifacts.indices
+            where snapshot.certificationArtifacts[index].validationStatus == .valid {
+            guard let keyRecord = keyRecordsById[snapshot.certificationArtifacts[index].keyId] else {
+                continue
+            }
+            let currentDigest = ContactCertificationArtifactReference.sha256Hex(
+                for: keyRecord.publicKeyData
+            )
+            guard snapshot.certificationArtifacts[index].targetCertificateDigest != currentDigest else {
+                continue
+            }
+            snapshot.certificationArtifacts[index].validationStatus = .invalidOrStale
+            snapshot.certificationArtifacts[index].updatedAt = updatedAt
         }
     }
 
