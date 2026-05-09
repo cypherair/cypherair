@@ -258,7 +258,7 @@ Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biomet
 
 ### 5.5 App Protection
 
-Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, Contacts flat compatibility state, self-test export-only behavior, and temporary/export/tutorial cleanup. Contacts feature enhancements such as person-centered modeling, search, tags, recipient lists, merge, and richer package exchange remain in the Contacts follow-on plan.
+Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, Contacts flat compatibility state, self-test export-only behavior, and temporary/export/tutorial cleanup. Contacts feature enhancements such as person-centered modeling, search, tags, recipient lists, merge, and organization workflows remain in the Contacts follow-on plan. Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be a separate mandatory encrypted design.
 
 ---
 

@@ -21,7 +21,7 @@ This TDD covers:
 - search, tags, recipient lists, and merge behavior
 - manual verification and certification integration
 - migration, quarantine, and final legacy deletion
-- `.cypherair-contacts` package export/import for one or more selected contacts
+- the boundary that withdraws Contacts package exchange and defers full Contacts backup to a separate mandatory encrypted design
 
 This TDD does not redefine the shared ProtectedData framework. The following remain owned by the current shared-framework documentation:
 
@@ -45,7 +45,8 @@ The implementation must satisfy these principles:
 - shared-session-authenticated Contacts access rather than Contacts-owned session ownership
 - deterministic behavior for multi-key contacts
 - conservative identity-linking behavior
-- explicit contact-package exchange without whole-domain backup or restore semantics
+- no unencrypted or optionally encrypted export of complete Contacts social-graph state
+- full Contacts backup and device migration deferred to a separate mandatory encrypted design
 - deterministic crash recovery with no silent reset to an empty Contacts domain
 - stable UI dependency through a single `ContactService` facade
 
@@ -443,16 +444,16 @@ The framework owns:
 
 If the framework enters `restartRequired`, Contacts must treat that as `frameworkUnavailable` until restart and must not attempt an independent in-process recovery path.
 
-### 8.4 Contact Package Export Authentication Boundary
+### 8.4 Contact Export And Backup Boundary
 
-Contact package export is a high-risk externalization action because it intentionally externalizes relationship and public-key possession information.
+Contacts package export/import is withdrawn from the active design because even public-key-only multi-contact packages externalize relationship and public-key possession information.
 
 Required behavior:
 
-- export requires a currently available and unlocked Contacts domain
-- export requires a fresh authentication immediately before package generation
-- export serializes only export-safe selected contact data, not framework artifacts or whole-domain state
-- import preview may parse an external package before Contacts is open, but import commit requires framework availability and an unlocked Contacts domain
+- no `.cypherair-contacts` package format, package import preview, package commit, or multi-contact export is specified by this TDD
+- ordinary public certificate import remains an existing public-key import path, not a Contacts package exchange feature
+- PR6 certification-signature export/share remains a certification artifact action, not a Contacts backup or package exchange feature
+- any future full Contacts backup or device-migration feature must be separately designed and must require encryption; plaintext or optional-encryption export of complete Contacts state is not allowed
 
 ## 9. Decrypt And Verify Integration
 
@@ -519,8 +520,8 @@ Contacts-side requirements:
 - contact detail exposes the common `Certify This Contact` action without embedding the full advanced tool surface
 - a redesigned certification details surface exposes saved history, exportable signature material, raw details, and secondary external signature import/verification actions
 - import flow does not perform certification
-- Contacts package import may bring in certification signature artifacts, but commit must validate them before saving projection state
-- unlock and package import flows may trigger revalidation so stale projected state can be corrected
+- saved certification signature artifacts may be imported only through explicit certification signature preview/save flows that validate them before saving projection state
+- unlock and certification artifact mutation flows may trigger revalidation so stale projected state can be corrected
 - Contacts surfaces keep manual verification and certification visually separate
 
 The redesigned workflow must cover the capabilities of the current three-mode page without preserving that UI model:
@@ -589,72 +590,15 @@ If migration is interrupted:
 - later recovery logic must be deterministic and idempotent
 - any framework `pendingMutation` or Contacts domain generation cleanup resumes under the shared framework recovery rules rather than a Contacts-specific parallel mechanism
 
-## 12. Contacts Package Export / Import
+## 12. Contacts Backup And Exchange Boundary
 
-The Contacts subsystem must provide a first-class export/import path for one or more selected contacts. This is a contact exchange format, not a whole-domain backup or recovery artifact.
+The earlier plan for a first-class Contacts package exchange format is withdrawn. This TDD no longer defines a `.cypherair-contacts` package, Apple Archive-backed Contacts container, package manifest, package import preview, package commit, or multi-contact export.
 
-### 12.1 Package Format
+Ordinary OpenPGP public certificate import remains available through the existing public-key import path. That path inspects external public key material and commits through normal Contacts mutations; it is not a Contacts package, backup, restore, or forwarding feature.
 
-Export produces an Apple Archive-backed `.cypherair-contacts` package.
+PR6 certification-signature export/share remains available for saved certification artifacts. That export is scoped to certification signature material and must not be treated as a Contacts backup or contact package.
 
-The package is not a standard ZIP file. It should use Apple Archive / Compression facilities where practical and should be exported through the existing system file exporter handoff pattern.
-
-Required package entries:
-
-- `manifest.json`
-- `contacts/<stable-export-id>/keys/*.asc`
-- optional `contacts/<stable-export-id>/certifications/*.asc`
-
-Required manifest fields:
-
-- package format version
-- producer app identifier and package creation timestamp
-- `contacts[]`
-- per-contact public-certificate-derived display label
-- optional per-contact local relationship / custom display label only when explicitly selected for export
-- per-contact exported key fingerprints and file references
-- per-key public User ID / selector metadata needed for preview and certification validation
-- per-contact certification signature references when included
-- required-feature flags so future packages fail closed when the app cannot understand mandatory semantics
-
-Package payload rules:
-
-- one package may contain one or more contacts
-- each contact may include multiple public certificates or public update artifacts
-- certification signature artifacts are optional and user-selectable
-- private keys are never included
-- local manual verification state is never included
-- local relationship labels or custom display labels are privacy-sensitive, default to not exported, and may appear only when the user explicitly selects them for a package
-- tags, notes, recipient lists, local contact IDs, protected-domain generation IDs, wrapped-DMK records, registry state, root-secret state, and source-device authorization state are never included
-
-### 12.2 Export Flow
-
-Export flow:
-
-1. require a currently unlocked Contacts domain inside an available app-data session
-2. require a fresh authentication immediately before package generation
-3. collect one selected contact from Contact Detail or one or more selected contacts from Contacts list selection mode
-4. build a package manifest from export-safe contact data, using public-certificate-derived labels by default and local relationship / custom labels only when explicitly selected
-5. write armored public certificates and optional saved certification signature artifacts into the package
-6. write a temporary protected export file for the system file exporter / Share Sheet
-7. delete temporary export material after completion or cancellation
-
-### 12.3 Import Flow
-
-Import flow:
-
-1. open the `.cypherair-contacts` package or ordinary public certificate input
-2. validate the package container and manifest before reading referenced payload entries
-3. reject path traversal, absolute paths, parent directory references, symlinks, hard links, duplicate logical paths, unknown required features, excessive file counts, excessive total size, and excessive per-entry size
-4. parse public certificates and certification signatures through the existing OpenPGP validation layer
-5. build an import preview without mutating Contacts; imported labels are untrusted display hints only
-6. let the user choose which contacts, keys, and valid certification artifacts to commit
-7. require framework availability and an unlocked Contacts domain for commit
-8. merge committed data through `ContactService` / `ContactsDomainRepository`
-9. persist valid certification projection and saved signature artifacts as protected Contacts data
-10. rebuild search, signer-recognition, and certification projection indexes from committed state
-
-Package import never replaces the Contacts domain as a whole. It creates or updates local contact/key/certification records through the normal protected-domain write path.
+Full Contacts backup or device migration remains deferred. If introduced later, it must be a separate mandatory encrypted backup design. Plaintext or optional-encryption export of complete Contacts state, including contact groupings, local labels, tags, notes, recipient lists, manual verification state, certification history, or protected-domain metadata, is not allowed by this TDD.
 
 ## 13. Service Architecture
 
@@ -666,7 +610,6 @@ Planned Contacts-owned components:
 - `ContactsDomainRepository`
 - `ContactsMigrationCoordinator`
 - `ContactsSearchIndex`
-- `ContactsPackageService`
 - `ContactsCertificationStore` or equivalent certification-record repository
 
 Framework-owned dependencies consumed by Contacts:
@@ -683,7 +626,6 @@ Responsibilities:
 - `ContactsDomainRepository`: canonical snapshot encode/decode, Contacts schema validation, translation between snapshot and runtime graphs, and delegation into the shared framework storage path
 - `ContactsMigrationCoordinator`: legacy import, quarantine, and final cleanup flow
 - `ContactsSearchIndex`: in-memory search and ranking over unlocked Contacts data plus relock-time cleanup participation
-- `ContactsPackageService`: Apple Archive-backed `.cypherair-contacts` package export/import, preview, validation, and temporary export cleanup
 - `ContactsCertificationStore`: persistence and revalidation of certification projections and saved signature artifacts inside the Contacts protected domain
 
 Minimum supporting internal types:
@@ -692,8 +634,6 @@ Minimum supporting internal types:
 - `ContactsDomainSchemaVersion`
 - `ContactsAvailability`
 - `ContactCertificationRecord`
-- `ContactPackageManifest`
-- `ContactPackageImportPreview`
 
 Vault-specific infrastructure types such as dedicated vault envelope headers, vault-key managers, or Contacts-owned recovery state machines are not the authoritative design for this round.
 
@@ -739,7 +679,6 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 - ordinary Contacts use within an already active app-data session does not trigger redundant prompts
 - if another protected domain already activated the shared session, opening Contacts does not prompt again
 - framework-level blocked state is surfaced distinctly from Contacts domain recovery
-- contact package export requires fresh authentication and cancellation produces no package file
 
 ### 14.5 Domain Integrity And Recovery
 
@@ -751,7 +690,7 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 - relock clears Contacts in-memory search, signer-recognition, and `ContactService` runtime / compatibility projection state through relock-participant cleanup
 - `restartRequired` is treated as framework-level blocked state, not as Contacts data loss
 
-### 14.6 Migration And Contact Package Exchange
+### 14.6 Migration And Backup Boundary
 
 - Contacts PR4 protected-domain security/storage cutover occurs after AppData Phase 1-7 prerequisites are complete; remaining person-centered feature work still follows the Contacts-specific implementation plan
 - Contacts migration is triggered by post-auth protected-domain open, not by process launch or service initialization before app-data authorization
@@ -759,11 +698,8 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 - quarantine storage is inactive for normal Contacts resolution
 - final deletion happens only after next successful Contacts domain open
 - interrupted migration recovers deterministically
-- `.cypherair-contacts` export supports one or more selected contacts
-- `.cypherair-contacts` import previews before commit and never replaces the Contacts domain wholesale
-- package import rejects path traversal, link entries, duplicate logical paths, excessive size/count, bad manifests, bad certificates, and bad certification signatures
-- package export/import never transports private keys, manual verification state, tags, notes, recipient lists, the shared root secret, wrapped-DMK record, registry state, or source-device authorization state
-- package export includes public-certificate-derived labels by default; local relationship / custom labels require explicit default-off selection
+- Contacts PR7 package exchange remains withdrawn and does not define package import/export behavior
+- future complete Contacts backup or device migration is out of scope and must be mandatory encrypted if specified later
 
 ### 14.7 Search And Tags
 
@@ -776,6 +712,7 @@ Vault-specific infrastructure types such as dedicated vault envelope headers, va
 This document does not define:
 
 - packet-level OpenPGP certification cryptography
-- the final localized UI copy for package export/import education
+- a Contacts package exchange format or UI
+- a complete Contacts backup, restore, or device-migration format
 - shared protected app-data framework internals such as registry invariants, wrapped-DMK transactions, root-secret lifecycle, or framework recovery classification
 - implementation details for unrelated canonical documents outside the Contacts initiative

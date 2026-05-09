@@ -404,7 +404,7 @@ Current production domains:
 - `contacts`: PR4 compatibility `ContactsDomainSnapshot`, migrated from legacy `Documents/contacts` after app unlock.
 - `protected-framework-sentinel`: framework-owned schema/purpose marker only, used to exercise multi-domain lifecycle behavior.
 
-The current `contacts` domain is the security/storage cutover for the flat compatibility snapshot. Person-centered Contacts modeling, search, tags, recipient lists, merge, and richer `.cypherair-contacts` package workflows remain future Contacts feature work.
+The current `contacts` domain is the security/storage cutover for the flat compatibility snapshot. Person-centered Contacts modeling, search, tags, recipient lists, merge, and organization workflows remain future Contacts feature work. Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be designed separately as mandatory encrypted backup.
 
 Migration and exception rules:
 

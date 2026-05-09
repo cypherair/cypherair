@@ -1,7 +1,7 @@
 # Contacts Protected Domain Surface Inventory
 
-> **Version:** Draft v0.4
-> **Status:** Draft implementation-prep checklist, updated with Contacts PR6 certification persistence and UX coverage notes.
+> **Version:** Draft v0.5
+> **Status:** Draft implementation-prep checklist, updated with the Contacts PR7 package-exchange withdrawal.
 > **Purpose:** Enumerate all Contacts-required access and mutation surfaces that must be accounted for during Contacts protected-domain implementation.
 > **Audience:** Engineering, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
@@ -23,7 +23,7 @@ It exists because current Contacts access is distributed across:
 Every later implementation PR should use this document to answer:
 
 - which surfaces it owns
-- whether each surface is a domain read, mutation, package action, maintenance action, or optional Contacts enrichment
+- whether each surface is a domain read, mutation, maintenance action, or optional Contacts enrichment
 - what the locked-state behavior must be
 - whether framework gating is required
 
@@ -35,7 +35,6 @@ Each row in the inventory uses the following concepts.
 
 - `read` — needs Contacts domain content for ordinary user-visible behavior
 - `mutation` — changes Contacts domain content
-- `package` — selected-contact `.cypherair-contacts` package export/import preview/commit
 - `maintenance` — migration, quarantine, reset, cleanup, reconciliation, or sandbox boundary flows
 - `enrichment` — optional Contacts-aware enhancement around otherwise meaningful non-Contacts work
 
@@ -103,22 +102,16 @@ Allowed outcomes:
 | Tag management | future Contacts detail / filter management | mutation | yes | yes | Unlock required | Contacts PR8 | Tags belong to `ContactIdentity` layer |
 | Recipient-list management | future Contacts list/detail management surfaces | mutation | yes | yes | Unlock required | Contacts PR8 | Lists bind to `ContactIdentity`, not fingerprints |
 
-## 5. Package, Migration, Certification, And Maintenance Surfaces
+## 5. Migration, Certification, And Maintenance Surfaces
 
 | Surface | Current entrypoints | Type | Target unlock requirement | Framework gate | Locked-state target behavior | Planned PR | Notes |
 |---------|---------------------|------|---------------------------|----------------|------------------------------|------------|-------|
-| Contact Detail single-contact export | future Contact Detail export action | package | yes | yes | Requires unlocked Contacts plus fresh authentication immediately before export | Contacts PR7 | Exports one contact into `.cypherair-contacts`; public-derived labels are default, local relationship/custom labels require explicit default-off selection |
-| Contacts list multi-select export | future Contacts list selection mode | package | yes | yes | Requires unlocked Contacts plus fresh authentication immediately before export | Contacts PR7 | Exports one or more selected contacts into one package; local relationship/custom labels require explicit default-off selection |
-| Contact package import preview | future package import route / file importer | package | no | conditional | Parse and preview without Contacts mutation; framework gate is required only for later commit | Contacts PR7 | Reject malformed packages before preview; imported labels are untrusted preview hints |
-| Contact package import commit | future package import confirmation | package | yes | yes | Commit blocked until Contacts domain is available | Contacts PR7 | Creates/updates contacts through protected-domain write path; never whole-domain restore |
 | Certification projection revalidation on unlock | Contacts unlock flow + revalidation helper | maintenance | yes | yes | Runs after open as needed; failures must not be misrepresented as empty Contacts state | Contacts PR6 | PR6 covered: projections are recomputed after protected Contacts open and through reusable `ContactService` hooks |
-| Certification projection revalidation on package import | package import commit finalization | maintenance | yes | yes | Rebuild projected state deterministically after commit | Contacts PR6, Contacts PR7 | PR6 provides the reusable hooks; PR7 will call them during package import commit |
 | Legacy plaintext migration read | migration coordinator reading `.gpg` files and `contact-metadata.json` | maintenance | conditional | yes | Old source remains authoritative until target readability is proven | Contacts PR4 | Reads legacy plaintext without treating it as the final source after cutover |
 | Quarantine management | migration coordinator quarantine paths | maintenance | yes | yes | Quarantine is inactive for normal Contacts display and resolution | Contacts PR4 | No ordinary route may read quarantine as active source |
 | Final legacy deletion | post-cutover cleanup after later successful Contacts domain open | maintenance | yes | yes | Delete only after later successful open confirmation | Contacts PR4 | Avoids destructive deletion on first cutover success |
-| Local data reset | `LocalDataResetService.resetAllLocalData(...)` | maintenance | no | yes | Delete legacy Contacts, protected Contacts artifacts, package temporary artifacts, and clear `ContactService` runtime state | Contacts PR4, Contacts PR7 | Current reset already deletes legacy contacts directory and clears in-memory Contacts state |
-| Tutorial / test sandbox Contacts stores | `TutorialSandboxContainer`, UI test preload helpers | maintenance | no | no | Remain isolated from real protected Contacts migration and package exchange | Contacts PR4 | Sandbox contacts are test/tutorial data, not production protected-domain state |
-| Package temporary artifact cleanup | `AppTemporaryArtifactStore` / future package export temp files | maintenance | no | no | Temporary package files are cleaned after completion, cancellation, startup cleanup, and reset | Contacts PR7 | Mirrors existing protected export handoff expectations |
+| Local data reset | `LocalDataResetService.resetAllLocalData(...)` | maintenance | no | yes | Delete legacy Contacts and protected Contacts artifacts, and clear `ContactService` runtime state | Contacts PR4 | Current reset already deletes legacy contacts directory and clears in-memory Contacts state |
+| Tutorial / test sandbox Contacts stores | `TutorialSandboxContainer`, UI test preload helpers | maintenance | no | no | Remain isolated from real protected Contacts migration | Contacts PR4 | Sandbox contacts are test/tutorial data, not production protected-domain state |
 
 ## 6. Surfaces Explicitly Not Treated As Contacts Domain Access
 
@@ -135,7 +128,7 @@ These repository behaviors remain important, but they are not ordinary Contacts 
 This inventory is only complete if later implementers can use it to answer all of the following without rediscovering repository state manually:
 
 - which current entrypoints directly touch Contacts behavior
-- which surfaces are reads vs mutations vs package actions vs maintenance actions vs optional enrichment
+- which surfaces are reads vs mutations vs maintenance actions vs optional enrichment
 - which surfaces can partially operate while Contacts is opening, locked, or unavailable
 - which surfaces must wait for Contacts unlock before commit
 - which PR will own each surface during later implementation
@@ -165,4 +158,4 @@ Contacts PR5 then moves ordinary Contacts UI and Encrypt behavior to person-cent
 
 Contacts PR6 adds protected persistence for valid certification artifacts, recomputes per-key OpenPGP certification projection from saved records, exports saved canonical signature bytes as armor on demand, revalidates projection after protected Contacts open, and replaces the ordinary fingerprint-first Certificate Signatures entry with a contact-centered certification details route. Contact Detail now shows manual fingerprint verification and OpenPGP certification as separate signals, `Certify This Contact` saves a validated generated User ID certification only after the user runs that action, and external `.asc` / `.sig` import remains preview-first until `Save Signature` is explicitly chosen.
 
-Remaining follow-on work still includes `.cypherair-contacts` packages, search, tags, recipient-list UI, and organization workflows.
+Contacts PR7 package exchange is withdrawn and has no active inventory rows. Remaining follow-on work still includes search, tags, recipient-list UI, and organization workflows. Any future complete Contacts backup or device migration must be designed separately as a mandatory encrypted feature before it receives inventory coverage.

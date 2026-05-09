@@ -131,7 +131,7 @@ Completed Phase 7 validation expectations:
 
 Future Contacts feature validation targets:
 
-- Person-centered Contacts follow-on work must prove search, tags, recipient lists, merge behavior, richer `.cypherair-contacts` package UX, certification projection persistence, and any new Contacts route states without weakening the implemented protected-domain security lifecycle.
+- Person-centered Contacts follow-on work must prove search, tags, recipient lists, merge behavior, certification projection persistence, and any new Contacts route states without weakening the implemented protected-domain security lifecycle. Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be covered by a separate mandatory encrypted design and test plan.
 
 Docs-only documentation authority or archive PRs do not require Rust or Xcode test runs unless they touch code, generated files, project files, entitlements, release metadata, or build settings. They should still run documentation consistency checks, link checks for active platform references, and `git diff --check`.
 
