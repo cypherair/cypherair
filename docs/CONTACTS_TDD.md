@@ -1,6 +1,6 @@
 # Contacts Technical Design Document (TDD)
 
-> **Version:** Draft v1.1  
+> **Version:** Draft v1.2  
 > **Status:** Draft future Contacts feature spec. Current protected-domain security/storage behavior is owned by the current-state architecture, security, TDD, and testing docs.
 > **Purpose:** Technical design for implementing the Contacts enhancement initiative as a Contacts domain on the shared protected app-data framework.  
 > **Audience:** Engineering, QA, and AI coding tools.  

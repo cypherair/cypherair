@@ -188,7 +188,7 @@ Views and app coordinators continue to depend on a single `ContactService`.
 - route-aware open / unlock coordination for Contacts-dependent surfaces
 - Contacts query APIs
 - Contacts mutation APIs
-- import / merge / contact-package actions
+- import / merge / organization actions
 - recipient resolution by `ContactIdentity`
 - signer enrichment lookup over unlocked Contacts runtime state
 
@@ -277,7 +277,7 @@ The companion [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_D
 
 It is responsible for:
 
-- classifying whether a surface is a read, mutation, package action, maintenance action, or optional Contacts enrichment
+- classifying whether a surface is a read, mutation, maintenance action, or optional Contacts enrichment
 - defining whether the surface requires Contacts unlocked, framework gate only, or no Contacts access
 - freezing the target locked-state behavior
 - assigning each surface to a future Contacts-internal PR
