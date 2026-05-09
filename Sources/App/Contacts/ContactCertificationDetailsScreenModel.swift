@@ -54,7 +54,7 @@ final class ContactCertificationDetailsScreenModel {
         ContactCertificationArtifactSource,
         String?
     ) async throws -> ContactCertificationArtifactValidation
-    typealias SaveArtifactAction = @MainActor (ContactCertificationArtifactReference) throws -> ContactCertificationArtifactReference
+    typealias SaveArtifactAction = @MainActor (VerifiedContactCertificationArtifact) throws -> ContactCertificationArtifactReference
     typealias ExportArtifactAction = @MainActor (String) throws -> (data: Data, filename: String)
     typealias SignatureFileImportAction = @MainActor (URL) throws -> (data: Data, text: String?)
 
@@ -91,7 +91,7 @@ final class ContactCertificationDetailsScreenModel {
     private(set) var catalog: CertificateSelectionCatalog?
     private(set) var loadError: CypherAirError?
     private(set) var activeOperation: ActiveOperation?
-    private(set) var pendingArtifact: ContactCertificationArtifactReference?
+    private(set) var pendingArtifact: VerifiedContactCertificationArtifact?
     private(set) var verification: CertificateSignatureVerification?
     private(set) var lastSavedArtifact: ContactCertificationArtifactReference?
 
@@ -278,7 +278,8 @@ final class ContactCertificationDetailsScreenModel {
     }
 
     var canGenerateAndSave: Bool {
-        selectedKeyRecord != nil &&
+        contactsAvailability.allowsProtectedCertificationPersistence &&
+            selectedKeyRecord != nil &&
             selectedKey != nil &&
             selectedUserId != nil &&
             selectedSigner != nil &&
@@ -298,7 +299,9 @@ final class ContactCertificationDetailsScreenModel {
     }
 
     var canSavePendingArtifact: Bool {
-        pendingArtifact != nil && !isOperationLocked
+        contactsAvailability.allowsProtectedCertificationPersistence &&
+            pendingArtifact != nil &&
+            !isOperationLocked
     }
 
     func loadIfNeeded() {
@@ -398,6 +401,9 @@ final class ContactCertificationDetailsScreenModel {
     }
 
     func generateAndSaveCertification() {
+        guard contactsAvailability.allowsProtectedCertificationPersistence else {
+            return
+        }
         guard let key = selectedKey,
               let keyRecord = selectedKeyRecord,
               let selectedUserId,
@@ -479,7 +485,8 @@ final class ContactCertificationDetailsScreenModel {
     }
 
     func savePendingSignature() {
-        guard let pendingArtifact else {
+        guard contactsAvailability.allowsProtectedCertificationPersistence,
+              let pendingArtifact else {
             return
         }
 
@@ -664,7 +671,7 @@ final class ContactCertificationDetailsScreenModel {
         _ operation: ActiveOperation,
         work: @escaping @MainActor () async throws -> (
             CertificateSignatureVerification?,
-            ContactCertificationArtifactReference?,
+            VerifiedContactCertificationArtifact?,
             ContactCertificationArtifactReference?
         )
     ) {

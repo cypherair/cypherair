@@ -466,12 +466,24 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
 
     @MainActor
     func test_generateCertification_savesWithoutAutomaticExport_thenExplicitExportUsesPolicy() async throws {
+        let protectedContacts = try await makeProtectedContactService(prefix: "DetailsGenerate")
+        defer {
+            try? FileManager.default.removeItem(
+                at: protectedContacts.storageRoot.rootURL.deletingLastPathComponent()
+            )
+        }
+        let certificateSignatureService = CertificateSignatureService(
+            engine: stack.engine,
+            keyManagement: stack.keyManagement,
+            contactService: protectedContacts.service
+        )
         let (contactId, key, catalog) = try makeContactContext(
             name: "Details Generate",
-            email: "details-generate@example.com"
+            email: "details-generate@example.com",
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService
         )
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Details Signer")
-        var savedArtifacts = [ContactCertificationArtifactReference]()
         var interceptedFilename: String?
         let configuration = ContactCertificationDetailsConfiguration(
             outputInterceptionPolicy: OutputInterceptionPolicy(
@@ -481,36 +493,13 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
                 }
             )
         )
-        let artifact = makeValidArtifact(
-            artifactId: "details-generated",
-            key: key,
-            userId: catalog.userIds[0]
-        )
         let model = makeModel(
             contactId: contactId,
             keyId: key.keyId,
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService,
             configuration: configuration,
-            selectionCatalogAction: { _ in catalog },
-            generateArmoredCertificationAction: { _, _, _, _ in Data("armored".utf8) },
-            validateUserIdArtifactAction: { _, _, _, _, _, _ in
-                ContactCertificationArtifactValidation(
-                    verification: CertificateSignatureVerification(
-                        status: .valid,
-                        certificationKind: .generic,
-                        signerPrimaryFingerprint: nil,
-                        signingKeyFingerprint: nil,
-                        signerIdentity: nil
-                    ),
-                    artifact: artifact
-                )
-            },
-            saveArtifactAction: { artifact in
-                savedArtifacts.append(artifact)
-                return artifact
-            },
-            exportArtifactAction: { _ in
-                (Data("exported".utf8), "details-generated.asc")
-            }
+            selectionCatalogAction: { _ in catalog }
         )
 
         model.loadIfNeeded()
@@ -519,36 +508,58 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         }
         model.generateAndSaveCertification()
         await waitUntil("generated certification save") {
-            model.lastSavedArtifact?.artifactId == "details-generated"
+            model.lastSavedArtifact != nil
         }
 
-        XCTAssertEqual(savedArtifacts.map(\.artifactId), ["details-generated"])
         XCTAssertNil(model.exportController.payload)
 
-        model.exportArtifact(artifact)
+        let savedArtifact = try XCTUnwrap(model.lastSavedArtifact)
+        model.exportArtifact(savedArtifact)
         await waitUntil("explicit export interception") {
-            interceptedFilename == "details-generated.asc"
+            interceptedFilename == savedArtifact.resolvedExportFilename
         }
     }
 
     @MainActor
     func test_importPreviewOnlyEnablesSaveForValidArtifact() async throws {
+        let protectedContacts = try await makeProtectedContactService(prefix: "DetailsImport")
+        defer {
+            try? FileManager.default.removeItem(
+                at: protectedContacts.storageRoot.rootURL.deletingLastPathComponent()
+            )
+        }
+        let certificateSignatureService = CertificateSignatureService(
+            engine: stack.engine,
+            keyManagement: stack.keyManagement,
+            contactService: protectedContacts.service
+        )
         let (contactId, key, catalog) = try makeContactContext(
             name: "Details Import",
-            email: "details-import@example.com"
+            email: "details-import@example.com",
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService
         )
-        let validArtifact = makeValidArtifact(
-            artifactId: "details-imported",
-            key: key,
-            userId: catalog.userIds[0]
+        let signer = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Details Import Signer"
+        )
+        let keyRecord = try XCTUnwrap(
+            protectedContacts.service.availableContactKeyRecord(keyId: key.keyId)
+        )
+        let validSignature = try await certificateSignatureService.generateArmoredUserIdCertification(
+            signerFingerprint: signer.fingerprint,
+            targetCert: keyRecord.publicKeyData,
+            selectedUserId: catalog.userIds[0],
+            certificationKind: .generic
         )
         var validationCalls = 0
-        var savedArtifactId: String?
         let model = makeModel(
             contactId: contactId,
             keyId: key.keyId,
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService,
             selectionCatalogAction: { _ in catalog },
-            validateUserIdArtifactAction: { _, _, _, _, _, _ in
+            validateUserIdArtifactAction: { signature, targetKey, targetCert, selectedUserId, source, filename in
                 validationCalls += 1
                 if validationCalls == 1 {
                     return ContactCertificationArtifactValidation(
@@ -562,20 +573,14 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
                         artifact: nil
                     )
                 }
-                return ContactCertificationArtifactValidation(
-                    verification: CertificateSignatureVerification(
-                        status: .valid,
-                        certificationKind: .generic,
-                        signerPrimaryFingerprint: nil,
-                        signingKeyFingerprint: nil,
-                        signerIdentity: nil
-                    ),
-                    artifact: validArtifact
+                return try await certificateSignatureService.validateUserIdCertificationArtifact(
+                    signature: signature,
+                    targetKey: targetKey,
+                    targetCert: targetCert,
+                    selectedUserId: selectedUserId,
+                    source: source,
+                    exportFilename: filename
                 )
-            },
-            saveArtifactAction: { artifact in
-                savedArtifactId = artifact.artifactId
-                return artifact
             }
         )
 
@@ -583,40 +588,90 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         await waitUntil("details import catalog load") {
             model.loadState == .loaded
         }
-        model.setSignatureInput("signature")
+        model.setSignatureInput("invalid signature")
         model.verifyImportedSignature()
         await waitUntil("invalid import preview") {
             model.verification?.status == .invalid
         }
         XCTAssertFalse(model.canSavePendingArtifact)
 
+        model.setSignatureInput(String(decoding: validSignature, as: UTF8.self))
         model.verifyImportedSignature()
         await waitUntil("valid import preview") {
-            model.pendingArtifact?.artifactId == "details-imported"
+            model.pendingArtifact != nil
         }
         XCTAssertTrue(model.canSavePendingArtifact)
 
         model.savePendingSignature()
         await waitUntil("pending signature save") {
-            savedArtifactId == "details-imported"
+            model.lastSavedArtifact != nil
         }
+    }
+
+    @MainActor
+    func test_legacyCompatibilityDisablesCertificationPersistenceActions() async throws {
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Legacy",
+            email: "details-legacy@example.com"
+        )
+        let signer = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Details Legacy Signer"
+        )
+        let keyRecord = try XCTUnwrap(
+            stack.contactService.availableContactKeyRecord(keyId: key.keyId)
+        )
+        let validSignature = try await stack.certificateSignatureService.generateArmoredUserIdCertification(
+            signerFingerprint: signer.fingerprint,
+            targetCert: keyRecord.publicKeyData,
+            selectedUserId: catalog.userIds[0],
+            certificationKind: .generic
+        )
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            selectionCatalogAction: { _ in catalog }
+        )
+
+        model.loadIfNeeded()
+        await waitUntil("legacy details catalog load") {
+            model.loadState == .loaded
+        }
+
+        XCTAssertEqual(model.contactsAvailability, .availableLegacyCompatibility)
+        XCTAssertFalse(model.canGenerateAndSave)
+
+        model.setSignatureInput(String(decoding: validSignature, as: UTF8.self))
+        model.verifyImportedSignature()
+        await waitUntil("legacy valid import preview") {
+            model.pendingArtifact != nil
+        }
+
+        XCTAssertFalse(model.canSavePendingArtifact)
+        model.savePendingSignature()
+        await Task.yield()
+        XCTAssertNil(model.lastSavedArtifact)
     }
 
     @MainActor
     private func makeContactContext(
         name: String,
-        email: String
+        email: String,
+        contactService: ContactService? = nil,
+        certificateSignatureService: CertificateSignatureService? = nil
     ) throws -> (contactId: String, key: ContactKeySummary, catalog: CertificateSelectionCatalog) {
+        let contactService = contactService ?? stack.contactService
+        let certificateSignatureService = certificateSignatureService ?? stack.certificateSignatureService
         let generated = try stack.engine.generateKey(
             name: name,
             email: email,
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try stack.contactService.addContact(publicKeyData: generated.publicKeyData)
-        let contactId = try XCTUnwrap(stack.contactService.contactId(forFingerprint: generated.fingerprint))
-        let key = try XCTUnwrap(stack.contactService.availableKey(fingerprint: generated.fingerprint))
-        let catalog = try stack.certificateSignatureService.selectionCatalog(
+        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(contactService.contactId(forFingerprint: generated.fingerprint))
+        let key = try XCTUnwrap(contactService.availableKey(fingerprint: generated.fingerprint))
+        let catalog = try certificateSignatureService.selectionCatalog(
             targetCert: generated.publicKeyData
         )
         return (contactId, key, catalog)
@@ -626,6 +681,9 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
     private func makeModel(
         contactId: String,
         keyId: String,
+        contactService: ContactService? = nil,
+        keyManagement: KeyManagementService? = nil,
+        certificateSignatureService: CertificateSignatureService? = nil,
         configuration: ContactCertificationDetailsConfiguration = .default,
         selectionCatalogAction: ContactCertificationDetailsScreenModel.SelectionCatalogAction? = nil,
         generateArmoredCertificationAction: ContactCertificationDetailsScreenModel.GenerateArmoredCertificationAction? = nil,
@@ -638,9 +696,9 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             contactId: contactId,
             initialKeyId: keyId,
             intent: .details,
-            contactService: stack.contactService,
-            keyManagement: stack.keyManagement,
-            certificateSignatureService: stack.certificateSignatureService,
+            contactService: contactService ?? stack.contactService,
+            keyManagement: keyManagement ?? stack.keyManagement,
+            certificateSignatureService: certificateSignatureService ?? stack.certificateSignatureService,
             configuration: configuration,
             selectionCatalogAction: selectionCatalogAction,
             generateArmoredCertificationAction: generateArmoredCertificationAction,
@@ -651,38 +709,59 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         )
     }
 
-    private func makeValidArtifact(
-        artifactId: String,
-        key: ContactKeySummary,
-        userId: UserIdSelectionOption
-    ) -> ContactCertificationArtifactReference {
-        let signatureData = Data("signature-\(artifactId)".utf8)
-        return ContactCertificationArtifactReference(
-            artifactId: artifactId,
-            keyId: key.keyId,
-            userId: userId.displayText,
-            createdAt: Date(),
-            storageHint: "test",
-            canonicalSignatureData: signatureData,
-            signatureDigest: ContactCertificationArtifactReference.sha256Hex(for: signatureData),
-            source: .imported,
-            targetKeyFingerprint: key.fingerprint,
-            targetSelector: .userId(
-                data: userId.userIdData,
-                displayText: userId.displayText,
-                occurrenceIndex: userId.occurrenceIndex
-            ),
-            signerPrimaryFingerprint: nil,
-            signingKeyFingerprint: nil,
-            certificationKind: .generic,
-            validationStatus: .valid,
-            targetCertificateDigest: ContactCertificationArtifactReference.sha256Hex(
-                for: Data("target".utf8)
-            ),
-            lastValidatedAt: Date(),
-            updatedAt: Date(),
-            exportFilename: "\(artifactId).asc"
+    private func makeProtectedContactService(
+        prefix: String
+    ) async throws -> (
+        service: ContactService,
+        storageRoot: ProtectedDataStorageRoot,
+        contactsDirectory: URL
+    ) {
+        let contactsDirectory = stack.tempDir
+            .appendingPathComponent("\(prefix)-contacts-\(UUID().uuidString)", isDirectory: true)
+        let storageRoot = ProtectedDataStorageRoot(
+            baseDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)
         )
+        let registryStore = ProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.details.\(UUID().uuidString)"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        var registry = try registryStore.loadRegistry()
+        registry.sharedResourceLifecycleState = .ready
+        registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
+        try registryStore.saveRegistry(registry)
+
+        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot)
+        let wrappingRootKey = Data(repeating: 0xD6, count: 32)
+        let migrationSource = ContactsLegacyMigrationSource(
+            engine: stack.engine,
+            repository: ContactRepository(contactsDirectory: contactsDirectory)
+        )
+        let store = ContactsDomainStore(
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey },
+            initialSnapshotProvider: {
+                try migrationSource.makeInitialSnapshot()
+            }
+        )
+        let service = ContactService(
+            engine: stack.engine,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: store
+        )
+        let availability = await service.openContactsAfterPostUnlock(
+            gateResult: ContactsPostAuthGateResult(
+                postUnlockOutcome: .opened([ProtectedSettingsStore.domainID]),
+                frameworkState: .sessionAuthorized
+            ),
+            wrappingRootKey: { wrappingRootKey }
+        )
+        XCTAssertEqual(availability, .availableProtectedDomain)
+
+        return (service, storageRoot, contactsDirectory)
     }
 
     @MainActor

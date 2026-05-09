@@ -221,7 +221,10 @@ struct ContactDetailView: View {
                         systemImage: "checkmark.seal"
                     )
                 }
-                .disabled(!configuration.allowsCertificateSignatureLaunch)
+                .disabled(
+                    !configuration.allowsCertificateSignatureLaunch ||
+                        !contactService.contactsAvailability.allowsProtectedCertificationPersistence
+                )
                 .accessibilityIdentifier("contactdetail.certifyContact")
             }
 

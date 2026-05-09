@@ -657,7 +657,7 @@ final class ContactService: @unchecked Sendable {
 
     @discardableResult
     func saveCertificationArtifact(
-        _ artifact: ContactCertificationArtifactReference
+        _ artifact: VerifiedContactCertificationArtifact
     ) throws -> ContactCertificationArtifactReference {
         try requireContactsAvailable()
         guard contactsAvailability == .availableProtectedDomain else {
@@ -667,7 +667,7 @@ final class ContactService: @unchecked Sendable {
         return try withProtectedRuntimeRollback {
             var snapshot = try mutableRuntimeSnapshot()
             let mutation = try snapshotMutator.saveCertificationArtifact(
-                artifact,
+                artifact.reference,
                 in: &snapshot
             )
             if mutation.didMutate {
@@ -685,6 +685,14 @@ final class ContactService: @unchecked Sendable {
         try requireContactsAvailable()
         guard contactsAvailability == .availableProtectedDomain else {
             throw CypherAirError.contactsUnavailable(contactsAvailability)
+        }
+        guard status != .valid else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(
+                    localized: "contactcertification.update.validRequiresVerification",
+                    defaultValue: "Certification signatures must be revalidated before they can be marked valid."
+                )
+            )
         }
 
         return try withProtectedRuntimeRollback {

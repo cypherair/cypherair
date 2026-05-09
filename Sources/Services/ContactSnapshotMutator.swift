@@ -345,17 +345,12 @@ struct ContactSnapshotMutator {
             )
         }
 
-        var artifact = candidateArtifact
-        artifact.targetKeyFingerprint = artifact.targetKeyFingerprint ?? keyRecord.fingerprint
-        artifact.targetCertificateDigest = artifact.targetCertificateDigest
-            ?? ContactCertificationArtifactReference.sha256Hex(for: keyRecord.publicKeyData)
-        artifact.userId = artifact.userId ?? artifact.targetSelector.legacyUserIdDisplayText
-        artifact.updatedAt = now
-        artifact.lastValidatedAt = artifact.lastValidatedAt ?? now
-        artifact.storageHint = artifact.storageHint ?? "protected-contacts-domain"
-        artifact = try artifact.validatedForPersistence(now: now)
+        let currentTargetDigest = ContactCertificationArtifactReference.sha256Hex(
+            for: keyRecord.publicKeyData
+        )
 
-        guard artifact.targetKeyFingerprint?.lowercased() == keyRecord.fingerprint.lowercased() else {
+        if let targetKeyFingerprint = candidateArtifact.targetKeyFingerprint,
+           targetKeyFingerprint.lowercased() != keyRecord.fingerprint.lowercased() {
             throw CypherAirError.invalidKeyData(
                 reason: String(
                     localized: "contactcertification.save.wrongKey",
@@ -364,20 +359,56 @@ struct ContactSnapshotMutator {
             )
         }
 
+        if let targetCertificateDigest = candidateArtifact.targetCertificateDigest,
+           !targetCertificateDigest.isEmpty,
+           targetCertificateDigest != currentTargetDigest {
+            throw CypherAirError.invalidKeyData(
+                reason: String(
+                    localized: "contactcertification.save.staleTarget",
+                    defaultValue: "The certification signature was validated for a different version of this contact key."
+                )
+            )
+        }
+
+        var artifact = candidateArtifact
+        artifact.targetKeyFingerprint = keyRecord.fingerprint
+        artifact.targetCertificateDigest = currentTargetDigest
+        artifact.userId = artifact.userId ?? artifact.targetSelector.legacyUserIdDisplayText
+        artifact.updatedAt = now
+        artifact.lastValidatedAt = artifact.lastValidatedAt ?? now
+        artifact.storageHint = "protected-contacts-domain"
+        artifact = try artifact.validatedForPersistence(now: now)
+
         if let deduplicationKey = artifact.deduplicationKey,
            let existingIndex = snapshot.certificationArtifacts.firstIndex(where: {
                $0.deduplicationKey == deduplicationKey
            }) {
-            var existing = snapshot.certificationArtifacts[existingIndex]
-            if existing.validationStatus != .valid ||
-                existing.lastValidatedAt == nil ||
-                existing.exportFilename == nil {
-                existing.validationStatus = .valid
-                existing.lastValidatedAt = existing.lastValidatedAt ?? now
-                existing.updatedAt = now
-                existing.exportFilename = existing.exportFilename ?? artifact.exportFilename
-                snapshot.certificationArtifacts[existingIndex] = try existing.validatedForPersistence(now: now)
-            }
+            let existing = snapshot.certificationArtifacts[existingIndex]
+            let exportFilename = existing.exportFilename?.isEmpty == false
+                ? existing.exportFilename
+                : artifact.exportFilename
+            let refreshedArtifact = ContactCertificationArtifactReference(
+                artifactId: existing.artifactId,
+                keyId: existing.keyId,
+                userId: artifact.userId,
+                createdAt: existing.createdAt,
+                storageHint: "protected-contacts-domain",
+                canonicalSignatureData: artifact.canonicalSignatureData,
+                signatureDigest: artifact.signatureDigest,
+                source: artifact.source,
+                targetKeyFingerprint: artifact.targetKeyFingerprint,
+                targetSelector: artifact.targetSelector,
+                signerPrimaryFingerprint: artifact.signerPrimaryFingerprint,
+                signingKeyFingerprint: artifact.signingKeyFingerprint,
+                certificationKind: artifact.certificationKind,
+                validationStatus: .valid,
+                targetCertificateDigest: artifact.targetCertificateDigest,
+                lastValidatedAt: now,
+                updatedAt: now,
+                exportFilename: exportFilename
+            )
+            snapshot.certificationArtifacts[existingIndex] = try refreshedArtifact
+                .validatedForPersistence(now: now)
             _ = try recomputeCertificationProjections(in: &snapshot, updatedAt: now)
             snapshot.updatedAt = now
             try snapshot.validateContract()
@@ -398,6 +429,14 @@ struct ContactSnapshotMutator {
     ) throws -> Mutation<ContactCertificationArtifactReference> {
         let before = snapshot
         let now = Date()
+        guard status != .valid else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(
+                    localized: "contactcertification.update.validRequiresVerification",
+                    defaultValue: "Certification signatures must be revalidated before they can be marked valid."
+                )
+            )
+        }
         guard let index = snapshot.certificationArtifacts.firstIndex(where: { $0.artifactId == artifactId }) else {
             throw CypherAirError.internalError(
                 reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
@@ -440,12 +479,7 @@ struct ContactSnapshotMutator {
                 status: status,
                 artifactIds: artifactIds,
                 lastValidatedAt: artifacts.compactMap(\.lastValidatedAt).max(),
-                reconciliationMetadata: artifacts.isEmpty
-                    ? nil
-                    : String.localizedStringWithFormat(
-                        String(localized: "contactcertification.projection.count", defaultValue: "%d saved certification signatures"),
-                        artifacts.count
-                    )
+                reconciliationMetadata: nil
             )
 
             if snapshot.keyRecords[index].certificationArtifactIds != artifactIds ||

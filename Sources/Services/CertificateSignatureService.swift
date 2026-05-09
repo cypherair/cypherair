@@ -2,10 +2,25 @@ import Foundation
 
 struct ContactCertificationArtifactValidation: Equatable {
     let verification: CertificateSignatureVerification
-    let artifact: ContactCertificationArtifactReference?
+    let artifact: VerifiedContactCertificationArtifact?
 
     var canSave: Bool {
         artifact != nil
+    }
+}
+
+@dynamicMemberLookup
+struct VerifiedContactCertificationArtifact: Equatable, Sendable {
+    let reference: ContactCertificationArtifactReference
+
+    fileprivate init(reference: ContactCertificationArtifactReference) {
+        self.reference = reference
+    }
+
+    subscript<Value>(
+        dynamicMember keyPath: KeyPath<ContactCertificationArtifactReference, Value>
+    ) -> Value {
+        reference[keyPath: keyPath]
     }
 }
 
@@ -251,9 +266,9 @@ final class CertificateSignatureService {
         userId: String?,
         verification: CertificateSignatureVerification,
         exportFilename: String?
-    ) -> ContactCertificationArtifactReference {
+    ) -> VerifiedContactCertificationArtifact {
         let now = Date()
-        return ContactCertificationArtifactReference(
+        let reference = ContactCertificationArtifactReference(
             artifactId: "cert-artifact-\(UUID().uuidString)",
             keyId: targetKey.keyId,
             userId: userId,
@@ -277,6 +292,7 @@ final class CertificateSignatureService {
             updatedAt: now,
             exportFilename: exportFilename
         )
+        return VerifiedContactCertificationArtifact(reference: reference)
     }
 
     private func validatedSelectorInput(
