@@ -1,6 +1,6 @@
 import Foundation
 
-enum ContactVerificationState: String, Codable, Hashable {
+enum ContactVerificationState: String, Codable, Hashable, Sendable {
     case verified
     case unverified
 
@@ -26,9 +26,20 @@ struct Contact: Identifiable, Hashable {
     /// Primary User ID (e.g., "Bob <bob@example.com>").
     let userId: String?
 
+    /// Stable person/relationship identifier when this key is projected from the
+    /// protected Contacts domain.
+    var contactId: String? = nil
+
+    /// Contact-level display name for person-centered Contacts views and signer
+    /// recognition. Falls back to the key User ID for legacy compatibility rows.
+    var contactDisplayName: String? = nil
+
+    /// Key usage state in the owning contact identity.
+    var usageState: ContactKeyUsageState? = nil
+
     /// Display name extracted from User ID.
     var displayName: String {
-        IdentityPresentation.displayName(from: userId)
+        contactDisplayName ?? IdentityPresentation.displayName(from: userId)
     }
 
     /// Email extracted from User ID.

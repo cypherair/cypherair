@@ -17,8 +17,8 @@ struct AppRouteDestinationView: View {
             SelectiveRevocationView(fingerprint: fingerprint)
         case .importKey:
             ImportKeyView()
-        case .contactDetail(let fingerprint):
-            ContactDetailView(fingerprint: fingerprint)
+        case .contactDetail(let contactId):
+            ContactDetailView(contactId: contactId)
         case .contactCertificateSignatures(let fingerprint):
             ContactCertificateSignaturesView(fingerprint: fingerprint)
         case .addContact:

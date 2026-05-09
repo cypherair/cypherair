@@ -381,7 +381,8 @@ final class TutorialSessionStore {
             )
             let contact: Contact
             switch result {
-            case .added(let added), .duplicate(let added), .updated(let added):
+            case .added(let added), .addedWithCandidate(let added, _),
+                 .duplicate(let added), .updated(let added):
                 contact = added
             case .keyUpdateDetected(let newContact, _, _):
                 contact = newContact
@@ -389,7 +390,10 @@ final class TutorialSessionStore {
 
             noteBobImported(contact)
             selectTab(.contacts)
-            setRoutePath([.contactDetail(fingerprint: contact.fingerprint)], for: .contacts)
+            setRoutePath(
+                [.contactDetail(contactId: contact.contactId ?? "legacy-contact-\(contact.fingerprint)")],
+                for: .contacts
+            )
             return true
         } catch {
             errorMessage = error.localizedDescription

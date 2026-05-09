@@ -103,6 +103,14 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         XCTAssertNoThrow(try historicalCannotEncrypt.validateContract())
     }
 
+    func test_zeroPreferredKeyIsValidAsUnresolvedRuntimeState() throws {
+        var snapshot = try makeValidSnapshotWithTwoKeys()
+        snapshot.keyRecords[0].usageState = .additionalActive
+        snapshot.keyRecords[1].usageState = .additionalActive
+
+        XCTAssertNoThrow(try snapshot.validateContract())
+    }
+
     func test_validSnapshotWithTagsRecipientsAndArtifacts_validates() throws {
         var snapshot = try makeValidSnapshot()
         snapshot.tags = [

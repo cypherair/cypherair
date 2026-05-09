@@ -1761,6 +1761,22 @@
         }
       }
     },
+    "contactdetail.additionalKeys" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Additional Active Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他活跃密钥"
+          }
+        }
+      }
+    },
     "contactdetail.canEncrypt" : {
       "localizations" : {
         "en" : {
@@ -1862,13 +1878,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This will remove the contact's public key from your device."
+            "value" : "This will remove this contact and all of their public keys from your device."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这将从你的设备上移除该联系人的公钥。"
+            "value" : "这将从你的设备上移除此联系人及其所有公钥。"
           }
         }
       }
@@ -1905,6 +1921,22 @@
         }
       }
     },
+    "contactdetail.historicalKeys" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Historical Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史密钥"
+          }
+        }
+      }
+    },
     "contactdetail.fingerprint" : {
       "localizations" : {
         "en" : {
@@ -1917,6 +1949,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "指纹"
+          }
+        }
+      }
+    },
+    "contactdetail.keyCountLabel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥"
+          }
+        }
+      }
+    },
+    "contactdetail.markAdditionalActive" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move to Active Keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移至活跃密钥"
+          }
+        }
+      }
+    },
+    "contactdetail.markHistorical" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move to Historical"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移至历史密钥"
           }
         }
       }
@@ -1937,6 +2017,70 @@
         }
       }
     },
+    "contactdetail.merge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merge Another Contact Into This Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将另一个联系人合并到此联系人"
+          }
+        }
+      }
+    },
+    "contactdetail.merge.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose another contact to merge into this contact. Their keys and memberships will move here."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要合并到此联系人的另一个联系人。其密钥和成员关系将移到这里。"
+          }
+        }
+      }
+    },
+    "contactdetail.merge.none" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There are no other contacts to merge."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可合并的其他联系人。"
+          }
+        }
+      }
+    },
+    "contactdetail.merge.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merge Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并联系人"
+          }
+        }
+      }
+    },
     "contactdetail.name" : {
       "localizations" : {
         "en" : {
@@ -1949,6 +2093,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "名称"
+          }
+        }
+      }
+    },
+    "contactdetail.noKeysInSection" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无"
+          }
+        }
+      }
+    },
+    "contactdetail.noPreferredKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose one active encryption key before encrypting to this contact."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向此联系人加密前，请先选择一个活跃加密密钥。"
           }
         }
       }
@@ -1969,6 +2145,22 @@
         }
       }
     },
+    "contactdetail.preferredKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preferred Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首选密钥"
+          }
+        }
+      }
+    },
     "contactdetail.profile" : {
       "localizations" : {
         "en" : {
@@ -1981,6 +2173,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "配置"
+          }
+        }
+      }
+    },
+    "contactdetail.setPreferredKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make Preferred Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设为首选密钥"
           }
         }
       }
@@ -2022,13 +2230,61 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This contact has not been verified yet. Confirm the fingerprint with the key owner before relying on it."
+            "value" : "This key has not been verified yet. Confirm the fingerprint with the key owner before relying on it."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此联系人尚未验证。在依赖该联系人前，请先与密钥所有者核对指纹。"
+            "value" : "此密钥尚未验证。在依赖该密钥前，请先与密钥所有者核对指纹。"
+          }
+        }
+      }
+    },
+    "contactdetail.usage.additional" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活跃"
+          }
+        }
+      }
+    },
+    "contactdetail.usage.historical" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Historical"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史"
+          }
+        }
+      }
+    },
+    "contactdetail.usage.preferred" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preferred"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首选"
           }
         }
       }
@@ -2045,6 +2301,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加联系人"
+          }
+        }
+      }
+    },
+    "contacts.activeKey.notEncryptable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected key cannot be active because it cannot receive encrypted messages."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所选密钥无法设为活跃，因为它不能接收加密消息。"
           }
         }
       }
@@ -2273,6 +2545,38 @@
         }
       }
     },
+    "contacts.keyCount" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d keys"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 个密钥"
+          }
+        }
+      }
+    },
+    "contacts.candidate.multiple" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Multiple possible matching contacts were found."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到了多个可能匹配的联系人。"
+          }
+        }
+      }
+    },
     "contacts.metadata.corrupt" : {
       "localizations" : {
         "en" : {
@@ -2285,6 +2589,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法读取联系人元数据。"
+          }
+        }
+      }
+    },
+    "contacts.merge.sameContact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose two different contacts to merge."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择两个不同的联系人进行合并。"
+          }
+        }
+      }
+    },
+    "contacts.noPreferredKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需选密钥"
+          }
+        }
+      }
+    },
+    "contacts.preferredKey.notEncryptable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected key cannot receive encrypted messages."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所选密钥不能接收加密消息。"
           }
         }
       }
@@ -2749,6 +3101,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "兼容"
+          }
+        }
+      }
+    },
+    "encrypt.compat.noPreferred" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No preferred encryption key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有首选加密密钥"
           }
         }
       }
@@ -3297,6 +3665,22 @@
         }
       }
     },
+    "error.contactKeyReplacementUnsupported" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key replacement is only available for legacy contacts. Import the new key as a separate contact, then merge contacts if needed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥替换仅适用于旧版联系人。请将新密钥作为单独联系人导入，然后按需合并联系人。"
+          }
+        }
+      }
+    },
     "error.corruptData" : {
       "localizations" : {
         "en" : {
@@ -3757,6 +4141,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在通讯录中未找到收件人密钥。"
+          }
+        }
+      }
+    },
+    "error.recipientPreferredKeyMissing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One or more selected contacts do not have a preferred encryption key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个或多个所选联系人没有首选加密密钥。"
           }
         }
       }

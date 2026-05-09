@@ -4,12 +4,16 @@ import Foundation
 enum AddContactResult {
     /// Contact was added successfully.
     case added(Contact)
+    /// Contact was added as a new person-centered identity, and the imported
+    /// key appears related to one or more existing identities.
+    case addedWithCandidate(Contact, ContactCandidateMatch)
     /// Contact already exists (same fingerprint). No material changes were needed.
     case duplicate(Contact)
     /// Existing same-fingerprint contact absorbed new public update material.
     case updated(Contact)
-    /// Same userId but different fingerprint detected. The caller must confirm
-    /// before the old key is replaced. Call `confirmKeyUpdate` to proceed.
+    /// Legacy flat Contacts only: same userId but different fingerprint detected.
+    /// The caller must confirm before the old key is replaced. Protected-domain
+    /// Contacts import different fingerprints as separate identities instead.
     case keyUpdateDetected(newContact: Contact, existingContact: Contact, keyData: Data)
 }
 
@@ -27,8 +31,13 @@ final class ContactService: @unchecked Sendable {
     private let domainRepository: ContactsDomainRepository
     private let legacyMigrationSource: ContactsLegacyMigrationSource
     private let contactsDomainStore: ContactsDomainStore?
+    private let importMatcher = ContactImportMatcher()
+    private let recipientResolver = ContactRecipientResolver()
+    private let summaryProjector = ContactSummaryProjector()
+    private let snapshotMutator: ContactSnapshotMutator
     private(set) var contactsAvailability: ContactsAvailability = .locked
     private var verificationStates: [String: ContactVerificationState] = [:]
+    private var runtimeSnapshot: ContactsDomainSnapshot?
     private(set) var protectedDomainMigrationWarning: String?
 
     init(
@@ -53,6 +62,7 @@ final class ContactService: @unchecked Sendable {
             engine: engine,
             repository: repository
         )
+        snapshotMutator = ContactSnapshotMutator(engine: engine)
         self.contactsDomainStore = contactsDomainStore
     }
 
@@ -158,10 +168,11 @@ final class ContactService: @unchecked Sendable {
     /// Import a public key and add it as a contact.
     /// Handles both binary and ASCII-armored input.
     ///
-    /// Returns `.keyUpdateDetected` if the parsed userId conflicts with another
-    /// contact's fingerprint, including after a same-fingerprint merge/update.
-    /// In that case, the caller must present a warning and call `confirmKeyUpdate`
-    /// if the user approves.
+    /// In legacy flat Contacts runtime, returns `.keyUpdateDetected` if the parsed
+    /// userId conflicts with another contact's fingerprint, including after a
+    /// same-fingerprint merge/update. Protected-domain runtime imports related
+    /// different-fingerprint keys as separate identities and returns candidates
+    /// for optional later merge.
     ///
     /// - Parameter publicKeyData: The public key data (binary or armored).
     /// - Returns: The result of the add operation.
@@ -173,7 +184,7 @@ final class ContactService: @unchecked Sendable {
         try requireContactsAvailable()
         if contactsAvailability == .availableProtectedDomain {
             return try withProtectedRuntimeRollback {
-                try performAddContact(
+                try performProtectedAddContact(
                     publicKeyData: publicKeyData,
                     verificationState: verificationState
                 )
@@ -234,9 +245,10 @@ final class ContactService: @unchecked Sendable {
                     verificationState: resolvedVerificationState
                 )
 
-                if let conflictingContact = conflictingContact(
+                if let conflictingContact = importMatcher.conflictingLegacyContact(
                     forUserId: updatedContact.userId,
-                    excludingFingerprint: updatedContact.fingerprint
+                    excludingFingerprint: updatedContact.fingerprint,
+                    contacts: contacts
                 ) {
                     var replacementContact = updatedContact
                     replacementContact.verificationState = .verified
@@ -260,9 +272,10 @@ final class ContactService: @unchecked Sendable {
         }
 
         // Check for same userId but different fingerprint (key update)
-        if let existingContact = conflictingContact(
+        if let existingContact = importMatcher.conflictingLegacyContact(
             forUserId: contact.userId,
-            excludingFingerprint: contact.fingerprint
+            excludingFingerprint: contact.fingerprint,
+            contacts: contacts
         ) {
             contact.verificationState = .verified
             // Different fingerprint = key regenerated — caller must confirm before replacing.
@@ -281,9 +294,41 @@ final class ContactService: @unchecked Sendable {
         return .added(contact)
     }
 
-    /// Apply a user-confirmed key replacement after `addContact` returns
-    /// `.keyUpdateDetected`. Supports both classic different-fingerprint replacement
-    /// and same-fingerprint merged updates that now conflict with another contact.
+    @discardableResult
+    private func performProtectedAddContact(
+        publicKeyData: Data,
+        verificationState: ContactVerificationState = .verified
+    ) throws -> AddContactResult {
+        var snapshot = try mutableRuntimeSnapshot()
+        let mutation = try snapshotMutator.addContact(
+            publicKeyData: publicKeyData,
+            verificationState: verificationState,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistProtectedRuntimeSnapshot(snapshot)
+        }
+
+        switch mutation.output {
+        case .duplicate(let fingerprint):
+            let contact = try compatibilityContact(forFingerprint: fingerprint, in: snapshot)
+            return .duplicate(contact)
+        case .updated(let fingerprint):
+            let contact = try compatibilityContact(forFingerprint: fingerprint, in: snapshot)
+            return .updated(contact)
+        case .added(let fingerprint, let candidateMatch):
+            let contact = try compatibilityContact(forFingerprint: fingerprint, in: snapshot)
+            if let candidateMatch {
+                return .addedWithCandidate(contact, candidateMatch)
+            }
+            return .added(contact)
+        }
+    }
+
+    /// Legacy flat Contacts compatibility only: apply a user-confirmed key
+    /// replacement after `addContact` returns `.keyUpdateDetected`. Protected-domain
+    /// Contacts does not support replacement; import the new key separately and
+    /// merge identities if needed.
     ///
     /// - Parameters:
     ///   - existingFingerprint: Fingerprint of the contact being removed/replaced.
@@ -293,12 +338,7 @@ final class ContactService: @unchecked Sendable {
     func confirmKeyUpdate(existingFingerprint: String, keyData: Data) throws -> Contact {
         try requireContactsAvailable()
         if contactsAvailability == .availableProtectedDomain {
-            return try withProtectedRuntimeRollback {
-                try performConfirmKeyUpdate(
-                    existingFingerprint: existingFingerprint,
-                    keyData: keyData
-                )
-            }
+            throw CypherAirError.contactKeyReplacementUnsupported
         }
         return try performConfirmKeyUpdate(
             existingFingerprint: existingFingerprint,
@@ -343,11 +383,35 @@ final class ContactService: @unchecked Sendable {
         try requireContactsAvailable()
         if contactsAvailability == .availableProtectedDomain {
             try withProtectedRuntimeRollback {
-                try performRemoveContact(fingerprint: fingerprint)
+                try performProtectedRemoveKey(fingerprint: fingerprint)
             }
             return
         }
         try performRemoveContact(fingerprint: fingerprint)
+    }
+
+    func removeContactIdentity(contactId: String) throws {
+        try requireContactsAvailable()
+        if contactsAvailability == .availableProtectedDomain {
+            try withProtectedRuntimeRollback {
+                var snapshot = try mutableRuntimeSnapshot()
+                let mutation = try snapshotMutator.removeContactIdentity(
+                    contactId: contactId,
+                    in: &snapshot
+                )
+                if mutation.didMutate {
+                    try persistProtectedRuntimeSnapshot(snapshot)
+                }
+            }
+            return
+        }
+
+        let fingerprints = contacts
+            .filter { $0.contactId == contactId || "legacy-contact-\($0.fingerprint)" == contactId }
+            .map(\.fingerprint)
+        for fingerprint in fingerprints {
+            try performRemoveContact(fingerprint: fingerprint)
+        }
     }
 
     private func performRemoveContact(fingerprint: String) throws {
@@ -365,7 +429,7 @@ final class ContactService: @unchecked Sendable {
         try requireContactsAvailable()
         if contactsAvailability == .availableProtectedDomain {
             try withProtectedRuntimeRollback {
-                try performSetVerificationState(verificationState, for: fingerprint)
+                try performProtectedSetVerificationState(verificationState, for: fingerprint)
             }
             return
         }
@@ -388,11 +452,53 @@ final class ContactService: @unchecked Sendable {
         try refreshRuntimeProjectionAfterMutation()
     }
 
+    private func performProtectedSetVerificationState(
+        _ verificationState: ContactVerificationState,
+        for fingerprint: String
+    ) throws {
+        var snapshot = try mutableRuntimeSnapshot()
+        let mutation = try snapshotMutator.setVerificationState(
+            verificationState,
+            for: fingerprint,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistProtectedRuntimeSnapshot(snapshot)
+        }
+    }
+
+    private func performProtectedRemoveKey(fingerprint: String) throws {
+        var snapshot = try mutableRuntimeSnapshot()
+        let mutation = try snapshotMutator.removeKey(
+            fingerprint: fingerprint,
+            in: &snapshot
+        )
+        if mutation.didMutate {
+            try persistProtectedRuntimeSnapshot(snapshot)
+        }
+    }
+
     var availableContacts: [Contact] {
         guard contactsAvailability.isAvailable else {
             return []
         }
         return contacts
+    }
+
+    var availableContactIdentities: [ContactIdentitySummary] {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return []
+        }
+        return summaryProjector.identitySummaries(from: runtimeSnapshot)
+    }
+
+    var availableRecipientContacts: [ContactRecipientSummary] {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return []
+        }
+        return summaryProjector.recipientSummaries(from: runtimeSnapshot)
     }
 
     var runtimeContactCountForDiagnostics: Int {
@@ -407,6 +513,10 @@ final class ContactService: @unchecked Sendable {
 
     func currentCompatibilitySnapshot() throws -> ContactsDomainSnapshot {
         try requireContactsAvailable()
+        if let runtimeSnapshot {
+            try runtimeSnapshot.validateContract()
+            return runtimeSnapshot
+        }
         return try domainRepository.makeCompatibilitySnapshot(from: contacts)
     }
 
@@ -423,6 +533,7 @@ final class ContactService: @unchecked Sendable {
     var contactsDomainRuntimeStateIsClearedForTests: Bool {
         contacts.isEmpty &&
         verificationStates.isEmpty &&
+        runtimeSnapshot == nil &&
         contactsAvailability == .locked &&
         domainRepository.runtimeStateIsClearedForTests
     }
@@ -436,6 +547,36 @@ final class ContactService: @unchecked Sendable {
         }
 
         return contacts.first { $0.fingerprint == fingerprint }
+    }
+
+    func availableContactIdentity(forContactID contactId: String) -> ContactIdentitySummary? {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return nil
+        }
+        return summaryProjector.identitySummary(contactId: contactId, in: runtimeSnapshot)
+    }
+
+    func contactId(forFingerprint fingerprint: String) -> String? {
+        guard contactsAvailability.isAvailable else {
+            return nil
+        }
+        if let runtimeSnapshot,
+           let keyRecord = runtimeSnapshot.keyRecords.first(where: { $0.fingerprint == fingerprint }) {
+            return keyRecord.contactId
+        }
+        guard let contact = contacts.first(where: { $0.fingerprint == fingerprint }) else {
+            return nil
+        }
+        return contact.contactId ?? "legacy-contact-\(fingerprint)"
+    }
+
+    func availableKey(fingerprint: String) -> ContactKeySummary? {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return nil
+        }
+        return summaryProjector.keySummary(fingerprint: fingerprint, in: runtimeSnapshot)
     }
 
     func requireAvailableContact(forFingerprint fingerprint: String) throws -> Contact? {
@@ -471,23 +612,28 @@ final class ContactService: @unchecked Sendable {
         return selectedContacts.map { $0.publicKeyData }
     }
 
+    @available(*, deprecated, message: "Use contact ID recipient APIs; this remains only for legacy compatibility.")
     func publicKeysForRecipientFingerprints(_ recipientFingerprints: [String]) throws -> [Data] {
+        try legacyPublicKeysForRecipientFingerprints(recipientFingerprints)
+    }
+
+    func legacyPublicKeysForRecipientFingerprints(_ recipientFingerprints: [String]) throws -> [Data] {
         try requireContactsAvailable()
-        let contactsByFingerprint = Dictionary(uniqueKeysWithValues: contacts.map { ($0.fingerprint, $0) })
-        let recipientKeys = recipientFingerprints.compactMap { fingerprint in
-            contactsByFingerprint[fingerprint]?.publicKeyData
-        }
+        return try recipientResolver.legacyPublicKeysForRecipientFingerprints(
+            recipientFingerprints,
+            contacts: contacts
+        )
+    }
 
-        guard recipientKeys.count == recipientFingerprints.count else {
-            throw CypherAirError.invalidKeyData(
-                reason: String(
-                    localized: "error.recipientNotFound",
-                    defaultValue: "One or more recipients could not be found in contacts."
-                )
-            )
+    func publicKeysForRecipientContactIDs(_ recipientContactIds: [String]) throws -> [Data] {
+        try requireContactsAvailable()
+        guard let runtimeSnapshot else {
+            throw CypherAirError.contactsUnavailable(contactsAvailability)
         }
-
-        return recipientKeys
+        return try recipientResolver.publicKeysForRecipientContactIDs(
+            recipientContactIds,
+            in: runtimeSnapshot
+        )
     }
 
     func contactsForVerificationContext() -> (contacts: [Contact], availability: ContactsAvailability) {
@@ -498,7 +644,154 @@ final class ContactService: @unchecked Sendable {
         return (contacts, availability)
     }
 
+    func setPreferredKey(fingerprint: String, for contactId: String) throws {
+        try requireContactsAvailable()
+        if contactsAvailability == .availableProtectedDomain {
+            try withProtectedRuntimeRollback {
+                var snapshot = try mutableRuntimeSnapshot()
+                let mutation = try snapshotMutator.setPreferredKey(
+                    fingerprint: fingerprint,
+                    for: contactId,
+                    in: &snapshot
+                )
+                if mutation.didMutate {
+                    try persistProtectedRuntimeSnapshot(snapshot)
+                }
+            }
+        } else {
+            try requireContactsAvailable()
+        }
+    }
+
+    func setKeyUsageState(
+        _ usageState: ContactKeyUsageState,
+        fingerprint: String
+    ) throws {
+        try requireContactsAvailable()
+        if contactsAvailability == .availableProtectedDomain {
+            try withProtectedRuntimeRollback {
+                var snapshot = try mutableRuntimeSnapshot()
+                let mutation = try snapshotMutator.setKeyUsageState(
+                    usageState,
+                    fingerprint: fingerprint,
+                    in: &snapshot
+                )
+                if mutation.didMutate {
+                    try persistProtectedRuntimeSnapshot(snapshot)
+                }
+            }
+        } else {
+            try requireContactsAvailable()
+        }
+    }
+
+    @discardableResult
+    func mergeContact(
+        sourceContactId: String,
+        into targetContactId: String
+    ) throws -> ContactMergeResult {
+        try requireContactsAvailable()
+        guard sourceContactId != targetContactId else {
+            throw CypherAirError.internalError(
+                reason: String(
+                    localized: "contacts.merge.sameContact",
+                    defaultValue: "Choose two different contacts to merge."
+                )
+            )
+        }
+
+        if contactsAvailability == .availableProtectedDomain {
+            return try withProtectedRuntimeRollback {
+                var snapshot = try mutableRuntimeSnapshot()
+                let mutation = try snapshotMutator.mergeContact(
+                    sourceContactId: sourceContactId,
+                    into: targetContactId,
+                    in: &snapshot
+                )
+                if mutation.didMutate {
+                    try persistProtectedRuntimeSnapshot(snapshot)
+                }
+                let surviving = try contactSummaryOrThrow(
+                    mutation.output.targetContactId,
+                    in: snapshot
+                )
+                return ContactMergeResult(
+                    survivingContact: surviving,
+                    removedContactId: mutation.output.sourceContactId,
+                    preferredKeyNeedsSelection: surviving.preferredKey == nil
+                        && surviving.keys.contains(where: { $0.usageState == .additionalActive })
+                )
+            }
+        }
+
+        let sourceFingerprints = contacts
+            .filter { $0.contactId == sourceContactId || "legacy-contact-\($0.fingerprint)" == sourceContactId }
+            .map(\.fingerprint)
+        guard !sourceFingerprints.isEmpty,
+              let targetFingerprint = contacts.first(where: {
+                  $0.contactId == targetContactId || "legacy-contact-\($0.fingerprint)" == targetContactId
+              })?.fingerprint else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+        _ = sourceFingerprints
+        let target = try contactSummaryOrThrow(
+            "legacy-contact-\(targetFingerprint)",
+            in: try currentCompatibilitySnapshot()
+        )
+        return ContactMergeResult(
+            survivingContact: target,
+            removedContactId: sourceContactId,
+            preferredKeyNeedsSelection: false
+        )
+    }
+
     // MARK: - Private
+
+    private func mutableRuntimeSnapshot() throws -> ContactsDomainSnapshot {
+        if let runtimeSnapshot {
+            try runtimeSnapshot.validateContract()
+            return runtimeSnapshot
+        }
+        return try domainRepository.makeCompatibilitySnapshot(from: contacts)
+    }
+
+    private func persistProtectedRuntimeSnapshot(
+        _ snapshot: ContactsDomainSnapshot
+    ) throws {
+        guard let contactsDomainStore else {
+            throw ProtectedDataError.authorizingUnavailable
+        }
+        try snapshot.validateContract()
+        try contactsDomainStore.replaceSnapshot(snapshot)
+        try applyProtectedRuntimeSnapshot(snapshot)
+    }
+
+    private func compatibilityContact(
+        forFingerprint fingerprint: String,
+        in snapshot: ContactsDomainSnapshot
+    ) throws -> Contact {
+        let projected = try domainRepository.makeCompatibilityContacts(from: snapshot)
+        guard let contact = projected.first(where: { $0.fingerprint == fingerprint }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+        return contact
+    }
+
+    private func contactSummaryOrThrow(
+        _ contactId: String,
+        in snapshot: ContactsDomainSnapshot
+    ) throws -> ContactIdentitySummary {
+        guard let summary = summaryProjector.identitySummary(contactId: contactId, in: snapshot) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+        return summary
+    }
 
     private func loadLegacyCompatibilityRuntimeValues() throws -> ContactsLegacyRuntimeValues {
         try repository.ensureDirectoryExists()
@@ -553,21 +846,8 @@ final class ContactService: @unchecked Sendable {
         )
     }
 
-    private func conflictingContact(
-        forUserId userId: String?,
-        excludingFingerprint fingerprint: String
-    ) -> Contact? {
-        guard let userId else {
-            return nil
-        }
-
-        return contacts.first {
-            $0.userId == userId && $0.fingerprint != fingerprint
-        }
-    }
-
     private func refreshCompatibilityProjection() throws {
-        _ = try domainRepository.updateCompatibilityRuntime(from: contacts)
+        runtimeSnapshot = try domainRepository.updateCompatibilityRuntime(from: contacts)
         contactsAvailability = .availableLegacyCompatibility
     }
 
@@ -582,6 +862,7 @@ final class ContactService: @unchecked Sendable {
     private func applyProtectedRuntimeSnapshot(_ snapshot: ContactsDomainSnapshot) throws {
         let projectedContacts = try domainRepository.updateProtectedRuntime(from: snapshot)
         contacts = projectedContacts
+        runtimeSnapshot = snapshot
         verificationStates = Dictionary(
             uniqueKeysWithValues: projectedContacts.map {
                 ($0.fingerprint, $0.verificationState)
@@ -594,7 +875,12 @@ final class ContactService: @unchecked Sendable {
         guard let contactsDomainStore else {
             throw ProtectedDataError.authorizingUnavailable
         }
-        let snapshot = try domainRepository.makeCompatibilitySnapshot(from: contacts)
+        let snapshot: ContactsDomainSnapshot
+        if let runtimeSnapshot {
+            snapshot = runtimeSnapshot
+        } else {
+            snapshot = try domainRepository.makeCompatibilitySnapshot(from: contacts)
+        }
         try contactsDomainStore.replaceSnapshot(snapshot)
         try applyProtectedRuntimeSnapshot(snapshot)
     }
@@ -643,6 +929,7 @@ final class ContactService: @unchecked Sendable {
         let previousContacts = contacts
         let previousVerificationStates = verificationStates
         let previousAvailability = contactsAvailability
+        let previousRuntimeSnapshot = runtimeSnapshot
         let previousMigrationWarning = protectedDomainMigrationWarning
 
         do {
@@ -651,6 +938,7 @@ final class ContactService: @unchecked Sendable {
             contacts = previousContacts
             verificationStates = previousVerificationStates
             contactsAvailability = previousAvailability
+            runtimeSnapshot = previousRuntimeSnapshot
             protectedDomainMigrationWarning = previousMigrationWarning
             if let snapshot = contactsDomainStore?.snapshot {
                 try? applyProtectedRuntimeSnapshot(snapshot)
@@ -663,6 +951,7 @@ final class ContactService: @unchecked Sendable {
         contacts = []
         verificationStates = [:]
         contactsAvailability = availability
+        runtimeSnapshot = nil
         protectedDomainMigrationWarning = nil
         domainRepository.clearRuntimeState()
     }
