@@ -1,7 +1,7 @@
 # Contacts Protected Domain Implementation Plan
 
-> **Version:** Draft v0.4
-> **Status:** Draft implementation-prep plan for remaining Contacts feature work, updated with Contacts PR6 certification persistence and UX coverage notes.
+> **Version:** Draft v0.5
+> **Status:** Draft implementation-prep plan for remaining Contacts feature work, updated with the Contacts PR7 package-exchange withdrawal.
 > **Purpose:** Bridge the gap between the current shared ProtectedData framework, implemented Contacts protected-domain security/storage behavior, and the remaining Contacts feature work so later implementation can proceed through a stable, reviewable PR sequence.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
@@ -10,7 +10,7 @@
 
 ## 1. Scope And Relationship
 
-This document is an implementation-prep companion for the Contacts follow-on phase. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, the Contacts PR4 protected-domain security/storage cutover, the Contacts PR5 person-centered runtime model, and Contacts PR6 certification persistence/UX work, while package exchange and organization/search surfaces still need a stable implementation path.
+This document is an implementation-prep companion for the Contacts follow-on phase. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, the Contacts PR4 protected-domain security/storage cutover, the Contacts PR5 person-centered runtime model, and Contacts PR6 certification persistence/UX work, while organization/search surfaces still need a stable implementation path and the earlier Contacts package-exchange plan has been withdrawn.
 
 This document specifies:
 
@@ -34,7 +34,8 @@ This document refines implementation sequencing and repository-specific integrat
 The active Contacts and shared-framework documents already establish the correct target direction:
 
 - Contacts is a protected domain on the shared app-data framework
-- Contacts package export/import supports explicit one-or-more-contact exchange, not whole-domain recovery
+- Contacts package export/import is not an active Contacts feature plan because even public-key-only multi-contact packages externalize the user's social graph
+- any future complete Contacts backup/migration feature must be designed separately as a mandatory encrypted backup format, not as a package-exchange flow
 - `AppSessionOrchestrator` owns app-session sequencing
 - `ProtectedDataSessionCoordinator` owns shared app-data root-secret retrieval
 - Contacts must not invent a second vault architecture
@@ -44,7 +45,7 @@ The repository has already resolved the major PR3 / PR4 security-storage deltas 
 - PR3 removed pre-auth plaintext Contacts startup loading and moved ordinary Contacts access behind the shared post-auth lifecycle surface
 - PR4 migrated the flat compatibility snapshot into the protected `contacts` domain, quarantined legacy plaintext, and made legacy/quarantine storage cleanup-only after cutover
 - verification-capable services still need the planned contract split between cryptographic verification and Contacts enrichment
-- remaining feature work still includes selected-contact package exchange, search, tags, recipient-list UI, and organization workflows
+- remaining feature work still includes search, tags, recipient-list UI, and organization workflows
 
 This document preserves the historical PR sequence for review context and turns the remaining work into explicit dependencies and validation gates.
 
@@ -96,17 +97,18 @@ Contacts access and mutation is not centralized in a single route boundary today
 
 Because these surfaces are distributed, remaining Contacts feature work still requires an explicit inventory and PR-by-PR coverage checklist rather than relying on memory or a short prose summary.
 
-### 3.4 Package Export / Import And Maintenance Delta
+### 3.4 Backup, Export, And Maintenance Delta
 
 Whole-domain Contacts backup, replace-domain restore, and empty-install Contacts restore are no longer in scope for the remaining Contacts feature plan.
 
-The target package feature instead exports and imports selected contact public material through a `.cypherair-contacts` package. That package may contain one or more contacts, public-certificate-derived display labels, optional explicitly selected local relationship / custom labels, and optional saved certification signature artifacts, but it must not transport local protected-domain state, manual verification state, tags, notes, recipient lists, root-secret material, wrapped-DMK records, registry state, or source-device authorization material.
+The earlier selected-contact package exchange plan is withdrawn. The product no longer plans a `.cypherair-contacts` package, multi-contact export, package import preview, or package commit path. Even when payloads contain only public certificates, grouping multiple retained contacts into one export externalizes relationship graph information.
+
+Future complete Contacts backup or device-migration support remains deferred. If it is designed later, it must be a separate mandatory encrypted backup format and must not allow plaintext or optional-encryption export of complete local Contacts state.
 
 Current reset and sandbox paths are also relevant implementation deltas:
 
 - `LocalDataResetService` currently deletes the legacy contacts directory and clears `ContactService` in-memory state
 - tutorial sandbox containers use isolated temporary Contacts directories and must remain outside real protected Contacts migration
-- future package export/import temporary artifacts must be covered by reset/cleanup paths
 
 ### 3.5 Certification Projection Delta
 
@@ -119,7 +121,7 @@ Contacts PR6 resolves the certification persistence and UX delta that previously
 - Contact Detail now exposes a compact trust/certification summary and a contact-centered `Certify This Contact` action.
 - The certification details surface replaces the previous three-mode technical entry for ordinary navigation, while preserving direct-key verification, User ID binding verification, text/file import, generated certification, explicit export/share, signer identity resolution, selector validation, and certification-kind display.
 
-Remaining package work may consume the PR6 artifact/revalidation APIs, but package exchange is not part of PR6.
+PR6 remains independent of the withdrawn PR7 package plan. Ordinary public-certificate import and explicit certification-signature export/share remain existing capabilities; no Contacts package exchange is planned around them.
 
 ## 4. Frozen Implementation Decisions
 
@@ -186,7 +188,7 @@ Views and app coordinators continue to depend on a single `ContactService`.
 - route-aware open / unlock coordination for Contacts-dependent surfaces
 - Contacts query APIs
 - Contacts mutation APIs
-- import / merge / contact-package actions
+- import / merge / organization actions
 - recipient resolution by `ContactIdentity`
 - signer enrichment lookup over unlocked Contacts runtime state
 
@@ -241,13 +243,13 @@ Certification projection, saved signature artifacts, and the redesigned contact-
 It is intentionally separated from:
 
 - the early schema skeleton / facade PR
-- the later package export/import PR
+- the withdrawn package export/import PR
 - the final search / tags / recipient-list finish PR
 
 This keeps the sequence stable:
 
 - snapshot schema can reserve the necessary fields early
-- projection persistence and signature artifact storage can be implemented before package export/import depends on them
+- projection persistence and signature artifact storage can be implemented without waiting for final Contacts organization UI
 - the old three-mode technical page can be replaced by a clearer workflow without waiting for final Contacts organization UI
 
 The redesigned workflow must cover all capabilities of the current page:
@@ -261,17 +263,13 @@ The redesigned workflow must cover all capabilities of the current page:
 - target certificate selector validation
 - certification-kind display
 
-### 4.7 Package Export / Import Is Not Domain Recovery
+### 4.7 Contacts PR7 Package Exchange Is Withdrawn
 
-The package PR owns selected-contact exchange only:
+Contacts PR7 is retained as a historical sequence marker, but it no longer owns active implementation work.
 
-- one-contact export from Contact Detail
-- one-or-more-contact export from Contacts list selection mode
-- `.cypherair-contacts` Apple Archive-backed package generation
-- package preview before import commit
-- protected Contacts commit after framework/domain availability
+The withdrawn plan included selected-contact export/import, multi-contact package generation, and package import commit. That direction is no longer accepted because multi-contact export exposes social-graph information once the file leaves app custody.
 
-It explicitly does not own whole-domain backup, replace-domain restore, empty-install restore, or framework-owned first-domain recovery import.
+Contacts PR7 must not be reintroduced as a package exchange, public-key forwarding, whole-domain backup, replace-domain restore, empty-install restore, or framework-owned first-domain recovery import. Complete Contacts backup remains a future separate design and must be mandatory encrypted if it is ever added.
 
 ## 5. Companion Inventory Document
 
@@ -279,7 +277,7 @@ The companion [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_D
 
 It is responsible for:
 
-- classifying whether a surface is a read, mutation, package action, maintenance action, or optional Contacts enrichment
+- classifying whether a surface is a read, mutation, maintenance action, or optional Contacts enrichment
 - defining whether the surface requires Contacts unlocked, framework gate only, or no Contacts access
 - freezing the target locked-state behavior
 - assigning each surface to a future Contacts-internal PR
@@ -345,6 +343,8 @@ Status: implemented as the schema/facade foundation for the protected Contacts c
 - relock cleanup assertions for snapshot, scratch-buffer, search-index, signer-recognition, and `ContactService` runtime projection teardown
 
 ### 6.3 Contacts PR2 — Verification Accuracy Refactor
+
+Status: implemented.
 
 **Goals**
 
@@ -501,7 +501,7 @@ Status: implemented for the flat compatibility snapshot security/storage cutover
 **Not In Scope**
 
 - no search / tags / recipient lists yet
-- no contact package export/import yet
+- no Contacts package export/import; PR7 package exchange is withdrawn
 - no certification UI redesign yet
 
 **Inventory Coverage**
@@ -575,7 +575,7 @@ Status: implemented as a Swift-only Contacts feature PR on top of the PR4 protec
 
 **Not In Scope**
 
-- no contact package export/import yet
+- no Contacts package export/import; PR7 package exchange is withdrawn
 - no search / tags / recipient-list finish yet
 
 **Inventory Coverage**
@@ -594,51 +594,43 @@ Status: implemented as a Swift-only Contacts feature PR on top of the PR4 protec
 - certification details screen-model tests cover generated certification save, explicit export, import preview, save gating, and locked Contacts handling
 - UI smoke coverage verifies Contact Detail separates manual verification and OpenPGP certification signals
 
-### 6.8 Contacts PR7 — `.cypherair-contacts` Package Export / Import
+### 6.8 Contacts PR7 — Withdrawn Package Exchange Plan
 
 **Goals**
 
-- implement selected-contact package exchange after the person-centered and certification persistence models are stable
-- support one-contact export from Contact Detail and one-or-more-contact export from Contacts list selection mode
-- support safe preview-then-commit import
+- preserve the PR7 sequence marker as withdrawn
+- prevent active implementation of `.cypherair-contacts`, Apple Archive-backed package exchange, multi-contact export, package import preview, or package commit
+- document that complete Contacts backup is deferred to a separate mandatory encrypted design
 
 **Key Changes**
 
-- Apple Archive-backed `.cypherair-contacts` package generation
-- package manifest with `contacts[]`, public-certificate-derived labels, optional explicitly selected local relationship / custom labels, key file references, selector metadata, and optional certification signature references
-- selected-contact export through the existing protected temporary export/fileExporter pattern
-- package import parser and preview model
-- package commit through `ContactService` / `ContactsDomainRepository`
-- validation for path traversal, absolute paths, parent-directory references, links, duplicate logical paths, unknown required features, excessive size/count, invalid certificates, and invalid certification signatures
+- no active package service, manifest schema, UTI/extension, archive container, import preview model, or package commit path is planned
+- no replacement single-contact public-key forwarding feature is planned in this PR
+- existing ordinary public-certificate import paths and PR6 certification-signature export/share remain unchanged
 
 **Not In Scope**
 
-- no whole-domain backup
-- no replace-domain restore
-- no empty-install restore
-- no standard ZIP support
+- no `.cypherair-contacts` package format
+- no Apple Archive-backed Contacts package
+- no multi-contact export
+- no contact-package import
+- no full Contacts backup design in this PR
 
 **Inventory Coverage**
 
-- Contact Detail single-contact export row
-- Contacts list multi-select export row
-- package import preview row
-- package import commit row
-- package temporary artifact cleanup row
+- package rows are removed from the active surface inventory
+- PR7 remains documented only as withdrawn
 
 **Validation**
 
-- single-contact and multi-contact export tests
-- package preview without mutation
-- package commit into protected Contacts state
-- malformed package rejection tests
-- package export omits private keys, manual verification state, tags, notes, recipient lists, root-secret material, wrapped-DMK records, registry state, and source-device authorization state; local relationship / custom labels are exported only when explicitly selected and default to off
+- documentation checks must not leave `.cypherair-contacts`, Apple Archive package exchange, package import/export, multi-contact export, or `ContactsPackageService` as active planned functionality
+- documentation may mention PR7 only in withdrawn or historical-sequence context
 
 ### 6.9 Contacts PR8 — Search, Tags, Recipient Lists, And UI Finish
 
 **Goals**
 
-- complete the remaining Contacts product capabilities once lifecycle, migration, model semantics, certification persistence, and package exchange are already stable
+- complete the remaining Contacts product capabilities once lifecycle, migration, model semantics, and certification persistence are already stable
 
 **Key Changes**
 
@@ -701,15 +693,13 @@ The later implementation PRs must collectively satisfy the following scenario se
 - certification projection and saved signature artifacts persist as protected Contacts data
 - manual verification and OpenPGP certification remain separate
 
-### 7.4 Contact Package Exchange
+### 7.4 Withdrawn Package Exchange And Backup Boundary
 
-- `.cypherair-contacts` export supports one or more selected contacts
-- Contact Detail can export the current contact
-- Contacts list selection mode can export multiple contacts
-- package import previews before mutating Contacts
-- package import commit requires protected Contacts availability
-- malformed packages fail closed for path traversal, links, excessive size/count, invalid manifests, invalid certificates, and invalid certification signatures
-- package export/import never acts as whole-domain backup, replace-domain restore, or empty-install restore
+- Contacts PR7 remains withdrawn and does not introduce a package service, package format, package import/export UI, or multi-contact export
+- ordinary public-certificate import remains separate from Contacts package exchange
+- PR6 certification-signature export/share remains separate from Contacts package exchange
+- future complete Contacts backup or device migration is not specified by this plan and must be a separate mandatory encrypted design
+- Contacts domain recovery is not represented as package import, backup restore, or empty-install restore
 
 ### 7.5 Migration And Cutover
 
@@ -721,10 +711,9 @@ The later implementation PRs must collectively satisfy the following scenario se
 
 ### 7.6 Reset, Cleanup, And Sandbox Boundaries
 
-- local reset deletes legacy Contacts, protected Contacts artifacts, and package temporary artifacts
+- local reset deletes legacy Contacts and protected Contacts artifacts
 - local reset clears `ContactService` runtime state
-- tutorial sandbox Contacts directories remain isolated from real Contacts migration and package exchange
-- package temporary files are cleaned after completion or cancellation
+- tutorial sandbox Contacts directories remain isolated from real Contacts migration
 
 ## 8. Documentation Acceptance Criteria
 
@@ -736,9 +725,10 @@ This implementation-prep document is only complete if a later implementer can an
 - what the Contacts schema skeleton may define before later behavior PRs
 - why verification contract refactor must happen before lifecycle wiring
 - which Contacts entrypoints are gated and which are only enrichment consumers
-- where certification projection / artifact persistence lands relative to package exchange
+- where certification projection / artifact persistence lands after PR6
 - why whole-domain backup, replace-domain restore, and empty-install restore are not in scope
-- how `.cypherair-contacts` one-or-more-contact package exchange is supposed to work
+- why Contacts PR7 package exchange is withdrawn
+- why any future full Contacts backup must be a separate mandatory encrypted design
 - which PR owns which behavior and what each PR explicitly avoids
 
 The companion inventory document must also be detailed enough that an implementer does not need to rediscover Contacts-dependent surfaces by searching the repository from scratch.
@@ -750,5 +740,6 @@ The companion inventory document must also be detailed enough that an implemente
 - Future implementation proceeds with conservative, smaller PRs rather than a single large Contacts feature rollout.
 - Verification accuracy refactor is a dedicated earlier PR.
 - Certification projection, saved signature artifacts, and UX redesign are a dedicated capability PR.
-- `.cypherair-contacts` package export/import is selected-contact exchange, not whole-domain recovery.
+- Contacts PR7 package export/import is withdrawn and must not be implemented from this plan.
 - Empty-install restore is out of scope for the remaining Contacts feature plan.
+- Future complete Contacts backup or device migration is out of scope for this plan and must be mandatory encrypted if specified later.

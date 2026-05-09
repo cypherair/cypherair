@@ -1,6 +1,6 @@
 # Contacts Product Requirements Document (PRD)
 
-> **Version:** Draft v1.1  
+> **Version:** Draft v1.2
 > **Status:** Draft future product spec. This document does not describe current shipped Contacts behavior.  
 > **Purpose:** Product requirements for the Contacts enhancement initiative as a Contacts domain built on the shared protected app-data framework.  
 > **Audience:** Product, design, engineering, QA, and AI coding tools.  
@@ -26,7 +26,8 @@ The initiative also defines the target privacy posture for Contacts:
 
 - Contacts data is treated as social-graph-sensitive
 - Contacts is implemented as a protected app-data domain, not as a second independent security architecture
-- Contacts package export/import is supported for explicit user-directed contact exchange, not as whole-domain backup or recovery
+- Contacts package exchange is withdrawn from this initiative because multi-contact export can externalize the user's social graph
+- complete Contacts backup or device migration is deferred to a separate mandatory encrypted design
 
 ## 2. Problem Statement
 
@@ -53,7 +54,7 @@ The Contacts enhancement initiative must:
 - reuse the shared app-data framework rather than invent a Contacts-specific vault base layer
 - remain fully offline
 - preserve a stable user-facing Contacts model despite a more advanced internal architecture
-- support explicit export/import of one or more contacts as offline contact packages
+- preserve existing ordinary public certificate import behavior without introducing a Contacts package exchange feature
 
 ### 3.2 Non-Goals
 
@@ -66,7 +67,8 @@ This initiative does not include:
 - changes to private-key cryptography or Secure Enclave architecture
 - redesign of the shared protected app-data framework itself
 - whole-domain Contacts backup, whole-domain Contacts restore, or empty-install Contacts domain restore
-- standard ZIP interoperability for Contacts packages
+- Contacts package export/import or public-key forwarding as a Contacts feature
+- plaintext or optionally encrypted export of complete local Contacts state
 
 The app already has low-level OpenPGP certificate-signature generation and verification workflows. This initiative redesigns how Contacts owns, persists, and presents certification state, while leaving packet-level OpenPGP certification cryptography to the existing crypto/service layer.
 
@@ -192,26 +194,26 @@ The Contacts domain follows shared app-data session semantics:
 - ordinary Contacts browsing, search, tag/list management, and recipient selection do not trigger a separate Contacts-specific routine prompt once the app-data session is active
 - a second or third protected domain in the same active app-data session must not trigger another prompt merely because Contacts is opened later
 - Contacts access relocks after app lock, session loss, grace-period expiry, or app exit
-- exporting contact packages remains a high-risk externalization action and requires a fresh authentication immediately before export
 
-Contacts does not mirror private-key per-operation gating and does not inherit the loss semantics of `Special Security Mode`. High-risk externalization actions such as export are treated separately from ordinary in-session use.
+Contacts does not mirror private-key per-operation gating and does not inherit the loss semantics of `Special Security Mode`. Future high-risk externalization actions such as complete Contacts backup must be designed separately and must not be treated as ordinary in-session use.
 
-### 5.4 Domain Failure And Package Exchange Position
+### 5.4 Domain Failure And Backup Boundary
 
 Contacts domain failure remains explicit, but this initiative does not define a portable whole-domain backup or restore feature.
 
 The formal direction for this initiative is:
 
-- Contacts package export/import supports explicit exchange of one or more contacts' public materials
-- package import writes through the local protected Contacts domain after app-data authorization succeeds
-- package export/import does not transport local protected-domain state, local authorization material, tags, notes, recipient lists, or manual verification state
-- unreadable Contacts domain state is surfaced as domain-scoped `recovery needed`, not silently replaced by an imported package or an empty domain
+- Contacts package exchange is not an active product requirement
+- ordinary public certificate import remains an existing public-key import path, not a Contacts backup or exchange package
+- future complete Contacts backup or device migration must be a separate mandatory encrypted design
+- plaintext or optionally encrypted export of complete Contacts social-graph state is not allowed
+- unreadable Contacts domain state is surfaced as domain-scoped `recovery needed`, not silently replaced by backup restore or an empty domain
 
 Failure ownership is layered:
 
 - Contacts owns domain-scoped failure presentation for unreadable Contacts payload or Contacts wrapped-DMK state
 - the shared app-data framework owns framework-level recovery when registry or shared-resource state is unreadable, inconsistent, or unsafe
-- framework-level recovery must not be misrepresented as Contacts package import or Contacts empty state
+- framework-level recovery must not be misrepresented as Contacts backup restore or Contacts empty state
 
 ### 5.5 Failure Position
 
@@ -481,30 +483,23 @@ After cutover succeeds:
 
 This creates a safer rollback window than immediate deletion while still honoring the privacy goal of eliminating long-lived plaintext contacts storage.
 
-## 13. Contacts Package Export / Import
+## 13. Contacts Backup And Public Certificate Import Boundary
 
-The Contacts initiative includes a formal export/import story for explicit contact exchange.
+The Contacts initiative no longer includes a formal Contacts package export/import story.
 
-The product must support:
+The product boundary is:
 
-- exporting one or more selected contacts into a `.cypherair-contacts` package
-- importing a `.cypherair-contacts` package later through a preview-then-commit flow
-- importing ordinary OpenPGP public certificate material through the existing public-key import path
+- ordinary OpenPGP public certificate material continues to use the existing public-key import path
+- importing public certificate material is not a Contacts package, backup, restore, or forwarding feature
+- PR6 certification-signature export/share remains scoped to certification artifacts, not Contacts backup
+- complete Contacts backup, restore, or device migration is deferred to a separate product/design effort
 
-The exact package structure is a TDD concern, but product-level expectations are fixed:
+Future complete Contacts backup must meet these product constraints before it can enter scope:
 
-- the export is user-driven
-- the export supports one contact from Contact Detail and multiple selected contacts from Contacts list selection mode
-- the export requires a fresh authentication immediately before package generation
-- the export produces an Apple Archive-backed custom package, not a standard ZIP and not raw local protected-domain files
-- the export is delivered through the system file export/share flow so the user chooses where the offline contact package is stored
-- the export may include public certificates, public key update material, public User ID selector metadata, public-certificate-derived display labels, and user-selected saved OpenPGP certification signature artifacts
-- local relationship labels or custom display labels are privacy-sensitive and may be exported only through an explicit user selection that defaults off
-- the export does not include private keys, the shared app-data root secret, wrapped DMK records, registry state, source-device authorization state, tags, notes, recipient lists, or manual verification state
-- the import preview never mutates Contacts data
-- imported display labels are untrusted preview hints and never create local manual verification, certification, or trust state by themselves
-- the import commit requires the protected Contacts domain to be available and writes fresh local Contacts state
-- package import is not a whole-domain restore and must not be presented as a remedy for framework-level protected-data recovery
+- backup must be a separate mandatory encrypted format
+- plaintext or optionally encrypted export of complete Contacts state is not allowed
+- backup must not be presented as Contacts domain recovery, framework recovery, or empty-install bootstrap unless that behavior is explicitly designed later
+- backup design must account for social-graph-sensitive data such as local labels, tags, notes, recipient lists, manual verification state, certification history, and retained public-key groupings
 
 ## 14. Authentication Mode Boundary
 
@@ -539,11 +534,8 @@ This initiative is product-complete only if all of the following are true:
 - decrypt and verify report missing Contacts verification context accurately and never claim completed signature verification without a suitable verification certificate
 - verify does not silently continue without required verification context
 - legacy plaintext storage is retired through quarantine and next-successful-open deletion
-- `.cypherair-contacts` package export/import exists in product scope for one or more selected contacts
-- contact package export requires fresh authentication and produces an Apple Archive-backed package
-- contact package import previews safely before commit and does not act as whole-domain restore
 - Contacts domain damage or unreadable Contacts wrapped-DMK state results in explicit Contacts `recovery needed` rather than an empty Contacts list
-- framework-level protected-data failure is shown distinctly from Contacts domain recovery and is not misrepresented as a Contacts empty-state or package-import path
+- framework-level protected-data failure is shown distinctly from Contacts domain recovery and is not misrepresented as a Contacts empty-state or backup restore path
 - manual verification and certification are both represented clearly and separately
 - certification workflows cover the existing direct-key verification, User ID binding verification, external signature import, user certification generation, generated-signature export/share, signer identity resolution, selector validation, and certification-kind display capabilities without retaining the old three-mode technical UI
 
@@ -571,37 +563,21 @@ This initiative is product-complete only if all of the following are true:
 3. App asks the user to unlock protected app data if that can make Contacts context available.
 4. If the user cancels, verification reports required context unavailable.
 
-### Scenario D: Export Multiple Contacts
-
-1. User enters Contacts list selection mode.
-2. User selects one or more contacts.
-3. App requires a fresh authentication before package generation.
-4. App writes a `.cypherair-contacts` package through the system file export/share flow.
-5. The package includes only export-safe public contact material, public-certificate-derived labels, optional explicitly selected local labels, and selected certification signatures.
-
-### Scenario E: Import A Contacts Package
-
-1. User opens a `.cypherair-contacts` package.
-2. App validates the package and presents an import preview without mutating Contacts.
-3. User reviews untrusted package labels as preview hints and chooses which contacts or keys to import.
-4. Commit requires the protected Contacts domain to be available.
-5. Imported data becomes fresh local Contacts state and does not transport source-device authorization material.
-
-### Scenario F: Launch Into Protected Contacts Availability
+### Scenario D: Launch Into Protected Contacts Availability
 
 1. User cold-launches or resumes the app from a state that requires authentication.
 2. `AppSessionOrchestrator` runs the user-visible unlock flow.
 3. The authenticated `LAContext` is reused by shared post-unlock orchestration to retrieve the root secret and open registered protected domains, including Contacts.
 4. Later in the same active app-data session, opening Contacts or recipient selection in `Encrypt` reuses that session.
 
-### Scenario G: Use Contacts Within An Already Active App-Data Session
+### Scenario E: Use Contacts Within An Already Active App-Data Session
 
 1. Earlier in the current app session, the user already activated the shared app-data session by accessing a protected domain.
 2. User opens `Contacts` and later opens recipient selection in `Encrypt`.
 3. The app does not show another Contacts-specific authentication prompt.
 4. If the grace period later expires, Contacts returns to an explicit locked state.
 
-### Scenario H: Certify A Contact
+### Scenario F: Certify A Contact
 
 1. User opens Contact Detail and sees a compact trust/certification summary.
 2. User chooses `Certify This Contact`.
@@ -609,26 +585,26 @@ This initiative is product-complete only if all of the following are true:
 4. App generates and saves a certification record and signature artifact in the protected Contacts domain.
 5. User may export/share the generated certification signature.
 
-### Scenario I: Manage Certification Details
+### Scenario G: Manage Certification Details
 
 1. User opens a contact's certification details.
 2. App shows saved certification history, exportable signature material, and raw technical details.
 3. User may use a secondary action to import or verify an external certification signature.
 4. Imported valid certification material is saved as protected Contacts data.
 
-### Scenario J: Contacts Domain Recovery Needed
+### Scenario H: Contacts Domain Recovery Needed
 
 1. App starts and the Contacts domain cannot be opened because the Contacts payload is damaged or the domain-specific wrapped-DMK state is unreadable.
 2. `Contacts` does not appear empty.
 3. The app presents an explicit Contacts `recovery needed` state.
-4. The app does not silently reset Contacts or present contact package import as framework/domain recovery.
+4. The app does not silently reset Contacts or present backup restore as framework/domain recovery.
 
-### Scenario K: Protected App-Data Framework Recovery Blocks Contacts
+### Scenario I: Protected App-Data Framework Recovery Blocks Contacts
 
 1. App starts and the shared protected app-data framework cannot safely determine or use the shared root-secret resource.
 2. `Contacts` does not bypass that framework state independently.
 3. The app presents a framework-level unavailable or recovery-required state.
-4. The app does not mislabel that condition as a Contacts empty-state or a Contacts package import path.
+4. The app does not mislabel that condition as a Contacts empty-state or a backup restore path.
 
 ## 17. Out Of Scope For This Document
 
@@ -636,8 +612,9 @@ This document does not define:
 
 - packet-level certification implementation
 - shared ProtectedData framework internals such as registry invariants, wrapped-DMK transactions, or relock state-machine mechanics
-- Apple Archive implementation details for `.cypherair-contacts`
+- Contacts package exchange
+- complete Contacts backup, restore, or device-migration format
 - detailed service APIs
 - persistence schema internals
 
-Those topics belong in [CONTACTS_TDD](CONTACTS_TDD.md) and the current shared-framework references listed at the top of this document.
+Technical details that remain in scope belong in [CONTACTS_TDD](CONTACTS_TDD.md) and the current shared-framework references listed at the top of this document. Withdrawn package exchange and deferred backup design require a new product decision before they can re-enter the active spec set.
