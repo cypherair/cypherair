@@ -344,6 +344,8 @@ Status: implemented as the schema/facade foundation for the protected Contacts c
 
 ### 6.3 Contacts PR2 — Verification Accuracy Refactor
 
+Status: implemented.
+
 **Goals**
 
 - make decrypt / verify outputs accurately distinguish plaintext delivery, certificate-backed signature verification, and Contacts enrichment
