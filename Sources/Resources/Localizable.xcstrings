@@ -913,6 +913,22 @@
         }
       }
     },
+    "common.export" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出"
+          }
+        }
+      }
+    },
     "common.exporting" : {
       "localizations" : {
         "en" : {
@@ -1023,6 +1039,222 @@
             "value" : "未知"
           }
         }
+      }
+    },
+    "contactcertification.certify.action" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Certify This Contact" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "认证此联系人" } }
+      }
+    },
+    "contactcertification.certify.header" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Certify This Contact" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "认证此联系人" } }
+      }
+    },
+    "contactcertification.export.empty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The saved certification signature cannot be exported because its signature bytes are missing." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法导出已保存的认证签名，因为签名字节缺失。" } }
+      }
+    },
+    "contactcertification.export.latest" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export Saved Signature" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导出已保存签名" } }
+      }
+    },
+    "contactcertification.generated.invalid" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The generated certification signature did not verify and was not saved." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "生成的认证签名未通过验证，未保存。" } }
+      }
+    },
+    "contactcertification.history" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved History" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已保存历史" } }
+      }
+    },
+    "contactcertification.history.directKey" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Direct Key Certification" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "直接密钥认证" } }
+      }
+    },
+    "contactcertification.history.empty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No saved certification signatures for this key." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此密钥没有已保存的认证签名。" } }
+      }
+    },
+    "contactcertification.history.signer" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Signer %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "签名者 %@" } }
+      }
+    },
+    "contactcertification.history.userId" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "User ID Certification" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用户 ID 认证" } }
+      }
+    },
+    "contactcertification.import.footer" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preview and verification are read-only. Save Signature appears only when the signature is valid for this contact key and selector." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "预览和验证是只读操作。只有签名对该联系人密钥和选择器有效时，才会显示“保存签名”。" } }
+      }
+    },
+    "contactcertification.import.header" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Import or Verify" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导入或验证" } }
+      }
+    },
+    "contactcertification.import.mode" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Signature Type" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "签名类型" } }
+      }
+    },
+    "contactcertification.import.mode.directKey" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Direct Key" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "直接密钥" } }
+      }
+    },
+    "contactcertification.import.mode.userId" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "User ID" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用户 ID" } }
+      }
+    },
+    "contactcertification.import.save" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save Signature" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保存签名" } }
+      }
+    },
+    "contactcertification.import.userIdRequired" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose the exact User ID before verifying this signature." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "验证此签名前，请选择精确的用户 ID。" } }
+      }
+    },
+    "contactcertification.import.verify" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Verify Signature" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "验证签名" } }
+      }
+    },
+    "contactcertification.key" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Key" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "密钥" } }
+      }
+    },
+    "contactcertification.key.header" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Target Key" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标密钥" } }
+      }
+    },
+    "contactcertification.loadFailed.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could Not Load Certification Details" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法载入认证详情" } }
+      }
+    },
+    "contactcertification.loading" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Loading certification context..." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在载入认证上下文..." } }
+      }
+    },
+    "contactcertification.notFound.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Contact Not Found" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未找到联系人" } }
+      }
+    },
+    "contactcertification.overview" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Overview" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "概览" } }
+      }
+    },
+    "contactcertification.projection.certified" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Certified" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已认证" } }
+      }
+    },
+    "contactcertification.projection.count" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%d saved certification signatures" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%d 个已保存的认证签名" } }
+      }
+    },
+    "contactcertification.projection.invalid" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Invalid or Stale" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无效或已过期" } }
+      }
+    },
+    "contactcertification.projection.none" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not Certified" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未认证" } }
+      }
+    },
+    "contactcertification.projection.revalidation" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Revalidation Needed" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需要重新验证" } }
+      }
+    },
+    "contactcertification.save.invalid" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Only valid certification signatures can be saved." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "只能保存有效的认证签名。" } }
+      }
+    },
+    "contactcertification.save.wrongKey" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The certification signature belongs to a different contact key." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此认证签名属于另一个联系人密钥。" } }
+      }
+    },
+    "contactcertification.status.invalid" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Invalid or Stale" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无效或已过期" } }
+      }
+    },
+    "contactcertification.status.revalidationNeeded" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Revalidation Needed" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需要重新验证" } }
+      }
+    },
+    "contactcertification.status.valid" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Valid" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "有效" } }
+      }
+    },
+    "contactcertification.summary.openpgp" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "OpenPGP Certification" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "OpenPGP 认证" } }
+      }
+    },
+    "contactcertification.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Certification Details" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "认证详情" } }
       }
     },
     "contactcertsig.action.certify" : {
@@ -1841,6 +2073,18 @@
         }
       }
     },
+    "contactdetail.certificationDetails" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Certification Details" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "认证详情" } }
+      }
+    },
+    "contactdetail.certifyContact" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Certify This Contact" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "认证此联系人" } }
+      }
+    },
     "contactdetail.delete" : {
       "localizations" : {
         "en" : {
@@ -1967,6 +2211,24 @@
             "value" : "密钥"
           }
         }
+      }
+    },
+    "contactdetail.manualVerification" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Manual Fingerprint Verification" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "手动指纹验证" } }
+      }
+    },
+    "contactdetail.manualVerification.needsReview" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Needs Review" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需要检查" } }
+      }
+    },
+    "contactdetail.manualVerification.verified" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Verified" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已验证" } }
       }
     },
     "contactdetail.markAdditionalActive" : {
@@ -2145,6 +2407,36 @@
         }
       }
     },
+    "contactdetail.openpgpCertification" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "OpenPGP Certification" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "OpenPGP 认证" } }
+      }
+    },
+    "contactdetail.openpgpCertification.certified" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Certified" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已认证" } }
+      }
+    },
+    "contactdetail.openpgpCertification.invalid" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Invalid or Stale" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无效或已过期" } }
+      }
+    },
+    "contactdetail.openpgpCertification.none" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not Certified" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未认证" } }
+      }
+    },
+    "contactdetail.openpgpCertification.revalidation" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Revalidation Needed" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需要重新验证" } }
+      }
+    },
     "contactdetail.preferredKey" : {
       "localizations" : {
         "en" : {
@@ -2223,6 +2515,18 @@
             "value" : "联系人"
           }
         }
+      }
+    },
+    "contactdetail.trust" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Trust" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "信任" } }
+      }
+    },
+    "contactdetail.trust.footer" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Manual fingerprint verification and OpenPGP certification are tracked separately." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "手动指纹验证与 OpenPGP 认证会分别记录。" } }
       }
     },
     "contactdetail.unverified" : {

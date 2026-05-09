@@ -2465,6 +2465,99 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertTrue(container.contactService.availableContacts.isEmpty)
     }
 
+    func test_pr6ProtectedCertificationArtifactSaveDeduplicatesExportsAndPersists() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6CertificationSave")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "PR6 Certified Contact",
+            email: "pr6-certified@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let keyRecord = try XCTUnwrap(
+            service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
+        )
+        let artifact = makeValidCertificationArtifact(
+            artifactId: "artifact-pr6-save",
+            keyRecord: keyRecord,
+            signatureData: Data([0xca, 0xfe])
+        )
+
+        let saved = try service.saveCertificationArtifact(artifact)
+        let duplicate = try service.saveCertificationArtifact(
+            makeValidCertificationArtifact(
+                artifactId: "artifact-pr6-duplicate",
+                keyRecord: keyRecord,
+                signatureData: Data([0xca, 0xfe])
+            )
+        )
+        let export = try service.exportCertificationArtifact(artifactId: saved.artifactId)
+        let snapshot = try service.currentCompatibilitySnapshot()
+        let projectedKey = try XCTUnwrap(
+            snapshot.keyRecords.first { $0.keyId == keyRecord.keyId }
+        )
+
+        XCTAssertEqual(saved.artifactId, "artifact-pr6-save")
+        XCTAssertEqual(duplicate.artifactId, saved.artifactId)
+        XCTAssertEqual(service.certificationArtifacts(for: keyRecord.keyId).map(\.artifactId), [saved.artifactId])
+        XCTAssertEqual(projectedKey.certificationProjection.status, .certified)
+        XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [saved.artifactId])
+        XCTAssertTrue(String(data: export.data, encoding: .utf8)?.contains("BEGIN PGP SIGNATURE") == true)
+        XCTAssertEqual(export.filename, "artifact-pr6-save.asc")
+
+        try await service.relockProtectedData()
+        let reopened = await reopenProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory
+        )
+        let reopenedArtifacts = reopened.service.certificationArtifacts(for: keyRecord.keyId)
+
+        XCTAssertEqual(reopenedArtifacts.map(\.artifactId), [saved.artifactId])
+        XCTAssertEqual(
+            reopened.service.availableKey(keyId: keyRecord.keyId)?.certificationProjection.status,
+            .certified
+        )
+    }
+
+    func test_pr6CertificationProjectionDoesNotChangeManualVerification() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6ManualSeparate")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "PR6 Manual Separate",
+            email: "pr6-manual@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .unverified
+        )
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let keyRecord = try XCTUnwrap(
+            service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
+        )
+
+        _ = try service.saveCertificationArtifact(
+            makeValidCertificationArtifact(
+                artifactId: "artifact-pr6-manual-separate",
+                keyRecord: keyRecord,
+                signatureData: Data([0xaa, 0xbb])
+            )
+        )
+        let summary = try XCTUnwrap(service.availableKey(keyId: keyRecord.keyId))
+
+        XCTAssertEqual(summary.manualVerificationState, .unverified)
+        XCTAssertEqual(summary.certificationProjection.status, .certified)
+    }
+
     private func contactsDomainArtifactsExist(in storageRoot: ProtectedDataStorageRoot) -> Bool {
         let fileManager = FileManager.default
         let urls = ProtectedDomainGenerationSlot.allCases.map {
@@ -2555,6 +2648,42 @@ final class ContactServiceTests: XCTestCase {
             artifactIds: [artifactId],
             lastValidatedAt: nil,
             reconciliationMetadata: "test-\(artifactId)"
+        )
+    }
+
+    private func makeValidCertificationArtifact(
+        artifactId: String,
+        keyRecord: ContactKeyRecord,
+        signatureData: Data
+    ) -> ContactCertificationArtifactReference {
+        let userId = keyRecord.primaryUserId ?? "Contact <contact@example.invalid>"
+        return ContactCertificationArtifactReference(
+            artifactId: artifactId,
+            keyId: keyRecord.keyId,
+            userId: userId,
+            createdAt: Date(),
+            storageHint: "test",
+            canonicalSignatureData: signatureData,
+            signatureDigest: ContactCertificationArtifactReference.sha256Hex(
+                for: signatureData
+            ),
+            source: .generated,
+            targetKeyFingerprint: keyRecord.fingerprint,
+            targetSelector: .userId(
+                data: Data(userId.utf8),
+                displayText: userId,
+                occurrenceIndex: 0
+            ),
+            signerPrimaryFingerprint: "cccccccccccccccccccccccccccccccccccccccc",
+            signingKeyFingerprint: "cccccccccccccccccccccccccccccccccccccccc",
+            certificationKind: .generic,
+            validationStatus: .valid,
+            targetCertificateDigest: ContactCertificationArtifactReference.sha256Hex(
+                for: keyRecord.publicKeyData
+            ),
+            lastValidatedAt: Date(),
+            updatedAt: Date(),
+            exportFilename: "\(artifactId).asc"
         )
     }
 

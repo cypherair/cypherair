@@ -88,6 +88,13 @@ struct ContactSnapshotMutator {
                     verificationState: resolvedVerificationState,
                     now: now
                 )
+                markCertificationArtifactsStaleIfTargetChanged(
+                    keyId: existingRecord.keyId,
+                    newPublicKeyData: mergedResult.mergedCertData,
+                    in: &snapshot,
+                    now: now
+                )
+                _ = try recomputeCertificationProjections(in: &snapshot, updatedAt: now)
                 updateIdentityDisplayIfNeeded(
                     contactId: existingRecord.contactId,
                     from: snapshot.keyRecords[existingIndex],
@@ -317,6 +324,142 @@ struct ContactSnapshotMutator {
         )
     }
 
+    func saveCertificationArtifact(
+        _ candidateArtifact: ContactCertificationArtifactReference,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<ContactCertificationArtifactReference> {
+        let before = snapshot
+        let now = Date()
+
+        guard let keyRecord = snapshot.keyRecords.first(where: { $0.keyId == candidateArtifact.keyId }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+        guard candidateArtifact.validationStatus == .valid else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(
+                    localized: "contactcertification.save.invalid",
+                    defaultValue: "Only valid certification signatures can be saved."
+                )
+            )
+        }
+
+        var artifact = candidateArtifact
+        artifact.targetKeyFingerprint = artifact.targetKeyFingerprint ?? keyRecord.fingerprint
+        artifact.targetCertificateDigest = artifact.targetCertificateDigest
+            ?? ContactCertificationArtifactReference.sha256Hex(for: keyRecord.publicKeyData)
+        artifact.userId = artifact.userId ?? artifact.targetSelector.legacyUserIdDisplayText
+        artifact.updatedAt = now
+        artifact.lastValidatedAt = artifact.lastValidatedAt ?? now
+        artifact.storageHint = artifact.storageHint ?? "protected-contacts-domain"
+        artifact = try artifact.validatedForPersistence(now: now)
+
+        guard artifact.targetKeyFingerprint?.lowercased() == keyRecord.fingerprint.lowercased() else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(
+                    localized: "contactcertification.save.wrongKey",
+                    defaultValue: "The certification signature belongs to a different contact key."
+                )
+            )
+        }
+
+        if let deduplicationKey = artifact.deduplicationKey,
+           let existingIndex = snapshot.certificationArtifacts.firstIndex(where: {
+               $0.deduplicationKey == deduplicationKey
+           }) {
+            var existing = snapshot.certificationArtifacts[existingIndex]
+            if existing.validationStatus != .valid ||
+                existing.lastValidatedAt == nil ||
+                existing.exportFilename == nil {
+                existing.validationStatus = .valid
+                existing.lastValidatedAt = existing.lastValidatedAt ?? now
+                existing.updatedAt = now
+                existing.exportFilename = existing.exportFilename ?? artifact.exportFilename
+                snapshot.certificationArtifacts[existingIndex] = try existing.validatedForPersistence(now: now)
+            }
+            _ = try recomputeCertificationProjections(in: &snapshot, updatedAt: now)
+            snapshot.updatedAt = now
+            try snapshot.validateContract()
+            return Mutation(output: snapshot.certificationArtifacts[existingIndex], didMutate: snapshot != before)
+        }
+
+        snapshot.certificationArtifacts.append(artifact)
+        _ = try recomputeCertificationProjections(in: &snapshot, updatedAt: now)
+        snapshot.updatedAt = now
+        try snapshot.validateContract()
+        return Mutation(output: artifact, didMutate: true)
+    }
+
+    func updateCertificationArtifactValidation(
+        artifactId: String,
+        status: ContactCertificationValidationStatus,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<ContactCertificationArtifactReference> {
+        let before = snapshot
+        let now = Date()
+        guard let index = snapshot.certificationArtifacts.firstIndex(where: { $0.artifactId == artifactId }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+
+        snapshot.certificationArtifacts[index].validationStatus = status
+        snapshot.certificationArtifacts[index].updatedAt = now
+        snapshot.certificationArtifacts[index].lastValidatedAt = status == .valid
+            ? now
+            : snapshot.certificationArtifacts[index].lastValidatedAt
+        snapshot.certificationArtifacts[index] = try snapshot.certificationArtifacts[index]
+            .validatedForPersistence(now: now)
+        _ = try recomputeCertificationProjections(in: &snapshot, updatedAt: now)
+        snapshot.updatedAt = now
+        try snapshot.validateContract()
+        return Mutation(output: snapshot.certificationArtifacts[index], didMutate: snapshot != before)
+    }
+
+    @discardableResult
+    func recomputeCertificationProjections(
+        in snapshot: inout ContactsDomainSnapshot,
+        updatedAt: Date = Date()
+    ) throws -> Bool {
+        let before = snapshot.keyRecords
+        let artifactsByKeyId = Dictionary(grouping: snapshot.certificationArtifacts, by: \.keyId)
+
+        for index in snapshot.keyRecords.indices {
+            let keyId = snapshot.keyRecords[index].keyId
+            let artifacts = (artifactsByKeyId[keyId] ?? [])
+                .sorted { lhs, rhs in
+                    if lhs.createdAt != rhs.createdAt {
+                        return lhs.createdAt < rhs.createdAt
+                    }
+                    return lhs.artifactId < rhs.artifactId
+                }
+            let artifactIds = artifacts.map(\.artifactId)
+            let status = certificationProjectionStatus(for: artifacts)
+            let projection = ContactCertificationProjection(
+                status: status,
+                artifactIds: artifactIds,
+                lastValidatedAt: artifacts.compactMap(\.lastValidatedAt).max(),
+                reconciliationMetadata: artifacts.isEmpty
+                    ? nil
+                    : String.localizedStringWithFormat(
+                        String(localized: "contactcertification.projection.count", defaultValue: "%d saved certification signatures"),
+                        artifacts.count
+                    )
+            )
+
+            if snapshot.keyRecords[index].certificationArtifactIds != artifactIds ||
+                snapshot.keyRecords[index].certificationProjection != projection {
+                snapshot.keyRecords[index].certificationArtifactIds = artifactIds
+                snapshot.keyRecords[index].certificationProjection = projection
+                snapshot.keyRecords[index].updatedAt = updatedAt
+            }
+        }
+
+        try snapshot.validateContract()
+        return snapshot.keyRecords != before
+    }
+
     private func makeIdentity(
         from validation: PublicCertificateValidationResult,
         now: Date
@@ -421,6 +564,39 @@ struct ContactSnapshotMutator {
         snapshot.certificationArtifacts.removeAll {
             removedKeyIds.contains($0.keyId)
         }
+    }
+
+    private func markCertificationArtifactsStaleIfTargetChanged(
+        keyId: String,
+        newPublicKeyData: Data,
+        in snapshot: inout ContactsDomainSnapshot,
+        now: Date
+    ) {
+        let newDigest = ContactCertificationArtifactReference.sha256Hex(for: newPublicKeyData)
+        for index in snapshot.certificationArtifacts.indices
+            where snapshot.certificationArtifacts[index].keyId == keyId {
+            guard snapshot.certificationArtifacts[index].targetCertificateDigest != nil,
+                  snapshot.certificationArtifacts[index].targetCertificateDigest != newDigest else {
+                continue
+            }
+            snapshot.certificationArtifacts[index].validationStatus = .invalidOrStale
+            snapshot.certificationArtifacts[index].updatedAt = now
+        }
+    }
+
+    private func certificationProjectionStatus(
+        for artifacts: [ContactCertificationArtifactReference]
+    ) -> ContactCertificationProjection.Status {
+        guard !artifacts.isEmpty else {
+            return .notCertified
+        }
+        if artifacts.contains(where: { $0.validationStatus == .valid }) {
+            return .certified
+        }
+        if artifacts.contains(where: { $0.validationStatus == .invalidOrStale }) {
+            return .invalidOrStale
+        }
+        return .revalidationNeeded
     }
 
     private func normalizeKeyUsage(

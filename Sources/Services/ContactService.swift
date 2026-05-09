@@ -100,7 +100,11 @@ final class ContactService: @unchecked Sendable {
             let openedSnapshot = try await contactsDomainStore.openDomainIfNeeded(
                 wrappingRootKey: wrappingKey
             )
-            try applyProtectedRuntimeSnapshot(openedSnapshot)
+            var reconciledSnapshot = openedSnapshot
+            if try snapshotMutator.recomputeCertificationProjections(in: &reconciledSnapshot) {
+                try contactsDomainStore.replaceSnapshot(reconciledSnapshot)
+            }
+            try applyProtectedRuntimeSnapshot(reconciledSnapshot)
             retireLegacySourceAfterProtectedOpen(
                 activeLegacyExistedAtOpenStart: activeLegacyExistedAtOpenStart,
                 quarantineExistedAtOpenStart: quarantineExistedAtOpenStart
@@ -577,6 +581,166 @@ final class ContactService: @unchecked Sendable {
             return nil
         }
         return summaryProjector.keySummary(fingerprint: fingerprint, in: runtimeSnapshot)
+    }
+
+    func availableKey(keyId: String) -> ContactKeySummary? {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot,
+              let keyRecord = runtimeSnapshot.keyRecords.first(where: { $0.keyId == keyId }) else {
+            return nil
+        }
+        return summaryProjector.keySummary(from: keyRecord)
+    }
+
+    func availableContactKeyRecord(keyId: String) -> ContactKeyRecord? {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return nil
+        }
+        return runtimeSnapshot.keyRecords.first { $0.keyId == keyId }
+    }
+
+    func availableContactKeyRecord(
+        contactId: String,
+        preferredKeyId: String?
+    ) -> ContactKeyRecord? {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return nil
+        }
+        let keyRecords = runtimeSnapshot.keyRecords.filter { $0.contactId == contactId }
+        if let preferredKeyId,
+           let record = keyRecords.first(where: { $0.keyId == preferredKeyId }) {
+            return record
+        }
+        return keyRecords.first { $0.usageState == .preferred } ?? keyRecords.first
+    }
+
+    func certificationArtifacts(
+        for keyId: String
+    ) -> [ContactCertificationArtifactReference] {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return []
+        }
+        return runtimeSnapshot.certificationArtifacts
+            .filter { $0.keyId == keyId }
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt > rhs.createdAt
+                }
+                return lhs.artifactId < rhs.artifactId
+            }
+    }
+
+    func certificationArtifacts(
+        forContactId contactId: String
+    ) -> [ContactCertificationArtifactReference] {
+        guard contactsAvailability.isAvailable,
+              let runtimeSnapshot else {
+            return []
+        }
+        let keyIds = Set(
+            runtimeSnapshot.keyRecords
+                .filter { $0.contactId == contactId }
+                .map(\.keyId)
+        )
+        return runtimeSnapshot.certificationArtifacts
+            .filter { keyIds.contains($0.keyId) }
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt > rhs.createdAt
+                }
+                return lhs.artifactId < rhs.artifactId
+            }
+    }
+
+    @discardableResult
+    func saveCertificationArtifact(
+        _ artifact: ContactCertificationArtifactReference
+    ) throws -> ContactCertificationArtifactReference {
+        try requireContactsAvailable()
+        guard contactsAvailability == .availableProtectedDomain else {
+            throw CypherAirError.contactsUnavailable(contactsAvailability)
+        }
+
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.saveCertificationArtifact(
+                artifact,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return mutation.output
+        }
+    }
+
+    @discardableResult
+    func updateCertificationArtifactValidation(
+        artifactId: String,
+        status: ContactCertificationValidationStatus
+    ) throws -> ContactCertificationArtifactReference {
+        try requireContactsAvailable()
+        guard contactsAvailability == .availableProtectedDomain else {
+            throw CypherAirError.contactsUnavailable(contactsAvailability)
+        }
+
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.updateCertificationArtifactValidation(
+                artifactId: artifactId,
+                status: status,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return mutation.output
+        }
+    }
+
+    func exportCertificationArtifact(
+        artifactId: String
+    ) throws -> (data: Data, filename: String) {
+        try requireContactsAvailable()
+        guard let runtimeSnapshot,
+              let artifact = runtimeSnapshot.certificationArtifacts.first(where: { $0.artifactId == artifactId }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+        guard !artifact.canonicalSignatureData.isEmpty else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(
+                    localized: "contactcertification.export.empty",
+                    defaultValue: "The saved certification signature cannot be exported because its signature bytes are missing."
+                )
+            )
+        }
+
+        do {
+            return (
+                try engine.armor(data: artifact.canonicalSignatureData, kind: .signature),
+                artifact.resolvedExportFilename
+            )
+        } catch {
+            throw CypherAirError.from(error) { .armorError(reason: $0) }
+        }
+    }
+
+    func refreshCertificationProjections() throws {
+        try requireContactsAvailable()
+        guard contactsAvailability == .availableProtectedDomain else {
+            return
+        }
+        try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            if try snapshotMutator.recomputeCertificationProjections(in: &snapshot) {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+        }
     }
 
     func requireAvailableContact(forFingerprint fingerprint: String) throws -> Contact? {

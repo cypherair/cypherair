@@ -328,6 +328,59 @@ final class CertificateSignatureServiceTests: XCTestCase {
         XCTAssertEqual(verification.certificationKind, .casual)
     }
 
+    func test_validateUserIdCertificationArtifact_returnsPersistableMetadata() async throws {
+        let signer = try await generateSigner(
+            profile: .universal,
+            name: "Artifact Metadata Signer",
+            email: "artifact-metadata-signer@example.com"
+        )
+        let target = try generatedTarget(
+            profile: .universal,
+            name: "Artifact Metadata Target",
+            email: "artifact-metadata-target@example.com"
+        )
+        _ = try stack.contactService.addContact(publicKeyData: target.publicKeyData)
+        let targetKey = try XCTUnwrap(
+            stack.contactService.availableKey(fingerprint: target.fingerprint)
+        )
+        let selectedUserId = try selectedUserId(for: target.publicKeyData)
+        let armored = try await stack.certificateSignatureService.generateArmoredUserIdCertification(
+            signerFingerprint: signer.fingerprint,
+            targetCert: target.publicKeyData,
+            selectedUserId: selectedUserId,
+            certificationKind: .positive
+        )
+
+        let validation = try await stack.certificateSignatureService.validateUserIdCertificationArtifact(
+            signature: armored,
+            targetKey: targetKey,
+            targetCert: target.publicKeyData,
+            selectedUserId: selectedUserId,
+            source: .generated,
+            exportFilename: "certification.asc"
+        )
+        let artifact = try XCTUnwrap(validation.artifact)
+
+        XCTAssertEqual(validation.verification.status, .valid)
+        XCTAssertEqual(artifact.source, .generated)
+        XCTAssertEqual(artifact.keyId, targetKey.keyId)
+        XCTAssertEqual(artifact.targetKeyFingerprint, target.fingerprint)
+        XCTAssertEqual(artifact.targetSelector.kind, .userId)
+        XCTAssertEqual(artifact.targetSelector.userIdData, selectedUserId.userIdData)
+        XCTAssertEqual(artifact.targetSelector.occurrenceIndex, selectedUserId.occurrenceIndex)
+        XCTAssertEqual(artifact.signerPrimaryFingerprint, signer.fingerprint)
+        XCTAssertEqual(artifact.certificationKind, .positive)
+        XCTAssertEqual(artifact.validationStatus, .valid)
+        XCTAssertEqual(artifact.exportFilename, "certification.asc")
+        XCTAssertEqual(
+            artifact.signatureDigest,
+            ContactCertificationArtifactReference.sha256Hex(for: artifact.canonicalSignatureData)
+        )
+        XCTAssertFalse(
+            String(data: artifact.canonicalSignatureData, encoding: .utf8)?.contains("BEGIN PGP SIGNATURE") == true
+        )
+    }
+
     func test_verifyDirectKeySignature_acceptsBinaryAndArmoredSignatureBytes() async throws {
         let target = try loadFixture("ffi_direct_key_target")
         let binary = try loadFixture("ffi_direct_key_signature", ext: "sig")

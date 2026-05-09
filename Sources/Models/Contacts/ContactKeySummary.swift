@@ -18,6 +18,8 @@ struct ContactKeySummary: Identifiable, Hashable, Sendable {
     let isExpired: Bool
     let manualVerificationState: ContactVerificationState
     let usageState: ContactKeyUsageState
+    let certificationProjection: ContactCertificationProjection
+    let certificationArtifactIds: [String]
 
     var shortKeyId: String {
         IdentityPresentation.shortKeyId(from: fingerprint)
@@ -29,5 +31,9 @@ struct ContactKeySummary: Identifiable, Hashable, Sendable {
 
     var isVerified: Bool {
         manualVerificationState.isVerified
+    }
+
+    var isOpenPGPCertified: Bool {
+        certificationProjection.status == .certified
     }
 }

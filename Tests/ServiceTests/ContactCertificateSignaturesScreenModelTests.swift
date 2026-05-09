@@ -450,6 +450,260 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
     }
 }
 
+final class ContactCertificationDetailsScreenModelTests: XCTestCase {
+    private var stack: TestHelpers.ServiceStack!
+
+    override func setUp() {
+        super.setUp()
+        stack = TestHelpers.makeServiceStack()
+    }
+
+    override func tearDown() {
+        stack.cleanup()
+        stack = nil
+        super.tearDown()
+    }
+
+    @MainActor
+    func test_generateCertification_savesWithoutAutomaticExport_thenExplicitExportUsesPolicy() async throws {
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Generate",
+            email: "details-generate@example.com"
+        )
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Details Signer")
+        var savedArtifacts = [ContactCertificationArtifactReference]()
+        var interceptedFilename: String?
+        let configuration = ContactCertificationDetailsConfiguration(
+            outputInterceptionPolicy: OutputInterceptionPolicy(
+                interceptDataExport: { _, filename, _ in
+                    interceptedFilename = filename
+                    return true
+                }
+            )
+        )
+        let artifact = makeValidArtifact(
+            artifactId: "details-generated",
+            key: key,
+            userId: catalog.userIds[0]
+        )
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            configuration: configuration,
+            selectionCatalogAction: { _ in catalog },
+            generateArmoredCertificationAction: { _, _, _, _ in Data("armored".utf8) },
+            validateUserIdArtifactAction: { _, _, _, _, _, _ in
+                ContactCertificationArtifactValidation(
+                    verification: CertificateSignatureVerification(
+                        status: .valid,
+                        certificationKind: .generic,
+                        signerPrimaryFingerprint: nil,
+                        signingKeyFingerprint: nil,
+                        signerIdentity: nil
+                    ),
+                    artifact: artifact
+                )
+            },
+            saveArtifactAction: { artifact in
+                savedArtifacts.append(artifact)
+                return artifact
+            },
+            exportArtifactAction: { _ in
+                (Data("exported".utf8), "details-generated.asc")
+            }
+        )
+
+        model.loadIfNeeded()
+        await waitUntil("details catalog load") {
+            model.loadState == .loaded
+        }
+        model.generateAndSaveCertification()
+        await waitUntil("generated certification save") {
+            model.lastSavedArtifact?.artifactId == "details-generated"
+        }
+
+        XCTAssertEqual(savedArtifacts.map(\.artifactId), ["details-generated"])
+        XCTAssertNil(model.exportController.payload)
+
+        model.exportArtifact(artifact)
+        await waitUntil("explicit export interception") {
+            interceptedFilename == "details-generated.asc"
+        }
+    }
+
+    @MainActor
+    func test_importPreviewOnlyEnablesSaveForValidArtifact() async throws {
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Import",
+            email: "details-import@example.com"
+        )
+        let validArtifact = makeValidArtifact(
+            artifactId: "details-imported",
+            key: key,
+            userId: catalog.userIds[0]
+        )
+        var validationCalls = 0
+        var savedArtifactId: String?
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            selectionCatalogAction: { _ in catalog },
+            validateUserIdArtifactAction: { _, _, _, _, _, _ in
+                validationCalls += 1
+                if validationCalls == 1 {
+                    return ContactCertificationArtifactValidation(
+                        verification: CertificateSignatureVerification(
+                            status: .invalid,
+                            certificationKind: nil,
+                            signerPrimaryFingerprint: nil,
+                            signingKeyFingerprint: nil,
+                            signerIdentity: nil
+                        ),
+                        artifact: nil
+                    )
+                }
+                return ContactCertificationArtifactValidation(
+                    verification: CertificateSignatureVerification(
+                        status: .valid,
+                        certificationKind: .generic,
+                        signerPrimaryFingerprint: nil,
+                        signingKeyFingerprint: nil,
+                        signerIdentity: nil
+                    ),
+                    artifact: validArtifact
+                )
+            },
+            saveArtifactAction: { artifact in
+                savedArtifactId = artifact.artifactId
+                return artifact
+            }
+        )
+
+        model.loadIfNeeded()
+        await waitUntil("details import catalog load") {
+            model.loadState == .loaded
+        }
+        model.setSignatureInput("signature")
+        model.verifyImportedSignature()
+        await waitUntil("invalid import preview") {
+            model.verification?.status == .invalid
+        }
+        XCTAssertFalse(model.canSavePendingArtifact)
+
+        model.verifyImportedSignature()
+        await waitUntil("valid import preview") {
+            model.pendingArtifact?.artifactId == "details-imported"
+        }
+        XCTAssertTrue(model.canSavePendingArtifact)
+
+        model.savePendingSignature()
+        await waitUntil("pending signature save") {
+            savedArtifactId == "details-imported"
+        }
+    }
+
+    @MainActor
+    private func makeContactContext(
+        name: String,
+        email: String
+    ) throws -> (contactId: String, key: ContactKeySummary, catalog: CertificateSelectionCatalog) {
+        let generated = try stack.engine.generateKey(
+            name: name,
+            email: email,
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try stack.contactService.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(stack.contactService.contactId(forFingerprint: generated.fingerprint))
+        let key = try XCTUnwrap(stack.contactService.availableKey(fingerprint: generated.fingerprint))
+        let catalog = try stack.certificateSignatureService.selectionCatalog(
+            targetCert: generated.publicKeyData
+        )
+        return (contactId, key, catalog)
+    }
+
+    @MainActor
+    private func makeModel(
+        contactId: String,
+        keyId: String,
+        configuration: ContactCertificationDetailsConfiguration = .default,
+        selectionCatalogAction: ContactCertificationDetailsScreenModel.SelectionCatalogAction? = nil,
+        generateArmoredCertificationAction: ContactCertificationDetailsScreenModel.GenerateArmoredCertificationAction? = nil,
+        validateUserIdArtifactAction: ContactCertificationDetailsScreenModel.ValidateUserIdArtifactAction? = nil,
+        validateDirectKeyArtifactAction: ContactCertificationDetailsScreenModel.ValidateDirectKeyArtifactAction? = nil,
+        saveArtifactAction: ContactCertificationDetailsScreenModel.SaveArtifactAction? = nil,
+        exportArtifactAction: ContactCertificationDetailsScreenModel.ExportArtifactAction? = nil
+    ) -> ContactCertificationDetailsScreenModel {
+        ContactCertificationDetailsScreenModel(
+            contactId: contactId,
+            initialKeyId: keyId,
+            intent: .details,
+            contactService: stack.contactService,
+            keyManagement: stack.keyManagement,
+            certificateSignatureService: stack.certificateSignatureService,
+            configuration: configuration,
+            selectionCatalogAction: selectionCatalogAction,
+            generateArmoredCertificationAction: generateArmoredCertificationAction,
+            validateUserIdArtifactAction: validateUserIdArtifactAction,
+            validateDirectKeyArtifactAction: validateDirectKeyArtifactAction,
+            saveArtifactAction: saveArtifactAction,
+            exportArtifactAction: exportArtifactAction
+        )
+    }
+
+    private func makeValidArtifact(
+        artifactId: String,
+        key: ContactKeySummary,
+        userId: UserIdSelectionOption
+    ) -> ContactCertificationArtifactReference {
+        let signatureData = Data("signature-\(artifactId)".utf8)
+        return ContactCertificationArtifactReference(
+            artifactId: artifactId,
+            keyId: key.keyId,
+            userId: userId.displayText,
+            createdAt: Date(),
+            storageHint: "test",
+            canonicalSignatureData: signatureData,
+            signatureDigest: ContactCertificationArtifactReference.sha256Hex(for: signatureData),
+            source: .imported,
+            targetKeyFingerprint: key.fingerprint,
+            targetSelector: .userId(
+                data: userId.userIdData,
+                displayText: userId.displayText,
+                occurrenceIndex: userId.occurrenceIndex
+            ),
+            signerPrimaryFingerprint: nil,
+            signingKeyFingerprint: nil,
+            certificationKind: .generic,
+            validationStatus: .valid,
+            targetCertificateDigest: ContactCertificationArtifactReference.sha256Hex(
+                for: Data("target".utf8)
+            ),
+            lastValidatedAt: Date(),
+            updatedAt: Date(),
+            exportFilename: "\(artifactId).asc"
+        )
+    }
+
+    @MainActor
+    private func waitUntil(
+        _ description: String,
+        timeout: TimeInterval = 2,
+        condition: @escaping @MainActor () async -> Bool
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            if await condition() {
+                return
+            }
+            await Task.yield()
+        }
+
+        XCTFail("Timed out waiting for \(description)")
+    }
+}
+
 private struct ContactCertificateSignaturesScreenModelTestError: LocalizedError {
     let message: String
 
