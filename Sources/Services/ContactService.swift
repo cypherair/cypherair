@@ -511,6 +511,7 @@ final class ContactService: @unchecked Sendable {
             summaries,
             matching: query,
             tagFilterIds: tagFilterIds,
+            scope: .identity,
             contactId: \.contactId
         )
     }
@@ -528,6 +529,7 @@ final class ContactService: @unchecked Sendable {
             summaries,
             matching: query,
             tagFilterIds: tagFilterIds,
+            scope: .recipient,
             contactId: \.contactId
         )
     }

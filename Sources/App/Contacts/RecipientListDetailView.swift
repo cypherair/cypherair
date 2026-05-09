@@ -30,7 +30,9 @@ struct RecipientListDetailView: View {
 
     var body: some View {
         Group {
-            if let recipientList {
+            if !contactService.contactsAvailability.isAvailable {
+                contactsUnavailableContent(contactService.contactsAvailability)
+            } else if let recipientList {
                 List {
                     Section {
                         TextField(
@@ -146,6 +148,35 @@ struct RecipientListDetailView: View {
             if let errorMessage {
                 Text(errorMessage)
             }
+        }
+    }
+
+    private func contactsUnavailableContent(_ availability: ContactsAvailability) -> some View {
+        ContentUnavailableView {
+            Label(availability.unavailableTitle, systemImage: systemImage(for: availability))
+        } description: {
+            Text(availability.unavailableDescription)
+        } actions: {
+            if availability == .opening {
+                ProgressView()
+            }
+        }
+    }
+
+    private func systemImage(for availability: ContactsAvailability) -> String {
+        switch availability {
+        case .opening:
+            "lock.open"
+        case .locked:
+            "lock"
+        case .recoveryNeeded:
+            "exclamationmark.triangle"
+        case .frameworkUnavailable:
+            "externaldrive.badge.exclamationmark"
+        case .restartRequired:
+            "arrow.clockwise"
+        case .availableLegacyCompatibility, .availableProtectedDomain:
+            "person.2"
         }
     }
 

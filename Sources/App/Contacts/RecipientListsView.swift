@@ -16,49 +16,55 @@ struct RecipientListsView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                HStack {
-                    TextField(
-                        String(localized: "recipientLists.name", defaultValue: "List Name"),
-                        text: $newListName
-                    )
-                    Button {
-                        createRecipientList()
-                    } label: {
-                        Label(
-                            String(localized: "recipientLists.create", defaultValue: "Create"),
-                            systemImage: "plus"
-                        )
-                    }
-                    .disabled(!allowsEditing || ContactTag.displayName(for: newListName).isEmpty)
-                }
-            } header: {
-                Text(String(localized: "recipientLists.create.header", defaultValue: "New List"))
-            } footer: {
-                if !allowsEditing {
-                    Text(String(localized: "recipientLists.protectedOnly", defaultValue: "Recipient lists can be edited after Contacts are opened from protected app data."))
-                }
-            }
-
-            Section {
-                if recipientLists.isEmpty {
-                    Label(
-                        String(localized: "recipientLists.empty.title", defaultValue: "No Recipient Lists"),
-                        systemImage: "person.3"
-                    )
-                    Text(String(localized: "recipientLists.empty.description", defaultValue: "Create lists to encrypt to saved groups without reselecting each contact."))
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(recipientLists) { list in
-                        NavigationLink(value: AppRoute.recipientListDetail(recipientListId: list.recipientListId)) {
-                            RecipientListRowView(list: list)
+        Group {
+            if contactService.contactsAvailability.isAvailable {
+                List {
+                    Section {
+                        HStack {
+                            TextField(
+                                String(localized: "recipientLists.name", defaultValue: "List Name"),
+                                text: $newListName
+                            )
+                            Button {
+                                createRecipientList()
+                            } label: {
+                                Label(
+                                    String(localized: "recipientLists.create", defaultValue: "Create"),
+                                    systemImage: "plus"
+                                )
+                            }
+                            .disabled(!allowsEditing || ContactTag.displayName(for: newListName).isEmpty)
+                        }
+                    } header: {
+                        Text(String(localized: "recipientLists.create.header", defaultValue: "New List"))
+                    } footer: {
+                        if !allowsEditing {
+                            Text(String(localized: "recipientLists.protectedOnly", defaultValue: "Recipient lists can be edited after Contacts are opened from protected app data."))
                         }
                     }
-                    .onDelete(perform: deleteRecipientLists)
+
+                    Section {
+                        if recipientLists.isEmpty {
+                            Label(
+                                String(localized: "recipientLists.empty.title", defaultValue: "No Recipient Lists"),
+                                systemImage: "person.3"
+                            )
+                            Text(String(localized: "recipientLists.empty.description", defaultValue: "Create lists to encrypt to saved groups without reselecting each contact."))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(recipientLists) { list in
+                                NavigationLink(value: AppRoute.recipientListDetail(recipientListId: list.recipientListId)) {
+                                    RecipientListRowView(list: list)
+                                }
+                            }
+                            .onDelete(perform: deleteRecipientLists)
+                        }
+                    } header: {
+                        Text(String(localized: "contacts.manageRecipientLists", defaultValue: "Recipient Lists"))
+                    }
                 }
-            } header: {
-                Text(String(localized: "contacts.manageRecipientLists", defaultValue: "Recipient Lists"))
+            } else {
+                contactsUnavailableContent(contactService.contactsAvailability)
             }
         }
         #if os(macOS)
@@ -78,6 +84,35 @@ struct RecipientListsView: View {
         }
     }
 
+    private func contactsUnavailableContent(_ availability: ContactsAvailability) -> some View {
+        ContentUnavailableView {
+            Label(availability.unavailableTitle, systemImage: systemImage(for: availability))
+        } description: {
+            Text(availability.unavailableDescription)
+        } actions: {
+            if availability == .opening {
+                ProgressView()
+            }
+        }
+    }
+
+    private func systemImage(for availability: ContactsAvailability) -> String {
+        switch availability {
+        case .opening:
+            "lock.open"
+        case .locked:
+            "lock"
+        case .recoveryNeeded:
+            "exclamationmark.triangle"
+        case .frameworkUnavailable:
+            "externaldrive.badge.exclamationmark"
+        case .restartRequired:
+            "arrow.clockwise"
+        case .availableLegacyCompatibility, .availableProtectedDomain:
+            "person.2"
+        }
+    }
+
     private func createRecipientList() {
         do {
             let list = try contactService.createRecipientList(named: newListName)
@@ -89,10 +124,15 @@ struct RecipientListsView: View {
     }
 
     private func deleteRecipientLists(at indexSet: IndexSet) {
-        for index in indexSet {
-            let list = recipientLists[index]
+        let lists = recipientLists
+        let idsToDelete = RecipientListDeletionResolver.recipientListIdsToDelete(
+            at: indexSet,
+            from: lists
+        )
+
+        for recipientListId in idsToDelete {
             do {
-                try contactService.deleteRecipientList(list.recipientListId)
+                try contactService.deleteRecipientList(recipientListId)
             } catch {
                 presentError(error)
             }
@@ -102,6 +142,20 @@ struct RecipientListsView: View {
     private func presentError(_ error: Error) {
         errorMessage = error.localizedDescription
         showError = true
+    }
+}
+
+enum RecipientListDeletionResolver {
+    static func recipientListIdsToDelete(
+        at indexSet: IndexSet,
+        from recipientLists: [RecipientListSummary]
+    ) -> [String] {
+        indexSet.sorted().compactMap { index in
+            guard recipientLists.indices.contains(index) else {
+                return nil
+            }
+            return recipientLists[index].recipientListId
+        }
     }
 }
 

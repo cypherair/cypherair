@@ -13133,6 +13133,22 @@
         }
       }
     },
+    "encrypt.recipients.staleSelection" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recipient selection changed. Review recipients and try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收件人选择已变化。请检查收件人后再重试。"
+          }
+        }
+      }
+    },
     "encrypt.recipients.noMatches" : {
       "localizations" : {
         "en" : {

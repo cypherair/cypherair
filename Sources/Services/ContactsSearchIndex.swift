@@ -1,6 +1,11 @@
 import Foundation
 
 struct ContactsSearchIndex {
+    enum ContactSearchScope {
+        case identity
+        case recipient
+    }
+
     private enum MatchRank: Int {
         case exact = 0
         case prefix = 1
@@ -10,8 +15,18 @@ struct ContactsSearchIndex {
     private struct ContactEntry {
         let contactId: String
         let tagIds: Set<String>
-        let fields: [String]
+        let identityFields: [String]
+        let recipientFields: [String]
         let defaultOrder: Int
+
+        func fields(for scope: ContactSearchScope) -> [String] {
+            switch scope {
+            case .identity:
+                identityFields
+            case .recipient:
+                recipientFields
+            }
+        }
     }
 
     private struct TagEntry {
@@ -39,23 +54,37 @@ struct ContactsSearchIndex {
             uniqueKeysWithValues: snapshot.identities.map { identity in
                 let keyRecords = keyRecordsByContactID[identity.contactId] ?? []
                 let tagFields = identity.tagIds.compactMap { tagSummariesByID[$0]?.displayName }
-                let keyFields = keyRecords.flatMap { keyRecord in
+                let identityKeyFields = keyRecords.flatMap { keyRecord in
                     [
                         keyRecord.fingerprint,
                         IdentityPresentation.shortKeyId(from: keyRecord.fingerprint)
                     ]
                 }
-                let fields = Self.normalizedFields(
-                    [identity.displayName, identity.primaryEmail].compactMap(\.self) +
-                        tagFields +
-                        keyFields
+                let recipientKeyFields = keyRecords
+                    .filter { $0.usageState == .preferred && $0.canEncryptTo }
+                    .flatMap { keyRecord in
+                        [
+                            keyRecord.fingerprint,
+                            IdentityPresentation.shortKeyId(from: keyRecord.fingerprint)
+                        ]
+                    }
+                let contactFields = [identity.displayName, identity.primaryEmail].compactMap(\.self) +
+                    tagFields
+                let identityFields = Self.normalizedFields(
+                    contactFields +
+                        identityKeyFields
+                )
+                let recipientFields = Self.normalizedFields(
+                    contactFields +
+                        recipientKeyFields
                 )
                 return (
                     identity.contactId,
                     ContactEntry(
                         contactId: identity.contactId,
                         tagIds: Set(identity.tagIds),
-                        fields: fields,
+                        identityFields: identityFields,
+                        recipientFields: recipientFields,
                         defaultOrder: defaultOrderByContactID[identity.contactId] ?? .max
                     )
                 )
@@ -75,6 +104,7 @@ struct ContactsSearchIndex {
         _ summaries: [Summary],
         matching query: String,
         tagFilterIds: Set<String>,
+        scope: ContactSearchScope = .identity,
         contactId: (Summary) -> String
     ) -> [Summary] {
         let normalizedQuery = Self.normalizedSearchText(query)
@@ -86,7 +116,7 @@ struct ContactsSearchIndex {
                 guard !normalizedQuery.isEmpty else {
                     return (entry.contactId, .exact, entry.defaultOrder)
                 }
-                guard let rank = Self.rank(entry.fields, for: normalizedQuery) else {
+                guard let rank = Self.rank(entry.fields(for: scope), for: normalizedQuery) else {
                     return nil
                 }
                 return (entry.contactId, rank, entry.defaultOrder)

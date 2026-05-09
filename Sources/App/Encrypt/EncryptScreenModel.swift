@@ -154,10 +154,7 @@ final class EncryptScreenModel {
     }
 
     var selectedUnverifiedContacts: [ContactRecipientSummary] {
-        let effectiveIds = Set(effectiveRecipientContactIds)
-        return contactService.recipientContacts(matching: "").filter { contact in
-            effectiveIds.contains(contact.contactId) && !contact.isPreferredKeyVerified
-        }
+        unverifiedContacts(for: effectiveRecipientContactIds)
     }
 
     var selectedRecipientListsContainInvalidMembers: Bool {
@@ -314,26 +311,49 @@ final class EncryptScreenModel {
             return
         }
 
-        if !selectedUnverifiedContacts.isEmpty {
+        let recipients: [String]
+        do {
+            recipients = try validatedEffectiveRecipientContactIdsForEncryption()
+        } catch {
+            operation.present(error: mapEncryptionError(error))
+            return
+        }
+
+        if !unverifiedContacts(for: recipients).isEmpty {
             showUnverifiedRecipientsWarning = true
             return
         }
 
-        performEncrypt()
+        performEncrypt(to: recipients)
     }
 
     func confirmEncryptWithUnverifiedRecipients() {
         showUnverifiedRecipientsWarning = false
-        performEncrypt()
+        do {
+            let recipients = try validatedEffectiveRecipientContactIdsForEncryption()
+            performEncrypt(to: recipients)
+        } catch {
+            operation.present(error: mapEncryptionError(error))
+        }
     }
 
     func dismissUnverifiedRecipientsWarning() {
         showUnverifiedRecipientsWarning = false
     }
 
-    func encryptText() {
+    func encryptText(validatedRecipientContactIds: [String]? = nil) {
         let text = plaintext
-        let recipients = effectiveRecipientContactIds
+        let recipients: [String]
+        do {
+            if let validatedRecipientContactIds {
+                recipients = validatedRecipientContactIds
+            } else {
+                recipients = try validatedEffectiveRecipientContactIdsForEncryption()
+            }
+        } catch {
+            operation.present(error: mapEncryptionError(error))
+            return
+        }
         let signerFingerprint = signMessage ? signerFingerprint : nil
         guard let encryptToSelf = resolvedEncryptToSelf else {
             presentProtectedOrdinarySettingsLockedError()
@@ -368,10 +388,20 @@ final class EncryptScreenModel {
         }
     }
 
-    func encryptFile() {
+    func encryptFile(validatedRecipientContactIds: [String]? = nil) {
         guard let fileURL = selectedFileURL else { return }
 
-        let recipients = effectiveRecipientContactIds
+        let recipients: [String]
+        do {
+            if let validatedRecipientContactIds {
+                recipients = validatedRecipientContactIds
+            } else {
+                recipients = try validatedEffectiveRecipientContactIdsForEncryption()
+            }
+        } catch {
+            operation.present(error: mapEncryptionError(error))
+            return
+        }
         let signerFingerprint = signMessage ? signerFingerprint : nil
         guard let encryptToSelf = resolvedEncryptToSelf else {
             presentProtectedOrdinarySettingsLockedError()
@@ -521,12 +551,62 @@ final class EncryptScreenModel {
         encryptToSelf = protectedOrdinarySettings.encryptToSelf
     }
 
-    private func performEncrypt() {
+    private func performEncrypt(to recipientContactIds: [String]) {
         switch encryptMode {
         case .text:
-            encryptText()
+            encryptText(validatedRecipientContactIds: recipientContactIds)
         case .file:
-            encryptFile()
+            encryptFile(validatedRecipientContactIds: recipientContactIds)
+        }
+    }
+
+    private func validatedEffectiveRecipientContactIdsForEncryption() throws -> [String] {
+        guard contactsAvailability.isAvailable else {
+            throw CypherAirError.contactsUnavailable(contactsAvailability)
+        }
+
+        let availableRecipientIds = Set(contactService.recipientContacts(matching: "").map(\.contactId))
+        let staleDirectRecipientIds = selectedRecipients.subtracting(availableRecipientIds)
+
+        let currentRecipientLists = recipientLists
+        let currentRecipientListIds = Set(currentRecipientLists.map(\.recipientListId))
+        let staleRecipientListIds = selectedRecipientListIds.subtracting(currentRecipientListIds)
+
+        if !staleDirectRecipientIds.isEmpty || !staleRecipientListIds.isEmpty {
+            selectedRecipients.subtract(staleDirectRecipientIds)
+            selectedRecipientListIds.subtract(staleRecipientListIds)
+            throw CypherAirError.encryptionFailed(
+                reason: String(
+                    localized: "encrypt.recipients.staleSelection",
+                    defaultValue: "Recipient selection changed. Review recipients and try again."
+                )
+            )
+        }
+
+        let selectedLists = currentRecipientLists.filter {
+            selectedRecipientListIds.contains($0.recipientListId)
+        }
+        guard !selectedLists.contains(where: { !$0.canEncryptToAll }) else {
+            throw CypherAirError.encryptionFailed(
+                reason: String(
+                    localized: "encrypt.recipientLists.invalidSelection",
+                    defaultValue: "A selected list now needs preferred keys before it can be used."
+                )
+            )
+        }
+
+        let selectedListMemberIds = selectedLists.flatMap(\.memberContactIds)
+        let recipientContactIds = dedupedContactIds(Array(selectedRecipients) + selectedListMemberIds)
+        guard !recipientContactIds.isEmpty else {
+            throw CypherAirError.noRecipientsSelected
+        }
+        return recipientContactIds
+    }
+
+    private func unverifiedContacts(for contactIds: [String]) -> [ContactRecipientSummary] {
+        let contactIds = Set(contactIds)
+        return contactService.recipientContacts(matching: "").filter { contact in
+            contactIds.contains(contact.contactId) && !contact.isPreferredKeyVerified
         }
     }
 
@@ -553,7 +633,10 @@ final class EncryptScreenModel {
         let resolution = initialRecipientResolution(from: configuration)
         pendingInitialRecipientFingerprints = resolution.pendingFingerprints
         selectedRecipientListIds.removeAll()
-        if !resolution.contactIds.isEmpty {
+        if !configuration.initialRecipientContactIds.isEmpty {
+            selectedRecipients = Set(resolution.contactIds)
+        } else if !configuration.initialRecipientFingerprints.isEmpty,
+                  resolution.pendingFingerprints.isEmpty {
             selectedRecipients = Set(resolution.contactIds)
         }
     }
@@ -569,7 +652,14 @@ final class EncryptScreenModel {
         from configuration: EncryptView.Configuration
     ) -> (contactIds: [String], pendingFingerprints: Set<String>) {
         if !configuration.initialRecipientContactIds.isEmpty {
-            return (configuration.initialRecipientContactIds, [])
+            guard contactsAvailability.isAvailable else {
+                return (configuration.initialRecipientContactIds, [])
+            }
+            let availableRecipientIds = Set(contactService.recipientContacts(matching: "").map(\.contactId))
+            let contactIds = configuration.initialRecipientContactIds.filter {
+                availableRecipientIds.contains($0)
+            }
+            return (contactIds, [])
         }
         guard !configuration.initialRecipientFingerprints.isEmpty else {
             return ([], [])

@@ -851,6 +851,21 @@ final class ContactServiceTests: XCTestCase {
         """))
     }
 
+    func test_pr8RepositoryAuditSnapshotIncludesContactsOrganizationSources() throws {
+        let requiredPaths = [
+            "Sources/App/Contacts/ContactsScreenModel.swift",
+            "Sources/App/Contacts/RecipientListsView.swift",
+            "Sources/App/Contacts/RecipientListDetailView.swift",
+            "Sources/Services/ContactsSearchIndex.swift",
+            "Sources/Models/Contacts/ContactTagSummary.swift",
+            "Sources/Models/Contacts/RecipientListSummary.swift",
+        ]
+
+        for path in requiredPaths {
+            XCTAssertNoThrow(try RepositoryAuditLoader.loadString(relativePath: path), path)
+        }
+    }
+
     func test_productionContactsCallsitesUseGatedAccessors() throws {
         let sourcesRoot = try RepositoryAuditLoader.sourcesRootURL()
         let allowedRelativePaths: Set<String> = [
@@ -1667,6 +1682,26 @@ final class ContactServiceTests: XCTestCase {
         )
     }
 
+    func test_pr8RecipientListDeletionResolverUsesStableSnapshotOffsets() {
+        let recipientLists = [
+            makeRecipientListSummary(id: "list-a", name: "A"),
+            makeRecipientListSummary(id: "list-b", name: "B"),
+            makeRecipientListSummary(id: "list-c", name: "C"),
+        ]
+        var indexSet = IndexSet()
+        indexSet.insert(0)
+        indexSet.insert(2)
+        indexSet.insert(99)
+
+        XCTAssertEqual(
+            RecipientListDeletionResolver.recipientListIdsToDelete(
+                at: indexSet,
+                from: recipientLists
+            ),
+            ["list-a", "list-c"]
+        )
+    }
+
     func test_pr8SearchRanksAndMatchesTagsFingerprintAndShortKeyId() async throws {
         let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8Search")
         defer {
@@ -1723,6 +1758,62 @@ final class ContactServiceTests: XCTestCase {
             service.contactIdentities(matching: "", tagFilterIds: [try XCTUnwrap(service.contactTagSummaries().first?.tagId)])
                 .map(\.contactId),
             [substringContactId]
+        )
+    }
+
+    func test_pr8RecipientSearchMatchesOnlyPreferredEncryptableKeyIdentifiers() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8RecipientSearch")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let preferred = try engine.generateKey(
+            name: "Recipient Preferred",
+            email: "recipient-preferred@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let historical = try engine.generateKey(
+            name: "Recipient Historical",
+            email: "recipient-historical@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+
+        _ = try service.addContact(publicKeyData: preferred.publicKeyData)
+        _ = try service.addContact(publicKeyData: historical.publicKeyData)
+        let targetContactId = try XCTUnwrap(service.contactId(forFingerprint: preferred.fingerprint))
+        let sourceContactId = try XCTUnwrap(service.contactId(forFingerprint: historical.fingerprint))
+
+        _ = try service.mergeContact(sourceContactId: sourceContactId, into: targetContactId)
+        try service.setKeyUsageState(.historical, fingerprint: historical.fingerprint)
+
+        XCTAssertEqual(
+            service.contactIdentities(matching: historical.fingerprint).map(\.contactId),
+            [targetContactId]
+        )
+        XCTAssertEqual(
+            service.contactIdentities(
+                matching: IdentityPresentation.shortKeyId(from: historical.fingerprint)
+            ).map(\.contactId),
+            [targetContactId]
+        )
+        XCTAssertTrue(service.recipientContacts(matching: historical.fingerprint).isEmpty)
+        XCTAssertTrue(
+            service.recipientContacts(
+                matching: IdentityPresentation.shortKeyId(from: historical.fingerprint)
+            )
+            .isEmpty
+        )
+        XCTAssertEqual(
+            service.recipientContacts(matching: preferred.fingerprint).map(\.contactId),
+            [targetContactId]
+        )
+        XCTAssertEqual(
+            service.recipientContacts(
+                matching: IdentityPresentation.shortKeyId(from: preferred.fingerprint)
+            ).map(\.contactId),
+            [targetContactId]
         )
     }
 
@@ -3274,6 +3365,17 @@ final class ContactServiceTests: XCTestCase {
         )
         configure(&artifact)
         return artifact
+    }
+
+    private func makeRecipientListSummary(id: String, name: String) -> RecipientListSummary {
+        RecipientListSummary(
+            recipientListId: id,
+            name: name,
+            memberContactIds: [],
+            memberCount: 0,
+            canEncryptToAll: false,
+            missingPreferredContactIds: []
+        )
     }
 
     private func makeContactsProtectedHarness(
