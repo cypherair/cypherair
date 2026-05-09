@@ -1857,6 +1857,68 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(model.visibleContacts.map(\.contactId), [personalContactId])
     }
 
+    @MainActor
+    func test_pr8ContactsScreenModelPrunesStaleTagFilterAfterTagRemoval() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8ScreenModelStaleTag")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "Tagged Person",
+            email: "tagged-person@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let tag = try service.addTag(named: "Temporary", toContactId: contactId)
+
+        let model = ContactsScreenModel(contactService: service)
+        model.toggleTagFilter(tag.tagId)
+        XCTAssertEqual(model.selectedTagFilterIds, Set([tag.tagId]))
+        XCTAssertEqual(model.visibleContacts.map(\.contactId), [contactId])
+
+        try service.removeTag(tagId: tag.tagId, fromContactId: contactId)
+
+        XCTAssertTrue(service.contactTagSummaries().isEmpty)
+        XCTAssertTrue(model.selectedTagFilterIds.isEmpty)
+        XCTAssertFalse(model.hasActiveSearchOrFilters)
+        XCTAssertEqual(model.visibleContacts.map(\.contactId), [contactId])
+    }
+
+    @MainActor
+    func test_pr8ContactsScreenModelIgnoresMissingTagFilterIds() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8ScreenModelMissingTag")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "Searchable Person",
+            email: "searchable-person@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+
+        let model = ContactsScreenModel(contactService: service)
+        model.selectedTagFilterIds = ["missing-tag"]
+        XCTAssertTrue(model.selectedTagFilterIds.isEmpty)
+        XCTAssertFalse(model.hasActiveSearchOrFilters)
+
+        model.toggleTagFilter("missing-tag")
+        XCTAssertTrue(model.selectedTagFilterIds.isEmpty)
+        XCTAssertFalse(model.hasActiveSearchOrFilters)
+
+        model.searchText = "searchable"
+        XCTAssertTrue(model.hasActiveSearchOrFilters)
+        XCTAssertEqual(model.visibleContacts.map(\.contactId), [contactId])
+    }
+
     func test_pr8RecipientListsEditPruneAndFailClosedWhenPreferredKeyMissing() async throws {
         let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8RecipientLists")
         defer {
