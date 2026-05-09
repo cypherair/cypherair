@@ -1047,6 +1047,132 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(afterRecord.keyId, beforeRecord.keyId)
     }
 
+    func test_pr5SnapshotMutator_removeKeyPrunesOwnedCertificationArtifacts() throws {
+        var snapshot = ContactsDomainSnapshot.empty()
+        let mutator = ContactSnapshotMutator(engine: engine)
+        let generated = try engine.generateKey(
+            name: "Artifact Removed Key",
+            email: "artifact-removed@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        _ = try mutator.addContact(
+            publicKeyData: generated.publicKeyData,
+            verificationState: .verified,
+            in: &snapshot
+        )
+        try attachCertificationArtifact(
+            artifactId: "artifact-remove-key",
+            toKeyWithFingerprint: generated.fingerprint,
+            in: &snapshot
+        )
+        try snapshot.validateContract()
+
+        let mutation = try mutator.removeKey(
+            fingerprint: generated.fingerprint,
+            in: &snapshot
+        )
+
+        XCTAssertTrue(mutation.didMutate)
+        XCTAssertTrue(snapshot.identities.isEmpty)
+        XCTAssertTrue(snapshot.keyRecords.isEmpty)
+        XCTAssertTrue(snapshot.certificationArtifacts.isEmpty)
+        XCTAssertNoThrow(try snapshot.validateContract())
+    }
+
+    func test_pr5SnapshotMutator_removeContactIdentityPrunesOnlyOwnedCertificationArtifacts() throws {
+        var snapshot = ContactsDomainSnapshot.empty()
+        let mutator = ContactSnapshotMutator(engine: engine)
+        let firstKey = try engine.generateKey(
+            name: "Artifact Target One",
+            email: "artifact-target-one@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let secondKey = try engine.generateKey(
+            name: "Artifact Target Two",
+            email: "artifact-target-two@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+        let retainedKey = try engine.generateKey(
+            name: "Artifact Retained",
+            email: "artifact-retained@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        _ = try mutator.addContact(
+            publicKeyData: firstKey.publicKeyData,
+            verificationState: .verified,
+            in: &snapshot
+        )
+        _ = try mutator.addContact(
+            publicKeyData: secondKey.publicKeyData,
+            verificationState: .verified,
+            in: &snapshot
+        )
+        _ = try mutator.addContact(
+            publicKeyData: retainedKey.publicKeyData,
+            verificationState: .verified,
+            in: &snapshot
+        )
+        let targetContactId = try XCTUnwrap(
+            snapshot.keyRecords.first { $0.fingerprint == firstKey.fingerprint }?.contactId
+        )
+        let sourceContactId = try XCTUnwrap(
+            snapshot.keyRecords.first { $0.fingerprint == secondKey.fingerprint }?.contactId
+        )
+        let retainedContactId = try XCTUnwrap(
+            snapshot.keyRecords.first { $0.fingerprint == retainedKey.fingerprint }?.contactId
+        )
+        _ = try mutator.mergeContact(
+            sourceContactId: sourceContactId,
+            into: targetContactId,
+            in: &snapshot
+        )
+
+        try attachCertificationArtifact(
+            artifactId: "artifact-target-one",
+            toKeyWithFingerprint: firstKey.fingerprint,
+            in: &snapshot
+        )
+        try attachCertificationArtifact(
+            artifactId: "artifact-target-two",
+            toKeyWithFingerprint: secondKey.fingerprint,
+            in: &snapshot
+        )
+        try attachCertificationArtifact(
+            artifactId: "artifact-retained",
+            toKeyWithFingerprint: retainedKey.fingerprint,
+            in: &snapshot
+        )
+        snapshot.recipientLists = [
+            RecipientList(
+                recipientListId: "list-with-retained-member",
+                name: "List",
+                memberContactIds: [targetContactId, retainedContactId],
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+        ]
+        try snapshot.validateContract()
+
+        let mutation = try mutator.removeContactIdentity(
+            contactId: targetContactId,
+            in: &snapshot
+        )
+
+        XCTAssertTrue(mutation.didMutate)
+        XCTAssertFalse(snapshot.identities.contains { $0.contactId == targetContactId })
+        XCTAssertFalse(snapshot.keyRecords.contains { $0.contactId == targetContactId })
+        XCTAssertEqual(snapshot.recipientLists.first?.memberContactIds, [retainedContactId])
+        XCTAssertEqual(snapshot.certificationArtifacts.map(\.artifactId), ["artifact-retained"])
+        XCTAssertTrue(snapshot.keyRecords.contains { $0.fingerprint == retainedKey.fingerprint })
+        XCTAssertNoThrow(try snapshot.validateContract())
+    }
+
     func test_pr5RecipientResolver_usesPreferredKeyAndLegacyExactFingerprintRows() throws {
         var snapshot = ContactsDomainSnapshot.empty()
         let mutator = ContactSnapshotMutator(engine: engine)
@@ -2404,6 +2530,32 @@ final class ContactServiceTests: XCTestCase {
         )
         XCTAssertEqual(availability, .availableProtectedDomain)
         return (service, store)
+    }
+
+    private func attachCertificationArtifact(
+        artifactId: String,
+        toKeyWithFingerprint fingerprint: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws {
+        let keyIndex = try XCTUnwrap(
+            snapshot.keyRecords.firstIndex { $0.fingerprint == fingerprint }
+        )
+        let keyId = snapshot.keyRecords[keyIndex].keyId
+        let artifact = ContactCertificationArtifactReference(
+            artifactId: artifactId,
+            keyId: keyId,
+            userId: snapshot.keyRecords[keyIndex].primaryUserId,
+            createdAt: Date(),
+            storageHint: "test-\(artifactId)"
+        )
+        snapshot.certificationArtifacts.append(artifact)
+        snapshot.keyRecords[keyIndex].certificationArtifactIds.append(artifactId)
+        snapshot.keyRecords[keyIndex].certificationProjection = ContactCertificationProjection(
+            status: .revalidationNeeded,
+            artifactIds: [artifactId],
+            lastValidatedAt: nil,
+            reconciliationMetadata: "test-\(artifactId)"
+        )
     }
 
     private func makeContactsProtectedHarness(

@@ -152,7 +152,9 @@ struct ContactSnapshotMutator {
         }
 
         let now = Date()
+        let removedKeyIds = Set([keyRecord.keyId])
         snapshot.keyRecords.removeAll { $0.fingerprint == fingerprint }
+        pruneCertificationArtifacts(forRemovedKeyIds: removedKeyIds, in: &snapshot)
         if !snapshot.keyRecords.contains(where: { $0.contactId == keyRecord.contactId }) {
             snapshot.identities.removeAll { $0.contactId == keyRecord.contactId }
             for listIndex in snapshot.recipientLists.indices {
@@ -168,19 +170,26 @@ struct ContactSnapshotMutator {
     func removeContactIdentity(
         contactId: String,
         in snapshot: inout ContactsDomainSnapshot
-    ) -> Mutation<Void> {
+    ) throws -> Mutation<Void> {
         guard snapshot.identities.contains(where: { $0.contactId == contactId }) else {
             return Mutation(output: (), didMutate: false)
         }
 
         let now = Date()
+        let removedKeyIds = Set(
+            snapshot.keyRecords
+                .filter { $0.contactId == contactId }
+                .map(\.keyId)
+        )
         snapshot.identities.removeAll { $0.contactId == contactId }
         snapshot.keyRecords.removeAll { $0.contactId == contactId }
+        pruneCertificationArtifacts(forRemovedKeyIds: removedKeyIds, in: &snapshot)
         for listIndex in snapshot.recipientLists.indices {
             snapshot.recipientLists[listIndex].memberContactIds.removeAll { $0 == contactId }
             snapshot.recipientLists[listIndex].updatedAt = now
         }
         snapshot.updatedAt = now
+        try snapshot.validateContract()
         return Mutation(output: (), didMutate: true)
     }
 
@@ -400,6 +409,18 @@ struct ContactSnapshotMutator {
             snapshot.identities[identityIndex].primaryEmail = keyRecord.email
         }
         snapshot.identities[identityIndex].updatedAt = now
+    }
+
+    private func pruneCertificationArtifacts(
+        forRemovedKeyIds removedKeyIds: Set<String>,
+        in snapshot: inout ContactsDomainSnapshot
+    ) {
+        guard !removedKeyIds.isEmpty else {
+            return
+        }
+        snapshot.certificationArtifacts.removeAll {
+            removedKeyIds.contains($0.keyId)
+        }
     }
 
     private func normalizeKeyUsage(

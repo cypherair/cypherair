@@ -395,7 +395,7 @@ final class ContactService: @unchecked Sendable {
         if contactsAvailability == .availableProtectedDomain {
             try withProtectedRuntimeRollback {
                 var snapshot = try mutableRuntimeSnapshot()
-                let mutation = snapshotMutator.removeContactIdentity(
+                let mutation = try snapshotMutator.removeContactIdentity(
                     contactId: contactId,
                     in: &snapshot
                 )
