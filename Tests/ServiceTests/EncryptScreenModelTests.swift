@@ -218,6 +218,94 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_contactsAvailabilityChange_restoresPendingCompatibilityFingerprint() async throws {
+        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+            service: stack.keyManagement,
+            name: "Delayed Recipient"
+        )
+        let delayed = try makeLockedLegacyContactServiceSeeded(with: recipientIdentity)
+        defer { try? FileManager.default.removeItem(at: delayed.directory) }
+
+        var configuration = EncryptView.Configuration()
+        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        let model = makeModel(
+            contactService: delayed.service,
+            configuration: configuration
+        )
+
+        model.handleAppear()
+
+        XCTAssertTrue(model.selectedRecipients.isEmpty)
+
+        let previousAvailability = delayed.service.contactsAvailability
+        let currentAvailability = try delayed.service.openLegacyCompatibilityForTests()
+        model.handleContactsAvailabilityChange(
+            from: previousAvailability,
+            to: currentAvailability
+        )
+
+        XCTAssertEqual(model.selectedRecipients, [delayed.contactId])
+    }
+
+    @MainActor
+    func test_configurationDefaultClearsPendingCompatibilityFingerprintBeforeContactsBecomeAvailable() async throws {
+        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+            service: stack.keyManagement,
+            name: "Cleared Delayed Recipient"
+        )
+        let delayed = try makeLockedLegacyContactServiceSeeded(with: recipientIdentity)
+        defer { try? FileManager.default.removeItem(at: delayed.directory) }
+
+        var configuration = EncryptView.Configuration()
+        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        let model = makeModel(
+            contactService: delayed.service,
+            configuration: configuration
+        )
+
+        model.handleAppear()
+        model.updateConfiguration(.default)
+
+        let previousAvailability = delayed.service.contactsAvailability
+        let currentAvailability = try delayed.service.openLegacyCompatibilityForTests()
+        model.handleContactsAvailabilityChange(
+            from: previousAvailability,
+            to: currentAvailability
+        )
+
+        XCTAssertTrue(model.selectedRecipients.isEmpty)
+    }
+
+    @MainActor
+    func test_delayedCompatibilityFingerprintResolutionAppendsToManualSelection() async throws {
+        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+            service: stack.keyManagement,
+            name: "Union Delayed Recipient"
+        )
+        let delayed = try makeLockedLegacyContactServiceSeeded(with: recipientIdentity)
+        defer { try? FileManager.default.removeItem(at: delayed.directory) }
+
+        var configuration = EncryptView.Configuration()
+        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        let model = makeModel(
+            contactService: delayed.service,
+            configuration: configuration
+        )
+        model.selectedRecipients = ["manual-recipient"]
+
+        model.handleAppear()
+
+        let previousAvailability = delayed.service.contactsAvailability
+        let currentAvailability = try delayed.service.openLegacyCompatibilityForTests()
+        model.handleContactsAvailabilityChange(
+            from: previousAvailability,
+            to: currentAvailability
+        )
+
+        XCTAssertEqual(model.selectedRecipients, ["manual-recipient", delayed.contactId])
+    }
+
+    @MainActor
     func test_encryptText_usesCallbackCapturedAtOperationStart_whenConfigurationChangesMidFlight() async {
         let gate = EncryptOperationGate()
         var firstCallbackCiphertext: Data?
@@ -613,15 +701,24 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     private func makeModel(
+        contactService: ContactService? = nil,
         configuration: EncryptView.Configuration = .default,
         operation: OperationController = OperationController(),
         textEncryptionAction: EncryptScreenModel.TextEncryptionAction? = nil,
         fileEncryptionAction: EncryptScreenModel.FileEncryptionAction? = nil
     ) -> EncryptScreenModel {
-        EncryptScreenModel(
-            encryptionService: stack.encryptionService,
+        let resolvedContactService = contactService ?? stack.contactService
+        let resolvedEncryptionService = contactService.map {
+            EncryptionService(
+                engine: stack.engine,
+                keyManagement: stack.keyManagement,
+                contactService: $0
+            )
+        } ?? stack.encryptionService
+        return EncryptScreenModel(
+            encryptionService: resolvedEncryptionService,
             keyManagement: stack.keyManagement,
-            contactService: stack.contactService,
+            contactService: resolvedContactService,
             config: config,
             protectedOrdinarySettings: protectedOrdinarySettings,
             configuration: configuration,
@@ -634,6 +731,32 @@ final class EncryptScreenModelTests: XCTestCase {
     private func importContactAndResolveContactId(for identity: PGPKeyIdentity) throws -> String {
         _ = try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
         return try XCTUnwrap(stack.contactService.contactId(forFingerprint: identity.fingerprint))
+    }
+
+    private func makeLockedLegacyContactServiceSeeded(
+        with identity: PGPKeyIdentity
+    ) throws -> (service: ContactService, contactId: String, directory: URL) {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("EncryptDelayedPrefill-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+
+        let writer = ContactService(
+            engine: stack.engine,
+            contactsDirectory: directory
+        )
+        try writer.openLegacyCompatibilityForTests()
+        _ = try writer.addContact(publicKeyData: identity.publicKeyData)
+        let contactId = try XCTUnwrap(writer.contactId(forFingerprint: identity.fingerprint))
+
+        let locked = ContactService(
+            engine: stack.engine,
+            contactsDirectory: directory
+        )
+        XCTAssertEqual(locked.contactsAvailability, .locked)
+        return (locked, contactId, directory)
     }
 
     private func makeOpenedProtectedContactService(

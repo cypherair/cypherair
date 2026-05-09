@@ -32,6 +32,7 @@ final class EncryptScreenModel {
     private let textEncryptionAction: TextEncryptionAction
     private let fileEncryptionAction: FileEncryptionAction
     @ObservationIgnored private var encryptedFileArtifact: AppTemporaryArtifact?
+    private var pendingInitialRecipientFingerprints: Set<String> = []
 
     var encryptMode: EncryptView.EncryptMode = .text
     var plaintext = ""
@@ -232,6 +233,25 @@ final class EncryptScreenModel {
         if previousConfiguration.encryptToSelfPolicy != configuration.encryptToSelfPolicy {
             applyEncryptToSelfPolicy(from: configuration)
         }
+    }
+
+    func handleContactsAvailabilityChange(
+        from previousAvailability: ContactsAvailability,
+        to currentAvailability: ContactsAvailability
+    ) {
+        guard !previousAvailability.isAvailable,
+              currentAvailability.isAvailable,
+              !pendingInitialRecipientFingerprints.isEmpty else {
+            return
+        }
+
+        let resolvedContactIds = pendingInitialRecipientFingerprints.compactMap { fingerprint in
+            contactService.contactId(forFingerprint: fingerprint)
+        }
+        if !resolvedContactIds.isEmpty {
+            selectedRecipients.formUnion(resolvedContactIds)
+        }
+        pendingInitialRecipientFingerprints = []
     }
 
     func toggleRecipient(_ contactId: String, isOn: Bool) {
@@ -495,23 +515,35 @@ final class EncryptScreenModel {
     }
 
     private func applyInitialRecipientSelection(from configuration: EncryptView.Configuration) {
-        let contactIds = initialRecipientContactIDs(from: configuration)
-        if !contactIds.isEmpty {
-            selectedRecipients = Set(contactIds)
+        let resolution = initialRecipientResolution(from: configuration)
+        pendingInitialRecipientFingerprints = resolution.pendingFingerprints
+        if !resolution.contactIds.isEmpty {
+            selectedRecipients = Set(resolution.contactIds)
         }
     }
 
     private func syncRuntimeRecipientSelection(from configuration: EncryptView.Configuration) {
-        selectedRecipients = Set(initialRecipientContactIDs(from: configuration))
+        let resolution = initialRecipientResolution(from: configuration)
+        pendingInitialRecipientFingerprints = resolution.pendingFingerprints
+        selectedRecipients = Set(resolution.contactIds)
     }
 
-    private func initialRecipientContactIDs(from configuration: EncryptView.Configuration) -> [String] {
+    private func initialRecipientResolution(
+        from configuration: EncryptView.Configuration
+    ) -> (contactIds: [String], pendingFingerprints: Set<String>) {
         if !configuration.initialRecipientContactIds.isEmpty {
-            return configuration.initialRecipientContactIds
+            return (configuration.initialRecipientContactIds, [])
         }
-        return configuration.initialRecipientFingerprints.compactMap { fingerprint in
+        guard !configuration.initialRecipientFingerprints.isEmpty else {
+            return ([], [])
+        }
+        guard contactsAvailability.isAvailable else {
+            return ([], Set(configuration.initialRecipientFingerprints))
+        }
+        let contactIds = configuration.initialRecipientFingerprints.compactMap { fingerprint in
             contactService.contactId(forFingerprint: fingerprint)
         }
+        return (contactIds, [])
     }
 
     private func applyInitialSignerSelection(from configuration: EncryptView.Configuration) {
