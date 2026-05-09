@@ -19,6 +19,12 @@ struct AppRouteDestinationView: View {
             ImportKeyView()
         case .contactDetail(let contactId):
             ContactDetailView(contactId: contactId)
+        case .contactCertification(let contactId, let keyId, let intent):
+            ContactCertificationDetailsView(
+                contactId: contactId,
+                keyId: keyId,
+                intent: intent
+            )
         case .contactCertificateSignatures(let fingerprint):
             ContactCertificateSignaturesView(fingerprint: fingerprint)
         case .addContact:

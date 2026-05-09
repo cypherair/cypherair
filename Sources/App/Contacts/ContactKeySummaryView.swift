@@ -57,6 +57,20 @@ struct ContactKeySummaryView: View {
                 .foregroundStyle(.orange)
             }
 
+            HStack {
+                Text(
+                    String(
+                        localized: "contactdetail.openpgpCertification",
+                        defaultValue: "OpenPGP Certification"
+                    )
+                )
+                Spacer()
+                CypherStatusBadge(
+                    title: certificationStatusTitle,
+                    color: certificationStatusColor
+                )
+            }
+
             actionButtons
         }
         .padding(.vertical, 6)
@@ -118,18 +132,22 @@ struct ContactKeySummaryView: View {
 
             if configuration.showsCertificateSignatureEntry {
                 NavigationLink(
-                    value: AppRoute.contactCertificateSignatures(fingerprint: key.fingerprint)
+                    value: AppRoute.contactCertification(
+                        contactId: key.contactId,
+                        keyId: key.keyId,
+                        intent: .details
+                    )
                 ) {
                     Label(
                         String(
-                            localized: "contactdetail.certificateSignatures",
-                            defaultValue: "Certificate Signatures"
+                            localized: "contactdetail.certificationDetails",
+                            defaultValue: "Certification Details"
                         ),
                         systemImage: "checkmark.seal"
                     )
                 }
                 .disabled(!configuration.allowsCertificateSignatureLaunch)
-                .accessibilityIdentifier("contactdetail.certificateSignatures")
+                .accessibilityIdentifier("contactdetail.certificationDetails")
             }
 
             if let restrictionMessage = configuration.certificateSignatureRestrictionMessage {
@@ -139,5 +157,31 @@ struct ContactKeySummaryView: View {
             }
         }
         .buttonStyle(.borderless)
+    }
+
+    private var certificationStatusTitle: String {
+        switch key.certificationProjection.status {
+        case .notCertified:
+            String(localized: "contactdetail.openpgpCertification.none", defaultValue: "Not Certified")
+        case .certified:
+            String(localized: "contactdetail.openpgpCertification.certified", defaultValue: "Certified")
+        case .invalidOrStale:
+            String(localized: "contactdetail.openpgpCertification.invalid", defaultValue: "Invalid or Stale")
+        case .revalidationNeeded:
+            String(localized: "contactdetail.openpgpCertification.revalidation", defaultValue: "Revalidation Needed")
+        }
+    }
+
+    private var certificationStatusColor: Color {
+        switch key.certificationProjection.status {
+        case .notCertified:
+            .secondary
+        case .certified:
+            .green
+        case .invalidOrStale:
+            .red
+        case .revalidationNeeded:
+            .orange
+        }
     }
 }

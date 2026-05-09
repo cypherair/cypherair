@@ -152,6 +152,79 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         XCTAssertNoThrow(try snapshot.validateContract())
     }
 
+    func test_legacyCertificationArtifactDecodesWithRevalidationDefaults() throws {
+        var snapshot = try makeValidSnapshot()
+        snapshot.keyRecords[0].certificationArtifactIds = ["artifact-legacy"]
+        snapshot.keyRecords[0].certificationProjection = ContactCertificationProjection(
+            status: .revalidationNeeded,
+            artifactIds: ["artifact-legacy"],
+            lastValidatedAt: nil,
+            reconciliationMetadata: "legacy"
+        )
+        let legacySnapshot = LegacyContactsDomainSnapshot(
+            schemaVersion: snapshot.schemaVersion,
+            identities: snapshot.identities,
+            keyRecords: snapshot.keyRecords,
+            recipientLists: snapshot.recipientLists,
+            tags: snapshot.tags,
+            certificationArtifacts: [
+                LegacyCertificationArtifactReference(
+                    artifactId: "artifact-legacy",
+                    keyId: "key-1",
+                    userId: "Alice <alice@example.com>",
+                    createdAt: referenceDate,
+                    storageHint: "legacy-placeholder"
+                )
+            ],
+            createdAt: snapshot.createdAt,
+            updatedAt: snapshot.updatedAt
+        )
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+
+        let decoded = try ContactsDomainRepository().decodeSnapshot(
+            try encoder.encode(legacySnapshot)
+        )
+        let artifact = try XCTUnwrap(decoded.certificationArtifacts.first)
+
+        XCTAssertEqual(artifact.validationStatus, .revalidationNeeded)
+        XCTAssertEqual(artifact.source, .imported)
+        XCTAssertTrue(artifact.canonicalSignatureData.isEmpty)
+        XCTAssertEqual(artifact.targetSelector.kind, .userId)
+        XCTAssertEqual(artifact.targetSelector.occurrenceIndex, 0)
+        XCTAssertEqual(artifact.targetSelector.userIdDisplayText, "Alice <alice@example.com>")
+    }
+
+    func test_certificationArtifactDigestMismatch_isRejected() throws {
+        var snapshot = try makeValidSnapshot()
+        snapshot.certificationArtifacts = [
+            makePersistedArtifact(
+                artifactId: "artifact-digest-mismatch",
+                signatureData: Data([0x01, 0x02, 0x03]),
+                signatureDigest: "not-the-digest"
+            )
+        ]
+
+        XCTAssertThrowsError(try snapshot.validateContract())
+    }
+
+    func test_duplicateCertificationArtifactPayloads_areRejected() throws {
+        var snapshot = try makeValidSnapshot()
+        let signatureData = Data([0x10, 0x20, 0x30])
+        snapshot.certificationArtifacts = [
+            makePersistedArtifact(
+                artifactId: "artifact-1",
+                signatureData: signatureData
+            ),
+            makePersistedArtifact(
+                artifactId: "artifact-2",
+                signatureData: signatureData
+            ),
+        ]
+
+        XCTAssertThrowsError(try snapshot.validateContract())
+    }
+
     func test_keyRecordCertificationArtifactsMustBelongToSameKey() throws {
         var snapshot = try makeValidSnapshotWithTwoKeys()
         snapshot.certificationArtifacts = [
@@ -261,4 +334,54 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             updatedAt: referenceDate
         )
     }
+
+    private func makePersistedArtifact(
+        artifactId: String,
+        signatureData: Data,
+        signatureDigest: String? = nil
+    ) -> ContactCertificationArtifactReference {
+        ContactCertificationArtifactReference(
+            artifactId: artifactId,
+            keyId: "key-1",
+            userId: nil,
+            createdAt: referenceDate,
+            storageHint: "test",
+            canonicalSignatureData: signatureData,
+            signatureDigest: signatureDigest ?? ContactCertificationArtifactReference.sha256Hex(
+                for: signatureData
+            ),
+            source: .imported,
+            targetKeyFingerprint: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            targetSelector: .directKey,
+            signerPrimaryFingerprint: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            signingKeyFingerprint: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            certificationKind: nil,
+            validationStatus: .valid,
+            targetCertificateDigest: ContactCertificationArtifactReference.sha256Hex(
+                for: Data([0x01, 0x02, 0x03])
+            ),
+            lastValidatedAt: referenceDate,
+            updatedAt: referenceDate,
+            exportFilename: "artifact.asc"
+        )
+    }
+}
+
+private struct LegacyContactsDomainSnapshot: Encodable {
+    let schemaVersion: Int
+    let identities: [ContactIdentity]
+    let keyRecords: [ContactKeyRecord]
+    let recipientLists: [RecipientList]
+    let tags: [ContactTag]
+    let certificationArtifacts: [LegacyCertificationArtifactReference]
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+private struct LegacyCertificationArtifactReference: Encodable {
+    let artifactId: String
+    let keyId: String
+    let userId: String?
+    let createdAt: Date
+    let storageHint: String?
 }

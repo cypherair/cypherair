@@ -65,7 +65,7 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("selectiverevocation.ready")
     }
 
-    func test_mainFlow_contacts_opensCertificateSignatures() throws {
+    func test_mainFlow_contacts_opensCertificationDetails() throws {
         launchMain(preloadContact: true)
 
         element("sidebar.contacts").tap()
@@ -74,9 +74,9 @@ final class MacUISmokeTests: XCTestCase {
 
         waitForScreenReady("contactdetail.ready")
 
-        element("contactdetail.certificateSignatures").tap()
+        element("contactdetail.certifyContact").tap()
 
-        waitForScreenReady("contactcertsig.ready")
+        waitForScreenReady("contactcertification.ready")
     }
 
     func test_settingsRoot_opensThemePicker() throws {
@@ -167,12 +167,12 @@ final class MacUISmokeTests: XCTestCase {
         XCTAssertFalse(element("keydetail.selectiveRevocation").isEnabled)
     }
 
-    func test_tutorial_contactDetail_showsDisabledCertificateSignatureEntry() throws {
+    func test_tutorial_contactDetail_showsDisabledCertifyContactEntry() throws {
         launchTutorial(task: "addDemoContact", preloadedContactDetail: true)
 
         waitForScreenReady("contactdetail.ready")
-        XCTAssertTrue(element("contactdetail.certificateSignatures").exists)
-        XCTAssertFalse(element("contactdetail.certificateSignatures").isEnabled)
+        XCTAssertTrue(element("contactdetail.certifyContact").exists)
+        XCTAssertFalse(element("contactdetail.certifyContact").isEnabled)
     }
 
     func test_tutorial_firstRunOnboardingStart_launchesTutorial() throws {

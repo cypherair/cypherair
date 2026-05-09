@@ -81,7 +81,9 @@ struct ContactSummaryProjector {
             isRevoked: keyRecord.isRevoked,
             isExpired: keyRecord.isExpired,
             manualVerificationState: keyRecord.manualVerificationState,
-            usageState: keyRecord.usageState
+            usageState: keyRecord.usageState,
+            certificationProjection: keyRecord.certificationProjection,
+            certificationArtifactIds: keyRecord.certificationArtifactIds
         )
     }
 

@@ -1,7 +1,7 @@
 import Foundation
 
-struct ContactCertificationProjection: Codable, Equatable, Sendable {
-    enum Status: String, Codable, Equatable, Sendable {
+struct ContactCertificationProjection: Codable, Equatable, Hashable, Sendable {
+    enum Status: String, Codable, Equatable, Hashable, Sendable {
         case notCertified
         case certified
         case invalidOrStale

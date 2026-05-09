@@ -98,6 +98,16 @@ struct TutorialRouteDestinationView: View {
                     ContactCertificateSignaturesView(fingerprint: fingerprint)
                 }
             )
+        case .contactCertification(let contactId, let keyId, let intent):
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    ContactCertificationDetailsView(
+                        contactId: contactId,
+                        keyId: keyId,
+                        intent: intent
+                    )
+                }
+            )
         case .keyDetail(let fingerprint):
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {

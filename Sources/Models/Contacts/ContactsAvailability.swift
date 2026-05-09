@@ -24,6 +24,10 @@ extension ContactsAvailability {
         isAvailable
     }
 
+    var allowsProtectedCertificationPersistence: Bool {
+        self == .availableProtectedDomain
+    }
+
     var requiresUnlock: Bool {
         switch self {
         case .locked:

@@ -1,7 +1,7 @@
 # Contacts Protected Domain Implementation Plan
 
-> **Version:** Draft v0.3
-> **Status:** Draft implementation-prep plan for remaining Contacts feature work, updated with Contacts PR5 person-centered model coverage notes.
+> **Version:** Draft v0.4
+> **Status:** Draft implementation-prep plan for remaining Contacts feature work, updated with Contacts PR6 certification persistence and UX coverage notes.
 > **Purpose:** Bridge the gap between the current shared ProtectedData framework, implemented Contacts protected-domain security/storage behavior, and the remaining Contacts feature work so later implementation can proceed through a stable, reviewable PR sequence.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
@@ -10,7 +10,7 @@
 
 ## 1. Scope And Relationship
 
-This document is an implementation-prep companion for the Contacts follow-on phase. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, the Contacts PR4 protected-domain security/storage cutover, and the Contacts PR5 person-centered runtime model, while certification projection, package exchange, and organization/search surfaces still need a stable implementation path.
+This document is an implementation-prep companion for the Contacts follow-on phase. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, the Contacts PR4 protected-domain security/storage cutover, the Contacts PR5 person-centered runtime model, and Contacts PR6 certification persistence/UX work, while package exchange and organization/search surfaces still need a stable implementation path.
 
 This document specifies:
 
@@ -44,7 +44,7 @@ The repository has already resolved the major PR3 / PR4 security-storage deltas 
 - PR3 removed pre-auth plaintext Contacts startup loading and moved ordinary Contacts access behind the shared post-auth lifecycle surface
 - PR4 migrated the flat compatibility snapshot into the protected `contacts` domain, quarantined legacy plaintext, and made legacy/quarantine storage cleanup-only after cutover
 - verification-capable services still need the planned contract split between cryptographic verification and Contacts enrichment
-- remaining feature work still includes Contacts-owned certification projection, selected-contact package exchange, search, tags, recipient-list UI, and organization workflows
+- remaining feature work still includes selected-contact package exchange, search, tags, recipient-list UI, and organization workflows
 
 This document preserves the historical PR sequence for review context and turns the remaining work into explicit dependencies and validation gates.
 
@@ -110,21 +110,16 @@ Current reset and sandbox paths are also relevant implementation deltas:
 
 ### 3.5 Certification Projection Delta
 
-Current certification support is still workflow-oriented:
+Contacts PR6 resolves the certification persistence and UX delta that previously remained after the protected-domain cutover:
 
-- `CertificateSignatureService` discovers, verifies, and generates certification artifacts
-- it does not persist Contacts-owned certification projection state
-- it does not save valid imported or locally generated certification signature artifacts as protected Contacts data
-- the current Contacts UI exposes direct-key verification, User ID binding verification, and certification generation as a three-mode technical page
+- `CertificateSignatureService` still owns cryptographic discovery, verification, signer resolution, selector validation, and User ID certification generation.
+- Contacts now owns protected persistence of valid certification artifacts and the per-key certification projection derived from those saved records.
+- Saved records include canonical binary signature bytes, a signature digest, source, target selector, target key fingerprint/key ID, signer fingerprints, certification kind, validation status, target certificate digest, timestamps, and export filename.
+- Schema-v1 placeholder artifact payloads decode through compatibility defaults instead of making older protected Contacts snapshots unreadable.
+- Contact Detail now exposes a compact trust/certification summary and a contact-centered `Certify This Contact` action.
+- The certification details surface replaces the previous three-mode technical entry for ordinary navigation, while preserving direct-key verification, User ID binding verification, text/file import, generated certification, explicit export/share, signer identity resolution, selector validation, and certification-kind display.
 
-The Contacts TDD requires:
-
-- certification projection on each `ContactKeyRecord`
-- enough source reference, selector, signer, and revision metadata for later revalidation
-- protected persistence for saved certification signature artifacts
-- a redesigned contact-centered workflow that preserves all current capabilities without keeping the three-mode technical UI
-
-Therefore certification projection and UX cannot be treated as late-stage UI polish.
+Remaining package work may consume the PR6 artifact/revalidation APIs, but package exchange is not part of PR6.
 
 ## 4. Frozen Implementation Decisions
 
@@ -567,13 +562,16 @@ Status: implemented as a Swift-only Contacts feature PR on top of the PR4 protec
 
 **Key Changes**
 
-- add certification projection storage on `ContactKeyRecord`
-- add `ContactCertificationRecord` or equivalent saved signature artifact model
-- save valid imported and locally generated certification signature artifacts as protected Contacts data
-- implement Contact Detail trust/certification summary
-- implement `Certify This Contact` as the common action from Contact Detail
-- implement a certification details surface for saved history, exportable signature material, raw details, and secondary external signature import/verification
-- retain coverage for direct-key verification, User ID binding verification, external text/file import, certification generation, generated signature export/share, signer identity resolution, selector validation, and certification-kind display
+- added certification projection storage on `ContactKeyRecord`
+- extended the saved certification artifact model with canonical binary signature bytes, digest, source, target selector, signer fingerprints, certification kind, validation status, target certificate digest, timestamps, and export filename
+- saved only valid imported and locally generated certification signature artifacts as protected Contacts data
+- deduplicated saved artifacts by target key, target selector, and signature digest
+- exported saved artifacts by armoring canonical binary signature bytes on demand
+- recomputed per-key certification projection after protected Contacts open and after artifact mutations
+- implemented Contact Detail trust/certification summary
+- implemented `Certify This Contact` as the common action from Contact Detail
+- implemented a certification details surface for saved history, exportable signature material, raw details, and secondary external signature import/verification
+- retained coverage for direct-key verification, User ID binding verification, external text/file import, certification generation, generated signature export/share, signer identity resolution, selector validation, and certification-kind display
 
 **Not In Scope**
 
@@ -582,19 +580,19 @@ Status: implemented as a Swift-only Contacts feature PR on top of the PR4 protec
 
 **Inventory Coverage**
 
-- certification summary row
-- certify-contact action row
-- certification details rows
-- external certification signature import/verification rows
-- projection/artifact persistence rows
+- certification summary read row is covered by Contact Detail and key summary projection reads
+- certify-contact action row is covered by the contact-centered details route and `ContactService.saveCertificationArtifact(_:)`
+- certification details read row is covered by `ContactCertificationDetailsView` / `ContactCertificationDetailsScreenModel`
+- external certification signature import/verification row is covered by preview-then-save gating
+- projection/artifact persistence rows are covered by protected-domain save, export, revalidation, deduplication, removal pruning, and merge preservation behavior
 
 **Validation**
 
-- projection persistence tests
-- saved signature artifact persistence tests
-- external signature import validation tests
-- generated certification save and export/share tests
-- regression tests confirming manual verification and OpenPGP certification are not collapsed
+- snapshot decode/validation covers legacy artifact defaults, digest mismatch, duplicate artifacts, wrong-key references, and projection recomputation
+- `ContactServiceTests` cover save/reopen persistence, deduplication, export data generation, stale projection behavior, removal pruning, merge preservation, and manual verification separation
+- `CertificateSignatureServiceTests` cover persistable validated metadata and selector/signer context behavior
+- certification details screen-model tests cover generated certification save, explicit export, import preview, save gating, and locked Contacts handling
+- UI smoke coverage verifies Contact Detail separates manual verification and OpenPGP certification signals
 
 ### 6.8 Contacts PR7 — `.cypherair-contacts` Package Export / Import
 

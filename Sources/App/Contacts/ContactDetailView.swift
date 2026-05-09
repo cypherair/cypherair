@@ -48,6 +48,7 @@ struct ContactDetailView: View {
             } else if let contact {
                 List {
                     identitySection(contact)
+                    certificationSummarySection(contact)
 
                     if let preferredKey = contact.preferredKey {
                         keySection(
@@ -168,6 +169,78 @@ struct ContactDetailView: View {
                 contact.canEncryptTo
                     ? String(localized: "contactdetail.canEncrypt.yes", defaultValue: "Can encrypt to this contact: Yes")
                     : String(localized: "contactdetail.canEncrypt.no", defaultValue: "Can encrypt to this contact: No")
+            )
+        }
+    }
+
+    private func certificationSummarySection(_ contact: ContactIdentitySummary) -> some View {
+        Section {
+            HStack {
+                Text(
+                    String(
+                        localized: "contactdetail.manualVerification",
+                        defaultValue: "Manual Fingerprint Verification"
+                    )
+                )
+                Spacer()
+                CypherStatusBadge(
+                    title: contact.hasUnverifiedKeys
+                        ? String(localized: "contactdetail.manualVerification.needsReview", defaultValue: "Needs Review")
+                        : String(localized: "contactdetail.manualVerification.verified", defaultValue: "Verified"),
+                    color: contact.hasUnverifiedKeys ? .orange : .green
+                )
+            }
+
+            HStack {
+                Text(
+                    String(
+                        localized: "contactdetail.openpgpCertification",
+                        defaultValue: "OpenPGP Certification"
+                    )
+                )
+                Spacer()
+                CypherStatusBadge(
+                    title: certificationSummaryTitle(for: contact),
+                    color: certificationSummaryColor(for: contact)
+                )
+            }
+
+            if configuration.showsCertificateSignatureEntry {
+                NavigationLink(
+                    value: AppRoute.contactCertification(
+                        contactId: contact.contactId,
+                        keyId: contact.preferredKey?.keyId,
+                        intent: .certify
+                    )
+                ) {
+                    Label(
+                        String(
+                            localized: "contactdetail.certifyContact",
+                            defaultValue: "Certify This Contact"
+                        ),
+                        systemImage: "checkmark.seal"
+                    )
+                }
+                .disabled(
+                    !configuration.allowsCertificateSignatureLaunch ||
+                        !contactService.contactsAvailability.allowsProtectedCertificationPersistence
+                )
+                .accessibilityIdentifier("contactdetail.certifyContact")
+            }
+
+            if let restrictionMessage = configuration.certificateSignatureRestrictionMessage {
+                Text(restrictionMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text(String(localized: "contactdetail.trust", defaultValue: "Trust"))
+        } footer: {
+            Text(
+                String(
+                    localized: "contactdetail.trust.footer",
+                    defaultValue: "Manual fingerprint verification and OpenPGP certification are tracked separately."
+                )
             )
         }
     }
@@ -294,5 +367,33 @@ struct ContactDetailView: View {
         case .availableLegacyCompatibility, .availableProtectedDomain:
             "person"
         }
+    }
+
+    private func certificationSummaryTitle(for contact: ContactIdentitySummary) -> String {
+        let statuses = contact.keys.map(\.certificationProjection.status)
+        if statuses.contains(.certified) {
+            return String(localized: "contactdetail.openpgpCertification.certified", defaultValue: "Certified")
+        }
+        if statuses.contains(.invalidOrStale) {
+            return String(localized: "contactdetail.openpgpCertification.invalid", defaultValue: "Invalid or Stale")
+        }
+        if statuses.contains(.revalidationNeeded) {
+            return String(localized: "contactdetail.openpgpCertification.revalidation", defaultValue: "Revalidation Needed")
+        }
+        return String(localized: "contactdetail.openpgpCertification.none", defaultValue: "Not Certified")
+    }
+
+    private func certificationSummaryColor(for contact: ContactIdentitySummary) -> Color {
+        let statuses = contact.keys.map(\.certificationProjection.status)
+        if statuses.contains(.certified) {
+            return .green
+        }
+        if statuses.contains(.invalidOrStale) {
+            return .red
+        }
+        if statuses.contains(.revalidationNeeded) {
+            return .orange
+        }
+        return .secondary
     }
 }

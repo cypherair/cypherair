@@ -1,5 +1,10 @@
 import Foundation
 
+enum ContactCertificationRouteIntent: String, Hashable {
+    case details
+    case certify
+}
+
 /// Type-safe navigation routes for NavigationStack.
 enum AppRoute: Hashable {
     // Keys
@@ -12,6 +17,7 @@ enum AppRoute: Hashable {
 
     // Contacts
     case contactDetail(contactId: String)
+    case contactCertification(contactId: String, keyId: String?, intent: ContactCertificationRouteIntent)
     case contactCertificateSignatures(fingerprint: String)
     case addContact
     case qrDisplay(publicKeyData: Data, displayName: String)

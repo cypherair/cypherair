@@ -60,6 +60,10 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
             certificationArtifacts.map(\.artifactId),
             label: "certification artifact identifiers"
         )
+        try Self.validateUnique(
+            certificationArtifacts.compactMap(\.deduplicationKey),
+            label: "certification artifact payloads"
+        )
 
         let contactIds = Set(identities.map(\.contactId))
         let tagIds = Set(tags.map(\.tagId))
@@ -142,9 +146,17 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
         for artifact in certificationArtifacts {
             try Self.validateNonEmpty(artifact.artifactId, label: "certification artifact identifier")
             try Self.validateNonEmpty(artifact.keyId, label: "certification artifact key identifier")
+            try artifact.validatePayload()
             guard keyIds.contains(artifact.keyId) else {
                 throw ProtectedDataError.invalidEnvelope(
                     "Contacts payload contains a certification artifact without a matching key."
+                )
+            }
+            if let targetKeyFingerprint = artifact.targetKeyFingerprint,
+               let keyRecord = keyRecords.first(where: { $0.keyId == artifact.keyId }),
+               targetKeyFingerprint.lowercased() != keyRecord.fingerprint.lowercased() {
+                throw ProtectedDataError.invalidEnvelope(
+                    "Contacts payload contains a certification artifact with stale target key metadata."
                 )
             }
         }

@@ -1,5 +1,29 @@
 import Foundation
 
+struct ContactCertificationArtifactValidation: Equatable {
+    let verification: CertificateSignatureVerification
+    let artifact: VerifiedContactCertificationArtifact?
+
+    var canSave: Bool {
+        artifact != nil
+    }
+}
+
+@dynamicMemberLookup
+struct VerifiedContactCertificationArtifact: Equatable, Sendable {
+    let reference: ContactCertificationArtifactReference
+
+    fileprivate init(reference: ContactCertificationArtifactReference) {
+        self.reference = reference
+    }
+
+    subscript<Value>(
+        dynamicMember keyPath: KeyPath<ContactCertificationArtifactReference, Value>
+    ) -> Value {
+        reference[keyPath: keyPath]
+    }
+}
+
 /// Handles certificate-signature verification and User ID certification generation.
 @Observable
 final class CertificateSignatureService {
@@ -125,6 +149,84 @@ final class CertificateSignatureService {
         }
     }
 
+    func canonicalSignatureData(from signature: Data) -> Data {
+        (try? engine.dearmor(armored: signature)) ?? signature
+    }
+
+    func validateDirectKeyCertificationArtifact(
+        signature: Data,
+        targetKey: ContactKeySummary,
+        targetCert: Data,
+        source: ContactCertificationArtifactSource,
+        exportFilename: String? = nil
+    ) async throws -> ContactCertificationArtifactValidation {
+        let canonicalSignature = canonicalSignatureData(from: signature)
+        let verification = try await verifyDirectKeySignature(
+            signature: canonicalSignature,
+            targetCert: targetCert
+        )
+        guard verification.status == .valid else {
+            return ContactCertificationArtifactValidation(
+                verification: verification,
+                artifact: nil
+            )
+        }
+
+        return ContactCertificationArtifactValidation(
+            verification: verification,
+            artifact: makeCertificationArtifact(
+                canonicalSignatureData: canonicalSignature,
+                source: source,
+                targetKey: targetKey,
+                targetCert: targetCert,
+                targetSelector: .directKey,
+                userId: nil,
+                verification: verification,
+                exportFilename: exportFilename
+            )
+        )
+    }
+
+    func validateUserIdCertificationArtifact(
+        signature: Data,
+        targetKey: ContactKeySummary,
+        targetCert: Data,
+        selectedUserId: UserIdSelectionOption,
+        source: ContactCertificationArtifactSource,
+        exportFilename: String? = nil
+    ) async throws -> ContactCertificationArtifactValidation {
+        let canonicalSignature = canonicalSignatureData(from: signature)
+        let verification = try await verifyUserIdBindingSignature(
+            signature: canonicalSignature,
+            targetCert: targetCert,
+            selectedUserId: selectedUserId
+        )
+        guard verification.status == .valid else {
+            return ContactCertificationArtifactValidation(
+                verification: verification,
+                artifact: nil
+            )
+        }
+
+        return ContactCertificationArtifactValidation(
+            verification: verification,
+            artifact: makeCertificationArtifact(
+                canonicalSignatureData: canonicalSignature,
+                source: source,
+                targetKey: targetKey,
+                targetCert: targetCert,
+                targetSelector: .userId(
+                    data: selectedUserId.userIdData,
+                    displayText: selectedUserId.displayText,
+                    occurrenceIndex: selectedUserId.occurrenceIndex
+                ),
+                userId: selectedUserId.displayText,
+                verification: verification,
+                exportFilename: exportFilename
+            )
+        )
+    }
+
     func candidateSignerCertificates() throws -> [Data] {
         try contactService.requireContactsAvailable()
         return contactService.availableContacts.map(\.publicKeyData)
@@ -153,6 +255,44 @@ final class CertificateSignatureService {
                 primaryFingerprint: result.signerPrimaryFingerprint
             )
         )
+    }
+
+    private func makeCertificationArtifact(
+        canonicalSignatureData: Data,
+        source: ContactCertificationArtifactSource,
+        targetKey: ContactKeySummary,
+        targetCert: Data,
+        targetSelector: ContactCertificationTargetSelector,
+        userId: String?,
+        verification: CertificateSignatureVerification,
+        exportFilename: String?
+    ) -> VerifiedContactCertificationArtifact {
+        let now = Date()
+        let reference = ContactCertificationArtifactReference(
+            artifactId: "cert-artifact-\(UUID().uuidString)",
+            keyId: targetKey.keyId,
+            userId: userId,
+            createdAt: now,
+            storageHint: "protected-contacts-domain",
+            canonicalSignatureData: canonicalSignatureData,
+            signatureDigest: ContactCertificationArtifactReference.sha256Hex(
+                for: canonicalSignatureData
+            ),
+            source: source,
+            targetKeyFingerprint: targetKey.fingerprint,
+            targetSelector: targetSelector,
+            signerPrimaryFingerprint: verification.signerPrimaryFingerprint,
+            signingKeyFingerprint: verification.signingKeyFingerprint,
+            certificationKind: verification.certificationKind,
+            validationStatus: .valid,
+            targetCertificateDigest: ContactCertificationArtifactReference.sha256Hex(
+                for: targetCert
+            ),
+            lastValidatedAt: now,
+            updatedAt: now,
+            exportFilename: exportFilename
+        )
+        return VerifiedContactCertificationArtifact(reference: reference)
     }
 
     private func validatedSelectorInput(
