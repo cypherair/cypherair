@@ -386,21 +386,7 @@ Migration and exception rules:
 - Future protected-domain migrations must preserve readable source state until the protected destination is created/opened and verified through the normal post-auth path.
 - After cutover, legacy sources are cleanup/quarantine only and must not become fallback sources of truth.
 - Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary settings boot-authentication exception.
-- Documentation updates for storage or migration changes belong in `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md`; archived Contacts planning documents are historical context only.
-
-### 6.2 Contacts Domain Contract
-
-Contacts is a protected app-data domain, not a separate vault architecture. The durable model is:
-
-- `ContactIdentity` owns person-level relationship state, tags, and recipient-list membership.
-- `ContactKeyRecord` owns one public certificate, manual verification state, key usage state, and certification projection/artifact references.
-- `RecipientList` stores contact IDs, not fingerprints; encryption resolves each member to its current preferred encryptable key at send time.
-- Key usage is `preferred`, `additionalActive`, or `historical`. Historical keys remain available for signer recognition but are excluded from recipient resolution.
-- Merge preserves all key records and per-key manual verification/certification state, unions tags and recipient-list membership, and keeps the selected target identity as the survivor.
-
-Contacts verification context is built from unlocked Contacts plus the user's own keys. Detailed verification distinguishes a missing signer certificate from unavailable Contacts context, while legacy verify/decrypt APIs keep the summary-first compatibility bridge. Manual verification does not imply OpenPGP certification, and saved certification artifacts do not change manual verification or introduce trust/web-of-trust policy.
-
-Contacts may build runtime search indexes, tag/filter state, recipient selection state, and signer lookup helpers only in memory. These derived caches must clear on relock/content clear and must not become plaintext persisted state outside the protected `contacts` payload.
+- Documentation updates for storage or migration changes belong in `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and affected Contacts docs when Contacts is involved.
 
 ---
 

@@ -182,11 +182,12 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Module breakdown, data flows, storage layout |
 | [SECURITY](docs/SECURITY.md) | Encryption scheme, key lifecycle, threat model |
 | [TESTING](docs/TESTING.md) | Test strategy and coverage |
-| [PERSISTED_STATE_INVENTORY](docs/PERSISTED_STATE_INVENTORY.md) | Canonical persisted/local-state classification, including Contacts protected-domain state |
+| [CONTACTS_PRD](docs/CONTACTS_PRD.md) | Future Contacts feature requirements beyond the implemented PR4 protected-domain cutover |
+| [CONTACTS_TDD](docs/CONTACTS_TDD.md) | Future Contacts feature technical design; current security/storage behavior lives in the current-state docs |
+| [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](docs/CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) | Remaining Contacts feature plan with PR4 protected-domain cutover notes |
+| [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](docs/CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) | Contacts access, mutation, and enrichment checklist |
 | [APP_RELEASE_PROCESS](docs/APP_RELEASE_PROCESS.md) | Current app-build release modes, stable asset contract, and App Store candidate ordering |
 | [DOCUMENTATION_GOVERNANCE](docs/DOCUMENTATION_GOVERNANCE.md) | Documentation classes, metadata rules, archive rules, and update triggers |
-| [CONTACTS_PRD (Archive)](docs/archive/CONTACTS_PRD.md) | Archived Contacts product planning snapshot; current Contacts behavior lives in the canonical docs above |
-| [CONTACTS_TDD (Archive)](docs/archive/CONTACTS_TDD.md) | Archived Contacts technical planning snapshot |
 | [COMPLIANCE_REMEDIATION_PLAN (Archive)](docs/archive/COMPLIANCE_REMEDIATION_PLAN.md) | Archived remediation plan and close-out history for the licensing/distribution rollout |
 | [POC](docs/archive/POC.md) | Proof-of-concept test plan (archived) |
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards, SwiftUI patterns, and current Liquid Glass rules |

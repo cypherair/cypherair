@@ -11,7 +11,7 @@
 
 The long-term goal is to protect every CypherAir-owned local data surface unless a documented technical or security reason keeps it outside a protected domain.
 
-This inventory tracks current shipped state plus pending classified surfaces. It is not a roadmap narrative. Current Contacts persisted-state classification lives in this inventory; user-visible behavior and durable technical/security contracts live in [PRD](PRD.md), [TDD](TDD.md), [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), and [TESTING](TESTING.md). Archived Contacts planning documents are historical context only.
+This inventory tracks current shipped state plus pending classified surfaces. It is not a roadmap narrative. Contacts Phase 8 implementation details live in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), and Contacts access/mutation surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md).
 
 Every in-scope row must carry:
 
@@ -88,7 +88,7 @@ Every future migration from plaintext, Keychain metadata, or non-uniform local s
 - make corrupted committed protected state a recovery surface
 - document cleanup or quarantine behavior explicitly
 - update this inventory, [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), [TESTING](TESTING.md), and [CODE_REVIEW](CODE_REVIEW.md) as needed in the same change
-- do not treat archived Contacts planning documents as active current-state update targets; update them only when deliberately preserving historical context or archive metadata
+- update [CONTACTS_PRD](CONTACTS_PRD.md), [CONTACTS_TDD](CONTACTS_TDD.md), [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), and [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) when Contacts behavior or Phase 8 surfaces are involved
 
 For Phase 7 settings, no shadow copy may be introduced to preserve pre-unlock behavior. If a setting still controls launch authentication, startup routing, or pre-unlock UI before ProtectedData opens, the implementation must first redesign that read path or keep the setting as an explicit boot exception. The only ordinary-settings boot-auth exception is `appSessionAuthenticationPolicy`.
 

@@ -1,23 +1,19 @@
-> **Status:** Archived historical Contacts product specification snapshot.
-> **Archived:** 2026-05-10.
-> **Archive reason:** Current shipped Contacts behavior and durable product boundaries have been distilled into [PRD](../PRD.md), [TDD](../TDD.md), [ARCHITECTURE](../ARCHITECTURE.md), [SECURITY](../SECURITY.md), [TESTING](../TESTING.md), [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md), and [CODE_REVIEW](../CODE_REVIEW.md). This file is retained only for historical context; current code and active canonical docs outrank it.
-
 # Contacts Product Requirements Document (PRD)
 
 > **Version:** Draft v1.3
-> **Status:** Archived snapshot of former Contacts PR5/6/8 product requirements plus deferred backup/package boundaries.
+> **Status:** Current product requirements for implemented Contacts PR5/6/8 behavior plus deferred backup/package boundaries.
 > **Purpose:** Product requirements for the Contacts enhancement initiative as a Contacts domain built on the shared protected app-data framework.  
 > **Audience:** Product, design, engineering, QA, and AI coding tools.  
-> **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific product direction.  
+> **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific product direction.  
 > **Companion document:** [CONTACTS_TDD](CONTACTS_TDD.md)  
-> **Primary framework references:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md)
-> **Related documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md) · [TESTING](../TESTING.md) · [SPECIAL_SECURITY_MODE](../SPECIAL_SECURITY_MODE.md)
+> **Primary framework references:** [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md)
+> **Related documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md) · [TESTING](TESTING.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Product Intent
 
 CypherAir's Contacts capability now runs over the protected Contacts domain and includes person-centered key management, certification integration, search, tags, and recipient lists. This document records the product requirements for that capability and the remaining product boundaries around package exchange and future backup design.
 
-The shared ProtectedData framework, Phase 1-7 non-Contacts domains, Contacts PR4 protected-domain security/storage cutover, and Contacts PR5/6/8 capability stack have landed. Implementation history and future expansion gates are owned by [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), surface coverage is owned by [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md), and persisted-state classification is owned by [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md).
+The shared ProtectedData framework, Phase 1-7 non-Contacts domains, Contacts PR4 protected-domain security/storage cutover, and Contacts PR5/6/8 capability stack have landed. Implementation history and future expansion gates are owned by [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), surface coverage is owned by [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md), and persisted-state classification is owned by [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
 
 The Contacts enhancement initiative covers four user-facing capability areas:
 

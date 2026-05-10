@@ -240,8 +240,6 @@ Security invariants for protected app data:
 - `appSessionAuthenticationPolicy` remains the documented early-readable boot-authentication exception.
 - Legacy Contacts files and metadata are migration/quarantine cleanup sources only after protected cutover and must not become a fallback source of truth.
 - Contacts PR5/6/8 production state stays inside the protected `contacts` domain. Certification-signature export/share is an explicit artifact export boundary, not a Contacts backup, package, or social-graph export.
-- Contacts manual verification, OpenPGP certification projection, saved certification artifacts, tags, recipient lists, and key-usage state are protected Contacts data. No plaintext Contacts derivative cache, search index, recipient-selection cache, signer-recognition cache, or social-graph package may be persisted outside that domain.
-- Contacts package exchange and multi-contact/social-graph export are not active features. Any future complete Contacts backup or device migration must be a separate mandatory encrypted design.
 - Self-test, decrypted, streaming, export handoff, and tutorial artifacts keep the inventory's ephemeral-with-cleanup behavior; files exported to user-selected destinations are outside app custody after handoff.
 
 UserDefaults is allowed only for documented boot, test, tutorial, and legacy cleanup exceptions. Personal or sensitive app data must not be newly introduced there; post-auth settings use `protected-settings` unless they are explicit boot-authentication exceptions.

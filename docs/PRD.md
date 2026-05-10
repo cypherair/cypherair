@@ -123,8 +123,6 @@ Open App → Onboarding (3 pages) → tutorial decision page
 
 **Unified Import:** Contacts → Add Friend's Key → QR Photo | File | Paste. Fingerprint verification reminder.
 
-**Contacts Management:** Contacts are person-centered. A contact can retain multiple public keys with preferred, additional active, or historical usage state; recipient selection resolves a contact to its current preferred encryptable key. Contacts support search, tags, recipient lists, merge behavior, and a clear distinction between local manual fingerprint verification and OpenPGP certification history. Contacts package exchange is not a shipped feature, and any future complete Contacts backup or device migration must be a separate mandatory encrypted design.
-
 ### 4.3 Encryption
 
 **Text:**
@@ -156,8 +154,6 @@ Text: cleartext sig. File: detached .sig. Auto-verify during decryption. Graded 
 The shipped verify and decrypt routes preserve a summary-first result presentation while also showing detailed per-signature entries when available.
 
 Contact detail includes a contact-scoped certificate-signature workflow for direct-key verification, User ID binding verification, and User ID certification generation.
-
-Saved certification signatures are Contacts data only after an explicit save action. They remain separate from local manual verification and can be exported/shared only as explicit certification artifacts.
 
 Password / SKESK message handling exists at the service layer, but it is not part of the current shipped app surface.
 
@@ -234,13 +230,6 @@ The App offers two authentication modes, selectable in Settings:
 - **Multi-Key:** Multiple keys with different profiles supported. One key = "Default."
 - **Public Key Update:** Same UID + same fingerprint = absorb any new public update material (revocations, refreshed bindings, added User IDs/subkeys); exact duplicate re-import remains a no-op. Same UID + different fingerprint = key regenerated (warning: verify with contact before accepting update).
 - **Key Detail Page:** Full fingerprint, Short Key ID (de-emphasized), profile indicator (A/B), backup status badge, expiry modification (MVP), key-level revocation export, and selective revocation launchers for subkey/User ID revocation export.
-
-### 5.1.1 Contacts
-
-- Person-centered Contacts keep relationship state on `ContactIdentity` records and key-specific state on `ContactKeyRecord` records.
-- Contacts support multiple keys per person, merge, preferred-key selection, historical-key signer recognition, search, tags, and recipient lists.
-- Manual verification remains a local fingerprint-check state. OpenPGP certification state and saved certification signature artifacts remain separate and are surfaced distinctly.
-- Contacts data lives in protected app data after unlock. There is no Contacts package exchange; complete Contacts backup or device migration is deferred to a future mandatory encrypted design.
 
 ### 5.2 Encryption / Decryption
 

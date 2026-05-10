@@ -150,10 +150,8 @@ Completed Phase 7 validation expectations:
 
 Current Contacts PR5-PR8 validation expectations:
 
-- Contacts validation should prove person-centered merge, preferred/additional/historical key behavior, historical-key signer recognition, certification projection/artifact persistence and revalidation, search relevance, tag normalization, recipient-list CRUD/member resolution, route states, relock cleanup, and Encrypt recipient-list selection over the protected `contacts` domain.
-- Contacts locked, opening, recovery-needed, framework-unavailable, and restart-required states must be visible as blocked states rather than empty Contacts data. Mutations, recipient selection, certification artifact saves, and manual-verification changes must not bypass Contacts availability.
-- Contacts cutover regression coverage must prove legacy files and quarantine never become ordinary fallback sources after protected-domain cutover, protected mutations do not write active legacy files, and runtime/search/signer state clears on relock or framework reset.
-- Contacts package exchange remains withdrawn; any future complete Contacts backup or device migration must be mandatory encrypted and covered by a separate product, technical, and test plan.
+- Contacts validation should prove person-centered merge/preferred-key behavior, certification projection and artifact persistence, search, tags, recipient lists, route states, relock cleanup, and Encrypt recipient-list selection over the protected `contacts` domain without reactivating legacy Contacts files or weakening the implemented protected-domain security lifecycle.
+- Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be covered by a separate mandatory encrypted design and test plan.
 
 Docs-only documentation authority or archive PRs do not require Rust or Xcode test runs unless they touch code, generated files, project files, entitlements, release metadata, or build settings. They should still run documentation consistency checks, link checks for active platform references, and `git diff --check`.
 
