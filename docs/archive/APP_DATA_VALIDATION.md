@@ -3,7 +3,7 @@
 > **Status:** Archived historical AppData validation snapshot.
 > **Archived on:** 2026-04-28.
 > **Archival reason:** Implemented Phase 1-6 validation ownership has been synchronized into the long-lived testing and review documentation.
-> **Successor documents:** [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_TDD](../CONTACTS_TDD.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
+> **Successor documents:** [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [TDD](../TDD.md)
 > **Current code and active canonical docs outrank this archived file whenever they disagree.**
 
 Original snapshot metadata follows.
@@ -14,7 +14,7 @@ Original snapshot metadata follows.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Primary authority:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture and security rules, and [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) for rollout intent.
 > **Companion documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
-> **Related documents:** [TESTING](../TESTING.md) · [CONTACTS_TDD](../CONTACTS_TDD.md)
+> **Related documents:** [TESTING](../TESTING.md) · [CONTACTS_TDD](CONTACTS_TDD.md)
 
 ## 1. Scope And Relationship
 
@@ -143,7 +143,7 @@ This draft proposal must map its validation buckets onto the repository's existi
 - private-key bundle tests must prove that permanent and pending SE-wrapped private-key rows remain in the existing Keychain / Secure Enclave material domain and are not copied into ProtectedData payloads
 - Phase 6 key metadata migration tests must prove that `PGPKeyIdentity` data loads from `key-metadata` only after app unlock, that both transitional metadata-account and older default-account rows migrate with fingerprint de-duplication, that legacy rows are cleaned only after verified protected-domain readability, that pending-create recovery reuses the authenticated `LAContext` for default-account rows or fails retryably without committing a partial payload, that cleanup retry deletes migrated source rows by fingerprint membership, that corrupt legacy rows remain retryable, and that startup does not regress to pre-auth metadata reads, double authentication, or a visible empty-key-list flash
 - protected settings route tests must cover the already-on-Settings background/foreground path: after app privacy unlock, `contentClearGeneration` invalidation should non-interactively auto-open protected settings when the session is already authorized or handoff is available
-- Phase 8 Contacts migration tests must cover `Documents/contacts/*.gpg` and `Documents/contacts/contact-metadata.json` source preservation, protected-domain readability, and no-silent-reset failure behavior
+- the original Contacts migration test plan expected coverage for `Documents/contacts/*.gpg` and `Documents/contacts/contact-metadata.json` source preservation, protected-domain readability, and no-silent-reset failure behavior; current Contacts validation requirements live in [TESTING](../TESTING.md)
 - self-test persistence tests must prove either protected diagnostics storage or short-lived/export-only cleanup semantics for `Documents/self-test`
 - temporary-file tests must cover `tmp/decrypted`, `tmp/streaming`, `tmp/export-*`, and tutorial sandbox cleanup, including relock/reset/startup cleanup where each surface applies
 - migration survivability, startup adoption, and no-silent-reset guarantees belong to Swift unit coverage in `CypherAir-UnitTests` plus targeted macOS-local integration validation, adding the `CypherAir-MacUITests` macOS smoke path when startup routing or user-visible recovery flows are part of the scenario

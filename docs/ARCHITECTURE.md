@@ -82,7 +82,7 @@ Orchestrates user-facing operations by coordinating the Security layer and the R
 | `SigningService` | Cleartext text signatures, detached file signatures, legacy verification summaries, and detailed signature-result service APIs used by the current verify workflows |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, and selective revocation export through focused internal key-management helpers |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
-| `ContactService` | App/UI-facing Contacts facade for availability, public-key import/update, verification state, lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
+| `ContactService` | App/UI-facing Contacts facade for availability, public-key import/update, verification state, search/tags, recipient lists, lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing. **Security-critical: parses untrusted external input.** |
 | `SelfTestService` | One-tap diagnostic covering **both profiles**: key gen → encrypt/decrypt → sign/verify → tamper test → QR round-trip |
 | `FileProgressReporter` | Bridges Rust streaming progress callbacks to SwiftUI `@Observable` state. Implements UniFFI `ProgressReporter` protocol. Thread-safe via `OSAllocatedUnfairLock`. |
@@ -141,7 +141,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 
 ### ProtectedData Current Additions (`Sources/Security/ProtectedData/`)
 
-- `ProtectedDataStorageRoot.swift` — resolves `Application Support/ProtectedData/`, file-protection application, and registry/domain metadata paths
+- `ProtectedDataStorageRoot.swift` — resolves the protected app-data storage root, applies file protection, and owns registry/domain metadata paths
 - `ProtectedDataRegistry.swift` / `ProtectedDataRegistryStore.swift` — registry manifest, consistency validation, recovery classification, empty-registry bootstrap, and bootstrap outcome construction
 - `ProtectedDataRootSecretCoordinator.swift` — root-secret save/load/reprotect/delete orchestration, legacy right-store migration handoff, envelope-floor recording, and root-secret operation tracing
 - `KeychainProtectedDataRootSecretStore` (`ProtectedDataRightStoreClient.swift`) — Keychain storage for the shared app-data root-secret v2 envelope, legacy raw-secret migration, and anti-downgrade enforcement
@@ -152,43 +152,31 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `ProtectedDomainRecoveryCoordinator` / `ProtectedDomainRecoveryHandler` — generic pending-mutation recovery dispatch by `ProtectedDataDomainID`
 - `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `private-key-control`, `key-metadata`, `protected-settings`, and `protected-framework-sentinel`, and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff
 - `ProtectedDataFrameworkSentinelStore.swift` — framework-owned second production domain (`protected-framework-sentinel`) with a minimal schema/purpose payload used to prove multi-domain lifecycle, recovery, and relock behavior before later product-domain migrations
-- `PrivateKeyControlStore.swift` — Phase 5 protected domain for `settings.authMode` plus `recoveryJournal`; migrates legacy UserDefaults sources after app authentication and opens through post-unlock orchestration
-- `KeyMetadataDomainStore.swift` — Phase 6 protected domain `key-metadata`; stores `schemaVersion` plus `identities: [PGPKeyIdentity]`, migrates legacy Keychain metadata rows after unlock, and participates in relock/recovery
+- `PrivateKeyControlStore.swift` — protected domain `private-key-control` for `settings.authMode` plus `recoveryJournal`; migrates legacy UserDefaults sources after app authentication and opens through post-unlock orchestration
+- `KeyMetadataDomainStore.swift` — protected domain `key-metadata`; stores `schemaVersion` plus `identities: [PGPKeyIdentity]`, migrates legacy Keychain metadata rows after unlock, and participates in relock/recovery
 
-Current ProtectedData scope:
+ProtectedData component ownership:
 
 - the framework exists and is wired into startup/bootstrap and app-session ownership
 - `PrivateKeyControlStore` is the private-key control source of truth; current migrated payload scope is `authMode`, rewrap recovery, and modify-expiry recovery
 - `KeyMetadataDomainStore` is the key metadata source of truth; it is recoverable after unlock but must not be silently rebuilt from private-key bundle rows
 - `ProtectedSettingsStore` is the first protected-domain adopter; schema v2 preserves `clipboardNotice` and owns the ordinary-settings snapshot for grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion
-- `ProtectedOrdinarySettingsCoordinator` is the Phase 7 source of truth for ordinary-settings availability and loaded snapshots; production reads/writes `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff
+- `ProtectedOrdinarySettingsCoordinator` is the source of truth for ordinary-settings availability and loaded snapshots; production reads/writes `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff
 - `ProtectedDataFrameworkSentinelStore` is the second production domain; it contains no user data, telemetry, or UI state, and is created only after another domain is already committed and the shared resource is ready
-- `ContactService` is the only app/UI-facing Contacts facade. It owns Contacts availability, query APIs, mutation APIs, rollback behavior, verification state, migration/quarantine cleanup warnings, and relock cleanup.
-- `ContactsDomainStore` is the Contacts protected-domain persistence owner after PR4 cutover; it opens the protected `contacts` domain post-auth, migrates active legacy contacts once, quarantines legacy plaintext, and never reads quarantine for ordinary routes.
-- `ContactsDomainRepository` owns Contacts schema serialization, flat compatibility projection, and runtime scratch/search/signer state clearing. Schema evolution remains in the Contacts implementation plan and surface inventory.
+- `ContactService` is the only app/UI-facing Contacts facade. It owns Contacts availability, query APIs, mutation APIs, search/tag/list behavior, rollback behavior, verification state, migration/quarantine cleanup warnings, and relock cleanup.
+- `ContactsDomainStore` is the Contacts protected-domain persistence owner; it opens the protected `contacts` domain post-auth, migrates active legacy contacts once, quarantines legacy plaintext, and never reads quarantine for ordinary routes.
+- `ContactsDomainRepository` owns Contacts schema serialization, legacy `Contact` compatibility projection, and runtime scratch/search/signer state clearing; Contacts schema or storage changes update the long-term docs and persisted-state inventory.
 - `AppContainer` assembles the Contacts store, migration source, relock participants, and post-unlock call sites only; Contacts availability and mutation policy stay inside `ContactService`.
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`; Contacts then joins the authorized session through its dedicated post-auth open path
-- current Phase 1-7 ProtectedData work is implemented, including ordinary-settings, self-test export-only, and temporary/export/tutorial hardening; Contacts PR4 adds the protected `contacts` domain while preserving the flat compatibility snapshot
+- ProtectedData current-state coverage includes ordinary-settings, self-test export-only state, temporary/export/tutorial artifact hardening, and Contacts protected-domain state; Contacts uses the protected `contacts` domain for person-centered Contacts data while preserving compatibility projections for older call sites
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
-- Contacts security/storage lifecycle is current: post-auth gating, protected-domain persistence, migration/quarantine, no legacy fallback after cutover, recovery states, and relock cleanup are implemented. Later Contacts search, tags, recipient lists, and organization workflows remain in the Contacts follow-on plan; Contacts PR7 package exchange is withdrawn, and complete encrypted backup is deferred to a separate mandatory encrypted design. Sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+- Contacts security/storage lifecycle is current: post-auth gating, protected-domain persistence, migration/quarantine, no legacy fallback after cutover, recovery states, and relock cleanup are implemented. Search, tags, recipient lists, and organization workflows run over the unlocked protected `contacts` snapshot. Contacts package exchange is not active, and complete encrypted backup is deferred to a separate mandatory encrypted design.
 
-Current local-data classification:
-
-| Class | Current surfaces |
-|-------|------------------|
-| Protected after unlock | `protected-settings` schema v2 ordinary settings, `private-key-control`, `key-metadata`, `contacts`, and the framework sentinel under `Application Support/ProtectedData/`. |
-| Early-readable boot exception | `appSessionAuthenticationPolicy` in `UserDefaults`; it selects app-session authentication before ProtectedData opens. |
-| Private-key material exception | Permanent and pending Secure Enclave-wrapped private-key bundle rows remain in the Keychain / Secure Enclave private-key material domain. |
-| Framework bootstrap | Root-secret envelope, device-binding key metadata, registry, and per-domain bootstrap metadata. |
-| Ephemeral with cleanup | Self-test reports in memory, legacy `Documents/self-test/` cleanup, `tmp/decrypted`, `tmp/streaming`, `tmp/export-*`, tutorial directories, and tutorial-only defaults cleanup. |
-| Out of app custody | User-selected export destinations after handoff succeeds. |
-| Legacy migration cleanup | Legacy Contacts files under `Documents/contacts/` and `Documents/contacts.quarantine/` after Contacts protected-domain cutover. |
-
-The canonical row-level classification, current status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
+The canonical row-level persisted-state classification, current status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This architecture section names component owners and data-flow responsibilities rather than duplicating that inventory.
 
 ### Models (`Sources/Models/`)
 
@@ -458,7 +446,7 @@ App Sandbox:
 │       ├── private-key-control/           → Auth mode + private-key recovery journal envelopes
 │       ├── key-metadata/                  → PGPKeyIdentity metadata envelopes
 │       ├── protected-settings/              → Protected settings envelopes; schema v2 clipboardNotice + ordinary settings
-│       ├── contacts/                        → Contacts flat compatibility snapshot envelopes
+│       ├── contacts/                        → Protected Contacts domain envelopes
 │       └── protected-framework-sentinel/    → Framework sentinel envelopes; schema/purpose marker only
 ├── Library/Preferences/
 │   └── (UserDefaults)

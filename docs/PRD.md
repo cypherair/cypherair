@@ -203,14 +203,7 @@ Blur overlay when App enters background. Prevents multitasking switcher leakage.
 
 After app privacy authentication succeeds, the app can open protected app-data domains through the same authenticated session. Protected app data is separate from private-key material: it protects app-owned local state after unlock, while private keys remain under the Secure Enclave / Keychain private-key domain.
 
-Current protected app-data scope:
-
-- `clipboardNotice` is stored in protected settings.
-- Private-key control state, including the selected auth mode and rewrap / modify-expiry recovery journal, is stored in `private-key-control`.
-- Key-list metadata (`PGPKeyIdentity`) is stored in `key-metadata` and loads after app unlock.
-- Contacts flat compatibility state is stored in the protected `contacts` domain after app unlock.
-
-Ordinary protected settings are migrated into `protected-settings`, and self-test reports are short-lived export-only data rather than a protected diagnostics domain. Temporary/export/tutorial cleanup hardening is complete, and Contacts PR4 moved the legacy compatibility snapshot into protected app data. Remaining person-centered Contacts features stay in the Contacts follow-on plan and are not part of the current App Protection user surface.
+Protected app-data scope and per-surface classification are maintained in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). At product level, current coverage includes ordinary protected settings, private-key control state, key metadata, and the protected Contacts domain. Contacts now supports person-centered entries, multiple keys per contact, manual verification and OpenPGP certification state, search, tags, and recipient lists over protected app data. Self-test reports remain short-lived export-only data rather than a protected diagnostics domain, and temporary/export/tutorial cleanup hardening is complete. Contacts package exchange is not an active product feature; any future complete Contacts backup or device migration must be a separate mandatory encrypted design.
 
 **Authentication Mode**
 
@@ -238,13 +231,20 @@ The App offers two authentication modes, selectable in Settings:
 - **Public Key Update:** Same UID + same fingerprint = absorb any new public update material (revocations, refreshed bindings, added User IDs/subkeys); exact duplicate re-import remains a no-op. Same UID + different fingerprint = key regenerated (warning: verify with contact before accepting update).
 - **Key Detail Page:** Full fingerprint, Short Key ID (de-emphasized), profile indicator (A/B), backup status badge, expiry modification (MVP), key-level revocation export, and selective revocation launchers for subkey/User ID revocation export.
 
-### 5.2 Encryption / Decryption
+### 5.2 Contacts
+
+- Contacts are person-centered entries, not bare public-key files. A contact may have one preferred key, additional active keys, and historical keys retained for signer recognition and audit context.
+- Contact detail separates local manual fingerprint verification from OpenPGP certification. Manual verification is a local user assertion; saved certification artifacts are cryptographic evidence and may be exported explicitly as certification signatures.
+- Contacts support search, free-form tags, and named recipient lists. Recipient lists bind to contact identities and resolve to current preferred encryptable keys at send time.
+- Contacts package exchange is not active. Any future complete Contacts backup or device migration must be designed as mandatory encrypted export/import, not as plaintext or optional-encryption social-graph export.
+
+### 5.3 Encryption / Decryption
 
 - Text + file. Multi-recipient. Encrypt-to-self. Two-phase decryption. Cancellable. Runtime disk space validation.
 - Message format auto-selected by recipient key version. Mixed v4+v6 recipients → SEIPDv1.
 - Device auth: Standard or High Security mode.
 
-### 5.3 Signing / Verification
+### 5.4 Signing / Verification
 
 Text: cleartext sig. File: detached .sig. Auto-verify. Graded results.
 
@@ -252,13 +252,13 @@ Text: cleartext sig. File: detached .sig. Auto-verify. Graded results.
 - Contact detail includes a contact-scoped certificate-signature tool for direct-key verification, User ID binding verification, and User ID certification generation.
 - Password / SKESK message workflows are not currently exposed in the shipped app UI.
 
-### 5.4 Private Key Protection
+### 5.5 Private Key Protection
 
 Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biometric/passcode auth. Keys device-bound. Two access control configurations for Standard/High Security modes. See [TDD](TDD.md) Section 3 and [SECURITY](SECURITY.md) Section 3.
 
-### 5.5 App Protection
+### 5.6 App Protection
 
-Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, Contacts flat compatibility state, self-test export-only behavior, and temporary/export/tutorial cleanup. Contacts feature enhancements such as person-centered modeling, search, tags, recipient lists, merge, and organization workflows remain in the Contacts follow-on plan. Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be a separate mandatory encrypted design.
+Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, protected Contacts data, self-test export-only behavior, and temporary/export/tutorial cleanup; row-level classification lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). Contacts package exchange is not active; any future complete Contacts backup or device migration must be a separate mandatory encrypted design.
 
 ---
 

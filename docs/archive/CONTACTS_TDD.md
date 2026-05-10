@@ -1,13 +1,21 @@
 # Contacts Technical Design Document (TDD)
 
-> **Version:** Draft v1.2
-> **Status:** Draft future Contacts feature spec. Current protected-domain security/storage behavior is owned by the current-state architecture, security, TDD, and testing docs.
-> **Purpose:** Technical design for implementing the Contacts enhancement initiative as a Contacts domain on the shared protected app-data framework.  
-> **Audience:** Engineering, QA, and AI coding tools.  
-> **Companion document:** [CONTACTS_PRD](CONTACTS_PRD.md)  
-> **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific technical direction.  
-> **Primary framework references:** [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md)
-> **Related documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [TESTING](TESTING.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Status:** Archived historical Contacts technical design.
+> **Archived on:** 2026-05-10.
+> **Archival reason:** Durable current-state Contacts technical contracts have been consolidated into long-term docs.
+> **Successor documents:** [TDD](../TDD.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TESTING](../TESTING.md) · [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md)
+> **Current code and active canonical docs outrank this archived file whenever they disagree.**
+>
+> Original snapshot metadata follows.
+
+> **Version:** Draft v1.3
+> **Status:** Current Contacts domain design for implemented PR5/6/8 behavior plus future expansion boundaries. Current protected-domain security/storage behavior is owned by the current-state architecture, security, TDD, testing docs, and persisted-state inventory.
+> **Purpose:** Technical design for implementing the Contacts enhancement initiative as a Contacts domain on the shared protected app-data framework.
+> **Audience:** Engineering, QA, and AI coding tools.
+> **Companion document:** [CONTACTS_PRD](CONTACTS_PRD.md)
+> **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific technical direction.
+> **Primary framework references:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md)
+> **Related documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [TESTING](../TESTING.md) · [SPECIAL_SECURITY_MODE](../SPECIAL_SECURITY_MODE.md)
 
 ## 1. Technical Scope
 
@@ -308,6 +316,8 @@ Normalization is applied at write time, not only at display time.
 
 The Contacts source of truth is one protected app-data domain managed through the shared framework. User-facing product copy may continue to say "Contacts vault," but the technical design uses Contacts protected-domain terminology.
 
+The row-level persisted-state classification for the Contacts payload, legacy cleanup-only sources, runtime-only indexes, and export/temp exceptions lives in [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md). This TDD defines Contacts domain semantics and no-plaintext-cache rules.
+
 Storage ownership is split as follows.
 
 Framework-owned storage mechanics:
@@ -554,7 +564,7 @@ Legacy source:
 
 ### 11.2 Migration Phases
 
-Contacts security/storage migration occurs after the earlier shared-framework prerequisites are already satisfied, including protected app-data framework setup, post-unlock multi-domain hardening, `private-key-control`, `key metadata`, and completed non-Contacts protected-after-unlock work. Those prerequisites are complete, and Contacts PR4 has implemented the protected `contacts` domain cutover for the flat compatibility snapshot. Remaining person-centered Contacts features still follow the Contacts-specific implementation plan.
+Contacts security/storage migration occurs after the earlier shared-framework prerequisites are already satisfied, including protected app-data framework setup, post-unlock multi-domain hardening, `private-key-control`, `key metadata`, and completed non-Contacts protected-after-unlock work. Those prerequisites are complete, Contacts PR4 has implemented the protected `contacts` domain cutover for the flat compatibility snapshot, and Contacts PR5/6/8 behavior now runs over that protected domain. Future Contacts expansion still follows the Contacts-specific implementation plan.
 
 The implemented PR4 cutover trigger is the first post-auth Contacts domain open with an authorized ProtectedData session. This may occur during launch/resume post-unlock orchestration. Migration must not be triggered merely by process launch or service initialization before app-data authorization.
 

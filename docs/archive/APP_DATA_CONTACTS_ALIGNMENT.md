@@ -3,7 +3,7 @@
 > **Version:** Archived v1.1  
 > **Status:** Archived historical bridge. This document is no longer an active design or precedence source.  
 > **Purpose:** Preserve a short record that the temporary app-data / Contacts alignment bridge has been superseded by the active Contacts and shared-framework documents.
-> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
+> **Successor documents:** [PRD](../PRD.md) · [TDD](../TDD.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md)
 
 This document was a temporary bridge while the Contacts docs still described an older Contacts-specific vault model.
 
