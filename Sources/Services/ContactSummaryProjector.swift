@@ -74,38 +74,6 @@ struct ContactSummaryProjector {
             }
     }
 
-    func recipientListSummaries(
-        from snapshot: ContactsDomainSnapshot
-    ) -> [RecipientListSummary] {
-        let preferredEncryptableContactIds = Set(
-            snapshot.keyRecords
-                .filter { $0.usageState == .preferred && $0.canEncryptTo }
-                .map(\.contactId)
-        )
-
-        return snapshot.recipientLists
-            .map { list in
-                let missingPreferredContactIds = list.memberContactIds.filter {
-                    !preferredEncryptableContactIds.contains($0)
-                }
-                return RecipientListSummary(
-                    recipientListId: list.recipientListId,
-                    name: list.name,
-                    memberContactIds: list.memberContactIds,
-                    memberCount: list.memberContactIds.count,
-                    canEncryptToAll: !list.memberContactIds.isEmpty && missingPreferredContactIds.isEmpty,
-                    missingPreferredContactIds: missingPreferredContactIds
-                )
-            }
-            .sorted { lhs, rhs in
-                let nameOrder = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
-                if nameOrder != .orderedSame {
-                    return nameOrder == .orderedAscending
-                }
-                return lhs.recipientListId < rhs.recipientListId
-            }
-    }
-
     func identitySummary(
         contactId: String,
         in snapshot: ContactsDomainSnapshot

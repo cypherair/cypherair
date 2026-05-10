@@ -76,15 +76,6 @@ private struct ContactsScreenHostView: View {
                     }
 
                     Button {
-                        routeNavigator.open(.recipientLists)
-                    } label: {
-                        Image(systemName: "person.3")
-                    }
-                    .accessibilityLabel(
-                        String(localized: "contacts.manageRecipientLists", defaultValue: "Recipient Lists")
-                    )
-
-                    Button {
                         routeNavigator.open(.addContact)
                     } label: {
                         Image(systemName: "plus")

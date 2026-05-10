@@ -542,14 +542,6 @@ final class ContactService: @unchecked Sendable {
         return summaryProjector.tagSummaries(from: runtimeSnapshot)
     }
 
-    func recipientListSummaries() -> [RecipientListSummary] {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
-            return []
-        }
-        return summaryProjector.recipientListSummaries(from: runtimeSnapshot)
-    }
-
     func tagSuggestions(matching query: String) -> [ContactTagSummary] {
         guard contactsAvailability.isAvailable,
               let runtimeSnapshot else {
@@ -950,133 +942,6 @@ final class ContactService: @unchecked Sendable {
     }
 
     @discardableResult
-    func createRecipientList(
-        named name: String,
-        memberContactIds: [String] = []
-    ) throws -> RecipientListSummary {
-        try requireProtectedContactsAvailableForOrganization()
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.createRecipientList(
-                named: name,
-                memberContactIds: memberContactIds,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return try recipientListSummaryOrThrow(mutation.output.recipientListId, in: snapshot)
-        }
-    }
-
-    @discardableResult
-    func renameRecipientList(
-        _ recipientListId: String,
-        to name: String
-    ) throws -> RecipientListSummary {
-        try requireProtectedContactsAvailableForOrganization()
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.renameRecipientList(
-                recipientListId,
-                to: name,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return try recipientListSummaryOrThrow(mutation.output.recipientListId, in: snapshot)
-        }
-    }
-
-    func deleteRecipientList(_ recipientListId: String) throws {
-        try requireProtectedContactsAvailableForOrganization()
-        try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.deleteRecipientList(
-                recipientListId,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-        }
-    }
-
-    @discardableResult
-    func setRecipientListMembers(
-        _ recipientListId: String,
-        memberContactIds: [String]
-    ) throws -> RecipientListSummary {
-        try requireProtectedContactsAvailableForOrganization()
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.setRecipientListMembers(
-                recipientListId,
-                memberContactIds: memberContactIds,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return try recipientListSummaryOrThrow(mutation.output.recipientListId, in: snapshot)
-        }
-    }
-
-    @discardableResult
-    func addContact(
-        _ contactId: String,
-        toRecipientList recipientListId: String
-    ) throws -> RecipientListSummary {
-        try requireProtectedContactsAvailableForOrganization()
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.addContact(
-                contactId,
-                toRecipientList: recipientListId,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return try recipientListSummaryOrThrow(mutation.output.recipientListId, in: snapshot)
-        }
-    }
-
-    @discardableResult
-    func removeContact(
-        _ contactId: String,
-        fromRecipientList recipientListId: String
-    ) throws -> RecipientListSummary {
-        try requireProtectedContactsAvailableForOrganization()
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.removeContact(
-                contactId,
-                fromRecipientList: recipientListId,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return try recipientListSummaryOrThrow(mutation.output.recipientListId, in: snapshot)
-        }
-    }
-
-    func recipientContactIds(forRecipientListId recipientListId: String) throws -> [String] {
-        try requireContactsAvailable()
-        guard let runtimeSnapshot,
-              let recipientList = runtimeSnapshot.recipientLists.first(where: {
-                  $0.recipientListId == recipientListId
-              }) else {
-            throw CypherAirError.internalError(
-                reason: String(localized: "contacts.recipientList.notFound", defaultValue: "The selected recipient list could not be found.")
-            )
-        }
-        return recipientList.memberContactIds
-    }
-
-    @discardableResult
     func mergeContact(
         sourceContactId: String,
         into targetContactId: String
@@ -1193,20 +1058,6 @@ final class ContactService: @unchecked Sendable {
         }) else {
             throw CypherAirError.internalError(
                 reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
-            )
-        }
-        return summary
-    }
-
-    private func recipientListSummaryOrThrow(
-        _ recipientListId: String,
-        in snapshot: ContactsDomainSnapshot
-    ) throws -> RecipientListSummary {
-        guard let summary = summaryProjector.recipientListSummaries(from: snapshot).first(where: {
-            $0.recipientListId == recipientListId
-        }) else {
-            throw CypherAirError.internalError(
-                reason: String(localized: "contacts.recipientList.notFound", defaultValue: "The selected recipient list could not be found.")
             )
         }
         return summary

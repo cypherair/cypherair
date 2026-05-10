@@ -10,6 +10,16 @@ private struct InitialRecipientSelectionSignature: Equatable {
     }
 }
 
+struct RecipientTagSelectionOption: Identifiable, Hashable, Sendable {
+    var id: String { tagId }
+
+    let tagId: String
+    let displayName: String
+    let contactCount: Int
+    let selectableContactIds: [String]
+    let skippedContactCount: Int
+}
+
 @MainActor
 @Observable
 final class EncryptScreenModel {
@@ -49,7 +59,6 @@ final class EncryptScreenModel {
     var plaintext = ""
     var recipientSearchText = ""
     var selectedRecipients: Set<String> = []
-    var selectedRecipientListIds: Set<String> = []
     var signMessage = true
     var signerFingerprint: String?
     var ciphertext: Data?
@@ -66,6 +75,8 @@ final class EncryptScreenModel {
         }
     }
     var showUnverifiedRecipientsWarning = false
+    var tagSelectionSkippedContactCount = 0
+    var tagSelectionSkippedTagName: String?
     var textInputSectionEpoch = 0
 
     init(
@@ -141,15 +152,8 @@ final class EncryptScreenModel {
         contactService.recipientContacts(matching: recipientSearchText)
     }
 
-    var recipientLists: [RecipientListSummary] {
-        contactService.recipientListSummaries()
-    }
-
     var effectiveRecipientContactIds: [String] {
-        let selectedListMemberIds = recipientLists
-            .filter { selectedRecipientListIds.contains($0.recipientListId) }
-            .flatMap(\.memberContactIds)
-        return dedupedContactIds(Array(selectedRecipients) + selectedListMemberIds)
+        dedupedContactIds(Array(selectedRecipients))
     }
 
     var contactsAvailability: ContactsAvailability {
@@ -168,15 +172,26 @@ final class EncryptScreenModel {
         unverifiedContacts(for: effectiveRecipientContactIds)
     }
 
-    var selectedRecipientListsContainInvalidMembers: Bool {
-        recipientLists.contains { list in
-            selectedRecipientListIds.contains(list.recipientListId) && !list.canEncryptToAll
+    var recipientTagOptions: [RecipientTagSelectionOption] {
+        guard contactsAvailability.isAvailable else {
+            return []
         }
-    }
-
-    func isRecipientListSelectionDisabled(_ recipientList: RecipientListSummary) -> Bool {
-        !recipientList.canEncryptToAll &&
-            !selectedRecipientListIds.contains(recipientList.recipientListId)
+        let recipientContactIdsByTagId = contactService.recipientContacts(matching: "")
+            .reduce(into: [String: [String]]()) { partialResult, contact in
+                for tagId in contact.tagIds {
+                    partialResult[tagId, default: []].append(contact.contactId)
+                }
+            }
+        return contactService.contactTagSummaries().map { tag in
+            let selectableContactIds = dedupedContactIds(recipientContactIdsByTagId[tag.tagId] ?? [])
+            return RecipientTagSelectionOption(
+                tagId: tag.tagId,
+                displayName: tag.displayName,
+                contactCount: tag.contactCount,
+                selectableContactIds: selectableContactIds,
+                skippedContactCount: max(tag.contactCount - selectableContactIds.count, 0)
+            )
+        }
     }
 
     var encryptButtonDisabled: Bool {
@@ -184,9 +199,6 @@ final class EncryptScreenModel {
             return true
         }
         if effectiveRecipientContactIds.isEmpty {
-            return true
-        }
-        if selectedRecipientListsContainInvalidMembers {
             return true
         }
         if !contactsAvailability.isAvailable {
@@ -234,6 +246,21 @@ final class EncryptScreenModel {
                 defaultValue: "These recipients are not verified yet: %@. Continue only if you trust these keys."
             ),
             selectedUnverifiedContacts.map(\.displayName).joined(separator: ", ")
+        )
+    }
+
+    var tagSelectionSkipMessage: String? {
+        guard tagSelectionSkippedContactCount > 0,
+              let tagSelectionSkippedTagName else {
+            return nil
+        }
+        return String.localizedStringWithFormat(
+            String(
+                localized: "encrypt.tagSelection.skipped",
+                defaultValue: "%1$@ added available recipients. %2$d contacts were skipped because they need a preferred encryption key."
+            ),
+            tagSelectionSkippedTagName,
+            tagSelectionSkippedContactCount
         )
     }
 
@@ -305,15 +332,29 @@ final class EncryptScreenModel {
         }
     }
 
-    func toggleRecipientList(_ recipientListId: String, isOn: Bool) {
-        if isOn {
-            guard recipientLists.first(where: { $0.recipientListId == recipientListId })?.canEncryptToAll == true else {
-                selectedRecipientListIds.remove(recipientListId)
-                return
-            }
-            selectedRecipientListIds.insert(recipientListId)
-        } else {
-            selectedRecipientListIds.remove(recipientListId)
+    func selectRecipients(withTagId tagId: String) {
+        guard let option = recipientTagOptions.first(where: { $0.tagId == tagId }) else {
+            return
+        }
+        selectedRecipients.formUnion(option.selectableContactIds)
+        tagSelectionSkippedContactCount = option.skippedContactCount
+        tagSelectionSkippedTagName = option.displayName
+    }
+
+    func clearRecipients() {
+        selectedRecipients.removeAll()
+        tagSelectionSkippedContactCount = 0
+        tagSelectionSkippedTagName = nil
+    }
+
+    func dismissTagSelectionSkipMessage() {
+        tagSelectionSkippedContactCount = 0
+        tagSelectionSkippedTagName = nil
+    }
+
+    func selectedRecipientCount(for tagOption: RecipientTagSelectionOption) -> Int {
+        tagOption.selectableContactIds.reduce(0) { count, contactId in
+            count + (selectedRecipients.contains(contactId) ? 1 : 0)
         }
     }
 
@@ -591,13 +632,8 @@ final class EncryptScreenModel {
         let availableRecipientIds = Set(contactService.recipientContacts(matching: "").map(\.contactId))
         let staleDirectRecipientIds = selectedRecipients.subtracting(availableRecipientIds)
 
-        let currentRecipientLists = recipientLists
-        let currentRecipientListIds = Set(currentRecipientLists.map(\.recipientListId))
-        let staleRecipientListIds = selectedRecipientListIds.subtracting(currentRecipientListIds)
-
-        if !staleDirectRecipientIds.isEmpty || !staleRecipientListIds.isEmpty {
+        if !staleDirectRecipientIds.isEmpty {
             selectedRecipients.subtract(staleDirectRecipientIds)
-            selectedRecipientListIds.subtract(staleRecipientListIds)
             throw CypherAirError.encryptionFailed(
                 reason: String(
                     localized: "encrypt.recipients.staleSelection",
@@ -606,20 +642,7 @@ final class EncryptScreenModel {
             )
         }
 
-        let selectedLists = currentRecipientLists.filter {
-            selectedRecipientListIds.contains($0.recipientListId)
-        }
-        guard !selectedLists.contains(where: { !$0.canEncryptToAll }) else {
-            throw CypherAirError.encryptionFailed(
-                reason: String(
-                    localized: "encrypt.recipientLists.invalidSelection",
-                    defaultValue: "A selected list now needs preferred keys before it can be used."
-                )
-            )
-        }
-
-        let selectedListMemberIds = selectedLists.flatMap(\.memberContactIds)
-        let recipientContactIds = dedupedContactIds(Array(selectedRecipients) + selectedListMemberIds)
+        let recipientContactIds = dedupedContactIds(Array(selectedRecipients))
         guard !recipientContactIds.isEmpty else {
             throw CypherAirError.noRecipientsSelected
         }
@@ -655,7 +678,6 @@ final class EncryptScreenModel {
     private func applyInitialRecipientSelection(from configuration: EncryptView.Configuration) {
         let resolution = initialRecipientResolution(from: configuration)
         pendingInitialRecipientFingerprints = resolution.pendingFingerprints
-        selectedRecipientListIds.removeAll()
         if !configuration.initialRecipientContactIds.isEmpty {
             selectedRecipients = Set(resolution.contactIds)
         } else if !configuration.initialRecipientFingerprints.isEmpty,
@@ -668,7 +690,6 @@ final class EncryptScreenModel {
         let resolution = initialRecipientResolution(from: configuration)
         pendingInitialRecipientFingerprints = resolution.pendingFingerprints
         selectedRecipients = Set(resolution.contactIds)
-        selectedRecipientListIds.removeAll()
     }
 
     private func initialRecipientResolution(
