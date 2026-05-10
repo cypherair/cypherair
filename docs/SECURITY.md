@@ -231,23 +231,16 @@ Legacy `UserDefaults` keys such as `com.cypherair.internal.rewrapInProgress` and
 
 Protected app data is a separate security domain for CypherAir-owned local state outside private-key material. It must not be conflated with the Secure Enclave wrapping path that protects OpenPGP secret key bytes.
 
-Current protected app-data scope:
+Protected app-data scope and per-surface classification live in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This security model records the rules and invariants; the inventory records the row-level domains, paths, cleanup-only legacy surfaces, and export/temp exceptions.
 
-- `private-key-control` stores the private-key control source of truth: `settings.authMode` plus the rewrap / modify-expiry `recoveryJournal`.
-- `key-metadata` stores `PGPKeyIdentity` payloads after app unlock. Legacy metadata Keychain rows are migration and cleanup sources only.
-- `protected-settings` stores protected settings. Schema v2 preserves `clipboardNotice` and adds grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion.
-- `contacts` stores the Contacts snapshot after app unlock, including person-centered identities, per-key manual verification state, certification projection, and saved valid OpenPGP certification signature artifacts. Legacy `Documents/contacts` and `Documents/contacts.quarantine` are migration and cleanup sources only after protected cutover.
-- `protected-framework-sentinel` is a framework-owned sentinel domain with a schema/purpose marker only. It contains no user data, telemetry, contacts, or UI state.
+Security invariants for protected app data:
 
-Contacts PR4 covers the protected-domain security, storage, migration/quarantine, recovery, and relock lifecycle for the flat compatibility snapshot. Contacts PR5 adds the person-centered runtime model. Contacts PR6 adds certification projection and saved certification artifacts inside the same protected domain. Contacts PR7 package exchange is withdrawn because multi-contact export can externalize social-graph information. Contacts PR8 adds in-memory search, tag organization, and recipient-list management over the unlocked protected `contacts` snapshot; complete encrypted backup is deferred to a separate mandatory encrypted design.
-
-Current non-goals and pending surfaces:
-
-- Permanent and pending SE-wrapped private-key bundle rows remain in the existing private-key material domain.
-- `appSessionAuthenticationPolicy` remains an early-readable boot-authentication setting.
-- Self-test reports are short-lived export-only data held in memory until explicit user export, reset, or app exit; legacy `Documents/self-test/` content is cleanup-only on startup and local-data reset. Decrypted, streaming, export handoff, and tutorial artifacts are Phase 7 `ephemeral-with-cleanup` state: CypherAir-owned temporary files/directories use verified complete file protection where created by the app, per-operation or owner cleanup, startup cleanup, and Reset All Local Data cleanup. Phase 7 is complete. Phase 7 PR 2 moved the targeted ordinary settings into `protected-settings`; legacy ordinary `UserDefaults` keys are cleanup-only after verified schema v2 readback. Contacts PR4 moved Contacts into the protected `contacts` domain; legacy Contacts directories are migration/quarantine cleanup sources and are never the source of truth after protected cutover. Contacts PR6 keeps saved certification signature artifacts inside that same protected domain and exports armored `.asc` / `.sig` material only through explicit user export actions.
-
-The exhaustive row-level local-data classification, current status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This security model records the rules and invariants; the inventory records each surface.
+- Protected domains open only after app privacy authentication and the shared ProtectedData authorization path.
+- ProtectedData is separate from the private-key material domain; permanent and pending SE-wrapped private-key bundle rows remain under the Keychain / Secure Enclave private-key-material boundary.
+- `appSessionAuthenticationPolicy` remains the documented early-readable boot-authentication exception.
+- Legacy Contacts files and metadata are migration/quarantine cleanup sources only after protected cutover and must not become a fallback source of truth.
+- Contacts PR5/6/8 production state stays inside the protected `contacts` domain. Certification-signature export/share is an explicit artifact export boundary, not a Contacts backup, package, or social-graph export.
+- Self-test, decrypted, streaming, export handoff, and tutorial artifacts keep the inventory's ephemeral-with-cleanup behavior; files exported to user-selected destinations are outside app custody after handoff.
 
 UserDefaults is allowed only for documented boot, test, tutorial, and legacy cleanup exceptions. Personal or sensitive app data must not be newly introduced there; post-auth settings use `protected-settings` unless they are explicit boot-authentication exceptions.
 
@@ -261,7 +254,7 @@ The shared root secret is not stored as raw bytes in the current format. Keychai
 
 Relock is fail-closed. `ProtectedDataSessionCoordinator` blocks new protected-domain access, fans out to all registered `ProtectedDataRelockParticipant`s, zeroizes the wrapping root key, clears unwrapped DMKs, and returns to `sessionLocked` only if teardown succeeds. The ordinary-settings coordinator also clears its loaded snapshot on relock/content clear. Any relock participant failure latches runtime-only `restartRequired`, blocking further protected-domain access until process restart.
 
-ProtectedData files live under `Application Support/ProtectedData/`. Registry files, bootstrap metadata, scratch writes, wrapped-DMK files, and committed domain files use explicit file-protection verification where the platform supports it. Storage outside the app-owned container is not an allowed fallback for protected-domain files.
+ProtectedData files live under the protected app-data storage root documented in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). Registry files, bootstrap metadata, scratch writes, wrapped-DMK files, and committed domain files use explicit file-protection verification where the platform supports it. Storage outside the app-owned container is not an allowed fallback for protected-domain files.
 
 ## 6. Guided Tutorial Sandbox Isolation
 
@@ -269,7 +262,7 @@ The guided tutorial is allowed to run real app services and real OpenPGP operati
 
 Tutorial isolation boundaries:
 
-- `TutorialSandboxContainer` uses the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite and a temporary contacts directory with verified complete file protection instead of the app's real preferences and `Documents/contacts` storage. The product flow owns a single active tutorial sandbox at a time; container creation and current tutorial cleanup clear the fixed suite and directory. Startup and Reset All Local Data also remove legacy orphaned `com.cypherair.tutorial.<UUID>` suites.
+- `TutorialSandboxContainer` uses the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite and a temporary contacts directory with verified complete file protection instead of the app's real preferences and real Contacts storage. The product flow owns a single active tutorial sandbox at a time; container creation and current tutorial cleanup clear the fixed suite and directory. Startup and Reset All Local Data also remove legacy orphaned `com.cypherair.tutorial.<UUID>` suites.
 - Tutorial key management, encryption, decryption, signing, certificate, QR, and self-test services are constructed against tutorial-local storage and the same Rust engine API shape used by the real app.
 - Tutorial private-key protection uses mock Secure Enclave and mock Keychain primitives behind a real `AuthenticationManager` instance, so auth-mode behavior is exercised without touching real Secure Enclave-wrapped private keys or real Keychain rows.
 - `OutputInterceptionPolicy` and page-level configuration must block or intercept real file import/export, clipboard writes, share-sheet export, URL handoff, app icon changes, onboarding management actions, and other real-workspace side effects.

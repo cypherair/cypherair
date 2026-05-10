@@ -1,19 +1,19 @@
 # Contacts Product Requirements Document (PRD)
 
-> **Version:** Draft v1.2
-> **Status:** Draft future product spec. This document does not describe current shipped Contacts behavior.  
+> **Version:** Draft v1.3
+> **Status:** Current product requirements for implemented Contacts PR5/6/8 behavior plus deferred backup/package boundaries.
 > **Purpose:** Product requirements for the Contacts enhancement initiative as a Contacts domain built on the shared protected app-data framework.  
 > **Audience:** Product, design, engineering, QA, and AI coding tools.  
 > **Supersedes:** [CONTACTS_ENHANCEMENT_PLAN](archive/CONTACTS_ENHANCEMENT_PLAN.md) for Contacts-specific product direction.  
 > **Companion document:** [CONTACTS_TDD](CONTACTS_TDD.md)  
 > **Primary framework references:** [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md)
-> **Related documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [TESTING](TESTING.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
+> **Related documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md) · [TESTING](TESTING.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Product Intent
 
-CypherAir's current Contacts capability is sufficient for a small number of imported public keys, but it is not yet structured for real-world relationship management, recurring recipient workflows, or social-graph-sensitive privacy requirements.
+CypherAir's Contacts capability now runs over the protected Contacts domain and includes person-centered key management, certification integration, search, tags, and recipient lists. This document records the product requirements for that capability and the remaining product boundaries around package exchange and future backup design.
 
-This document defines the product requirements for the next-generation Contacts capability. The shared ProtectedData framework, Phase 1-7 non-Contacts domains, and Contacts PR4 protected-domain security/storage cutover have landed. Remaining Contacts feature sequencing is owned by [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), and surface coverage is owned by [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md).
+The shared ProtectedData framework, Phase 1-7 non-Contacts domains, Contacts PR4 protected-domain security/storage cutover, and Contacts PR5/6/8 capability stack have landed. Implementation history and future expansion gates are owned by [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), surface coverage is owned by [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md), and persisted-state classification is owned by [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
 
 The Contacts enhancement initiative covers four user-facing capability areas:
 
@@ -445,7 +445,7 @@ Manual verification and certification must remain visibly distinct.
 
 ### 12.1 Migration Source
 
-Migration source remains the legacy plaintext contacts storage:
+The legacy migration source is the old plaintext contacts storage:
 
 - `.gpg` contact files
 - `contact-metadata.json`
@@ -464,7 +464,7 @@ Shared-framework prerequisites are complete:
 - Phase 6 `key-metadata` domain is implemented
 - Phase 7 non-Contacts protected-after-unlock domains and required local file/static-protection cleanup are implemented
 
-No remaining AppData gate blocks Contacts PR1-PR8. Contacts still follows the PR sequence in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md).
+No remaining AppData gate blocks Contacts PR1-PR8. Implementation history and future expansion gates are tracked in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md).
 
 Contacts adoption and migration occur after app authentication through the shared post-unlock protected-domain orchestration. The same authenticated `LAContext` may be reused for root-secret retrieval and Contacts domain open, so normal app entry does not create a separate Contacts prompt.
 

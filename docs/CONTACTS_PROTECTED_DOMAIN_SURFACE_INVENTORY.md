@@ -1,15 +1,15 @@
 # Contacts Protected Domain Surface Inventory
 
-> **Version:** Draft v0.5
-> **Status:** Draft implementation-prep checklist, updated with the Contacts PR7 package-exchange withdrawal.
+> **Version:** Draft v0.6
+> **Status:** Current Contacts access/mutation surface checklist, updated with the Contacts PR7 package-exchange withdrawal and PR8 coverage.
 > **Purpose:** Enumerate all Contacts-required access and mutation surfaces that must be accounted for during Contacts protected-domain implementation.
 > **Audience:** Engineering, QA, and AI coding tools.
-> **Companion document:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
+> **Companion documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md)
 > **Primary design references:** [CONTACTS_TDD](CONTACTS_TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md)
 
 ## 1. Scope And Usage
 
-This document is the execution checklist for Contacts protected-domain adoption.
+This document is the execution checklist for Contacts protected-domain access and mutation coverage. It does not own global persisted-state classification; row-level storage classes, locations, and migration status live in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
 
 It exists because current Contacts access is distributed across:
 
@@ -20,7 +20,7 @@ It exists because current Contacts access is distributed across:
 - verification enrichment helpers
 - certificate-signature workflows
 
-Every later implementation PR should use this document to answer:
+Every Contacts implementation or expansion PR should use this document to answer:
 
 - which surfaces it owns
 - whether each surface is a domain read, mutation, maintenance action, or optional Contacts enrichment

@@ -354,34 +354,9 @@ Generate: `CIQRCodeGenerator`. Decode from photo: PHPicker + CoreImage `CIDetect
 
 ## 6. Storage Architecture
 
-```
-Keychain default account: SE key + salt + sealed-key + pending private-key recovery rows
-Keychain metadata account: legacy `PGPKeyIdentity` migration/cleanup source
-Keychain protected-data row: shared app-data root secret
-/Application Support/ProtectedData/: registry, private-key-control domain, key-metadata domain, protected-settings domain, domain bootstrap metadata
-/Documents/: contacts/ (public keys + `contact-metadata.json`), legacy self-test/ cleanup source only
-/Library/Preferences/ (UserDefaults):
-  com.cypherair.preference.authMode              → legacy source removed after private-key-control migration
-  com.cypherair.preference.appSessionAuthenticationPolicy → boot auth profile
-  com.cypherair.preference.gracePeriod           → legacy cleanup-only after protected-settings schema v2 migration
-  com.cypherair.preference.encryptToSelf         → legacy cleanup-only after protected-settings schema v2 migration
-  com.cypherair.preference.clipboardNotice       → legacy cleanup-only after protected-settings migration
-  com.cypherair.preference.onboardingComplete    → legacy cleanup-only after protected-settings schema v2 migration
-  com.cypherair.preference.guidedTutorialCompletedVersion → legacy cleanup-only after protected-settings schema v2 migration
-  com.cypherair.preference.colorTheme            → legacy cleanup-only after protected-settings schema v2 migration
-  com.cypherair.internal.rewrapInProgress        → legacy source removed after private-key-control migration
-  com.cypherair.internal.rewrapTargetMode        → legacy source removed after private-key-control migration
-  com.cypherair.internal.modifyExpiryInProgress  → legacy source removed after private-key-control migration
-  com.cypherair.internal.modifyExpiryFingerprint → legacy source removed after private-key-control migration
-  com.cypherair.tutorial.sandbox.plist           → fixed tutorial sandbox defaults, cleared on container creation/startup/reset
-  com.cypherair.tutorial.<UUID>.plist            → legacy tutorial sandbox defaults, fallback-cleaned on startup/reset if orphaned
-/tmp/decrypted/op-<UUID>/: per-operation decrypted file previews
-/tmp/streaming/op-<UUID>/: per-operation streaming encryption outputs
-/tmp/export-<UUID>-<filename>: temporary fileExporter handoff files
-/tmp/CypherAirGuidedTutorial-<UUID>/: tutorial contacts sandbox
-```
+Detailed storage locations, target classes, current status, and migration readiness live in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This TDD owns the technical contracts for ProtectedData behavior, migration safety, relock, and recovery; it does not duplicate the full persisted-state inventory.
 
-Protected app-data planning covers all CypherAir-owned local data, not only preferences. Current permanent exceptions are limited to the app-session boot authentication profile, private-key material rows protected by Keychain / Secure Enclave, ProtectedData framework bootstrap metadata, test-only or legacy-cleanup state, short-lived temporary files with cleanup requirements, and user-exported files after they leave the app-controlled sandbox. Private-key control state now lives in the post-unlock `private-key-control` ProtectedData domain, and key metadata now lives in the post-unlock `key-metadata` ProtectedData domain. The canonical per-surface classification, status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
+Protected app-data planning covers all CypherAir-owned local data, not only preferences. Permanent exceptions remain limited to documented boot-authentication, private-key material, framework bootstrap, test-only, cleanup-only, temporary, and out-of-app-custody export surfaces as classified in the inventory.
 
 ### 6.1 ProtectedData Current Contract
 
@@ -393,18 +368,12 @@ Current framework contracts:
 - Pre-auth startup may classify the registry and per-domain bootstrap metadata, but must not load the shared app-data root secret, unwrap any domain master key, or open protected payload generations.
 - The shared app-data root secret is stored in the Keychain as a v2 `CAPDSEV2` envelope and is loaded with an authenticated `LAContext` handoff. The ProtectedData-only Secure Enclave device-binding key silently unwraps that envelope under the same app-session gate.
 - `ProtectedDomainKeyManager` derives a wrapping root key from the raw root secret, zeroizes the raw root secret, then unwraps per-domain 256-bit domain master keys from wrapped-DMK records.
-- Protected domain files live under `Application Support/ProtectedData/`; registry, bootstrap metadata, scratch writes, and wrapped-DMK files verify explicit file protection where available.
+- Protected domain files live under the inventory's protected app-data storage root; registry, bootstrap metadata, scratch writes, and wrapped-DMK files verify explicit file protection where available.
 - Relock clears the wrapping root key, unwrapped DMKs, and registered domain-local decrypted state. A relock participant failure latches runtime-only `restartRequired`.
 
-Current production domains:
+Current production domain families and their row-level payload classification are tracked in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). At the technical-contract level, each production domain must open through the post-auth handoff, decode strictly, enter recovery instead of silently resetting unreadable committed state, and clear decrypted domain-local state on relock.
 
-- `private-key-control`: `settings.authMode` plus rewrap / modify-expiry recovery journal state.
-- `key-metadata`: schema v1 `PGPKeyIdentity` list, migrated from legacy metadata Keychain rows after app unlock.
-- `protected-settings`: schema v2 stores `clipboardNotice` plus the ordinary-settings snapshot for grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion.
-- `contacts`: PR4 compatibility `ContactsDomainSnapshot`, migrated from legacy `Documents/contacts` after app unlock.
-- `protected-framework-sentinel`: framework-owned schema/purpose marker only, used to exercise multi-domain lifecycle behavior.
-
-The current `contacts` domain is the security/storage cutover for the flat compatibility snapshot. Person-centered Contacts modeling, search, tags, recipient lists, merge, and organization workflows remain future Contacts feature work. Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be designed separately as mandatory encrypted backup.
+The current `contacts` domain is the authoritative protected source after the PR4 security/storage cutover. PR5 person-centered key modeling and merge behavior, PR6 certification projection and saved certification artifacts, and PR8 search, tags, recipient-list organization, and Encrypt recipient-list selection are implemented over the unlocked protected `contacts` snapshot. Search indexes, screen filters, and recipient selections are runtime state only, not persisted state. Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be designed separately as mandatory encrypted backup.
 
 Migration and exception rules:
 
@@ -412,7 +381,8 @@ Migration and exception rules:
 - Legacy key metadata rows in the dedicated metadata account and older default-account rows are migration/cleanup sources only after verified `key-metadata` readability.
 - Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
 - Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset.
-- Phase 7 temporary artifacts are centralized through `AppTemporaryArtifactStore`: streaming/decrypted outputs use one `op-<UUID>` owner directory per operation, export handoff files use atomic complete-protection writes, tutorial sandbox directories use verified complete protection, and startup/reset cleanup removes `decrypted`, `streaming`, `export-*`, `CypherAirGuidedTutorial-*`, fixed `com.cypherair.tutorial.sandbox` defaults, and orphaned legacy `com.cypherair.tutorial.<UUID>.plist` suites. Contacts PR4 moved the flat compatibility snapshot into the protected `contacts` domain; remaining person-centered Contacts behavior stays in the follow-on Contacts plan.
+- Phase 7 temporary artifacts are centralized through `AppTemporaryArtifactStore`; streaming/decrypted outputs, export handoff files, tutorial sandbox directories, startup cleanup, and reset cleanup keep the ephemeral-with-cleanup behavior classified in the inventory.
+- Contacts PR5/6/8 production data remains in the protected `contacts` domain, while legacy Contacts sources remain cleanup/quarantine only after cutover.
 - Future protected-domain migrations must preserve readable source state until the protected destination is created/opened and verified through the normal post-auth path.
 - After cutover, legacy sources are cleanup/quarantine only and must not become fallback sources of truth.
 - Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary settings boot-authentication exception.

@@ -10,7 +10,7 @@
 
 ## 1. Scope And Relationship
 
-This document is an implementation-prep companion for the Contacts follow-on phase. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, the Contacts PR4 protected-domain security/storage cutover, the Contacts PR5 person-centered runtime model, Contacts PR6 certification persistence/UX work, and the Contacts PR8 organization/search finish, while the earlier Contacts package-exchange plan has been withdrawn.
+This document is an implementation-prep companion for the Contacts protected-domain follow-on stack. It exists because the repository has landed the shared ProtectedData foundation, completed Phase 7 non-Contacts work, the Contacts PR4 protected-domain security/storage cutover, the Contacts PR5 person-centered runtime model, Contacts PR6 certification persistence/UX work, and the Contacts PR8 organization/search finish, while the earlier Contacts package-exchange plan has been withdrawn.
 
 This document specifies:
 
@@ -40,12 +40,12 @@ The active Contacts and shared-framework documents already establish the correct
 - `ProtectedDataSessionCoordinator` owns shared app-data root-secret retrieval
 - Contacts must not invent a second vault architecture
 
-The repository has already resolved the major PR3 / PR4 security-storage deltas that used to block protected Contacts. The remaining gaps are feature and verification-contract work rather than a missing protected-domain cutover:
+The repository has already resolved the major PR3 / PR4 security-storage deltas that used to block protected Contacts and the PR5/PR6/PR8 feature stack that now runs over that protected domain. Any remaining gaps are future expansion or verification-contract work rather than a missing protected-domain cutover:
 
 - PR3 removed pre-auth plaintext Contacts startup loading and moved ordinary Contacts access behind the shared post-auth lifecycle surface
 - PR4 migrated the flat compatibility snapshot into the protected `contacts` domain, quarantined legacy plaintext, and made legacy/quarantine storage cleanup-only after cutover
 - verification-capable services still need the planned contract split between cryptographic verification and Contacts enrichment
-- the remaining organization feature work covered by Contacts PR8 is now implemented over the existing protected `contacts` domain
+- the organization feature work covered by Contacts PR8 is now implemented over the existing protected `contacts` domain
 
 This document preserves the historical PR sequence for review context and turns the remaining work into explicit dependencies and validation gates.
 
@@ -222,7 +222,7 @@ This early freeze is a schema and compatibility contract only. It may define fie
 
 - certification projection writes and reconciliation belong to the certification projection PR
 - merge, preferred-key, additional-key, and historical-key behavior belong to the person-centered model PR
-- search, tags, recipient-list management, and related UI finish belong to the final product-capability PR
+- search, tags, recipient-list management, and related UI finish belonged to the final product-capability PR and are now implemented as Contacts PR8
 
 ### 4.5 Surface Inventory Is A Required Companion Artifact
 
@@ -280,13 +280,13 @@ It is responsible for:
 - classifying whether a surface is a read, mutation, maintenance action, or optional Contacts enrichment
 - defining whether the surface requires Contacts unlocked, framework gate only, or no Contacts access
 - freezing the target locked-state behavior
-- assigning each surface to a future Contacts-internal PR
+- assigning each surface to the responsible Contacts-internal PR
 
 This implementation plan references the inventory by behavior group rather than repeating every row inline.
 
 ## 6. Prerequisites And Planned Contacts PR Sequence
 
-This section records completed shared AppData prerequisites, the implemented Contacts PR4 security/storage cutover, and the remaining Contacts-internal feature order.
+This section records completed shared AppData prerequisites, the implemented Contacts PR4 security/storage cutover, the completed PR5/PR6/PR8 feature sequence, and remaining expansion constraints.
 
 ### 6.1 Shared AppData Prerequisites
 
@@ -301,7 +301,7 @@ Completed prerequisites:
 - Phase 7 non-Contacts protected-after-unlock domains and local file/static-protection cleanup are implemented and closed through PR 5 documentation/gate closure.
 - Contacts PR4 protected-domain security/storage cutover is implemented for the flat compatibility snapshot, including migration/quarantine, no legacy fallback after cutover, recovery states, and relock cleanup.
 
-No remaining Phase 7 prerequisite blocks Contacts feature work. Later Contacts implementation still follows the remaining PR sequence below and does not start from this document alone.
+No remaining Phase 7 prerequisite blocks Contacts feature work. Later Contacts expansion should build from the completed sequence below and the companion surface inventory rather than from this document alone.
 
 ### 6.2 Contacts PR1 — Contacts Schema Skeleton And Compatibility Facade
 

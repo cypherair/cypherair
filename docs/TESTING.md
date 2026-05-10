@@ -148,9 +148,10 @@ Completed Phase 7 validation expectations:
 - Phase 7 PR 3 covers self-test export-only report state and legacy `Documents/self-test/` cleanup.
 - Phase 7 PR 4 covers temporary/export/tutorial hardening: per-operation streaming/decrypted owner directories, owner cleanup, startup cleanup, Reset All Local Data cleanup, verified complete file protection, export handoff ownership, fixed tutorial defaults cleanup, and legacy tutorial defaults UUID cleanup.
 
-Future Contacts feature validation targets:
+Current Contacts PR5-PR8 validation expectations:
 
-- Person-centered Contacts follow-on work must prove search, tags, recipient lists, merge behavior, certification projection persistence, and any new Contacts route states without weakening the implemented protected-domain security lifecycle. Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be covered by a separate mandatory encrypted design and test plan.
+- Contacts validation should prove person-centered merge/preferred-key behavior, certification projection and artifact persistence, search, tags, recipient lists, route states, relock cleanup, and Encrypt recipient-list selection over the protected `contacts` domain without reactivating legacy Contacts files or weakening the implemented protected-domain security lifecycle.
+- Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be covered by a separate mandatory encrypted design and test plan.
 
 Docs-only documentation authority or archive PRs do not require Rust or Xcode test runs unless they touch code, generated files, project files, entitlements, release metadata, or build settings. They should still run documentation consistency checks, link checks for active platform references, and `git diff --check`.
 

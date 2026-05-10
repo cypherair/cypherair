@@ -141,7 +141,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 
 ### ProtectedData Current Additions (`Sources/Security/ProtectedData/`)
 
-- `ProtectedDataStorageRoot.swift` — resolves `Application Support/ProtectedData/`, file-protection application, and registry/domain metadata paths
+- `ProtectedDataStorageRoot.swift` — resolves the protected app-data storage root, applies file protection, and owns registry/domain metadata paths
 - `ProtectedDataRegistry.swift` / `ProtectedDataRegistryStore.swift` — registry manifest, consistency validation, recovery classification, empty-registry bootstrap, and bootstrap outcome construction
 - `ProtectedDataRootSecretCoordinator.swift` — root-secret save/load/reprotect/delete orchestration, legacy right-store migration handoff, envelope-floor recording, and root-secret operation tracing
 - `KeychainProtectedDataRootSecretStore` (`ProtectedDataRightStoreClient.swift`) — Keychain storage for the shared app-data root-secret v2 envelope, legacy raw-secret migration, and anti-downgrade enforcement
@@ -155,7 +155,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `PrivateKeyControlStore.swift` — Phase 5 protected domain for `settings.authMode` plus `recoveryJournal`; migrates legacy UserDefaults sources after app authentication and opens through post-unlock orchestration
 - `KeyMetadataDomainStore.swift` — Phase 6 protected domain `key-metadata`; stores `schemaVersion` plus `identities: [PGPKeyIdentity]`, migrates legacy Keychain metadata rows after unlock, and participates in relock/recovery
 
-Current ProtectedData scope:
+ProtectedData component ownership:
 
 - the framework exists and is wired into startup/bootstrap and app-session ownership
 - `PrivateKeyControlStore` is the private-key control source of truth; current migrated payload scope is `authMode`, rewrap recovery, and modify-expiry recovery
@@ -174,21 +174,9 @@ Current ProtectedData scope:
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`; Contacts then joins the authorized session through its dedicated post-auth open path
 - current Phase 1-7 ProtectedData work is implemented, including ordinary-settings, self-test export-only, and temporary/export/tutorial hardening; Contacts PR4 adds the protected `contacts` domain while preserving the flat compatibility snapshot
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
-- Contacts security/storage lifecycle is current: post-auth gating, protected-domain persistence, migration/quarantine, no legacy fallback after cutover, recovery states, and relock cleanup are implemented. Later Contacts search, tags, recipient lists, and organization workflows remain in the Contacts follow-on plan; Contacts PR7 package exchange is withdrawn, and complete encrypted backup is deferred to a separate mandatory encrypted design. Sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+- Contacts security/storage lifecycle is current: post-auth gating, protected-domain persistence, migration/quarantine, no legacy fallback after cutover, recovery states, and relock cleanup are implemented. Contacts PR8 search, tags, recipient lists, and organization workflows run over the unlocked protected `contacts` snapshot. Contacts PR7 package exchange is withdrawn, and complete encrypted backup is deferred to a separate mandatory encrypted design. Sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
 
-Current local-data classification:
-
-| Class | Current surfaces |
-|-------|------------------|
-| Protected after unlock | `protected-settings` schema v2 ordinary settings, `private-key-control`, `key-metadata`, `contacts`, and the framework sentinel under `Application Support/ProtectedData/`. |
-| Early-readable boot exception | `appSessionAuthenticationPolicy` in `UserDefaults`; it selects app-session authentication before ProtectedData opens. |
-| Private-key material exception | Permanent and pending Secure Enclave-wrapped private-key bundle rows remain in the Keychain / Secure Enclave private-key material domain. |
-| Framework bootstrap | Root-secret envelope, device-binding key metadata, registry, and per-domain bootstrap metadata. |
-| Ephemeral with cleanup | Self-test reports in memory, legacy `Documents/self-test/` cleanup, `tmp/decrypted`, `tmp/streaming`, `tmp/export-*`, tutorial directories, and tutorial-only defaults cleanup. |
-| Out of app custody | User-selected export destinations after handoff succeeds. |
-| Legacy migration cleanup | Legacy Contacts files under `Documents/contacts/` and `Documents/contacts.quarantine/` after Contacts protected-domain cutover. |
-
-The canonical row-level classification, current status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
+The canonical row-level persisted-state classification, current status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This architecture section names component owners and data-flow responsibilities rather than duplicating that inventory.
 
 ### Models (`Sources/Models/`)
 
