@@ -1458,6 +1458,7 @@
       }
     },
     "contactcertification.projection.count" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2417,6 +2418,23 @@
         }
       }
     },
+    "contactdetail.addTag.confirm" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加"
+          }
+        }
+      }
+    },
     "contactdetail.addTag.create" : {
       "localizations" : {
         "en" : {
@@ -2445,6 +2463,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已有标签"
+          }
+        }
+      }
+    },
+    "contactdetail.addTag.field" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag Name"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签名称"
           }
         }
       }
@@ -2481,38 +2515,6 @@
         }
       }
     },
-    "contactdetail.addTag.confirm" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加"
-          }
-        }
-      }
-    },
-    "contactdetail.addTag.field" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tag Name"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "标签名称"
-          }
-        }
-      }
-    },
     "contactdetail.addTag.title" : {
       "localizations" : {
         "en" : {
@@ -2525,54 +2527,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加标签"
-          }
-        }
-      }
-    },
-    "contactdetail.removeTag.confirm" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove Tag"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除标签"
-          }
-        }
-      }
-    },
-    "contactdetail.removeTag.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove \"%@\" from this contact?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要从此联系人移除“%@”吗？"
-          }
-        }
-      }
-    },
-    "contactdetail.removeTag.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove Tag"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除标签"
           }
         }
       }
@@ -2642,6 +2596,7 @@
       }
     },
     "contactdetail.certificateSignatures" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2770,6 +2725,7 @@
       }
     },
     "contactdetail.fingerprint" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3154,6 +3110,54 @@
       }
     },
     "contactdetail.removeTag" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Tag"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除标签"
+          }
+        }
+      }
+    },
+    "contactdetail.removeTag.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Tag"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除标签"
+          }
+        }
+      }
+    },
+    "contactdetail.removeTag.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove \"%@\" from this contact?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要从此联系人移除“%@”吗？"
+          }
+        }
+      }
+    },
+    "contactdetail.removeTag.title" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3842,6 +3846,7 @@
       }
     },
     "contacts.selectedTags" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3853,22 +3858,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已选标签"
-          }
-        }
-      }
-    },
-    "contacts.tag.empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enter a tag name."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请输入标签名称。"
           }
         }
       }
@@ -3885,6 +3874,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已存在同名标签。"
+          }
+        }
+      }
+    },
+    "contacts.tag.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a tag name."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入标签名称。"
           }
         }
       }
@@ -4338,6 +4343,7 @@
       }
     },
     "encrypt.compat.expired" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4354,6 +4360,7 @@
       }
     },
     "encrypt.compat.noPreferred" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4561,22 +4568,6 @@
         }
       }
     },
-    "encrypt.selectedRecipients.count" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d recipients selected"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已选择 %d 个收件人"
-          }
-        }
-      }
-    },
     "encrypt.result" : {
       "localizations" : {
         "en" : {
@@ -4605,6 +4596,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收件人、标签、指纹"
+          }
+        }
+      }
+    },
+    "encrypt.selectedRecipients.count" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d recipients selected"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选择 %d 个收件人"
           }
         }
       }
@@ -13617,6 +13624,22 @@
         }
       }
     },
+    "tagManagement.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage Tags"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理标签"
+          }
+        }
+      }
+    },
     "tagManagement.unavailable.protectedDescription" : {
       "localizations" : {
         "en" : {
@@ -13645,22 +13668,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要受保护的联系人"
-          }
-        }
-      }
-    },
-    "tagManagement.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Manage Tags"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "管理标签"
           }
         }
       }
