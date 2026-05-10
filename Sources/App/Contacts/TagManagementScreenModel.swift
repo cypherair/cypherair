@@ -8,8 +8,8 @@ final class TagManagementScreenModel {
     var searchText = ""
     var createTagName = ""
     var selectedTagId: String?
+    var renameTargetTagId: String?
     var renameText = ""
-    var isRenamingSelectedTag = false
     var pendingDeleteTag: ContactTagSummary?
     var membershipDraftContactIds: Set<String> = []
     var errorMessage: String?
@@ -21,6 +21,10 @@ final class TagManagementScreenModel {
 
     var contactsAvailability: ContactsAvailability {
         contactService.contactsAvailability
+    }
+
+    var canManageTags: Bool {
+        contactsAvailability == .availableProtectedDomain
     }
 
     var allTags: [ContactTagSummary] {
@@ -56,11 +60,21 @@ final class TagManagementScreenModel {
         membershipDraftContactIds != selectedTagMemberIds
     }
 
+    var isRenamingSelectedTag: Bool {
+        guard let selectedTagId, let renameTargetTagId else {
+            return false
+        }
+        return selectedTagId == renameTargetTagId
+    }
+
     func handleAppear() {
         refreshSelectionIfNeeded()
     }
 
     func selectTag(_ tagId: String) {
+        if selectedTagId != tagId {
+            cancelRename()
+        }
         selectedTagId = tagId
         resetMembershipDraft()
     }
@@ -70,6 +84,7 @@ final class TagManagementScreenModel {
             let tag = try contactService.createTag(named: createTagName)
             createTagName = ""
             selectedTagId = tag.tagId
+            cancelRename()
             resetMembershipDraft()
         } catch {
             presentError(error)
@@ -77,25 +92,30 @@ final class TagManagementScreenModel {
     }
 
     func beginRenameSelectedTag() {
-        guard let selectedTag else {
+        guard let selectedTagId, let selectedTag else {
             return
         }
+        renameTargetTagId = selectedTagId
         renameText = selectedTag.displayName
-        isRenamingSelectedTag = true
     }
 
     func commitRenameSelectedTag() {
-        guard let currentTagId = selectedTagId else {
+        guard let currentTagId = renameTargetTagId else {
             return
         }
         do {
             let tag = try contactService.renameTag(tagId: currentTagId, to: renameText)
             selectedTagId = tag.tagId
-            isRenamingSelectedTag = false
+            cancelRename()
             resetMembershipDraft()
         } catch {
             presentError(error)
         }
+    }
+
+    func cancelRename() {
+        renameTargetTagId = nil
+        renameText = ""
     }
 
     func requestDeleteSelectedTag() {
@@ -114,6 +134,9 @@ final class TagManagementScreenModel {
             try contactService.deleteTag(tagId: tag.tagId)
             if selectedTagId == tag.tagId {
                 selectedTagId = nil
+            }
+            if renameTargetTagId == tag.tagId {
+                cancelRename()
             }
             pendingDeleteTag = nil
             refreshSelectionIfNeeded()
@@ -158,9 +181,14 @@ final class TagManagementScreenModel {
         let tags = allTags
         if let currentTagId = selectedTagId,
            tags.contains(where: { $0.tagId == currentTagId }) {
+            if let renameTargetTagId,
+               !tags.contains(where: { $0.tagId == renameTargetTagId }) {
+                cancelRename()
+            }
             resetMembershipDraft()
             return
         }
+        cancelRename()
         selectedTagId = visibleTags.first?.tagId ?? tags.first?.tagId
         resetMembershipDraft()
     }

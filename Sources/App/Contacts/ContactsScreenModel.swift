@@ -26,6 +26,10 @@ final class ContactsScreenModel {
         contactService.contactsAvailability
     }
 
+    var canManageTags: Bool {
+        contactsAvailability == .availableProtectedDomain
+    }
+
     var visibleContacts: [ContactIdentitySummary] {
         let filters = tagFilters
         return contactService.contactIdentities(

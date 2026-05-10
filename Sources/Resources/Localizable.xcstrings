@@ -13617,6 +13617,38 @@
         }
       }
     },
+    "tagManagement.unavailable.protectedDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag management is available when Contacts are backed by protected app data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系人由受保护的应用数据支持时，才可以管理标签。"
+          }
+        }
+      }
+    },
+    "tagManagement.unavailable.protectedTitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected Contacts Required"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要受保护的联系人"
+          }
+        }
+      }
+    },
     "tagManagement.title" : {
       "localizations" : {
         "en" : {

@@ -48,13 +48,15 @@ private struct ContactsScreenHostView: View {
         .toolbar {
             if model.contactsAvailability.isAvailable {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    Button {
-                        routeNavigator.open(.tagManagement)
-                    } label: {
-                        Image(systemName: "tag")
+                    if model.canManageTags {
+                        Button {
+                            routeNavigator.open(.tagManagement)
+                        } label: {
+                            Image(systemName: "tag")
+                        }
+                        .accessibilityIdentifier("contacts.tags.toolbar")
+                        .accessibilityLabel(String(localized: "contacts.manageTags", defaultValue: "Manage Tags"))
                     }
-                    .accessibilityIdentifier("contacts.tags.toolbar")
-                    .accessibilityLabel(String(localized: "contacts.manageTags", defaultValue: "Manage Tags"))
 
                     Button {
                         routeNavigator.open(.addContact)
