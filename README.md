@@ -155,7 +155,7 @@ CypherAir publishes unique edge prerelease XCFrameworks for the current `main` b
 CypherAir's security design centers around several layers of protection:
 
 - **Private Key Storage** — Keys are wrapped by a Secure Enclave P-256 key via self-ECDH + HKDF + AES-GCM, then stored in Keychain. Keys are device-bound and never leave the hardware.
-- **Protected App Data** — Implemented app-data domains open after app privacy authentication through a shared Keychain root-secret gate plus Secure Enclave device binding. Current protected domains cover private-key control state, key metadata, protected settings schema v2, Contacts flat compatibility state, and the framework sentinel.
+- **Protected App Data** — Implemented app-data domains open after app privacy authentication through a shared Keychain root-secret gate plus Secure Enclave device binding. Current protected domains cover private-key control state, key metadata, protected settings schema v2, protected Contacts domain data, and the framework sentinel.
 - **Two-Phase Decryption** — Phase 1 parses the message header and matches recipient keys without authentication. Phase 2 requires biometric/passcode auth before decryption proceeds.
 - **Authentication Modes** — Standard Mode (Face ID / Touch ID with passcode fallback) or High Security Mode (biometric only, inspired by Apple's Stolen Device Protection).
 - **Memory Safety** — Sensitive data is zeroed from memory after use. MIE (Memory Integrity Enforcement) is enabled via Xcode's Enhanced Security capability, providing hardware memory tagging on A19+ devices.
