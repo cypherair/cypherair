@@ -4,7 +4,7 @@
 > Purpose: Document the current release flows for CypherAir app builds and the stable build contract that backs formal App Store candidate archives.
 > Audience: Human developers, release owners, and AI coding tools.
 > Source of truth: `CypherAir` and `CypherAir AppStore Candidate` scheme behavior, `SourceComplianceInfo.json` build integration, and `.github/workflows/stable-build-release.yml`.
-> Last reviewed: 2026-04-27.
+> Last reviewed: 2026-05-10.
 > Update triggers: stable tag rules, stable asset names, `Source & Compliance` archive metadata, App Store candidate gating, or release-ordering changes.
 > Scope: App build release flow and the exact stable GitHub release contract used by the app. `XCFramework` channel discovery and verification remain in [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md).
 
@@ -37,6 +37,7 @@ CypherAir's formal stable app-build release uses a unified GitHub release page.
   the workflow publishes with `gh release create --verify-tag`.
 - The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
 - The stable workflow validates that the tag's marketing version and build number match `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` before assets are published.
+- The stable workflow includes an independent `rust-dependency-audit` job that runs `cargo audit --file pgp-mobile/Cargo.lock --deny warnings` against the same checked-out ref. This job makes the workflow fail if advisories are present, but it does not block stable asset generation.
 - Release owners choose and set the Xcode release metadata in the project. The
   release scripts read those values; they do not invent, increment, reset, or
   formula-generate `CURRENT_PROJECT_VERSION`.
@@ -56,6 +57,7 @@ Stable build binding and immutability rules:
 - Stable assets must bind to one exact marketing version, build number, release tag, and commit SHA.
 - App Store candidate archives must embed the exact stable release tag, stable release URL, and commit SHA in `SourceComplianceInfo.json`.
 - Stable assets are immutable once published. If the asset set is wrong, fix it with a new build number, new stable tag, and new release rather than replacing assets in place.
+- A stable workflow run whose `rust-dependency-audit` job fails must not be treated as release-ready, even if binary and compliance assets were generated or published.
 
 Version and build-number rules:
 
@@ -186,6 +188,7 @@ Before uploading the App Store candidate to TestFlight, confirm:
   macOS build for the app
 - the stable tag matches the app version/build
 - the GitHub stable release completed successfully
+- the stable workflow's Rust dependency audit passed without warnings
 - the release page includes the expected stable assets:
   `CypherAir-source-bundle.tar.zst`,
   `CypherAir-compliance-manifest.json`,

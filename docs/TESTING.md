@@ -32,6 +32,22 @@ cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- -
 Fixture-dependent ignored tests in `gnupg_fixture_regression_tests.rs` remain manual and
 are not part of the standard GitHub workflows.
 
+### Rust Dependency Audit
+
+Run the RustSec audit whenever `pgp-mobile/Cargo.lock` changes and before
+formal release validation:
+
+```bash
+cargo +stable install cargo-audit --version 0.22.1 --locked
+cargo audit --file pgp-mobile/Cargo.lock --deny warnings
+```
+
+The GitHub PR, nightly, edge XCFramework, and stable release workflows pin
+`cargo-audit` to `0.22.1` in an independent `rust-dependency-audit` job. A
+failed audit makes the workflow/check fail, but packaging, hosted Swift tests,
+and release jobs do not declare `needs: rust-dependency-audit`, so they still
+run and produce their own signal.
+
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
@@ -148,13 +164,14 @@ in GitHub Actions.
 
 These jobs must pass on pull requests and nightly validation:
 
+- `rust-dependency-audit` audits `pgp-mobile/Cargo.lock` with `cargo-audit --deny warnings` as an independent failure signal
 - `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
 - `xcframework-package` checks the arm64e OpenSSL carry-chain freshness, runs `./build-xcframework.sh --release`, uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days, and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes
 - `swift-unit-tests-hosted-preview` downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests`
 
 The repository also publishes unique edge XCFramework prereleases:
 
-- `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, rebuilds and validates the XCFramework, then publishes a unique `pgpmobile-edge-` prerelease for canonical `main` builds; non-main manual runs must use `pgpmobile-drill-*` prefixes
+- `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, starts the independent Rust dependency audit, rebuilds and validates the XCFramework, then publishes a unique `pgpmobile-edge-` prerelease for canonical `main` builds; non-main manual runs must use `pgpmobile-drill-*` prefixes
 - The arm64e XCFramework path consumes the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease on GitHub Actions. Stable `arm64` slices are still built with stable Rust, while `arm64e` slices use nightly Cargo with `RUSTC` pointing at the downloaded stage1 compiler.
 
 Toolchain contract:
@@ -177,7 +194,7 @@ Impact:
 
 - Rust CI remains valid.
 - The hosted Swift unit-test preview job can fail before test execution because the runner OS is older than the app/test deployment target.
-- The hosted Swift unit-test preview runs as a regular blocking PR check. If it fails before tests start because of the runner OS, diagnose that as a hosted-image mismatch and confirm with local macOS validation.
+- The hosted Swift unit-test preview runs as a separate failure signal in PR and nightly workflows. If it fails before tests start because of the runner OS, diagnose that as a hosted-image mismatch and confirm with local macOS validation. No later jobs depend on this preview job, so it does not block additional automation steps.
 - Local macOS validation remains the source of truth until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 
 ## 2.3 Release Flows
@@ -205,6 +222,13 @@ Today, the Xcode project links:
 - `Sources/PgpMobile/pgp_mobile.swift`
 
 `PgpMobile.xcframework` is a local generated artifact. It is ignored by git and must be refreshed with the full sync path below after Rust or UniFFI changes that can affect Swift-visible behavior. The build also emits `PgpMobile.arm64e-build-manifest.json`, which records the Rust stage1 prerelease provenance, the OpenSSL carry-chain commits, and the verified XCFramework slice layout. The shared scheme and app target both check for the XCFramework artifact and fail with a clear error if it is missing.
+
+Treat `pgp-mobile/Cargo.lock` updates as Rust artifact inputs. Even when a
+lockfile-only dependency update does not change Rust source or UniFFI surface,
+run the dependency audit, Rust tests, and the full XCFramework sync before
+Swift / FFI validation so local generated artifacts are built from the same
+lockfile that will be submitted. Do not submit the ignored
+`PgpMobile.xcframework` directory itself.
 
 Xcode user-script sandboxing is enabled for app and test targets. Local `xcodebuild` validation must not depend on `ENABLE_USER_SCRIPT_SANDBOXING=NO`. When adding or modifying a Run Script phase, declare every file the script reads in `inputPaths` or an `inputFileListPaths` file, and declare every generated or modified build product in `outputPaths` or an `outputFileListPaths` file. A parent directory input is not a substitute for recursive child-file access under the sandbox. This includes generated bundle resources such as `Settings.bundle/Root.plist`, fixture/source audit manifests, and repository metadata such as `.git/HEAD` plus `.git/logs/HEAD` for the source-compliance fallback. The app's `Settings.bundle` is copied and version-stamped by its script phase rather than by the Resources phase so the sandboxed script owns the generated bundle output. When adding fixture resources or repository-audited source files, update the matching `Tests/*.xcfilelist` manifests in the same change.
 
@@ -293,6 +317,14 @@ Treat this as build/linkage and platform-availability validation, not as a subst
 Recommended flows:
 
 ```bash
+# Cargo.lock dependency update
+cargo audit --file pgp-mobile/Cargo.lock --deny warnings
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
+    ./build-xcframework.sh --release
+xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
+    -destination 'platform=macOS'
+
 # Rust-backed behavior change
 cargo test --manifest-path pgp-mobile/Cargo.toml
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \

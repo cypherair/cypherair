@@ -16,6 +16,22 @@ env:
   ARM64E_STAGE1_RELEASE_TAG: latest
 
 jobs:
+  rust-dependency-audit:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Rust stable toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install stable
+          rustup default stable
+          rustc +stable --version
+          cargo +stable --version
+      - name: Audit Rust dependencies
+        run: |
+          cargo +stable install cargo-audit --version 0.22.1 --locked
+          cargo audit --file pgp-mobile/Cargo.lock --deny warnings
+
   rust-full-tests:
     runs-on: macos-26
     steps:
@@ -112,7 +128,6 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
   swift-unit-tests-hosted-preview:
-    continue-on-error: true
     needs: xcframework-package
     runs-on: macos-26
     steps:
@@ -146,8 +161,8 @@ jobs:
           ditto -x -k "$XCFRAMEWORK_ZIP" .
       - name: Run hosted macOS unit-test preview
         run: |
-          # Observational only until GitHub-hosted macOS reaches 26.4
-          # or the repository adopts a self-hosted macOS runner.
+          # Run as a separate failure signal until GitHub-hosted macOS reaches
+          # 26.4 or the repository adopts a self-hosted macOS runner.
           xcodebuild test \
             -scheme CypherAir \
             -project CypherAir.xcodeproj \
