@@ -15,7 +15,7 @@ Original snapshot metadata follows.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Companion document:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md)
 > **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
-> **Related documents:** [SECURITY](../SECURITY.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [TESTING](../TESTING.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](../SPECIAL_SECURITY_MODE.md)
+> **Related documents:** [SECURITY](../SECURITY.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [TESTING](../TESTING.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](SPECIAL_SECURITY_MODE.md)
 
 ## 1. Technical Scope
 

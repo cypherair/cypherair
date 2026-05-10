@@ -2,7 +2,20 @@
 
 > Purpose: Product-facing feature specification for the proposed Special Security Mode and its supporting Settings flow.
 > Audience: Product, design, engineering, QA, and AI coding tools.
-> Status: Draft intermediate spec. This document does not yet modify the canonical PRD, TDD, SECURITY, or TESTING documents.
+> Status: Withdrawn design. This document is retained as an archived product/security review note only. It does not modify the canonical PRD, TDD, SECURITY, or TESTING documents, and Special Security Mode is not planned for implementation.
+
+## 0. Withdrawal Decision
+
+This proposal is withdrawn.
+
+The proposed mode would have offered a narrow security improvement against passcode-assisted biometric re-enrollment attacks, but it would also have introduced a substantial and user-visible risk of permanent local private-key loss after biometric enrollment changes. That tradeoff is not currently justified for CypherAir's product model.
+
+CypherAir should continue to expose the existing two private-key protection modes:
+
+- **Standard** — biometrics with device passcode fallback
+- **High Security** — biometrics only, no passcode fallback
+
+Future work should prefer improving backup clarity, restore confidence, and existing High Security messaging over adding a third mode that deliberately increases unrecoverable-data-loss risk.
 
 ## 1. Overview
 

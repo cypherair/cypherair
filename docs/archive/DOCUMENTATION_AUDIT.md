@@ -117,7 +117,7 @@ Docs with the strongest sampled alignment to current repository truth:
 | `docs/RUST_FFI_APP_SURFACE_ADOPTION_PLAN.md` | App adoption plan | Active design or roadmap | Developers, reviewers, designers, AI tools | Future UI adoption for landed Rust/FFI service work | Must separate future UI work from the shipped UI baseline | `Sources/App/Sign/VerifyScreenModel.swift`, `Sources/App/Decrypt/DecryptScreenModel.swift`, `Sources/App/Keys/KeyDetailView.swift`, `Sources/App/Contacts/ContactDetailView.swift` | 2026-04-17 | 2026-04-17 (same-day app/service state) | Posture is good, but the "current app-surface baseline" is already partially stale because `Verify` and `Decrypt` now call the detailed service APIs directly. | `update` |
 | `docs/RUST_FFI_IMPLEMENTATION_REFERENCE.md` | FFI/reference spec | Active design or roadmap | Developers, reviewers, AI tools | Future expansion reference with some current-state claims | Must keep current-state assertions synchronized even when mostly future-facing | `Sources/Services/`, `pgp-mobile/src/`, `Tests/` | 2026-04-16 | 2026-04-17 (service rollout completed) | Still says there is no current `CertificateSignatureService` owner and that detailed-result service ownership is future work. | `update` |
 | `docs/RUST_FFI_SERVICE_INTEGRATION_PLAN.md` | Rollout plan | Active design or roadmap | Developers, reviewers, AI tools | Future service-rollout queue | Must only describe work that has not already landed | `Sources/Services/`, `Tests/ServiceTests/`, `docs/RUST_FFI_APP_SURFACE_ADOPTION_PLAN.md` | 2026-04-17 | 2026-04-17 (same-day service rollout) | Still lists landed service work as future rollout items, so the remaining queue is no longer represented accurately. | `update` |
-| `docs/SPECIAL_SECURITY_MODE.md` | Future feature spec | Active design or roadmap | Product, design, engineering, QA | Proposed third auth mode | Must stay explicitly non-canonical until implemented and adopted into PRD/TDD/SECURITY | `Sources/Security/AuthenticationEvaluable.swift`, `Sources/App/Settings/`, `docs/PRD.md`, `docs/SECURITY.md` | 2026-04-06 | 2026-04-17 (auth code still exposes only `standard` + `highSecurity`) | Draft framing is explicit and code has no matching implementation yet, but top-level placement increases the chance of being misread as planned-near-term or partially shipped. | `update` |
+| `docs/archive/SPECIAL_SECURITY_MODE.md` | Withdrawn feature spec | Archived review note | Product, design, engineering, QA | Rejected third auth mode | Must remain explicitly non-canonical and unplanned | `Sources/Security/AuthenticationEvaluable.swift`, `Sources/App/Settings/`, `docs/PRD.md`, `docs/SECURITY.md` | 2026-05-10 | 2026-04-17 (auth code still exposes only `standard` + `highSecurity`) | The proposal is withdrawn and archived because the narrow anti-re-enrollment benefit does not justify the permanent private-key loss risk. | `archived` |
 | `docs/TUTORIAL_REBUILD_SPEC.md` | Future/tutorial target spec | Active design or roadmap | Developers, designers, product owners, AI tools | Ideal end-state tutorial design | Must stay clearly target-state and pair cleanly with current implementation audits | `Sources/App/Onboarding/Tutorial/`, `Tests/ServiceTests/TutorialSessionStoreTests.swift`, `docs/TUTORIAL_IMPLEMENTATION_AUDIT.md` | 2026-04-06 | 2026-04-11 (tutorial host fixes and macOS launch follow-ups) | Posture is explicit and useful; the remaining issue is taxonomy and placement, not core ambiguity inside the file. | `update` |
 
 ### Active Audit or Review Snapshots
@@ -215,9 +215,9 @@ Docs with the strongest sampled alignment to current repository truth:
 3. **Future specs are mixed into top-level `docs/` beside canonical docs**
    - Buckets: `Lifecycle or placement issue`, `Governance gap`
    - Evidence:
-     - `docs/CONTACTS_PRD.md`, `docs/CONTACTS_TDD.md`, `docs/SPECIAL_SECURITY_MODE.md`, `docs/TUTORIAL_REBUILD_SPEC.md`, and the Rust/FFI plan stack all live in top-level `docs/`.
+     - `docs/CONTACTS_PRD.md`, `docs/CONTACTS_TDD.md`, `docs/TUTORIAL_REBUILD_SPEC.md`, and the Rust/FFI plan stack all live in top-level `docs/`; `docs/archive/SPECIAL_SECURITY_MODE.md` previously did too before withdrawal and archival.
      - Those files do use draft/plan language, for example:
-       - `docs/SPECIAL_SECURITY_MODE.md:5`
+       - `docs/archive/SPECIAL_SECURITY_MODE.md:5`
        - `docs/RUST_FFI_APP_SURFACE_ADOPTION_PLAN.md:7`
    - Why it matters:
      - The lifecycle signal depends on readers noticing prose disclaimers. The path itself does not distinguish future design work from canonical current-state guidance.
@@ -280,7 +280,7 @@ Docs with the strongest sampled alignment to current repository truth:
 - `docs/RUST_FFI_IMPLEMENTATION_REFERENCE.md`
 - `docs/RUST_FFI_SERVICE_INTEGRATION_BASELINE.md`
 - `docs/RUST_FFI_SERVICE_INTEGRATION_PLAN.md`
-- `docs/SPECIAL_SECURITY_MODE.md`
+- `docs/archive/SPECIAL_SECURITY_MODE.md`
 - `docs/TDD.md`
 - `docs/TUTORIAL_IMPLEMENTATION_AUDIT.md`
 - `docs/TUTORIAL_REBUILD_SPEC.md`
