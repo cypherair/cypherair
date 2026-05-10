@@ -188,6 +188,7 @@ Mode switching requires re-wrapping all Secure Enclave protected keys.
 - Do not add “nice to have” refactors unless they directly support the requested work.
 - Let the intended architecture determine the shape of the change. Keep source layout, ownership boundaries, and project wiring aligned with the design; do not hide new behavior in unrelated places to make a diff look smaller or avoid configuration work.
   Example: Shared Swift components should live in dedicated files in the right feature or shared area. Xcode file-system sync, target membership, and test-target exclusions should reflect that structure; do not tuck reusable code into unrelated existing files to dodge that wiring.
+  Example: If `Localizable.xcstrings` marks a key with `extractionState: stale`, first verify whether the key is still referenced by Swift source. If it is unused, remove the stale catalog entry; if it is still used, fix the source/catalog extraction path. Do not make the tests pass by merely deleting the `stale` marker while leaving an unused or incorrectly extracted key behind.
 - In Plan mode only, for build-system, Xcode-project, packaging, or other high-coupling changes where toolchain behavior is a material risk, prefer validating the approach first in an isolated temporary copy or other disposable prototype environment before editing the real workspace.
 - Prefer small, reviewable diffs.
 - Maintain existing user-visible behavior unless the task explicitly changes it.

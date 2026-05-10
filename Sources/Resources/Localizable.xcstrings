@@ -1457,23 +1457,6 @@
         }
       }
     },
-    "contactcertification.projection.count" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d saved certification signatures"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d 个已保存的认证签名"
-          }
-        }
-      }
-    },
     "contactcertification.projection.invalid" : {
       "localizations" : {
         "en" : {
@@ -2418,23 +2401,6 @@
         }
       }
     },
-    "contactdetail.addTag.confirm" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加"
-          }
-        }
-      }
-    },
     "contactdetail.addTag.create" : {
       "localizations" : {
         "en" : {
@@ -2595,23 +2561,6 @@
         }
       }
     },
-    "contactdetail.certificateSignatures" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certificate Signatures"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "证书签名"
-          }
-        }
-      }
-    },
     "contactdetail.certificationDetails" : {
       "localizations" : {
         "en" : {
@@ -2720,23 +2669,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "邮箱"
-          }
-        }
-      }
-    },
-    "contactdetail.fingerprint" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fingerprint"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "指纹"
           }
         }
       }
@@ -3845,23 +3777,6 @@
         }
       }
     },
-    "contacts.selectedTags" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selected Tags"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已选标签"
-          }
-        }
-      }
-    },
     "contacts.tag.duplicate" : {
       "localizations" : {
         "en" : {
@@ -4338,40 +4253,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "格式降级为 SEIPDv1"
-          }
-        }
-      }
-    },
-    "encrypt.compat.expired" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key expired or revoked"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密钥已过期或已吊销"
-          }
-        }
-      }
-    },
-    "encrypt.compat.noPreferred" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No preferred encryption key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有首选加密密钥"
           }
         }
       }
