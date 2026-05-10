@@ -45,8 +45,11 @@ cargo audit --file pgp-mobile/Cargo.lock --deny warnings
 The GitHub PR, nightly, edge XCFramework, and stable release workflows pin
 `cargo-audit` to `0.22.1` in an independent `rust-dependency-audit` job. A
 failed audit makes the workflow/check fail, but packaging, hosted Swift tests,
-and release jobs do not declare `needs: rust-dependency-audit`, so they still
-run and produce their own signal.
+and edge release jobs do not declare `needs: rust-dependency-audit`, so they
+still run and produce their own signal. The stable workflow is stricter:
+stable asset generation still runs without depending on the audit, but the
+formal `publish-stable-release` job depends on `rust-dependency-audit` and will
+not create an immutable GitHub Release unless the audit passes.
 
 ### Layer 2: Swift Unit Tests
 
@@ -173,6 +176,7 @@ The repository also publishes unique edge XCFramework prereleases:
 
 - `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, starts the independent Rust dependency audit, rebuilds and validates the XCFramework, then publishes a unique `pgpmobile-edge-` prerelease for canonical `main` builds; non-main manual runs must use `pgpmobile-drill-*` prefixes
 - The arm64e XCFramework path consumes the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease on GitHub Actions. Stable `arm64` slices are still built with stable Rust, while `arm64e` slices use nightly Cargo with `RUSTC` pointing at the downloaded stage1 compiler.
+- `Stable Build Release` splits asset generation from publishing: `build-stable-release-assets` can upload diagnostic stable asset artifacts even if `rust-dependency-audit` fails, while `publish-stable-release` depends on both jobs and creates the immutable GitHub Release only after the audit passes.
 
 Toolchain contract:
 

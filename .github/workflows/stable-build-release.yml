@@ -56,8 +56,13 @@ jobs:
           cargo +stable install cargo-audit --version 0.22.1 --locked
           cargo audit --file pgp-mobile/Cargo.lock --deny warnings
 
-  publish-stable-release:
+  build-stable-release-assets:
     runs-on: macos-26
+    outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      create_release: ${{ steps.resolve.outputs.create_release }}
+      commit_sha: ${{ steps.resolve.outputs.commit_sha }}
+      artifact_name: ${{ steps.resolve.outputs.artifact_name }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -98,6 +103,7 @@ jobs:
           workspaces: "pgp-mobile -> target"
 
       - name: Resolve stable release settings
+        id: resolve
         env:
           INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag }}
           INPUT_CREATE_RELEASE: ${{ github.event.inputs.create_release }}
@@ -130,6 +136,7 @@ jobs:
 
           RELEASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
           COMMIT_SHA="$(git rev-parse HEAD)"
+          STABLE_RELEASE_ARTIFACT="stable-build-release-assets-${RELEASE_TAG}"
 
           {
             echo "RELEASE_TAG=$RELEASE_TAG"
@@ -137,7 +144,15 @@ jobs:
             echo "RELEASE_URL=$RELEASE_URL"
             echo "CREATE_RELEASE=$CREATE_RELEASE"
             echo "COMMIT_SHA=$COMMIT_SHA"
+            echo "STABLE_RELEASE_ARTIFACT=$STABLE_RELEASE_ARTIFACT"
           } >> "$GITHUB_ENV"
+
+          {
+            echo "release_tag=$RELEASE_TAG"
+            echo "create_release=$CREATE_RELEASE"
+            echo "commit_sha=$COMMIT_SHA"
+            echo "artifact_name=$STABLE_RELEASE_ARTIFACT"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Validate tag against project version
         run: |
@@ -258,6 +273,12 @@ jobs:
 
           This stable build page is the exact source and compliance landing page for the tagged App build and the stable \`PgpMobile.xcframework\` assets.
 
+          Release readiness:
+
+          - Formal GitHub Release creation is gated on this workflow run's \`rust-dependency-audit\` job.
+          - If the audit fails, these files may exist only as workflow artifacts and must not be treated as release-ready.
+          - Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
           Assets:
 
           - \`$SOURCE_BUNDLE\`
@@ -268,11 +289,10 @@ jobs:
           - \`$RELINK_KIT\`
           EOF
 
-      - name: Upload dry-run assets
-        if: env.CREATE_RELEASE != 'true'
+      - name: Upload stable release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: stable-build-release-assets-${{ env.RELEASE_TAG }}
+          name: ${{ env.STABLE_RELEASE_ARTIFACT }}
           path: |
             ${{ env.SOURCE_BUNDLE }}
             ${{ env.COMPLIANCE_MANIFEST }}
@@ -284,8 +304,44 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  publish-stable-release:
+    needs:
+      - rust-dependency-audit
+      - build-stable-release-assets
+    if: needs.build-stable-release-assets.outputs.create_release == 'true'
+    runs-on: macos-26
+    env:
+      RELEASE_TAG: ${{ needs.build-stable-release-assets.outputs.release_tag }}
+      COMMIT_SHA: ${{ needs.build-stable-release-assets.outputs.commit_sha }}
+      STABLE_RELEASE_ARTIFACT: ${{ needs.build-stable-release-assets.outputs.artifact_name }}
+    steps:
+      - name: Download stable release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ env.STABLE_RELEASE_ARTIFACT }}
+
+      - name: Verify stable release assets
+        run: |
+          set -euo pipefail
+
+          for asset in \
+            "$SOURCE_BUNDLE" \
+            "$COMPLIANCE_MANIFEST" \
+            "$XCFRAMEWORK_ZIP" \
+            "$XCFRAMEWORK_CHECKSUM" \
+            "$ARM64E_MANIFEST" \
+            "$RELINK_KIT" \
+            release-notes.md
+          do
+            if [ ! -f "$asset" ]; then
+              echo "::error::Missing stable release asset: $asset"
+              exit 1
+            fi
+          done
+
+          shasum -a 256 -c "$XCFRAMEWORK_CHECKSUM"
+
       - name: Generate artifact attestation
-        if: env.CREATE_RELEASE == 'true'
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-path: |
@@ -297,7 +353,6 @@ jobs:
             ${{ env.RELINK_KIT }}
 
       - name: Create immutable stable release
-        if: env.CREATE_RELEASE == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |

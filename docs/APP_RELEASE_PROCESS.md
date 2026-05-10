@@ -37,7 +37,7 @@ CypherAir's formal stable app-build release uses a unified GitHub release page.
   the workflow publishes with `gh release create --verify-tag`.
 - The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
 - The stable workflow validates that the tag's marketing version and build number match `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` before assets are published.
-- The stable workflow includes an independent `rust-dependency-audit` job that runs `cargo audit --file pgp-mobile/Cargo.lock --deny warnings` against the same checked-out ref. This job makes the workflow fail if advisories are present, but it does not block stable asset generation.
+- The stable workflow includes an independent `rust-dependency-audit` job that runs `cargo audit --file pgp-mobile/Cargo.lock --deny warnings` against the same checked-out ref. This job does not block stable asset generation, but the formal `publish-stable-release` job depends on it and will not create the immutable GitHub Release unless the audit passes.
 - Release owners choose and set the Xcode release metadata in the project. The
   release scripts read those values; they do not invent, increment, reset, or
   formula-generate `CURRENT_PROJECT_VERSION`.
@@ -57,7 +57,7 @@ Stable build binding and immutability rules:
 - Stable assets must bind to one exact marketing version, build number, release tag, and commit SHA.
 - App Store candidate archives must embed the exact stable release tag, stable release URL, and commit SHA in `SourceComplianceInfo.json`.
 - Stable assets are immutable once published. If the asset set is wrong, fix it with a new build number, new stable tag, and new release rather than replacing assets in place.
-- A stable workflow run whose `rust-dependency-audit` job fails must not be treated as release-ready, even if binary and compliance assets were generated or published.
+- If the `rust-dependency-audit` job fails, the workflow may still upload diagnostic stable asset artifacts, but it must not create the formal immutable GitHub Release and those artifacts must not be promoted manually.
 
 Version and build-number rules:
 
@@ -169,7 +169,7 @@ This order is mandatory for App Store candidates:
    - annotated and SSH-signed; lightweight and unsigned tags are not allowed
    - push the tag to `origin`; that tag push triggers the formal stable release
      workflow
-5. Wait for the GitHub stable release workflow to complete successfully.
+5. Wait for the GitHub stable release workflow to complete successfully, including the `rust-dependency-audit` and `publish-stable-release` jobs.
 6. Confirm the stable release page and required assets exist.
 7. Return to a clean `main` checkout whose `HEAD` exactly matches the stable tag commit.
 8. Open Xcode and archive using `CypherAir AppStore Candidate`.
@@ -189,6 +189,8 @@ Before uploading the App Store candidate to TestFlight, confirm:
 - the stable tag matches the app version/build
 - the GitHub stable release completed successfully
 - the stable workflow's Rust dependency audit passed without warnings
+- the release notes identify the same workflow run whose `rust-dependency-audit`
+  job gated the published GitHub Release
 - the release page includes the expected stable assets:
   `CypherAir-source-bundle.tar.zst`,
   `CypherAir-compliance-manifest.json`,
