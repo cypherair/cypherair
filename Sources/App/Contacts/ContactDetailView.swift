@@ -27,7 +27,7 @@ struct ContactDetailView: View {
     @State private var showDeleteConfirmation = false
     @State private var showMergeDialog = false
     @State private var showAddTagSheet = false
-    @State private var newTagName = ""
+    @State private var pendingTagRemoval: ContactTagSummary?
     @State private var detailError: String?
     @State private var showDetailError = false
 
@@ -134,13 +134,38 @@ struct ContactDetailView: View {
             Text(String(localized: "contactdetail.merge.message", defaultValue: "Choose another contact to merge into this contact. Their keys and memberships will move here."))
         }
         .sheet(isPresented: $showAddTagSheet) {
-            AddContactTagSheet(
-                tagName: $newTagName,
-                addTag: addTag,
-                cancel: {
-                    newTagName = ""
-                    showAddTagSheet = false
-                }
+            ContactTagAssignmentSheet(
+                availableTags: contactService.contactTagSummaries(),
+                assignedTagIds: Set(contact?.tagIds ?? []),
+                assignExistingTag: assignExistingTag,
+                createAndAssignTag: addTag
+            )
+        }
+        .confirmationDialog(
+            String(localized: "contactdetail.removeTag.title", defaultValue: "Remove Tag"),
+            isPresented: Binding(
+                get: { pendingTagRemoval != nil },
+                set: { if !$0 { pendingTagRemoval = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingTagRemoval
+        ) { tag in
+            Button(String(localized: "contactdetail.removeTag.confirm", defaultValue: "Remove Tag"), role: .destructive) {
+                removeTag(tag.tagId)
+                pendingTagRemoval = nil
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {
+                pendingTagRemoval = nil
+            }
+        } message: { tag in
+            Text(
+                String.localizedStringWithFormat(
+                    String(
+                        localized: "contactdetail.removeTag.message",
+                        defaultValue: "Remove \"%@\" from this contact?"
+                    ),
+                    tag.displayName
+                )
             )
         }
         .alert(
@@ -166,7 +191,7 @@ struct ContactDetailView: View {
                         Label(tag.displayName, systemImage: "tag")
                         Spacer()
                         Button(role: .destructive) {
-                            removeTag(tag.tagId)
+                            pendingTagRemoval = tag
                         } label: {
                             Image(systemName: "minus.circle")
                         }
@@ -178,7 +203,6 @@ struct ContactDetailView: View {
             }
 
             Button {
-                newTagName = ""
                 showAddTagSheet = true
             } label: {
                 Label(
@@ -373,14 +397,12 @@ struct ContactDetailView: View {
         }
     }
 
-    private func addTag() {
-        do {
-            try contactService.addTag(named: newTagName, toContactId: contactId)
-            newTagName = ""
-            showAddTagSheet = false
-        } catch {
-            presentError(error)
-        }
+    private func addTag(_ name: String) throws {
+        try contactService.addTag(named: name, toContactId: contactId)
+    }
+
+    private func assignExistingTag(_ tagId: String) throws {
+        try contactService.assignTag(tagId: tagId, toContactId: contactId)
     }
 
     private func removeTag(_ tagId: String) {
@@ -463,36 +485,5 @@ struct ContactDetailView: View {
             return .orange
         }
         return .secondary
-    }
-}
-
-private struct AddContactTagSheet: View {
-    @Binding var tagName: String
-    let addTag: () -> Void
-    let cancel: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                TextField(
-                    String(localized: "contactdetail.addTag.field", defaultValue: "Tag Name"),
-                    text: $tagName
-                )
-            }
-            .navigationTitle(String(localized: "contactdetail.addTag.title", defaultValue: "Add Tag"))
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                        cancel()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "contactdetail.addTag.confirm", defaultValue: "Add")) {
-                        addTag()
-                    }
-                    .disabled(ContactTag.displayName(for: tagName).isEmpty)
-                }
-            }
-        }
     }
 }

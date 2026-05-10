@@ -164,7 +164,6 @@ struct ContactSnapshotMutator {
         pruneCertificationArtifacts(forRemovedKeyIds: removedKeyIds, in: &snapshot)
         if !snapshot.keyRecords.contains(where: { $0.contactId == keyRecord.contactId }) {
             snapshot.identities.removeAll { $0.contactId == keyRecord.contactId }
-            pruneUnusedTags(in: &snapshot)
         }
         snapshot.updatedAt = now
         try normalizeKeyUsage(in: &snapshot, updatedAt: now)
@@ -188,7 +187,6 @@ struct ContactSnapshotMutator {
         snapshot.identities.removeAll { $0.contactId == contactId }
         snapshot.keyRecords.removeAll { $0.contactId == contactId }
         pruneCertificationArtifacts(forRemovedKeyIds: removedKeyIds, in: &snapshot)
-        pruneUnusedTags(in: &snapshot)
         snapshot.updatedAt = now
         try snapshot.validateContract()
         return Mutation(output: (), didMutate: true)
@@ -259,6 +257,107 @@ struct ContactSnapshotMutator {
     }
 
     @discardableResult
+    func createTag(
+        named rawName: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<ContactTag> {
+        let displayName = ContactTag.displayName(for: rawName)
+        guard !displayName.isEmpty else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(localized: "contacts.tag.empty", defaultValue: "Enter a tag name.")
+            )
+        }
+
+        let normalizedName = ContactTag.normalizedName(for: displayName)
+        guard !snapshot.tags.contains(where: { $0.normalizedName == normalizedName }) else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(
+                    localized: "contacts.tag.duplicate",
+                    defaultValue: "A tag with this name already exists."
+                )
+            )
+        }
+
+        let now = Date()
+        let tag = ContactTag(
+            tagId: "tag-\(UUID().uuidString)",
+            displayName: displayName,
+            normalizedName: normalizedName,
+            createdAt: now,
+            updatedAt: now
+        )
+        snapshot.tags.append(tag)
+        snapshot.updatedAt = now
+        try snapshot.validateContract()
+        return Mutation(output: tag, didMutate: true)
+    }
+
+    @discardableResult
+    func renameTag(
+        tagId: String,
+        to rawName: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<ContactTag> {
+        let displayName = ContactTag.displayName(for: rawName)
+        guard !displayName.isEmpty else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(localized: "contacts.tag.empty", defaultValue: "Enter a tag name.")
+            )
+        }
+        guard let tagIndex = snapshot.tags.firstIndex(where: { $0.tagId == tagId }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.tag.notFound", defaultValue: "The selected tag could not be found.")
+            )
+        }
+
+        let normalizedName = ContactTag.normalizedName(for: displayName)
+        let duplicateExists = snapshot.tags.contains {
+            $0.tagId != tagId && $0.normalizedName == normalizedName
+        }
+        guard !duplicateExists else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(
+                    localized: "contacts.tag.duplicate",
+                    defaultValue: "A tag with this name already exists."
+                )
+            )
+        }
+
+        guard snapshot.tags[tagIndex].displayName != displayName ||
+            snapshot.tags[tagIndex].normalizedName != normalizedName else {
+            return Mutation(output: snapshot.tags[tagIndex], didMutate: false)
+        }
+
+        let now = Date()
+        snapshot.tags[tagIndex].displayName = displayName
+        snapshot.tags[tagIndex].normalizedName = normalizedName
+        snapshot.tags[tagIndex].updatedAt = now
+        snapshot.updatedAt = now
+        try snapshot.validateContract()
+        return Mutation(output: snapshot.tags[tagIndex], didMutate: true)
+    }
+
+    @discardableResult
+    func deleteTag(
+        tagId: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<Void> {
+        guard snapshot.tags.contains(where: { $0.tagId == tagId }) else {
+            return Mutation(output: (), didMutate: false)
+        }
+
+        let now = Date()
+        snapshot.tags.removeAll { $0.tagId == tagId }
+        for index in snapshot.identities.indices where snapshot.identities[index].tagIds.contains(tagId) {
+            snapshot.identities[index].tagIds.removeAll { $0 == tagId }
+            snapshot.identities[index].updatedAt = now
+        }
+        snapshot.updatedAt = now
+        try snapshot.validateContract()
+        return Mutation(output: (), didMutate: true)
+    }
+
+    @discardableResult
     func addTag(
         named rawName: String,
         toContactId contactId: String,
@@ -308,6 +407,35 @@ struct ContactSnapshotMutator {
     }
 
     @discardableResult
+    func assignTag(
+        tagId: String,
+        toContactId contactId: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<ContactTag> {
+        guard let tag = snapshot.tags.first(where: { $0.tagId == tagId }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.tag.notFound", defaultValue: "The selected tag could not be found.")
+            )
+        }
+        guard let contactIndex = snapshot.identities.firstIndex(where: { $0.contactId == contactId }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+        guard !snapshot.identities[contactIndex].tagIds.contains(tagId) else {
+            return Mutation(output: tag, didMutate: false)
+        }
+
+        let now = Date()
+        snapshot.identities[contactIndex].tagIds.append(tagId)
+        snapshot.identities[contactIndex].tagIds.sort()
+        snapshot.identities[contactIndex].updatedAt = now
+        snapshot.updatedAt = now
+        try snapshot.validateContract()
+        return Mutation(output: tag, didMutate: true)
+    }
+
+    @discardableResult
     func removeTag(
         tagId: String,
         fromContactId contactId: String,
@@ -325,7 +453,51 @@ struct ContactSnapshotMutator {
         let now = Date()
         snapshot.identities[contactIndex].tagIds.removeAll { $0 == tagId }
         snapshot.identities[contactIndex].updatedAt = now
-        pruneUnusedTags(in: &snapshot)
+        snapshot.updatedAt = now
+        try snapshot.validateContract()
+        return Mutation(output: (), didMutate: true)
+    }
+
+    @discardableResult
+    func replaceTagMembership(
+        tagId: String,
+        contactIds: Set<String>,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<Void> {
+        guard snapshot.tags.contains(where: { $0.tagId == tagId }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.tag.notFound", defaultValue: "The selected tag could not be found.")
+            )
+        }
+        let availableContactIds = Set(snapshot.identities.map(\.contactId))
+        guard contactIds.isSubset(of: availableContactIds) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+
+        let now = Date()
+        var didMutate = false
+        for index in snapshot.identities.indices {
+            let shouldContainTag = contactIds.contains(snapshot.identities[index].contactId)
+            let containsTag = snapshot.identities[index].tagIds.contains(tagId)
+            guard shouldContainTag != containsTag else {
+                continue
+            }
+
+            if shouldContainTag {
+                snapshot.identities[index].tagIds.append(tagId)
+                snapshot.identities[index].tagIds.sort()
+            } else {
+                snapshot.identities[index].tagIds.removeAll { $0 == tagId }
+            }
+            snapshot.identities[index].updatedAt = now
+            didMutate = true
+        }
+
+        guard didMutate else {
+            return Mutation(output: (), didMutate: false)
+        }
         snapshot.updatedAt = now
         try snapshot.validateContract()
         return Mutation(output: (), didMutate: true)
@@ -663,11 +835,6 @@ struct ContactSnapshotMutator {
         snapshot.certificationArtifacts.removeAll {
             removedKeyIds.contains($0.keyId)
         }
-    }
-
-    private func pruneUnusedTags(in snapshot: inout ContactsDomainSnapshot) {
-        let usedTagIds = Set(snapshot.identities.flatMap(\.tagIds))
-        snapshot.tags.removeAll { !usedTagIds.contains($0.tagId) }
     }
 
     private func markCertificationArtifactsStaleIfTargetChanged(

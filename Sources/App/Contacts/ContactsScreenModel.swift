@@ -69,6 +69,20 @@ final class ContactsScreenModel {
         rawSelectedTagFilterIds = selectedIds
     }
 
+    func isTagFilterSelected(_ tagId: String) -> Bool {
+        selectedTagFilterIds.contains(tagId)
+    }
+
+    func applyTagSuggestion(_ tagId: String) {
+        let filters = tagFilters
+        let availableTagIds = Set(filters.map(\.tagId))
+        guard availableTagIds.contains(tagId) else {
+            return
+        }
+        rawSelectedTagFilterIds = [tagId]
+        searchText = ""
+    }
+
     func clearTagFilters() {
         rawSelectedTagFilterIds.removeAll()
     }

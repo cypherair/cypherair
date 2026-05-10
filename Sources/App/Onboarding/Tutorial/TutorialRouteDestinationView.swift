@@ -126,6 +126,8 @@ struct TutorialRouteDestinationView: View {
                     )
                 }
             )
+        case .tagManagement:
+            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { TagManagementView() })
         case .qrDisplay(let publicKeyData, let displayName):
             return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { QRDisplayView(publicKeyData: publicKeyData, displayName: displayName) })
         case .importKey:
