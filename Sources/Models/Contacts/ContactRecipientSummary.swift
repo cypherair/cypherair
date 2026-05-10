@@ -6,6 +6,7 @@ struct ContactRecipientSummary: Identifiable, Hashable, Sendable {
     let contactId: String
     let displayName: String
     let primaryEmail: String?
+    let tagIds: [String]
     let preferredKey: ContactKeySummary
 
     var isPreferredKeyVerified: Bool {

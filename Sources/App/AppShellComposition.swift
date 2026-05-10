@@ -27,6 +27,10 @@ struct AppRouteDestinationView: View {
             )
         case .contactCertificateSignatures(let fingerprint):
             ContactCertificateSignaturesView(fingerprint: fingerprint)
+        case .recipientLists:
+            RecipientListsView()
+        case .recipientListDetail(let recipientListId):
+            RecipientListDetailView(recipientListId: recipientListId)
         case .addContact:
             AddContactView()
         case .qrDisplay(let publicKeyData, let displayName):

@@ -164,6 +164,7 @@ struct ContactSnapshotMutator {
         pruneCertificationArtifacts(forRemovedKeyIds: removedKeyIds, in: &snapshot)
         if !snapshot.keyRecords.contains(where: { $0.contactId == keyRecord.contactId }) {
             snapshot.identities.removeAll { $0.contactId == keyRecord.contactId }
+            pruneUnusedTags(in: &snapshot)
             for listIndex in snapshot.recipientLists.indices {
                 snapshot.recipientLists[listIndex].memberContactIds.removeAll { $0 == keyRecord.contactId }
                 snapshot.recipientLists[listIndex].updatedAt = now
@@ -191,6 +192,7 @@ struct ContactSnapshotMutator {
         snapshot.identities.removeAll { $0.contactId == contactId }
         snapshot.keyRecords.removeAll { $0.contactId == contactId }
         pruneCertificationArtifacts(forRemovedKeyIds: removedKeyIds, in: &snapshot)
+        pruneUnusedTags(in: &snapshot)
         for listIndex in snapshot.recipientLists.indices {
             snapshot.recipientLists[listIndex].memberContactIds.removeAll { $0 == contactId }
             snapshot.recipientLists[listIndex].updatedAt = now
@@ -262,6 +264,211 @@ struct ContactSnapshotMutator {
         snapshot.updatedAt = now
         try normalizeKeyUsage(in: &snapshot, updatedAt: now)
         return Mutation(output: (), didMutate: true)
+    }
+
+    @discardableResult
+    func addTag(
+        named rawName: String,
+        toContactId contactId: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<ContactTag> {
+        let displayName = ContactTag.displayName(for: rawName)
+        guard !displayName.isEmpty else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(localized: "contacts.tag.empty", defaultValue: "Enter a tag name.")
+            )
+        }
+
+        guard let contactIndex = snapshot.identities.firstIndex(where: { $0.contactId == contactId }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+
+        let now = Date()
+        let normalizedName = ContactTag.normalizedName(for: displayName)
+        if let existingTag = snapshot.tags.first(where: { $0.normalizedName == normalizedName }) {
+            guard !snapshot.identities[contactIndex].tagIds.contains(existingTag.tagId) else {
+                return Mutation(output: existingTag, didMutate: false)
+            }
+            snapshot.identities[contactIndex].tagIds.append(existingTag.tagId)
+            snapshot.identities[contactIndex].tagIds.sort()
+            snapshot.identities[contactIndex].updatedAt = now
+            snapshot.updatedAt = now
+            try snapshot.validateContract()
+            return Mutation(output: existingTag, didMutate: true)
+        }
+
+        let tag = ContactTag(
+            tagId: "tag-\(UUID().uuidString)",
+            displayName: displayName,
+            normalizedName: normalizedName,
+            createdAt: now,
+            updatedAt: now
+        )
+        snapshot.tags.append(tag)
+        snapshot.identities[contactIndex].tagIds.append(tag.tagId)
+        snapshot.identities[contactIndex].tagIds.sort()
+        snapshot.identities[contactIndex].updatedAt = now
+        snapshot.updatedAt = now
+        try snapshot.validateContract()
+        return Mutation(output: tag, didMutate: true)
+    }
+
+    @discardableResult
+    func removeTag(
+        tagId: String,
+        fromContactId contactId: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<Void> {
+        guard let contactIndex = snapshot.identities.firstIndex(where: { $0.contactId == contactId }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+            )
+        }
+        guard snapshot.identities[contactIndex].tagIds.contains(tagId) else {
+            return Mutation(output: (), didMutate: false)
+        }
+
+        let now = Date()
+        snapshot.identities[contactIndex].tagIds.removeAll { $0 == tagId }
+        snapshot.identities[contactIndex].updatedAt = now
+        pruneUnusedTags(in: &snapshot)
+        snapshot.updatedAt = now
+        try snapshot.validateContract()
+        return Mutation(output: (), didMutate: true)
+    }
+
+    @discardableResult
+    func createRecipientList(
+        named rawName: String,
+        memberContactIds: [String],
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<RecipientList> {
+        let name = try normalizedRecipientListName(rawName)
+        let members = try uniqueExistingMemberContactIds(memberContactIds, in: snapshot)
+        let now = Date()
+        let recipientList = RecipientList(
+            recipientListId: "list-\(UUID().uuidString)",
+            name: name,
+            memberContactIds: members,
+            createdAt: now,
+            updatedAt: now
+        )
+        snapshot.recipientLists.append(recipientList)
+        snapshot.updatedAt = now
+        try snapshot.validateContract()
+        return Mutation(output: recipientList, didMutate: true)
+    }
+
+    @discardableResult
+    func renameRecipientList(
+        _ recipientListId: String,
+        to rawName: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<RecipientList> {
+        let name = try normalizedRecipientListName(rawName)
+        guard let listIndex = snapshot.recipientLists.firstIndex(where: {
+            $0.recipientListId == recipientListId
+        }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.recipientList.notFound", defaultValue: "The selected recipient list could not be found.")
+            )
+        }
+        guard snapshot.recipientLists[listIndex].name != name else {
+            return Mutation(output: snapshot.recipientLists[listIndex], didMutate: false)
+        }
+
+        snapshot.recipientLists[listIndex].name = name
+        snapshot.recipientLists[listIndex].updatedAt = Date()
+        snapshot.updatedAt = snapshot.recipientLists[listIndex].updatedAt
+        try snapshot.validateContract()
+        return Mutation(output: snapshot.recipientLists[listIndex], didMutate: true)
+    }
+
+    @discardableResult
+    func deleteRecipientList(
+        _ recipientListId: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<Void> {
+        guard snapshot.recipientLists.contains(where: { $0.recipientListId == recipientListId }) else {
+            return Mutation(output: (), didMutate: false)
+        }
+        snapshot.recipientLists.removeAll { $0.recipientListId == recipientListId }
+        snapshot.updatedAt = Date()
+        try snapshot.validateContract()
+        return Mutation(output: (), didMutate: true)
+    }
+
+    @discardableResult
+    func setRecipientListMembers(
+        _ recipientListId: String,
+        memberContactIds: [String],
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<RecipientList> {
+        guard let listIndex = snapshot.recipientLists.firstIndex(where: {
+            $0.recipientListId == recipientListId
+        }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.recipientList.notFound", defaultValue: "The selected recipient list could not be found.")
+            )
+        }
+        let members = try uniqueExistingMemberContactIds(memberContactIds, in: snapshot)
+        guard snapshot.recipientLists[listIndex].memberContactIds != members else {
+            return Mutation(output: snapshot.recipientLists[listIndex], didMutate: false)
+        }
+
+        snapshot.recipientLists[listIndex].memberContactIds = members
+        snapshot.recipientLists[listIndex].updatedAt = Date()
+        snapshot.updatedAt = snapshot.recipientLists[listIndex].updatedAt
+        try snapshot.validateContract()
+        return Mutation(output: snapshot.recipientLists[listIndex], didMutate: true)
+    }
+
+    @discardableResult
+    func addContact(
+        _ contactId: String,
+        toRecipientList recipientListId: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<RecipientList> {
+        guard let list = snapshot.recipientLists.first(where: {
+            $0.recipientListId == recipientListId
+        }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.recipientList.notFound", defaultValue: "The selected recipient list could not be found.")
+            )
+        }
+        guard !list.memberContactIds.contains(contactId) else {
+            return Mutation(output: list, didMutate: false)
+        }
+        return try setRecipientListMembers(
+            recipientListId,
+            memberContactIds: list.memberContactIds + [contactId],
+            in: &snapshot
+        )
+    }
+
+    @discardableResult
+    func removeContact(
+        _ contactId: String,
+        fromRecipientList recipientListId: String,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> Mutation<RecipientList> {
+        guard let list = snapshot.recipientLists.first(where: {
+            $0.recipientListId == recipientListId
+        }) else {
+            throw CypherAirError.internalError(
+                reason: String(localized: "contacts.recipientList.notFound", defaultValue: "The selected recipient list could not be found.")
+            )
+        }
+        guard list.memberContactIds.contains(contactId) else {
+            return Mutation(output: list, didMutate: false)
+        }
+        return try setRecipientListMembers(
+            recipientListId,
+            memberContactIds: list.memberContactIds.filter { $0 != contactId },
+            in: &snapshot
+        )
     }
 
     func mergeContact(
@@ -604,6 +811,45 @@ struct ContactSnapshotMutator {
         snapshot.certificationArtifacts.removeAll {
             removedKeyIds.contains($0.keyId)
         }
+    }
+
+    private func pruneUnusedTags(in snapshot: inout ContactsDomainSnapshot) {
+        let usedTagIds = Set(snapshot.identities.flatMap(\.tagIds))
+        snapshot.tags.removeAll { !usedTagIds.contains($0.tagId) }
+    }
+
+    private func normalizedRecipientListName(_ rawName: String) throws -> String {
+        let name = rawName
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        guard !name.isEmpty else {
+            throw CypherAirError.invalidKeyData(
+                reason: String(localized: "contacts.recipientList.emptyName", defaultValue: "Enter a recipient list name.")
+            )
+        }
+        return name
+    }
+
+    private func uniqueExistingMemberContactIds(
+        _ memberContactIds: [String],
+        in snapshot: ContactsDomainSnapshot
+    ) throws -> [String] {
+        let availableContactIds = Set(snapshot.identities.map(\.contactId))
+        var seenContactIds: Set<String> = []
+        var resolvedMemberContactIds: [String] = []
+
+        for contactId in memberContactIds {
+            guard availableContactIds.contains(contactId) else {
+                throw CypherAirError.internalError(
+                    reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
+                )
+            }
+            if seenContactIds.insert(contactId).inserted {
+                resolvedMemberContactIds.append(contactId)
+            }
+        }
+
+        return resolvedMemberContactIds
     }
 
     private func markCertificationArtifactsStaleIfTargetChanged(

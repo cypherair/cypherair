@@ -19,6 +19,8 @@ enum AppRoute: Hashable {
     case contactDetail(contactId: String)
     case contactCertification(contactId: String, keyId: String?, intent: ContactCertificationRouteIntent)
     case contactCertificateSignatures(fingerprint: String)
+    case recipientLists
+    case recipientListDetail(recipientListId: String)
     case addContact
     case qrDisplay(publicKeyData: Data, displayName: String)
 

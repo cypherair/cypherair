@@ -7,6 +7,7 @@ struct ContactIdentitySummary: Identifiable, Hashable, Sendable {
     let displayName: String
     let primaryEmail: String?
     let tagIds: [String]
+    let tags: [ContactTagSummary]
     let notes: String?
     let keys: [ContactKeySummary]
 
