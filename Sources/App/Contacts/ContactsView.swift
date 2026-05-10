@@ -11,6 +11,7 @@ struct ContactsView: View {
 
 private struct ContactsScreenHostView: View {
     @Environment(\.appRouteNavigator) private var routeNavigator
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model: ContactsScreenModel
 
     init(contactService: ContactService) {
@@ -39,7 +40,9 @@ private struct ContactsScreenHostView: View {
         .searchSuggestions {
             ForEach(model.tagSuggestions.prefix(6)) { tag in
                 Button {
-                    model.applyTagSuggestion(tag.tagId)
+                    withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
+                        model.applyTagSuggestion(tag.tagId)
+                    }
                 } label: {
                     Label(tag.displayName, systemImage: "tag")
                 }
@@ -96,14 +99,18 @@ private extension ContactsScreenHostView {
                                     tag: tag,
                                     isSelected: model.isTagFilterSelected(tag.tagId),
                                     toggle: {
-                                        model.toggleTagFilter(tag.tagId)
+                                        withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
+                                            model.toggleTagFilter(tag.tagId)
+                                        }
                                     }
                                 )
                             }
 
                             if !model.selectedTagFilters.isEmpty {
                                 Button {
-                                    model.clearTagFilters()
+                                    withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
+                                        model.clearTagFilters()
+                                    }
                                 } label: {
                                     Label(
                                         String(localized: "contacts.clearTagFilters", defaultValue: "Clear"),
@@ -112,6 +119,7 @@ private extension ContactsScreenHostView {
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
+                                .transition(.opacity.combined(with: .scale(scale: 0.96)))
                             }
                         }
                     }
@@ -130,15 +138,30 @@ private extension ContactsScreenHostView {
                 model.deleteContacts(at: indexSet, from: contacts)
             }
         }
+        .scrollDismissesKeyboardInteractivelyIfAvailable()
         .overlay {
             if contacts.isEmpty {
                 if model.hasActiveSearchOrFilters {
                     noResultsContent
+                        .transition(.opacity)
                 } else {
                     emptyStateContent
+                        .transition(.opacity)
                 }
             }
         }
+        .animation(
+            CypherMotion.quickEaseOut(reduceMotion: reduceMotion),
+            value: contacts.map(\.contactId)
+        )
+        .animation(
+            CypherMotion.quickEaseOut(reduceMotion: reduceMotion),
+            value: model.selectedTagFilterIds
+        )
+        .animation(
+            CypherMotion.quickEaseOut(reduceMotion: reduceMotion),
+            value: model.hasActiveSearchOrFilters
+        )
         .cypherMacReadableContent()
     }
 

@@ -129,6 +129,7 @@ private struct TagManagementHostView: View {
                 membersSection(selectedTag, model: model)
             }
         }
+        .scrollDismissesKeyboardInteractivelyIfAvailable()
         #if os(macOS)
         .formStyle(.grouped)
         #endif

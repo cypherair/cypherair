@@ -50,6 +50,7 @@ struct ContactTagAssignmentSheet: View {
                     Text(String(localized: "contactdetail.addTag.new", defaultValue: "New Tag"))
                 }
             }
+            .scrollDismissesKeyboardInteractivelyIfAvailable()
             .navigationTitle(String(localized: "contactdetail.addTag.title", defaultValue: "Add Tag"))
             .searchable(
                 text: $searchText,
