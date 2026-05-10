@@ -174,10 +174,10 @@
 				Models/Contacts/ContactMergePreview.swift,
 				Models/Contacts/ContactMergeResult.swift,
 				Models/Contacts/ContactRecipientSummary.swift,
-				Models/Contacts/ContactTagSummary.swift,
 				Models/Contacts/ContactsAvailability.swift,
 				Models/Contacts/ContactsDomainSnapshot.swift,
 				Models/Contacts/ContactTag.swift,
+				Models/Contacts/ContactTagSummary.swift,
 				Models/Contacts/RecipientList.swift,
 				Models/Contacts/RecipientListSummary.swift,
 				Models/CypherAirError.swift,
@@ -254,8 +254,8 @@
 				Services/ContactsDomainRepository.swift,
 				Services/ContactService.swift,
 				Services/ContactsLegacyMigrationSource.swift,
-				Services/ContactsSearchIndex.swift,
 				Services/ContactSnapshotMutator.swift,
+				Services/ContactsSearchIndex.swift,
 				Services/ContactSummaryProjector.swift,
 				Services/DecryptionService.swift,
 				Services/DiskSpaceChecker.swift,
@@ -733,7 +733,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 13901;
+				CURRENT_PROJECT_VERSION = 14000;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -763,7 +763,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.3.9;
+				MARKETING_VERSION = 1.4.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -958,7 +958,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 13901;
+				CURRENT_PROJECT_VERSION = 14000;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -988,7 +988,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.3.9;
+				MARKETING_VERSION = 1.4.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -1103,7 +1103,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 13901;
+				CURRENT_PROJECT_VERSION = 14000;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1133,7 +1133,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.3.9;
+				MARKETING_VERSION = 1.4.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
