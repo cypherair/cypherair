@@ -26,6 +26,24 @@ env:
   ARM64E_DEPENDENCY_FRESHNESS_LEVEL: error
 
 jobs:
+  rust-dependency-audit:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Install Rust stable toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install stable
+          rustup default stable
+          rustc +stable --version
+          cargo +stable --version
+      - name: Audit Rust dependencies
+        run: |
+          cargo +stable install cargo-audit --version 0.22.1 --locked
+          cargo audit --file pgp-mobile/Cargo.lock --deny warnings
+
   publish-edge-release:
     runs-on: macos-26
     steps:
