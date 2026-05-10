@@ -32,7 +32,8 @@ Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`
 - [ ] Startup diagnostics remain generic and do not leak fingerprints or key identifiers
 - [ ] ProtectedData changes preserve the app-data/private-key-material boundary: no SE-wrapped private-key bundle bytes are copied into ProtectedData payloads
 - [ ] ProtectedData changes preserve registry authority, explicit pending-mutation recovery, no-silent-reset behavior, relock zeroization, and `restartRequired` fail-closed semantics
-- [ ] ProtectedData changes that migrate a persisted surface update `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed; Contacts storage or behavior changes update long-term docs and the inventory, and `CONTACTS_DOC_BRIDGE.md` is used only for consolidation/archive work on Contacts-specific docs
+- [ ] ProtectedData changes that migrate a persisted surface update `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed
+- [ ] Contacts changes preserve protected-domain-only production state, no legacy/quarantine fallback, runtime-only search/filter/selection state, per-key manual verification and certification state, relock cleanup, and the no-package-exchange / mandatory-encrypted-future-backup boundary
 
 ## Rust API Changes
 

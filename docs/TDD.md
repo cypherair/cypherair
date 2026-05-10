@@ -375,6 +375,14 @@ Current production domain families and their row-level payload classification ar
 
 The current `contacts` domain is the authoritative protected source for Contacts data. Person-centered key modeling and merge behavior, certification projection and saved certification artifacts, search, tags, recipient-list organization, and Encrypt recipient-list selection are implemented over the unlocked protected `contacts` snapshot. Search indexes, screen filters, and recipient selections are runtime state only, not persisted state. Contacts package exchange is not implemented; any future complete Contacts backup must be designed separately as mandatory encrypted backup.
 
+### 6.2 Contacts Domain Contract
+
+The protected Contacts payload is a `ContactsDomainSnapshot` with `ContactIdentity`, `ContactKeyRecord`, `ContactTag`, `RecipientList`, and `ContactCertificationArtifactReference` records. Contact identities own display name, primary email, tag membership, notes, and timestamps. Key records own public certificate bytes, fingerprint/User ID/profile/algorithm metadata, manual verification state, preferred/additional/historical usage state, certification projection, and certification artifact references.
+
+At most one encryptable key per contact may be preferred. Additional active keys remain usable as contact-owned key material but are not selected for recipient-list resolution unless made preferred. Historical keys are excluded from encryption recipient resolution while remaining available for signer recognition and history. Merge operations preserve per-key manual verification and certification state, union tags and recipient-list memberships, and keep certification artifacts attached to their original key records.
+
+Recipient lists store named contact-ID member sets and resolve at send time to each member's current preferred encryptable key. Tags normalize display text for case-insensitive uniqueness. Contacts search indexes, screen filters, pending route state, recipient selection, signer lookup caches, and other derived projections are runtime-only and must be cleared on relock or content clear rather than persisted outside the protected `contacts` payload.
+
 Migration and exception rules:
 
 - Legacy `authMode`, rewrap, and modify-expiry `UserDefaults` keys are migration sources only after verified `private-key-control` creation/open.
@@ -386,7 +394,7 @@ Migration and exception rules:
 - Future protected-domain migrations must preserve readable source state until the protected destination is created/opened and verified through the normal post-auth path.
 - After cutover, legacy sources are cleanup/quarantine only and must not become fallback sources of truth.
 - Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary settings boot-authentication exception.
-- Documentation updates for storage or migration changes belong in `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and affected Contacts docs when Contacts is involved.
+- Documentation updates for storage or migration changes belong in `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed.
 
 ---
 

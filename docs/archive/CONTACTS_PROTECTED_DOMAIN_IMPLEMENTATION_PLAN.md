@@ -1,12 +1,20 @@
 # Contacts Protected Domain Implementation Plan
 
+> **Status:** Archived historical Contacts implementation plan.
+> **Archived on:** 2026-05-10.
+> **Archival reason:** Durable current-state Contacts implementation facts have been consolidated into long-term docs; PR-by-PR sequencing remains historical context only.
+> **Successor documents:** [TDD](../TDD.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TESTING](../TESTING.md) · [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md)
+> **Current code and active canonical docs outrank this archived file whenever they disagree.**
+>
+> Original snapshot metadata follows.
+
 > **Version:** Draft v0.5
 > **Status:** Draft implementation-prep plan for remaining Contacts feature work, updated with the Contacts PR7 package-exchange withdrawal.
 > **Purpose:** Bridge the gap between the current shared ProtectedData framework, implemented Contacts protected-domain security/storage behavior, and the remaining Contacts feature work so later implementation can proceed through a stable, reviewable PR sequence.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Companion document:** [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
-> **Primary authority:** [CONTACTS_TDD](CONTACTS_TDD.md) for Contacts design intent and [ARCHITECTURE](ARCHITECTURE.md) / [SECURITY](SECURITY.md) / [TDD](TDD.md) for current shared ProtectedData architecture.
-> **Related documents:** [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [TESTING](TESTING.md)
+> **Primary authority:** [CONTACTS_TDD](CONTACTS_TDD.md) for Contacts design intent and [ARCHITECTURE](../ARCHITECTURE.md) / [SECURITY](../SECURITY.md) / [TDD](../TDD.md) for current shared ProtectedData architecture.
+> **Related documents:** [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) · [TESTING](../TESTING.md)
 
 ## 1. Scope And Relationship
 
@@ -23,7 +31,7 @@ This document does not replace the existing formal specs.
 
 If this document conflicts with:
 
-- [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), or [TDD](TDD.md) on current shared-framework architecture or security rules, those long-lived docs win
+- [ARCHITECTURE](../ARCHITECTURE.md), [SECURITY](../SECURITY.md), or [TDD](../TDD.md) on current shared-framework architecture or security rules, those long-lived docs win
 - [CONTACTS_TDD](CONTACTS_TDD.md) on Contacts target behavior, the Contacts TDD wins
 - Contacts PR1-PR8 sequencing or inventory ownership, this document is the active authority unless a later Contacts implementation plan replaces it
 

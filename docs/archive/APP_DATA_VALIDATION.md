@@ -3,7 +3,7 @@
 > **Status:** Archived historical AppData validation snapshot.
 > **Archived on:** 2026-04-28.
 > **Archival reason:** Implemented Phase 1-6 validation ownership has been synchronized into the long-lived testing and review documentation.
-> **Successor documents:** [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_TDD](../CONTACTS_TDD.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
+> **Successor documents:** [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [TDD](../TDD.md)
 > **Current code and active canonical docs outrank this archived file whenever they disagree.**
 
 Original snapshot metadata follows.
@@ -14,7 +14,7 @@ Original snapshot metadata follows.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Primary authority:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture and security rules, and [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) for rollout intent.
 > **Companion documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
-> **Related documents:** [TESTING](../TESTING.md) · [CONTACTS_TDD](../CONTACTS_TDD.md)
+> **Related documents:** [TESTING](../TESTING.md) · [CONTACTS_TDD](CONTACTS_TDD.md)
 
 ## 1. Scope And Relationship
 

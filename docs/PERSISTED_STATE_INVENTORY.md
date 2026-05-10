@@ -11,7 +11,7 @@
 
 The long-term goal is to protect every CypherAir-owned local data surface unless a documented technical or security reason keeps it outside a protected domain.
 
-This inventory tracks current shipped state plus pending classified surfaces. It is not a roadmap narrative. Contacts-specific documents are consolidation source material only; [CONTACTS_DOC_BRIDGE](CONTACTS_DOC_BRIDGE.md) controls any later move of durable Contacts content into long-term docs before archive.
+This inventory tracks current shipped state plus pending classified surfaces. It is not a roadmap narrative. Archived Contacts-specific documents are historical source material only; current persisted-state classification lives here.
 
 Every in-scope row must carry:
 
@@ -88,7 +88,7 @@ Every future migration from plaintext, Keychain metadata, or non-uniform local s
 - make corrupted committed protected state a recovery surface
 - document cleanup or quarantine behavior explicitly
 - update this inventory, [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), [TESTING](TESTING.md), and [CODE_REVIEW](CODE_REVIEW.md) as needed in the same change
-- for Contacts protected-domain behavior, storage, or mutation changes, update the long-term docs above and this inventory; use [CONTACTS_DOC_BRIDGE](CONTACTS_DOC_BRIDGE.md) only when consolidating or archiving Contacts-specific source docs
+- for Contacts protected-domain behavior, storage, or mutation changes, update the long-term docs above and this inventory
 
 For Phase 7 settings, no shadow copy may be introduced to preserve pre-unlock behavior. If a setting still controls launch authentication, startup routing, or pre-unlock UI before ProtectedData opens, the implementation must first redesign that read path or keep the setting as an explicit boot exception. The only ordinary-settings boot-auth exception is `appSessionAuthenticationPolicy`.
 

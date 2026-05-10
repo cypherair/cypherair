@@ -150,7 +150,7 @@ Completed Phase 7 validation expectations:
 
 Current Contacts validation expectations:
 
-- Contacts validation should prove person-centered merge/preferred-key behavior, certification projection and artifact persistence, search, tags, recipient lists, route states, relock cleanup, and Encrypt recipient-list selection over the protected `contacts` domain without reactivating legacy Contacts files or weakening the implemented protected-domain security lifecycle.
+- Contacts validation should prove person-centered merge/preferred/additional/historical key behavior, per-key verification/certification preservation, certification projection and artifact persistence/revalidation, search ranking, tag normalization, recipient-list CRUD/resolution, locked/opening/recovery/framework-unavailable route states, relock cleanup, and Encrypt recipient-list selection over the protected `contacts` domain without reactivating legacy Contacts files or weakening the implemented protected-domain security lifecycle.
 - Contacts package exchange is not active; any future complete Contacts backup must be covered by a separate mandatory encrypted design and test plan.
 
 Docs-only documentation authority or archive PRs do not require Rust or Xcode test runs unless they touch code, generated files, project files, entitlements, release metadata, or build settings. They should still run documentation consistency checks, link checks for active platform references, and `git diff --check`.
