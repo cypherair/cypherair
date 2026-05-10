@@ -897,22 +897,6 @@
         }
       }
     },
-    "common.done" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Done"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完成"
-          }
-        }
-      }
-    },
     "common.dismiss" : {
       "localizations" : {
         "en" : {
@@ -925,6 +909,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关闭"
+          }
+        }
+      }
+    },
+    "common.done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
           }
         }
       }
@@ -1458,6 +1458,7 @@
       }
     },
     "contactcertification.projection.count" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2530,6 +2531,7 @@
       }
     },
     "contactdetail.certificateSignatures" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2658,6 +2660,7 @@
       }
     },
     "contactdetail.fingerprint" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4113,6 +4116,22 @@
         }
       }
     },
+    "encrypt.addByTag" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add by Tag"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按标签添加"
+          }
+        }
+      }
+    },
     "encrypt.button" : {
       "localizations" : {
         "en" : {
@@ -4125,6 +4144,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "加密"
+          }
+        }
+      }
+    },
+    "encrypt.clearRecipients" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Recipients"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清空收件人"
           }
         }
       }
@@ -4146,6 +4181,7 @@
       }
     },
     "encrypt.compat.expired" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4162,6 +4198,7 @@
       }
     },
     "encrypt.compat.noPreferred" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4321,102 +4358,6 @@
         }
       }
     },
-    "encrypt.addByTag" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add by Tag"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按标签添加"
-          }
-        }
-      }
-    },
-    "encrypt.clearRecipients" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clear Recipients"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "清空收件人"
-          }
-        }
-      }
-    },
-    "encrypt.tagSelection.skipped" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ added available recipients. %2$d contacts were skipped because they need a preferred encryption key."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已从 %1$@ 添加可用收件人。已跳过 %2$d 个需要首选加密密钥的联系人。"
-          }
-        }
-      }
-    },
-    "encrypt.tagSelection.subtitle" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d available"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d 个可用"
-          }
-        }
-      }
-    },
-    "encrypt.tagSelection.subtitleSelected" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$d of %2$d selected"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已选 %1$d / %2$d"
-          }
-        }
-      }
-    },
-    "encrypt.tagSelection.subtitleWithSkipped" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$d available, %2$d skipped"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$d 个可用，%2$d 个跳过"
-          }
-        }
-      }
-    },
     "encrypt.recipients" : {
       "localizations" : {
         "en" : {
@@ -4525,6 +4466,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "签名密钥"
+          }
+        }
+      }
+    },
+    "encrypt.tagSelection.skipped" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ added available recipients. %2$d contacts were skipped because they need a preferred encryption key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已从 %1$@ 添加可用收件人。已跳过 %2$d 个需要首选加密密钥的联系人。"
+          }
+        }
+      }
+    },
+    "encrypt.tagSelection.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 个可用"
+          }
+        }
+      }
+    },
+    "encrypt.tagSelection.subtitleSelected" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d of %2$d selected"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选 %1$d / %2$d"
+          }
+        }
+      }
+    },
+    "encrypt.tagSelection.subtitleWithSkipped" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d available, %2$d skipped"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d 个可用，%2$d 个跳过"
           }
         }
       }
