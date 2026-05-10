@@ -84,10 +84,10 @@
 				App/Contacts/Import/ContactImportWorkflow.swift,
 				App/Contacts/Import/IncomingURLImportCoordinator.swift,
 				App/Contacts/Import/PublicKeyImportLoader.swift,
-					App/Contacts/ImportConfirmationCoordinator.swift,
-					App/Contacts/ImportConfirmView.swift,
-					App/Contacts/QRDisplayView.swift,
-					App/ContentView.swift,
+				App/Contacts/ImportConfirmationCoordinator.swift,
+				App/Contacts/ImportConfirmView.swift,
+				App/Contacts/QRDisplayView.swift,
+				App/ContentView.swift,
 				App/CypherAirApp.swift,
 				App/Decrypt/DecryptScreenModel.swift,
 				App/Decrypt/DecryptView.swift,
@@ -173,10 +173,10 @@
 				Models/Contacts/ContactMergeResult.swift,
 				Models/Contacts/ContactRecipientSummary.swift,
 				Models/Contacts/ContactsAvailability.swift,
-					Models/Contacts/ContactsDomainSnapshot.swift,
-					Models/Contacts/ContactTag.swift,
-					Models/Contacts/ContactTagSummary.swift,
-					Models/CypherAirError.swift,
+				Models/Contacts/ContactsDomainSnapshot.swift,
+				Models/Contacts/ContactTag.swift,
+				Models/Contacts/ContactTagSummary.swift,
+				Models/CypherAirError.swift,
 				Models/DetailedSignatureVerification.swift,
 				Models/ExportableFile.swift,
 				Models/IdentityPresentation.swift,
@@ -729,7 +729,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14001;
+				CURRENT_PROJECT_VERSION = 14002;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -954,7 +954,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14001;
+				CURRENT_PROJECT_VERSION = 14002;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1099,7 +1099,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14001;
+				CURRENT_PROJECT_VERSION = 14002;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
