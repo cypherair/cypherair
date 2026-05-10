@@ -38,41 +38,24 @@ private struct ContactsScreenHostView: View {
         )
         .searchSuggestions {
             ForEach(model.tagSuggestions.prefix(6)) { tag in
-                Label(tag.displayName, systemImage: "tag")
-                    .searchCompletion(tag.displayName)
+                Button {
+                    model.applyTagSuggestion(tag.tagId)
+                } label: {
+                    Label(tag.displayName, systemImage: "tag")
+                }
             }
         }
         .toolbar {
             if model.contactsAvailability.isAvailable {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    if !model.tagFilters.isEmpty {
-                        Menu {
-                            ForEach(model.tagFilters) { tag in
-                                Button {
-                                    model.toggleTagFilter(tag.tagId)
-                                } label: {
-                                    if model.selectedTagFilterIds.contains(tag.tagId) {
-                                        Label(tag.displayName, systemImage: "checkmark")
-                                    } else {
-                                        Text(tag.displayName)
-                                    }
-                                }
-                            }
-                            if !model.selectedTagFilterIds.isEmpty {
-                                Divider()
-                                Button {
-                                    model.clearTagFilters()
-                                } label: {
-                                    Label(
-                                        String(localized: "contacts.clearTagFilters", defaultValue: "Clear Tag Filters"),
-                                        systemImage: "xmark.circle"
-                                    )
-                                }
-                            }
+                    if model.canManageTags {
+                        Button {
+                            routeNavigator.open(.tagManagement)
                         } label: {
                             Image(systemName: "tag")
                         }
-                        .accessibilityLabel(String(localized: "contacts.filterTags", defaultValue: "Filter Tags"))
+                        .accessibilityIdentifier("contacts.tags.toolbar")
+                        .accessibilityLabel(String(localized: "contacts.manageTags", defaultValue: "Manage Tags"))
                     }
 
                     Button {
@@ -104,22 +87,36 @@ private extension ContactsScreenHostView {
         let contacts = model.visibleContacts
 
         return List {
-            if !model.selectedTagFilters.isEmpty {
+            if !model.tagFilters.isEmpty {
                 Section {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
-                            ForEach(model.selectedTagFilters) { tag in
+                            ForEach(model.tagFilters) { tag in
+                                TagFilterChipButton(
+                                    tag: tag,
+                                    isSelected: model.isTagFilterSelected(tag.tagId),
+                                    toggle: {
+                                        model.toggleTagFilter(tag.tagId)
+                                    }
+                                )
+                            }
+
+                            if !model.selectedTagFilters.isEmpty {
                                 Button {
-                                    model.toggleTagFilter(tag.tagId)
+                                    model.clearTagFilters()
                                 } label: {
-                                    Label(tag.displayName, systemImage: "xmark.circle")
+                                    Label(
+                                        String(localized: "contacts.clearTagFilters", defaultValue: "Clear"),
+                                        systemImage: "xmark.circle"
+                                    )
                                 }
                                 .buttonStyle(.bordered)
+                                .controlSize(.small)
                             }
                         }
                     }
                 } header: {
-                    Text(String(localized: "contacts.selectedTags", defaultValue: "Selected Tags"))
+                    Text(String(localized: "contacts.filterTags", defaultValue: "Filter Tags"))
                 }
             }
 
@@ -210,10 +207,11 @@ private struct ContactRowView: View {
     let contact: ContactIdentitySummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(contact.displayName)
                     .font(.body.weight(.medium))
+                    .lineLimit(1)
                 if contact.hasUnverifiedKeys {
                     CypherStatusBadge(
                         title: String(localized: "contacts.unverified", defaultValue: "Unverified"),
@@ -227,22 +225,17 @@ private struct ContactRowView: View {
                     )
                 }
             }
-            HStack(spacing: 8) {
+            if let email = contact.primaryEmail {
+                Text(email)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            HStack(spacing: 6) {
                 Text(contact.keyCountDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if let preferredKey = contact.preferredKey {
-                    Text(preferredKey.profile.displayName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if let email = contact.primaryEmail {
-                    Text(email)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            if !contact.tags.isEmpty {
+
                 HStack(spacing: 4) {
                     ForEach(contact.tags.prefix(3)) { tag in
                         CypherStatusBadge(title: tag.displayName, color: .blue)
@@ -260,5 +253,29 @@ private struct ContactRowView: View {
             }
         }
         .accessibilityIdentifier("contacts.row")
+    }
+}
+
+private struct TagFilterChipButton: View {
+    let tag: ContactTagSummary
+    let isSelected: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        if isSelected {
+            Button(action: toggle) {
+                Label(tag.displayName, systemImage: "checkmark.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .accessibilityLabel(tag.displayName)
+        } else {
+            Button(action: toggle) {
+                Label(tag.displayName, systemImage: "tag")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityLabel(tag.displayName)
+        }
     }
 }

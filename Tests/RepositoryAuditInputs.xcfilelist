@@ -24,6 +24,7 @@ $(SRCROOT)/Sources/App/Contacts/AddContactView.swift
 $(SRCROOT)/Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/ContactCertificateSignaturesView.swift
 $(SRCROOT)/Sources/App/Contacts/ContactDetailView.swift
+$(SRCROOT)/Sources/App/Contacts/ContactTagAssignmentSheet.swift
 $(SRCROOT)/Sources/App/Contacts/ContactsScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/ContactsView.swift
 $(SRCROOT)/Sources/App/Contacts/Import/AppSceneIncomingURLRouter.swift
@@ -33,6 +34,8 @@ $(SRCROOT)/Sources/App/Contacts/Import/PublicKeyImportLoader.swift
 $(SRCROOT)/Sources/App/Contacts/ImportConfirmView.swift
 $(SRCROOT)/Sources/App/Contacts/ImportConfirmationCoordinator.swift
 $(SRCROOT)/Sources/App/Contacts/QRDisplayView.swift
+$(SRCROOT)/Sources/App/Contacts/TagManagementScreenModel.swift
+$(SRCROOT)/Sources/App/Contacts/TagManagementView.swift
 $(SRCROOT)/Sources/App/ContentView.swift
 $(SRCROOT)/Sources/App/CypherAirApp.swift
 $(SRCROOT)/Sources/App/Decrypt/DecryptScreenModel.swift

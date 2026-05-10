@@ -204,46 +204,56 @@ private struct EncryptScreenHostView: View {
 
             Section {
                 if model.contactsAvailability.isAvailable {
-                    if !model.recipientTagOptions.isEmpty || !model.selectedRecipients.isEmpty {
-                        HStack {
-                            if !model.recipientTagOptions.isEmpty {
-                                Menu {
+                    if !model.recipientTagOptions.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(String(localized: "encrypt.addByTag", defaultValue: "Add by Tag"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
                                     ForEach(model.recipientTagOptions) { tagOption in
                                         Button {
                                             model.selectRecipients(withTagId: tagOption.tagId)
                                         } label: {
-                                            Label {
-                                                VStack(alignment: .leading) {
-                                                    Text(tagOption.displayName)
-                                                    Text(tagSelectionSubtitle(for: tagOption))
-                                                        .font(.caption)
-                                                }
-                                            } icon: {
-                                                Image(systemName: "tag")
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Label(
+                                                    tagOption.displayName,
+                                                    systemImage: model.selectedRecipientCount(for: tagOption) > 0
+                                                        ? "checkmark.circle.fill"
+                                                        : "tag"
+                                                )
+                                                Text(tagSelectionSubtitle(for: tagOption))
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
                                             }
                                         }
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.small)
                                         .disabled(tagOption.selectableContactIds.isEmpty)
                                     }
-                                } label: {
-                                    Label(
-                                        String(localized: "encrypt.addByTag", defaultValue: "Add by Tag"),
-                                        systemImage: "tag"
-                                    )
                                 }
                             }
+                        }
+                    }
 
+                    if !model.selectedRecipients.isEmpty {
+                        HStack {
+                            Label(
+                                selectedRecipientsSummary,
+                                systemImage: "person.2.fill"
+                            )
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                             Spacer()
-
-                            if !model.selectedRecipients.isEmpty {
-                                Button {
-                                    model.clearRecipients()
-                                } label: {
-                                    Label(
-                                        String(localized: "encrypt.clearRecipients", defaultValue: "Clear Recipients"),
-                                        systemImage: "xmark.circle"
-                                    )
-                                }
+                            Button {
+                                model.clearRecipients()
+                            } label: {
+                                Label(
+                                    String(localized: "encrypt.clearRecipients", defaultValue: "Clear All"),
+                                    systemImage: "xmark.circle"
+                                )
                             }
+                            .controlSize(.small)
                         }
                     }
 
@@ -616,6 +626,13 @@ private struct EncryptScreenHostView: View {
         return String.localizedStringWithFormat(
             String(localized: "encrypt.tagSelection.subtitle", defaultValue: "%d available"),
             tagOption.selectableContactIds.count
+        )
+    }
+
+    private var selectedRecipientsSummary: String {
+        String.localizedStringWithFormat(
+            String(localized: "encrypt.selectedRecipients.count", defaultValue: "%d recipients selected"),
+            model.selectedRecipients.count
         )
     }
 

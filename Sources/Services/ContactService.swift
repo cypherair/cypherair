@@ -904,6 +904,50 @@ final class ContactService: @unchecked Sendable {
     }
 
     @discardableResult
+    func createTag(named name: String) throws -> ContactTagSummary {
+        try requireProtectedContactsAvailableForOrganization()
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.createTag(named: name, in: &snapshot)
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
+        }
+    }
+
+    @discardableResult
+    func renameTag(
+        tagId: String,
+        to name: String
+    ) throws -> ContactTagSummary {
+        try requireProtectedContactsAvailableForOrganization()
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.renameTag(
+                tagId: tagId,
+                to: name,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
+        }
+    }
+
+    func deleteTag(tagId: String) throws {
+        try requireProtectedContactsAvailableForOrganization()
+        try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.deleteTag(tagId: tagId, in: &snapshot)
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+        }
+    }
+
+    @discardableResult
     func addTag(
         named name: String,
         toContactId contactId: String
@@ -913,6 +957,26 @@ final class ContactService: @unchecked Sendable {
             var snapshot = try mutableRuntimeSnapshot()
             let mutation = try snapshotMutator.addTag(
                 named: name,
+                toContactId: contactId,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+            return try tagSummaryOrThrow(mutation.output.tagId, in: snapshot)
+        }
+    }
+
+    @discardableResult
+    func assignTag(
+        tagId: String,
+        toContactId contactId: String
+    ) throws -> ContactTagSummary {
+        try requireProtectedContactsAvailableForOrganization()
+        return try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.assignTag(
+                tagId: tagId,
                 toContactId: contactId,
                 in: &snapshot
             )
@@ -933,6 +997,24 @@ final class ContactService: @unchecked Sendable {
             let mutation = try snapshotMutator.removeTag(
                 tagId: tagId,
                 fromContactId: contactId,
+                in: &snapshot
+            )
+            if mutation.didMutate {
+                try persistProtectedRuntimeSnapshot(snapshot)
+            }
+        }
+    }
+
+    func replaceTagMembership(
+        tagId: String,
+        contactIds: Set<String>
+    ) throws {
+        try requireProtectedContactsAvailableForOrganization()
+        try withProtectedRuntimeRollback {
+            var snapshot = try mutableRuntimeSnapshot()
+            let mutation = try snapshotMutator.replaceTagMembership(
+                tagId: tagId,
+                contactIds: contactIds,
                 in: &snapshot
             )
             if mutation.didMutate {

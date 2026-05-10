@@ -26,6 +26,10 @@ final class ContactsScreenModel {
         contactService.contactsAvailability
     }
 
+    var canManageTags: Bool {
+        contactsAvailability == .availableProtectedDomain
+    }
+
     var visibleContacts: [ContactIdentitySummary] {
         let filters = tagFilters
         return contactService.contactIdentities(
@@ -67,6 +71,20 @@ final class ContactsScreenModel {
             selectedIds.insert(tagId)
         }
         rawSelectedTagFilterIds = selectedIds
+    }
+
+    func isTagFilterSelected(_ tagId: String) -> Bool {
+        selectedTagFilterIds.contains(tagId)
+    }
+
+    func applyTagSuggestion(_ tagId: String) {
+        let filters = tagFilters
+        let availableTagIds = Set(filters.map(\.tagId))
+        guard availableTagIds.contains(tagId) else {
+            return
+        }
+        rawSelectedTagFilterIds = [tagId]
+        searchText = ""
     }
 
     func clearTagFilters() {

@@ -932,7 +932,10 @@ final class ContactServiceTests: XCTestCase {
 
     func test_pr8RepositoryAuditSnapshotIncludesContactsOrganizationSources() throws {
         let requiredPaths = [
+            "Sources/App/Contacts/ContactTagAssignmentSheet.swift",
             "Sources/App/Contacts/ContactsScreenModel.swift",
+            "Sources/App/Contacts/TagManagementScreenModel.swift",
+            "Sources/App/Contacts/TagManagementView.swift",
             "Sources/Services/ContactsSearchIndex.swift",
             "Sources/Models/Contacts/ContactTagSummary.swift",
         ]
@@ -1007,6 +1010,8 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertFalse(unavailableBlock.contains("routeNavigator.open(.addContact)"))
         XCTAssertFalse(unavailableBlock.contains("contacts.add"))
         XCTAssertTrue(toolbarBlock.contains("if model.contactsAvailability.isAvailable"))
+        XCTAssertTrue(toolbarBlock.contains("if model.canManageTags"))
+        XCTAssertTrue(toolbarBlock.contains("routeNavigator.open(.tagManagement)"))
         XCTAssertTrue(toolbarBlock.contains("routeNavigator.open(.addContact)"))
     }
 
@@ -1691,7 +1696,7 @@ final class ContactServiceTests: XCTestCase {
         }
     }
 
-    func test_pr8ProtectedTagsNormalizeDedupePersistAndPrune() async throws {
+    func test_pr8ProtectedTagsNormalizeDedupePersistAndRetainEmptyTags() async throws {
         let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8Tags")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
@@ -1727,12 +1732,180 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(reopenedService.contactTagSummaries().map(\.displayName), ["Work Legal"])
 
         try reopenedService.removeTag(tagId: firstTag.tagId, fromContactId: contactId)
-        XCTAssertTrue(reopenedService.contactTagSummaries().isEmpty)
+        XCTAssertEqual(reopenedService.contactTagSummaries().map(\.displayName), ["Work Legal"])
+        XCTAssertEqual(reopenedService.contactTagSummaries().first?.contactCount, 0)
         XCTAssertTrue(
             try XCTUnwrap(reopenedService.availableContactIdentity(forContactID: contactId))
                 .tagIds
                 .isEmpty
         )
+
+        try reopenedService.deleteTag(tagId: firstTag.tagId)
+        XCTAssertTrue(reopenedService.contactTagSummaries().isEmpty)
+    }
+
+    func test_tagManagementCreatesRenamesDeletesAndReplacesMembership() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagManagement")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let first = try engine.generateKey(
+            name: "Tag Member One",
+            email: "tag-member-one@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let second = try engine.generateKey(
+            name: "Tag Member Two",
+            email: "tag-member-two@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(publicKeyData: first.publicKeyData)
+        _ = try service.addContact(publicKeyData: second.publicKeyData)
+        let firstContactId = try XCTUnwrap(service.contactId(forFingerprint: first.fingerprint))
+        let secondContactId = try XCTUnwrap(service.contactId(forFingerprint: second.fingerprint))
+
+        let tag = try service.createTag(named: "  Team   Alpha  ")
+        XCTAssertEqual(tag.displayName, "Team Alpha")
+        XCTAssertEqual(tag.contactCount, 0)
+        XCTAssertThrowsError(try service.createTag(named: "team alpha")) { error in
+            guard case .invalidKeyData = error as? CypherAirError else {
+                return XCTFail("Expected invalidKeyData for duplicate tag, got \(error)")
+            }
+        }
+
+        let renamed = try service.renameTag(tagId: tag.tagId, to: "Core Team")
+        XCTAssertEqual(renamed.displayName, "Core Team")
+        _ = try service.createTag(named: "Archive")
+        XCTAssertThrowsError(try service.renameTag(tagId: renamed.tagId, to: "archive")) { error in
+            guard case .invalidKeyData = error as? CypherAirError else {
+                return XCTFail("Expected invalidKeyData for duplicate rename, got \(error)")
+            }
+        }
+
+        try service.replaceTagMembership(
+            tagId: renamed.tagId,
+            contactIds: [firstContactId, secondContactId]
+        )
+        XCTAssertEqual(
+            service.contactTagSummaries().first { $0.tagId == renamed.tagId }?.contactCount,
+            2
+        )
+        XCTAssertEqual(
+            Set(try XCTUnwrap(service.availableContactIdentity(forContactID: firstContactId)).tagIds),
+            Set([renamed.tagId])
+        )
+
+        try service.replaceTagMembership(tagId: renamed.tagId, contactIds: [])
+        XCTAssertEqual(
+            service.contactTagSummaries().first { $0.tagId == renamed.tagId }?.contactCount,
+            0
+        )
+        XCTAssertTrue(try XCTUnwrap(service.availableContactIdentity(forContactID: secondContactId)).tagIds.isEmpty)
+
+        try service.deleteTag(tagId: renamed.tagId)
+        XCTAssertNil(service.contactTagSummaries().first { $0.tagId == renamed.tagId })
+    }
+
+    func test_tagManagementOperationsRequireProtectedContacts() throws {
+        _ = try contactService.openLegacyCompatibilityForTests()
+
+        XCTAssertThrowsError(try contactService.createTag(named: "Legacy Tag")) { error in
+            guard case .contactsUnavailable(.availableLegacyCompatibility) = error as? CypherAirError else {
+                return XCTFail("Expected contactsUnavailable for legacy compatibility, got \(error)")
+            }
+        }
+    }
+
+    @MainActor
+    func test_tagManagementModelsCanManageTagsOnlyForProtectedContacts() async throws {
+        _ = try contactService.openLegacyCompatibilityForTests()
+        XCTAssertFalse(ContactsScreenModel(contactService: contactService).canManageTags)
+        XCTAssertFalse(TagManagementScreenModel(contactService: contactService).canManageTags)
+
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagManagementAvailability")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+
+        XCTAssertTrue(ContactsScreenModel(contactService: opened.service).canManageTags)
+        XCTAssertTrue(TagManagementScreenModel(contactService: opened.service).canManageTags)
+    }
+
+    @MainActor
+    func test_tagManagementScreenModelCreatesRenamesDeletesAndSavesMembers() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagManagementModel")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "Managed Member",
+            email: "managed-member@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let model = TagManagementScreenModel(contactService: service)
+
+        model.createTagName = "Managed"
+        model.createTag()
+
+        let tag = try XCTUnwrap(model.selectedTag)
+        XCTAssertEqual(tag.displayName, "Managed")
+        XCTAssertEqual(model.membershipDraftContactIds, [])
+
+        model.setMembership(contactId: contactId, isMember: true)
+        XCTAssertTrue(model.hasMembershipDraftChanges)
+        model.saveMembership()
+        XCTAssertFalse(model.hasMembershipDraftChanges)
+        XCTAssertEqual(service.contactTagSummaries().first?.contactCount, 1)
+
+        model.beginRenameSelectedTag()
+        XCTAssertEqual(model.renameTargetTagId, tag.tagId)
+        model.renameText = "Managed Team"
+        model.commitRenameSelectedTag()
+        XCTAssertEqual(model.selectedTag?.displayName, "Managed Team")
+        XCTAssertNil(model.renameTargetTagId)
+
+        model.requestDeleteSelectedTag()
+        XCTAssertEqual(model.pendingDeleteTag?.displayName, "Managed Team")
+        model.confirmDeleteTag()
+        XCTAssertTrue(service.contactTagSummaries().isEmpty)
+        XCTAssertNil(model.selectedTag)
+    }
+
+    @MainActor
+    func test_tagManagementScreenModelCancelsRenameWhenSelectionChanges() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagManagementRenameTarget")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let firstTag = try service.createTag(named: "Alpha")
+        let secondTag = try service.createTag(named: "Beta")
+        let model = TagManagementScreenModel(contactService: service)
+
+        model.selectTag(firstTag.tagId)
+        model.beginRenameSelectedTag()
+        model.renameText = "Wrong Target"
+
+        XCTAssertTrue(model.isRenamingSelectedTag)
+        XCTAssertEqual(model.renameTargetTagId, firstTag.tagId)
+
+        model.selectTag(secondTag.tagId)
+        XCTAssertFalse(model.isRenamingSelectedTag)
+        XCTAssertNil(model.renameTargetTagId)
+        XCTAssertEqual(model.renameText, "")
+
+        model.commitRenameSelectedTag()
+        let tags = service.contactTagSummaries()
+        XCTAssertEqual(tags.first { $0.tagId == firstTag.tagId }?.displayName, "Alpha")
+        XCTAssertEqual(tags.first { $0.tagId == secondTag.tagId }?.displayName, "Beta")
+        XCTAssertEqual(model.selectedTagId, secondTag.tagId)
     }
 
     func test_pr8SearchRanksAndMatchesTagsFingerprintAndShortKeyId() async throws {
@@ -1888,10 +2061,15 @@ final class ContactServiceTests: XCTestCase {
         model.clearTagFilters()
         model.searchText = "personal"
         XCTAssertEqual(model.visibleContacts.map(\.contactId), [personalContactId])
+
+        model.applyTagSuggestion(workTag.tagId)
+        XCTAssertEqual(model.searchText, "")
+        XCTAssertEqual(model.selectedTagFilters.map(\.tagId), [workTag.tagId])
+        XCTAssertEqual(model.visibleContacts.map(\.contactId), [workContactId])
     }
 
     @MainActor
-    func test_pr8ContactsScreenModelPrunesStaleTagFilterAfterTagRemoval() async throws {
+    func test_pr8ContactsScreenModelPrunesStaleTagFilterAfterTagDeletion() async throws {
         let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8ScreenModelStaleTag")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
@@ -1914,6 +2092,13 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(model.visibleContacts.map(\.contactId), [contactId])
 
         try service.removeTag(tagId: tag.tagId, fromContactId: contactId)
+
+        XCTAssertEqual(service.contactTagSummaries().map(\.tagId), [tag.tagId])
+        XCTAssertEqual(model.selectedTagFilterIds, Set([tag.tagId]))
+        XCTAssertTrue(model.visibleContacts.isEmpty)
+        XCTAssertTrue(model.hasActiveSearchOrFilters)
+
+        try service.deleteTag(tagId: tag.tagId)
 
         XCTAssertTrue(service.contactTagSummaries().isEmpty)
         XCTAssertTrue(model.selectedTagFilterIds.isEmpty)
