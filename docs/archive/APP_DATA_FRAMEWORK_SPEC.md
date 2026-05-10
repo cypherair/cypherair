@@ -14,7 +14,7 @@ Original snapshot metadata follows.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Primary authority:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture boundaries, security posture, and core design constraints.
 > **Companion documents:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
-> **Related documents:** [CONTACTS_TDD](../CONTACTS_TDD.md)
+> **Related documents:** [CONTACTS_TDD](CONTACTS_TDD.md)
 
 ## 1. Scope And Precedence
 

@@ -32,7 +32,9 @@ Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`
 - [ ] Startup diagnostics remain generic and do not leak fingerprints or key identifiers
 - [ ] ProtectedData changes preserve the app-data/private-key-material boundary: no SE-wrapped private-key bundle bytes are copied into ProtectedData payloads
 - [ ] ProtectedData changes preserve registry authority, explicit pending-mutation recovery, no-silent-reset behavior, relock zeroization, and `restartRequired` fail-closed semantics
-- [ ] ProtectedData changes that migrate a persisted surface update `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed; update `CONTACTS_PRD.md`, `CONTACTS_TDD.md`, `CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md`, and `CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md` when Contacts behavior or Phase 8 surfaces are involved
+- [ ] ProtectedData changes that migrate a persisted surface update `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed; archived Contacts planning documents are historical context only and are not active current-state update targets
+- [ ] Contacts changes preserve the protected `contacts` domain as the source of truth: no legacy/quarantine fallback, no plaintext derivative caches, no package/social-graph export, and no bypass of locked/recovery/framework-unavailable availability states
+- [ ] Contacts changes preserve person/key semantics: merge keeps per-key manual verification and certification state, historical keys remain signer-recognition only, recipient lists resolve through preferred encryptable keys, and certification artifacts stay distinct from manual verification
 
 ## Rust API Changes
 

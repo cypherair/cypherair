@@ -1,15 +1,19 @@
+> **Status:** Archived historical Contacts surface-inventory snapshot.
+> **Archived:** 2026-05-10.
+> **Archive reason:** Current shipped Contacts behavior, access boundaries, and validation requirements have been distilled into [PRD](../PRD.md), [TDD](../TDD.md), [ARCHITECTURE](../ARCHITECTURE.md), [SECURITY](../SECURITY.md), [TESTING](../TESTING.md), [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md), and [CODE_REVIEW](../CODE_REVIEW.md). This file is retained only for historical checklist context; current code and active canonical docs outrank it.
+
 # Contacts Protected Domain Surface Inventory
 
 > **Version:** Draft v0.6
-> **Status:** Current Contacts access/mutation surface checklist, updated with the Contacts PR7 package-exchange withdrawal and PR8 coverage.
+> **Status:** Archived Contacts access/mutation surface checklist, retained for historical package-exchange withdrawal and PR8 coverage context.
 > **Purpose:** Enumerate all Contacts-required access and mutation surfaces that must be accounted for during Contacts protected-domain implementation.
 > **Audience:** Engineering, QA, and AI coding tools.
-> **Companion documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md)
-> **Primary design references:** [CONTACTS_TDD](CONTACTS_TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [TDD](TDD.md)
+> **Companion documents:** [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) · [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md)
+> **Primary design references:** [CONTACTS_TDD](CONTACTS_TDD.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md)
 
 ## 1. Scope And Usage
 
-This document is the execution checklist for Contacts protected-domain access and mutation coverage. It does not own global persisted-state classification; row-level storage classes, locations, and migration status live in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md).
+This document is the execution checklist for Contacts protected-domain access and mutation coverage. It does not own global persisted-state classification; row-level storage classes, locations, and migration status live in [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md).
 
 It exists because current Contacts access is distributed across:
 

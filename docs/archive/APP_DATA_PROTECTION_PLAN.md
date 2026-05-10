@@ -3,7 +3,7 @@
 > **Status:** Archived historical AppData roadmap snapshot.
 > **Archived on:** 2026-04-28.
 > **Archival reason:** AppData implementation details have been absorbed into long-lived current-state documentation, and Phase 8 follow-on work now lives in Contacts-specific docs.
-> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
 > **Current code and active canonical docs outrank this archived file whenever they disagree.**
 
 Original snapshot metadata follows.
@@ -15,7 +15,7 @@ Original snapshot metadata follows.
 > **Companion document:** [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md)  
 > **Detailed proposal documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md)
 > **Current progress record:** [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
-> **Related documents:** [SECURITY](../SECURITY.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [TESTING](../TESTING.md) · [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](../SPECIAL_SECURITY_MODE.md)
+> **Related documents:** [SECURITY](../SECURITY.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [TESTING](../TESTING.md) · [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md) · [SPECIAL_SECURITY_MODE](../SPECIAL_SECURITY_MODE.md)
 
 ## 1. Intent
 
@@ -190,7 +190,7 @@ Migrate ordinary protected-after-unlock settings, self-test policy, and related 
 
 Migrate Contacts onto the shared protected app-data framework only after the earlier key-metadata and non-Contacts protected-after-unlock work has been completed. Contacts must remain a domain-specific consumer of the shared framework, not a second independent vault architecture.
 
-See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts-internal PR sequence. AppData Phase 4 and Phase 5 are prerequisites, but Contacts PR1-PR8 remain Phase 8 work behind the remaining Phase 6-7 gates.
+See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts-internal PR sequence. AppData Phase 4 and Phase 5 are prerequisites, but Contacts PR1-PR8 remain Phase 8 work behind the remaining Phase 6-7 gates.
 
 ### Phase 9: Future Persistent Domains
 

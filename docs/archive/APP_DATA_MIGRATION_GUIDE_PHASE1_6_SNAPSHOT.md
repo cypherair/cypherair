@@ -3,7 +3,7 @@
 > **Status:** Archived historical AppData migration-guide snapshot.
 > **Archived on:** 2026-04-28.
 > **Archival reason:** This snapshot preserves the detailed Phase 1-6 migration material removed from the active migration guide during the AppData documentation consolidation.
-> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
+> **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
 > **Current code and active canonical docs outrank this archived file whenever they disagree.**
 
 Original snapshot metadata follows.
@@ -14,7 +14,7 @@ Original snapshot metadata follows.
 > **Audience:** Engineering, security review, QA, and AI coding tools.
 > **Primary authority:** [APP_DATA_PROTECTION_PLAN](APP_DATA_PROTECTION_PLAN.md) for roadmap intent and [APP_DATA_PROTECTION_TDD](APP_DATA_PROTECTION_TDD.md) for architecture and security constraints.
 > **Companion documents:** [APP_DATA_FRAMEWORK_SPEC](APP_DATA_FRAMEWORK_SPEC.md) · [APP_DATA_VALIDATION](APP_DATA_VALIDATION.md) · [APP_DATA_ROADMAP_STATUS](APP_DATA_ROADMAP_STATUS.md)
-> **Related documents:** [CONTACTS_PRD](../CONTACTS_PRD.md) · [CONTACTS_TDD](../CONTACTS_TDD.md)
+> **Related documents:** [CONTACTS_PRD](CONTACTS_PRD.md) · [CONTACTS_TDD](CONTACTS_TDD.md)
 
 ## 1. Scope And Relationship
 
@@ -173,7 +173,7 @@ Goals:
 - avoid duplicating domain key lifecycle, envelope handling, recovery logic, registry authority, and relock rules
 - keep Contacts explicitly `import-recoverable`
 
-Contacts internal implementation sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](../CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md). AppData Phase 4 framework hardening and Phase 5 private-key-control migration are complete prerequisites, but Contacts PR1-PR8 are still Phase 8 work and remain behind the remaining Phase 6-7 roadmap gates. No Contacts schema-only prep starts earlier unless this roadmap is explicitly revised.
+Contacts internal implementation sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md). AppData Phase 4 framework hardening and Phase 5 private-key-control migration are complete prerequisites, but Contacts PR1-PR8 are still Phase 8 work and remain behind the remaining Phase 6-7 roadmap gates. No Contacts schema-only prep starts earlier unless this roadmap is explicitly revised.
 
 ### 2.9 Phase 9: Future Persistent Domains
 
