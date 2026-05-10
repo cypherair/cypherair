@@ -33,8 +33,6 @@ $(SRCROOT)/Sources/App/Contacts/Import/PublicKeyImportLoader.swift
 $(SRCROOT)/Sources/App/Contacts/ImportConfirmView.swift
 $(SRCROOT)/Sources/App/Contacts/ImportConfirmationCoordinator.swift
 $(SRCROOT)/Sources/App/Contacts/QRDisplayView.swift
-$(SRCROOT)/Sources/App/Contacts/RecipientListDetailView.swift
-$(SRCROOT)/Sources/App/Contacts/RecipientListsView.swift
 $(SRCROOT)/Sources/App/ContentView.swift
 $(SRCROOT)/Sources/App/CypherAirApp.swift
 $(SRCROOT)/Sources/App/Decrypt/DecryptScreenModel.swift
@@ -116,7 +114,6 @@ $(SRCROOT)/Sources/Models/CertificateSignerSource.swift
 $(SRCROOT)/Sources/Models/ColorTheme.swift
 $(SRCROOT)/Sources/Models/Contact.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactTagSummary.swift
-$(SRCROOT)/Sources/Models/Contacts/RecipientListSummary.swift
 $(SRCROOT)/Sources/Models/CypherAirError.swift
 $(SRCROOT)/Sources/Models/DetailedSignatureVerification.swift
 $(SRCROOT)/Sources/Models/ExportableFile.swift

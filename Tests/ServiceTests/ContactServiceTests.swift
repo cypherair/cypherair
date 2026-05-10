@@ -307,6 +307,85 @@ final class ContactServiceTests: XCTestCase {
         ))
     }
 
+    func test_contactsV1SnapshotWithRecipientListsMigratesToV2AndWritesBack() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsV2Migration")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "Migrated Contact",
+            email: "migrated-contact@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(publicKeyData: generated.publicKeyData, verificationState: .verified)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let tag = try service.addTag(named: "Migrated Tag", toContactId: contactId)
+        var snapshot = try service.currentCompatibilitySnapshot()
+        try attachCertificationArtifact(
+            artifactId: "artifact-v1-migration",
+            toKeyWithFingerprint: generated.fingerprint,
+            in: &snapshot
+        )
+
+        let legacyGenerationIdentifier = 9
+        let legacySnapshot = LegacyContactsDomainSnapshotV1ForContactServiceTests(
+            schemaVersion: 1,
+            identities: snapshot.identities,
+            keyRecords: snapshot.keyRecords,
+            recipientLists: [
+                LegacyRecipientListForContactServiceTests(
+                    recipientListId: "legacy-list",
+                    name: "Legacy Team",
+                    memberContactIds: [contactId],
+                    createdAt: Date(),
+                    updatedAt: Date()
+                )
+            ],
+            tags: snapshot.tags,
+            certificationArtifacts: snapshot.certificationArtifacts,
+            createdAt: snapshot.createdAt,
+            updatedAt: snapshot.updatedAt
+        )
+        try writeLegacyContactsV1Snapshot(
+            legacySnapshot,
+            generationIdentifier: legacyGenerationIdentifier,
+            harness: opened.harness
+        )
+        try await service.relockProtectedData()
+
+        let reopened = await reopenProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory
+        )
+        let migratedSnapshot = try reopened.service.currentCompatibilitySnapshot()
+        let metadata = try XCTUnwrap(
+            ProtectedDomainBootstrapStore(storageRoot: opened.harness.storageRoot)
+                .loadMetadata(for: ContactsDomainRepository.domainID)
+        )
+        let envelope = try currentContactsEnvelope(in: opened.harness.storageRoot)
+
+        XCTAssertEqual(migratedSnapshot.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        XCTAssertEqual(migratedSnapshot.identities.map(\.contactId), [contactId])
+        XCTAssertEqual(migratedSnapshot.keyRecords.map(\.fingerprint), [generated.fingerprint])
+        XCTAssertEqual(migratedSnapshot.tags.map(\.tagId), [tag.tagId])
+        XCTAssertEqual(migratedSnapshot.tags.map(\.displayName), ["Migrated Tag"])
+        XCTAssertFalse(migratedSnapshot.tags.contains { $0.displayName == "Legacy Team" })
+        XCTAssertEqual(migratedSnapshot.certificationArtifacts.map(\.artifactId), ["artifact-v1-migration"])
+        XCTAssertEqual(
+            migratedSnapshot.keyRecords.first?.certificationArtifactIds,
+            ["artifact-v1-migration"]
+        )
+        XCTAssertEqual(metadata.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        let metadataGenerationIdentifier = try XCTUnwrap(
+            metadata.expectedCurrentGenerationIdentifier.flatMap(Int.init)
+        )
+        XCTAssertGreaterThan(metadataGenerationIdentifier, legacyGenerationIdentifier)
+        XCTAssertEqual(envelope.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        XCTAssertEqual(envelope.generationIdentifier, metadataGenerationIdentifier)
+    }
+
     func test_contactsPR4CorruptLegacySourceDoesNotPartiallyCutOver() async throws {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         try Data("not-a-public-certificate".utf8).write(
@@ -854,11 +933,8 @@ final class ContactServiceTests: XCTestCase {
     func test_pr8RepositoryAuditSnapshotIncludesContactsOrganizationSources() throws {
         let requiredPaths = [
             "Sources/App/Contacts/ContactsScreenModel.swift",
-            "Sources/App/Contacts/RecipientListsView.swift",
-            "Sources/App/Contacts/RecipientListDetailView.swift",
             "Sources/Services/ContactsSearchIndex.swift",
             "Sources/Models/Contacts/ContactTagSummary.swift",
-            "Sources/Models/Contacts/RecipientListSummary.swift",
         ]
 
         for path in requiredPaths {
@@ -1139,9 +1215,6 @@ final class ContactServiceTests: XCTestCase {
         let sourceContactId = try XCTUnwrap(
             snapshot.keyRecords.first { $0.fingerprint == secondKey.fingerprint }?.contactId
         )
-        let retainedContactId = try XCTUnwrap(
-            snapshot.keyRecords.first { $0.fingerprint == retainedKey.fingerprint }?.contactId
-        )
         _ = try mutator.mergeContact(
             sourceContactId: sourceContactId,
             into: targetContactId,
@@ -1163,15 +1236,6 @@ final class ContactServiceTests: XCTestCase {
             toKeyWithFingerprint: retainedKey.fingerprint,
             in: &snapshot
         )
-        snapshot.recipientLists = [
-            RecipientList(
-                recipientListId: "list-with-retained-member",
-                name: "List",
-                memberContactIds: [targetContactId, retainedContactId],
-                createdAt: Date(),
-                updatedAt: Date()
-            )
-        ]
         try snapshot.validateContract()
 
         let mutation = try mutator.removeContactIdentity(
@@ -1182,7 +1246,6 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertTrue(mutation.didMutate)
         XCTAssertFalse(snapshot.identities.contains { $0.contactId == targetContactId })
         XCTAssertFalse(snapshot.keyRecords.contains { $0.contactId == targetContactId })
-        XCTAssertEqual(snapshot.recipientLists.first?.memberContactIds, [retainedContactId])
         XCTAssertEqual(snapshot.certificationArtifacts.map(\.artifactId), ["artifact-retained"])
         XCTAssertTrue(snapshot.keyRecords.contains { $0.fingerprint == retainedKey.fingerprint })
         XCTAssertNoThrow(try snapshot.validateContract())
@@ -1501,7 +1564,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertTrue(verificationContext.contacts.contains { $0.fingerprint == targetKey.fingerprint })
     }
 
-    func test_pr5ProtectedMergeUnionsTagsAndRecipientListMemberships() async throws {
+    func test_pr5ProtectedMergeUnionsTags() async throws {
         let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR5MergeMembership")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
@@ -1551,15 +1614,6 @@ final class ContactServiceTests: XCTestCase {
         )
         snapshot.identities[targetIdentityIndex].tagIds = ["tag-target"]
         snapshot.identities[sourceIdentityIndex].tagIds = ["tag-source"]
-        snapshot.recipientLists = [
-            RecipientList(
-                recipientListId: "list-source",
-                name: "Source List",
-                memberContactIds: [sourceContactId],
-                createdAt: now,
-                updatedAt: now
-            )
-        ]
         try opened.harness.store.replaceSnapshot(snapshot)
         try await service.relockProtectedData()
         let reopened = await reopenProtectedContactService(
@@ -1575,7 +1629,6 @@ final class ContactServiceTests: XCTestCase {
             mergedSnapshot.identities.first { $0.contactId == targetContactId }
         )
         XCTAssertEqual(Set(mergedIdentity.tagIds), Set(["tag-target", "tag-source"]))
-        XCTAssertEqual(mergedSnapshot.recipientLists.first?.memberContactIds, [targetContactId])
         XCTAssertFalse(mergedSnapshot.identities.contains { $0.contactId == sourceContactId })
     }
 
@@ -1679,26 +1732,6 @@ final class ContactServiceTests: XCTestCase {
             try XCTUnwrap(reopenedService.availableContactIdentity(forContactID: contactId))
                 .tagIds
                 .isEmpty
-        )
-    }
-
-    func test_pr8RecipientListDeletionResolverUsesStableSnapshotOffsets() {
-        let recipientLists = [
-            makeRecipientListSummary(id: "list-a", name: "A"),
-            makeRecipientListSummary(id: "list-b", name: "B"),
-            makeRecipientListSummary(id: "list-c", name: "C"),
-        ]
-        var indexSet = IndexSet()
-        indexSet.insert(0)
-        indexSet.insert(2)
-        indexSet.insert(99)
-
-        XCTAssertEqual(
-            RecipientListDeletionResolver.recipientListIdsToDelete(
-                at: indexSet,
-                from: recipientLists
-            ),
-            ["list-a", "list-c"]
         )
     }
 
@@ -1917,89 +1950,6 @@ final class ContactServiceTests: XCTestCase {
         model.searchText = "searchable"
         XCTAssertTrue(model.hasActiveSearchOrFilters)
         XCTAssertEqual(model.visibleContacts.map(\.contactId), [contactId])
-    }
-
-    func test_pr8RecipientListsEditPruneAndFailClosedWhenPreferredKeyMissing() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8RecipientLists")
-        defer {
-            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
-        }
-        let service = opened.service
-        let first = try engine.generateKey(
-            name: "List First",
-            email: "list-first@example.invalid",
-            expirySeconds: nil,
-            profile: .universal
-        )
-        let second = try engine.generateKey(
-            name: "List Second",
-            email: "list-second@example.invalid",
-            expirySeconds: nil,
-            profile: .advanced
-        )
-
-        _ = try service.addContact(publicKeyData: first.publicKeyData)
-        _ = try service.addContact(publicKeyData: second.publicKeyData)
-        let firstContactId = try XCTUnwrap(service.contactId(forFingerprint: first.fingerprint))
-        let secondContactId = try XCTUnwrap(service.contactId(forFingerprint: second.fingerprint))
-
-        let emptyList = try service.createRecipientList(named: "Draft", memberContactIds: [])
-        XCTAssertFalse(emptyList.canEncryptToAll)
-        XCTAssertEqual(emptyList.memberCount, 0)
-
-        let list = try service.createRecipientList(
-            named: "Team",
-            memberContactIds: [firstContactId, secondContactId, firstContactId]
-        )
-        XCTAssertEqual(list.memberContactIds, [firstContactId, secondContactId])
-        XCTAssertTrue(list.canEncryptToAll)
-        XCTAssertEqual(
-            try service.recipientContactIds(forRecipientListId: list.recipientListId),
-            [firstContactId, secondContactId]
-        )
-
-        let renamed = try service.renameRecipientList(list.recipientListId, to: "  Team A  ")
-        XCTAssertEqual(renamed.name, "Team A")
-        _ = try service.removeContact(secondContactId, fromRecipientList: list.recipientListId)
-        XCTAssertEqual(
-            try service.recipientContactIds(forRecipientListId: list.recipientListId),
-            [firstContactId]
-        )
-        _ = try service.addContact(secondContactId, toRecipientList: list.recipientListId)
-
-        var snapshot = try service.currentCompatibilitySnapshot()
-        for index in snapshot.keyRecords.indices
-            where snapshot.keyRecords[index].contactId == secondContactId {
-            snapshot.keyRecords[index].usageState = .historical
-        }
-        try opened.harness.store.replaceSnapshot(snapshot)
-        try await service.relockProtectedData()
-        let reopened = await reopenProtectedContactService(
-            harness: opened.harness,
-            contactsDirectory: opened.contactsDirectory
-        )
-        let reopenedService = reopened.service
-
-        let failClosedSummary = try XCTUnwrap(
-            reopenedService.recipientListSummaries().first {
-                $0.recipientListId == list.recipientListId
-            }
-        )
-        XCTAssertFalse(failClosedSummary.canEncryptToAll)
-        XCTAssertEqual(failClosedSummary.missingPreferredContactIds, [secondContactId])
-        XCTAssertThrowsError(
-            try reopenedService.publicKeysForRecipientContactIDs(failClosedSummary.memberContactIds)
-        ) { error in
-            guard case .invalidKeyData = error as? CypherAirError else {
-                return XCTFail("Expected invalidKeyData for missing preferred list member, got \(error)")
-            }
-        }
-
-        try reopenedService.removeContactIdentity(contactId: secondContactId)
-        XCTAssertEqual(
-            try reopenedService.recipientContactIds(forRecipientListId: list.recipientListId),
-            [firstContactId]
-        )
     }
 
     // MARK: - Load Contacts
@@ -3429,17 +3379,6 @@ final class ContactServiceTests: XCTestCase {
         return artifact
     }
 
-    private func makeRecipientListSummary(id: String, name: String) -> RecipientListSummary {
-        RecipientListSummary(
-            recipientListId: id,
-            name: name,
-            memberContactIds: [],
-            memberCount: 0,
-            canEncryptToAll: false,
-            missingPreferredContactIds: []
-        )
-    }
-
     private func makeContactsProtectedHarness(
         prefix: String,
         contactsDirectory: URL
@@ -3483,6 +3422,70 @@ final class ContactServiceTests: XCTestCase {
         )
     }
 
+    private func writeLegacyContactsV1Snapshot(
+        _ snapshot: LegacyContactsDomainSnapshotV1ForContactServiceTests,
+        generationIdentifier: Int,
+        harness: ContactsProtectedHarness
+    ) throws {
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        var plaintext = try encoder.encode(snapshot)
+        defer {
+            plaintext.protectedDataZeroize()
+        }
+        var domainMasterKey = try XCTUnwrap(
+            harness.domainKeyManager.unlockedDomainMasterKey(for: ContactsDomainRepository.domainID)
+        )
+        defer {
+            domainMasterKey.protectedDataZeroize()
+        }
+        let envelope = try ProtectedDomainEnvelopeCodec.seal(
+            plaintext: plaintext,
+            domainID: ContactsDomainRepository.domainID,
+            schemaVersion: 1,
+            generationIdentifier: generationIdentifier,
+            domainMasterKey: domainMasterKey
+        )
+        let pendingURL = harness.storageRoot.domainEnvelopeURL(
+            for: ContactsDomainRepository.domainID,
+            slot: .pending
+        )
+        try harness.storageRoot.writeProtectedData(try encoder.encode(envelope), to: pendingURL)
+
+        let currentURL = harness.storageRoot.domainEnvelopeURL(
+            for: ContactsDomainRepository.domainID,
+            slot: .current
+        )
+        let previousURL = harness.storageRoot.domainEnvelopeURL(
+            for: ContactsDomainRepository.domainID,
+            slot: .previous
+        )
+        if try harness.storageRoot.managedItemExists(at: currentURL) {
+            try harness.storageRoot.promoteStagedFile(from: currentURL, to: previousURL)
+        }
+        try harness.storageRoot.promoteStagedFile(from: pendingURL, to: currentURL)
+
+        try ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).saveMetadata(
+            ProtectedDomainBootstrapMetadata(
+                schemaVersion: 1,
+                expectedCurrentGenerationIdentifier: String(generationIdentifier),
+                coarseRecoveryReason: nil,
+                wrappedDomainMasterKeyRecordVersion: WrappedDomainMasterKeyRecord.currentFormatVersion
+            ),
+            for: ContactsDomainRepository.domainID
+        )
+    }
+
+    private func currentContactsEnvelope(in storageRoot: ProtectedDataStorageRoot) throws -> ProtectedDomainEnvelope {
+        let data = try storageRoot.readManagedData(
+            at: storageRoot.domainEnvelopeURL(
+                for: ContactsDomainRepository.domainID,
+                slot: .current
+            )
+        )
+        return try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
+    }
+
     private func authorizedContactsGate() -> ContactsPostAuthGateResult {
         ContactsPostAuthGateResult(
             postUnlockOutcome: .opened([ProtectedSettingsStore.domainID]),
@@ -3511,4 +3514,23 @@ final class ContactServiceTests: XCTestCase {
             UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
         }
     }
+}
+
+private struct LegacyContactsDomainSnapshotV1ForContactServiceTests: Encodable {
+    let schemaVersion: Int
+    let identities: [ContactIdentity]
+    let keyRecords: [ContactKeyRecord]
+    let recipientLists: [LegacyRecipientListForContactServiceTests]
+    let tags: [ContactTag]
+    let certificationArtifacts: [ContactCertificationArtifactReference]
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+private struct LegacyRecipientListForContactServiceTests: Encodable {
+    let recipientListId: String
+    let name: String
+    let memberContactIds: [String]
+    let createdAt: Date
+    let updatedAt: Date
 }

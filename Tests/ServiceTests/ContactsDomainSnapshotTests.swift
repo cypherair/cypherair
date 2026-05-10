@@ -51,18 +51,6 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         missingKeyContact.keyRecords[0].contactId = "missing-contact"
         XCTAssertThrowsError(try missingKeyContact.validateContract())
 
-        var missingRecipientMember = try makeValidSnapshot()
-        missingRecipientMember.recipientLists = [
-            RecipientList(
-                recipientListId: "list-1",
-                name: "Work",
-                memberContactIds: ["missing-contact"],
-                createdAt: referenceDate,
-                updatedAt: referenceDate
-            )
-        ]
-        XCTAssertThrowsError(try missingRecipientMember.validateContract())
-
         var missingArtifactKey = try makeValidSnapshot()
         missingArtifactKey.certificationArtifacts = [
             ContactCertificationArtifactReference(
@@ -111,7 +99,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         XCTAssertNoThrow(try snapshot.validateContract())
     }
 
-    func test_validSnapshotWithTagsRecipientsAndArtifacts_validates() throws {
+    func test_validSnapshotWithTagsAndArtifacts_validates() throws {
         var snapshot = try makeValidSnapshot()
         snapshot.tags = [
             ContactTag(
@@ -123,15 +111,6 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             )
         ]
         snapshot.identities[0].tagIds = ["tag-1"]
-        snapshot.recipientLists = [
-            RecipientList(
-                recipientListId: "list-1",
-                name: "Project",
-                memberContactIds: ["contact-1"],
-                createdAt: referenceDate,
-                updatedAt: referenceDate
-            )
-        ]
         snapshot.certificationArtifacts = [
             ContactCertificationArtifactReference(
                 artifactId: "artifact-1",
@@ -161,11 +140,10 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             lastValidatedAt: nil,
             reconciliationMetadata: "legacy"
         )
-        let legacySnapshot = LegacyContactsDomainSnapshot(
+        let legacySnapshot = LegacyCertificationArtifactSnapshot(
             schemaVersion: snapshot.schemaVersion,
             identities: snapshot.identities,
             keyRecords: snapshot.keyRecords,
-            recipientLists: snapshot.recipientLists,
             tags: snapshot.tags,
             certificationArtifacts: [
                 LegacyCertificationArtifactReference(
@@ -193,6 +171,147 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         XCTAssertEqual(artifact.targetSelector.kind, .userId)
         XCTAssertEqual(artifact.targetSelector.occurrenceIndex, 0)
         XCTAssertEqual(artifact.targetSelector.userIdDisplayText, "Alice <alice@example.com>")
+    }
+
+    func test_v1SnapshotMigratesToV2DroppingRecipientListsAndPreservingSupportedRecords() throws {
+        var snapshot = try makeValidSnapshot()
+        snapshot.tags = [
+            ContactTag(
+                tagId: "tag-1",
+                displayName: "Kept Tag",
+                normalizedName: ContactTag.normalizedName(for: "Kept Tag"),
+                createdAt: referenceDate,
+                updatedAt: referenceDate
+            )
+        ]
+        snapshot.identities[0].tagIds = ["tag-1"]
+        snapshot.certificationArtifacts = [
+            ContactCertificationArtifactReference(
+                artifactId: "artifact-1",
+                keyId: "key-1",
+                userId: "Alice <alice@example.com>",
+                createdAt: referenceDate,
+                storageHint: "placeholder"
+            )
+        ]
+        snapshot.keyRecords[0].certificationArtifactIds = ["artifact-1"]
+        snapshot.keyRecords[0].certificationProjection = ContactCertificationProjection(
+            status: .revalidationNeeded,
+            artifactIds: ["artifact-1"],
+            lastValidatedAt: nil,
+            reconciliationMetadata: "placeholder"
+        )
+        let legacySnapshot = LegacyContactsDomainSnapshotV1(
+            schemaVersion: 1,
+            identities: snapshot.identities,
+            keyRecords: snapshot.keyRecords,
+            recipientLists: [
+                LegacyRecipientListForTests(
+                    recipientListId: "list-1",
+                    name: "Team",
+                    memberContactIds: ["contact-1"],
+                    createdAt: referenceDate,
+                    updatedAt: referenceDate
+                )
+            ],
+            tags: snapshot.tags,
+            certificationArtifacts: snapshot.certificationArtifacts,
+            createdAt: snapshot.createdAt,
+            updatedAt: snapshot.updatedAt
+        )
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        let repository = ContactsDomainRepository()
+
+        let decoded = try repository.decodeSnapshot(try encoder.encode(legacySnapshot))
+
+        XCTAssertEqual(repository.lastDecodedSourceSchemaVersion, 1)
+        XCTAssertEqual(decoded.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        XCTAssertEqual(decoded.identities, snapshot.identities)
+        XCTAssertEqual(decoded.keyRecords, snapshot.keyRecords)
+        XCTAssertEqual(decoded.tags, snapshot.tags)
+        XCTAssertEqual(decoded.certificationArtifacts, snapshot.certificationArtifacts)
+        XCTAssertFalse(decoded.tags.contains { $0.displayName == "Team" })
+        XCTAssertNoThrow(try decoded.validateContract())
+    }
+
+    func test_v1MigrationIgnoresMalformedRecipientListsPayload() throws {
+        var snapshot = try makeValidSnapshot()
+        snapshot.tags = [
+            ContactTag(
+                tagId: "tag-1",
+                displayName: "Kept Tag",
+                normalizedName: ContactTag.normalizedName(for: "Kept Tag"),
+                createdAt: referenceDate,
+                updatedAt: referenceDate
+            )
+        ]
+        snapshot.identities[0].tagIds = ["tag-1"]
+        let legacySnapshot = LegacyContactsDomainSnapshotV1(
+            schemaVersion: 1,
+            identities: snapshot.identities,
+            keyRecords: snapshot.keyRecords,
+            recipientLists: [
+                LegacyRecipientListForTests(
+                    recipientListId: "list-1",
+                    name: "Team",
+                    memberContactIds: ["contact-1"],
+                    createdAt: referenceDate,
+                    updatedAt: referenceDate
+                )
+            ],
+            tags: snapshot.tags,
+            certificationArtifacts: snapshot.certificationArtifacts,
+            createdAt: snapshot.createdAt,
+            updatedAt: snapshot.updatedAt
+        )
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        let encoded = try encoder.encode(legacySnapshot)
+        var format = PropertyListSerialization.PropertyListFormat.binary
+        var propertyList = try XCTUnwrap(
+            PropertyListSerialization.propertyList(
+                from: encoded,
+                options: [],
+                format: &format
+            ) as? [String: Any]
+        )
+        propertyList["recipientLists"] = "discarded malformed recipient-list payload"
+        let malformedListPayload = try PropertyListSerialization.data(
+            fromPropertyList: propertyList,
+            format: .binary,
+            options: 0
+        )
+
+        let decoded = try ContactsDomainRepository().decodeSnapshot(malformedListPayload)
+
+        XCTAssertEqual(decoded.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        XCTAssertEqual(decoded.identities, snapshot.identities)
+        XCTAssertEqual(decoded.keyRecords, snapshot.keyRecords)
+        XCTAssertEqual(decoded.tags, snapshot.tags)
+        XCTAssertEqual(decoded.certificationArtifacts, snapshot.certificationArtifacts)
+        XCTAssertNoThrow(try decoded.validateContract())
+    }
+
+    func test_v1MigrationRejectsInvalidPreservedData() throws {
+        var snapshot = try makeValidSnapshot()
+        snapshot.keyRecords[0].contactId = "missing-contact"
+        let legacySnapshot = LegacyContactsDomainSnapshotV1(
+            schemaVersion: 1,
+            identities: snapshot.identities,
+            keyRecords: snapshot.keyRecords,
+            recipientLists: [],
+            tags: snapshot.tags,
+            certificationArtifacts: snapshot.certificationArtifacts,
+            createdAt: snapshot.createdAt,
+            updatedAt: snapshot.updatedAt
+        )
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+
+        XCTAssertThrowsError(
+            try ContactsDomainRepository().decodeSnapshot(try encoder.encode(legacySnapshot))
+        )
     }
 
     func test_certificationArtifactDigestMismatch_isRejected() throws {
@@ -283,7 +402,6 @@ final class ContactsDomainSnapshotTests: XCTestCase {
                     fingerprint: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                 )
             ],
-            recipientLists: [],
             tags: [],
             certificationArtifacts: [],
             createdAt: referenceDate,
@@ -367,11 +485,10 @@ final class ContactsDomainSnapshotTests: XCTestCase {
     }
 }
 
-private struct LegacyContactsDomainSnapshot: Encodable {
+private struct LegacyCertificationArtifactSnapshot: Encodable {
     let schemaVersion: Int
     let identities: [ContactIdentity]
     let keyRecords: [ContactKeyRecord]
-    let recipientLists: [RecipientList]
     let tags: [ContactTag]
     let certificationArtifacts: [LegacyCertificationArtifactReference]
     let createdAt: Date
@@ -384,4 +501,23 @@ private struct LegacyCertificationArtifactReference: Encodable {
     let userId: String?
     let createdAt: Date
     let storageHint: String?
+}
+
+private struct LegacyContactsDomainSnapshotV1: Encodable {
+    let schemaVersion: Int
+    let identities: [ContactIdentity]
+    let keyRecords: [ContactKeyRecord]
+    let recipientLists: [LegacyRecipientListForTests]
+    let tags: [ContactTag]
+    let certificationArtifacts: [ContactCertificationArtifactReference]
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+private struct LegacyRecipientListForTests: Encodable {
+    let recipientListId: String
+    let name: String
+    let memberContactIds: [String]
+    let createdAt: Date
+    let updatedAt: Date
 }

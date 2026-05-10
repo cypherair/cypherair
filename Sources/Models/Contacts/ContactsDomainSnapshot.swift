@@ -1,12 +1,11 @@
 import Foundation
 
 struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
-    static let currentSchemaVersion = 1
+    static let currentSchemaVersion = 2
 
     var schemaVersion: Int
     var identities: [ContactIdentity]
     var keyRecords: [ContactKeyRecord]
-    var recipientLists: [RecipientList]
     var tags: [ContactTag]
     var certificationArtifacts: [ContactCertificationArtifactReference]
     var createdAt: Date
@@ -17,7 +16,6 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
             schemaVersion: currentSchemaVersion,
             identities: [],
             keyRecords: [],
-            recipientLists: [],
             tags: [],
             certificationArtifacts: [],
             createdAt: now,
@@ -43,10 +41,6 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
         try Self.validateUnique(
             keyRecords.map { $0.fingerprint.lowercased() },
             label: "contact key fingerprints"
-        )
-        try Self.validateUnique(
-            recipientLists.map(\.recipientListId),
-            label: "recipient list identifiers"
         )
         try Self.validateUnique(
             tags.map(\.tagId),
@@ -117,20 +111,6 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
                 keyId: keyRecord.keyId,
                 artifactsByID: artifactsByID
             )
-        }
-
-        for recipientList in recipientLists {
-            try Self.validateNonEmpty(recipientList.recipientListId, label: "recipient list identifier")
-            try Self.validateUnique(
-                recipientList.memberContactIds,
-                label: "recipient list members for \(recipientList.recipientListId)"
-            )
-            let missingMembers = recipientList.memberContactIds.filter { !contactIds.contains($0) }
-            guard missingMembers.isEmpty else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains recipient-list members without matching contacts."
-                )
-            }
         }
 
         for tag in tags {

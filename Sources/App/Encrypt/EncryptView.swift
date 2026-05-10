@@ -204,37 +204,46 @@ private struct EncryptScreenHostView: View {
 
             Section {
                 if model.contactsAvailability.isAvailable {
-                    if !model.recipientLists.isEmpty {
-                        ForEach(model.recipientLists) { recipientList in
-                            Toggle(isOn: Binding(
-                                get: { model.selectedRecipientListIds.contains(recipientList.recipientListId) },
-                                set: { isOn in
-                                    model.toggleRecipientList(recipientList.recipientListId, isOn: isOn)
-                                }
-                            )) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Label(recipientList.name, systemImage: "person.3")
-                                        if !recipientList.canEncryptToAll {
-                                            CypherStatusBadge(
-                                                title: recipientList.memberCount == 0
-                                                    ? String(localized: "recipientLists.emptyList", defaultValue: "Empty")
-                                                    : String(localized: "recipientLists.cannotEncrypt", defaultValue: "Needs Keys"),
-                                                color: .orange
-                                            )
+                    if !model.recipientTagOptions.isEmpty || !model.selectedRecipients.isEmpty {
+                        HStack {
+                            if !model.recipientTagOptions.isEmpty {
+                                Menu {
+                                    ForEach(model.recipientTagOptions) { tagOption in
+                                        Button {
+                                            model.selectRecipients(withTagId: tagOption.tagId)
+                                        } label: {
+                                            Label {
+                                                VStack(alignment: .leading) {
+                                                    Text(tagOption.displayName)
+                                                    Text(tagSelectionSubtitle(for: tagOption))
+                                                        .font(.caption)
+                                                }
+                                            } icon: {
+                                                Image(systemName: "tag")
+                                            }
                                         }
+                                        .disabled(tagOption.selectableContactIds.isEmpty)
                                     }
-                                    Text(
-                                        String.localizedStringWithFormat(
-                                            String(localized: "recipientLists.memberCount", defaultValue: "%d members"),
-                                            recipientList.memberCount
-                                        )
+                                } label: {
+                                    Label(
+                                        String(localized: "encrypt.addByTag", defaultValue: "Add by Tag"),
+                                        systemImage: "tag"
                                     )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
                                 }
                             }
-                            .disabled(model.isRecipientListSelectionDisabled(recipientList))
+
+                            Spacer()
+
+                            if !model.selectedRecipients.isEmpty {
+                                Button {
+                                    model.clearRecipients()
+                                } label: {
+                                    Label(
+                                        String(localized: "encrypt.clearRecipients", defaultValue: "Clear Recipients"),
+                                        systemImage: "xmark.circle"
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -270,13 +279,21 @@ private struct EncryptScreenHostView: View {
                         }
                     }
 
-                    if model.selectedRecipientListsContainInvalidMembers {
+                    if let tagSelectionSkipMessage = model.tagSelectionSkipMessage {
                         Label(
-                            String(localized: "encrypt.recipientLists.invalidSelection", defaultValue: "A selected list now needs preferred keys before it can be used."),
+                            tagSelectionSkipMessage,
                             systemImage: "exclamationmark.triangle.fill"
                         )
                         .font(.footnote)
                         .foregroundStyle(.orange)
+                        Button {
+                            model.dismissTagSelectionSkipMessage()
+                        } label: {
+                            Label(
+                                String(localized: "common.dismiss", defaultValue: "Dismiss"),
+                                systemImage: "xmark"
+                            )
+                        }
                     }
 
                     if !model.selectedUnverifiedContacts.isEmpty {
@@ -575,6 +592,31 @@ private struct EncryptScreenHostView: View {
                     .accessibilityLabel(String(localized: "encrypt.compat.ok", defaultValue: "Compatible"))
             }
         }
+    }
+
+    private func tagSelectionSubtitle(for tagOption: RecipientTagSelectionOption) -> String {
+        let selectedCount = model.selectedRecipientCount(for: tagOption)
+        if tagOption.skippedContactCount > 0 {
+            return String.localizedStringWithFormat(
+                String(
+                    localized: "encrypt.tagSelection.subtitleWithSkipped",
+                    defaultValue: "%1$d available, %2$d skipped"
+                ),
+                tagOption.selectableContactIds.count,
+                tagOption.skippedContactCount
+            )
+        }
+        if selectedCount > 0 {
+            return String.localizedStringWithFormat(
+                String(localized: "encrypt.tagSelection.subtitleSelected", defaultValue: "%1$d of %2$d selected"),
+                selectedCount,
+                tagOption.selectableContactIds.count
+            )
+        }
+        return String.localizedStringWithFormat(
+            String(localized: "encrypt.tagSelection.subtitle", defaultValue: "%d available"),
+            tagOption.selectableContactIds.count
+        )
     }
 
     private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {

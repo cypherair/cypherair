@@ -28,7 +28,6 @@ struct ContactDetailView: View {
     @State private var showMergeDialog = false
     @State private var showAddTagSheet = false
     @State private var newTagName = ""
-    @State private var showAddToListDialog = false
     @State private var detailError: String?
     @State private var showDetailError = false
 
@@ -38,18 +37,6 @@ struct ContactDetailView: View {
 
     private var mergeCandidates: [ContactIdentitySummary] {
         contactService.availableContactIdentities.filter { $0.contactId != contactId }
-    }
-
-    private var recipientLists: [RecipientListSummary] {
-        contactService.recipientListSummaries()
-    }
-
-    private var recipientListsForContact: [RecipientListSummary] {
-        recipientLists.filter { $0.memberContactIds.contains(contactId) }
-    }
-
-    private var recipientListsAvailableForContact: [RecipientListSummary] {
-        recipientLists.filter { !$0.memberContactIds.contains(contactId) }
     }
 
     private var allowsProtectedIdentityActions: Bool {
@@ -64,7 +51,6 @@ struct ContactDetailView: View {
                 List {
                     identitySection(contact)
                     tagsSection(contact)
-                    recipientListsSection
                     certificationSummarySection(contact)
 
                     if let preferredKey = contact.preferredKey {
@@ -147,20 +133,6 @@ struct ContactDetailView: View {
         } message: {
             Text(String(localized: "contactdetail.merge.message", defaultValue: "Choose another contact to merge into this contact. Their keys and memberships will move here."))
         }
-        .confirmationDialog(
-            String(localized: "contactdetail.recipientLists.add.title", defaultValue: "Add to Recipient List"),
-            isPresented: $showAddToListDialog,
-            titleVisibility: .visible
-        ) {
-            ForEach(recipientListsAvailableForContact) { recipientList in
-                Button(recipientList.name) {
-                    addToRecipientList(recipientList.recipientListId)
-                }
-            }
-            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {}
-        } message: {
-            Text(String(localized: "contactdetail.recipientLists.add.message", defaultValue: "Choose a list to add this contact to."))
-        }
         .sheet(isPresented: $showAddTagSheet) {
             AddContactTagSheet(
                 tagName: $newTagName,
@@ -217,55 +189,6 @@ struct ContactDetailView: View {
             .disabled(!allowsProtectedIdentityActions)
         } header: {
             Text(String(localized: "contactdetail.tags", defaultValue: "Tags"))
-        }
-    }
-
-    private var recipientListsSection: some View {
-        Section {
-            if recipientListsForContact.isEmpty {
-                Text(String(localized: "contactdetail.recipientLists.none", defaultValue: "Not in any recipient lists"))
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(recipientListsForContact) { recipientList in
-                    HStack {
-                        NavigationLink(value: AppRoute.recipientListDetail(recipientListId: recipientList.recipientListId)) {
-                            RecipientListMembershipRow(list: recipientList)
-                        }
-                        Spacer()
-                        Button(role: .destructive) {
-                            removeFromRecipientList(recipientList.recipientListId)
-                        } label: {
-                            Image(systemName: "minus.circle")
-                        }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel(String(localized: "contactdetail.recipientLists.remove", defaultValue: "Remove from List"))
-                        .disabled(!allowsProtectedIdentityActions)
-                    }
-                }
-            }
-
-            Button {
-                showAddToListDialog = true
-            } label: {
-                Label(
-                    String(localized: "contactdetail.recipientLists.add", defaultValue: "Add to Recipient List"),
-                    systemImage: "person.3.sequence"
-                )
-            }
-            .disabled(!allowsProtectedIdentityActions || recipientListsAvailableForContact.isEmpty)
-
-            NavigationLink(value: AppRoute.recipientLists) {
-                Label(
-                    String(localized: "contactdetail.recipientLists.manage", defaultValue: "Manage Recipient Lists"),
-                    systemImage: "person.3"
-                )
-            }
-        } header: {
-            Text(String(localized: "contactdetail.recipientLists", defaultValue: "Recipient Lists"))
-        } footer: {
-            if allowsProtectedIdentityActions && recipientListsAvailableForContact.isEmpty && !recipientLists.isEmpty {
-                Text(String(localized: "contactdetail.recipientLists.allAdded", defaultValue: "This contact is already in every recipient list."))
-            }
         }
     }
 
@@ -468,22 +391,6 @@ struct ContactDetailView: View {
         }
     }
 
-    private func addToRecipientList(_ recipientListId: String) {
-        do {
-            try contactService.addContact(contactId, toRecipientList: recipientListId)
-        } catch {
-            presentError(error)
-        }
-    }
-
-    private func removeFromRecipientList(_ recipientListId: String) {
-        do {
-            try contactService.removeContact(contactId, fromRecipientList: recipientListId)
-        } catch {
-            presentError(error)
-        }
-    }
-
     private func markVerified(fingerprint: String) {
         do {
             try contactService.setVerificationState(.verified, for: fingerprint)
@@ -586,24 +493,6 @@ private struct AddContactTagSheet: View {
                     .disabled(ContactTag.displayName(for: tagName).isEmpty)
                 }
             }
-        }
-    }
-}
-
-private struct RecipientListMembershipRow: View {
-    let list: RecipientListSummary
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(list.name)
-            Text(
-                String.localizedStringWithFormat(
-                    String(localized: "recipientLists.memberCount", defaultValue: "%d members"),
-                    list.memberCount
-                )
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
     }
 }

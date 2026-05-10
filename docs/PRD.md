@@ -203,7 +203,7 @@ Blur overlay when App enters background. Prevents multitasking switcher leakage.
 
 After app privacy authentication succeeds, the app can open protected app-data domains through the same authenticated session. Protected app data is separate from private-key material: it protects app-owned local state after unlock, while private keys remain under the Secure Enclave / Keychain private-key domain.
 
-Protected app-data scope and per-surface classification are maintained in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). At product level, current coverage includes ordinary protected settings, private-key control state, key metadata, and the protected Contacts domain. Contacts now supports person-centered entries, multiple keys per contact, manual verification and OpenPGP certification state, search, tags, and recipient lists over protected app data. Self-test reports remain short-lived export-only data rather than a protected diagnostics domain, and temporary/export/tutorial cleanup hardening is complete. Contacts package exchange is not an active product feature; any future complete Contacts backup or device migration must be a separate mandatory encrypted design.
+Protected app-data scope and per-surface classification are maintained in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). At product level, current coverage includes ordinary protected settings, private-key control state, key metadata, and the protected Contacts domain. Contacts now supports person-centered entries, multiple keys per contact, manual verification and OpenPGP certification state, search, and tags over protected app data. Self-test reports remain short-lived export-only data rather than a protected diagnostics domain, and temporary/export/tutorial cleanup hardening is complete. Contacts package exchange is not an active product feature; any future complete Contacts backup or device migration must be a separate mandatory encrypted design.
 
 **Authentication Mode**
 
@@ -235,7 +235,8 @@ The App offers two authentication modes, selectable in Settings:
 
 - Contacts are person-centered entries, not bare public-key files. A contact may have one preferred key, additional active keys, and historical keys retained for signer recognition and audit context.
 - Contact detail separates local manual fingerprint verification from OpenPGP certification. Manual verification is a local user assertion; saved certification artifacts are cryptographic evidence and may be exported explicitly as certification signatures.
-- Contacts support search, free-form tags, and named recipient lists. Recipient lists bind to contact identities and resolve to current preferred encryptable keys at send time.
+- Contacts support search and free-form tags. Encrypt can use a tag as a one-click batch selection entry that adds the tag's currently encryptable contacts to the explicit recipient selection; users may then add, remove, or clear selected recipients before sending.
+- Contacts schema v2 no longer stores recipient lists. Opening a legacy schema v1 Contacts payload deletes `recipientLists` during migration and writes back a verified v2 generation; list names are not converted into tags.
 - Contacts package exchange is not active. Any future complete Contacts backup or device migration must be designed as mandatory encrypted export/import, not as plaintext or optional-encryption social-graph export.
 
 ### 5.3 Encryption / Decryption
