@@ -363,7 +363,7 @@ jobs:
             exit 1
           fi
 
-          gh release create "$RELEASE_TAG" \
+          gh release create "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
             --verify-tag \
             --target "$COMMIT_SHA" \
             --title "CypherAir Stable Build ($RELEASE_TAG)" \

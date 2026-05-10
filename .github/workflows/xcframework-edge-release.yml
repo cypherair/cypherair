@@ -308,7 +308,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          gh release create "$RELEASE_TAG" \
+          gh release create "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
             --verify-tag \
             --target "$GITHUB_SHA" \
             --title "$RELEASE_TITLE" \
@@ -322,7 +322,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          gh release upload "$RELEASE_TAG" \
+          gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
             "$XCFRAMEWORK_ZIP" \
             "$XCFRAMEWORK_CHECKSUM" \
             "$ARM64E_MANIFEST" \
@@ -333,7 +333,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          gh release edit "$RELEASE_TAG" \
+          gh release edit "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
             --draft=false \
             --prerelease \
             --latest=false
