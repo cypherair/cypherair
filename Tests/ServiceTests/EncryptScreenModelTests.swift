@@ -62,7 +62,7 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_handleAppear_preservesCurrentPlaintext_butResetsRecipientsAndSigningState() async throws {
+    func test_handleAppear_preservesCurrentPlaintextAndRecipients_butResetsSigningState() async throws {
         let signerIdentity = try await TestHelpers.generateProfileAKey(
             service: stack.keyManagement,
             name: "Signer"
@@ -100,7 +100,7 @@ final class EncryptScreenModelTests: XCTestCase {
         model.handleAppear()
 
         XCTAssertEqual(model.plaintext, "User edited plaintext")
-        XCTAssertEqual(model.selectedRecipients, [recipientContactId])
+        XCTAssertEqual(model.selectedRecipients, ["override"])
         XCTAssertEqual(model.signerFingerprint, signerIdentity.fingerprint)
         XCTAssertEqual(model.encryptToSelfFingerprint, signerIdentity.fingerprint)
         XCTAssertFalse(model.signMessage)
@@ -536,6 +536,67 @@ final class EncryptScreenModelTests: XCTestCase {
             model.operation.isRunning == false
         }
         XCTAssertEqual(Set(capturedRecipients), Set([firstContactId, secondContactId]))
+    }
+
+    @MainActor
+    func test_pr8HandleAppearPreservesManualRecipientListSelectionWhenConfigurationIsUnchanged() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptPR8ListReappear")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let member = try stack.engine.generateKey(
+            name: "Reappear List Member",
+            email: "reappear-list-member@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        try opened.service.addContact(publicKeyData: member.publicKeyData, verificationState: .verified)
+        let memberContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: member.fingerprint))
+        let list = try opened.service.createRecipientList(
+            named: "Reappear Team",
+            memberContactIds: [memberContactId]
+        )
+
+        let model = makeModel(contactService: opened.service)
+        model.handleAppear()
+        model.toggleRecipientList(list.recipientListId, isOn: true)
+
+        model.handleAppear()
+
+        XCTAssertEqual(model.selectedRecipientListIds, [list.recipientListId])
+        XCTAssertEqual(model.effectiveRecipientContactIds, [memberContactId])
+    }
+
+    @MainActor
+    func test_pr8RecipientListSelectionDisablesOnlyInvalidUnselectedLists() {
+        let model = makeModel()
+        let validList = RecipientListSummary(
+            recipientListId: "valid-list",
+            name: "Valid",
+            memberContactIds: ["contact-1"],
+            memberCount: 1,
+            canEncryptToAll: true,
+            missingPreferredContactIds: []
+        )
+        let invalidList = RecipientListSummary(
+            recipientListId: "invalid-list",
+            name: "Invalid",
+            memberContactIds: ["contact-2"],
+            memberCount: 1,
+            canEncryptToAll: false,
+            missingPreferredContactIds: ["contact-2"]
+        )
+
+        XCTAssertFalse(model.isRecipientListSelectionDisabled(validList))
+        XCTAssertTrue(model.isRecipientListSelectionDisabled(invalidList))
+
+        model.selectedRecipientListIds = [invalidList.recipientListId]
+
+        XCTAssertFalse(model.isRecipientListSelectionDisabled(invalidList))
     }
 
     @MainActor

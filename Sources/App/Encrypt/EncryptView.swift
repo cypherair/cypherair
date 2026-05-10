@@ -234,7 +234,7 @@ private struct EncryptScreenHostView: View {
                                     .foregroundStyle(.secondary)
                                 }
                             }
-                            .disabled(!recipientList.canEncryptToAll)
+                            .disabled(model.isRecipientListSelectionDisabled(recipientList))
                         }
                     }
 

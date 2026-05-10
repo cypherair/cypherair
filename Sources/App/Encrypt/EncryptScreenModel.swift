@@ -1,5 +1,15 @@
 import Foundation
 
+private struct InitialRecipientSelectionSignature: Equatable {
+    let contactIds: [String]
+    let fingerprints: [String]
+
+    init(configuration: EncryptView.Configuration) {
+        contactIds = configuration.initialRecipientContactIds
+        fingerprints = configuration.initialRecipientFingerprints
+    }
+}
+
 @MainActor
 @Observable
 final class EncryptScreenModel {
@@ -32,6 +42,7 @@ final class EncryptScreenModel {
     private let textEncryptionAction: TextEncryptionAction
     private let fileEncryptionAction: FileEncryptionAction
     @ObservationIgnored private var encryptedFileArtifact: AppTemporaryArtifact?
+    @ObservationIgnored private var lastAppliedInitialRecipientSelectionSignature: InitialRecipientSelectionSignature?
     private var pendingInitialRecipientFingerprints: Set<String> = []
 
     var encryptMode: EncryptView.EncryptMode = .text
@@ -163,6 +174,11 @@ final class EncryptScreenModel {
         }
     }
 
+    func isRecipientListSelectionDisabled(_ recipientList: RecipientListSummary) -> Bool {
+        !recipientList.canEncryptToAll &&
+            !selectedRecipientListIds.contains(recipientList.recipientListId)
+    }
+
     var encryptButtonDisabled: Bool {
         if operation.isRunning {
             return true
@@ -223,7 +239,11 @@ final class EncryptScreenModel {
 
     func handleAppear() {
         applyPrefilledPlaintextIfNeeded(from: configuration)
-        applyInitialRecipientSelection(from: configuration)
+        let initialRecipientSelectionSignature = InitialRecipientSelectionSignature(configuration: configuration)
+        if lastAppliedInitialRecipientSelectionSignature != initialRecipientSelectionSignature {
+            applyInitialRecipientSelection(from: configuration)
+            lastAppliedInitialRecipientSelectionSignature = initialRecipientSelectionSignature
+        }
         applyInitialSignerSelection(from: configuration)
         applySigningPolicy(from: configuration)
         applyEncryptToSelfPolicy(from: configuration)
@@ -240,6 +260,9 @@ final class EncryptScreenModel {
         if previousConfiguration.initialRecipientContactIds != configuration.initialRecipientContactIds ||
             previousConfiguration.initialRecipientFingerprints != configuration.initialRecipientFingerprints {
             syncRuntimeRecipientSelection(from: configuration)
+            lastAppliedInitialRecipientSelectionSignature = InitialRecipientSelectionSignature(
+                configuration: configuration
+            )
         }
 
         if previousConfiguration.initialSignerFingerprint != configuration.initialSignerFingerprint {
