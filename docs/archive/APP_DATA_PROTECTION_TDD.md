@@ -908,7 +908,7 @@ In practical terms:
 - Contacts owns person/key/tag/list semantics
 - the protected app-data framework owns registry authority, shared-session authority, wrapped-DMK lifecycle, envelope rules, generation recovery, and relock posture
 
-Contacts-specific adoption behavior now lives directly in [CONTACTS_PRD](CONTACTS_PRD.md), [CONTACTS_TDD](CONTACTS_TDD.md), [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md), and the rollout sequencing sections of [APP_DATA_MIGRATION_GUIDE](APP_DATA_MIGRATION_GUIDE.md).
+Current Contacts adoption behavior now lives in the active long-term docs and [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md). Archived Contacts-specific docs and this rollout sequencing material are historical source material only.
 
 ## 10. Migration Rules
 

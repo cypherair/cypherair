@@ -2,7 +2,7 @@
 
 > **Status:** Archived historical AppData migration and inventory snapshot.
 > **Archived on:** 2026-05-02.
-> **Archival reason:** AppData Phase 1-7 current-state facts have been absorbed into long-lived architecture, security, technical, testing, and review docs. Phase 8 Contacts follow-on work now lives in Contacts-specific docs.
+> **Archival reason:** AppData current-state facts and later Contacts protected-domain facts have been absorbed into long-lived architecture, security, technical, testing, review, and persisted-state docs. Archived Contacts-specific docs are historical source material only.
 > **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md)
 > **Current code and active canonical docs outrank this archived file whenever they disagree.**
 >
@@ -19,15 +19,15 @@
 
 This guide is no longer the detailed implementation plan for the completed AppData foundation. Phase 1-7 have landed and are now documented as current behavior in the long-lived architecture, security, technical, and testing docs.
 
-This guide remains active for:
+This archived guide preserves the historical snapshot for:
 
-- implemented Phase 7 non-Contacts protected-after-unlock surfaces and closure state
-- Phase 8 Contacts readiness and follow-on planning
-- Phase 9 future app-owned persistent domains
-- the reviewed persistent-state inventory
-- cross-domain migration rules that future dedicated plans must preserve
+- implemented non-Contacts protected-after-unlock surfaces and closure state as of the archive date
+- pre-implementation Contacts readiness and follow-on planning that current active docs now supersede
+- future app-owned persistent-domain planning context
+- the reviewed persistent-state inventory at that point in time
+- cross-domain migration rules that future dedicated plans had to preserve
 
-This guide no longer creates Phase 7 implementation work. It records the completed Phase 7 scope and the constraints future Phase 8+ plans must preserve. The Phase 7 architecture-level closure reference lives in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md).
+This guide no longer creates implementation work. It records the completed non-Contacts scope and the constraints future protected-domain plans had to preserve at archive time. The Phase 7 architecture-level closure reference lives in [APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE](APP_DATA_PHASE7_IMPLEMENTATION_REFERENCE.md).
 
 ## 2. Current Foundation Status
 
@@ -68,16 +68,11 @@ The older [APP_DATA_PHASE7_TEMPORARY_RECORD](APP_DATA_PHASE7_TEMPORARY_RECORD.md
 
 ### Phase 8: Contacts Protected Domain
 
-Phase 8 remains pending but is unblocked by Phase 7 closure. Contacts work should continue through the Contacts-specific documents:
-
-- [CONTACTS_PRD](CONTACTS_PRD.md)
-- [CONTACTS_TDD](CONTACTS_TDD.md)
-- [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md)
-- [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+Superseded on 2026-05-10: Contacts protected-domain work has since landed. Current Contacts product behavior, technical contracts, security invariants, validation requirements, and persisted-state classification live in the active long-term docs listed in this file's successor documents. Archived Contacts-specific docs are historical source material only.
 
 Contacts must remain a domain-specific consumer of the shared ProtectedData framework. It must not introduce a second vault architecture or take ownership of registry authority, root-secret lifecycle, wrapped-DMK lifecycle, or app-session grace-window behavior.
 
-Contacts PR1-PR8 remain Phase 8 work and should follow the Contacts-specific PR sequence. PR5 does not implement Contacts or redesign the Contacts protected-domain schema.
+The original PR-sequence note for Contacts is historical only and must not be used as current implementation guidance.
 
 ### Phase 9: Future Persistent Domains
 

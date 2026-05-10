@@ -2,7 +2,7 @@
 
 > **Status:** Archived historical AppData roadmap snapshot.
 > **Archived on:** 2026-04-28.
-> **Archival reason:** AppData implementation details have been absorbed into long-lived current-state documentation, and Phase 8 follow-on work now lives in Contacts-specific docs.
+> **Archival reason:** AppData implementation details and later Contacts protected-domain facts have been absorbed into long-lived current-state documentation. Archived Contacts-specific docs are historical source material only.
 > **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md)
 > **Current code and active canonical docs outrank this archived file whenever they disagree.**
 
@@ -188,9 +188,9 @@ Migrate ordinary protected-after-unlock settings, self-test policy, and related 
 
 ### Phase 8: Contacts Protected Domain
 
-Migrate Contacts onto the shared protected app-data framework only after the earlier key-metadata and non-Contacts protected-after-unlock work has been completed. Contacts must remain a domain-specific consumer of the shared framework, not a second independent vault architecture.
+The original roadmap required Contacts to move onto the shared protected app-data framework only after earlier key-metadata and non-Contacts protected-after-unlock work had been completed. Contacts still must remain a domain-specific consumer of the shared framework, not a second independent vault architecture.
 
-See [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) for the deferred Contacts-internal PR sequence. AppData Phase 4 and Phase 5 are prerequisites, but Contacts PR1-PR8 remain Phase 8 work behind the remaining Phase 6-7 gates.
+Superseded on 2026-05-10: Contacts protected-domain work has since landed. Use active long-term docs and [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md) for current Contacts behavior and storage classification; archived Contacts-specific docs are historical source material only.
 
 ### Phase 9: Future Persistent Domains
 

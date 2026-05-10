@@ -173,7 +173,7 @@ Goals:
 - avoid duplicating domain key lifecycle, envelope handling, recovery logic, registry authority, and relock rules
 - keep Contacts explicitly `import-recoverable`
 
-Contacts internal implementation sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md). AppData Phase 4 framework hardening and Phase 5 private-key-control migration are complete prerequisites, but Contacts PR1-PR8 are still Phase 8 work and remain behind the remaining Phase 6-7 roadmap gates. No Contacts schema-only prep starts earlier unless this roadmap is explicitly revised.
+Original snapshot note: this archive treated Contacts internal implementation sequencing as future gated work. That roadmap state is superseded; current Contacts behavior and storage classification live in the active long-term docs and [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md). Archived Contacts-specific docs are historical source material only.
 
 ### 2.9 Phase 9: Future Persistent Domains
 

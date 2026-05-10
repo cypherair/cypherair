@@ -8,16 +8,16 @@
 >
 > Original bridge metadata follows.
 
-> **Status:** Temporary bridge; not a canonical current-state authority.
-> **Purpose:** Guide the later consolidation of Contacts-specific documents into long-term CypherAir documentation before those Contacts-specific documents are archived.
+> **Status:** Completed temporary bridge; not a canonical current-state authority.
+> **Purpose:** Record the completed consolidation of the archived Contacts source files into long-term CypherAir documentation.
 > **Audience:** Engineering, product, QA, security review, and AI coding tools.
-> **Source of truth:** Current code plus canonical current-state docs win over this bridge and over Contacts-specific planning history.
+> **Source of truth:** Current code plus canonical current-state docs win over this bridge and over archived Contacts planning history.
 > **Last reviewed:** 2026-05-10.
 > **Update triggers:** Any decision to consolidate, archive, or materially rewrite the Contacts-specific document set.
 
 ## 1. Source Documents
 
-Use these Contacts-specific documents only as source material for consolidation, not as long-term current-state authorities:
+Use these archived Contacts source files only as historical source material, not as long-term current-state authorities:
 
 - [CONTACTS_PRD](CONTACTS_PRD.md)
 - [CONTACTS_TDD](CONTACTS_TDD.md)
@@ -41,4 +41,4 @@ Before moving any claim, verify it against current code and the active long-term
 
 ## 4. Completion Criteria
 
-The Contacts-specific docs can be archived after their durable current-state content has been consolidated into the long-term docs, active links have been redirected to those long-term docs, and a markdown-link audit plus targeted stale-claim sweep passes for active and archived documentation.
+The archived Contacts source files were moved after their durable current-state content was consolidated into the long-term docs, active links were redirected to those long-term docs, and a markdown-link audit plus targeted stale-claim sweep passed for active and archived documentation.

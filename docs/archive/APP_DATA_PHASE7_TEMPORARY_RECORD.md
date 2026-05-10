@@ -2,7 +2,7 @@
 
 > **Status:** Archived temporary Phase 7 recovery record.
 > **Archived on:** 2026-05-02.
-> **Archival reason:** The temporary recovery note was already superseded by the Phase 7 implementation reference; both are now archived because current Phase 7 facts live in long-lived docs and Phase 8 work lives in Contacts docs.
+> **Archival reason:** The temporary recovery note was already superseded by the Phase 7 implementation reference; both are now archived because current AppData and Contacts protected-domain facts live in long-lived docs.
 > **Successor documents:** [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [TDD](../TDD.md) · [TESTING](../TESTING.md) · [CODE_REVIEW](../CODE_REVIEW.md) · [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md)
 > **Current code and active canonical docs outrank this archived file whenever they disagree.**
 >
