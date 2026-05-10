@@ -182,10 +182,11 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Module breakdown, data flows, storage layout |
 | [SECURITY](docs/SECURITY.md) | Encryption scheme, key lifecycle, threat model |
 | [TESTING](docs/TESTING.md) | Test strategy and coverage |
-| [CONTACTS_PRD](docs/CONTACTS_PRD.md) | Future Contacts feature requirements beyond the implemented PR4 protected-domain cutover |
-| [CONTACTS_TDD](docs/CONTACTS_TDD.md) | Future Contacts feature technical design; current security/storage behavior lives in the current-state docs |
-| [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](docs/CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) | Remaining Contacts feature plan with PR4 protected-domain cutover notes |
+| [CONTACTS_PRD](docs/CONTACTS_PRD.md) | Contacts product requirements and package/backup boundaries pending consolidation into long-term docs |
+| [CONTACTS_TDD](docs/CONTACTS_TDD.md) | Contacts technical design pending consolidation into long-term docs |
+| [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](docs/CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) | Contacts implementation-history and expansion-planning reference pending consolidation |
 | [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](docs/CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md) | Contacts access, mutation, and enrichment checklist |
+| [CONTACTS_DOC_BRIDGE](docs/CONTACTS_DOC_BRIDGE.md) | Temporary bridge for moving durable Contacts content into long-term docs before archiving Contacts-specific docs |
 | [APP_RELEASE_PROCESS](docs/APP_RELEASE_PROCESS.md) | Current app-build release modes, stable asset contract, and App Store candidate ordering |
 | [DOCUMENTATION_GOVERNANCE](docs/DOCUMENTATION_GOVERNANCE.md) | Documentation classes, metadata rules, archive rules, and update triggers |
 | [COMPLIANCE_REMEDIATION_PLAN (Archive)](docs/archive/COMPLIANCE_REMEDIATION_PLAN.md) | Archived remediation plan and close-out history for the licensing/distribution rollout |

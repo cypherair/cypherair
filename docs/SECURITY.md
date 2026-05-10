@@ -239,7 +239,7 @@ Security invariants for protected app data:
 - ProtectedData is separate from the private-key material domain; permanent and pending SE-wrapped private-key bundle rows remain under the Keychain / Secure Enclave private-key-material boundary.
 - `appSessionAuthenticationPolicy` remains the documented early-readable boot-authentication exception.
 - Legacy Contacts files and metadata are migration/quarantine cleanup sources only after protected cutover and must not become a fallback source of truth.
-- Contacts PR5/6/8 production state stays inside the protected `contacts` domain. Certification-signature export/share is an explicit artifact export boundary, not a Contacts backup, package, or social-graph export.
+- Contacts production state stays inside the protected `contacts` domain. Certification-signature export/share is an explicit artifact export boundary, not a Contacts backup, package, or social-graph export.
 - Self-test, decrypted, streaming, export handoff, and tutorial artifacts keep the inventory's ephemeral-with-cleanup behavior; files exported to user-selected destinations are outside app custody after handoff.
 
 UserDefaults is allowed only for documented boot, test, tutorial, and legacy cleanup exceptions. Personal or sensitive app data must not be newly introduced there; post-auth settings use `protected-settings` unless they are explicit boot-authentication exceptions.

@@ -373,7 +373,7 @@ Current framework contracts:
 
 Current production domain families and their row-level payload classification are tracked in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). At the technical-contract level, each production domain must open through the post-auth handoff, decode strictly, enter recovery instead of silently resetting unreadable committed state, and clear decrypted domain-local state on relock.
 
-The current `contacts` domain is the authoritative protected source after the PR4 security/storage cutover. PR5 person-centered key modeling and merge behavior, PR6 certification projection and saved certification artifacts, and PR8 search, tags, recipient-list organization, and Encrypt recipient-list selection are implemented over the unlocked protected `contacts` snapshot. Search indexes, screen filters, and recipient selections are runtime state only, not persisted state. Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be designed separately as mandatory encrypted backup.
+The current `contacts` domain is the authoritative protected source for Contacts data. Person-centered key modeling and merge behavior, certification projection and saved certification artifacts, search, tags, recipient-list organization, and Encrypt recipient-list selection are implemented over the unlocked protected `contacts` snapshot. Search indexes, screen filters, and recipient selections are runtime state only, not persisted state. Contacts package exchange is not implemented; any future complete Contacts backup must be designed separately as mandatory encrypted backup.
 
 Migration and exception rules:
 
@@ -382,7 +382,7 @@ Migration and exception rules:
 - Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
 - Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset.
 - Phase 7 temporary artifacts are centralized through `AppTemporaryArtifactStore`; streaming/decrypted outputs, export handoff files, tutorial sandbox directories, startup cleanup, and reset cleanup keep the ephemeral-with-cleanup behavior classified in the inventory.
-- Contacts PR5/6/8 production data remains in the protected `contacts` domain, while legacy Contacts sources remain cleanup/quarantine only after cutover.
+- Contacts production data remains in the protected `contacts` domain, while legacy Contacts sources remain cleanup/quarantine only after cutover.
 - Future protected-domain migrations must preserve readable source state until the protected destination is created/opened and verified through the normal post-auth path.
 - After cutover, legacy sources are cleanup/quarantine only and must not become fallback sources of truth.
 - Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary settings boot-authentication exception.

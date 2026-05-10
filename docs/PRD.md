@@ -203,7 +203,7 @@ Blur overlay when App enters background. Prevents multitasking switcher leakage.
 
 After app privacy authentication succeeds, the app can open protected app-data domains through the same authenticated session. Protected app data is separate from private-key material: it protects app-owned local state after unlock, while private keys remain under the Secure Enclave / Keychain private-key domain.
 
-Protected app-data scope and per-surface classification are maintained in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). At product level, current coverage includes ordinary protected settings, private-key control state, key metadata, and Contacts protected-domain state through PR8. Self-test reports remain short-lived export-only data rather than a protected diagnostics domain, and temporary/export/tutorial cleanup hardening is complete. Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be a separate mandatory encrypted design.
+Protected app-data scope and per-surface classification are maintained in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). At product level, current coverage includes ordinary protected settings, private-key control state, key metadata, and the protected Contacts domain. Contacts now supports person-centered entries, multiple keys per contact, manual verification and OpenPGP certification state, search, tags, and recipient lists over protected app data. Self-test reports remain short-lived export-only data rather than a protected diagnostics domain, and temporary/export/tutorial cleanup hardening is complete. Contacts package exchange is not an active product feature; any future complete Contacts backup or device migration must be a separate mandatory encrypted design.
 
 **Authentication Mode**
 
@@ -251,7 +251,7 @@ Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biomet
 
 ### 5.5 App Protection
 
-Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, Contacts protected-domain state through PR8, self-test export-only behavior, and temporary/export/tutorial cleanup; row-level classification lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be a separate mandatory encrypted design.
+Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, protected Contacts data, self-test export-only behavior, and temporary/export/tutorial cleanup; row-level classification lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). Contacts package exchange is not active; any future complete Contacts backup or device migration must be a separate mandatory encrypted design.
 
 ---
 

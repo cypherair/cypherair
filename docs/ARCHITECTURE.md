@@ -164,7 +164,7 @@ ProtectedData component ownership:
 - `ProtectedOrdinarySettingsCoordinator` is the Phase 7 source of truth for ordinary-settings availability and loaded snapshots; production reads/writes `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff
 - `ProtectedDataFrameworkSentinelStore` is the second production domain; it contains no user data, telemetry, or UI state, and is created only after another domain is already committed and the shared resource is ready
 - `ContactService` is the only app/UI-facing Contacts facade. It owns Contacts availability, query APIs, mutation APIs, rollback behavior, verification state, migration/quarantine cleanup warnings, and relock cleanup.
-- `ContactsDomainStore` is the Contacts protected-domain persistence owner after PR4 cutover; it opens the protected `contacts` domain post-auth, migrates active legacy contacts once, quarantines legacy plaintext, and never reads quarantine for ordinary routes.
+- `ContactsDomainStore` is the Contacts protected-domain persistence owner; it opens the protected `contacts` domain post-auth, migrates active legacy contacts once, quarantines legacy plaintext, and never reads quarantine for ordinary routes.
 - `ContactsDomainRepository` owns Contacts schema serialization, flat compatibility projection, and runtime scratch/search/signer state clearing. Schema evolution remains in the Contacts implementation plan and surface inventory.
 - `AppContainer` assembles the Contacts store, migration source, relock participants, and post-unlock call sites only; Contacts availability and mutation policy stay inside `ContactService`.
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
@@ -172,9 +172,9 @@ ProtectedData component ownership:
 - after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`; Contacts then joins the authorized session through its dedicated post-auth open path
-- current Phase 1-7 ProtectedData work is implemented, including ordinary-settings, self-test export-only, and temporary/export/tutorial hardening; Contacts PR4 adds the protected `contacts` domain while preserving the flat compatibility snapshot
+- current Phase 1-7 ProtectedData work is implemented, including ordinary-settings, self-test export-only, and temporary/export/tutorial hardening; Contacts uses the protected `contacts` domain for person-centered Contacts data while preserving compatibility projections for older call sites
 - Settings refresh can still auto-open protected settings only by consuming an existing app-session `LAContext` handoff; the handoff-only path must not start a new interactive authentication prompt
-- Contacts security/storage lifecycle is current: post-auth gating, protected-domain persistence, migration/quarantine, no legacy fallback after cutover, recovery states, and relock cleanup are implemented. Contacts PR8 search, tags, recipient lists, and organization workflows run over the unlocked protected `contacts` snapshot. Contacts PR7 package exchange is withdrawn, and complete encrypted backup is deferred to a separate mandatory encrypted design. Sequencing lives in [CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN](CONTACTS_PROTECTED_DOMAIN_IMPLEMENTATION_PLAN.md) and surface coverage lives in [CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY](CONTACTS_PROTECTED_DOMAIN_SURFACE_INVENTORY.md)
+- Contacts security/storage lifecycle is current: post-auth gating, protected-domain persistence, migration/quarantine, no legacy fallback after cutover, recovery states, and relock cleanup are implemented. Search, tags, recipient lists, and organization workflows run over the unlocked protected `contacts` snapshot. Contacts package exchange is not active, and complete encrypted backup is deferred to a separate mandatory encrypted design. Contacts-specific source documents remain active until their current-state content is bridged into long-term docs; see [CONTACTS_DOC_BRIDGE](CONTACTS_DOC_BRIDGE.md).
 
 The canonical row-level persisted-state classification, current status, and migration-readiness table lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This architecture section names component owners and data-flow responsibilities rather than duplicating that inventory.
 
@@ -446,7 +446,7 @@ App Sandbox:
 │       ├── private-key-control/           → Auth mode + private-key recovery journal envelopes
 │       ├── key-metadata/                  → PGPKeyIdentity metadata envelopes
 │       ├── protected-settings/              → Protected settings envelopes; schema v2 clipboardNotice + ordinary settings
-│       ├── contacts/                        → Contacts flat compatibility snapshot envelopes
+│       ├── contacts/                        → Protected Contacts domain envelopes
 │       └── protected-framework-sentinel/    → Framework sentinel envelopes; schema/purpose marker only
 ├── Library/Preferences/
 │   └── (UserDefaults)

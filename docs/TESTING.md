@@ -131,7 +131,7 @@ Current ProtectedData unit-test expectations for the implemented AppData and Con
 - verify that protected-settings refresh auto-opens with a valid handoff context and stays locked without starting interactive authorization when the handoff is absent or disappears
 - verify that ordinary settings stay locked before app authentication, load/save only from `protected-settings` schema v2 after an unlocked post-auth protected-settings handoff, migrate schema v1 plus legacy ordinary values only after verified readback, treat existing schema v2 as authoritative over legacy keys, enter recovery without resetting to defaults when the protected payload is corrupt, persist updates through the coordinator, clear snapshots on relock, and fail closed for resume grace while unavailable
 - verify that onboarding, root tint/theme, guided tutorial entry/completion, Settings controls, and encrypt-to-self behavior consume `ProtectedOrdinarySettingsCoordinator` state rather than `AppConfiguration` or `ProtectedSettingsHost`
-- verify that Contacts PR4 migrates the legacy flat compatibility source into the protected `contacts` domain only after app unlock, proves protected-domain readability before retiring the source, quarantines legacy plaintext without using quarantine for ordinary routes, deletes quarantine only after a later successful Contacts domain open, treats corrupt or missing protected Contacts state as recovery instead of falling back to legacy or quarantine, persists protected mutations without writing active legacy files, and clears Contacts runtime/projection state on relock or framework reset
+- verify that Contacts migrates legacy sources into the protected `contacts` domain only after app unlock, proves protected-domain readability before retiring the source, quarantines legacy plaintext without using quarantine for ordinary routes, deletes quarantine only after a later successful Contacts domain open, treats corrupt or missing protected Contacts state as recovery instead of falling back to legacy or quarantine, persists protected mutations without writing active legacy files, and clears Contacts runtime/projection state on relock or framework reset
 - verify that Reset All Local Data deletes default-account and metadata-account CypherAir Keychain items, treats missing items as success, clears in-memory state, and validates a clean empty ProtectedData state
 
 Current ProtectedData file-protection expectations:
@@ -148,10 +148,10 @@ Completed Phase 7 validation expectations:
 - Phase 7 PR 3 covers self-test export-only report state and legacy `Documents/self-test/` cleanup.
 - Phase 7 PR 4 covers temporary/export/tutorial hardening: per-operation streaming/decrypted owner directories, owner cleanup, startup cleanup, Reset All Local Data cleanup, verified complete file protection, export handoff ownership, fixed tutorial defaults cleanup, and legacy tutorial defaults UUID cleanup.
 
-Current Contacts PR5-PR8 validation expectations:
+Current Contacts validation expectations:
 
 - Contacts validation should prove person-centered merge/preferred-key behavior, certification projection and artifact persistence, search, tags, recipient lists, route states, relock cleanup, and Encrypt recipient-list selection over the protected `contacts` domain without reactivating legacy Contacts files or weakening the implemented protected-domain security lifecycle.
-- Contacts PR7 package exchange is withdrawn; any future complete Contacts backup must be covered by a separate mandatory encrypted design and test plan.
+- Contacts package exchange is not active; any future complete Contacts backup must be covered by a separate mandatory encrypted design and test plan.
 
 Docs-only documentation authority or archive PRs do not require Rust or Xcode test runs unless they touch code, generated files, project files, entitlements, release metadata, or build settings. They should still run documentation consistency checks, link checks for active platform references, and `git diff --check`.
 
