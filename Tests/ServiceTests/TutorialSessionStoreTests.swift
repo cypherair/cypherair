@@ -980,6 +980,7 @@ final class TutorialSessionStoreTests: XCTestCase {
 
     func test_encryptAndDecryptViews_keepRuntimeConfigurationSyncHook() throws {
         let encryptViewContents = try loadRepositoryAuditSource("Sources/App/Encrypt/EncryptView.swift")
+        let encryptHostContents = try loadRepositoryAuditSource("Sources/App/Encrypt/EncryptScreenHostView.swift")
         let encryptScreenModelContents = try loadRepositoryAuditSource("Sources/App/Encrypt/EncryptScreenModel.swift")
         let decryptViewContents = try loadRepositoryAuditSource("Sources/App/Decrypt/DecryptView.swift")
         let decryptScreenModelContents = try loadRepositoryAuditSource("Sources/App/Decrypt/DecryptScreenModel.swift")
@@ -1005,15 +1006,15 @@ final class TutorialSessionStoreTests: XCTestCase {
             "EncryptScreenModel should own repeated onAppear synchronization"
         )
         XCTAssertTrue(
-            encryptViewContents.contains("let configuration: EncryptView.Configuration"),
+            encryptHostContents.contains("let configuration: EncryptView.Configuration"),
             "Encrypt host should retain the latest incoming configuration"
         )
         XCTAssertTrue(
-            encryptViewContents.contains(".onChange(of: runtimeSyncKey)"),
+            encryptHostContents.contains(".onChange(of: runtimeSyncKey)"),
             "Encrypt host should watch runtime configuration changes"
         )
         XCTAssertTrue(
-            encryptViewContents.contains("model.updateConfiguration(configuration)"),
+            encryptHostContents.contains("model.updateConfiguration(configuration)"),
             "Encrypt host should forward runtime configuration updates into the screen model"
         )
 
