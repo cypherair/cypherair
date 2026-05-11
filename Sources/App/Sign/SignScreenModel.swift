@@ -245,6 +245,17 @@ final class SignScreenModel {
         exportController.finish()
     }
 
+    func clearTransientInput() {
+        text = ""
+        signedMessage = nil
+        detachedSignature = nil
+        showFileImporter = false
+        selectedFileURL = nil
+        selectedFileName = nil
+        exportController.finish()
+        textInputSectionEpoch &+= 1
+    }
+
     func handleExportError(_ error: Error) {
         operation.present(error: mapSigningError(error))
     }

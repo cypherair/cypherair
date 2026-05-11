@@ -1064,6 +1064,61 @@ final class TutorialSessionStoreTests: XCTestCase {
         )
     }
 
+    func test_keyboardInputAPIs_areCentralizedAndPrivacyHardened() throws {
+        let allowedDirectInputFiles: Set<String> = [
+            "Sources/App/Common/CypherTextInputs.swift",
+            "Sources/App/Common/CypherMultilineTextInput.swift",
+        ]
+        let bannedPatterns: [(pattern: String, label: String)] = [
+            ("(?<![A-Za-z0-9_])TextField\\(", "TextField("),
+            ("(?<![A-Za-z0-9_])SecureField\\(", "SecureField("),
+            ("\\.searchable\\(", ".searchable("),
+            ("(?<![A-Za-z0-9_])TextEditor\\(", "TextEditor("),
+        ]
+
+        for path in try repositoryAuditSwiftSourcePaths(under: "App") {
+            guard !allowedDirectInputFiles.contains(path) else {
+                continue
+            }
+            let contents = try loadRepositoryAuditSource(path)
+            for bannedPattern in bannedPatterns {
+                XCTAssertNil(
+                    contents.range(of: bannedPattern.pattern, options: .regularExpression),
+                    "\(path) should use Cypher input wrappers instead of direct \(bannedPattern.label)"
+                )
+            }
+        }
+
+        let inputComponentContents = try loadRepositoryAuditSource("Sources/App/Common/CypherTextInputs.swift")
+        XCTAssertTrue(inputComponentContents.contains("enum CypherSingleLineTextInputProfile"))
+        XCTAssertTrue(inputComponentContents.contains("enum CypherSecureTextInputProfile"))
+        XCTAssertTrue(inputComponentContents.contains("enum CypherSearchTextInputProfile"))
+        XCTAssertTrue(inputComponentContents.contains(".privacySensitive()"))
+        XCTAssertTrue(inputComponentContents.contains(".autocorrectionDisabled(true)"))
+        XCTAssertTrue(inputComponentContents.contains(".applyMacWritingToolsPolicy()"))
+
+        let appContents = try loadRepositoryAuditSource("Sources/App/CypherAirApp.swift")
+        XCTAssertTrue(appContents.contains("shouldAllowExtensionPointIdentifier"))
+        XCTAssertTrue(appContents.contains("extensionPointIdentifier != .keyboard"))
+    }
+
+    func test_keyImportAndBackup_clearSensitiveInputOnSuccessDismissAndContentClear() throws {
+        let importContents = try loadRepositoryAuditSource("Sources/App/Keys/ImportKeyView.swift")
+        XCTAssertTrue(importContents.contains("clearTransientInput()"))
+        XCTAssertTrue(importContents.contains("clearImportedKeyData()"))
+        XCTAssertTrue(importContents.contains(".onDisappear"))
+        XCTAssertTrue(importContents.contains(".onChange(of: appSessionOrchestrator.contentClearGeneration)"))
+        XCTAssertTrue(importContents.contains("dismiss()"))
+
+        let backupContents = try loadRepositoryAuditSource("Sources/App/Keys/BackupKeyView.swift")
+        XCTAssertTrue(backupContents.contains("clearTransientInput()"))
+        XCTAssertTrue(backupContents.contains("clearExportedData()"))
+        XCTAssertTrue(backupContents.contains(".onDisappear"))
+        XCTAssertTrue(backupContents.contains(".onChange(of: appSessionOrchestrator.contentClearGeneration)"))
+        XCTAssertTrue(backupContents.contains("passphrase = \"\""))
+        XCTAssertTrue(backupContents.contains("passphraseConfirm = \"\""))
+    }
+
     func test_outputPages_removeTutorialOutputCouplingFromPageImplementations() throws {
         let files = [
             "Sources/App/Encrypt/EncryptView.swift",
@@ -1205,6 +1260,33 @@ final class TutorialSessionStoreTests: XCTestCase {
 
     private func loadRepositoryAuditSource(_ relativePath: String) throws -> String {
         try RepositoryAuditLoader.loadString(relativePath: relativePath)
+    }
+
+    private func repositoryAuditSwiftSourcePaths(under relativeDirectory: String) throws -> [String] {
+        let sourcesRootURL = try RepositoryAuditLoader.sourcesRootURL()
+        let rootURL = sourcesRootURL.appending(path: relativeDirectory, directoryHint: .isDirectory)
+        let fileManager = FileManager.default
+        guard let enumerator = fileManager.enumerator(
+            at: rootURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        var paths: [String] = []
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension == "swift" else {
+                continue
+            }
+            let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
+            guard values.isRegularFile == true else {
+                continue
+            }
+            let relativePath = String(fileURL.path.dropFirst(sourcesRootURL.path.count + 1))
+            paths.append("Sources/\(relativePath)")
+        }
+        return paths.sorted()
     }
 
     private func sourceBlock(

@@ -32,6 +32,7 @@ struct SettingsView: View {
     @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(AuthenticationManager.self) private var authManager
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
     @Environment(\.appAccessPolicySwitchAction) private var appAccessPolicySwitchAction
@@ -50,6 +51,7 @@ struct SettingsView: View {
             protectedOrdinarySettings: protectedOrdinarySettings,
             authManager: authManager,
             keyManagement: keyManagement,
+            appSessionOrchestrator: appSessionOrchestrator,
             iosPresentationController: iosPresentationController,
             macPresentationController: macPresentationController,
             appAccessPolicySwitchAction: appAccessPolicySwitchAction,

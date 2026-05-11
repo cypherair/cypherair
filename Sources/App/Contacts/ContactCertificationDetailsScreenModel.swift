@@ -400,6 +400,15 @@ final class ContactCertificationDetailsScreenModel {
         invalidatePreview()
     }
 
+    func clearTransientInput() {
+        importedSignature.clear()
+        signatureInput = ""
+        pendingArtifact = nil
+        verification = nil
+        showFileImporter = false
+        exportController.finish()
+    }
+
     func generateAndSaveCertification() {
         guard contactsAvailability.allowsProtectedCertificationPersistence else {
             return

@@ -4,6 +4,7 @@ struct RecipientTagPickerSheet: View {
     let model: EncryptScreenModel
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @State private var searchText = ""
 
     var body: some View {
@@ -69,7 +70,7 @@ struct RecipientTagPickerSheet: View {
             }
             .scrollDismissesKeyboardInteractivelyIfAvailable()
             .navigationTitle(String(localized: "encrypt.addByTag", defaultValue: "Add by Tag"))
-            .searchable(
+            .cypherSearchable(
                 text: $searchText,
                 placement: .automatic,
                 prompt: String(localized: "tagManagement.search", defaultValue: "Search tags")
@@ -80,6 +81,9 @@ struct RecipientTagPickerSheet: View {
                         dismiss()
                     }
                 }
+            }
+            .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+                searchText = ""
             }
         }
     }

@@ -9,6 +9,7 @@ $(SRCROOT)/Sources/App/Common/AuthenticationShieldCoordinator.swift
 $(SRCROOT)/Sources/App/Common/AuthenticationShieldHost.swift
 $(SRCROOT)/Sources/App/Common/AuthenticationShieldOverlayView.swift
 $(SRCROOT)/Sources/App/Common/CypherMultilineTextInput.swift
+$(SRCROOT)/Sources/App/Common/CypherTextInputs.swift
 $(SRCROOT)/Sources/App/Common/DetailedSignatureSectionView.swift
 $(SRCROOT)/Sources/App/Common/FileExportController.swift
 $(SRCROOT)/Sources/App/Common/FingerprintView.swift

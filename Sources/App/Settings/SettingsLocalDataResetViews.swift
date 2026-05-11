@@ -37,9 +37,12 @@ struct SettingsLocalDataResetPhraseView: View {
                         defaultValue: "Type RESET to permanently delete all CypherAir data on this device."
                     )
                 )
-                TextField(
+                CypherSingleLineTextField(
                     String(localized: "settings.resetAll.phrasePlaceholder", defaultValue: "Confirmation phrase"),
-                    text: $model.localDataResetConfirmationPhrase
+                    text: $model.localDataResetConfirmationPhrase,
+                    profile: .confirmationPhrase,
+                    submitLabel: .done,
+                    onSubmit: model.confirmLocalDataReset
                 )
                 .accessibilityIdentifier("settings.resetAll.phrase")
             }

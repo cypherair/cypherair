@@ -246,11 +246,25 @@ final class DecryptScreenModel {
             name: "decrypt.contentClearObserved",
             metadata: ["mode": decryptMode.rawValue]
         )
+        clearTransientInput()
+    }
+
+    func clearTransientInput() {
+        ciphertextInput = ""
         clearDisplayedText()
         deleteTemporaryDecryptedFile()
         clearDetailedSignatureVerification()
         phase1Result = nil
         filePhase1Result = nil
+        importedCiphertext.clear()
+        pendingTextModeImport = nil
+        fileImportTarget = nil
+        selectedFileURL = nil
+        selectedFileName = nil
+        showFileImporter = false
+        showTextModeSuggestion = false
+        exportController.finish()
+        textInputSectionEpoch &+= 1
     }
 
     func setCiphertextInput(_ newValue: String) {

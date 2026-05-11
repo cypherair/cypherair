@@ -349,6 +349,10 @@ final class SettingsScreenModel {
         localDataResetConfirmationPhrase = ""
     }
 
+    func clearTransientInput() {
+        localDataResetConfirmationPhrase = ""
+    }
+
     func confirmLocalDataReset() {
         guard isLocalDataResetControlEnabled,
               canConfirmLocalDataReset,

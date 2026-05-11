@@ -1137,6 +1137,34 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_handleContentClearGenerationChange_clearsInputSearchRecipientsAndResults() {
+        let model = makeModel()
+        model.plaintext = "Sensitive plaintext"
+        model.recipientSearchText = "alice"
+        model.selectedRecipients = ["contact-1"]
+        model.ciphertext = Data("ciphertext".utf8)
+        model.selectedFileURL = URL(fileURLWithPath: "/tmp/plain.txt")
+        model.selectedFileName = "plain.txt"
+        model.showFileImporter = true
+        model.showUnverifiedRecipientsWarning = true
+        model.tagSelectionSkippedContactCount = 2
+        model.tagSelectionSkippedTagName = "Team"
+
+        model.handleContentClearGenerationChange()
+
+        XCTAssertEqual(model.plaintext, "")
+        XCTAssertEqual(model.recipientSearchText, "")
+        XCTAssertTrue(model.selectedRecipients.isEmpty)
+        XCTAssertNil(model.ciphertext)
+        XCTAssertNil(model.selectedFileURL)
+        XCTAssertNil(model.selectedFileName)
+        XCTAssertFalse(model.showFileImporter)
+        XCTAssertFalse(model.showUnverifiedRecipientsWarning)
+        XCTAssertEqual(model.tagSelectionSkippedContactCount, 0)
+        XCTAssertNil(model.tagSelectionSkippedTagName)
+    }
+
+    @MainActor
     private func waitUntil(
         _ description: String,
         timeout: TimeInterval = 2,

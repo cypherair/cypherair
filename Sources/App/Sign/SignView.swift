@@ -38,6 +38,7 @@ struct SignView: View {
     @Environment(SigningService.self) private var signingService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
     @Environment(\.protectedSettingsHost) private var protectedSettingsHost
 
@@ -52,6 +53,7 @@ struct SignView: View {
             signingService: signingService,
             keyManagement: keyManagement,
             config: config,
+            appSessionOrchestrator: appSessionOrchestrator,
             authLifecycleTraceStore: authLifecycleTraceStore,
             protectedSettingsHost: protectedSettingsHost,
             configuration: configuration
@@ -60,16 +62,20 @@ struct SignView: View {
 }
 
 private struct SignScreenHostView: View {
+    let appSessionOrchestrator: AppSessionOrchestrator
+
     @State private var model: SignScreenModel
 
     init(
         signingService: SigningService,
         keyManagement: KeyManagementService,
         config: AppConfiguration,
+        appSessionOrchestrator: AppSessionOrchestrator,
         authLifecycleTraceStore: AuthLifecycleTraceStore?,
         protectedSettingsHost: ProtectedSettingsHost?,
         configuration: SignView.Configuration
     ) {
+        self.appSessionOrchestrator = appSessionOrchestrator
         _model = State(
             initialValue: SignScreenModel(
                 signingService: signingService,
@@ -254,6 +260,9 @@ private struct SignScreenHostView: View {
         }
         .onAppear {
             model.syncSignerFromDefaultOnAppear()
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            model.clearTransientInput()
         }
     }
 

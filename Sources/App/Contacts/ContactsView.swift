@@ -3,18 +3,24 @@ import SwiftUI
 /// Lists imported contacts (public keys).
 struct ContactsView: View {
     @Environment(ContactService.self) private var contactService
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
 
     var body: some View {
-        ContactsScreenHostView(contactService: contactService)
+        ContactsScreenHostView(
+            contactService: contactService,
+            appSessionOrchestrator: appSessionOrchestrator
+        )
     }
 }
 
 private struct ContactsScreenHostView: View {
     @Environment(\.appRouteNavigator) private var routeNavigator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let appSessionOrchestrator: AppSessionOrchestrator
     @State private var model: ContactsScreenModel
 
-    init(contactService: ContactService) {
+    init(contactService: ContactService, appSessionOrchestrator: AppSessionOrchestrator) {
+        self.appSessionOrchestrator = appSessionOrchestrator
         _model = State(initialValue: ContactsScreenModel(contactService: contactService))
     }
 
@@ -29,7 +35,7 @@ private struct ContactsScreenHostView: View {
             }
         }
         .navigationTitle(String(localized: "contacts.title", defaultValue: "Contacts"))
-        .searchable(
+        .cypherSearchable(
             text: $model.searchText,
             placement: .automatic,
             prompt: String(
@@ -81,6 +87,9 @@ private struct ContactsScreenHostView: View {
             if let deleteError = model.deleteError {
                 Text(deleteError)
             }
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            model.clearTransientInput()
         }
     }
 }
