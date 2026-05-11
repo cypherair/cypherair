@@ -149,6 +149,7 @@ private struct EncryptScreenHostView: View {
     let appSessionOrchestrator: AppSessionOrchestrator
 
     @State private var model: EncryptScreenModel
+    @State private var isRecipientTagPickerPresented = false
 
     init(
         encryptionService: EncryptionService,
@@ -205,56 +206,44 @@ private struct EncryptScreenHostView: View {
             Section {
                 if model.contactsAvailability.isAvailable {
                     if !model.recipientTagOptions.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(String(localized: "encrypt.addByTag", defaultValue: "Add by Tag"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(model.recipientTagOptions) { tagOption in
-                                        Button {
-                                            model.selectRecipients(withTagId: tagOption.tagId)
-                                        } label: {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Label(
-                                                    tagOption.displayName,
-                                                    systemImage: model.selectedRecipientCount(for: tagOption) > 0
-                                                        ? "checkmark.circle.fill"
-                                                        : "tag"
-                                                )
-                                                Text(tagSelectionSubtitle(for: tagOption))
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                        }
-                                        .buttonStyle(.bordered)
-                                        .controlSize(.small)
-                                        .disabled(tagOption.selectableContactIds.isEmpty)
-                                    }
-                                }
+                        Button {
+                            isRecipientTagPickerPresented = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Label(
+                                    String(localized: "encrypt.addByTag", defaultValue: "Add by Tag"),
+                                    systemImage: "tag"
+                                )
+                                Spacer()
+                                Text(recipientTagPickerStatus)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
                             }
                         }
+                        .buttonStyle(.plain)
                     }
 
-                    if !model.selectedRecipients.isEmpty {
-                        HStack {
+                    HStack {
+                        Label(
+                            selectedRecipientsSummary,
+                            systemImage: "person.2.fill"
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            model.clearRecipients()
+                        } label: {
                             Label(
-                                selectedRecipientsSummary,
-                                systemImage: "person.2.fill"
+                                String(localized: "encrypt.clearRecipients", defaultValue: "Clear All"),
+                                systemImage: "xmark.circle"
                             )
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            Spacer()
-                            Button {
-                                model.clearRecipients()
-                            } label: {
-                                Label(
-                                    String(localized: "encrypt.clearRecipients", defaultValue: "Clear All"),
-                                    systemImage: "xmark.circle"
-                                )
-                            }
-                            .controlSize(.small)
                         }
+                        .controlSize(.small)
+                        .disabled(model.selectedRecipients.isEmpty)
                     }
 
                     if model.encryptableContacts.isEmpty {
@@ -517,6 +506,9 @@ private struct EncryptScreenHostView: View {
         } message: {
             Text(model.unverifiedRecipientsWarningMessage)
         }
+        .sheet(isPresented: $isRecipientTagPickerPresented) {
+            RecipientTagPickerSheet(model: model)
+        }
         .onChange(of: runtimeSyncKey) { _, _ in
             model.updateConfiguration(configuration)
         }
@@ -604,8 +596,187 @@ private struct EncryptScreenHostView: View {
         }
     }
 
-    private func tagSelectionSubtitle(for tagOption: RecipientTagSelectionOption) -> String {
-        let selectedCount = model.selectedRecipientCount(for: tagOption)
+    private var selectedRecipientsSummary: String {
+        String.localizedStringWithFormat(
+            String(localized: "encrypt.selectedRecipients.count", defaultValue: "%d recipients selected"),
+            model.selectedRecipients.count
+        )
+    }
+
+    private var recipientTagPickerStatus: String {
+        String.localizedStringWithFormat(
+            String(localized: "encrypt.tagPicker.availableTags", defaultValue: "%d tags"),
+            model.recipientTagOptions.count
+        )
+    }
+
+    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
+        #if canImport(UIKit)
+        (110, 160, 240)
+        #else
+        (120, 170, 240)
+        #endif
+    }
+
+    private var runtimeSyncKey: EncryptView.RuntimeSyncKey {
+        EncryptView.RuntimeSyncKey(configuration: configuration)
+    }
+}
+
+private struct RecipientTagPickerSheet: View {
+    let model: EncryptScreenModel
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    HStack {
+                        Label(
+                            selectedRecipientsSummary,
+                            systemImage: "person.2.fill"
+                        )
+                        .foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            model.clearRecipients()
+                        } label: {
+                            Label(
+                                String(localized: "encrypt.clearRecipients", defaultValue: "Clear All"),
+                                systemImage: "xmark.circle"
+                            )
+                        }
+                        .disabled(model.selectedRecipients.isEmpty)
+                    }
+                }
+
+                Section {
+                    if filteredTagOptions.isEmpty {
+                        Text(emptyTagListMessage)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(filteredTagOptions) { tagOption in
+                            RecipientTagPickerRow(
+                                tagOption: tagOption,
+                                selectedCount: model.selectedRecipientCount(for: tagOption),
+                                add: {
+                                    model.selectRecipients(withTagId: tagOption.tagId)
+                                }
+                            )
+                        }
+                    }
+                } header: {
+                    Text(String(localized: "tagManagement.tags", defaultValue: "Tags"))
+                }
+
+                if let tagSelectionSkipMessage = model.tagSelectionSkipMessage {
+                    Section {
+                        Label(
+                            tagSelectionSkipMessage,
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        Button {
+                            model.dismissTagSelectionSkipMessage()
+                        } label: {
+                            Label(
+                                String(localized: "common.dismiss", defaultValue: "Dismiss"),
+                                systemImage: "xmark"
+                            )
+                        }
+                    }
+                }
+            }
+            .scrollDismissesKeyboardInteractivelyIfAvailable()
+            .navigationTitle(String(localized: "encrypt.addByTag", defaultValue: "Add by Tag"))
+            .searchable(
+                text: $searchText,
+                placement: .automatic,
+                prompt: String(localized: "tagManagement.search", defaultValue: "Search tags")
+            )
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "common.done", defaultValue: "Done")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private var filteredTagOptions: [RecipientTagSelectionOption] {
+        let normalizedSearchText = ContactsSearchIndex.normalizedSearchText(searchText)
+        guard !normalizedSearchText.isEmpty else {
+            return model.recipientTagOptions
+        }
+        return model.recipientTagOptions.filter { tagOption in
+            ContactsSearchIndex.normalizedSearchText(tagOption.displayName)
+                .contains(normalizedSearchText)
+        }
+    }
+
+    private var selectedRecipientsSummary: String {
+        String.localizedStringWithFormat(
+            String(localized: "encrypt.selectedRecipients.count", defaultValue: "%d recipients selected"),
+            model.selectedRecipients.count
+        )
+    }
+
+    private var emptyTagListMessage: String {
+        if ContactsSearchIndex.normalizedSearchText(searchText).isEmpty {
+            return String(localized: "tagManagement.empty", defaultValue: "No tags yet.")
+        }
+        return String(localized: "tagManagement.noMatchingTags", defaultValue: "No matching tags.")
+    }
+}
+
+private struct RecipientTagPickerRow: View {
+    let tagOption: RecipientTagSelectionOption
+    let selectedCount: Int
+    let add: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(tagOption.displayName, systemImage: "tag")
+                    .font(.body)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(tagOption.skippedContactCount > 0 ? Color.orange : Color.secondary)
+            }
+            Spacer()
+            Button {
+                add()
+            } label: {
+                Label(actionTitle, systemImage: isFullySelected ? "checkmark.circle.fill" : "plus.circle")
+                    .labelStyle(.titleAndIcon)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(isActionDisabled)
+        }
+    }
+
+    private var isFullySelected: Bool {
+        !tagOption.selectableContactIds.isEmpty &&
+            selectedCount >= tagOption.selectableContactIds.count
+    }
+
+    private var isActionDisabled: Bool {
+        tagOption.selectableContactIds.isEmpty || isFullySelected
+    }
+
+    private var actionTitle: String {
+        if isFullySelected {
+            return String(localized: "encrypt.tagPicker.added", defaultValue: "Added")
+        }
+        return String(localized: "encrypt.tagPicker.add", defaultValue: "Add")
+    }
+
+    private var subtitle: String {
         if tagOption.skippedContactCount > 0 {
             return String.localizedStringWithFormat(
                 String(
@@ -627,24 +798,5 @@ private struct EncryptScreenHostView: View {
             String(localized: "encrypt.tagSelection.subtitle", defaultValue: "%d available"),
             tagOption.selectableContactIds.count
         )
-    }
-
-    private var selectedRecipientsSummary: String {
-        String.localizedStringWithFormat(
-            String(localized: "encrypt.selectedRecipients.count", defaultValue: "%d recipients selected"),
-            model.selectedRecipients.count
-        )
-    }
-
-    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
-        #if canImport(UIKit)
-        (110, 160, 240)
-        #else
-        (120, 170, 240)
-        #endif
-    }
-
-    private var runtimeSyncKey: EncryptView.RuntimeSyncKey {
-        EncryptView.RuntimeSyncKey(configuration: configuration)
     }
 }
