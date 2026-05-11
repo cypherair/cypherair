@@ -95,7 +95,15 @@
 				App/Decrypt/DecryptScreenModel.swift,
 				App/Decrypt/DecryptView.swift,
 				App/Decrypt/Support/ArmoredTextMessageClassifier.swift,
+				App/Encrypt/EncryptInputSections.swift,
+				App/Encrypt/EncryptOptionsSection.swift,
+				App/Encrypt/EncryptRecipientTagPickerSheet.swift,
+				App/Encrypt/EncryptRecipientsSection.swift,
+				App/Encrypt/EncryptResultSections.swift,
+				App/Encrypt/EncryptScreenFormView.swift,
+				App/Encrypt/EncryptScreenHostView.swift,
 				App/Encrypt/EncryptScreenModel.swift,
+				App/Encrypt/EncryptScreenPresentations.swift,
 				App/Encrypt/EncryptView.swift,
 				App/HomeView.swift,
 				App/Keys/BackupKeyView.swift,
@@ -135,11 +143,22 @@
 				App/Settings/LocalDataResetRestartAction.swift,
 				App/Settings/LocalDataResetRestartCoordinator.swift,
 				App/Settings/LocalDataResetService.swift,
+				App/Settings/MacSettingsRootView.swift,
+				App/Settings/MainWindowSettingsRootView.swift,
 				App/Settings/OpenSourceNotice.swift,
 				App/Settings/OpenSourceNoticeStore.swift,
 				App/Settings/RepositoryURLCopyAction.swift,
 				App/Settings/SelfTestView.swift,
+				App/Settings/SettingsAppearanceSection.swift,
+				App/Settings/SettingsEncryptionSection.swift,
+				App/Settings/SettingsFormView.swift,
+				App/Settings/SettingsLocalDataResetViews.swift,
+				App/Settings/SettingsNavigationSection.swift,
+				App/Settings/SettingsProtectedClipboardNoticeRow.swift,
+				App/Settings/SettingsScreenHostView.swift,
 				App/Settings/SettingsScreenModel.swift,
+				App/Settings/SettingsScreenPresentations.swift,
+				App/Settings/SettingsSecuritySection.swift,
 				App/Settings/SettingsView.swift,
 				App/Settings/ThemePickerView.swift,
 				App/Shell/AppRouteNavigation.swift,
@@ -732,7 +751,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14004;
+				CURRENT_PROJECT_VERSION = 14005;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -957,7 +976,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14004;
+				CURRENT_PROJECT_VERSION = 14005;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1102,7 +1121,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14004;
+				CURRENT_PROJECT_VERSION = 14005;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
