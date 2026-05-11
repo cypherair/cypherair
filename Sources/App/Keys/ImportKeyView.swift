@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 /// Import a private key from file, paste, or QR photo.
 struct ImportKeyView: View {
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.dismiss) private var dismiss
 
     @State private var armoredText = ""
@@ -24,8 +25,7 @@ struct ImportKeyView: View {
                         fileName: fileName,
                         clearAccessibilityLabel: String(localized: "import.clearFile", defaultValue: "Clear file")
                     ) {
-                        importedKeyData = nil
-                        importedFileName = nil
+                        clearImportedKeyData()
                     }
                 } else {
                     CypherMultilineTextInput(
@@ -56,15 +56,10 @@ struct ImportKeyView: View {
             }
 
             Section {
-                SecureField(
+                CypherSecureTextField(
                     String(localized: "import.passphrase", defaultValue: "Passphrase"),
                     text: $passphrase
                 )
-                .autocorrectionDisabled(true)
-                .applyMacWritingToolsPolicy()
-                #if canImport(UIKit)
-                .textInputAutocapitalization(.never)
-                #endif
             } header: {
                 Text(String(localized: "import.passphrase.header", defaultValue: "Key Passphrase"))
             }
@@ -114,6 +109,12 @@ struct ImportKeyView: View {
                 loadFileContents(from: url)
             }
         }
+        .onDisappear {
+            clearTransientInput()
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            clearTransientInput()
+        }
     }
 
     private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
@@ -136,11 +137,11 @@ struct ImportKeyView: View {
             }
 
             if let text = String(data: data, encoding: .utf8) {
+                clearImportedKeyData()
                 armoredText = text
-                importedKeyData = nil
-                importedFileName = nil
             } else {
                 // Binary .gpg/.pgp key — store raw Data, bypass String conversion
+                clearImportedKeyData()
                 importedKeyData = data
                 importedFileName = url.lastPathComponent
                 armoredText = ""
@@ -165,11 +166,7 @@ struct ImportKeyView: View {
                 // Clear sensitive state before dismiss.
                 // Note: Swift String cannot be reliably zeroized (SECURITY.md §7.1),
                 // but we minimize lifetime by clearing references immediately.
-                armoredText = ""
-                passphrase = ""
-                importedKeyData?.resetBytes(in: 0..<(importedKeyData?.count ?? 0))
-                importedKeyData = nil
-                importedFileName = nil
+                clearTransientInput()
                 dismiss()
             } catch {
                 self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
@@ -177,5 +174,18 @@ struct ImportKeyView: View {
             }
             isImporting = false
         }
+    }
+
+    private func clearTransientInput() {
+        armoredText = ""
+        passphrase = ""
+        showFileImporter = false
+        clearImportedKeyData()
+    }
+
+    private func clearImportedKeyData() {
+        importedKeyData?.resetBytes(in: 0..<(importedKeyData?.count ?? 0))
+        importedKeyData = nil
+        importedFileName = nil
     }
 }

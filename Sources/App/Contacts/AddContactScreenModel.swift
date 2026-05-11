@@ -92,8 +92,7 @@ final class AddContactScreenModel {
         }
 
         importMode = newValue
-        importedKeyData = nil
-        importedFileName = nil
+        clearImportedKeyData()
     }
 
     func requestFileImport() {
@@ -101,8 +100,7 @@ final class AddContactScreenModel {
     }
 
     func clearImportedFile() {
-        importedKeyData = nil
-        importedFileName = nil
+        clearImportedKeyData()
     }
 
     func dismissError() {
@@ -172,9 +170,9 @@ final class AddContactScreenModel {
                 let publicKeyData = try await loadKeyData()
                 if let armoredString = String(data: publicKeyData, encoding: .utf8) {
                     armoredText = armoredString
-                    importedKeyData = nil
-                    importedFileName = nil
+                    clearImportedKeyData()
                 } else {
+                    clearImportedKeyData()
                     importedKeyData = publicKeyData
                     importedFileName = String(
                         localized: "addcontact.qr.binaryKey",
@@ -195,9 +193,10 @@ final class AddContactScreenModel {
 
             if let armoredString = loadedFile.text {
                 armoredText = armoredString
-                importedKeyData = nil
+                clearImportedKeyData()
             } else {
                 armoredText = ""
+                clearImportedKeyData()
                 importedKeyData = loadedFile.data
             }
             importedFileName = loadedFile.fileName
@@ -208,5 +207,23 @@ final class AddContactScreenModel {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
             showError = true
         }
+    }
+
+    func clearTransientInput() {
+        armoredText = ""
+        clearImportedKeyData()
+        pendingKeyUpdateRequest = nil
+        showKeyUpdateAlert = false
+        showFileImporter = false
+        error = nil
+        showError = false
+    }
+
+    private func clearImportedKeyData() {
+        if let count = importedKeyData?.count {
+            importedKeyData?.resetBytes(in: 0..<count)
+        }
+        importedKeyData = nil
+        importedFileName = nil
     }
 }

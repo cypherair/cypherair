@@ -49,7 +49,7 @@ struct EncryptScreenHostView: View {
         #endif
         .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "encrypt.title", defaultValue: "Encrypt"))
-        .searchable(
+        .cypherSearchable(
             text: $model.recipientSearchText,
             placement: .automatic,
             prompt: String(localized: "encrypt.search.prompt", defaultValue: "Recipients, tags, fingerprints")

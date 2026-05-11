@@ -604,6 +604,22 @@ final class EncryptScreenModel {
 
     func handleContentClearGenerationChange() {
         cleanupTemporaryEncryptedFile()
+        clearTransientInput()
+    }
+
+    func clearTransientInput() {
+        plaintext = ""
+        recipientSearchText = ""
+        selectedRecipients.removeAll()
+        ciphertext = nil
+        selectedFileURL = nil
+        selectedFileName = nil
+        showFileImporter = false
+        showUnverifiedRecipientsWarning = false
+        tagSelectionSkippedContactCount = 0
+        tagSelectionSkippedTagName = nil
+        exportController.finish()
+        textInputSectionEpoch &+= 1
     }
 
     func handleExportError(_ error: Error) {

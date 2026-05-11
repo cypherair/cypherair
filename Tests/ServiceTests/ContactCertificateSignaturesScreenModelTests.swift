@@ -392,6 +392,33 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_clearTransientInput_clearsSignatureInputImportAndVerification() throws {
+        let contact = try makeContact(name: "Clear Contact", email: "clear@example.com")
+        let model = makeModel(fingerprint: contact.fingerprint)
+        model.signatureInput = "signature"
+        model.importedSignature.setImportedFile(
+            data: Data("signature".utf8),
+            fileName: "signature.sig",
+            text: "signature"
+        )
+        model.verification = CertificateSignatureVerification(
+            status: .valid,
+            certificationKind: nil,
+            signerPrimaryFingerprint: nil,
+            signingKeyFingerprint: nil,
+            signerIdentity: nil
+        )
+        model.showFileImporter = true
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.signatureInput, "")
+        XCTAssertFalse(model.importedSignature.hasImportedFile)
+        XCTAssertNil(model.verification)
+        XCTAssertFalse(model.showFileImporter)
+    }
+
+    @MainActor
     private func makeContact(name: String, email: String) throws -> Contact {
         let generated = try stack.engine.generateKey(
             name: name,
@@ -651,6 +678,30 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         model.savePendingSignature()
         await Task.yield()
         XCTAssertNil(model.lastSavedArtifact)
+    }
+
+    @MainActor
+    func test_clearTransientInput_clearsImportedSignatureInputAndPicker() throws {
+        let (contactId, key, _) = try makeContactContext(
+            name: "Details Clear",
+            email: "details-clear@example.com"
+        )
+        let model = makeModel(contactId: contactId, keyId: key.keyId)
+        model.signatureInput = "signature"
+        model.importedSignature.setImportedFile(
+            data: Data("signature".utf8),
+            fileName: "signature.sig",
+            text: "signature"
+        )
+        model.showFileImporter = true
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.signatureInput, "")
+        XCTAssertFalse(model.importedSignature.hasImportedFile)
+        XCTAssertNil(model.pendingArtifact)
+        XCTAssertNil(model.verification)
+        XCTAssertFalse(model.showFileImporter)
     }
 
     @MainActor

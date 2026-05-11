@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct SettingsScreenHostView: View {
+    let appSessionOrchestrator: AppSessionOrchestrator
+
     @State private var model: SettingsScreenModel
 
     init(
@@ -8,6 +10,7 @@ struct SettingsScreenHostView: View {
         protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
         authManager: AuthenticationManager,
         keyManagement: KeyManagementService,
+        appSessionOrchestrator: AppSessionOrchestrator,
         iosPresentationController: IOSPresentationController?,
         macPresentationController: MacPresentationController?,
         appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction?,
@@ -15,6 +18,7 @@ struct SettingsScreenHostView: View {
         localDataResetRestartCoordinator: LocalDataResetRestartCoordinator?,
         configuration: SettingsView.Configuration
     ) {
+        self.appSessionOrchestrator = appSessionOrchestrator
         _model = State(
             initialValue: SettingsScreenModel(
                 config: config,
@@ -43,6 +47,9 @@ struct SettingsScreenHostView: View {
             .settingsScreenPresentations(model: model)
             .task {
                 await model.prepareProtectedSettingsSection()
+            }
+            .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+                model.clearTransientInput()
             }
     }
 }

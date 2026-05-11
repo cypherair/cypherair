@@ -21,6 +21,7 @@ struct KeyGenerationView: View {
     }
 
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appRouteNavigator) private var routeNavigator
 
@@ -68,36 +69,25 @@ struct KeyGenerationView: View {
             }
 
             Section {
-                TextField(
+                CypherSingleLineTextField(
                     String(localized: "keygen.name", defaultValue: "Name"),
-                    text: $name
+                    text: $name,
+                    profile: .name,
+                    submitLabel: .next,
+                    onSubmit: { focusedField = .email }
                 )
                 .accessibilityIdentifier("keygen.name")
-                .textContentType(.name)
-                .autocorrectionDisabled(true)
-                .applyMacWritingToolsPolicy()
-                #if canImport(UIKit)
-                .textInputAutocapitalization(.words)
-                #endif
                 .focused($focusedField, equals: .name)
-                .submitLabel(.next)
-                .onSubmit { focusedField = .email }
 
-                TextField(
+                CypherSingleLineTextField(
                     String(localized: "keygen.email", defaultValue: "Email (optional)"),
-                    text: $email
+                    text: $email,
+                    profile: .email,
+                    submitLabel: .done,
+                    onSubmit: { focusedField = nil }
                 )
                 .accessibilityIdentifier("keygen.email")
-                .textContentType(.emailAddress)
-                .autocorrectionDisabled(true)
-                .applyMacWritingToolsPolicy()
-                #if canImport(UIKit)
-                .keyboardType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                #endif
                 .focused($focusedField, equals: .email)
-                .submitLabel(.done)
-                .onSubmit { focusedField = nil }
             } header: {
                 Text(String(localized: "keygen.identity.header", defaultValue: "Identity"))
             }
@@ -175,6 +165,9 @@ struct KeyGenerationView: View {
                 expiryMonths = lockedExpiryMonths
             }
         }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            clearTransientInput()
+        }
     }
 
     private func generate() {
@@ -213,5 +206,12 @@ struct KeyGenerationView: View {
             }
             isGenerating = false
         }
+    }
+
+    private func clearTransientInput() {
+        name = ""
+        email = ""
+        focusedField = nil
+        generatedIdentity = nil
     }
 }

@@ -91,6 +91,13 @@ final class TagManagementScreenModel {
         }
     }
 
+    func createTagIfValid() {
+        guard !ContactTag.displayName(for: createTagName).isEmpty else {
+            return
+        }
+        createTag()
+    }
+
     func beginRenameSelectedTag() {
         guard let selectedTagId, let selectedTag else {
             return
@@ -111,6 +118,13 @@ final class TagManagementScreenModel {
         } catch {
             presentError(error)
         }
+    }
+
+    func commitRenameSelectedTagIfValid() {
+        guard !ContactTag.displayName(for: renameText).isEmpty else {
+            return
+        }
+        commitRenameSelectedTag()
     }
 
     func cancelRename() {
@@ -175,6 +189,13 @@ final class TagManagementScreenModel {
     func dismissError() {
         errorMessage = nil
         showError = false
+    }
+
+    func clearTransientInput() {
+        searchText = ""
+        createTagName = ""
+        cancelRename()
+        resetMembershipDraft()
     }
 
     private func refreshSelectionIfNeeded() {
