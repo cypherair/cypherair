@@ -3,6 +3,7 @@ import SwiftUI
 struct LicenseListView: View {
     private let store: OpenSourceNoticeStore
 
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @State private var notices: [OpenSourceNotice] = []
     @State private var hasLoaded = false
     @State private var loadError: String?
@@ -44,9 +45,9 @@ struct LicenseListView: View {
                 .cypherMacReadableContent()
             }
         }
-        .searchable(
+        .cypherSearchable(
             text: $searchText,
-            prompt: Text(String(localized: "license.search", defaultValue: "Search components"))
+            prompt: String(localized: "license.search", defaultValue: "Search components")
         )
         .accessibilityIdentifier("license.root")
         .screenReady("license.ready")
@@ -54,6 +55,9 @@ struct LicenseListView: View {
         .task {
             guard !hasLoaded, loadError == nil else { return }
             loadNotices()
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            searchText = ""
         }
     }
 

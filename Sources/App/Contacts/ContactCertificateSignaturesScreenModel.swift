@@ -264,6 +264,14 @@ final class ContactCertificateSignaturesScreenModel {
         invalidateVerification()
     }
 
+    func clearTransientInput() {
+        importedSignature.clear()
+        signatureInput = ""
+        verification = nil
+        showFileImporter = false
+        exportController.finish()
+    }
+
     func loadIfNeeded() {
         guard case .idle = loadState else {
             return

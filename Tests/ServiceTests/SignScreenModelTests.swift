@@ -260,6 +260,26 @@ final class SignScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_clearTransientInput_clearsMessageFileSelectionAndSignatureResults() {
+        let model = makeModel()
+        model.text = "Message to sign"
+        model.signedMessage = "signed"
+        model.detachedSignature = Data("signature".utf8)
+        model.showFileImporter = true
+        model.selectedFileURL = URL(fileURLWithPath: "/tmp/message.txt")
+        model.selectedFileName = "message.txt"
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.text, "")
+        XCTAssertNil(model.signedMessage)
+        XCTAssertNil(model.detachedSignature)
+        XCTAssertFalse(model.showFileImporter)
+        XCTAssertNil(model.selectedFileURL)
+        XCTAssertNil(model.selectedFileName)
+    }
+
+    @MainActor
     private func makeModel(
         configuration: SignView.Configuration = .default,
         operation: OperationController = OperationController(),

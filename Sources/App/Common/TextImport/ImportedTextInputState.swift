@@ -12,6 +12,7 @@ struct ImportedTextInputState {
     }
 
     mutating func setImportedFile(data: Data, fileName: String, text: String) {
+        clear()
         rawData = data
         self.fileName = fileName
         textSnapshot = text
@@ -32,6 +33,9 @@ struct ImportedTextInputState {
     }
 
     mutating func clear() {
+        if let count = rawData?.count {
+            rawData?.resetBytes(in: 0..<count)
+        }
         rawData = nil
         fileName = nil
         textSnapshot = nil

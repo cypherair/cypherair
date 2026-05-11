@@ -636,14 +636,19 @@ final class DecryptScreenModelTests: XCTestCase {
 
         model.handleContentClearGenerationChange()
 
+        XCTAssertEqual(model.ciphertextInput, "")
         XCTAssertNil(model.decryptedText)
         XCTAssertNil(model.signatureVerification)
         XCTAssertNil(model.detailedSignatureVerification)
         XCTAssertNil(model.phase1Result)
         XCTAssertNil(model.filePhase1Result)
         XCTAssertFalse(FileManager.default.fileExists(atPath: contentClearURL.path))
-        XCTAssertTrue(model.importedCiphertext.hasImportedFile)
-        XCTAssertEqual(model.fileImportTarget, .fileCiphertextImport)
+        XCTAssertFalse(model.importedCiphertext.hasImportedFile)
+        XCTAssertNil(model.fileImportTarget)
+        XCTAssertNil(model.selectedFileURL)
+        XCTAssertNil(model.selectedFileName)
+        XCTAssertFalse(model.showFileImporter)
+        XCTAssertFalse(model.showTextModeSuggestion)
 
         let disappearURL = try makeTemporaryFile(
             named: "disappear.tmp",

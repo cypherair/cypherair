@@ -1908,6 +1908,43 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(model.selectedTagId, secondTag.tagId)
     }
 
+    @MainActor
+    func test_tagManagementScreenModelClearTransientInput_clearsSearchAndTagDrafts() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagManagementClearInput")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "Tagged Member",
+            email: "tagged-member@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let tag = try service.createTag(named: "Clearable")
+        try service.assignTag(tagId: tag.tagId, toContactId: contactId)
+        let model = TagManagementScreenModel(contactService: service)
+
+        model.selectTag(tag.tagId)
+        model.searchText = "clear"
+        model.createTagName = "Draft"
+        model.beginRenameSelectedTag()
+        model.renameText = "Renamed Draft"
+        model.setMembership(contactId: contactId, isMember: false)
+        XCTAssertTrue(model.hasMembershipDraftChanges)
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.searchText, "")
+        XCTAssertEqual(model.createTagName, "")
+        XCTAssertFalse(model.isRenamingSelectedTag)
+        XCTAssertEqual(model.renameText, "")
+        XCTAssertFalse(model.hasMembershipDraftChanges)
+        XCTAssertEqual(model.membershipDraftContactIds, Set([contactId]))
+    }
+
     func test_pr8SearchRanksAndMatchesTagsFingerprintAndShortKeyId() async throws {
         let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR8Search")
         defer {
@@ -2066,6 +2103,34 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(model.searchText, "")
         XCTAssertEqual(model.selectedTagFilters.map(\.tagId), [workTag.tagId])
         XCTAssertEqual(model.visibleContacts.map(\.contactId), [workContactId])
+    }
+
+    @MainActor
+    func test_contactsScreenModelClearTransientInput_clearsSearchAndTagFilters() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsScreenModelClearInput")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let generated = try engine.generateKey(
+            name: "Filter Person",
+            email: "filter-person@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
+        let tag = try service.addTag(named: "Filter", toContactId: contactId)
+        let model = ContactsScreenModel(contactService: service)
+        model.searchText = "filter"
+        model.toggleTagFilter(tag.tagId)
+        XCTAssertTrue(model.hasActiveSearchOrFilters)
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.searchText, "")
+        XCTAssertTrue(model.selectedTagFilterIds.isEmpty)
+        XCTAssertFalse(model.hasActiveSearchOrFilters)
     }
 
     @MainActor

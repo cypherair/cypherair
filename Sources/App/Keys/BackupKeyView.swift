@@ -19,6 +19,7 @@ struct BackupKeyView: View {
     let configuration: Configuration
 
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
 
     enum Field {
         case passphrase
@@ -45,31 +46,21 @@ struct BackupKeyView: View {
     var body: some View {
         Form {
             Section {
-                SecureField(
+                CypherSecureTextField(
                     String(localized: "backup.passphrase", defaultValue: "Passphrase"),
-                    text: $passphrase
+                    text: $passphrase,
+                    submitLabel: .next,
+                    onSubmit: { focusedField = .confirm }
                 )
-                .autocorrectionDisabled(true)
-                .applyMacWritingToolsPolicy()
-                #if canImport(UIKit)
-                .textInputAutocapitalization(.never)
-                #endif
                 .focused($focusedField, equals: .passphrase)
-                .submitLabel(.next)
-                .onSubmit { focusedField = .confirm }
 
-                SecureField(
+                CypherSecureTextField(
                     String(localized: "backup.confirm", defaultValue: "Confirm Passphrase"),
-                    text: $passphraseConfirm
+                    text: $passphraseConfirm,
+                    submitLabel: .done,
+                    onSubmit: { focusedField = nil }
                 )
-                .autocorrectionDisabled(true)
-                .applyMacWritingToolsPolicy()
-                #if canImport(UIKit)
-                .textInputAutocapitalization(.never)
-                #endif
                 .focused($focusedField, equals: .confirm)
-                .submitLabel(.done)
-                .onSubmit { focusedField = nil }
             } header: {
                 Text(String(localized: "backup.header", defaultValue: "Protect your backup with a strong passphrase."))
             } footer: {
@@ -141,15 +132,32 @@ struct BackupKeyView: View {
             Text(err.localizedDescription)
         }
         .fileExporter(
-            isPresented: $showFileExporter,
+            isPresented: Binding(
+                get: { showFileExporter },
+                set: {
+                    showFileExporter = $0
+                    if !$0 {
+                        clearExportedData()
+                    }
+                }
+            ),
             item: exportedData,
             contentTypes: [.data],
             defaultFilename: "\(fingerprint.prefix(16)).asc"
         ) { result in
+            defer {
+                clearExportedData()
+            }
             if case .failure(let exportError) = result {
                 error = CypherAirError.from(exportError) { .encryptionFailed(reason: $0) }
                 showError = true
             }
+        }
+        .onDisappear {
+            clearTransientInput()
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            clearTransientInput()
         }
     }
 
@@ -175,5 +183,18 @@ struct BackupKeyView: View {
             }
             isExporting = false
         }
+    }
+
+    private func clearTransientInput() {
+        passphrase = ""
+        passphraseConfirm = ""
+        focusedField = nil
+        showFileExporter = false
+        clearExportedData()
+    }
+
+    private func clearExportedData() {
+        exportedData?.resetBytes(in: 0..<(exportedData?.count ?? 0))
+        exportedData = nil
     }
 }

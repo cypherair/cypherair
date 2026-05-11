@@ -7,6 +7,7 @@ struct ContactTagAssignmentSheet: View {
     let createAndAssignTag: (String) throws -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @State private var searchText = ""
     @State private var newTagName = ""
     @State private var errorMessage: String?
@@ -33,9 +34,12 @@ struct ContactTagAssignmentSheet: View {
                 }
 
                 Section {
-                    TextField(
+                    CypherSingleLineTextField(
                         String(localized: "contactdetail.addTag.field", defaultValue: "Tag Name"),
-                        text: $newTagName
+                        text: $newTagName,
+                        profile: .tagName,
+                        submitLabel: .done,
+                        onSubmit: create
                     )
                     Button {
                         create()
@@ -52,7 +56,7 @@ struct ContactTagAssignmentSheet: View {
             }
             .scrollDismissesKeyboardInteractivelyIfAvailable()
             .navigationTitle(String(localized: "contactdetail.addTag.title", defaultValue: "Add Tag"))
-            .searchable(
+            .cypherSearchable(
                 text: $searchText,
                 placement: .automatic,
                 prompt: String(localized: "tagManagement.search", defaultValue: "Search tags")
@@ -73,6 +77,10 @@ struct ContactTagAssignmentSheet: View {
                 if let errorMessage {
                     Text(errorMessage)
                 }
+            }
+            .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+                searchText = ""
+                newTagName = ""
             }
         }
     }

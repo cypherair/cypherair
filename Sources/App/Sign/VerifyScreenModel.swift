@@ -231,6 +231,21 @@ final class VerifyScreenModel {
         filePickerTarget = nil
     }
 
+    func clearTransientInput() {
+        signedInput = ""
+        cleartextOriginalText = nil
+        clearCleartextVerificationState()
+        clearDetachedVerificationState()
+        importedCleartext.clear()
+        originalFileURL = nil
+        originalFileName = nil
+        signatureFileURL = nil
+        signatureFileName = nil
+        filePickerTarget = nil
+        showFileImporter = false
+        textInputSectionEpoch &+= 1
+    }
+
     func verify() {
         switch verifyMode {
         case .cleartext:

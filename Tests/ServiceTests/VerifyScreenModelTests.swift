@@ -232,6 +232,42 @@ final class VerifyScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_clearTransientInput_clearsCleartextDetachedImportsAndResults() {
+        let model = makeModel()
+        model.signedInput = "signed input"
+        model.cleartextOriginalText = "original"
+        model.cleartextDetailedVerification = makeDetailedVerification(status: .valid)
+        model.detachedDetailedVerification = makeDetailedVerification(status: .bad)
+        model.importedCleartext.setImportedFile(
+            data: Data("signed".utf8),
+            fileName: "signed.asc",
+            text: "signed input"
+        )
+        model.originalFileURL = URL(fileURLWithPath: "/tmp/original.txt")
+        model.originalFileName = "original.txt"
+        model.signatureFileURL = URL(fileURLWithPath: "/tmp/original.sig")
+        model.signatureFileName = "original.sig"
+        model.filePickerTarget = .signature
+        model.showFileImporter = true
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.signedInput, "")
+        XCTAssertNil(model.cleartextOriginalText)
+        XCTAssertNil(model.cleartextVerification)
+        XCTAssertNil(model.cleartextDetailedVerification)
+        XCTAssertNil(model.detachedVerification)
+        XCTAssertNil(model.detachedDetailedVerification)
+        XCTAssertFalse(model.importedCleartext.hasImportedFile)
+        XCTAssertNil(model.originalFileURL)
+        XCTAssertNil(model.originalFileName)
+        XCTAssertNil(model.signatureFileURL)
+        XCTAssertNil(model.signatureFileName)
+        XCTAssertNil(model.filePickerTarget)
+        XCTAssertFalse(model.showFileImporter)
+    }
+
+    @MainActor
     private func makeModel(
         configuration: VerifyView.Configuration = .default,
         operation: OperationController = OperationController(),

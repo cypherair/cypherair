@@ -37,6 +37,7 @@ struct AddContactView: View {
 
     @Environment(ContactService.self) private var contactService
     @Environment(QRService.self) private var qrService
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.dismiss) private var dismiss
     @Environment(\.importConfirmationCoordinator) private var importConfirmationCoordinator
 
@@ -68,6 +69,7 @@ struct AddContactView: View {
             importLoader: PublicKeyImportLoader(qrService: qrService),
             importWorkflow: ContactImportWorkflow(contactService: contactService),
             importConfirmationCoordinator: importConfirmationCoordinator,
+            appSessionOrchestrator: appSessionOrchestrator,
             configuration: configuration,
             dismissAction: { dismiss() }
         )
@@ -78,6 +80,7 @@ private struct AddContactScreenHostView: View {
     let importLoader: PublicKeyImportLoader
     let importWorkflow: ContactImportWorkflow
     let importConfirmationCoordinator: ImportConfirmationCoordinator?
+    let appSessionOrchestrator: AppSessionOrchestrator
     let configuration: AddContactView.Configuration
     let dismissAction: @MainActor () -> Void
 
@@ -89,12 +92,14 @@ private struct AddContactScreenHostView: View {
         importLoader: PublicKeyImportLoader,
         importWorkflow: ContactImportWorkflow,
         importConfirmationCoordinator: ImportConfirmationCoordinator?,
+        appSessionOrchestrator: AppSessionOrchestrator,
         configuration: AddContactView.Configuration,
         dismissAction: @escaping @MainActor () -> Void
     ) {
         self.importLoader = importLoader
         self.importWorkflow = importWorkflow
         self.importConfirmationCoordinator = importConfirmationCoordinator
+        self.appSessionOrchestrator = appSessionOrchestrator
         self.configuration = configuration
         self.dismissAction = dismissAction
         _model = State(
@@ -122,6 +127,10 @@ private struct AddContactScreenHostView: View {
             }
             .onChange(of: runtimeSyncKey) { _, _ in
                 model.updateConfiguration(configuration)
+            }
+            .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+                selectedPhotoItem = nil
+                model.clearTransientInput()
             }
     }
 

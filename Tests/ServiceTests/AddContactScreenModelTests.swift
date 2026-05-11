@@ -225,6 +225,26 @@ final class AddContactScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_clearTransientInput_clearsPastedAndImportedKeyState() {
+        let model = makeModel()
+        model.armoredText = "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+        model.importedKeyData = Data("binary-key".utf8)
+        model.importedFileName = "contact.gpg"
+        model.showFileImporter = true
+        model.error = .invalidQRCode
+        model.showError = true
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.armoredText, "")
+        XCTAssertNil(model.importedKeyData)
+        XCTAssertNil(model.importedFileName)
+        XCTAssertFalse(model.showFileImporter)
+        XCTAssertNil(model.error)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
     private func makeModel(
         configuration: AddContactView.Configuration = .default,
         inspectKeyDataAction: AddContactScreenModel.InspectKeyDataAction? = nil,
