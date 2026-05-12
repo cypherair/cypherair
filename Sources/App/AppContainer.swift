@@ -399,10 +399,6 @@ final class AppContainer: @unchecked Sendable {
         )
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(keyMetadataDomainStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(contactsDomainStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
-        protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let keyManagement = KeyManagementService(
             engine: engine,
             secureEnclave: secureEnclave,
@@ -415,6 +411,10 @@ final class AppContainer: @unchecked Sendable {
             metadataPersistence: keyMetadataDomainStore
         )
         protectedDataSessionCoordinator.registerRelockParticipant(keyManagement)
+        protectedDataSessionCoordinator.registerRelockParticipant(keyMetadataDomainStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(contactsDomainStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let contactService = ContactService(
             engine: engine,
             contactsDirectory: contactsDirectory,

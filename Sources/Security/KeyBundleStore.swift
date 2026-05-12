@@ -2,9 +2,16 @@ import Foundation
 import Security
 
 /// Storage namespace for SE-wrapped key bundles.
-enum KeyBundleNamespace {
+enum KeyBundleNamespace: Equatable, Sendable {
     case permanent
     case pending
+}
+
+/// Receipt for bundle items created by one save operation.
+struct KeyBundleWriteReceipt: Equatable, Sendable {
+    let fingerprint: String
+    let namespace: KeyBundleNamespace
+    let services: [String]
 }
 
 /// Availability state for a three-item wrapped key bundle.
@@ -50,7 +57,17 @@ struct KeyBundleStore {
         fingerprint: String,
         namespace: KeyBundleNamespace = .permanent
     ) throws {
+        _ = try saveNewBundle(bundle, fingerprint: fingerprint, namespace: namespace)
+    }
+
+    /// Save all three bundle items and return a receipt for the items created by this call.
+    func saveNewBundle(
+        _ bundle: WrappedKeyBundle,
+        fingerprint: String,
+        namespace: KeyBundleNamespace = .permanent
+    ) throws -> KeyBundleWriteReceipt {
         let services = serviceNames(for: fingerprint, namespace: namespace)
+        var savedServices: [String] = []
 
         do {
             try keychain.save(
@@ -59,42 +76,44 @@ struct KeyBundleStore {
                 account: KeychainConstants.defaultAccount,
                 accessControl: nil
             )
-        } catch {
-            throw error
-        }
+            savedServices.append(services.seKey)
 
-        do {
             try keychain.save(
                 bundle.salt,
                 service: services.salt,
                 account: KeychainConstants.defaultAccount,
                 accessControl: nil
             )
-        } catch {
-            try? keychain.delete(
-                service: services.seKey,
-                account: KeychainConstants.defaultAccount
-            )
-            throw error
-        }
+            savedServices.append(services.salt)
 
-        do {
             try keychain.save(
                 bundle.sealedBox,
                 service: services.sealed,
                 account: KeychainConstants.defaultAccount,
                 accessControl: nil
             )
-        } catch {
-            try? keychain.delete(
-                service: services.seKey,
-                account: KeychainConstants.defaultAccount
+            savedServices.append(services.sealed)
+            return KeyBundleWriteReceipt(
+                fingerprint: fingerprint,
+                namespace: namespace,
+                services: savedServices
             )
-            try? keychain.delete(
-                service: services.salt,
-                account: KeychainConstants.defaultAccount
+        } catch {
+            rollback(
+                KeyBundleWriteReceipt(
+                    fingerprint: fingerprint,
+                    namespace: namespace,
+                    services: savedServices
+                )
             )
             throw error
+        }
+    }
+
+    /// Best-effort rollback of only the items created by the matching save operation.
+    func rollback(_ receipt: KeyBundleWriteReceipt) {
+        for service in receipt.services {
+            try? keychain.delete(service: service, account: KeychainConstants.defaultAccount)
         }
     }
 
@@ -201,14 +220,6 @@ struct KeyBundleStore {
     /// Best-effort cleanup of pending bundle items.
     func cleanupPendingBundle(fingerprint: String) {
         let services = serviceNames(for: fingerprint, namespace: .pending)
-        try? keychain.delete(service: services.seKey, account: KeychainConstants.defaultAccount)
-        try? keychain.delete(service: services.salt, account: KeychainConstants.defaultAccount)
-        try? keychain.delete(service: services.sealed, account: KeychainConstants.defaultAccount)
-    }
-
-    /// Best-effort cleanup of permanent bundle items.
-    func rollbackPermanentBundle(fingerprint: String) {
-        let services = serviceNames(for: fingerprint, namespace: .permanent)
         try? keychain.delete(service: services.seKey, account: KeychainConstants.defaultAccount)
         try? keychain.delete(service: services.salt, account: KeychainConstants.defaultAccount)
         try? keychain.delete(service: services.sealed, account: KeychainConstants.defaultAccount)

@@ -65,6 +65,11 @@ private enum KeyManagementPrivateKeyControlTestError: Error {
     case delayedFailure
 }
 
+private enum RecordingKeyMetadataPersistenceError: Error {
+    case duplicateIdentity
+    case saveFailed
+}
+
 private final class FailingModifyExpiryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unchecked Sendable {
     private var mode: AuthenticationMode?
     private var journal = PrivateKeyControlRecoveryJournal.empty
@@ -159,6 +164,12 @@ private final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
     private(set) var saveCallCount = 0
     private(set) var updateCallCount = 0
     private(set) var deleteCallCount = 0
+    var failNextSave = false
+    var throwOnDuplicate = true
+
+    func seed(_ identities: [PGPKeyIdentity]) {
+        self.identities = identities.sorted { $0.fingerprint < $1.fingerprint }
+    }
 
     func loadAll() throws -> [PGPKeyIdentity] {
         loadAllCallCount += 1
@@ -167,6 +178,13 @@ private final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
 
     func save(_ identity: PGPKeyIdentity) throws {
         saveCallCount += 1
+        if failNextSave {
+            failNextSave = false
+            throw RecordingKeyMetadataPersistenceError.saveFailed
+        }
+        if throwOnDuplicate && identities.contains(where: { $0.fingerprint == identity.fingerprint }) {
+            throw RecordingKeyMetadataPersistenceError.duplicateIdentity
+        }
         identities.append(identity)
         identities.sort { $0.fingerprint < $1.fingerprint }
     }
@@ -187,6 +205,49 @@ private final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
     }
 }
 
+private actor ProvisioningCheckpointGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var didResume = false
+
+    func suspend() async {
+        await withCheckedContinuation { continuation in
+            if didResume {
+                continuation.resume()
+            } else {
+                self.continuation = continuation
+            }
+        }
+    }
+
+    func isSuspended() -> Bool {
+        continuation != nil
+    }
+
+    func resume() {
+        didResume = true
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume()
+    }
+}
+
+private actor CapturedDataBox {
+    private var value = Data()
+
+    func set(_ value: Data) {
+        self.value = value
+    }
+
+    func data() -> Data {
+        value
+    }
+
+    func clear() {
+        value.protectedDataZeroize()
+        value.removeAll(keepingCapacity: false)
+    }
+}
+
 /// Tests for KeyManagementService — full key lifecycle with mock SE/Keychain/Auth.
 final class KeyManagementServiceTests: XCTestCase {
 
@@ -196,6 +257,16 @@ final class KeyManagementServiceTests: XCTestCase {
     private var mockKC: MockKeychain!
     private var mockAuth: MockAuthenticator!
     private var privateKeyControlStore: InMemoryPrivateKeyControlStore!
+
+    private struct ProtectedKeyMetadataProvisioningTarget {
+        let baseDirectory: URL
+        let defaultsSuiteName: String
+        let wrappingRootKey: Data
+        let keychain: MockKeychain
+        let keyMetadataStore: KeyMetadataDomainStore
+        let keyManagement: KeyManagementService
+        let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
+    }
 
     override func setUp() {
         super.setUp()
@@ -271,6 +342,221 @@ final class KeyManagementServiceTests: XCTestCase {
             authenticator: mockAuth,
             privateKeyControlStore: privateKeyControlStore
         )
+    }
+
+    private func makeTemporaryDirectory(_ prefix: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private func makeCheckpointedProvisioningService(
+        checkpoint: @escaping KeyProvisioningService.ProvisioningCheckpoint
+    ) -> (
+        service: KeyManagementService,
+        keychain: MockKeychain,
+        metadataPersistence: RecordingKeyMetadataPersistence
+    ) {
+        let localSE = MockSecureEnclave()
+        let localKeychain = MockKeychain()
+        let localAuthenticator = MockAuthenticator()
+        let localPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        let service = KeyManagementService(
+            engine: engine,
+            secureEnclave: localSE,
+            keychain: localKeychain,
+            authenticator: localAuthenticator,
+            privateKeyControlStore: localPrivateKeyControlStore,
+            metadataPersistence: metadataPersistence,
+            provisioningCheckpoint: checkpoint
+        )
+        return (service, localKeychain, metadataPersistence)
+    }
+
+    private func makePostProvisioningCheckpointedService(
+        checkpoint: @escaping KeyProvisioningService.ProvisioningCheckpoint
+    ) -> (
+        service: KeyManagementService,
+        keychain: MockKeychain,
+        metadataPersistence: RecordingKeyMetadataPersistence
+    ) {
+        let localSE = MockSecureEnclave()
+        let localKeychain = MockKeychain()
+        let localAuthenticator = MockAuthenticator()
+        let localPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        let service = KeyManagementService(
+            engine: engine,
+            secureEnclave: localSE,
+            keychain: localKeychain,
+            authenticator: localAuthenticator,
+            privateKeyControlStore: localPrivateKeyControlStore,
+            metadataPersistence: metadataPersistence,
+            postProvisioningCheckpoint: checkpoint
+        )
+        return (service, localKeychain, metadataPersistence)
+    }
+
+    private func makeRecordingMetadataService(
+        metadataPersistence: RecordingKeyMetadataPersistence = RecordingKeyMetadataPersistence(),
+        identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
+    ) -> (
+        service: KeyManagementService,
+        keychain: MockKeychain,
+        metadataPersistence: RecordingKeyMetadataPersistence
+    ) {
+        let localSE = MockSecureEnclave()
+        let localKeychain = MockKeychain()
+        let localAuthenticator = MockAuthenticator()
+        let localPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let service = KeyManagementService(
+            engine: engine,
+            secureEnclave: localSE,
+            keychain: localKeychain,
+            authenticator: localAuthenticator,
+            privateKeyControlStore: localPrivateKeyControlStore,
+            metadataPersistence: metadataPersistence,
+            identityStoreCheckpoint: identityStoreCheckpoint,
+            relockInvalidationCheckpoint: relockInvalidationCheckpoint
+        )
+        return (service, localKeychain, metadataPersistence)
+    }
+
+    private func makeProtectedKeyMetadataProvisioningTarget(
+        identityStoreCheckpoint: @escaping KeyProvisioningService.ProvisioningCheckpoint,
+        relockInvalidationCheckpoint: @escaping KeyProvisioningService.ProvisioningCheckpoint
+    ) async throws -> ProtectedKeyMetadataProvisioningTarget {
+        let baseDirectory = try makeTemporaryDirectory("KeyMetadataProvisioningRelock")
+        let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let sharedRightIdentifier = "com.cypherair.tests.key-metadata-provisioning.\(UUID().uuidString)"
+        let registryStore = ProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: sharedRightIdentifier
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot)
+        let defaultsSuiteName = "com.cypherair.tests.key-metadata-provisioning.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+
+        let privateKeyControlStore = PrivateKeyControlStore(
+            defaults: defaults,
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager
+        )
+        let persistedSecretBox = CapturedDataBox()
+        let handoffContext = LAContext()
+        defer { handoffContext.invalidate() }
+        _ = try await privateKeyControlStore.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
+            authenticationContext: handoffContext,
+            persistSharedRight: { secret in
+                await persistedSecretBox.set(secret)
+            }
+        )
+
+        var rootSecret = await persistedSecretBox.data()
+        let wrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rootSecret)
+        rootSecret.protectedDataZeroize()
+        await persistedSecretBox.clear()
+
+        let keychain = MockKeychain()
+        let keyMetadataStore = KeyMetadataDomainStore(
+            legacyMetadataStore: KeyMetadataStore(keychain: keychain),
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+        try await keyMetadataStore.ensureCommittedIfNeeded(
+            wrappingRootKey: wrappingRootKey,
+            authenticationContext: nil
+        )
+        _ = try await keyMetadataStore.openDomainIfNeeded(
+            wrappingRootKey: wrappingRootKey,
+            authenticationContext: nil
+        )
+
+        let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: sharedRightIdentifier
+        )
+        let keyManagement = KeyManagementService(
+            engine: engine,
+            secureEnclave: MockSecureEnclave(),
+            keychain: keychain,
+            authenticator: MockAuthenticator(),
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: keyMetadataStore,
+            identityStoreCheckpoint: identityStoreCheckpoint,
+            relockInvalidationCheckpoint: relockInvalidationCheckpoint
+        )
+        protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
+        protectedDataSessionCoordinator.registerRelockParticipant(keyManagement)
+        protectedDataSessionCoordinator.registerRelockParticipant(keyMetadataStore)
+
+        return ProtectedKeyMetadataProvisioningTarget(
+            baseDirectory: baseDirectory,
+            defaultsSuiteName: defaultsSuiteName,
+            wrappingRootKey: wrappingRootKey,
+            keychain: keychain,
+            keyMetadataStore: keyMetadataStore,
+            keyManagement: keyManagement,
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator
+        )
+    }
+
+    private func assertNoProvisionedKeyMaterial(
+        in keychain: MockKeychain,
+        metadataPersistence: RecordingKeyMetadataPersistence,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let privateKeyServices = try keychain.listItems(
+            servicePrefix: KeychainConstants.prefix,
+            account: KeychainConstants.defaultAccount
+        )
+        let metadataServices = try keychain.listItems(
+            servicePrefix: KeychainConstants.metadataPrefix,
+            account: KeychainConstants.metadataAccount
+        )
+
+        XCTAssertTrue(privateKeyServices.isEmpty, file: file, line: line)
+        XCTAssertTrue(metadataServices.isEmpty, file: file, line: line)
+        XCTAssertTrue(metadataPersistence.identities.isEmpty, file: file, line: line)
+        XCTAssertEqual(metadataPersistence.saveCallCount, 0, file: file, line: line)
+    }
+
+    private func assertNoPrivateKeyMaterial(
+        in keychain: MockKeychain,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let privateKeyServices = try keychain.listItems(
+            servicePrefix: KeychainConstants.prefix,
+            account: KeychainConstants.defaultAccount
+        )
+
+        XCTAssertTrue(privateKeyServices.isEmpty, file: file, line: line)
+    }
+
+    private func copyPermanentBundle(
+        fingerprint: String,
+        from source: MockKeychain,
+        to destination: MockKeychain
+    ) throws {
+        let account = KeychainConstants.defaultAccount
+        for service in [
+            KeychainConstants.seKeyService(fingerprint: fingerprint),
+            KeychainConstants.saltService(fingerprint: fingerprint),
+            KeychainConstants.sealedKeyService(fingerprint: fingerprint)
+        ] {
+            let data = try source.load(service: service, account: account)
+            try destination.save(data, service: service, account: account, accessControl: nil)
+        }
     }
 
     private func recoveryJournal() throws -> PrivateKeyControlRecoveryJournal {
@@ -351,6 +637,23 @@ final class KeyManagementServiceTests: XCTestCase {
         return identity
     }
 
+    private func waitUntil(
+        _ description: String,
+        timeout: TimeInterval = 5,
+        condition: @escaping () async -> Bool
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            if await condition() {
+                return
+            }
+            await Task.yield()
+        }
+
+        XCTFail("Timed out waiting for \(description)")
+    }
+
     // MARK: - Key Generation: Profile A
 
     func test_generateKey_profileA_storesKeychainItems() async throws {
@@ -402,6 +705,87 @@ final class KeyManagementServiceTests: XCTestCase {
             service: KeychainConstants.sealedKeyService(fingerprint: identity.fingerprint),
             account: KeychainConstants.defaultAccount
         ))
+    }
+
+    func test_generateKey_invalidatedBeforeProvisioning_doesNotPersistBundleOrMetadata() async throws {
+        let checkpointGate = ProvisioningCheckpointGate()
+        let target = makeCheckpointedProvisioningService {
+            await checkpointGate.suspend()
+        }
+        let targetService = target.service
+
+        let generationTask = Task { [targetService] in
+            try await targetService.generateKey(
+                name: "Reset Race",
+                email: "reset-race@example.com",
+                expirySeconds: nil,
+                profile: .universal,
+                authMode: .standard
+            )
+        }
+
+        await waitUntil("key generation provisioning checkpoint") {
+            await checkpointGate.isSuspended()
+        }
+
+        targetService.resetInMemoryStateAfterLocalDataReset()
+        await checkpointGate.resume()
+
+        do {
+            _ = try await generationTask.value
+            XCTFail("Expected invalidated key generation to cancel")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+
+        XCTAssertTrue(targetService.keys.isEmpty)
+        try assertNoProvisionedKeyMaterial(
+            in: target.keychain,
+            metadataPersistence: target.metadataPersistence
+        )
+    }
+
+    func test_generateKey_invalidatedAfterProvisioningBeforeSync_doesNotRepublishCatalogKeys() async throws {
+        let checkpointGate = ProvisioningCheckpointGate()
+        let target = makePostProvisioningCheckpointedService {
+            await checkpointGate.suspend()
+        }
+        let targetService = target.service
+
+        let generationTask = Task { [targetService] in
+            try await targetService.generateKey(
+                name: "Relock Race",
+                email: "relock-race@example.com",
+                expirySeconds: nil,
+                profile: .universal,
+                authMode: .standard
+            )
+        }
+
+        await waitUntil("key generation post-provisioning checkpoint") {
+            await checkpointGate.isSuspended()
+        }
+
+        try await targetService.relockProtectedData()
+        XCTAssertEqual(targetService.metadataLoadState, .locked)
+        XCTAssertTrue(targetService.keys.isEmpty)
+
+        await checkpointGate.resume()
+
+        do {
+            _ = try await generationTask.value
+            XCTFail("Expected invalidated key generation to cancel")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+
+        XCTAssertEqual(targetService.metadataLoadState, .locked)
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertEqual(target.metadataPersistence.saveCallCount, 1)
     }
 
     func test_generateKey_profileA_returnsCorrectIdentity() async throws {
@@ -924,6 +1308,355 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(imported.profile, .advanced,
                        "Imported key should retain Profile B (advanced)")
         XCTAssertEqual(imported.keyVersion, 6)
+    }
+
+    func test_importKey_existingPersistenceMetadataButUnloadedCatalog_keepsExistingMetadataAndRollsBackNewBundle() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: service,
+            name: "Existing Metadata"
+        )
+        let passphrase = "existing-metadata-passphrase"
+        var exportedData = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: passphrase
+        )
+        defer {
+            exportedData.resetBytes(in: 0..<exportedData.count)
+        }
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.seed([identity])
+        let target = makeRecordingMetadataService(metadataPersistence: metadataPersistence)
+
+        do {
+            _ = try await target.service.importKey(
+                armoredData: exportedData,
+                passphrase: passphrase,
+                authMode: .standard
+            )
+            XCTFail("Expected duplicate persisted metadata to reject import")
+        } catch RecordingKeyMetadataPersistenceError.duplicateIdentity {
+            // Expected.
+        } catch {
+            XCTFail("Expected duplicate metadata error, got \(error)")
+        }
+
+        XCTAssertEqual(metadataPersistence.identities.map(\.fingerprint), [identity.fingerprint])
+        XCTAssertEqual(metadataPersistence.saveCallCount, 1)
+        XCTAssertEqual(metadataPersistence.deleteCallCount, 0)
+        try assertNoPrivateKeyMaterial(in: target.keychain)
+    }
+
+    func test_importKey_existingPermanentBundleButUnloadedCatalog_keepsExistingBundle() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: service,
+            name: "Existing Bundle"
+        )
+        let passphrase = "existing-bundle-passphrase"
+        var exportedData = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: passphrase
+        )
+        defer {
+            exportedData.resetBytes(in: 0..<exportedData.count)
+        }
+        let target = makeRecordingMetadataService()
+        try copyPermanentBundle(
+            fingerprint: identity.fingerprint,
+            from: mockKC,
+            to: target.keychain
+        )
+        let bundleStore = KeyBundleStore(keychain: target.keychain)
+        let originalBundle = try bundleStore.loadBundle(fingerprint: identity.fingerprint)
+
+        do {
+            _ = try await target.service.importKey(
+                armoredData: exportedData,
+                passphrase: passphrase,
+                authMode: .standard
+            )
+            XCTFail("Expected duplicate keychain bundle to reject import")
+        } catch {
+            // Expected.
+        }
+
+        let storedBundle = try bundleStore.loadBundle(fingerprint: identity.fingerprint)
+        XCTAssertEqual(storedBundle.seKeyData, originalBundle.seKeyData)
+        XCTAssertEqual(storedBundle.salt, originalBundle.salt)
+        XCTAssertEqual(storedBundle.sealedBox, originalBundle.sealedBox)
+        XCTAssertEqual(target.metadataPersistence.saveCallCount, 0)
+        XCTAssertEqual(target.metadataPersistence.deleteCallCount, 0)
+    }
+
+    func test_generateKey_metadataSaveFailure_rollsBackNewBundleWithoutDeletingMetadata() async throws {
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.failNextSave = true
+        let target = makeRecordingMetadataService(metadataPersistence: metadataPersistence)
+
+        do {
+            _ = try await target.service.generateKey(
+                name: "Save Failure",
+                email: "save-failure@example.com",
+                expirySeconds: nil,
+                profile: .universal,
+                authMode: .standard
+            )
+            XCTFail("Expected metadata save failure")
+        } catch RecordingKeyMetadataPersistenceError.saveFailed {
+            // Expected.
+        } catch {
+            XCTFail("Expected metadata save failure, got \(error)")
+        }
+
+        XCTAssertTrue(metadataPersistence.identities.isEmpty)
+        XCTAssertEqual(metadataPersistence.saveCallCount, 1)
+        XCTAssertEqual(metadataPersistence.deleteCallCount, 0)
+        try assertNoPrivateKeyMaterial(in: target.keychain)
+    }
+
+    func test_generateKey_invalidatedAfterIdentityStore_rollsBackOnlyNewIdentityAndBundle() async throws {
+        let existing = try await TestHelpers.generateProfileBKey(
+            service: service,
+            name: "Existing Unrelated"
+        )
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.seed([existing])
+        let checkpointGate = ProvisioningCheckpointGate()
+        let relockInvalidationGate = ProvisioningCheckpointGate()
+        let target = makeRecordingMetadataService(
+            metadataPersistence: metadataPersistence,
+            identityStoreCheckpoint: {
+                await checkpointGate.suspend()
+            },
+            relockInvalidationCheckpoint: {
+                await relockInvalidationGate.suspend()
+            }
+        )
+        try copyPermanentBundle(
+            fingerprint: existing.fingerprint,
+            from: mockKC,
+            to: target.keychain
+        )
+        let targetService = target.service
+
+        let generationTask = Task { [targetService] in
+            try await targetService.generateKey(
+                name: "Cancelled After Metadata",
+                email: "cancelled-after-metadata@example.com",
+                expirySeconds: nil,
+                profile: .universal,
+                authMode: .standard
+            )
+        }
+
+        await waitUntil("key generation identity-store checkpoint") {
+            await checkpointGate.isSuspended()
+        }
+        XCTAssertEqual(metadataPersistence.saveCallCount, 1)
+        XCTAssertEqual(Set(metadataPersistence.identities.map(\.fingerprint)).count, 2)
+
+        let relockTask = Task { [targetService] in
+            try await targetService.relockProtectedData()
+        }
+        await waitUntil("key generation relock invalidation checkpoint") {
+            await relockInvalidationGate.isSuspended()
+        }
+        await relockInvalidationGate.resume()
+        await checkpointGate.resume()
+
+        do {
+            _ = try await generationTask.value
+            XCTFail("Expected invalidated key generation to cancel")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+        try await relockTask.value
+
+        XCTAssertEqual(metadataPersistence.identities.map(\.fingerprint), [existing.fingerprint])
+        XCTAssertEqual(metadataPersistence.deleteCallCount, 1)
+        let bundleStore = KeyBundleStore(keychain: target.keychain)
+        XCTAssertEqual(
+            bundleStore.bundleState(fingerprint: existing.fingerprint, namespace: .permanent),
+            .complete
+        )
+        let privateKeyServices = try target.keychain.listItems(
+            servicePrefix: KeychainConstants.prefix,
+            account: KeychainConstants.defaultAccount
+        )
+        XCTAssertEqual(
+            Set(privateKeyServices),
+            Set([
+                KeychainConstants.seKeyService(fingerprint: existing.fingerprint),
+                KeychainConstants.saltService(fingerprint: existing.fingerprint),
+                KeychainConstants.sealedKeyService(fingerprint: existing.fingerprint)
+            ])
+        )
+    }
+
+    func test_generateKey_realProtectedDataRelockAfterIdentityStore_doesNotLeaveOrphanedMetadata() async throws {
+        let checkpointGate = ProvisioningCheckpointGate()
+        let relockInvalidationGate = ProvisioningCheckpointGate()
+        let target = try await makeProtectedKeyMetadataProvisioningTarget(
+            identityStoreCheckpoint: {
+                await checkpointGate.suspend()
+            },
+            relockInvalidationCheckpoint: {
+                await relockInvalidationGate.suspend()
+            }
+        )
+        defer {
+            try? FileManager.default.removeItem(at: target.baseDirectory)
+            UserDefaults(suiteName: target.defaultsSuiteName)?
+                .removePersistentDomain(forName: target.defaultsSuiteName)
+        }
+
+        let generationTask = Task { [keyManagement = target.keyManagement] in
+            try await keyManagement.generateKey(
+                name: "Protected Relock Race",
+                email: "protected-relock-race@example.com",
+                expirySeconds: nil,
+                profile: .universal,
+                authMode: .standard
+            )
+        }
+
+        await waitUntil("protected key metadata identity-store checkpoint") {
+            await checkpointGate.isSuspended()
+        }
+        let storedDuringCommit = try target.keyMetadataStore.loadAll()
+        let orphanCandidate = try XCTUnwrap(storedDuringCommit.first)
+        XCTAssertEqual(storedDuringCommit.count, 1)
+
+        let relockTask = Task { [coordinator = target.protectedDataSessionCoordinator] in
+            await coordinator.relockCurrentSession()
+        }
+        await waitUntil("protected-data relock invalidation checkpoint") {
+            await relockInvalidationGate.isSuspended()
+        }
+        await relockInvalidationGate.resume()
+        await checkpointGate.resume()
+
+        do {
+            _ = try await generationTask.value
+            XCTFail("Expected invalidated protected key generation to cancel")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+        await relockTask.value
+
+        let reopenedPayload = try await target.keyMetadataStore.openDomainIfNeeded(
+            wrappingRootKey: target.wrappingRootKey,
+            authenticationContext: nil
+        )
+        XCTAssertEqual(reopenedPayload.identities, [])
+        XCTAssertEqual(
+            KeyBundleStore(keychain: target.keychain).bundleState(
+                fingerprint: orphanCandidate.fingerprint,
+                namespace: .permanent
+            ),
+            .missing
+        )
+    }
+
+    func test_importKey_invalidatedBeforeProvisioning_doesNotPersistBundleOrMetadata() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: service,
+            name: "Import Source"
+        )
+        let passphrase = "import-reset-passphrase"
+        let exportedData = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: passphrase
+        )
+        let checkpointGate = ProvisioningCheckpointGate()
+        let target = makeCheckpointedProvisioningService {
+            await checkpointGate.suspend()
+        }
+        let targetService = target.service
+
+        let importTask = Task { [targetService] in
+            try await targetService.importKey(
+                armoredData: exportedData,
+                passphrase: passphrase,
+                authMode: .standard
+            )
+        }
+
+        await waitUntil("key import provisioning checkpoint") {
+            await checkpointGate.isSuspended()
+        }
+
+        try await targetService.relockProtectedData()
+        await checkpointGate.resume()
+
+        do {
+            _ = try await importTask.value
+            XCTFail("Expected invalidated key import to cancel")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+
+        XCTAssertTrue(targetService.keys.isEmpty)
+        try assertNoProvisionedKeyMaterial(
+            in: target.keychain,
+            metadataPersistence: target.metadataPersistence
+        )
+    }
+
+    func test_importKey_invalidatedAfterProvisioningBeforeSync_doesNotRepublishCatalogKeys() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: service,
+            name: "Import Post Source"
+        )
+        let passphrase = "import-post-race-passphrase"
+        var exportedData = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: passphrase
+        )
+        defer {
+            exportedData.resetBytes(in: 0..<exportedData.count)
+        }
+        let checkpointGate = ProvisioningCheckpointGate()
+        let target = makePostProvisioningCheckpointedService {
+            await checkpointGate.suspend()
+        }
+        let targetService = target.service
+
+        let importTask = Task { [targetService, exportedData] in
+            try await targetService.importKey(
+                armoredData: exportedData,
+                passphrase: passphrase,
+                authMode: .standard
+            )
+        }
+
+        await waitUntil("key import post-provisioning checkpoint") {
+            await checkpointGate.isSuspended()
+        }
+
+        try await targetService.relockProtectedData()
+        XCTAssertEqual(targetService.metadataLoadState, .locked)
+        XCTAssertTrue(targetService.keys.isEmpty)
+
+        await checkpointGate.resume()
+
+        do {
+            _ = try await importTask.value
+            XCTFail("Expected invalidated key import to cancel")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+
+        XCTAssertEqual(targetService.metadataLoadState, .locked)
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertEqual(target.metadataPersistence.saveCallCount, 1)
     }
 
     // MARK: - Default Key

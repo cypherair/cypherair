@@ -19,6 +19,10 @@ final class KeyCatalogStore {
         keys = try metadataStore.loadAll()
     }
 
+    func clearInMemoryIdentities() {
+        keys = []
+    }
+
     func migrateLegacyMetadataIfNeeded(
         authenticationContext: LAContext?
     ) throws -> KeyMetadataLegacyMigrationOutcome {
@@ -47,18 +51,21 @@ final class KeyCatalogStore {
         keys.first(where: { $0.fingerprint == fingerprint })
     }
 
-    func storeNewIdentity(
-        _ identity: PGPKeyIdentity,
-        rollback: () -> Void
-    ) throws {
-        do {
-            try metadataStore.save(identity)
-        } catch {
-            rollback()
-            throw error
+    func storeNewIdentity(_ identity: PGPKeyIdentity) throws {
+        try metadataStore.save(identity)
+        keys.append(identity)
+    }
+
+    func discardCommittedIdentity(fingerprint: String) {
+        try? metadataStore.delete(fingerprint: fingerprint)
+        keys.removeAll { $0.fingerprint == fingerprint }
+
+        guard !keys.isEmpty, !keys.contains(where: \.isDefault) else {
+            return
         }
 
-        keys.append(identity)
+        keys[0].isDefault = true
+        try? metadataStore.update(keys[0])
     }
 
     func markBackedUp(fingerprint: String) {
