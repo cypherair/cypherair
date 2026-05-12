@@ -11,6 +11,7 @@ final class KeyProvisioningService {
     private let catalogStore: KeyCatalogStore
     private let invalidationGate: KeyProvisioningInvalidationGate
     private let beforePermanentStorageCheckpoint: ProvisioningCheckpoint?
+    private let afterIdentityStoreCheckpoint: ProvisioningCheckpoint?
 
     init(
         engine: PgpEngine,
@@ -19,7 +20,8 @@ final class KeyProvisioningService {
         bundleStore: KeyBundleStore,
         catalogStore: KeyCatalogStore,
         invalidationGate: KeyProvisioningInvalidationGate,
-        beforePermanentStorageCheckpoint: ProvisioningCheckpoint? = nil
+        beforePermanentStorageCheckpoint: ProvisioningCheckpoint? = nil,
+        afterIdentityStoreCheckpoint: ProvisioningCheckpoint? = nil
     ) {
         self.engine = engine
         self.secureEnclave = secureEnclave
@@ -28,6 +30,7 @@ final class KeyProvisioningService {
         self.catalogStore = catalogStore
         self.invalidationGate = invalidationGate
         self.beforePermanentStorageCheckpoint = beforePermanentStorageCheckpoint
+        self.afterIdentityStoreCheckpoint = afterIdentityStoreCheckpoint
     }
 
     func generateKey(
@@ -64,7 +67,7 @@ final class KeyProvisioningService {
         try invalidationGate.checkValid(token)
 
         let fingerprint = keyInfo.fingerprint
-        try bundleStore.saveBundle(bundle, fingerprint: fingerprint)
+        let bundleReceipt = try bundleStore.saveNewBundle(bundle, fingerprint: fingerprint)
 
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
@@ -85,7 +88,7 @@ final class KeyProvisioningService {
             }
         )
 
-        try commitIdentity(identity, fingerprint: fingerprint, token: token)
+        try await commitIdentity(identity, bundleReceipt: bundleReceipt, token: token)
 
         return identity
     }
@@ -136,7 +139,7 @@ final class KeyProvisioningService {
         try invalidationGate.checkValid(token)
 
         let fingerprint = keyInfo.fingerprint
-        try bundleStore.saveBundle(bundle, fingerprint: fingerprint)
+        let bundleReceipt = try bundleStore.saveNewBundle(bundle, fingerprint: fingerprint)
 
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
@@ -157,7 +160,7 @@ final class KeyProvisioningService {
             }
         )
 
-        try commitIdentity(identity, fingerprint: fingerprint, token: token)
+        try await commitIdentity(identity, bundleReceipt: bundleReceipt, token: token)
 
         return identity
     }
@@ -174,20 +177,25 @@ final class KeyProvisioningService {
 
     private func commitIdentity(
         _ identity: PGPKeyIdentity,
-        fingerprint: String,
+        bundleReceipt: KeyBundleWriteReceipt,
         token: KeyProvisioningInvalidationGate.Token
-    ) throws {
+    ) async throws {
+        var didStoreIdentity = false
         do {
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
-            try catalogStore.storeNewIdentity(identity) {
-                self.bundleStore.rollbackPermanentBundle(fingerprint: fingerprint)
+            try catalogStore.storeNewIdentity(identity)
+            didStoreIdentity = true
+            if let afterIdentityStoreCheckpoint {
+                await afterIdentityStoreCheckpoint()
             }
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
         } catch {
-            catalogStore.discardNewIdentity(fingerprint: fingerprint)
-            bundleStore.rollbackPermanentBundle(fingerprint: fingerprint)
+            if didStoreIdentity {
+                catalogStore.discardCommittedIdentity(fingerprint: identity.fingerprint)
+            }
+            bundleStore.rollback(bundleReceipt)
             throw error
         }
     }

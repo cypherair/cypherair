@@ -51,21 +51,12 @@ final class KeyCatalogStore {
         keys.first(where: { $0.fingerprint == fingerprint })
     }
 
-    func storeNewIdentity(
-        _ identity: PGPKeyIdentity,
-        rollback: () -> Void
-    ) throws {
-        do {
-            try metadataStore.save(identity)
-        } catch {
-            rollback()
-            throw error
-        }
-
+    func storeNewIdentity(_ identity: PGPKeyIdentity) throws {
+        try metadataStore.save(identity)
         keys.append(identity)
     }
 
-    func discardNewIdentity(fingerprint: String) {
+    func discardCommittedIdentity(fingerprint: String) {
         try? metadataStore.delete(fingerprint: fingerprint)
         keys.removeAll { $0.fingerprint == fingerprint }
 

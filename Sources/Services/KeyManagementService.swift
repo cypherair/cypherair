@@ -38,6 +38,7 @@ final class KeyManagementService: @unchecked Sendable {
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         metadataPersistence: (any KeyMetadataPersistence)? = nil,
         provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) {
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
@@ -67,7 +68,8 @@ final class KeyManagementService: @unchecked Sendable {
             bundleStore: bundleStore,
             catalogStore: catalogStore,
             invalidationGate: provisioningInvalidationGate,
-            beforePermanentStorageCheckpoint: provisioningCheckpoint
+            beforePermanentStorageCheckpoint: provisioningCheckpoint,
+            afterIdentityStoreCheckpoint: identityStoreCheckpoint
         )
         self.exportService = KeyExportService(
             engine: engine,

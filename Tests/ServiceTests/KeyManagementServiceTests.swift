@@ -65,6 +65,11 @@ private enum KeyManagementPrivateKeyControlTestError: Error {
     case delayedFailure
 }
 
+private enum RecordingKeyMetadataPersistenceError: Error {
+    case duplicateIdentity
+    case saveFailed
+}
+
 private final class FailingModifyExpiryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unchecked Sendable {
     private var mode: AuthenticationMode?
     private var journal = PrivateKeyControlRecoveryJournal.empty
@@ -159,6 +164,12 @@ private final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
     private(set) var saveCallCount = 0
     private(set) var updateCallCount = 0
     private(set) var deleteCallCount = 0
+    var failNextSave = false
+    var throwOnDuplicate = true
+
+    func seed(_ identities: [PGPKeyIdentity]) {
+        self.identities = identities.sorted { $0.fingerprint < $1.fingerprint }
+    }
 
     func loadAll() throws -> [PGPKeyIdentity] {
         loadAllCallCount += 1
@@ -167,6 +178,13 @@ private final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
 
     func save(_ identity: PGPKeyIdentity) throws {
         saveCallCount += 1
+        if failNextSave {
+            failNextSave = false
+            throw RecordingKeyMetadataPersistenceError.saveFailed
+        }
+        if throwOnDuplicate && identities.contains(where: { $0.fingerprint == identity.fingerprint }) {
+            throw RecordingKeyMetadataPersistenceError.duplicateIdentity
+        }
         identities.append(identity)
         identities.sort { $0.fingerprint < $1.fingerprint }
     }
@@ -347,6 +365,30 @@ final class KeyManagementServiceTests: XCTestCase {
         return (service, localKeychain, metadataPersistence)
     }
 
+    private func makeRecordingMetadataService(
+        metadataPersistence: RecordingKeyMetadataPersistence = RecordingKeyMetadataPersistence(),
+        identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
+    ) -> (
+        service: KeyManagementService,
+        keychain: MockKeychain,
+        metadataPersistence: RecordingKeyMetadataPersistence
+    ) {
+        let localSE = MockSecureEnclave()
+        let localKeychain = MockKeychain()
+        let localAuthenticator = MockAuthenticator()
+        let localPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let service = KeyManagementService(
+            engine: engine,
+            secureEnclave: localSE,
+            keychain: localKeychain,
+            authenticator: localAuthenticator,
+            privateKeyControlStore: localPrivateKeyControlStore,
+            metadataPersistence: metadataPersistence,
+            identityStoreCheckpoint: identityStoreCheckpoint
+        )
+        return (service, localKeychain, metadataPersistence)
+    }
+
     private func assertNoProvisionedKeyMaterial(
         in keychain: MockKeychain,
         metadataPersistence: RecordingKeyMetadataPersistence,
@@ -366,6 +408,35 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertTrue(metadataServices.isEmpty, file: file, line: line)
         XCTAssertTrue(metadataPersistence.identities.isEmpty, file: file, line: line)
         XCTAssertEqual(metadataPersistence.saveCallCount, 0, file: file, line: line)
+    }
+
+    private func assertNoPrivateKeyMaterial(
+        in keychain: MockKeychain,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let privateKeyServices = try keychain.listItems(
+            servicePrefix: KeychainConstants.prefix,
+            account: KeychainConstants.defaultAccount
+        )
+
+        XCTAssertTrue(privateKeyServices.isEmpty, file: file, line: line)
+    }
+
+    private func copyPermanentBundle(
+        fingerprint: String,
+        from source: MockKeychain,
+        to destination: MockKeychain
+    ) throws {
+        let account = KeychainConstants.defaultAccount
+        for service in [
+            KeychainConstants.seKeyService(fingerprint: fingerprint),
+            KeychainConstants.saltService(fingerprint: fingerprint),
+            KeychainConstants.sealedKeyService(fingerprint: fingerprint)
+        ] {
+            let data = try source.load(service: service, account: account)
+            try destination.save(data, service: service, account: account, accessControl: nil)
+        }
     }
 
     private func recoveryJournal() throws -> PrivateKeyControlRecoveryJournal {
@@ -1117,6 +1188,179 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(imported.profile, .advanced,
                        "Imported key should retain Profile B (advanced)")
         XCTAssertEqual(imported.keyVersion, 6)
+    }
+
+    func test_importKey_existingPersistenceMetadataButUnloadedCatalog_keepsExistingMetadataAndRollsBackNewBundle() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: service,
+            name: "Existing Metadata"
+        )
+        let passphrase = "existing-metadata-passphrase"
+        var exportedData = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: passphrase
+        )
+        defer {
+            exportedData.resetBytes(in: 0..<exportedData.count)
+        }
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.seed([identity])
+        let target = makeRecordingMetadataService(metadataPersistence: metadataPersistence)
+
+        do {
+            _ = try await target.service.importKey(
+                armoredData: exportedData,
+                passphrase: passphrase,
+                authMode: .standard
+            )
+            XCTFail("Expected duplicate persisted metadata to reject import")
+        } catch RecordingKeyMetadataPersistenceError.duplicateIdentity {
+            // Expected.
+        } catch {
+            XCTFail("Expected duplicate metadata error, got \(error)")
+        }
+
+        XCTAssertEqual(metadataPersistence.identities.map(\.fingerprint), [identity.fingerprint])
+        XCTAssertEqual(metadataPersistence.saveCallCount, 1)
+        XCTAssertEqual(metadataPersistence.deleteCallCount, 0)
+        try assertNoPrivateKeyMaterial(in: target.keychain)
+    }
+
+    func test_importKey_existingPermanentBundleButUnloadedCatalog_keepsExistingBundle() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: service,
+            name: "Existing Bundle"
+        )
+        let passphrase = "existing-bundle-passphrase"
+        var exportedData = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: passphrase
+        )
+        defer {
+            exportedData.resetBytes(in: 0..<exportedData.count)
+        }
+        let target = makeRecordingMetadataService()
+        try copyPermanentBundle(
+            fingerprint: identity.fingerprint,
+            from: mockKC,
+            to: target.keychain
+        )
+        let bundleStore = KeyBundleStore(keychain: target.keychain)
+        let originalBundle = try bundleStore.loadBundle(fingerprint: identity.fingerprint)
+
+        do {
+            _ = try await target.service.importKey(
+                armoredData: exportedData,
+                passphrase: passphrase,
+                authMode: .standard
+            )
+            XCTFail("Expected duplicate keychain bundle to reject import")
+        } catch {
+            // Expected.
+        }
+
+        let storedBundle = try bundleStore.loadBundle(fingerprint: identity.fingerprint)
+        XCTAssertEqual(storedBundle.seKeyData, originalBundle.seKeyData)
+        XCTAssertEqual(storedBundle.salt, originalBundle.salt)
+        XCTAssertEqual(storedBundle.sealedBox, originalBundle.sealedBox)
+        XCTAssertEqual(target.metadataPersistence.saveCallCount, 0)
+        XCTAssertEqual(target.metadataPersistence.deleteCallCount, 0)
+    }
+
+    func test_generateKey_metadataSaveFailure_rollsBackNewBundleWithoutDeletingMetadata() async throws {
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.failNextSave = true
+        let target = makeRecordingMetadataService(metadataPersistence: metadataPersistence)
+
+        do {
+            _ = try await target.service.generateKey(
+                name: "Save Failure",
+                email: "save-failure@example.com",
+                expirySeconds: nil,
+                profile: .universal,
+                authMode: .standard
+            )
+            XCTFail("Expected metadata save failure")
+        } catch RecordingKeyMetadataPersistenceError.saveFailed {
+            // Expected.
+        } catch {
+            XCTFail("Expected metadata save failure, got \(error)")
+        }
+
+        XCTAssertTrue(metadataPersistence.identities.isEmpty)
+        XCTAssertEqual(metadataPersistence.saveCallCount, 1)
+        XCTAssertEqual(metadataPersistence.deleteCallCount, 0)
+        try assertNoPrivateKeyMaterial(in: target.keychain)
+    }
+
+    func test_generateKey_invalidatedAfterIdentityStore_rollsBackOnlyNewIdentityAndBundle() async throws {
+        let existing = try await TestHelpers.generateProfileBKey(
+            service: service,
+            name: "Existing Unrelated"
+        )
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.seed([existing])
+        let checkpointGate = ProvisioningCheckpointGate()
+        let target = makeRecordingMetadataService(
+            metadataPersistence: metadataPersistence,
+            identityStoreCheckpoint: {
+                await checkpointGate.suspend()
+            }
+        )
+        try copyPermanentBundle(
+            fingerprint: existing.fingerprint,
+            from: mockKC,
+            to: target.keychain
+        )
+        let targetService = target.service
+
+        let generationTask = Task { [targetService] in
+            try await targetService.generateKey(
+                name: "Cancelled After Metadata",
+                email: "cancelled-after-metadata@example.com",
+                expirySeconds: nil,
+                profile: .universal,
+                authMode: .standard
+            )
+        }
+
+        await waitUntil("key generation identity-store checkpoint") {
+            await checkpointGate.isSuspended()
+        }
+        XCTAssertEqual(metadataPersistence.saveCallCount, 1)
+        XCTAssertEqual(Set(metadataPersistence.identities.map(\.fingerprint)).count, 2)
+
+        try await targetService.relockProtectedData()
+        await checkpointGate.resume()
+
+        do {
+            _ = try await generationTask.value
+            XCTFail("Expected invalidated key generation to cancel")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+
+        XCTAssertEqual(metadataPersistence.identities.map(\.fingerprint), [existing.fingerprint])
+        XCTAssertEqual(metadataPersistence.deleteCallCount, 1)
+        let bundleStore = KeyBundleStore(keychain: target.keychain)
+        XCTAssertEqual(
+            bundleStore.bundleState(fingerprint: existing.fingerprint, namespace: .permanent),
+            .complete
+        )
+        let privateKeyServices = try target.keychain.listItems(
+            servicePrefix: KeychainConstants.prefix,
+            account: KeychainConstants.defaultAccount
+        )
+        XCTAssertEqual(
+            Set(privateKeyServices),
+            Set([
+                KeychainConstants.seKeyService(fingerprint: existing.fingerprint),
+                KeychainConstants.saltService(fingerprint: existing.fingerprint),
+                KeychainConstants.sealedKeyService(fingerprint: existing.fingerprint)
+            ])
+        )
     }
 
     func test_importKey_invalidatedBeforeProvisioning_doesNotPersistBundleOrMetadata() async throws {
