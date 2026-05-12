@@ -268,6 +268,42 @@ final class VerifyScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_contentClearDuringCleartextVerifySuppressesLateVerification() async {
+        let gate = VerifyOperationGate()
+        let model = makeModel(
+            cleartextVerificationAction: { _ in
+                await gate.suspend()
+                return (
+                    Data("late-original-text".utf8),
+                    self.makeDetailedVerification(status: .valid)
+                )
+            }
+        )
+        model.signedInput = "signed message"
+
+        model.verifyCleartext()
+
+        await waitUntil("cleartext verification to suspend for content clear") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+        XCTAssertFalse(model.operation.isRunning)
+        XCTAssertNil(model.cleartextOriginalText)
+        XCTAssertNil(model.cleartextDetailedVerification)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.cleartextOriginalText)
+        XCTAssertNil(model.cleartextDetailedVerification)
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
     private func makeModel(
         configuration: VerifyView.Configuration = .default,
         operation: OperationController = OperationController(),
@@ -344,5 +380,11 @@ final class VerifyScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }

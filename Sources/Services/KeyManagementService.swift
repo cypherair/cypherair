@@ -292,10 +292,24 @@ final class KeyManagementService: @unchecked Sendable {
     func exportKey(fingerprint: String, passphrase: String) async throws -> Data {
         let exported = try await exportService.exportKey(
             fingerprint: fingerprint,
-            passphrase: passphrase
+            passphrase: passphrase,
+            markBackedUp: true
         )
         syncKeys()
         return exported
+    }
+
+    func exportKeyBackupData(fingerprint: String, passphrase: String) async throws -> Data {
+        try await exportService.exportKey(
+            fingerprint: fingerprint,
+            passphrase: passphrase,
+            markBackedUp: false
+        )
+    }
+
+    func confirmKeyBackupExported(fingerprint: String) {
+        catalogStore.markBackedUp(fingerprint: fingerprint)
+        syncKeys()
     }
 
     /// Export the key's revocation signature as an ASCII-armored signature.

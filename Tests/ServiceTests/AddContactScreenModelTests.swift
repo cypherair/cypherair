@@ -2,6 +2,32 @@ import Foundation
 import XCTest
 @testable import CypherAir
 
+private actor AddContactAsyncGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var didResume = false
+
+    func suspend() async {
+        await withCheckedContinuation { continuation in
+            if didResume {
+                continuation.resume()
+            } else {
+                self.continuation = continuation
+            }
+        }
+    }
+
+    func isSuspended() -> Bool {
+        continuation != nil
+    }
+
+    func resume() {
+        didResume = true
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume()
+    }
+}
+
 final class AddContactScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
     private var qrService: QRService!
@@ -189,6 +215,37 @@ final class AddContactScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_clearTransientInputDuringQRProcessingSuppressesLateLoadedKey() async {
+        let model = makeModel()
+        let gate = AddContactAsyncGate()
+
+        model.processSelectedQRPhoto {
+            await gate.suspend()
+            return Data("late-public-key".utf8)
+        }
+
+        await waitUntil("QR processing to suspend") {
+            guard model.isProcessingQR else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.clearTransientInput()
+        XCTAssertFalse(model.isProcessingQR)
+        XCTAssertEqual(model.armoredText, "")
+        XCTAssertNil(model.importedKeyData)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertEqual(model.armoredText, "")
+        XCTAssertNil(model.importedKeyData)
+        XCTAssertNil(model.importedFileName)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
     func test_loadFileContents_successAndFailure_updateImportState() throws {
         let armoredPublicKey = "-----BEGIN PGP PUBLIC KEY BLOCK-----"
         let expectedFileName = "contact.asc"
@@ -287,5 +344,11 @@ final class AddContactScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }
