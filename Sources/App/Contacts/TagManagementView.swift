@@ -2,16 +2,23 @@ import SwiftUI
 
 struct TagManagementView: View {
     @Environment(ContactService.self) private var contactService
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
 
     var body: some View {
-        TagManagementHostView(contactService: contactService)
+        TagManagementHostView(
+            contactService: contactService,
+            appSessionOrchestrator: appSessionOrchestrator
+        )
     }
 }
 
 private struct TagManagementHostView: View {
+    let appSessionOrchestrator: AppSessionOrchestrator
+
     @State private var model: TagManagementScreenModel
 
-    init(contactService: ContactService) {
+    init(contactService: ContactService, appSessionOrchestrator: AppSessionOrchestrator) {
+        self.appSessionOrchestrator = appSessionOrchestrator
         _model = State(initialValue: TagManagementScreenModel(contactService: contactService))
     }
 
@@ -26,13 +33,16 @@ private struct TagManagementHostView: View {
             }
         }
         .navigationTitle(String(localized: "tagManagement.title", defaultValue: "Manage Tags"))
-        .searchable(
+        .cypherSearchable(
             text: $model.searchText,
             placement: .automatic,
             prompt: String(localized: "tagManagement.search", defaultValue: "Search tags")
         )
         .onAppear {
             model.handleAppear()
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            model.clearTransientInput()
         }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
@@ -81,9 +91,12 @@ private struct TagManagementHostView: View {
 
         Form {
             Section {
-                TextField(
+                CypherSingleLineTextField(
                     String(localized: "tagManagement.create.field", defaultValue: "Tag Name"),
-                    text: $model.createTagName
+                    text: $model.createTagName,
+                    profile: .tagName,
+                    submitLabel: .done,
+                    onSubmit: model.createTagIfValid
                 )
                 Button {
                     model.createTag()
@@ -144,9 +157,12 @@ private struct TagManagementHostView: View {
 
         return Section {
             if model.isRenamingSelectedTag {
-                TextField(
+                CypherSingleLineTextField(
                     String(localized: "tagManagement.rename.field", defaultValue: "Tag Name"),
-                    text: $model.renameText
+                    text: $model.renameText,
+                    profile: .tagName,
+                    submitLabel: .done,
+                    onSubmit: model.commitRenameSelectedTagIfValid
                 )
                 Button {
                     model.commitRenameSelectedTag()

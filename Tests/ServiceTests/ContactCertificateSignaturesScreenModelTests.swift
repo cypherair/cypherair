@@ -1,6 +1,32 @@
 import XCTest
 @testable import CypherAir
 
+private actor ContactCertificateAsyncGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var didResume = false
+
+    func suspend() async {
+        await withCheckedContinuation { continuation in
+            if didResume {
+                continuation.resume()
+            } else {
+                self.continuation = continuation
+            }
+        }
+    }
+
+    func isSuspended() -> Bool {
+        continuation != nil
+    }
+
+    func resume() {
+        didResume = true
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume()
+    }
+}
+
 final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
 
@@ -98,6 +124,184 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
 
         XCTAssertEqual(model.loadState, .idle)
         XCTAssertNil(model.catalog)
+    }
+
+    @MainActor
+    func test_contactsAvailabilityChange_restartsLoadCancelledByContentClear() async throws {
+        let contact = try makeContact(name: "Reload Contact", email: "reload@example.com")
+        let catalog = try stack.certificateSignatureService.selectionCatalog(
+            targetCert: contact.publicKeyData
+        )
+        let staleCatalog = CertificateSelectionCatalog(
+            certificateFingerprint: "stale",
+            subkeys: [],
+            userIds: [
+                UserIdSelectionOption(
+                    occurrenceIndex: 0,
+                    userIdData: Data("stale@example.com".utf8),
+                    displayText: "Stale <stale@example.com>",
+                    isCurrentlyPrimary: true,
+                    isCurrentlyRevoked: false
+                ),
+            ]
+        )
+        let gate = ContactCertificateAsyncGate()
+        var loadCount = 0
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                if loadCount == 1 {
+                    await gate.suspend()
+                    return staleCatalog
+                }
+                return catalog
+            }
+        )
+
+        model.loadIfNeeded()
+
+        await waitUntil("initial catalog load to suspend") {
+            await gate.isSuspended()
+        }
+
+        model.clearTransientInput()
+        XCTAssertEqual(model.loadState, .idle)
+        await settleAsyncWork()
+        XCTAssertEqual(loadCount, 1)
+
+        model.handleContactsAvailabilityChange(
+            from: .opening,
+            to: .availableLegacyCompatibility
+        )
+
+        await waitUntil("catalog reload after contacts reopen") {
+            model.loadState == .loaded
+        }
+
+        XCTAssertEqual(loadCount, 2)
+        XCTAssertEqual(model.catalog, catalog)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertEqual(model.catalog, catalog)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_contactsAvailabilityChange_reloadsContactsUnavailableFailure() async throws {
+        let contact = try makeContact(
+            name: "Unavailable Reload Contact",
+            email: "unavailable-reload@example.com"
+        )
+        let catalog = try stack.certificateSignatureService.selectionCatalog(
+            targetCert: contact.publicKeyData
+        )
+        var loadCount = 0
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                return catalog
+            }
+        )
+
+        stack.contactService.resetInMemoryStateAfterLocalDataReset()
+
+        model.loadIfNeeded()
+
+        XCTAssertEqual(model.loadState, .failed)
+        guard case .contactsUnavailable(.locked)? = model.loadError else {
+            return XCTFail("Expected contacts unavailable error, got \(String(describing: model.loadError))")
+        }
+        XCTAssertEqual(loadCount, 0)
+
+        try stack.contactService.openLegacyCompatibilityForTests()
+        model.handleContactsAvailabilityChange(
+            from: .locked,
+            to: .availableLegacyCompatibility
+        )
+
+        await waitUntil("contacts-unavailable catalog reload") {
+            model.loadState == .loaded
+        }
+
+        XCTAssertEqual(loadCount, 1)
+        XCTAssertEqual(model.catalog, catalog)
+    }
+
+    @MainActor
+    func test_contactsAvailabilityChange_doesNotRetryCatalogFailure() async throws {
+        let contact = try makeContact(
+            name: "Catalog Failure Contact",
+            email: "catalog-failure@example.com"
+        )
+        enum CatalogFailure: Error { case failed }
+        var loadCount = 0
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                throw CatalogFailure.failed
+            }
+        )
+
+        model.loadIfNeeded()
+
+        await waitUntil("catalog load failure") {
+            model.loadState == .failed
+        }
+
+        model.handleContactsAvailabilityChange(
+            from: .opening,
+            to: .availableLegacyCompatibility
+        )
+        await settleAsyncWork()
+
+        XCTAssertEqual(loadCount, 1)
+        XCTAssertEqual(model.loadState, .failed)
+    }
+
+    @MainActor
+    func test_clearTransientInputDuringDirectKeyVerifySuppressesLateVerification() async throws {
+        let contact = try makeContact(name: "Clear Verify Contact", email: "clear-verify@example.com")
+        let gate = ContactCertificateAsyncGate()
+        let verification = CertificateSignatureVerification(
+            status: .valid,
+            certificationKind: nil,
+            signerPrimaryFingerprint: nil,
+            signingKeyFingerprint: "1234567890abcdef1234567890abcdef12345678",
+            signerIdentity: nil
+        )
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            verifyDirectKeyAction: { _, _ in
+                await gate.suspend()
+                return verification
+            }
+        )
+        model.setSignatureInput("signature")
+
+        model.verifyDirectKey()
+
+        await waitUntil("direct-key verification to suspend") {
+            guard model.activeOperation == .directKeyVerify else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.clearTransientInput()
+        XCTAssertNil(model.activeOperation)
+        XCTAssertNil(model.verification)
+        XCTAssertEqual(model.signatureInput, "")
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.verification)
+        XCTAssertFalse(model.showError)
     }
 
     @MainActor
@@ -392,6 +596,33 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_clearTransientInput_clearsSignatureInputImportAndVerification() throws {
+        let contact = try makeContact(name: "Clear Contact", email: "clear@example.com")
+        let model = makeModel(fingerprint: contact.fingerprint)
+        model.signatureInput = "signature"
+        model.importedSignature.setImportedFile(
+            data: Data("signature".utf8),
+            fileName: "signature.sig",
+            text: "signature"
+        )
+        model.verification = CertificateSignatureVerification(
+            status: .valid,
+            certificationKind: nil,
+            signerPrimaryFingerprint: nil,
+            signingKeyFingerprint: nil,
+            signerIdentity: nil
+        )
+        model.showFileImporter = true
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.signatureInput, "")
+        XCTAssertFalse(model.importedSignature.hasImportedFile)
+        XCTAssertNil(model.verification)
+        XCTAssertFalse(model.showFileImporter)
+    }
+
+    @MainActor
     private func makeContact(name: String, email: String) throws -> Contact {
         let generated = try stack.engine.generateKey(
             name: name,
@@ -447,6 +678,12 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }
 
@@ -609,6 +846,143 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_detailsContactsAvailabilityChange_restartsLoadCancelledByContentClear() async throws {
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Reload",
+            email: "details-reload@example.com"
+        )
+        let staleCatalog = CertificateSelectionCatalog(
+            certificateFingerprint: "stale",
+            subkeys: [],
+            userIds: [
+                UserIdSelectionOption(
+                    occurrenceIndex: 0,
+                    userIdData: Data("details-stale@example.com".utf8),
+                    displayText: "Details Stale <details-stale@example.com>",
+                    isCurrentlyPrimary: true,
+                    isCurrentlyRevoked: false
+                ),
+            ]
+        )
+        let gate = ContactCertificateAsyncGate()
+        var loadCount = 0
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                if loadCount == 1 {
+                    await gate.suspend()
+                    return staleCatalog
+                }
+                return catalog
+            }
+        )
+
+        model.loadIfNeeded()
+
+        await waitUntil("details initial catalog load to suspend") {
+            await gate.isSuspended()
+        }
+
+        model.clearTransientInput()
+        XCTAssertEqual(model.loadState, .idle)
+        await settleAsyncWork()
+        XCTAssertEqual(loadCount, 1)
+
+        model.handleContactsAvailabilityChange(
+            from: .opening,
+            to: .availableLegacyCompatibility
+        )
+
+        await waitUntil("details catalog reload after contacts reopen") {
+            model.loadState == .loaded
+        }
+
+        XCTAssertEqual(loadCount, 2)
+        XCTAssertEqual(model.catalog, catalog)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertEqual(model.catalog, catalog)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_detailsContactsAvailabilityChange_reloadsContactsUnavailableFailure() async throws {
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Unavailable Reload",
+            email: "details-unavailable-reload@example.com"
+        )
+        var loadCount = 0
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                return catalog
+            }
+        )
+
+        stack.contactService.resetInMemoryStateAfterLocalDataReset()
+
+        model.loadIfNeeded()
+
+        XCTAssertEqual(model.loadState, .failed)
+        guard case .contactsUnavailable(.locked)? = model.loadError else {
+            return XCTFail("Expected contacts unavailable error, got \(String(describing: model.loadError))")
+        }
+        XCTAssertEqual(loadCount, 0)
+
+        try stack.contactService.openLegacyCompatibilityForTests()
+        model.handleContactsAvailabilityChange(
+            from: .locked,
+            to: .availableLegacyCompatibility
+        )
+
+        await waitUntil("details contacts-unavailable catalog reload") {
+            model.loadState == .loaded
+        }
+
+        XCTAssertEqual(loadCount, 1)
+        XCTAssertEqual(model.catalog, catalog)
+    }
+
+    @MainActor
+    func test_detailsContactsAvailabilityChange_doesNotRetryCatalogFailure() async throws {
+        let (contactId, key, _) = try makeContactContext(
+            name: "Details Catalog Failure",
+            email: "details-catalog-failure@example.com"
+        )
+        enum CatalogFailure: Error { case failed }
+        var loadCount = 0
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                throw CatalogFailure.failed
+            }
+        )
+
+        model.loadIfNeeded()
+
+        await waitUntil("details catalog load failure") {
+            model.loadState == .failed
+        }
+
+        model.handleContactsAvailabilityChange(
+            from: .opening,
+            to: .availableLegacyCompatibility
+        )
+        await settleAsyncWork()
+
+        XCTAssertEqual(loadCount, 1)
+        XCTAssertEqual(model.loadState, .failed)
+    }
+
+    @MainActor
     func test_legacyCompatibilityDisablesCertificationPersistenceActions() async throws {
         let (contactId, key, catalog) = try makeContactContext(
             name: "Details Legacy",
@@ -651,6 +1025,215 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         model.savePendingSignature()
         await Task.yield()
         XCTAssertNil(model.lastSavedArtifact)
+    }
+
+    @MainActor
+    func test_clearTransientInput_clearsImportedSignatureInputAndPicker() throws {
+        let (contactId, key, _) = try makeContactContext(
+            name: "Details Clear",
+            email: "details-clear@example.com"
+        )
+        let model = makeModel(contactId: contactId, keyId: key.keyId)
+        model.signatureInput = "signature"
+        model.importedSignature.setImportedFile(
+            data: Data("signature".utf8),
+            fileName: "signature.sig",
+            text: "signature"
+        )
+        model.showFileImporter = true
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.signatureInput, "")
+        XCTAssertFalse(model.importedSignature.hasImportedFile)
+        XCTAssertNil(model.pendingArtifact)
+        XCTAssertNil(model.verification)
+        XCTAssertFalse(model.showFileImporter)
+    }
+
+    @MainActor
+    func test_clearTransientInputDuringImportVerificationSuppressesLatePreview() async throws {
+        let (contactId, key, _) = try makeContactContext(
+            name: "Details Clear Verify",
+            email: "details-clear-verify@example.com"
+        )
+        let gate = ContactCertificateAsyncGate()
+        let verification = CertificateSignatureVerification(
+            status: .valid,
+            certificationKind: nil,
+            signerPrimaryFingerprint: nil,
+            signingKeyFingerprint: "1234567890abcdef1234567890abcdef12345678",
+            signerIdentity: nil
+        )
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            validateDirectKeyArtifactAction: { _, _, _, _, _ in
+                await gate.suspend()
+                return ContactCertificationArtifactValidation(
+                    verification: verification,
+                    artifact: nil
+                )
+            }
+        )
+        model.selectImportMode(.directKey)
+        model.setSignatureInput("signature")
+
+        model.verifyImportedSignature()
+
+        await waitUntil("import verification to suspend") {
+            guard model.activeOperation == .verifyImport else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.clearTransientInput()
+        XCTAssertNil(model.activeOperation)
+        XCTAssertNil(model.verification)
+        XCTAssertNil(model.pendingArtifact)
+        XCTAssertEqual(model.signatureInput, "")
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.verification)
+        XCTAssertNil(model.pendingArtifact)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_clearTransientInputBeforePendingSaveSuppressesSaveAction() async throws {
+        let protectedContacts = try await makeProtectedContactService(prefix: "DetailsSaveClear")
+        defer {
+            try? FileManager.default.removeItem(
+                at: protectedContacts.storageRoot.rootURL.deletingLastPathComponent()
+            )
+        }
+        let certificateSignatureService = CertificateSignatureService(
+            engine: stack.engine,
+            keyManagement: stack.keyManagement,
+            contactService: protectedContacts.service
+        )
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Save Clear",
+            email: "details-save-clear@example.com",
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService
+        )
+        let signer = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Details Save Clear Signer"
+        )
+        let keyRecord = try XCTUnwrap(
+            protectedContacts.service.availableContactKeyRecord(keyId: key.keyId)
+        )
+        let validSignature = try await certificateSignatureService.generateArmoredUserIdCertification(
+            signerFingerprint: signer.fingerprint,
+            targetCert: keyRecord.publicKeyData,
+            selectedUserId: catalog.userIds[0],
+            certificationKind: .generic
+        )
+        var saveCalls = 0
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService,
+            selectionCatalogAction: { _ in catalog },
+            saveArtifactAction: { artifact in
+                saveCalls += 1
+                return artifact.reference
+            }
+        )
+
+        model.loadIfNeeded()
+        await waitUntil("details save-clear catalog load") {
+            model.loadState == .loaded
+        }
+        model.setSignatureInput(String(decoding: validSignature, as: UTF8.self))
+        model.verifyImportedSignature()
+        await waitUntil("details save-clear pending artifact") {
+            model.pendingArtifact != nil
+        }
+
+        model.savePendingSignature()
+        model.clearTransientInput()
+        await settleAsyncWork()
+
+        XCTAssertEqual(saveCalls, 0)
+        XCTAssertNil(model.lastSavedArtifact)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_clearTransientInputBeforeExportSuppressesExportPreparation() async throws {
+        let protectedContacts = try await makeProtectedContactService(prefix: "DetailsExportClear")
+        defer {
+            try? FileManager.default.removeItem(
+                at: protectedContacts.storageRoot.rootURL.deletingLastPathComponent()
+            )
+        }
+        let certificateSignatureService = CertificateSignatureService(
+            engine: stack.engine,
+            keyManagement: stack.keyManagement,
+            contactService: protectedContacts.service
+        )
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Export Clear",
+            email: "details-export-clear@example.com",
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService
+        )
+        let signer = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Details Export Clear Signer"
+        )
+        let keyRecord = try XCTUnwrap(
+            protectedContacts.service.availableContactKeyRecord(keyId: key.keyId)
+        )
+        let validSignature = try await certificateSignatureService.generateArmoredUserIdCertification(
+            signerFingerprint: signer.fingerprint,
+            targetCert: keyRecord.publicKeyData,
+            selectedUserId: catalog.userIds[0],
+            certificationKind: .generic
+        )
+        var exportCalls = 0
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService,
+            selectionCatalogAction: { _ in catalog },
+            saveArtifactAction: { artifact in artifact.reference },
+            exportArtifactAction: { artifactId in
+                exportCalls += 1
+                return (Data("export-\(artifactId)".utf8), "certification.asc")
+            }
+        )
+
+        model.loadIfNeeded()
+        await waitUntil("details export-clear catalog load") {
+            model.loadState == .loaded
+        }
+        model.setSignatureInput(String(decoding: validSignature, as: UTF8.self))
+        model.verifyImportedSignature()
+        await waitUntil("details export-clear pending artifact") {
+            model.pendingArtifact != nil
+        }
+        model.savePendingSignature()
+        await waitUntil("details export-clear saved artifact") {
+            model.lastSavedArtifact != nil
+        }
+        let savedArtifact = try XCTUnwrap(model.lastSavedArtifact)
+
+        model.exportArtifact(savedArtifact)
+        model.clearTransientInput()
+        await settleAsyncWork()
+
+        XCTAssertEqual(exportCalls, 0)
+        XCTAssertNil(model.exportController.payload)
+        XCTAssertFalse(model.showError)
     }
 
     @MainActor
@@ -780,6 +1363,12 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }
 

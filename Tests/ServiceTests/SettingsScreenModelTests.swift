@@ -447,6 +447,19 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_clearTransientInput_clearsLocalDataResetConfirmationPhrase() {
+        let resetContainer = AppContainer.makeUITest()
+        defer { cleanup(resetContainer) }
+        let model = makeModel(localDataResetService: resetContainer.localDataResetService)
+        model.localDataResetConfirmationPhrase = "RESET"
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.localDataResetConfirmationPhrase, "")
+        XCTAssertFalse(model.canConfirmLocalDataReset)
+    }
+
+    @MainActor
     func test_localDataReset_successMarksRestartRequiredWithoutResultAlert() async {
         let resetContainer = AppContainer.makeUITest()
         defer { cleanup(resetContainer) }

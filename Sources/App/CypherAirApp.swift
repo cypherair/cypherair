@@ -349,6 +349,7 @@ struct CypherAirApp: App {
                 .environment(container.authManager)
                 .environment(container.keyManagement)
                 .environment(container.selfTestService)
+                .environment(container.appSessionOrchestrator)
                 .environment(\.localDataResetService, container.localDataResetService)
                 .environment(\.localDataResetRestartCoordinator, localDataResetRestartCoordinator)
                 .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)

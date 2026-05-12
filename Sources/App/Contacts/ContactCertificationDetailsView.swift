@@ -10,6 +10,7 @@ struct ContactCertificationDetailsView: View {
     @Environment(ContactService.self) private var contactService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(CertificateSignatureService.self) private var certificateSignatureService
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
 
     init(
         contactId: String,
@@ -31,12 +32,15 @@ struct ContactCertificationDetailsView: View {
             contactService: contactService,
             keyManagement: keyManagement,
             certificateSignatureService: certificateSignatureService,
+            appSessionOrchestrator: appSessionOrchestrator,
             configuration: configuration
         )
     }
 }
 
 private struct ContactCertificationDetailsHostView: View {
+    let appSessionOrchestrator: AppSessionOrchestrator
+
     @State private var model: ContactCertificationDetailsScreenModel
 
     init(
@@ -46,8 +50,10 @@ private struct ContactCertificationDetailsHostView: View {
         contactService: ContactService,
         keyManagement: KeyManagementService,
         certificateSignatureService: CertificateSignatureService,
+        appSessionOrchestrator: AppSessionOrchestrator,
         configuration: ContactCertificationDetailsConfiguration
     ) {
+        self.appSessionOrchestrator = appSessionOrchestrator
         _model = State(
             initialValue: ContactCertificationDetailsScreenModel(
                 contactId: contactId,
@@ -135,6 +141,15 @@ private struct ContactCertificationDetailsHostView: View {
         }
         .onDisappear {
             model.handleDisappear()
+        }
+        .onChange(of: model.contactsAvailability) { previousAvailability, currentAvailability in
+            model.handleContactsAvailabilityChange(
+                from: previousAvailability,
+                to: currentAvailability
+            )
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            model.clearTransientInput()
         }
     }
 

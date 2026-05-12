@@ -18,6 +18,8 @@ final class AddContactScreenModel {
     private let importWorkflow: ContactImportWorkflow
     private let inspectKeyDataAction: InspectKeyDataAction
     private let loadFileAction: LoadFileAction
+    private var qrProcessingTask: Task<Void, Never>?
+    private var qrProcessingGeneration: UInt64 = 0
 
     var importMode: AddContactView.ImportMode = .paste
     var armoredText = ""
@@ -92,8 +94,7 @@ final class AddContactScreenModel {
         }
 
         importMode = newValue
-        importedKeyData = nil
-        importedFileName = nil
+        clearImportedKeyData()
     }
 
     func requestFileImport() {
@@ -101,8 +102,7 @@ final class AddContactScreenModel {
     }
 
     func clearImportedFile() {
-        importedKeyData = nil
-        importedFileName = nil
+        clearImportedKeyData()
     }
 
     func dismissError() {
@@ -164,27 +164,45 @@ final class AddContactScreenModel {
     }
 
     func processSelectedQRPhoto(loadKeyData: @escaping QRPhotoKeyDataLoader) {
+        qrProcessingTask?.cancel()
+        qrProcessingGeneration &+= 1
+        let generation = qrProcessingGeneration
         isProcessingQR = true
-        Task {
-            defer { isProcessingQR = false }
+        qrProcessingTask = Task { @MainActor [weak self, generation] in
+            defer {
+                if let self, generation == self.qrProcessingGeneration {
+                    self.isProcessingQR = false
+                    self.qrProcessingTask = nil
+                }
+            }
 
             do {
                 let publicKeyData = try await loadKeyData()
+                try Task.checkCancellation()
+                guard let self, generation == self.qrProcessingGeneration else {
+                    return
+                }
                 if let armoredString = String(data: publicKeyData, encoding: .utf8) {
-                    armoredText = armoredString
-                    importedKeyData = nil
-                    importedFileName = nil
+                    self.armoredText = armoredString
+                    self.clearImportedKeyData()
                 } else {
-                    importedKeyData = publicKeyData
-                    importedFileName = String(
+                    self.clearImportedKeyData()
+                    self.importedKeyData = publicKeyData
+                    self.importedFileName = String(
                         localized: "addcontact.qr.binaryKey",
                         defaultValue: "Binary key from QR"
                     )
-                    armoredText = ""
+                    self.armoredText = ""
                 }
             } catch {
+                guard let self else {
+                    return
+                }
+                guard !Self.shouldIgnore(error), generation == self.qrProcessingGeneration else {
+                    return
+                }
                 self.error = CypherAirError.from(error) { _ in .invalidQRCode }
-                showError = true
+                self.showError = true
             }
         }
     }
@@ -195,9 +213,10 @@ final class AddContactScreenModel {
 
             if let armoredString = loadedFile.text {
                 armoredText = armoredString
-                importedKeyData = nil
+                clearImportedKeyData()
             } else {
                 armoredText = ""
+                clearImportedKeyData()
                 importedKeyData = loadedFile.data
             }
             importedFileName = loadedFile.fileName
@@ -208,5 +227,42 @@ final class AddContactScreenModel {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
             showError = true
         }
+    }
+
+    func clearTransientInput() {
+        qrProcessingTask?.cancel()
+        qrProcessingGeneration &+= 1
+        qrProcessingTask = nil
+        isProcessingQR = false
+        armoredText = ""
+        clearImportedKeyData()
+        pendingKeyUpdateRequest = nil
+        showKeyUpdateAlert = false
+        showFileImporter = false
+        error = nil
+        showError = false
+    }
+
+    private func clearImportedKeyData() {
+        if let count = importedKeyData?.count {
+            importedKeyData?.resetBytes(in: 0..<count)
+        }
+        importedKeyData = nil
+        importedFileName = nil
+    }
+
+    private static func shouldIgnore(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        if let cypherAirError = error as? CypherAirError,
+           case .operationCancelled = cypherAirError {
+            return true
+        }
+        if let pgpError = error as? PgpError,
+           case .OperationCancelled = pgpError {
+            return true
+        }
+        return false
     }
 }

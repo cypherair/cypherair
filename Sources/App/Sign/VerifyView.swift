@@ -13,8 +13,6 @@ struct VerifyView: View {
         static let `default` = Configuration()
     }
 
-    @Environment(SigningService.self) private var signingService
-
     enum VerifyMode: String, CaseIterable {
         case cleartext, detached
         var label: String {
@@ -25,6 +23,9 @@ struct VerifyView: View {
         }
     }
 
+    @Environment(SigningService.self) private var signingService
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+
     let configuration: Configuration
 
     init(configuration: Configuration = .default) {
@@ -34,18 +35,23 @@ struct VerifyView: View {
     var body: some View {
         VerifyScreenHostView(
             signingService: signingService,
+            appSessionOrchestrator: appSessionOrchestrator,
             configuration: configuration
         )
     }
 }
 
 private struct VerifyScreenHostView: View {
+    let appSessionOrchestrator: AppSessionOrchestrator
+
     @State private var model: VerifyScreenModel
 
     init(
         signingService: SigningService,
+        appSessionOrchestrator: AppSessionOrchestrator,
         configuration: VerifyView.Configuration
     ) {
+        self.appSessionOrchestrator = appSessionOrchestrator
         _model = State(
             initialValue: VerifyScreenModel(
                 signingService: signingService,
@@ -154,6 +160,9 @@ private struct VerifyScreenHostView: View {
         }
         .onDisappear {
             model.handleDisappear()
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            model.handleContentClearGenerationChange()
         }
     }
 

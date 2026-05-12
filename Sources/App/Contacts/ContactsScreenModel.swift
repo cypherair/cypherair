@@ -91,6 +91,11 @@ final class ContactsScreenModel {
         rawSelectedTagFilterIds.removeAll()
     }
 
+    func clearTransientInput() {
+        searchText = ""
+        rawSelectedTagFilterIds.removeAll()
+    }
+
     func deleteContacts(at indexSet: IndexSet, from contacts: [ContactIdentitySummary]) {
         for index in indexSet {
             let contact = contacts[index]

@@ -274,8 +274,7 @@ final class SigningServiceTests: XCTestCase {
             name: "Expiring Signer",
             email: nil,
             expirySeconds: 1,
-            profile: .universal,
-            authMode: .standard
+            profile: .universal
         )
         try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
 
@@ -305,8 +304,7 @@ final class SigningServiceTests: XCTestCase {
             name: "Expiring Profile B Signer",
             email: nil,
             expirySeconds: 1,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
 

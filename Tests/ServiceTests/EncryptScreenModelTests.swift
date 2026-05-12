@@ -21,6 +21,25 @@ private actor EncryptOperationGate {
     }
 }
 
+private actor EncryptClipboardNoticeGate {
+    private var continuation: CheckedContinuation<Bool, Never>?
+
+    func decision() async -> Bool {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func isSuspended() -> Bool {
+        continuation != nil
+    }
+
+    func resume(returning value: Bool) {
+        continuation?.resume(returning: value)
+        continuation = nil
+    }
+}
+
 final class EncryptScreenModelTests: XCTestCase {
     private typealias ContactsProtectedHarness = (
         storageRoot: ProtectedDataStorageRoot,
@@ -784,6 +803,50 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_contentClearDuringTextEncryptionSuppressesLateCiphertextAndCallback() async throws {
+        let recipientIdentity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Privacy Recipient"
+        )
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
+        let gate = EncryptOperationGate()
+        var callbackCiphertext: Data?
+
+        var configuration = EncryptView.Configuration()
+        configuration.onEncrypted = { callbackCiphertext = $0 }
+
+        let model = makeModel(
+            configuration: configuration,
+            textEncryptionAction: { _, _, _, _, _ in
+                await gate.suspend()
+                return Data("late-ciphertext".utf8)
+            }
+        )
+        model.plaintext = "Sensitive plaintext"
+        model.selectedRecipients = [recipientContactId]
+
+        model.encryptText()
+
+        await waitUntil("text encryption to suspend for content clear") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+        XCTAssertFalse(model.operation.isRunning)
+        XCTAssertNil(model.ciphertext)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.ciphertext)
+        XCTAssertNil(callbackCiphertext)
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
     func test_encryptFile_handlesSelection_andRoutesFileExportThroughInterceptionPolicy() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
         let recipientIdentity = try await TestHelpers.generateProfileAKey(
@@ -973,7 +1036,9 @@ final class EncryptScreenModelTests: XCTestCase {
         configuration: EncryptView.Configuration = .default,
         operation: OperationController = OperationController(),
         textEncryptionAction: EncryptScreenModel.TextEncryptionAction? = nil,
-        fileEncryptionAction: EncryptScreenModel.FileEncryptionAction? = nil
+        fileEncryptionAction: EncryptScreenModel.FileEncryptionAction? = nil,
+        clipboardNoticeDecision: EncryptScreenModel.ClipboardNoticeDecision? = nil,
+        clipboardWriter: EncryptScreenModel.ClipboardWriter? = nil
     ) -> EncryptScreenModel {
         let resolvedContactService = contactService ?? stack.contactService
         let resolvedEncryptionService = contactService.map {
@@ -992,7 +1057,9 @@ final class EncryptScreenModelTests: XCTestCase {
             configuration: configuration,
             operation: operation,
             textEncryptionAction: textEncryptionAction,
-            fileEncryptionAction: fileEncryptionAction
+            fileEncryptionAction: fileEncryptionAction,
+            clipboardNoticeDecision: clipboardNoticeDecision,
+            clipboardWriter: clipboardWriter
         )
     }
 
@@ -1137,6 +1204,63 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_handleContentClearGenerationChange_clearsInputSearchRecipientsAndResults() {
+        let model = makeModel()
+        model.plaintext = "Sensitive plaintext"
+        model.recipientSearchText = "alice"
+        model.selectedRecipients = ["contact-1"]
+        model.ciphertext = Data("ciphertext".utf8)
+        model.selectedFileURL = URL(fileURLWithPath: "/tmp/plain.txt")
+        model.selectedFileName = "plain.txt"
+        model.showFileImporter = true
+        model.showUnverifiedRecipientsWarning = true
+        model.tagSelectionSkippedContactCount = 2
+        model.tagSelectionSkippedTagName = "Team"
+
+        model.handleContentClearGenerationChange()
+
+        XCTAssertEqual(model.plaintext, "")
+        XCTAssertEqual(model.recipientSearchText, "")
+        XCTAssertTrue(model.selectedRecipients.isEmpty)
+        XCTAssertNil(model.ciphertext)
+        XCTAssertNil(model.selectedFileURL)
+        XCTAssertNil(model.selectedFileName)
+        XCTAssertFalse(model.showFileImporter)
+        XCTAssertFalse(model.showUnverifiedRecipientsWarning)
+        XCTAssertEqual(model.tagSelectionSkippedContactCount, 0)
+        XCTAssertNil(model.tagSelectionSkippedTagName)
+    }
+
+    @MainActor
+    func test_contentClearDuringClipboardNoticeSuppressesLateClipboardWrite() async {
+        let gate = EncryptClipboardNoticeGate()
+        var copiedPayloads: [(String, Bool)] = []
+        let model = makeModel(
+            clipboardNoticeDecision: {
+                await gate.decision()
+            },
+            clipboardWriter: { text, shouldShowNotice in
+                copiedPayloads.append((text, shouldShowNotice))
+            }
+        )
+        model.ciphertext = Data("late-ciphertext".utf8)
+
+        model.copyCiphertextToClipboard()
+
+        await waitUntil("encrypt clipboard notice decision to suspend") {
+            await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+
+        await gate.resume(returning: true)
+        await settleAsyncWork()
+
+        XCTAssertTrue(copiedPayloads.isEmpty)
+        XCTAssertFalse(model.operation.isShowingClipboardNotice)
+    }
+
+    @MainActor
     private func waitUntil(
         _ description: String,
         timeout: TimeInterval = 2,
@@ -1152,5 +1276,11 @@ final class EncryptScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }

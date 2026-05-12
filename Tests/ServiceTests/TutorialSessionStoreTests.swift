@@ -75,8 +75,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
 
@@ -148,8 +147,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
 
@@ -171,8 +169,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
         XCTAssertTrue(store.isCompleted(.createDemoIdentity))
@@ -439,8 +436,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
 
@@ -504,8 +500,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
 
@@ -539,8 +534,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
 
@@ -1064,6 +1058,97 @@ final class TutorialSessionStoreTests: XCTestCase {
         )
     }
 
+    func test_keyboardInputAPIs_areCentralizedAndPrivacyHardened() throws {
+        let allowedDirectInputFiles: Set<String> = [
+            "Sources/App/Common/CypherTextInputs.swift",
+            "Sources/App/Common/CypherMultilineTextInput.swift",
+        ]
+        let bannedPatterns: [(pattern: String, label: String)] = [
+            ("(?<![A-Za-z0-9_])TextField\\(", "TextField("),
+            ("(?<![A-Za-z0-9_])SecureField\\(", "SecureField("),
+            ("\\.searchable\\(", ".searchable("),
+            ("(?<![A-Za-z0-9_])TextEditor\\(", "TextEditor("),
+        ]
+
+        for path in try repositoryAuditSwiftSourcePaths(under: "App") {
+            guard !allowedDirectInputFiles.contains(path) else {
+                continue
+            }
+            let contents = try loadRepositoryAuditSource(path)
+            for bannedPattern in bannedPatterns {
+                XCTAssertNil(
+                    contents.range(of: bannedPattern.pattern, options: .regularExpression),
+                    "\(path) should use Cypher input wrappers instead of direct \(bannedPattern.label)"
+                )
+            }
+        }
+
+        let inputComponentContents = try loadRepositoryAuditSource("Sources/App/Common/CypherTextInputs.swift")
+        XCTAssertTrue(inputComponentContents.contains("enum CypherSingleLineTextInputProfile"))
+        XCTAssertTrue(inputComponentContents.contains("enum CypherSecureTextInputProfile"))
+        XCTAssertTrue(inputComponentContents.contains("enum CypherSearchTextInputProfile"))
+        XCTAssertTrue(inputComponentContents.contains(".privacySensitive()"))
+        XCTAssertTrue(inputComponentContents.contains(".autocorrectionDisabled(true)"))
+        XCTAssertTrue(inputComponentContents.contains(".applyMacWritingToolsPolicy()"))
+
+        let appContents = try loadRepositoryAuditSource("Sources/App/CypherAirApp.swift")
+        XCTAssertTrue(appContents.contains("shouldAllowExtensionPointIdentifier"))
+        XCTAssertTrue(appContents.contains("extensionPointIdentifier != .keyboard"))
+    }
+
+    func test_keyImportAndBackup_clearSensitiveInputOnSuccessDismissAndContentClear() throws {
+        let importContents = try loadRepositoryAuditSource("Sources/App/Keys/ImportKeyView.swift")
+        XCTAssertTrue(importContents.contains("clearTransientInput()"))
+        XCTAssertTrue(importContents.contains("clearImportedKeyData()"))
+        XCTAssertTrue(importContents.contains(".onDisappear"))
+        XCTAssertTrue(importContents.contains(".onChange(of: appSessionOrchestrator.contentClearGeneration)"))
+        XCTAssertTrue(importContents.contains("dismiss()"))
+
+        let backupContents = try loadRepositoryAuditSource("Sources/App/Keys/BackupKeyView.swift")
+        XCTAssertTrue(backupContents.contains("clearTransientInput()"))
+        XCTAssertTrue(backupContents.contains("clearExportedData()"))
+        XCTAssertTrue(backupContents.contains(".onDisappear"))
+        XCTAssertTrue(backupContents.contains(".onChange(of: appSessionOrchestrator.contentClearGeneration)"))
+        XCTAssertTrue(backupContents.contains("passphrase = \"\""))
+        XCTAssertTrue(backupContents.contains("passphraseConfirm = \"\""))
+    }
+
+    func test_backupFileExporter_confirmsOnlyAfterSuccessfulSave() throws {
+        let backupContents = try loadRepositoryAuditSource("Sources/App/Keys/BackupKeyView.swift")
+        let fileExporterStart = try XCTUnwrap(
+            backupContents.range(of: ".fileExporter(")?.lowerBound
+        )
+        let fileExporterEnd = try XCTUnwrap(
+            backupContents.range(of: ".onDisappear", range: fileExporterStart..<backupContents.endIndex)?.lowerBound
+        )
+        let fileExporterBody = String(backupContents[fileExporterStart..<fileExporterEnd])
+        let successStart = try XCTUnwrap(fileExporterBody.range(of: "case .success:")?.lowerBound)
+        let failureStart = try XCTUnwrap(fileExporterBody.range(of: "case .failure")?.lowerBound)
+        let successBody = String(fileExporterBody[successStart..<failureStart])
+        let failureBody = String(fileExporterBody[failureStart...])
+
+        XCTAssertTrue(fileExporterBody.contains("exportedDataToken == exportToken"))
+        XCTAssertTrue(successBody.contains("configuration.onExported?(exportedData)"))
+        XCTAssertTrue(successBody.contains("keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)"))
+        XCTAssertFalse(failureBody.contains("confirmKeyBackupExported"))
+
+        let exportBackupStart = try XCTUnwrap(
+            backupContents.range(of: "private func exportBackup()")?.lowerBound
+        )
+        let exportBackupEnd = try XCTUnwrap(
+            backupContents.range(
+                of: "private func cancelExportAndClearTransientInput()",
+                range: exportBackupStart..<backupContents.endIndex
+            )?.lowerBound
+        )
+        let exportBackupBody = String(backupContents[exportBackupStart..<exportBackupEnd])
+
+        XCTAssertTrue(exportBackupBody.contains("exportedDataToken = token"))
+        XCTAssertTrue(exportBackupBody.contains("if configuration.resultPresentation == .inlinePreview"))
+        XCTAssertTrue(exportBackupBody.contains("configuration.onExported?(data)"))
+        XCTAssertTrue(exportBackupBody.contains("service.confirmKeyBackupExported(fingerprint: fp)"))
+    }
+
     func test_outputPages_removeTutorialOutputCouplingFromPageImplementations() throws {
         let files = [
             "Sources/App/Encrypt/EncryptView.swift",
@@ -1205,6 +1290,33 @@ final class TutorialSessionStoreTests: XCTestCase {
 
     private func loadRepositoryAuditSource(_ relativePath: String) throws -> String {
         try RepositoryAuditLoader.loadString(relativePath: relativePath)
+    }
+
+    private func repositoryAuditSwiftSourcePaths(under relativeDirectory: String) throws -> [String] {
+        let sourcesRootURL = try RepositoryAuditLoader.sourcesRootURL()
+        let rootURL = sourcesRootURL.appending(path: relativeDirectory, directoryHint: .isDirectory)
+        let fileManager = FileManager.default
+        guard let enumerator = fileManager.enumerator(
+            at: rootURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        var paths: [String] = []
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension == "swift" else {
+                continue
+            }
+            let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
+            guard values.isRegularFile == true else {
+                continue
+            }
+            let relativePath = String(fileURL.path.dropFirst(sourcesRootURL.path.count + 1))
+            paths.append("Sources/\(relativePath)")
+        }
+        return paths.sorted()
     }
 
     private func sourceBlock(

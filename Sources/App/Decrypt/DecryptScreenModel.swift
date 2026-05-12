@@ -246,11 +246,26 @@ final class DecryptScreenModel {
             name: "decrypt.contentClearObserved",
             metadata: ["mode": decryptMode.rawValue]
         )
+        operation.cancelAndInvalidate()
+        clearTransientInput()
+    }
+
+    func clearTransientInput() {
+        ciphertextInput = ""
         clearDisplayedText()
         deleteTemporaryDecryptedFile()
         clearDetailedSignatureVerification()
         phase1Result = nil
         filePhase1Result = nil
+        importedCiphertext.clear()
+        pendingTextModeImport = nil
+        fileImportTarget = nil
+        selectedFileURL = nil
+        selectedFileName = nil
+        showFileImporter = false
+        showTextModeSuggestion = false
+        exportController.finish()
+        textInputSectionEpoch &+= 1
     }
 
     func setCiphertextInput(_ newValue: String) {
@@ -295,6 +310,7 @@ final class DecryptScreenModel {
 
         operation.run(mapError: mapDecryptError) { [self] in
             let result = try await self.parseTextRecipientsAction(inputData)
+            try Task.checkCancellation()
             self.phase1Result = result
             self.textInputSectionEpoch &+= 1
             onParsed?(result)
@@ -308,6 +324,7 @@ final class DecryptScreenModel {
 
         operation.run(mapError: mapDecryptError) { [self] in
             let result = try await self.parseFileRecipientsAction(fileURL)
+            try Task.checkCancellation()
             self.filePhase1Result = result
         }
     }
@@ -318,21 +335,22 @@ final class DecryptScreenModel {
         authLifecycleTraceStore?.record(category: .operation, name: "decrypt.text.start", metadata: ["mode": "text"])
 
         operation.run(mapError: mapDecryptError) { [self] in
-            let result = try await self.textDecryptionAction(phase1Result)
+            var (plaintext, verification) = try await self.textDecryptionAction(phase1Result)
+            defer {
+                plaintext.resetBytes(in: 0..<plaintext.count)
+            }
+            try Task.checkCancellation()
 
-            if let text = String(data: result.plaintext, encoding: .utf8) {
+            if let text = String(data: plaintext, encoding: .utf8) {
                 self.decryptedText = text
             }
-            self.replaceDetailedSignatureVerification(with: result.verification)
-            onDecrypted?(result.plaintext, result.verification.legacyVerification)
+            self.replaceDetailedSignatureVerification(with: verification)
+            onDecrypted?(plaintext, verification.legacyVerification)
             self.authLifecycleTraceStore?.record(
                 category: .operation,
                 name: "decrypt.text.finish",
                 metadata: ["result": "success"]
             )
-
-            var mutablePlaintext = result.plaintext
-            mutablePlaintext.resetBytes(in: 0..<mutablePlaintext.count)
         }
     }
 

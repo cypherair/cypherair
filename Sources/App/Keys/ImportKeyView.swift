@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 /// Import a private key from file, paste, or QR photo.
 struct ImportKeyView: View {
     @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.dismiss) private var dismiss
 
     @State private var armoredText = ""
@@ -15,6 +16,8 @@ struct ImportKeyView: View {
     /// Raw key data for binary .gpg/.pgp files that cannot be represented as a String.
     @State private var importedKeyData: Data?
     @State private var importedFileName: String?
+    @State private var importTask: Task<Void, Never>?
+    @State private var importToken: UInt64 = 0
 
     var body: some View {
         Form {
@@ -24,8 +27,7 @@ struct ImportKeyView: View {
                         fileName: fileName,
                         clearAccessibilityLabel: String(localized: "import.clearFile", defaultValue: "Clear file")
                     ) {
-                        importedKeyData = nil
-                        importedFileName = nil
+                        clearImportedKeyData()
                     }
                 } else {
                     CypherMultilineTextInput(
@@ -56,15 +58,10 @@ struct ImportKeyView: View {
             }
 
             Section {
-                SecureField(
+                CypherSecureTextField(
                     String(localized: "import.passphrase", defaultValue: "Passphrase"),
                     text: $passphrase
                 )
-                .autocorrectionDisabled(true)
-                .applyMacWritingToolsPolicy()
-                #if canImport(UIKit)
-                .textInputAutocapitalization(.never)
-                #endif
             } header: {
                 Text(String(localized: "import.passphrase.header", defaultValue: "Key Passphrase"))
             }
@@ -114,6 +111,12 @@ struct ImportKeyView: View {
                 loadFileContents(from: url)
             }
         }
+        .onDisappear {
+            cancelImportAndClearTransientInput()
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            cancelImportAndClearTransientInput()
+        }
     }
 
     private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
@@ -136,11 +139,11 @@ struct ImportKeyView: View {
             }
 
             if let text = String(data: data, encoding: .utf8) {
+                clearImportedKeyData()
                 armoredText = text
-                importedKeyData = nil
-                importedFileName = nil
             } else {
                 // Binary .gpg/.pgp key — store raw Data, bypass String conversion
+                clearImportedKeyData()
                 importedKeyData = data
                 importedFileName = url.lastPathComponent
                 armoredText = ""
@@ -152,30 +155,84 @@ struct ImportKeyView: View {
     }
 
     private func importKey() {
+        importTask?.cancel()
+        importToken &+= 1
+        let token = importToken
         isImporting = true
         let service = keyManagement
-        let data = importedKeyData ?? Data(armoredText.utf8)
+        let importedKeyDataSnapshot = importedKeyData
+        let armoredTextSnapshot = armoredText
         let pass = passphrase
-        Task {
+
+        importTask = Task { @MainActor in
+            defer {
+                if token == importToken {
+                    isImporting = false
+                    importTask = nil
+                }
+            }
+
             do {
+                var data = importedKeyDataSnapshot ?? Data(armoredTextSnapshot.utf8)
+                defer {
+                    data.resetBytes(in: 0..<data.count)
+                }
                 _ = try await service.importKey(
                     armoredData: data,
                     passphrase: pass
                 )
+                try Task.checkCancellation()
+                guard token == importToken else {
+                    return
+                }
                 // Clear sensitive state before dismiss.
                 // Note: Swift String cannot be reliably zeroized (SECURITY.md §7.1),
                 // but we minimize lifetime by clearing references immediately.
-                armoredText = ""
-                passphrase = ""
-                importedKeyData?.resetBytes(in: 0..<(importedKeyData?.count ?? 0))
-                importedKeyData = nil
-                importedFileName = nil
+                clearTransientInput()
                 dismiss()
             } catch {
+                guard !Self.shouldIgnore(error), token == importToken else {
+                    return
+                }
                 self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
                 showError = true
             }
-            isImporting = false
         }
+    }
+
+    private func cancelImportAndClearTransientInput() {
+        importTask?.cancel()
+        importToken &+= 1
+        importTask = nil
+        isImporting = false
+        clearTransientInput()
+    }
+
+    private func clearTransientInput() {
+        armoredText = ""
+        passphrase = ""
+        showFileImporter = false
+        clearImportedKeyData()
+    }
+
+    private func clearImportedKeyData() {
+        importedKeyData?.resetBytes(in: 0..<(importedKeyData?.count ?? 0))
+        importedKeyData = nil
+        importedFileName = nil
+    }
+
+    private static func shouldIgnore(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        if let cypherAirError = error as? CypherAirError,
+           case .operationCancelled = cypherAirError {
+            return true
+        }
+        if let pgpError = error as? PgpError,
+           case .OperationCancelled = pgpError {
+            return true
+        }
+        return false
     }
 }

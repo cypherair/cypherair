@@ -14,6 +14,7 @@ struct ContactCertificateSignaturesView: View {
     @Environment(ContactService.self) private var contactService
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(CertificateSignatureService.self) private var certificateSignatureService
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
 
     init(
         fingerprint: String,
@@ -29,12 +30,15 @@ struct ContactCertificateSignaturesView: View {
             contactService: contactService,
             keyManagement: keyManagement,
             certificateSignatureService: certificateSignatureService,
+            appSessionOrchestrator: appSessionOrchestrator,
             configuration: configuration
         )
     }
 }
 
 private struct ContactCertificateSignaturesHostView: View {
+    let appSessionOrchestrator: AppSessionOrchestrator
+
     @State private var model: ContactCertificateSignaturesScreenModel
 
     init(
@@ -42,8 +46,10 @@ private struct ContactCertificateSignaturesHostView: View {
         contactService: ContactService,
         keyManagement: KeyManagementService,
         certificateSignatureService: CertificateSignatureService,
+        appSessionOrchestrator: AppSessionOrchestrator,
         configuration: ContactCertificateSignaturesView.Configuration
     ) {
+        self.appSessionOrchestrator = appSessionOrchestrator
         _model = State(
             initialValue: ContactCertificateSignaturesScreenModel(
                 fingerprint: fingerprint,
@@ -135,6 +141,15 @@ private struct ContactCertificateSignaturesHostView: View {
         }
         .onDisappear {
             model.handleDisappear()
+        }
+        .onChange(of: model.contactsAvailability) { previousAvailability, currentAvailability in
+            model.handleContactsAvailabilityChange(
+                from: previousAvailability,
+                to: currentAvailability
+            )
+        }
+        .onChange(of: appSessionOrchestrator.contentClearGeneration) {
+            model.clearTransientInput()
         }
     }
 

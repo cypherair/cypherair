@@ -231,6 +231,26 @@ final class VerifyScreenModel {
         filePickerTarget = nil
     }
 
+    func clearTransientInput() {
+        signedInput = ""
+        cleartextOriginalText = nil
+        clearCleartextVerificationState()
+        clearDetachedVerificationState()
+        importedCleartext.clear()
+        originalFileURL = nil
+        originalFileName = nil
+        signatureFileURL = nil
+        signatureFileName = nil
+        filePickerTarget = nil
+        showFileImporter = false
+        textInputSectionEpoch &+= 1
+    }
+
+    func handleContentClearGenerationChange() {
+        operation.cancelAndInvalidate()
+        clearTransientInput()
+    }
+
     func verify() {
         switch verifyMode {
         case .cleartext:
@@ -246,6 +266,7 @@ final class VerifyScreenModel {
 
         operation.run(mapError: mapVerificationError) { [self] in
             let result = try await self.cleartextVerificationAction(inputData)
+            try Task.checkCancellation()
             if let content = result.text {
                 self.cleartextOriginalText = String(data: content, encoding: .utf8)
             }

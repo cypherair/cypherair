@@ -18,10 +18,12 @@ struct CypherMultilineTextInput: View {
             text: $text,
             mode: mode
         )
+        .privacySensitive()
         #else
         TextEditor(text: $text)
             .font(font)
             .applyMacWritingToolsPolicy()
+            .privacySensitive()
             .cypherMacTextEditorChrome()
         #endif
     }
@@ -195,14 +197,3 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
 
 }
 #endif
-
-extension View {
-    @ViewBuilder
-    func applyMacWritingToolsPolicy() -> some View {
-        if #available(macOS 15.0, *) {
-            self.writingToolsBehavior(.disabled)
-        } else {
-            self
-        }
-    }
-}

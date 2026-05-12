@@ -5,6 +5,8 @@ import Foundation
 final class SignScreenModel {
     typealias CleartextSigningAction = @MainActor (String, String) async throws -> Data
     typealias DetachedFileSigningAction = @MainActor (URL, String, FileProgressReporter) async throws -> Data
+    typealias ClipboardNoticeDecision = @MainActor () async -> Bool
+    typealias ClipboardWriter = @MainActor (String, Bool) -> Void
 
     let configuration: SignView.Configuration
     let operation: OperationController
@@ -16,6 +18,10 @@ final class SignScreenModel {
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let cleartextSigningAction: CleartextSigningAction
     private let detachedFileSigningAction: DetachedFileSigningAction
+    private let clipboardNoticeDecision: ClipboardNoticeDecision
+    private let clipboardWriter: ClipboardWriter
+    @ObservationIgnored private var clipboardTask: Task<Void, Never>?
+    private var clipboardToken: UInt64 = 0
 
     var signMode: SignView.SignMode = .text
     var text = ""
@@ -37,15 +43,24 @@ final class SignScreenModel {
         operation: OperationController = OperationController(),
         exportController: FileExportController = FileExportController(),
         cleartextSigningAction: CleartextSigningAction? = nil,
-        detachedFileSigningAction: DetachedFileSigningAction? = nil
+        detachedFileSigningAction: DetachedFileSigningAction? = nil,
+        clipboardNoticeDecision: ClipboardNoticeDecision? = nil,
+        clipboardWriter: ClipboardWriter? = nil
     ) {
+        let operationController = operation
         self.configuration = configuration
-        self.operation = operation
+        self.operation = operationController
         self.exportController = exportController
         self.keyManagement = keyManagement
         self.appConfiguration = config
         self.authLifecycleTraceStore = authLifecycleTraceStore
         self.protectedSettingsHost = protectedSettingsHost
+        self.clipboardNoticeDecision = clipboardNoticeDecision ?? {
+            await protectedSettingsHost?.clipboardNoticeDecision() ?? true
+        }
+        self.clipboardWriter = clipboardWriter ?? { string, shouldShowNotice in
+            operationController.copyToClipboard(string, shouldShowNotice: shouldShowNotice)
+        }
         self.cleartextSigningAction = cleartextSigningAction ?? { message, signerFingerprint in
             try await signingService.signCleartext(message, signerFingerprint: signerFingerprint)
         }
@@ -128,6 +143,7 @@ final class SignScreenModel {
 
         operation.run(mapError: mapSigningError) { [self] in
             let signed = try await self.cleartextSigningAction(message, signerFingerprint)
+            try Task.checkCancellation()
             self.signedMessage = String(data: signed, encoding: .utf8)
             self.textInputSectionEpoch &+= 1
             self.authLifecycleTraceStore?.record(
@@ -170,13 +186,28 @@ final class SignScreenModel {
             appConfiguration,
             .generic
         ) != true {
-            Task { @MainActor [weak self] in
+            clipboardTask?.cancel()
+            clipboardToken &+= 1
+            let token = clipboardToken
+            let noticeDecision = clipboardNoticeDecision
+            let writer = clipboardWriter
+            clipboardTask = Task { @MainActor [weak self, token, signedMessage, noticeDecision, writer] in
                 guard let self else { return }
-                let shouldShowNotice = await self.protectedSettingsHost?.clipboardNoticeDecision() ?? true
-                self.operation.copyToClipboard(
-                    signedMessage,
-                    shouldShowNotice: shouldShowNotice
-                )
+                defer {
+                    if token == self.clipboardToken {
+                        self.clipboardTask = nil
+                    }
+                }
+                do {
+                    let shouldShowNotice = await noticeDecision()
+                    try Task.checkCancellation()
+                    guard token == self.clipboardToken else {
+                        return
+                    }
+                    writer(signedMessage, shouldShowNotice)
+                } catch {
+                    return
+                }
             }
         }
     }
@@ -243,6 +274,29 @@ final class SignScreenModel {
 
     func finishExport() {
         exportController.finish()
+    }
+
+    func handleContentClearGenerationChange() {
+        operation.cancelAndInvalidate()
+        cancelClipboardCopy()
+        clearTransientInput()
+    }
+
+    private func cancelClipboardCopy() {
+        clipboardTask?.cancel()
+        clipboardToken &+= 1
+        clipboardTask = nil
+    }
+
+    func clearTransientInput() {
+        text = ""
+        signedMessage = nil
+        detachedSignature = nil
+        showFileImporter = false
+        selectedFileURL = nil
+        selectedFileName = nil
+        exportController.finish()
+        textInputSectionEpoch &+= 1
     }
 
     func handleExportError(_ error: Error) {

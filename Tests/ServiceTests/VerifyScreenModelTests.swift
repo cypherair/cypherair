@@ -232,6 +232,78 @@ final class VerifyScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_clearTransientInput_clearsCleartextDetachedImportsAndResults() {
+        let model = makeModel()
+        model.signedInput = "signed input"
+        model.cleartextOriginalText = "original"
+        model.cleartextDetailedVerification = makeDetailedVerification(status: .valid)
+        model.detachedDetailedVerification = makeDetailedVerification(status: .bad)
+        model.importedCleartext.setImportedFile(
+            data: Data("signed".utf8),
+            fileName: "signed.asc",
+            text: "signed input"
+        )
+        model.originalFileURL = URL(fileURLWithPath: "/tmp/original.txt")
+        model.originalFileName = "original.txt"
+        model.signatureFileURL = URL(fileURLWithPath: "/tmp/original.sig")
+        model.signatureFileName = "original.sig"
+        model.filePickerTarget = .signature
+        model.showFileImporter = true
+
+        model.clearTransientInput()
+
+        XCTAssertEqual(model.signedInput, "")
+        XCTAssertNil(model.cleartextOriginalText)
+        XCTAssertNil(model.cleartextVerification)
+        XCTAssertNil(model.cleartextDetailedVerification)
+        XCTAssertNil(model.detachedVerification)
+        XCTAssertNil(model.detachedDetailedVerification)
+        XCTAssertFalse(model.importedCleartext.hasImportedFile)
+        XCTAssertNil(model.originalFileURL)
+        XCTAssertNil(model.originalFileName)
+        XCTAssertNil(model.signatureFileURL)
+        XCTAssertNil(model.signatureFileName)
+        XCTAssertNil(model.filePickerTarget)
+        XCTAssertFalse(model.showFileImporter)
+    }
+
+    @MainActor
+    func test_contentClearDuringCleartextVerifySuppressesLateVerification() async {
+        let gate = VerifyOperationGate()
+        let model = makeModel(
+            cleartextVerificationAction: { _ in
+                await gate.suspend()
+                return (
+                    Data("late-original-text".utf8),
+                    self.makeDetailedVerification(status: .valid)
+                )
+            }
+        )
+        model.signedInput = "signed message"
+
+        model.verifyCleartext()
+
+        await waitUntil("cleartext verification to suspend for content clear") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+        XCTAssertFalse(model.operation.isRunning)
+        XCTAssertNil(model.cleartextOriginalText)
+        XCTAssertNil(model.cleartextDetailedVerification)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.cleartextOriginalText)
+        XCTAssertNil(model.cleartextDetailedVerification)
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
     private func makeModel(
         configuration: VerifyView.Configuration = .default,
         operation: OperationController = OperationController(),
@@ -308,5 +380,11 @@ final class VerifyScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }
