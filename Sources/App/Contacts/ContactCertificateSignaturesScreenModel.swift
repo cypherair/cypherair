@@ -281,6 +281,30 @@ final class ContactCertificateSignaturesScreenModel {
         loadCatalog()
     }
 
+    func handleContactsAvailabilityChange(
+        from previousAvailability: ContactsAvailability,
+        to currentAvailability: ContactsAvailability
+    ) {
+        guard !previousAvailability.isAvailable,
+              currentAvailability.isAvailable else {
+            return
+        }
+
+        switch loadState {
+        case .idle:
+            loadIfNeeded()
+        case .failed:
+            guard case .some(.contactsUnavailable) = loadError else {
+                return
+            }
+            loadError = nil
+            loadState = .idle
+            loadIfNeeded()
+        case .loading, .loaded:
+            break
+        }
+    }
+
     func retry() {
         guard !isLoading else {
             return

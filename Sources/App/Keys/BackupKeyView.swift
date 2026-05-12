@@ -36,6 +36,7 @@ struct BackupKeyView: View {
     @State private var showFileExporter = false
     @State private var exportTask: Task<Void, Never>?
     @State private var exportToken: UInt64 = 0
+    @State private var exportedDataToken: UInt64?
 
     init(
         fingerprint: String,
@@ -138,9 +139,6 @@ struct BackupKeyView: View {
                 get: { showFileExporter },
                 set: {
                     showFileExporter = $0
-                    if !$0 {
-                        clearExportedData()
-                    }
                 }
             ),
             item: exportedData,
@@ -150,7 +148,19 @@ struct BackupKeyView: View {
             defer {
                 clearExportedData()
             }
-            if case .failure(let exportError) = result {
+
+            switch result {
+            case .success:
+                guard let exportedData,
+                      exportedDataToken == exportToken else {
+                    return
+                }
+                configuration.onExported?(exportedData)
+                keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)
+            case .failure(let exportError):
+                guard exportedDataToken == exportToken else {
+                    return
+                }
                 error = CypherAirError.from(exportError) { .encryptionFailed(reason: $0) }
                 showError = true
             }
@@ -196,9 +206,12 @@ struct BackupKeyView: View {
                     return
                 }
                 exportedData = data
+                exportedDataToken = token
                 didHandOffData = true
-                configuration.onExported?(data)
-                service.confirmKeyBackupExported(fingerprint: fp)
+                if configuration.resultPresentation == .inlinePreview {
+                    configuration.onExported?(data)
+                    service.confirmKeyBackupExported(fingerprint: fp)
+                }
                 passphrase = ""
                 passphraseConfirm = ""
             } catch {
@@ -230,6 +243,7 @@ struct BackupKeyView: View {
     private func clearExportedData() {
         exportedData?.resetBytes(in: 0..<(exportedData?.count ?? 0))
         exportedData = nil
+        exportedDataToken = nil
     }
 
     private static func shouldIgnore(_ error: Error) -> Bool {

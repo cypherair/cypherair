@@ -127,6 +127,143 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_contactsAvailabilityChange_restartsLoadCancelledByContentClear() async throws {
+        let contact = try makeContact(name: "Reload Contact", email: "reload@example.com")
+        let catalog = try stack.certificateSignatureService.selectionCatalog(
+            targetCert: contact.publicKeyData
+        )
+        let staleCatalog = CertificateSelectionCatalog(
+            certificateFingerprint: "stale",
+            subkeys: [],
+            userIds: [
+                UserIdSelectionOption(
+                    occurrenceIndex: 0,
+                    userIdData: Data("stale@example.com".utf8),
+                    displayText: "Stale <stale@example.com>",
+                    isCurrentlyPrimary: true,
+                    isCurrentlyRevoked: false
+                ),
+            ]
+        )
+        let gate = ContactCertificateAsyncGate()
+        var loadCount = 0
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                if loadCount == 1 {
+                    await gate.suspend()
+                    return staleCatalog
+                }
+                return catalog
+            }
+        )
+
+        model.loadIfNeeded()
+
+        await waitUntil("initial catalog load to suspend") {
+            await gate.isSuspended()
+        }
+
+        model.clearTransientInput()
+        XCTAssertEqual(model.loadState, .idle)
+        await settleAsyncWork()
+        XCTAssertEqual(loadCount, 1)
+
+        model.handleContactsAvailabilityChange(
+            from: .opening,
+            to: .availableLegacyCompatibility
+        )
+
+        await waitUntil("catalog reload after contacts reopen") {
+            model.loadState == .loaded
+        }
+
+        XCTAssertEqual(loadCount, 2)
+        XCTAssertEqual(model.catalog, catalog)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertEqual(model.catalog, catalog)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_contactsAvailabilityChange_reloadsContactsUnavailableFailure() async throws {
+        let contact = try makeContact(
+            name: "Unavailable Reload Contact",
+            email: "unavailable-reload@example.com"
+        )
+        let catalog = try stack.certificateSignatureService.selectionCatalog(
+            targetCert: contact.publicKeyData
+        )
+        var loadCount = 0
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                return catalog
+            }
+        )
+
+        stack.contactService.resetInMemoryStateAfterLocalDataReset()
+
+        model.loadIfNeeded()
+
+        XCTAssertEqual(model.loadState, .failed)
+        guard case .contactsUnavailable(.locked)? = model.loadError else {
+            return XCTFail("Expected contacts unavailable error, got \(String(describing: model.loadError))")
+        }
+        XCTAssertEqual(loadCount, 0)
+
+        try stack.contactService.openLegacyCompatibilityForTests()
+        model.handleContactsAvailabilityChange(
+            from: .locked,
+            to: .availableLegacyCompatibility
+        )
+
+        await waitUntil("contacts-unavailable catalog reload") {
+            model.loadState == .loaded
+        }
+
+        XCTAssertEqual(loadCount, 1)
+        XCTAssertEqual(model.catalog, catalog)
+    }
+
+    @MainActor
+    func test_contactsAvailabilityChange_doesNotRetryCatalogFailure() async throws {
+        let contact = try makeContact(
+            name: "Catalog Failure Contact",
+            email: "catalog-failure@example.com"
+        )
+        enum CatalogFailure: Error { case failed }
+        var loadCount = 0
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                throw CatalogFailure.failed
+            }
+        )
+
+        model.loadIfNeeded()
+
+        await waitUntil("catalog load failure") {
+            model.loadState == .failed
+        }
+
+        model.handleContactsAvailabilityChange(
+            from: .opening,
+            to: .availableLegacyCompatibility
+        )
+        await settleAsyncWork()
+
+        XCTAssertEqual(loadCount, 1)
+        XCTAssertEqual(model.loadState, .failed)
+    }
+
+    @MainActor
     func test_clearTransientInputDuringDirectKeyVerifySuppressesLateVerification() async throws {
         let contact = try makeContact(name: "Clear Verify Contact", email: "clear-verify@example.com")
         let gate = ContactCertificateAsyncGate()
@@ -706,6 +843,143 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         await waitUntil("pending signature save") {
             model.lastSavedArtifact != nil
         }
+    }
+
+    @MainActor
+    func test_detailsContactsAvailabilityChange_restartsLoadCancelledByContentClear() async throws {
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Reload",
+            email: "details-reload@example.com"
+        )
+        let staleCatalog = CertificateSelectionCatalog(
+            certificateFingerprint: "stale",
+            subkeys: [],
+            userIds: [
+                UserIdSelectionOption(
+                    occurrenceIndex: 0,
+                    userIdData: Data("details-stale@example.com".utf8),
+                    displayText: "Details Stale <details-stale@example.com>",
+                    isCurrentlyPrimary: true,
+                    isCurrentlyRevoked: false
+                ),
+            ]
+        )
+        let gate = ContactCertificateAsyncGate()
+        var loadCount = 0
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                if loadCount == 1 {
+                    await gate.suspend()
+                    return staleCatalog
+                }
+                return catalog
+            }
+        )
+
+        model.loadIfNeeded()
+
+        await waitUntil("details initial catalog load to suspend") {
+            await gate.isSuspended()
+        }
+
+        model.clearTransientInput()
+        XCTAssertEqual(model.loadState, .idle)
+        await settleAsyncWork()
+        XCTAssertEqual(loadCount, 1)
+
+        model.handleContactsAvailabilityChange(
+            from: .opening,
+            to: .availableLegacyCompatibility
+        )
+
+        await waitUntil("details catalog reload after contacts reopen") {
+            model.loadState == .loaded
+        }
+
+        XCTAssertEqual(loadCount, 2)
+        XCTAssertEqual(model.catalog, catalog)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertEqual(model.catalog, catalog)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_detailsContactsAvailabilityChange_reloadsContactsUnavailableFailure() async throws {
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Unavailable Reload",
+            email: "details-unavailable-reload@example.com"
+        )
+        var loadCount = 0
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                return catalog
+            }
+        )
+
+        stack.contactService.resetInMemoryStateAfterLocalDataReset()
+
+        model.loadIfNeeded()
+
+        XCTAssertEqual(model.loadState, .failed)
+        guard case .contactsUnavailable(.locked)? = model.loadError else {
+            return XCTFail("Expected contacts unavailable error, got \(String(describing: model.loadError))")
+        }
+        XCTAssertEqual(loadCount, 0)
+
+        try stack.contactService.openLegacyCompatibilityForTests()
+        model.handleContactsAvailabilityChange(
+            from: .locked,
+            to: .availableLegacyCompatibility
+        )
+
+        await waitUntil("details contacts-unavailable catalog reload") {
+            model.loadState == .loaded
+        }
+
+        XCTAssertEqual(loadCount, 1)
+        XCTAssertEqual(model.catalog, catalog)
+    }
+
+    @MainActor
+    func test_detailsContactsAvailabilityChange_doesNotRetryCatalogFailure() async throws {
+        let (contactId, key, _) = try makeContactContext(
+            name: "Details Catalog Failure",
+            email: "details-catalog-failure@example.com"
+        )
+        enum CatalogFailure: Error { case failed }
+        var loadCount = 0
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            selectionCatalogAction: { _ in
+                loadCount += 1
+                throw CatalogFailure.failed
+            }
+        )
+
+        model.loadIfNeeded()
+
+        await waitUntil("details catalog load failure") {
+            model.loadState == .failed
+        }
+
+        model.handleContactsAvailabilityChange(
+            from: .opening,
+            to: .availableLegacyCompatibility
+        )
+        await settleAsyncWork()
+
+        XCTAssertEqual(loadCount, 1)
+        XCTAssertEqual(model.loadState, .failed)
     }
 
     @MainActor
