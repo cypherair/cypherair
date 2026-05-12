@@ -131,8 +131,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             name: "Detailed Expiring Signer",
             email: "detailed-expiring@example.com",
             expirySeconds: 1,
-            profile: .universal,
-            authMode: .standard
+            profile: .universal
         )
         try addContact(identity.publicKeyData)
 
@@ -307,8 +306,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             name: "Detailed Profile B Signer",
             email: "detailed-b@example.com",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
 
         let signed = try await stack.signingService.signCleartext(
@@ -338,8 +336,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             name: "Detailed Profile B Detached Signer",
             email: "detailed-b-detached@example.com",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         let data = Data("Profile B detailed detached".utf8)
 

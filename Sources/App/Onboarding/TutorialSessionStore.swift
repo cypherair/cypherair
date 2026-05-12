@@ -520,8 +520,7 @@ final class TutorialSessionStore {
                 ),
                 email: "bob@demo.invalid",
                 expirySeconds: nil,
-                profile: .advanced,
-                authMode: .standard
+                profile: .advanced
             )
             session.artifacts.bobIdentity = bob
             if let armored = try? container.keyManagement.exportPublicKey(fingerprint: bob.fingerprint),

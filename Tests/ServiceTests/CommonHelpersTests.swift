@@ -938,8 +938,7 @@ final class CommonHelpersTests: XCTestCase {
             name: "Post Unlock",
             email: "post-unlock@example.invalid",
             expirySeconds: nil,
-            profile: .universal,
-            authMode: .standard
+            profile: .universal
         )
         try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
         try privateKeyControlStore.markRewrapCommitRequired()
@@ -985,8 +984,7 @@ final class CommonHelpersTests: XCTestCase {
             name: "Post Unlock Warning",
             email: "post-unlock-warning@example.invalid",
             expirySeconds: nil,
-            profile: .universal,
-            authMode: .standard
+            profile: .universal
         )
         try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
         try privateKeyControlStore.markRewrapCommitRequired()
@@ -1109,8 +1107,7 @@ final class CommonHelpersTests: XCTestCase {
             name: "Startup Test",
             email: "startup@example.com",
             expirySeconds: nil,
-            profile: .universal,
-            authMode: .standard
+            profile: .universal
         )
         let fingerprint = identity.fingerprint
         let account = KeychainConstants.defaultAccount

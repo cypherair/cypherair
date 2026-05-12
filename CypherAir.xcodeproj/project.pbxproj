@@ -282,6 +282,7 @@
 				Services/KeyManagement/KeyCatalogStore.swift,
 				Services/KeyManagement/KeyExportService.swift,
 				Services/KeyManagement/KeyMutationService.swift,
+				Services/KeyManagement/KeyProvisioningInvalidationGate.swift,
 				Services/KeyManagement/KeyProvisioningService.swift,
 				Services/KeyManagement/PrivateKeyAccessService.swift,
 				Services/KeyManagement/SelectiveRevocationService.swift,

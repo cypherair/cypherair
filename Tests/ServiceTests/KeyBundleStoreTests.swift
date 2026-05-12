@@ -29,6 +29,69 @@ final class KeyBundleStoreTests: XCTestCase {
         )
     }
 
+    func test_saveNewBundle_receiptRollback_removesCreatedItems() throws {
+        let receipt = try bundleStore.saveNewBundle(makeBundle(), fingerprint: fingerprint)
+
+        XCTAssertEqual(
+            bundleStore.bundleState(fingerprint: fingerprint, namespace: .permanent),
+            .complete
+        )
+
+        bundleStore.rollback(receipt)
+
+        XCTAssertEqual(
+            bundleStore.bundleState(fingerprint: fingerprint, namespace: .permanent),
+            .missing
+        )
+    }
+
+    func test_saveNewBundle_duplicateFirstItem_keepsPreexistingBundle() throws {
+        let original = makeBundle()
+        try bundleStore.saveBundle(original, fingerprint: fingerprint)
+
+        XCTAssertThrowsError(
+            try bundleStore.saveNewBundle(makeDifferentBundle(), fingerprint: fingerprint)
+        )
+
+        let stored = try bundleStore.loadBundle(fingerprint: fingerprint)
+        XCTAssertEqual(stored.seKeyData, original.seKeyData)
+        XCTAssertEqual(stored.salt, original.salt)
+        XCTAssertEqual(stored.sealedBox, original.sealedBox)
+    }
+
+    func test_saveNewBundle_duplicateSecondItem_keepsPreexistingItemAndRollsBackCreatedItem() throws {
+        let account = KeychainConstants.defaultAccount
+        let originalSalt = Data([0xAA])
+        try keychain.save(
+            originalSalt,
+            service: KeychainConstants.saltService(fingerprint: fingerprint),
+            account: account,
+            accessControl: nil
+        )
+
+        XCTAssertThrowsError(try bundleStore.saveNewBundle(makeBundle(), fingerprint: fingerprint))
+
+        XCTAssertFalse(
+            keychain.exists(
+                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                account: account
+            )
+        )
+        XCTAssertEqual(
+            try keychain.load(
+                service: KeychainConstants.saltService(fingerprint: fingerprint),
+                account: account
+            ),
+            originalSalt
+        )
+        XCTAssertFalse(
+            keychain.exists(
+                service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+                account: account
+            )
+        )
+    }
+
     func test_promotePending_secondPermanentWriteFailure_rollsBackPermanentAndKeepsPending() throws {
         try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint, namespace: .pending)
         keychain.failOnSaveNumber = keychain.saveCallCount + 2
@@ -180,6 +243,14 @@ final class KeyBundleStoreTests: XCTestCase {
             seKeyData: Data([0x01, 0x02, 0x03]),
             salt: Data([0x04, 0x05, 0x06]),
             sealedBox: Data([0x07, 0x08, 0x09])
+        )
+    }
+
+    private func makeDifferentBundle() -> WrappedKeyBundle {
+        WrappedKeyBundle(
+            seKeyData: Data([0x21, 0x22, 0x23]),
+            salt: Data([0x24, 0x25, 0x26]),
+            sealedBox: Data([0x27, 0x28, 0x29])
         )
     }
 }

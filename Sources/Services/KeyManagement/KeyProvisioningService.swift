@@ -1,25 +1,100 @@
 import Foundation
 
+private final class KeyProvisioningCommitDrain: @unchecked Sendable {
+    private let lock = NSLock()
+    private var activeCommitCount = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func enterCommit() {
+        lock.lock()
+        activeCommitCount += 1
+        lock.unlock()
+    }
+
+    func leaveCommit() {
+        var continuationsToResume: [CheckedContinuation<Void, Never>] = []
+
+        lock.lock()
+        activeCommitCount = max(activeCommitCount - 1, 0)
+        if activeCommitCount == 0 {
+            continuationsToResume = waiters
+            waiters.removeAll()
+        }
+        lock.unlock()
+
+        for continuation in continuationsToResume {
+            continuation.resume()
+        }
+    }
+
+    func waitForActiveCommitsToFinish(
+        waiterRegisteredCheckpoint: (@Sendable () async -> Void)? = nil
+    ) async {
+        await withCheckedContinuation { continuation in
+            var shouldResumeImmediately = false
+            var didRegisterWaiter = false
+
+            lock.lock()
+            if activeCommitCount == 0 {
+                shouldResumeImmediately = true
+            } else {
+                waiters.append(continuation)
+                didRegisterWaiter = true
+            }
+            lock.unlock()
+
+            if shouldResumeImmediately {
+                continuation.resume()
+            } else if didRegisterWaiter, let waiterRegisteredCheckpoint {
+                Task {
+                    await waiterRegisteredCheckpoint()
+                }
+            }
+        }
+    }
+}
+
 /// Owns key generation and import workflows behind the key-management facade.
 final class KeyProvisioningService {
+    typealias ProvisioningCheckpoint = @Sendable () async -> Void
+
     private let engine: PgpEngine
     private let secureEnclave: any SecureEnclaveManageable
     private let memoryInfo: any MemoryInfoProvidable
     private let bundleStore: KeyBundleStore
     private let catalogStore: KeyCatalogStore
+    private let invalidationGate: KeyProvisioningInvalidationGate
+    private let beforePermanentStorageCheckpoint: ProvisioningCheckpoint?
+    private let afterImportOffMainActorCheckpoint: ProvisioningCheckpoint?
+    private let afterPermanentBundleStoreCheckpoint: ProvisioningCheckpoint?
+    private let afterIdentityStoreCheckpoint: ProvisioningCheckpoint?
+    private let commitDrainWaiterRegisteredCheckpoint: ProvisioningCheckpoint?
+    private let commitDrain = KeyProvisioningCommitDrain()
 
     init(
         engine: PgpEngine,
         secureEnclave: any SecureEnclaveManageable,
         memoryInfo: any MemoryInfoProvidable,
         bundleStore: KeyBundleStore,
-        catalogStore: KeyCatalogStore
+        catalogStore: KeyCatalogStore,
+        invalidationGate: KeyProvisioningInvalidationGate,
+        beforePermanentStorageCheckpoint: ProvisioningCheckpoint? = nil,
+        afterImportOffMainActorCheckpoint: ProvisioningCheckpoint? = nil,
+        afterPermanentBundleStoreCheckpoint: ProvisioningCheckpoint? = nil,
+        afterIdentityStoreCheckpoint: ProvisioningCheckpoint? = nil,
+        commitDrainWaiterRegisteredCheckpoint: ProvisioningCheckpoint? = nil
     ) {
         self.engine = engine
         self.secureEnclave = secureEnclave
         self.memoryInfo = memoryInfo
         self.bundleStore = bundleStore
         self.catalogStore = catalogStore
+        self.invalidationGate = invalidationGate
+        self.beforePermanentStorageCheckpoint = beforePermanentStorageCheckpoint
+        self.afterImportOffMainActorCheckpoint = afterImportOffMainActorCheckpoint
+        self.afterPermanentBundleStoreCheckpoint = afterPermanentBundleStoreCheckpoint
+        self.afterIdentityStoreCheckpoint = afterIdentityStoreCheckpoint
+        self.commitDrainWaiterRegisteredCheckpoint = commitDrainWaiterRegisteredCheckpoint
     }
 
     func generateKey(
@@ -27,8 +102,12 @@ final class KeyProvisioningService {
         email: String?,
         expirySeconds: UInt64?,
         profile: KeyProfile,
-        authMode: AuthenticationMode
+        authMode: AuthenticationMode,
+        invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
+        try Task.checkCancellation()
+        try invalidationGate.checkValid(token)
+
         var (generated, keyInfo) = try await Self.generateKeyOffMainActor(
             engine: engine,
             name: name,
@@ -40,6 +119,7 @@ final class KeyProvisioningService {
             generated.certData.resetBytes(in: 0..<generated.certData.count)
         }
 
+        try await prepareForPermanentStorage(token: token)
         let accessControl = try authMode.createAccessControl()
         let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
         let bundle = try secureEnclave.wrap(
@@ -47,10 +127,10 @@ final class KeyProvisioningService {
             using: seHandle,
             fingerprint: keyInfo.fingerprint
         )
+        try Task.checkCancellation()
+        try invalidationGate.checkValid(token)
 
         let fingerprint = keyInfo.fingerprint
-        try bundleStore.saveBundle(bundle, fingerprint: fingerprint)
-
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
             keyVersion: keyInfo.keyVersion,
@@ -70,9 +150,7 @@ final class KeyProvisioningService {
             }
         )
 
-        try catalogStore.storeNewIdentity(identity) {
-            self.bundleStore.rollbackPermanentBundle(fingerprint: fingerprint)
-        }
+        try await commitIdentity(identity, bundle: bundle, token: token)
 
         return identity
     }
@@ -80,8 +158,12 @@ final class KeyProvisioningService {
     func importKey(
         armoredData: Data,
         passphrase: String,
-        authMode: AuthenticationMode
+        authMode: AuthenticationMode,
+        invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
+        try Task.checkCancellation()
+        try invalidationGate.checkValid(token)
+
         let s2kInfo: S2kInfo
         do {
             s2kInfo = try engine.parseS2kParams(armoredData: armoredData)
@@ -91,6 +173,8 @@ final class KeyProvisioningService {
 
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: memoryInfo)
         try memoryGuard.validate(s2kInfo: s2kInfo)
+        try Task.checkCancellation()
+        try invalidationGate.checkValid(token)
 
         var (secretKeyData, keyInfo, profile, publicKeyData, revocationCert) = try await Self.importKeyOffMainActor(
             engine: engine,
@@ -100,11 +184,17 @@ final class KeyProvisioningService {
         defer {
             secretKeyData.resetBytes(in: 0..<secretKeyData.count)
         }
+        if let afterImportOffMainActorCheckpoint {
+            await afterImportOffMainActorCheckpoint()
+        }
+        try Task.checkCancellation()
+        try invalidationGate.checkValid(token)
 
         if catalogStore.containsKey(fingerprint: keyInfo.fingerprint) {
             throw CypherAirError.duplicateKey
         }
 
+        try await prepareForPermanentStorage(token: token)
         let accessControl = try authMode.createAccessControl()
         let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
         let bundle = try secureEnclave.wrap(
@@ -112,10 +202,10 @@ final class KeyProvisioningService {
             using: seHandle,
             fingerprint: keyInfo.fingerprint
         )
+        try Task.checkCancellation()
+        try invalidationGate.checkValid(token)
 
         let fingerprint = keyInfo.fingerprint
-        try bundleStore.saveBundle(bundle, fingerprint: fingerprint)
-
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
             keyVersion: keyInfo.keyVersion,
@@ -135,11 +225,64 @@ final class KeyProvisioningService {
             }
         )
 
-        try catalogStore.storeNewIdentity(identity) {
-            self.bundleStore.rollbackPermanentBundle(fingerprint: fingerprint)
-        }
+        try await commitIdentity(identity, bundle: bundle, token: token)
 
         return identity
+    }
+
+    private func prepareForPermanentStorage(
+        token: KeyProvisioningInvalidationGate.Token
+    ) async throws {
+        if let beforePermanentStorageCheckpoint {
+            await beforePermanentStorageCheckpoint()
+        }
+        try Task.checkCancellation()
+        try invalidationGate.checkValid(token)
+    }
+
+    private func commitIdentity(
+        _ identity: PGPKeyIdentity,
+        bundle: WrappedKeyBundle,
+        token: KeyProvisioningInvalidationGate.Token
+    ) async throws {
+        commitDrain.enterCommit()
+        defer {
+            commitDrain.leaveCommit()
+        }
+
+        var bundleReceipt: KeyBundleWriteReceipt?
+        var didStoreIdentity = false
+        do {
+            try Task.checkCancellation()
+            try invalidationGate.checkValid(token)
+            bundleReceipt = try bundleStore.saveNewBundle(bundle, fingerprint: identity.fingerprint)
+            if let afterPermanentBundleStoreCheckpoint {
+                await afterPermanentBundleStoreCheckpoint()
+            }
+            try Task.checkCancellation()
+            try invalidationGate.checkValid(token)
+            try catalogStore.storeNewIdentity(identity)
+            didStoreIdentity = true
+            if let afterIdentityStoreCheckpoint {
+                await afterIdentityStoreCheckpoint()
+            }
+            try Task.checkCancellation()
+            try invalidationGate.checkValid(token)
+        } catch {
+            if didStoreIdentity {
+                try catalogStore.discardCommittedIdentity(fingerprint: identity.fingerprint)
+            }
+            if let bundleReceipt {
+                bundleStore.rollback(bundleReceipt)
+            }
+            throw error
+        }
+    }
+
+    func waitForActiveProvisioningCommitsToFinish() async {
+        await commitDrain.waitForActiveCommitsToFinish(
+            waiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint
+        )
     }
 
     @concurrent
