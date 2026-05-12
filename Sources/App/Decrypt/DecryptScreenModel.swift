@@ -246,6 +246,7 @@ final class DecryptScreenModel {
             name: "decrypt.contentClearObserved",
             metadata: ["mode": decryptMode.rawValue]
         )
+        operation.cancelAndInvalidate()
         clearTransientInput()
     }
 
@@ -309,6 +310,7 @@ final class DecryptScreenModel {
 
         operation.run(mapError: mapDecryptError) { [self] in
             let result = try await self.parseTextRecipientsAction(inputData)
+            try Task.checkCancellation()
             self.phase1Result = result
             self.textInputSectionEpoch &+= 1
             onParsed?(result)
@@ -322,6 +324,7 @@ final class DecryptScreenModel {
 
         operation.run(mapError: mapDecryptError) { [self] in
             let result = try await self.parseFileRecipientsAction(fileURL)
+            try Task.checkCancellation()
             self.filePhase1Result = result
         }
     }
@@ -333,6 +336,7 @@ final class DecryptScreenModel {
 
         operation.run(mapError: mapDecryptError) { [self] in
             let result = try await self.textDecryptionAction(phase1Result)
+            try Task.checkCancellation()
 
             if let text = String(data: result.plaintext, encoding: .utf8) {
                 self.decryptedText = text

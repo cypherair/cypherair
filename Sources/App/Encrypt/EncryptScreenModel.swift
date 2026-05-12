@@ -441,6 +441,7 @@ final class EncryptScreenModel {
                 encryptToSelf,
                 encryptToSelfFingerprint
             )
+            try Task.checkCancellation()
             self.ciphertext = result
             self.textInputSectionEpoch &+= 1
             onEncrypted?(result)
@@ -603,6 +604,7 @@ final class EncryptScreenModel {
     }
 
     func handleContentClearGenerationChange() {
+        operation.cancelAndInvalidate()
         cleanupTemporaryEncryptedFile()
         clearTransientInput()
     }

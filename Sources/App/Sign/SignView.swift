@@ -262,7 +262,7 @@ private struct SignScreenHostView: View {
             model.syncSignerFromDefaultOnAppear()
         }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
-            model.clearTransientInput()
+            model.handleContentClearGenerationChange()
         }
     }
 

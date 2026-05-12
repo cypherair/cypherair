@@ -21,6 +21,7 @@ final class KeyManagementService: @unchecked Sendable {
     private let selectiveRevocationService: SelectiveRevocationService
     private let mutationService: KeyMutationService
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
+    private let provisioningInvalidationGate: KeyProvisioningInvalidationGate
     private let traceStore: AuthLifecycleTraceStore?
     private var legacyMetadataMigrationCompletedInProcess = false
 
@@ -34,7 +35,8 @@ final class KeyManagementService: @unchecked Sendable {
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
-        metadataPersistence: (any KeyMetadataPersistence)? = nil
+        metadataPersistence: (any KeyMetadataPersistence)? = nil,
+        provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) {
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
         let keyMetadataPersistence = metadataPersistence ?? metadataStore
@@ -48,17 +50,21 @@ final class KeyManagementService: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let effectivePrivateKeyControlStore = privateKeyControlStore
+        let provisioningInvalidationGate = KeyProvisioningInvalidationGate()
 
         self.engine = engine
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
         self.privateKeyControlStore = effectivePrivateKeyControlStore
+        self.provisioningInvalidationGate = provisioningInvalidationGate
         self.provisioningService = KeyProvisioningService(
             engine: engine,
             secureEnclave: secureEnclave,
             memoryInfo: memoryInfo,
             bundleStore: bundleStore,
-            catalogStore: catalogStore
+            catalogStore: catalogStore,
+            invalidationGate: provisioningInvalidationGate,
+            beforePermanentStorageCheckpoint: provisioningCheckpoint
         )
         self.exportService = KeyExportService(
             engine: engine,
@@ -177,6 +183,7 @@ final class KeyManagementService: @unchecked Sendable {
     }
 
     func resetInMemoryStateAfterLocalDataReset() {
+        provisioningInvalidationGate.invalidate()
         keys = []
         legacyMetadataMigrationCompletedInProcess = false
         legacyMetadataMigrationLoadWarning = nil
@@ -519,6 +526,7 @@ final class KeyManagementService: @unchecked Sendable {
 
 extension KeyManagementService: ProtectedDataRelockParticipant {
     func relockProtectedData() async throws {
+        provisioningInvalidationGate.invalidate()
         markKeyMetadataLocked()
     }
 }

@@ -246,6 +246,11 @@ final class VerifyScreenModel {
         textInputSectionEpoch &+= 1
     }
 
+    func handleContentClearGenerationChange() {
+        operation.cancelAndInvalidate()
+        clearTransientInput()
+    }
+
     func verify() {
         switch verifyMode {
         case .cleartext:
@@ -261,6 +266,7 @@ final class VerifyScreenModel {
 
         operation.run(mapError: mapVerificationError) { [self] in
             let result = try await self.cleartextVerificationAction(inputData)
+            try Task.checkCancellation()
             if let content = result.text {
                 self.cleartextOriginalText = String(data: content, encoding: .utf8)
             }

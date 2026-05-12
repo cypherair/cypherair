@@ -128,6 +128,7 @@ final class SignScreenModel {
 
         operation.run(mapError: mapSigningError) { [self] in
             let signed = try await self.cleartextSigningAction(message, signerFingerprint)
+            try Task.checkCancellation()
             self.signedMessage = String(data: signed, encoding: .utf8)
             self.textInputSectionEpoch &+= 1
             self.authLifecycleTraceStore?.record(
@@ -243,6 +244,11 @@ final class SignScreenModel {
 
     func finishExport() {
         exportController.finish()
+    }
+
+    func handleContentClearGenerationChange() {
+        operation.cancelAndInvalidate()
+        clearTransientInput()
     }
 
     func clearTransientInput() {

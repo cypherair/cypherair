@@ -1,6 +1,32 @@
 import XCTest
 @testable import CypherAir
 
+private actor ContactCertificateAsyncGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var didResume = false
+
+    func suspend() async {
+        await withCheckedContinuation { continuation in
+            if didResume {
+                continuation.resume()
+            } else {
+                self.continuation = continuation
+            }
+        }
+    }
+
+    func isSuspended() -> Bool {
+        continuation != nil
+    }
+
+    func resume() {
+        didResume = true
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume()
+    }
+}
+
 final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
 
@@ -98,6 +124,47 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
 
         XCTAssertEqual(model.loadState, .idle)
         XCTAssertNil(model.catalog)
+    }
+
+    @MainActor
+    func test_clearTransientInputDuringDirectKeyVerifySuppressesLateVerification() async throws {
+        let contact = try makeContact(name: "Clear Verify Contact", email: "clear-verify@example.com")
+        let gate = ContactCertificateAsyncGate()
+        let verification = CertificateSignatureVerification(
+            status: .valid,
+            certificationKind: nil,
+            signerPrimaryFingerprint: nil,
+            signingKeyFingerprint: "1234567890abcdef1234567890abcdef12345678",
+            signerIdentity: nil
+        )
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            verifyDirectKeyAction: { _, _ in
+                await gate.suspend()
+                return verification
+            }
+        )
+        model.setSignatureInput("signature")
+
+        model.verifyDirectKey()
+
+        await waitUntil("direct-key verification to suspend") {
+            guard model.activeOperation == .directKeyVerify else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.clearTransientInput()
+        XCTAssertNil(model.activeOperation)
+        XCTAssertNil(model.verification)
+        XCTAssertEqual(model.signatureInput, "")
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.verification)
+        XCTAssertFalse(model.showError)
     }
 
     @MainActor
@@ -475,6 +542,12 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
 
         XCTFail("Timed out waiting for \(description)")
     }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
+    }
 }
 
 final class ContactCertificationDetailsScreenModelTests: XCTestCase {
@@ -705,6 +778,57 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_clearTransientInputDuringImportVerificationSuppressesLatePreview() async throws {
+        let (contactId, key, _) = try makeContactContext(
+            name: "Details Clear Verify",
+            email: "details-clear-verify@example.com"
+        )
+        let gate = ContactCertificateAsyncGate()
+        let verification = CertificateSignatureVerification(
+            status: .valid,
+            certificationKind: nil,
+            signerPrimaryFingerprint: nil,
+            signingKeyFingerprint: "1234567890abcdef1234567890abcdef12345678",
+            signerIdentity: nil
+        )
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            validateDirectKeyArtifactAction: { _, _, _, _, _ in
+                await gate.suspend()
+                return ContactCertificationArtifactValidation(
+                    verification: verification,
+                    artifact: nil
+                )
+            }
+        )
+        model.selectImportMode(.directKey)
+        model.setSignatureInput("signature")
+
+        model.verifyImportedSignature()
+
+        await waitUntil("import verification to suspend") {
+            guard model.activeOperation == .verifyImport else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.clearTransientInput()
+        XCTAssertNil(model.activeOperation)
+        XCTAssertNil(model.verification)
+        XCTAssertNil(model.pendingArtifact)
+        XCTAssertEqual(model.signatureInput, "")
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.verification)
+        XCTAssertNil(model.pendingArtifact)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
     private func makeContactContext(
         name: String,
         email: String,
@@ -831,6 +955,12 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }
 

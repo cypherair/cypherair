@@ -61,6 +61,18 @@ final class KeyCatalogStore {
         keys.append(identity)
     }
 
+    func discardNewIdentity(fingerprint: String) {
+        try? metadataStore.delete(fingerprint: fingerprint)
+        keys.removeAll { $0.fingerprint == fingerprint }
+
+        guard !keys.isEmpty, !keys.contains(where: \.isDefault) else {
+            return
+        }
+
+        keys[0].isDefault = true
+        try? metadataStore.update(keys[0])
+    }
+
     func markBackedUp(fingerprint: String) {
         guard let index = keys.firstIndex(where: { $0.fingerprint == fingerprint }) else {
             return

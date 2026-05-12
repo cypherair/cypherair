@@ -260,6 +260,42 @@ final class SignScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_contentClearDuringTextSigningSuppressesLateSignedMessage() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Signing Privacy"
+        )
+        let gate = SignOperationGate()
+        let model = makeModel(
+            cleartextSigningAction: { _, _ in
+                await gate.suspend()
+                return Data("late-signed-message".utf8)
+            }
+        )
+        model.signerFingerprint = identity.fingerprint
+        model.text = "Sensitive message"
+
+        model.signText()
+
+        await waitUntil("text signing to suspend for content clear") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+        XCTAssertFalse(model.operation.isRunning)
+        XCTAssertNil(model.signedMessage)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.signedMessage)
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
     func test_clearTransientInput_clearsMessageFileSelectionAndSignatureResults() {
         let model = makeModel()
         model.text = "Message to sign"
@@ -320,5 +356,11 @@ final class SignScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }

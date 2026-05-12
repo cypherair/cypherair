@@ -784,6 +784,50 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_contentClearDuringTextEncryptionSuppressesLateCiphertextAndCallback() async throws {
+        let recipientIdentity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Privacy Recipient"
+        )
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
+        let gate = EncryptOperationGate()
+        var callbackCiphertext: Data?
+
+        var configuration = EncryptView.Configuration()
+        configuration.onEncrypted = { callbackCiphertext = $0 }
+
+        let model = makeModel(
+            configuration: configuration,
+            textEncryptionAction: { _, _, _, _, _ in
+                await gate.suspend()
+                return Data("late-ciphertext".utf8)
+            }
+        )
+        model.plaintext = "Sensitive plaintext"
+        model.selectedRecipients = [recipientContactId]
+
+        model.encryptText()
+
+        await waitUntil("text encryption to suspend for content clear") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+        XCTAssertFalse(model.operation.isRunning)
+        XCTAssertNil(model.ciphertext)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.ciphertext)
+        XCTAssertNil(callbackCiphertext)
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
     func test_encryptFile_handlesSelection_andRoutesFileExportThroughInterceptionPolicy() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
         let recipientIdentity = try await TestHelpers.generateProfileAKey(
@@ -1180,5 +1224,11 @@ final class EncryptScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }

@@ -401,6 +401,7 @@ final class ContactCertificationDetailsScreenModel {
     }
 
     func clearTransientInput() {
+        invalidateAsyncWork(resetLoadingState: true)
         importedSignature.clear()
         signatureInput = ""
         pendingArtifact = nil
@@ -432,6 +433,7 @@ final class ContactCertificationDetailsScreenModel {
                 selectedUserId,
                 self.selectedCertificationKind
             )
+            try Task.checkCancellation()
             let validation = try await self.validateUserIdArtifactAction(
                 armoredCertification,
                 key,
@@ -440,6 +442,7 @@ final class ContactCertificationDetailsScreenModel {
                 .generated,
                 filename
             )
+            try Task.checkCancellation()
             guard let artifact = validation.artifact else {
                 throw CypherAirError.invalidKeyData(
                     reason: String(
@@ -471,6 +474,7 @@ final class ContactCertificationDetailsScreenModel {
                     .imported,
                     nil
                 )
+                try Task.checkCancellation()
             case .userIdBinding:
                 guard let selectedUserId = self.selectedUserId else {
                     throw CypherAirError.invalidKeyData(
@@ -488,6 +492,7 @@ final class ContactCertificationDetailsScreenModel {
                     .imported,
                     nil
                 )
+                try Task.checkCancellation()
             }
             return (validation.verification, validation.artifact, nil)
         }
@@ -508,6 +513,7 @@ final class ContactCertificationDetailsScreenModel {
     func exportArtifact(_ artifact: ContactCertificationArtifactReference) {
         startOperation(.exportArtifact(artifact.artifactId)) {
             let export = try self.exportArtifactAction(artifact.artifactId)
+            try Task.checkCancellation()
             try self.prepareExport(export.data, filename: export.filename)
             return (self.verification, self.pendingArtifact, self.lastSavedArtifact)
         }
@@ -527,10 +533,16 @@ final class ContactCertificationDetailsScreenModel {
     }
 
     func handleDisappear() {
+        invalidateAsyncWork(resetLoadingState: true)
+        showFileImporter = false
+        exportController.finish()
+    }
+
+    private func invalidateAsyncWork(resetLoadingState: Bool) {
         loadGeneration &+= 1
         loadTask?.cancel()
         loadTask = nil
-        if isLoading {
+        if resetLoadingState, isLoading {
             loadState = .idle
         }
 
@@ -538,8 +550,6 @@ final class ContactCertificationDetailsScreenModel {
         operationTask?.cancel()
         operationTask = nil
         activeOperation = nil
-        showFileImporter = false
-        exportController.finish()
     }
 
     func title(for importMode: ImportMode) -> String {
