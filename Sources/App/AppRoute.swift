@@ -20,6 +20,7 @@ enum AppRoute: Hashable {
     case contactCertification(contactId: String, keyId: String?, intent: ContactCertificationRouteIntent)
     case contactCertificateSignatures(fingerprint: String)
     case tagManagement
+    case tagDetail(tagId: String)
     case addContact
     case qrDisplay(publicKeyData: Data, displayName: String)
 

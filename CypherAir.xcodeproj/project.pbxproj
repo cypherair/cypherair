@@ -77,6 +77,8 @@
 				App/Contacts/ContactCertificationDetailsScreenModel.swift,
 				App/Contacts/ContactCertificationDetailsView.swift,
 				App/Contacts/ContactDetailView.swift,
+				App/Contacts/TagDetailScreenModel.swift,
+				App/Contacts/TagDetailView.swift,
 				App/Contacts/ContactKeySummaryView.swift,
 				"App/Contacts/ContactKeyUsageState+ContactDetailPresentation.swift",
 				App/Contacts/ContactsScreenModel.swift,

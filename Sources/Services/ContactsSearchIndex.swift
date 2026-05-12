@@ -110,7 +110,7 @@ struct ContactsSearchIndex {
         let normalizedQuery = Self.normalizedSearchText(query)
         let rankedContactIds = contactEntriesByID.values
             .compactMap { entry -> (contactId: String, rank: MatchRank, defaultOrder: Int)? in
-                guard tagFilterIds.isSubset(of: entry.tagIds) else {
+                guard tagFilterIds.isEmpty || !entry.tagIds.isDisjoint(with: tagFilterIds) else {
                     return nil
                 }
                 guard !normalizedQuery.isEmpty else {

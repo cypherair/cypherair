@@ -8,7 +8,6 @@ struct ContactTagAssignmentSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
-    @State private var searchText = ""
     @State private var newTagName = ""
     @State private var errorMessage: String?
     @State private var showError = false
@@ -17,11 +16,11 @@ struct ContactTagAssignmentSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    if assignableTags.isEmpty {
-                        Text(emptyExistingTagMessage)
+                    if availableAssignableTags.isEmpty {
+                        Text(String(localized: "contactdetail.addTag.noExisting", defaultValue: "No available existing tags."))
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(assignableTags) { tag in
+                        ForEach(availableAssignableTags) { tag in
                             Button {
                                 assign(tag)
                             } label: {
@@ -56,11 +55,6 @@ struct ContactTagAssignmentSheet: View {
             }
             .scrollDismissesKeyboardInteractivelyIfAvailable()
             .navigationTitle(String(localized: "contactdetail.addTag.title", defaultValue: "Add Tag"))
-            .cypherSearchable(
-                text: $searchText,
-                placement: .automatic,
-                prompt: String(localized: "tagManagement.search", defaultValue: "Search tags")
-            )
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "common.done", defaultValue: "Done")) {
@@ -79,37 +73,15 @@ struct ContactTagAssignmentSheet: View {
                 }
             }
             .onChange(of: appSessionOrchestrator.contentClearGeneration) {
-                searchText = ""
                 newTagName = ""
             }
         }
     }
 
-    private var assignableTags: [ContactTagSummary] {
-        let normalizedSearchText = ContactsSearchIndex.normalizedSearchText(searchText)
-        return availableTags.filter { tag in
-            guard !assignedTagIds.contains(tag.tagId) else {
-                return false
-            }
-            guard !normalizedSearchText.isEmpty else {
-                return true
-            }
-            return ContactsSearchIndex.normalizedSearchText(tag.displayName)
-                .contains(normalizedSearchText)
+    private var availableAssignableTags: [ContactTagSummary] {
+        availableTags.filter { tag in
+            !assignedTagIds.contains(tag.tagId)
         }
-    }
-
-    private var emptyExistingTagMessage: String {
-        if ContactsSearchIndex.normalizedSearchText(searchText).isEmpty {
-            return String(
-                localized: "contactdetail.addTag.noExisting",
-                defaultValue: "No available existing tags."
-            )
-        }
-        return String(
-            localized: "tagManagement.noMatchingTags",
-            defaultValue: "No matching tags."
-        )
     }
 
     private func assign(_ tag: ContactTagSummary) {
