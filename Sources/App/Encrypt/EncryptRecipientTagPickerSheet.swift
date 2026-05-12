@@ -69,7 +69,7 @@ struct RecipientTagPickerSheet: View {
                 }
             }
             .scrollDismissesKeyboardInteractivelyIfAvailable()
-            .navigationTitle(String(localized: "encrypt.addByTag", defaultValue: "Add by Tag"))
+            .navigationTitle(String(localized: "encrypt.addByTag", defaultValue: "Add from Tag"))
             .cypherSearchable(
                 text: $searchText,
                 placement: .automatic,
@@ -153,6 +153,9 @@ private struct RecipientTagPickerRow: View {
     private var actionTitle: String {
         if isFullySelected {
             return String(localized: "encrypt.tagPicker.added", defaultValue: "Added")
+        }
+        if selectedCount > 0 {
+            return String(localized: "encrypt.tagPicker.addMissing", defaultValue: "Add Missing")
         }
         return String(localized: "encrypt.tagPicker.add", defaultValue: "Add")
     }

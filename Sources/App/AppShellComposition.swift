@@ -29,6 +29,8 @@ struct AppRouteDestinationView: View {
             ContactCertificateSignaturesView(fingerprint: fingerprint)
         case .tagManagement:
             TagManagementView()
+        case .tagDetail(let tagId):
+            TagDetailView(tagId: tagId)
         case .addContact:
             AddContactView()
         case .qrDisplay(let publicKeyData, let displayName):

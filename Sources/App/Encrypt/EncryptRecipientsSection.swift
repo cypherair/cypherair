@@ -27,7 +27,7 @@ struct EncryptRecipientsSection: View {
             Button(action: openTagPicker) {
                 HStack(spacing: 12) {
                     Label(
-                        String(localized: "encrypt.addByTag", defaultValue: "Add by Tag"),
+                        String(localized: "encrypt.addByTag", defaultValue: "Add from Tag"),
                         systemImage: "tag"
                     )
                     Spacer()
