@@ -4,7 +4,7 @@
 > Purpose: Describe the current edge, drill, and stable `PgpMobile.xcframework` release channels, including discovery, verification, and the stable channel's relationship to the unified app-build release page.
 > Audience: Human developers and automation that consume prebuilt `PgpMobile.xcframework` assets.
 > Source of truth: `.github/workflows/xcframework-edge-release.yml`, `.github/workflows/stable-build-release.yml`, and published GitHub releases.
-> Last reviewed: 2026-04-27.
+> Last reviewed: 2026-05-12.
 > Update triggers: channel naming/routing, asset names, verification commands, stable asset contract, or relink-kit semantics.
 
 ## 1. Release Channels
@@ -77,6 +77,15 @@ CypherAir publishes stable XCFramework assets through the same unified stable Gi
 - `PgpMobile-relink-kit.tar.zst` is a technical supplement for SDK consumers and relink-focused compliance review. It does not replace the shared source bundle and is not an in-app asset.
 - Stable assets are immutable once published. If a stable asset set is wrong, publish a new build number under a new stable tag instead of replacing assets in place.
 - Edge and drill prereleases remain separate from the stable channel.
+
+### CI Cache Policy
+
+CypherAir release and validation workflows intentionally avoid Cargo cache
+actions. The arm64e XCFramework build force-downloads the selected Rust fork
+stage1 prerelease inside `./build-xcframework.sh --release`; caching Cargo
+`target/` artifacts before that resolution can reuse objects built by an older
+stage1 compiler. Clean Rust builds are slower, but they keep edge, drill, PR,
+nightly, and stable release artifacts deterministic across stage1 updates.
 
 ## 2. Edge Discovery And Downloading
 

@@ -185,6 +185,12 @@ Toolchain contract:
 - The repository root intentionally has no custom `rust-toolchain.toml` override. Use explicit `cargo +stable` / `rustc +stable` for ordinary Rust validation and metadata.
 - App-side Rust or UniFFI changes do not require waiting for a new GitHub Rust stage1 prerelease beyond the currently published one. Local full packaging should force-download the latest attested Rust fork stage1 prerelease to match GitHub-hosted release jobs; use a linked `stage1-arm64e-patch` only when deliberately testing a local compiler build.
 - Only changes to the Rust compiler fork itself require rebuilding the local stage1 or publishing a new Rust fork stage1 prerelease before app-side arm64e packaging can consume the new compiler.
+- GitHub-hosted Rust and XCFramework jobs intentionally do not use Cargo
+  cache actions. The arm64e path can consume a newer Rust fork stage1 while
+  `Cargo.lock` and official stable Rust remain unchanged; restoring old
+  `target/` artifacts can mix compiler generations and break proc-macro
+  builds. Prefer slower clean CI builds over cached Rust artifacts for release
+  correctness.
 
 ## 2.2 GitHub Actions Hosted macOS Limitation
 

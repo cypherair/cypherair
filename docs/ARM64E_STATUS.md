@@ -1,6 +1,6 @@
 # CypherAir Apple arm64e Status
 
-Snapshot date: 2026-05-03
+Snapshot date: 2026-05-12
 
 ## Repo Identity
 
@@ -31,11 +31,11 @@ Snapshot date: 2026-05-03
 - Pre-merge release validation passed through edge drill run `24897042096` and
   stable dry-run `24897042109`. Post-merge main validation passed through edge
   run `24916588574` and stable dry-run `24916629353`.
-- Latest verified main edge release: run `24947988541`, release
-  `pgpmobile-edge-20260426T041453Z-af7fe03-r24947988541-a1`, commit
-  `af7fe033c5f4`.
-- Latest verified stable build release: run `24925168188`, release
-  `cypherair-v1.3.1-build3`, commit `2e99c7e9cd30`.
+- Latest verified main edge release: run `25656213585` attempt 3, release
+  `pgpmobile-edge-20260512T075747Z-04f5ad6-r25656213585-a3`, commit
+  `04f5ad607e80`.
+- Latest verified stable build release: release `cypherair-v1.4.0-build14004`,
+  commit `4390ff91a8fa`.
 
 ## Current Verified Chain
 
@@ -45,7 +45,7 @@ Snapshot date: 2026-05-03
     stable commands such as `cargo +stable`
   - local Rust fork path: `/Users/tianren/coding/rust`
   - Rust stage1 carry branch: `carry/cypherair-arm64e-toolchain`
-  - current Rust stage1 carry head: `b402b926a05`
+  - current Rust stage1 carry head: `05e4abf6b2e`
   - Rust upstream-prep branch:
     `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`
   - current Rust upstream-prep head: `77e2e3639785`
@@ -64,15 +64,18 @@ Snapshot date: 2026-05-03
   - GitHub-hosted PR, nightly, edge, and stable release workflows force-download
     the Rust fork stage1 prerelease and record the resolved tag, commit, and
     checksums in `PgpMobile.arm64e-build-manifest.json`
+  - GitHub-hosted Rust and XCFramework jobs intentionally do not use Cargo
+    cache actions; clean CI builds avoid reusing `target/` artifacts produced
+    by an older Rust fork stage1 compiler
   - arm64e builds call the patched compiler through explicit `RUSTC` while
     using nightly Cargo as the driver for `-Zbuild-std`
   - latest verified stage1 prerelease:
-    `rust-arm64e-stage1-20260503T220008Z-b402b92-r25291584825-a1`
+    `rust-arm64e-stage1-20260512T070847Z-05e4abf-r25718545417-a1`
   - latest verified stage1 source ref:
     `refs/heads/carry/cypherair-arm64e-toolchain`
   - latest verified stage1 source commit:
-    `b402b926a05317680538f34e5d06495572b8b3cf`
-  - latest verified stage1 workflow run: `25291584825`
+    `05e4abf6b2e667dd7f8695f9dbeae52724337736`
+  - latest verified stage1 workflow run: `25718545417`
   - latest verified stage1 manifest declares `includedRustSrc: true` and
     includes host `std`/`proc_macro`, so GitHub-hosted app builds can run
     `cargo -Zbuild-std` without relying on a runner-local Rust source tree
@@ -115,6 +118,10 @@ Snapshot date: 2026-05-03
     `./build-xcframework.sh --release` path
   - ordinary Rust validation and release metadata use explicit `+stable`
     commands; arm64e never depends on a repo-wide rustup override
+  - hosted Rust and XCFramework workflows deliberately avoid Cargo cache
+    actions after the May 2026 stale-cache incident where an old `target/`
+    cache mixed with a newer stage1 prerelease and broke `rustversion`
+    proc-macro resolution during `generic-array` builds
   - edge and stable releases include `PgpMobile.arm64e-build-manifest.json`
   - stable compliance assets embed the arm64e manifest and the relink kit covers
     both stable `arm64` and patched `arm64e` target archives
