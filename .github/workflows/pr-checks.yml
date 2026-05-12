@@ -57,16 +57,16 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Select Xcode 26.4.1
+      - name: Select Xcode 26.5
         run: |
           set -euo pipefail
 
           if [ -n "${XCODE_26_DEVELOPER_DIR:-}" ] && [ -d "${XCODE_26_DEVELOPER_DIR}" ]; then
             SELECTED_DEVELOPER_DIR="${XCODE_26_DEVELOPER_DIR}"
-          elif [ -d "/Applications/Xcode_26.4.1.app/Contents/Developer" ]; then
-            SELECTED_DEVELOPER_DIR="/Applications/Xcode_26.4.1.app/Contents/Developer"
+          elif [ -d "/Applications/Xcode_26.5.app/Contents/Developer" ]; then
+            SELECTED_DEVELOPER_DIR="/Applications/Xcode_26.5.app/Contents/Developer"
           else
-            echo "::error::Xcode 26.4.1 was not found on this runner."
+            echo "::error::Xcode 26.5 was not found on this runner."
             exit 1
           fi
 
@@ -127,16 +127,16 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Select Xcode 26.4.1
+      - name: Select Xcode 26.5
         run: |
           set -euo pipefail
 
           if [ -n "${XCODE_26_DEVELOPER_DIR:-}" ] && [ -d "${XCODE_26_DEVELOPER_DIR}" ]; then
             SELECTED_DEVELOPER_DIR="${XCODE_26_DEVELOPER_DIR}"
-          elif [ -d "/Applications/Xcode_26.4.1.app/Contents/Developer" ]; then
-            SELECTED_DEVELOPER_DIR="/Applications/Xcode_26.4.1.app/Contents/Developer"
+          elif [ -d "/Applications/Xcode_26.5.app/Contents/Developer" ]; then
+            SELECTED_DEVELOPER_DIR="/Applications/Xcode_26.5.app/Contents/Developer"
           else
-            echo "::error::Xcode 26.4.1 was not found on this runner."
+            echo "::error::Xcode 26.5 was not found on this runner."
             exit 1
           fi
 
