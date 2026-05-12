@@ -38,6 +38,8 @@ final class EncryptScreenModel {
         String?,
         FileProgressReporter
     ) async throws -> AppTemporaryArtifact
+    typealias ClipboardNoticeDecision = @MainActor () async -> Bool
+    typealias ClipboardWriter = @MainActor (String, Bool) -> Void
 
     private(set) var configuration: EncryptView.Configuration
     let operation: OperationController
@@ -51,9 +53,13 @@ final class EncryptScreenModel {
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let textEncryptionAction: TextEncryptionAction
     private let fileEncryptionAction: FileEncryptionAction
+    private let clipboardNoticeDecision: ClipboardNoticeDecision
+    private let clipboardWriter: ClipboardWriter
     @ObservationIgnored private var encryptedFileArtifact: AppTemporaryArtifact?
     @ObservationIgnored private var lastAppliedInitialRecipientSelectionSignature: InitialRecipientSelectionSignature?
+    @ObservationIgnored private var clipboardTask: Task<Void, Never>?
     private var pendingInitialRecipientFingerprints: Set<String> = []
+    private var clipboardToken: UInt64 = 0
 
     var encryptMode: EncryptView.EncryptMode = .text
     var plaintext = ""
@@ -91,10 +97,13 @@ final class EncryptScreenModel {
         operation: OperationController = OperationController(),
         exportController: FileExportController = FileExportController(),
         textEncryptionAction: TextEncryptionAction? = nil,
-        fileEncryptionAction: FileEncryptionAction? = nil
+        fileEncryptionAction: FileEncryptionAction? = nil,
+        clipboardNoticeDecision: ClipboardNoticeDecision? = nil,
+        clipboardWriter: ClipboardWriter? = nil
     ) {
+        let operationController = operation
         self.configuration = configuration
-        self.operation = operation
+        self.operation = operationController
         self.exportController = exportController
         self.keyManagement = keyManagement
         self.contactService = contactService
@@ -102,6 +111,12 @@ final class EncryptScreenModel {
         self.protectedOrdinarySettings = protectedOrdinarySettings
         self.authLifecycleTraceStore = authLifecycleTraceStore
         self.protectedSettingsHost = protectedSettingsHost
+        self.clipboardNoticeDecision = clipboardNoticeDecision ?? {
+            await protectedSettingsHost?.clipboardNoticeDecision() ?? true
+        }
+        self.clipboardWriter = clipboardWriter ?? { string, shouldShowNotice in
+            operationController.copyToClipboard(string, shouldShowNotice: shouldShowNotice)
+        }
         self.textEncryptionAction = textEncryptionAction ?? {
             plaintext,
             recipients,
@@ -516,13 +531,28 @@ final class EncryptScreenModel {
             appConfiguration,
             .ciphertext
         ) != true {
-            Task { @MainActor [weak self] in
+            clipboardTask?.cancel()
+            clipboardToken &+= 1
+            let token = clipboardToken
+            let noticeDecision = clipboardNoticeDecision
+            let writer = clipboardWriter
+            clipboardTask = Task { @MainActor [weak self, token, ciphertextString, noticeDecision, writer] in
                 guard let self else { return }
-                let shouldShowNotice = await self.protectedSettingsHost?.clipboardNoticeDecision() ?? true
-                self.operation.copyToClipboard(
-                    ciphertextString,
-                    shouldShowNotice: shouldShowNotice
-                )
+                defer {
+                    if token == self.clipboardToken {
+                        self.clipboardTask = nil
+                    }
+                }
+                do {
+                    let shouldShowNotice = await noticeDecision()
+                    try Task.checkCancellation()
+                    guard token == self.clipboardToken else {
+                        return
+                    }
+                    writer(ciphertextString, shouldShowNotice)
+                } catch {
+                    return
+                }
             }
         }
     }
@@ -605,8 +635,15 @@ final class EncryptScreenModel {
 
     func handleContentClearGenerationChange() {
         operation.cancelAndInvalidate()
+        cancelClipboardCopy()
         cleanupTemporaryEncryptedFile()
         clearTransientInput()
+    }
+
+    private func cancelClipboardCopy() {
+        clipboardTask?.cancel()
+        clipboardToken &+= 1
+        clipboardTask = nil
     }
 
     func clearTransientInput() {

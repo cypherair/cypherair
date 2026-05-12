@@ -21,6 +21,25 @@ private actor EncryptOperationGate {
     }
 }
 
+private actor EncryptClipboardNoticeGate {
+    private var continuation: CheckedContinuation<Bool, Never>?
+
+    func decision() async -> Bool {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func isSuspended() -> Bool {
+        continuation != nil
+    }
+
+    func resume(returning value: Bool) {
+        continuation?.resume(returning: value)
+        continuation = nil
+    }
+}
+
 final class EncryptScreenModelTests: XCTestCase {
     private typealias ContactsProtectedHarness = (
         storageRoot: ProtectedDataStorageRoot,
@@ -1017,7 +1036,9 @@ final class EncryptScreenModelTests: XCTestCase {
         configuration: EncryptView.Configuration = .default,
         operation: OperationController = OperationController(),
         textEncryptionAction: EncryptScreenModel.TextEncryptionAction? = nil,
-        fileEncryptionAction: EncryptScreenModel.FileEncryptionAction? = nil
+        fileEncryptionAction: EncryptScreenModel.FileEncryptionAction? = nil,
+        clipboardNoticeDecision: EncryptScreenModel.ClipboardNoticeDecision? = nil,
+        clipboardWriter: EncryptScreenModel.ClipboardWriter? = nil
     ) -> EncryptScreenModel {
         let resolvedContactService = contactService ?? stack.contactService
         let resolvedEncryptionService = contactService.map {
@@ -1036,7 +1057,9 @@ final class EncryptScreenModelTests: XCTestCase {
             configuration: configuration,
             operation: operation,
             textEncryptionAction: textEncryptionAction,
-            fileEncryptionAction: fileEncryptionAction
+            fileEncryptionAction: fileEncryptionAction,
+            clipboardNoticeDecision: clipboardNoticeDecision,
+            clipboardWriter: clipboardWriter
         )
     }
 
@@ -1206,6 +1229,35 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertFalse(model.showUnverifiedRecipientsWarning)
         XCTAssertEqual(model.tagSelectionSkippedContactCount, 0)
         XCTAssertNil(model.tagSelectionSkippedTagName)
+    }
+
+    @MainActor
+    func test_contentClearDuringClipboardNoticeSuppressesLateClipboardWrite() async {
+        let gate = EncryptClipboardNoticeGate()
+        var copiedPayloads: [(String, Bool)] = []
+        let model = makeModel(
+            clipboardNoticeDecision: {
+                await gate.decision()
+            },
+            clipboardWriter: { text, shouldShowNotice in
+                copiedPayloads.append((text, shouldShowNotice))
+            }
+        )
+        model.ciphertext = Data("late-ciphertext".utf8)
+
+        model.copyCiphertextToClipboard()
+
+        await waitUntil("encrypt clipboard notice decision to suspend") {
+            await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+
+        await gate.resume(returning: true)
+        await settleAsyncWork()
+
+        XCTAssertTrue(copiedPayloads.isEmpty)
+        XCTAssertFalse(model.operation.isShowingClipboardNotice)
     }
 
     @MainActor

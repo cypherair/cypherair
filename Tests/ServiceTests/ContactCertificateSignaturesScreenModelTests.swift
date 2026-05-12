@@ -829,6 +829,140 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_clearTransientInputBeforePendingSaveSuppressesSaveAction() async throws {
+        let protectedContacts = try await makeProtectedContactService(prefix: "DetailsSaveClear")
+        defer {
+            try? FileManager.default.removeItem(
+                at: protectedContacts.storageRoot.rootURL.deletingLastPathComponent()
+            )
+        }
+        let certificateSignatureService = CertificateSignatureService(
+            engine: stack.engine,
+            keyManagement: stack.keyManagement,
+            contactService: protectedContacts.service
+        )
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Save Clear",
+            email: "details-save-clear@example.com",
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService
+        )
+        let signer = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Details Save Clear Signer"
+        )
+        let keyRecord = try XCTUnwrap(
+            protectedContacts.service.availableContactKeyRecord(keyId: key.keyId)
+        )
+        let validSignature = try await certificateSignatureService.generateArmoredUserIdCertification(
+            signerFingerprint: signer.fingerprint,
+            targetCert: keyRecord.publicKeyData,
+            selectedUserId: catalog.userIds[0],
+            certificationKind: .generic
+        )
+        var saveCalls = 0
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService,
+            selectionCatalogAction: { _ in catalog },
+            saveArtifactAction: { artifact in
+                saveCalls += 1
+                return artifact.reference
+            }
+        )
+
+        model.loadIfNeeded()
+        await waitUntil("details save-clear catalog load") {
+            model.loadState == .loaded
+        }
+        model.setSignatureInput(String(decoding: validSignature, as: UTF8.self))
+        model.verifyImportedSignature()
+        await waitUntil("details save-clear pending artifact") {
+            model.pendingArtifact != nil
+        }
+
+        model.savePendingSignature()
+        model.clearTransientInput()
+        await settleAsyncWork()
+
+        XCTAssertEqual(saveCalls, 0)
+        XCTAssertNil(model.lastSavedArtifact)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_clearTransientInputBeforeExportSuppressesExportPreparation() async throws {
+        let protectedContacts = try await makeProtectedContactService(prefix: "DetailsExportClear")
+        defer {
+            try? FileManager.default.removeItem(
+                at: protectedContacts.storageRoot.rootURL.deletingLastPathComponent()
+            )
+        }
+        let certificateSignatureService = CertificateSignatureService(
+            engine: stack.engine,
+            keyManagement: stack.keyManagement,
+            contactService: protectedContacts.service
+        )
+        let (contactId, key, catalog) = try makeContactContext(
+            name: "Details Export Clear",
+            email: "details-export-clear@example.com",
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService
+        )
+        let signer = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Details Export Clear Signer"
+        )
+        let keyRecord = try XCTUnwrap(
+            protectedContacts.service.availableContactKeyRecord(keyId: key.keyId)
+        )
+        let validSignature = try await certificateSignatureService.generateArmoredUserIdCertification(
+            signerFingerprint: signer.fingerprint,
+            targetCert: keyRecord.publicKeyData,
+            selectedUserId: catalog.userIds[0],
+            certificationKind: .generic
+        )
+        var exportCalls = 0
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            contactService: protectedContacts.service,
+            certificateSignatureService: certificateSignatureService,
+            selectionCatalogAction: { _ in catalog },
+            saveArtifactAction: { artifact in artifact.reference },
+            exportArtifactAction: { artifactId in
+                exportCalls += 1
+                return (Data("export-\(artifactId)".utf8), "certification.asc")
+            }
+        )
+
+        model.loadIfNeeded()
+        await waitUntil("details export-clear catalog load") {
+            model.loadState == .loaded
+        }
+        model.setSignatureInput(String(decoding: validSignature, as: UTF8.self))
+        model.verifyImportedSignature()
+        await waitUntil("details export-clear pending artifact") {
+            model.pendingArtifact != nil
+        }
+        model.savePendingSignature()
+        await waitUntil("details export-clear saved artifact") {
+            model.lastSavedArtifact != nil
+        }
+        let savedArtifact = try XCTUnwrap(model.lastSavedArtifact)
+
+        model.exportArtifact(savedArtifact)
+        model.clearTransientInput()
+        await settleAsyncWork()
+
+        XCTAssertEqual(exportCalls, 0)
+        XCTAssertNil(model.exportController.payload)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
     private func makeContactContext(
         name: String,
         email: String,

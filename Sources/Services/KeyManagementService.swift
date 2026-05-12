@@ -22,6 +22,7 @@ final class KeyManagementService: @unchecked Sendable {
     private let mutationService: KeyMutationService
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
     private let provisioningInvalidationGate: KeyProvisioningInvalidationGate
+    private let postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let traceStore: AuthLifecycleTraceStore?
     private var legacyMetadataMigrationCompletedInProcess = false
 
@@ -36,7 +37,8 @@ final class KeyManagementService: @unchecked Sendable {
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         metadataPersistence: (any KeyMetadataPersistence)? = nil,
-        provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
+        provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) {
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
         let keyMetadataPersistence = metadataPersistence ?? metadataStore
@@ -57,6 +59,7 @@ final class KeyManagementService: @unchecked Sendable {
         self.privateKeyAccessService = privateKeyAccessService
         self.privateKeyControlStore = effectivePrivateKeyControlStore
         self.provisioningInvalidationGate = provisioningInvalidationGate
+        self.postProvisioningCheckpoint = postProvisioningCheckpoint
         self.provisioningService = KeyProvisioningService(
             engine: engine,
             secureEnclave: secureEnclave,
@@ -100,6 +103,7 @@ final class KeyManagementService: @unchecked Sendable {
             syncKeys()
             metadataLoadState = .loaded
         } catch {
+            catalogStore.clearInMemoryIdentities()
             keys = []
             metadataLoadState = .recoveryNeeded
             throw error
@@ -111,11 +115,13 @@ final class KeyManagementService: @unchecked Sendable {
     }
 
     func markKeyMetadataLocked() {
+        catalogStore.clearInMemoryIdentities()
         keys = []
         metadataLoadState = .locked
     }
 
     func markKeyMetadataRecoveryNeeded() {
+        catalogStore.clearInMemoryIdentities()
         keys = []
         metadataLoadState = .recoveryNeeded
     }
@@ -184,6 +190,7 @@ final class KeyManagementService: @unchecked Sendable {
 
     func resetInMemoryStateAfterLocalDataReset() {
         provisioningInvalidationGate.invalidate()
+        catalogStore.clearInMemoryIdentities()
         keys = []
         legacyMetadataMigrationCompletedInProcess = false
         legacyMetadataMigrationLoadWarning = nil
@@ -236,13 +243,20 @@ final class KeyManagementService: @unchecked Sendable {
         profile: KeyProfile,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
+        let token = provisioningInvalidationGate.makeToken()
         let identity = try await provisioningService.generateKey(
             name: name,
             email: email,
             expirySeconds: expirySeconds,
             profile: profile,
-            authMode: authMode
+            authMode: authMode,
+            invalidationToken: token
         )
+        if let postProvisioningCheckpoint {
+            await postProvisioningCheckpoint()
+        }
+        try Task.checkCancellation()
+        try provisioningInvalidationGate.checkValid(token)
         syncKeys()
         return identity
     }
@@ -278,11 +292,18 @@ final class KeyManagementService: @unchecked Sendable {
         passphrase: String,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
+        let token = provisioningInvalidationGate.makeToken()
         let identity = try await provisioningService.importKey(
             armoredData: armoredData,
             passphrase: passphrase,
-            authMode: authMode
+            authMode: authMode,
+            invalidationToken: token
         )
+        if let postProvisioningCheckpoint {
+            await postProvisioningCheckpoint()
+        }
+        try Task.checkCancellation()
+        try provisioningInvalidationGate.checkValid(token)
         syncKeys()
         return identity
     }
@@ -299,10 +320,24 @@ final class KeyManagementService: @unchecked Sendable {
     func exportKey(fingerprint: String, passphrase: String) async throws -> Data {
         let exported = try await exportService.exportKey(
             fingerprint: fingerprint,
-            passphrase: passphrase
+            passphrase: passphrase,
+            markBackedUp: true
         )
         syncKeys()
         return exported
+    }
+
+    func exportKeyBackupData(fingerprint: String, passphrase: String) async throws -> Data {
+        try await exportService.exportKey(
+            fingerprint: fingerprint,
+            passphrase: passphrase,
+            markBackedUp: false
+        )
+    }
+
+    func confirmKeyBackupExported(fingerprint: String) {
+        catalogStore.markBackedUp(fingerprint: fingerprint)
+        syncKeys()
     }
 
     /// Export the key's revocation signature as an ASCII-armored signature.

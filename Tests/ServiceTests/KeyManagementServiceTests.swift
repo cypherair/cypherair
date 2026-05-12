@@ -323,6 +323,30 @@ final class KeyManagementServiceTests: XCTestCase {
         return (service, localKeychain, metadataPersistence)
     }
 
+    private func makePostProvisioningCheckpointedService(
+        checkpoint: @escaping KeyProvisioningService.ProvisioningCheckpoint
+    ) -> (
+        service: KeyManagementService,
+        keychain: MockKeychain,
+        metadataPersistence: RecordingKeyMetadataPersistence
+    ) {
+        let localSE = MockSecureEnclave()
+        let localKeychain = MockKeychain()
+        let localAuthenticator = MockAuthenticator()
+        let localPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        let service = KeyManagementService(
+            engine: engine,
+            secureEnclave: localSE,
+            keychain: localKeychain,
+            authenticator: localAuthenticator,
+            privateKeyControlStore: localPrivateKeyControlStore,
+            metadataPersistence: metadataPersistence,
+            postProvisioningCheckpoint: checkpoint
+        )
+        return (service, localKeychain, metadataPersistence)
+    }
+
     private func assertNoProvisionedKeyMaterial(
         in keychain: MockKeychain,
         metadataPersistence: RecordingKeyMetadataPersistence,
@@ -530,6 +554,47 @@ final class KeyManagementServiceTests: XCTestCase {
             in: target.keychain,
             metadataPersistence: target.metadataPersistence
         )
+    }
+
+    func test_generateKey_invalidatedAfterProvisioningBeforeSync_doesNotRepublishCatalogKeys() async throws {
+        let checkpointGate = ProvisioningCheckpointGate()
+        let target = makePostProvisioningCheckpointedService {
+            await checkpointGate.suspend()
+        }
+        let targetService = target.service
+
+        let generationTask = Task { [targetService] in
+            try await targetService.generateKey(
+                name: "Relock Race",
+                email: "relock-race@example.com",
+                expirySeconds: nil,
+                profile: .universal,
+                authMode: .standard
+            )
+        }
+
+        await waitUntil("key generation post-provisioning checkpoint") {
+            await checkpointGate.isSuspended()
+        }
+
+        try await targetService.relockProtectedData()
+        XCTAssertEqual(targetService.metadataLoadState, .locked)
+        XCTAssertTrue(targetService.keys.isEmpty)
+
+        await checkpointGate.resume()
+
+        do {
+            _ = try await generationTask.value
+            XCTFail("Expected invalidated key generation to cancel")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+
+        XCTAssertEqual(targetService.metadataLoadState, .locked)
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertEqual(target.metadataPersistence.saveCallCount, 1)
     }
 
     func test_generateKey_profileA_returnsCorrectIdentity() async throws {
@@ -772,6 +837,25 @@ final class KeyManagementServiceTests: XCTestCase {
 
         XCTAssertTrue(service.keys.first?.isBackedUp == true,
                       "Key should be marked as backed up after export")
+    }
+
+    func test_exportKeyBackupData_doesNotMarkBackedUpUntilConfirmed() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        XCTAssertFalse(try XCTUnwrap(service.keys.first).isBackedUp)
+
+        var exported = try await service.exportKeyBackupData(
+            fingerprint: identity.fingerprint,
+            passphrase: "backup-pass"
+        )
+        defer {
+            exported.resetBytes(in: 0..<exported.count)
+        }
+
+        XCTAssertFalse(try XCTUnwrap(service.keys.first).isBackedUp)
+
+        service.confirmKeyBackupExported(fingerprint: identity.fingerprint)
+
+        XCTAssertTrue(try XCTUnwrap(service.keys.first).isBackedUp)
     }
 
     func test_exportKey_metadataUpdateFailure_keepsSessionBackedUp_butFreshServiceSeesOldState() async throws {
@@ -1080,6 +1164,57 @@ final class KeyManagementServiceTests: XCTestCase {
             in: target.keychain,
             metadataPersistence: target.metadataPersistence
         )
+    }
+
+    func test_importKey_invalidatedAfterProvisioningBeforeSync_doesNotRepublishCatalogKeys() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: service,
+            name: "Import Post Source"
+        )
+        let passphrase = "import-post-race-passphrase"
+        var exportedData = try await service.exportKey(
+            fingerprint: identity.fingerprint,
+            passphrase: passphrase
+        )
+        defer {
+            exportedData.resetBytes(in: 0..<exportedData.count)
+        }
+        let checkpointGate = ProvisioningCheckpointGate()
+        let target = makePostProvisioningCheckpointedService {
+            await checkpointGate.suspend()
+        }
+        let targetService = target.service
+
+        let importTask = Task { [targetService, exportedData] in
+            try await targetService.importKey(
+                armoredData: exportedData,
+                passphrase: passphrase,
+                authMode: .standard
+            )
+        }
+
+        await waitUntil("key import post-provisioning checkpoint") {
+            await checkpointGate.isSuspended()
+        }
+
+        try await targetService.relockProtectedData()
+        XCTAssertEqual(targetService.metadataLoadState, .locked)
+        XCTAssertTrue(targetService.keys.isEmpty)
+
+        await checkpointGate.resume()
+
+        do {
+            _ = try await importTask.value
+            XCTFail("Expected invalidated key import to cancel")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+
+        XCTAssertEqual(targetService.metadataLoadState, .locked)
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertEqual(target.metadataPersistence.saveCallCount, 1)
     }
 
     // MARK: - Default Key

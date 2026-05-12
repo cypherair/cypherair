@@ -181,17 +181,24 @@ struct BackupKeyView: View {
             }
 
             do {
-                var data = try await service.exportKey(
+                var data = try await service.exportKeyBackupData(
                     fingerprint: fp,
                     passphrase: pass
                 )
+                var didHandOffData = false
+                defer {
+                    if !didHandOffData {
+                        data.resetBytes(in: 0..<data.count)
+                    }
+                }
                 try Task.checkCancellation()
                 guard token == exportToken else {
-                    data.resetBytes(in: 0..<data.count)
                     return
                 }
                 exportedData = data
+                didHandOffData = true
                 configuration.onExported?(data)
+                service.confirmKeyBackupExported(fingerprint: fp)
                 passphrase = ""
                 passphraseConfirm = ""
             } catch {

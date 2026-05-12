@@ -160,7 +160,8 @@ struct ImportKeyView: View {
         let token = importToken
         isImporting = true
         let service = keyManagement
-        let data = importedKeyData ?? Data(armoredText.utf8)
+        let importedKeyDataSnapshot = importedKeyData
+        let armoredTextSnapshot = armoredText
         let pass = passphrase
 
         importTask = Task { @MainActor in
@@ -172,6 +173,10 @@ struct ImportKeyView: View {
             }
 
             do {
+                var data = importedKeyDataSnapshot ?? Data(armoredTextSnapshot.utf8)
+                defer {
+                    data.resetBytes(in: 0..<data.count)
+                }
                 _ = try await service.importKey(
                     armoredData: data,
                     passphrase: pass

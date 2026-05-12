@@ -421,7 +421,7 @@ final class ContactCertificationDetailsScreenModel {
             return
         }
 
-        startOperation(.generateAndSave) {
+        startOperation(.generateAndSave) { checkActive in
             let filename = self.certificationExportFilename(
                 key: key,
                 signer: selectedSigner,
@@ -433,7 +433,7 @@ final class ContactCertificationDetailsScreenModel {
                 selectedUserId,
                 self.selectedCertificationKind
             )
-            try Task.checkCancellation()
+            try checkActive()
             let validation = try await self.validateUserIdArtifactAction(
                 armoredCertification,
                 key,
@@ -442,7 +442,7 @@ final class ContactCertificationDetailsScreenModel {
                 .generated,
                 filename
             )
-            try Task.checkCancellation()
+            try checkActive()
             guard let artifact = validation.artifact else {
                 throw CypherAirError.invalidKeyData(
                     reason: String(
@@ -451,6 +451,7 @@ final class ContactCertificationDetailsScreenModel {
                     )
                 )
             }
+            try checkActive()
             let saved = try self.saveArtifactAction(artifact)
             return (validation.verification, nil, saved)
         }
@@ -463,7 +464,7 @@ final class ContactCertificationDetailsScreenModel {
             return
         }
 
-        startOperation(.verifyImport) {
+        startOperation(.verifyImport) { checkActive in
             let validation: ContactCertificationArtifactValidation
             switch self.importMode {
             case .directKey:
@@ -474,7 +475,7 @@ final class ContactCertificationDetailsScreenModel {
                     .imported,
                     nil
                 )
-                try Task.checkCancellation()
+                try checkActive()
             case .userIdBinding:
                 guard let selectedUserId = self.selectedUserId else {
                     throw CypherAirError.invalidKeyData(
@@ -492,7 +493,7 @@ final class ContactCertificationDetailsScreenModel {
                     .imported,
                     nil
                 )
-                try Task.checkCancellation()
+                try checkActive()
             }
             return (validation.verification, validation.artifact, nil)
         }
@@ -504,16 +505,17 @@ final class ContactCertificationDetailsScreenModel {
             return
         }
 
-        startOperation(.savePending) {
+        startOperation(.savePending) { checkActive in
+            try checkActive()
             let saved = try self.saveArtifactAction(pendingArtifact)
             return (self.verification, nil, saved)
         }
     }
 
     func exportArtifact(_ artifact: ContactCertificationArtifactReference) {
-        startOperation(.exportArtifact(artifact.artifactId)) {
+        startOperation(.exportArtifact(artifact.artifactId)) { checkActive in
             let export = try self.exportArtifactAction(artifact.artifactId)
-            try Task.checkCancellation()
+            try checkActive()
             try self.prepareExport(export.data, filename: export.filename)
             return (self.verification, self.pendingArtifact, self.lastSavedArtifact)
         }
@@ -688,7 +690,7 @@ final class ContactCertificationDetailsScreenModel {
 
     private func startOperation(
         _ operation: ActiveOperation,
-        work: @escaping @MainActor () async throws -> (
+        work: @escaping @MainActor (@escaping @MainActor () throws -> Void) async throws -> (
             CertificateSignatureVerification?,
             VerifiedContactCertificationArtifact?,
             ContactCertificationArtifactReference?
@@ -714,8 +716,15 @@ final class ContactCertificationDetailsScreenModel {
             }
 
             do {
-                let (verification, pendingArtifact, savedArtifact) = try await work()
-                try Task.checkCancellation()
+                let checkActive: @MainActor () throws -> Void = { [weak self, generation] in
+                    try Task.checkCancellation()
+                    guard let self, generation == self.operationGeneration else {
+                        throw CancellationError()
+                    }
+                }
+                try checkActive()
+                let (verification, pendingArtifact, savedArtifact) = try await work(checkActive)
+                try checkActive()
 
                 guard let self, generation == self.operationGeneration else {
                     return

@@ -19,6 +19,10 @@ final class KeyCatalogStore {
         keys = try metadataStore.loadAll()
     }
 
+    func clearInMemoryIdentities() {
+        keys = []
+    }
+
     func migrateLegacyMetadataIfNeeded(
         authenticationContext: LAContext?
     ) throws -> KeyMetadataLegacyMigrationOutcome {

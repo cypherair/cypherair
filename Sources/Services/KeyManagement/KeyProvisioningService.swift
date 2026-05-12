@@ -35,9 +35,9 @@ final class KeyProvisioningService {
         email: String?,
         expirySeconds: UInt64?,
         profile: KeyProfile,
-        authMode: AuthenticationMode
+        authMode: AuthenticationMode,
+        invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
-        let token = invalidationGate.makeToken()
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
@@ -93,9 +93,9 @@ final class KeyProvisioningService {
     func importKey(
         armoredData: Data,
         passphrase: String,
-        authMode: AuthenticationMode
+        authMode: AuthenticationMode,
+        invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
-        let token = invalidationGate.makeToken()
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
