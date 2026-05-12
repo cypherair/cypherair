@@ -1119,6 +1119,42 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertTrue(backupContents.contains("passphraseConfirm = \"\""))
     }
 
+    func test_backupFileExporter_confirmsOnlyAfterSuccessfulSave() throws {
+        let backupContents = try loadRepositoryAuditSource("Sources/App/Keys/BackupKeyView.swift")
+        let fileExporterStart = try XCTUnwrap(
+            backupContents.range(of: ".fileExporter(")?.lowerBound
+        )
+        let fileExporterEnd = try XCTUnwrap(
+            backupContents.range(of: ".onDisappear", range: fileExporterStart..<backupContents.endIndex)?.lowerBound
+        )
+        let fileExporterBody = String(backupContents[fileExporterStart..<fileExporterEnd])
+        let successStart = try XCTUnwrap(fileExporterBody.range(of: "case .success:")?.lowerBound)
+        let failureStart = try XCTUnwrap(fileExporterBody.range(of: "case .failure")?.lowerBound)
+        let successBody = String(fileExporterBody[successStart..<failureStart])
+        let failureBody = String(fileExporterBody[failureStart...])
+
+        XCTAssertTrue(fileExporterBody.contains("exportedDataToken == exportToken"))
+        XCTAssertTrue(successBody.contains("configuration.onExported?(exportedData)"))
+        XCTAssertTrue(successBody.contains("keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)"))
+        XCTAssertFalse(failureBody.contains("confirmKeyBackupExported"))
+
+        let exportBackupStart = try XCTUnwrap(
+            backupContents.range(of: "private func exportBackup()")?.lowerBound
+        )
+        let exportBackupEnd = try XCTUnwrap(
+            backupContents.range(
+                of: "private func cancelExportAndClearTransientInput()",
+                range: exportBackupStart..<backupContents.endIndex
+            )?.lowerBound
+        )
+        let exportBackupBody = String(backupContents[exportBackupStart..<exportBackupEnd])
+
+        XCTAssertTrue(exportBackupBody.contains("exportedDataToken = token"))
+        XCTAssertTrue(exportBackupBody.contains("if configuration.resultPresentation == .inlinePreview"))
+        XCTAssertTrue(exportBackupBody.contains("configuration.onExported?(data)"))
+        XCTAssertTrue(exportBackupBody.contains("service.confirmKeyBackupExported(fingerprint: fp)"))
+    }
+
     func test_outputPages_removeTutorialOutputCouplingFromPageImplementations() throws {
         let files = [
             "Sources/App/Encrypt/EncryptView.swift",

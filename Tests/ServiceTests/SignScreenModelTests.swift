@@ -21,6 +21,25 @@ private actor SignOperationGate {
     }
 }
 
+private actor SignClipboardNoticeGate {
+    private var continuation: CheckedContinuation<Bool, Never>?
+
+    func decision() async -> Bool {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func isSuspended() -> Bool {
+        continuation != nil
+    }
+
+    func resume(returning value: Bool) {
+        continuation?.resume(returning: value)
+        continuation = nil
+    }
+}
+
 final class SignScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
     private var config: AppConfiguration!
@@ -260,6 +279,42 @@ final class SignScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_contentClearDuringTextSigningSuppressesLateSignedMessage() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Signing Privacy"
+        )
+        let gate = SignOperationGate()
+        let model = makeModel(
+            cleartextSigningAction: { _, _ in
+                await gate.suspend()
+                return Data("late-signed-message".utf8)
+            }
+        )
+        model.signerFingerprint = identity.fingerprint
+        model.text = "Sensitive message"
+
+        model.signText()
+
+        await waitUntil("text signing to suspend for content clear") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+        XCTAssertFalse(model.operation.isRunning)
+        XCTAssertNil(model.signedMessage)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.signedMessage)
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
     func test_clearTransientInput_clearsMessageFileSelectionAndSignatureResults() {
         let model = makeModel()
         model.text = "Message to sign"
@@ -280,11 +335,42 @@ final class SignScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_contentClearDuringClipboardNoticeSuppressesLateClipboardWrite() async {
+        let gate = SignClipboardNoticeGate()
+        var copiedPayloads: [(String, Bool)] = []
+        let model = makeModel(
+            clipboardNoticeDecision: {
+                await gate.decision()
+            },
+            clipboardWriter: { text, shouldShowNotice in
+                copiedPayloads.append((text, shouldShowNotice))
+            }
+        )
+        model.signedMessage = "late-signed-message"
+
+        model.copySignedMessageToClipboard()
+
+        await waitUntil("sign clipboard notice decision to suspend") {
+            await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+
+        await gate.resume(returning: true)
+        await settleAsyncWork()
+
+        XCTAssertTrue(copiedPayloads.isEmpty)
+        XCTAssertFalse(model.operation.isShowingClipboardNotice)
+    }
+
+    @MainActor
     private func makeModel(
         configuration: SignView.Configuration = .default,
         operation: OperationController = OperationController(),
         cleartextSigningAction: SignScreenModel.CleartextSigningAction? = nil,
-        detachedFileSigningAction: SignScreenModel.DetachedFileSigningAction? = nil
+        detachedFileSigningAction: SignScreenModel.DetachedFileSigningAction? = nil,
+        clipboardNoticeDecision: SignScreenModel.ClipboardNoticeDecision? = nil,
+        clipboardWriter: SignScreenModel.ClipboardWriter? = nil
     ) -> SignScreenModel {
         SignScreenModel(
             signingService: stack.signingService,
@@ -293,7 +379,9 @@ final class SignScreenModelTests: XCTestCase {
             configuration: configuration,
             operation: operation,
             cleartextSigningAction: cleartextSigningAction,
-            detachedFileSigningAction: detachedFileSigningAction
+            detachedFileSigningAction: detachedFileSigningAction,
+            clipboardNoticeDecision: clipboardNoticeDecision,
+            clipboardWriter: clipboardWriter
         )
     }
 
@@ -320,5 +408,11 @@ final class SignScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }

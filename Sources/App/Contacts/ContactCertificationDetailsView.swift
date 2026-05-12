@@ -142,6 +142,12 @@ private struct ContactCertificationDetailsHostView: View {
         .onDisappear {
             model.handleDisappear()
         }
+        .onChange(of: model.contactsAvailability) { previousAvailability, currentAvailability in
+            model.handleContactsAvailabilityChange(
+                from: previousAvailability,
+                to: currentAvailability
+            )
+        }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
             model.clearTransientInput()
         }

@@ -67,6 +67,19 @@ final class OperationController {
         isCancelling = true
     }
 
+    func cancelAndInvalidate() {
+        progress?.cancel()
+        currentTask?.cancel()
+        nextOperationID &+= 1
+        currentOperationID = nextOperationID
+        progress = nil
+        isRunning = false
+        isCancelling = false
+        currentTask = nil
+        dismissError()
+        isShowingClipboardNotice = false
+    }
+
     func dismissError() {
         error = nil
         isShowingError = false

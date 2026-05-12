@@ -34,6 +34,9 @@ struct BackupKeyView: View {
     @State private var error: CypherAirError?
     @State private var showError = false
     @State private var showFileExporter = false
+    @State private var exportTask: Task<Void, Never>?
+    @State private var exportToken: UInt64 = 0
+    @State private var exportedDataToken: UInt64?
 
     init(
         fingerprint: String,
@@ -136,9 +139,6 @@ struct BackupKeyView: View {
                 get: { showFileExporter },
                 set: {
                     showFileExporter = $0
-                    if !$0 {
-                        clearExportedData()
-                    }
                 }
             ),
             item: exportedData,
@@ -148,41 +148,88 @@ struct BackupKeyView: View {
             defer {
                 clearExportedData()
             }
-            if case .failure(let exportError) = result {
+
+            switch result {
+            case .success:
+                guard let exportedData,
+                      exportedDataToken == exportToken else {
+                    return
+                }
+                configuration.onExported?(exportedData)
+                keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)
+            case .failure(let exportError):
+                guard exportedDataToken == exportToken else {
+                    return
+                }
                 error = CypherAirError.from(exportError) { .encryptionFailed(reason: $0) }
                 showError = true
             }
         }
         .onDisappear {
-            clearTransientInput()
+            cancelExportAndClearTransientInput()
         }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
-            clearTransientInput()
+            cancelExportAndClearTransientInput()
         }
     }
 
     private func exportBackup() {
+        exportTask?.cancel()
+        exportToken &+= 1
+        let token = exportToken
         isExporting = true
         let service = keyManagement
         let fp = fingerprint
         let pass = passphrase
 
-        Task {
+        exportTask = Task { @MainActor in
+            defer {
+                if token == exportToken {
+                    isExporting = false
+                    exportTask = nil
+                }
+            }
+
             do {
-                let data = try await service.exportKey(
+                var data = try await service.exportKeyBackupData(
                     fingerprint: fp,
                     passphrase: pass
                 )
+                var didHandOffData = false
+                defer {
+                    if !didHandOffData {
+                        data.resetBytes(in: 0..<data.count)
+                    }
+                }
+                try Task.checkCancellation()
+                guard token == exportToken else {
+                    return
+                }
                 exportedData = data
-                configuration.onExported?(data)
+                exportedDataToken = token
+                didHandOffData = true
+                if configuration.resultPresentation == .inlinePreview {
+                    configuration.onExported?(data)
+                    service.confirmKeyBackupExported(fingerprint: fp)
+                }
                 passphrase = ""
                 passphraseConfirm = ""
             } catch {
+                guard !Self.shouldIgnore(error), token == exportToken else {
+                    return
+                }
                 self.error = CypherAirError.from(error) { .encryptionFailed(reason: $0) }
                 showError = true
             }
-            isExporting = false
         }
+    }
+
+    private func cancelExportAndClearTransientInput() {
+        exportTask?.cancel()
+        exportToken &+= 1
+        exportTask = nil
+        isExporting = false
+        clearTransientInput()
     }
 
     private func clearTransientInput() {
@@ -196,5 +243,21 @@ struct BackupKeyView: View {
     private func clearExportedData() {
         exportedData?.resetBytes(in: 0..<(exportedData?.count ?? 0))
         exportedData = nil
+        exportedDataToken = nil
+    }
+
+    private static func shouldIgnore(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        if let cypherAirError = error as? CypherAirError,
+           case .operationCancelled = cypherAirError {
+            return true
+        }
+        if let pgpError = error as? PgpError,
+           case .OperationCancelled = pgpError {
+            return true
+        }
+        return false
     }
 }

@@ -253,6 +253,91 @@ final class DecryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_contentClearDuringTextParseSuppressesLatePhase1ResultAndCallback() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Parse Privacy"
+        )
+        let phase1Result = makePhase1Result(matchedKey: identity)
+        let gate = DecryptOperationGate()
+        var parsedResult: DecryptionService.Phase1Result?
+        var configuration = DecryptView.Configuration()
+        configuration.onParsed = { parsedResult = $0 }
+
+        let model = makeModel(
+            configuration: configuration,
+            parseTextRecipientsAction: { _ in
+                await gate.suspend()
+                return phase1Result
+            }
+        )
+        model.ciphertextInput = "ciphertext"
+
+        model.parseRecipientsText()
+
+        await waitUntil("text parse to suspend for content clear") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+        XCTAssertFalse(model.operation.isRunning)
+        XCTAssertNil(model.phase1Result)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.phase1Result)
+        XCTAssertNil(parsedResult)
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
+    func test_contentClearDuringTextDecryptSuppressesLatePlaintextAndCallback() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Decrypt Privacy"
+        )
+        let detailedVerification = makeDetailedVerification(status: .valid)
+        let gate = DecryptOperationGate()
+        var decryptedPlaintext: Data?
+        var configuration = DecryptView.Configuration()
+        configuration.onDecrypted = { plaintext, _ in decryptedPlaintext = plaintext }
+
+        let model = makeModel(
+            configuration: configuration,
+            textDecryptionAction: { _ in
+                await gate.suspend()
+                return (Data("late-plaintext".utf8), detailedVerification)
+            }
+        )
+        model.phase1Result = makePhase1Result(matchedKey: identity)
+
+        model.decryptText()
+
+        await waitUntil("text decrypt to suspend for content clear") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.handleContentClearGenerationChange()
+        XCTAssertFalse(model.operation.isRunning)
+        XCTAssertNil(model.decryptedText)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.decryptedText)
+        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(decryptedPlaintext)
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
     func test_setCiphertextInput_invalidatesImportedTextAndTextPhase1State() async throws {
         let identity = try await TestHelpers.generateProfileAKey(
             service: stack.keyManagement,
@@ -842,5 +927,11 @@ final class DecryptScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    private func settleAsyncWork() async {
+        for _ in 0..<10 {
+            await Task.yield()
+        }
     }
 }

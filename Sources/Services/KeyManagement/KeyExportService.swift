@@ -18,7 +18,8 @@ final class KeyExportService {
 
     func exportKey(
         fingerprint: String,
-        passphrase: String
+        passphrase: String,
+        markBackedUp: Bool = true
     ) async throws -> Data {
         var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
         defer {
@@ -36,7 +37,9 @@ final class KeyExportService {
             profile: identity.profile
         )
 
-        catalogStore.markBackedUp(fingerprint: fingerprint)
+        if markBackedUp {
+            catalogStore.markBackedUp(fingerprint: fingerprint)
+        }
         return exported
     }
 

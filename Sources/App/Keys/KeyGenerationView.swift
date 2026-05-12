@@ -41,6 +41,8 @@ struct KeyGenerationView: View {
     @State private var error: CypherAirError?
     @State private var showError = false
     @State private var generatedIdentity: PGPKeyIdentity?
+    @State private var generationTask: Task<Void, Never>?
+    @State private var generationToken: UInt64 = 0
 
     private let expiryOptions = [12, 24, 36, 48, 60]
 
@@ -166,26 +168,41 @@ struct KeyGenerationView: View {
             }
         }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
-            clearTransientInput()
+            cancelGenerationAndClearTransientInput()
         }
     }
 
     private func generate() {
+        generationTask?.cancel()
+        generationToken &+= 1
+        let token = generationToken
         isGenerating = true
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
+        let selectedProfile = profile
         let expiryDate = Calendar.current.date(byAdding: .month, value: expiryMonths, to: Date()) ?? Date()
         let expirySeconds = UInt64(max(0, expiryDate.timeIntervalSinceNow))
         let service = keyManagement
 
-        Task {
+        generationTask = Task { @MainActor in
+            defer {
+                if token == generationToken {
+                    isGenerating = false
+                    generationTask = nil
+                }
+            }
+
             do {
                 let identity = try await service.generateKey(
                     name: trimmedName,
                     email: trimmedEmail.isEmpty ? nil : trimmedEmail,
                     expirySeconds: expirySeconds,
-                    profile: profile
+                    profile: selectedProfile
                 )
+                try Task.checkCancellation()
+                guard token == generationToken else {
+                    return
+                }
                 configuration.onGenerated?(identity)
 
                 switch configuration.postGenerationBehavior {
@@ -201,11 +218,21 @@ struct KeyGenerationView: View {
                     break
                 }
             } catch {
+                guard !Self.shouldIgnore(error), token == generationToken else {
+                    return
+                }
                 self.error = CypherAirError.from(error) { .keyGenerationFailed(reason: $0) }
                 showError = true
             }
-            isGenerating = false
         }
+    }
+
+    private func cancelGenerationAndClearTransientInput() {
+        generationTask?.cancel()
+        generationToken &+= 1
+        generationTask = nil
+        isGenerating = false
+        clearTransientInput()
     }
 
     private func clearTransientInput() {
@@ -213,5 +240,20 @@ struct KeyGenerationView: View {
         email = ""
         focusedField = nil
         generatedIdentity = nil
+    }
+
+    private static func shouldIgnore(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        if let cypherAirError = error as? CypherAirError,
+           case .operationCancelled = cypherAirError {
+            return true
+        }
+        if let pgpError = error as? PgpError,
+           case .OperationCancelled = pgpError {
+            return true
+        }
+        return false
     }
 }

@@ -265,6 +265,7 @@ final class ContactCertificateSignaturesScreenModel {
     }
 
     func clearTransientInput() {
+        invalidateAsyncWork()
         importedSignature.clear()
         signatureInput = ""
         verification = nil
@@ -278,6 +279,30 @@ final class ContactCertificateSignaturesScreenModel {
         }
 
         loadCatalog()
+    }
+
+    func handleContactsAvailabilityChange(
+        from previousAvailability: ContactsAvailability,
+        to currentAvailability: ContactsAvailability
+    ) {
+        guard !previousAvailability.isAvailable,
+              currentAvailability.isAvailable else {
+            return
+        }
+
+        switch loadState {
+        case .idle:
+            loadIfNeeded()
+        case .failed:
+            guard case .some(.contactsUnavailable) = loadError else {
+                return
+            }
+            loadError = nil
+            loadState = .idle
+            loadIfNeeded()
+        case .loading, .loaded:
+            break
+        }
     }
 
     func retry() {
@@ -365,6 +390,7 @@ final class ContactCertificateSignaturesScreenModel {
                 selectedUserId,
                 self.selectedCertificationKind
             )
+            try Task.checkCancellation()
             let verification = try await self.verifyUserIdBindingAction(
                 armoredCertification,
                 contact.publicKeyData,
@@ -559,6 +585,20 @@ final class ContactCertificateSignaturesScreenModel {
         ) != true {
             try exportController.prepareDataExport(data, suggestedFilename: filename)
         }
+    }
+
+    private func invalidateAsyncWork() {
+        catalogLoadGeneration &+= 1
+        catalogLoadTask?.cancel()
+        catalogLoadTask = nil
+        if case .loading = loadState {
+            loadState = .idle
+        }
+
+        operationGeneration &+= 1
+        operationTask?.cancel()
+        operationTask = nil
+        activeOperation = nil
     }
 
     private func certificationExportFilename(

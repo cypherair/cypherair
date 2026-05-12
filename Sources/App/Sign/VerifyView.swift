@@ -162,7 +162,7 @@ private struct VerifyScreenHostView: View {
             model.handleDisappear()
         }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
-            model.clearTransientInput()
+            model.handleContentClearGenerationChange()
         }
     }
 
