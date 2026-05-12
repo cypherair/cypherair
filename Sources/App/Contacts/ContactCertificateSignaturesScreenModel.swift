@@ -64,6 +64,7 @@ final class ContactCertificateSignaturesScreenModel {
     private var catalogLoadGeneration: UInt64 = 0
     private var operationTask: Task<Void, Never>?
     private var operationGeneration: UInt64 = 0
+    private var fileImportRequestGate = FileImportRequestGate()
 
     private(set) var loadState: LoadState = .idle
     private(set) var catalog: CertificateSelectionCatalog?
@@ -80,6 +81,10 @@ final class ContactCertificateSignaturesScreenModel {
     var verification: CertificateSignatureVerification?
     var error: CypherAirError?
     var showError = false
+
+    var fileImportRequestToken: FileImportRequestGate.Token? {
+        fileImportRequestGate.currentToken
+    }
 
     init(
         fingerprint: String,
@@ -221,6 +226,7 @@ final class ContactCertificateSignaturesScreenModel {
         }
 
         mode = newMode
+        fileImportRequestGate.invalidate()
         invalidateVerification()
     }
 
@@ -239,7 +245,21 @@ final class ContactCertificateSignaturesScreenModel {
             return
         }
 
+        fileImportRequestGate.begin()
         showFileImporter = true
+    }
+
+    func handleFileImporterResult(
+        _ result: Result<[URL], Error>,
+        token: FileImportRequestGate.Token?
+    ) {
+        guard fileImportRequestGate.consumeIfCurrent(token) else {
+            return
+        }
+
+        if case .success(let urls) = result, let url = urls.first {
+            handleImportedFile(url)
+        }
     }
 
     func handleImportedFile(_ url: URL) {
@@ -266,6 +286,7 @@ final class ContactCertificateSignaturesScreenModel {
 
     func clearTransientInput() {
         invalidateAsyncWork()
+        fileImportRequestGate.invalidate()
         importedSignature.clear()
         signatureInput = ""
         verification = nil
@@ -426,6 +447,7 @@ final class ContactCertificateSignaturesScreenModel {
         operationTask?.cancel()
         operationTask = nil
         activeOperation = nil
+        fileImportRequestGate.invalidate()
         showFileImporter = false
         exportController.finish()
     }

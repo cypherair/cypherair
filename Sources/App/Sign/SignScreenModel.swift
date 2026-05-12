@@ -22,6 +22,7 @@ final class SignScreenModel {
     private let clipboardWriter: ClipboardWriter
     @ObservationIgnored private var clipboardTask: Task<Void, Never>?
     private var clipboardToken: UInt64 = 0
+    private var fileImportRequestGate = FileImportRequestGate()
 
     var signMode: SignView.SignMode = .text
     var text = ""
@@ -111,18 +112,36 @@ final class SignScreenModel {
         signMode == .file && operation.isRunning && operation.progress != nil
     }
 
+    var fileImportRequestToken: FileImportRequestGate.Token? {
+        fileImportRequestGate.currentToken
+    }
+
     func syncSignerFromDefaultOnAppear() {
         signerFingerprint = keyManagement.defaultKey?.fingerprint
     }
 
     func requestFileImport() {
         guard configuration.allowsFileInput else { return }
+        fileImportRequestGate.begin()
         showFileImporter = true
     }
 
     func handleImportedFile(_ url: URL) {
         selectedFileURL = url
         selectedFileName = url.lastPathComponent
+    }
+
+    func handleFileImporterResult(
+        _ result: Result<[URL], Error>,
+        token: FileImportRequestGate.Token?
+    ) {
+        guard fileImportRequestGate.consumeIfCurrent(token) else {
+            return
+        }
+
+        if case .success(let urls) = result, let url = urls.first {
+            handleImportedFile(url)
+        }
     }
 
     func sign() {
@@ -276,6 +295,10 @@ final class SignScreenModel {
         exportController.finish()
     }
 
+    func handleDisappear() {
+        fileImportRequestGate.invalidate()
+    }
+
     func handleContentClearGenerationChange() {
         operation.cancelAndInvalidate()
         cancelClipboardCopy()
@@ -289,6 +312,7 @@ final class SignScreenModel {
     }
 
     func clearTransientInput() {
+        fileImportRequestGate.invalidate()
         text = ""
         signedMessage = nil
         detachedSignature = nil

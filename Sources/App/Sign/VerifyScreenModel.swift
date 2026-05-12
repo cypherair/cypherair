@@ -30,6 +30,7 @@ final class VerifyScreenModel {
     private let cleartextVerificationAction: CleartextVerificationAction
     private let detachedVerificationAction: DetachedVerificationAction
     private let cleartextFileImportAction: CleartextFileImportAction
+    private var fileImportRequestGate = FileImportRequestGate()
 
     var verifyMode: VerifyView.VerifyMode = .cleartext
     var signedInput = ""
@@ -168,6 +169,10 @@ final class VerifyScreenModel {
         verifyMode == .detached && operation.isRunning && operation.progress != nil
     }
 
+    var fileImportRequestToken: FileImportRequestGate.Token? {
+        fileImportRequestGate.currentToken
+    }
+
     func setSignedInput(_ newValue: String) {
         guard newValue != signedInput else {
             return
@@ -184,6 +189,7 @@ final class VerifyScreenModel {
         }
 
         filePickerTarget = .cleartextSignedImport
+        fileImportRequestGate.begin()
         showFileImporter = true
     }
 
@@ -193,6 +199,7 @@ final class VerifyScreenModel {
         }
 
         filePickerTarget = .original
+        fileImportRequestGate.begin()
         showFileImporter = true
     }
 
@@ -202,11 +209,30 @@ final class VerifyScreenModel {
         }
 
         filePickerTarget = .signature
+        fileImportRequestGate.begin()
         showFileImporter = true
     }
 
     func finishFileImportRequest() {
+        fileImportRequestGate.invalidate()
         filePickerTarget = nil
+    }
+
+    func handleFileImporterResult(
+        _ result: Result<[URL], Error>,
+        token: FileImportRequestGate.Token?
+    ) {
+        guard fileImportRequestGate.consumeIfCurrent(token) else {
+            return
+        }
+
+        defer {
+            finishFileImportRequest()
+        }
+
+        if case .success(let urls) = result, let url = urls.first {
+            handleImportedFile(url)
+        }
     }
 
     func handleImportedFile(_ url: URL) {
@@ -228,6 +254,7 @@ final class VerifyScreenModel {
 
     func handleDisappear() {
         importedCleartext.clear()
+        fileImportRequestGate.invalidate()
         filePickerTarget = nil
     }
 
@@ -243,6 +270,7 @@ final class VerifyScreenModel {
         signatureFileName = nil
         filePickerTarget = nil
         showFileImporter = false
+        fileImportRequestGate.invalidate()
         textInputSectionEpoch &+= 1
     }
 

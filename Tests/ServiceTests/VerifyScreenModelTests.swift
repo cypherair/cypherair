@@ -60,8 +60,8 @@ final class VerifyScreenModelTests: XCTestCase {
         )
 
         model.requestCleartextFileImport()
-        model.handleImportedFile(fileURL)
-        model.finishFileImportRequest()
+        let token = try XCTUnwrap(model.fileImportRequestToken)
+        model.handleFileImporterResult(.success([fileURL]), token: token)
         model.verifyCleartext()
 
         await waitUntil("cleartext verification to finish") {
@@ -69,6 +69,7 @@ final class VerifyScreenModelTests: XCTestCase {
         }
 
         XCTAssertTrue(model.importedCleartext.hasImportedFile)
+        XCTAssertNil(model.filePickerTarget)
         XCTAssertEqual(model.cleartextVerification?.status, .valid)
         XCTAssertEqual(model.cleartextDetailedVerification?.legacyStatus, .valid)
         XCTAssertEqual(model.cleartextOriginalText, "Original signed message")
@@ -79,6 +80,25 @@ final class VerifyScreenModelTests: XCTestCase {
         XCTAssertNil(model.cleartextVerification)
         XCTAssertNil(model.cleartextDetailedVerification)
         XCTAssertNil(model.cleartextOriginalText)
+    }
+
+    @MainActor
+    func test_handleFileImporterResult_afterContentClear_ignoresStaleCleartextSelection() throws {
+        let fileURL = URL(fileURLWithPath: "/tmp/signed.asc")
+        let model = makeModel(
+            cleartextFileImportAction: { _ in
+                (Data("SIGNED".utf8), "SIGNED")
+            }
+        )
+
+        model.requestCleartextFileImport()
+        let token = try XCTUnwrap(model.fileImportRequestToken)
+        model.clearTransientInput()
+        model.handleFileImporterResult(.success([fileURL]), token: token)
+
+        XCTAssertEqual(model.signedInput, "")
+        XCTAssertFalse(model.importedCleartext.hasImportedFile)
+        XCTAssertNil(model.filePickerTarget)
     }
 
     @MainActor

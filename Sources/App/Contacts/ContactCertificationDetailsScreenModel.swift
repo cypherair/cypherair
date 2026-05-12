@@ -86,6 +86,7 @@ final class ContactCertificationDetailsScreenModel {
     private var loadGeneration: UInt64 = 0
     private var operationTask: Task<Void, Never>?
     private var operationGeneration: UInt64 = 0
+    private var fileImportRequestGate = FileImportRequestGate()
 
     private(set) var loadState: LoadState = .idle
     private(set) var catalog: CertificateSelectionCatalog?
@@ -105,6 +106,10 @@ final class ContactCertificationDetailsScreenModel {
     var showFileImporter = false
     var error: CypherAirError?
     var showError = false
+
+    var fileImportRequestToken: FileImportRequestGate.Token? {
+        fileImportRequestGate.currentToken
+    }
 
     init(
         contactId: String,
@@ -383,6 +388,7 @@ final class ContactCertificationDetailsScreenModel {
             return
         }
         importMode = mode
+        fileImportRequestGate.invalidate()
         invalidatePreview()
     }
 
@@ -399,7 +405,21 @@ final class ContactCertificationDetailsScreenModel {
         guard !isOperationLocked else {
             return
         }
+        fileImportRequestGate.begin()
         showFileImporter = true
+    }
+
+    func handleFileImporterResult(
+        _ result: Result<[URL], Error>,
+        token: FileImportRequestGate.Token?
+    ) {
+        guard fileImportRequestGate.consumeIfCurrent(token) else {
+            return
+        }
+
+        if case .success(let urls) = result, let url = urls.first {
+            handleImportedFile(url)
+        }
     }
 
     func handleImportedFile(_ url: URL) {
@@ -426,6 +446,7 @@ final class ContactCertificationDetailsScreenModel {
 
     func clearTransientInput() {
         invalidateAsyncWork(resetLoadingState: true)
+        fileImportRequestGate.invalidate()
         importedSignature.clear()
         signatureInput = ""
         pendingArtifact = nil
@@ -560,6 +581,7 @@ final class ContactCertificationDetailsScreenModel {
 
     func handleDisappear() {
         invalidateAsyncWork(resetLoadingState: true)
+        fileImportRequestGate.invalidate()
         showFileImporter = false
         exportController.finish()
     }

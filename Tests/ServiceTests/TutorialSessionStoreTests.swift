@@ -1098,6 +1098,9 @@ final class TutorialSessionStoreTests: XCTestCase {
 
     func test_keyImportAndBackup_clearSensitiveInputOnSuccessDismissAndContentClear() throws {
         let importContents = try loadRepositoryAuditSource("Sources/App/Keys/ImportKeyView.swift")
+        XCTAssertTrue(importContents.contains("FileImportRequestGate"))
+        XCTAssertTrue(importContents.contains("handleFileImporterResult(result, token: fileImportRequestToken)"))
+        XCTAssertTrue(importContents.contains("fileImportRequestGate.invalidate()"))
         XCTAssertTrue(importContents.contains("clearTransientInput()"))
         XCTAssertTrue(importContents.contains("clearImportedKeyData()"))
         XCTAssertTrue(importContents.contains(".onDisappear"))

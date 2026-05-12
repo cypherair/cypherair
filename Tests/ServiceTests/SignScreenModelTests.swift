@@ -335,6 +335,20 @@ final class SignScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_handleFileImporterResult_afterContentClear_ignoresStaleSelection() throws {
+        let model = makeModel()
+        let fileURL = URL(fileURLWithPath: "/tmp/message.txt")
+
+        model.requestFileImport()
+        let token = try XCTUnwrap(model.fileImportRequestToken)
+        model.clearTransientInput()
+        model.handleFileImporterResult(.success([fileURL]), token: token)
+
+        XCTAssertNil(model.selectedFileURL)
+        XCTAssertNil(model.selectedFileName)
+    }
+
+    @MainActor
     func test_contentClearDuringClipboardNoticeSuppressesLateClipboardWrite() async {
         let gate = SignClipboardNoticeGate()
         var copiedPayloads: [(String, Bool)] = []

@@ -20,6 +20,7 @@ final class AddContactScreenModel {
     private let loadFileAction: LoadFileAction
     private var qrProcessingTask: Task<Void, Never>?
     private var qrProcessingGeneration: UInt64 = 0
+    private var fileImportRequestGate = FileImportRequestGate()
 
     var importMode: AddContactView.ImportMode = .paste
     var armoredText = ""
@@ -68,6 +69,10 @@ final class AddContactScreenModel {
         }
     }
 
+    var fileImportRequestToken: FileImportRequestGate.Token? {
+        fileImportRequestGate.currentToken
+    }
+
     func handleAppear() {
         let defaultImportMode = configuration.allowedImportModes.first ?? .paste
         setImportMode(defaultImportMode)
@@ -76,6 +81,10 @@ final class AddContactScreenModel {
            let prefilledArmoredText = configuration.prefilledArmoredText {
             armoredText = prefilledArmoredText
         }
+    }
+
+    func handleDisappear() {
+        fileImportRequestGate.invalidate()
     }
 
     func updateConfiguration(_ configuration: AddContactView.Configuration) {
@@ -94,14 +103,17 @@ final class AddContactScreenModel {
         }
 
         importMode = newValue
+        fileImportRequestGate.invalidate()
         clearImportedKeyData()
     }
 
     func requestFileImport() {
+        fileImportRequestGate.begin()
         showFileImporter = true
     }
 
     func clearImportedFile() {
+        fileImportRequestGate.invalidate()
         clearImportedKeyData()
     }
 
@@ -229,9 +241,23 @@ final class AddContactScreenModel {
         }
     }
 
+    func handleFileImporterResult(
+        _ result: Result<[URL], Error>,
+        token: FileImportRequestGate.Token?
+    ) {
+        guard fileImportRequestGate.consumeIfCurrent(token) else {
+            return
+        }
+
+        if case .success(let urls) = result, let url = urls.first {
+            loadFileContents(from: url)
+        }
+    }
+
     func clearTransientInput() {
         qrProcessingTask?.cancel()
         qrProcessingGeneration &+= 1
+        fileImportRequestGate.invalidate()
         qrProcessingTask = nil
         isProcessingQR = false
         armoredText = ""

@@ -128,6 +128,7 @@ private struct DecryptScreenHostView: View {
         @Bindable var model = model
         let operation = model.operation
         let exportController = model.exportController
+        let fileImportRequestToken = model.fileImportRequestToken
 
         Form {
             Section {
@@ -262,14 +263,7 @@ private struct DecryptScreenHostView: View {
             allowedContentTypes: allowedImportContentTypes,
             allowsMultipleSelection: false
         ) { result in
-            defer {
-                model.finishFileImportRequest()
-            }
-
-            if case .success(let urls) = result,
-               let url = urls.first {
-                model.handleImportedFile(url)
-            }
+            model.handleFileImporterResult(result, token: fileImportRequestToken)
         }
         .confirmationDialog(
             String(localized: "decrypt.openAsText.title", defaultValue: "Open as Text?"),
