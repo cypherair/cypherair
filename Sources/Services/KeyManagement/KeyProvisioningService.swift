@@ -1,5 +1,51 @@
 import Foundation
 
+private final class KeyProvisioningCommitDrain: @unchecked Sendable {
+    private let lock = NSLock()
+    private var activeCommitCount = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func enterCommit() {
+        lock.lock()
+        activeCommitCount += 1
+        lock.unlock()
+    }
+
+    func leaveCommit() {
+        var continuationsToResume: [CheckedContinuation<Void, Never>] = []
+
+        lock.lock()
+        activeCommitCount = max(activeCommitCount - 1, 0)
+        if activeCommitCount == 0 {
+            continuationsToResume = waiters
+            waiters.removeAll()
+        }
+        lock.unlock()
+
+        for continuation in continuationsToResume {
+            continuation.resume()
+        }
+    }
+
+    func waitForActiveCommitsToFinish() async {
+        await withCheckedContinuation { continuation in
+            var shouldResumeImmediately = false
+
+            lock.lock()
+            if activeCommitCount == 0 {
+                shouldResumeImmediately = true
+            } else {
+                waiters.append(continuation)
+            }
+            lock.unlock()
+
+            if shouldResumeImmediately {
+                continuation.resume()
+            }
+        }
+    }
+}
+
 /// Owns key generation and import workflows behind the key-management facade.
 final class KeyProvisioningService {
     typealias ProvisioningCheckpoint = @Sendable () async -> Void
@@ -12,6 +58,7 @@ final class KeyProvisioningService {
     private let invalidationGate: KeyProvisioningInvalidationGate
     private let beforePermanentStorageCheckpoint: ProvisioningCheckpoint?
     private let afterIdentityStoreCheckpoint: ProvisioningCheckpoint?
+    private let commitDrain = KeyProvisioningCommitDrain()
 
     init(
         engine: PgpEngine,
@@ -180,6 +227,7 @@ final class KeyProvisioningService {
         bundleReceipt: KeyBundleWriteReceipt,
         token: KeyProvisioningInvalidationGate.Token
     ) async throws {
+        commitDrain.enterCommit()
         var didStoreIdentity = false
         do {
             try Task.checkCancellation()
@@ -191,13 +239,19 @@ final class KeyProvisioningService {
             }
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
+            commitDrain.leaveCommit()
         } catch {
             if didStoreIdentity {
                 catalogStore.discardCommittedIdentity(fingerprint: identity.fingerprint)
             }
             bundleStore.rollback(bundleReceipt)
+            commitDrain.leaveCommit()
             throw error
         }
+    }
+
+    func waitForActiveIdentityCommitsToFinish() async {
+        await commitDrain.waitForActiveCommitsToFinish()
     }
 
     @concurrent

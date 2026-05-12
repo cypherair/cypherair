@@ -23,6 +23,7 @@ final class KeyManagementService: @unchecked Sendable {
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
     private let provisioningInvalidationGate: KeyProvisioningInvalidationGate
     private let postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
+    private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let traceStore: AuthLifecycleTraceStore?
     private var legacyMetadataMigrationCompletedInProcess = false
 
@@ -39,7 +40,8 @@ final class KeyManagementService: @unchecked Sendable {
         metadataPersistence: (any KeyMetadataPersistence)? = nil,
         provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
+        postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) {
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
         let keyMetadataPersistence = metadataPersistence ?? metadataStore
@@ -61,6 +63,7 @@ final class KeyManagementService: @unchecked Sendable {
         self.privateKeyControlStore = effectivePrivateKeyControlStore
         self.provisioningInvalidationGate = provisioningInvalidationGate
         self.postProvisioningCheckpoint = postProvisioningCheckpoint
+        self.relockInvalidationCheckpoint = relockInvalidationCheckpoint
         self.provisioningService = KeyProvisioningService(
             engine: engine,
             secureEnclave: secureEnclave,
@@ -564,6 +567,10 @@ final class KeyManagementService: @unchecked Sendable {
 extension KeyManagementService: ProtectedDataRelockParticipant {
     func relockProtectedData() async throws {
         provisioningInvalidationGate.invalidate()
+        if let relockInvalidationCheckpoint {
+            await relockInvalidationCheckpoint()
+        }
+        await provisioningService.waitForActiveIdentityCommitsToFinish()
         markKeyMetadataLocked()
     }
 }
