@@ -13569,38 +13569,6 @@
         }
       }
     },
-    "tagManagement.members.revert" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revert Changes"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "撤销更改"
-          }
-        }
-      }
-    },
-    "tagManagement.members.save" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save Members"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存成员"
-          }
-        }
-      }
-    },
     "tagManagement.members.selected" : {
       "localizations" : {
         "en" : {
@@ -13665,22 +13633,6 @@
         }
       }
     },
-    "tagManagement.rename.save" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save Name"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存名称"
-          }
-        }
-      }
-    },
     "tagManagement.search" : {
       "localizations" : {
         "en" : {
@@ -13697,22 +13649,6 @@
         }
       }
     },
-    "tagManagement.selected" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selected Tag"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已选标签"
-          }
-        }
-      }
-    },
     "tagManagement.selected.members" : {
       "localizations" : {
         "en" : {
@@ -13725,22 +13661,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "成员"
-          }
-        }
-      }
-    },
-    "tagManagement.selected.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Name"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "名称"
           }
         }
       }

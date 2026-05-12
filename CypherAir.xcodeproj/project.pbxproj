@@ -77,8 +77,6 @@
 				App/Contacts/ContactCertificationDetailsScreenModel.swift,
 				App/Contacts/ContactCertificationDetailsView.swift,
 				App/Contacts/ContactDetailView.swift,
-				App/Contacts/TagDetailScreenModel.swift,
-				App/Contacts/TagDetailView.swift,
 				App/Contacts/ContactKeySummaryView.swift,
 				"App/Contacts/ContactKeyUsageState+ContactDetailPresentation.swift",
 				App/Contacts/ContactsScreenModel.swift,
@@ -91,6 +89,8 @@
 				App/Contacts/ImportConfirmationCoordinator.swift,
 				App/Contacts/ImportConfirmView.swift,
 				App/Contacts/QRDisplayView.swift,
+				App/Contacts/TagDetailScreenModel.swift,
+				App/Contacts/TagDetailView.swift,
 				App/Contacts/TagManagementScreenModel.swift,
 				App/Contacts/TagManagementView.swift,
 				App/ContentView.swift,
@@ -755,7 +755,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14005;
+				CURRENT_PROJECT_VERSION = 14007;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -980,7 +980,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14005;
+				CURRENT_PROJECT_VERSION = 14007;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1125,7 +1125,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14005;
+				CURRENT_PROJECT_VERSION = 14007;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
