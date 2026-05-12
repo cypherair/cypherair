@@ -17,6 +17,7 @@ struct TagDetailView: View {
 
 private struct TagDetailHostView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let appSessionOrchestrator: AppSessionOrchestrator
     @State private var model: TagDetailScreenModel
 
@@ -91,7 +92,9 @@ private struct TagDetailHostView: View {
             titleVisibility: .visible
         ) {
             Button(String(localized: "tagManagement.members.discard.confirm", defaultValue: "Discard Changes"), role: .destructive) {
-                model.cancelMemberEditing()
+                withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
+                    model.cancelMemberEditing()
+                }
             }
             Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {}
         } message: {
@@ -123,19 +126,25 @@ private struct TagDetailHostView: View {
         if model.isEditingMembers {
             ToolbarItem(placement: .cancellationAction) {
                 Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                    model.requestCancelMemberEditing()
+                    withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
+                        model.requestCancelMemberEditing()
+                    }
                 }
             }
             ToolbarItem(placement: .primaryAction) {
                 Button(String(localized: "common.save", defaultValue: "Save")) {
-                    model.saveMembership()
+                    withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
+                        model.saveMembership()
+                    }
                 }
                 .disabled(!model.canSaveMembershipDraft)
             }
         } else if model.canManageTag && model.tag != nil {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button(String(localized: "common.edit", defaultValue: "Edit")) {
-                    model.beginMemberEditing()
+                    withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
+                        model.beginMemberEditing()
+                    }
                 }
                 Menu {
                     Button {
@@ -173,22 +182,46 @@ private struct TagDetailHostView: View {
 
             Section {
                 if model.isEditingMembers {
-                    editableContactsList
+                    editableSavedMemberContactsList
                 } else {
                     memberContactsList
                 }
             } header: {
                 Text(
                     model.isEditingMembers
-                        ? String(localized: "tagManagement.members.allContacts", defaultValue: "All Contacts")
+                        ? String(localized: "tagManagement.members.current", defaultValue: "Current Members")
                         : String.localizedStringWithFormat(
                             String(localized: "tagManagement.members.header", defaultValue: "Members of %@"),
                             tag.displayName
                         )
                 )
             }
+
+            if model.isEditingMembers {
+                Section {
+                    editableAvailableContactsList
+                } header: {
+                    Text(String(localized: "tagManagement.members.available", defaultValue: "Available Contacts"))
+                }
+            }
         }
         .scrollDismissesKeyboardInteractivelyIfAvailable()
+        .animation(
+            CypherMotion.quickEaseOut(reduceMotion: reduceMotion),
+            value: model.isEditingMembers
+        )
+        .animation(
+            CypherMotion.quickEaseOut(reduceMotion: reduceMotion),
+            value: model.savedMemberContactIds
+        )
+        .animation(
+            CypherMotion.quickEaseOut(reduceMotion: reduceMotion),
+            value: model.savedAvailableContactIds
+        )
+        .animation(
+            CypherMotion.quickEaseOut(reduceMotion: reduceMotion),
+            value: model.membershipDraftContactIds
+        )
     }
 
     @ViewBuilder
@@ -204,25 +237,42 @@ private struct TagDetailHostView: View {
     }
 
     @ViewBuilder
-    private var editableContactsList: some View {
-        if model.contacts.isEmpty {
+    private var editableSavedMemberContactsList: some View {
+        if model.savedMemberContacts.isEmpty {
+            Text(String(localized: "tagManagement.members.none", defaultValue: "No members yet."))
+                .foregroundStyle(.secondary)
+        } else {
+            editableContactRows(model.savedMemberContacts)
+        }
+    }
+
+    @ViewBuilder
+    private var editableAvailableContactsList: some View {
+        if model.savedAvailableContacts.isEmpty {
             Text(String(localized: "tagManagement.members.empty", defaultValue: "No contacts available."))
                 .foregroundStyle(.secondary)
         } else {
-            ForEach(model.contacts) { contact in
-                let isSelected = model.membershipDraftContactIds.contains(contact.contactId)
-                Button {
+            editableContactRows(model.savedAvailableContacts)
+        }
+    }
+
+    @ViewBuilder
+    private func editableContactRows(_ contacts: [ContactIdentitySummary]) -> some View {
+        ForEach(contacts) { contact in
+            let isSelected = model.membershipDraftContactIds.contains(contact.contactId)
+            Button {
+                withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
                     model.toggleDraftMembership(contactId: contact.contactId)
-                } label: {
-                    ContactMemberRow(
-                        contact: contact,
-                        isSelected: isSelected,
-                        showsCheckmark: true
-                    )
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(accessibilityLabel(for: contact, isSelected: isSelected))
+            } label: {
+                ContactMemberRow(
+                    contact: contact,
+                    isSelected: isSelected,
+                    showsCheckmark: true
+                )
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(accessibilityLabel(for: contact, isSelected: isSelected))
         }
     }
 
@@ -270,6 +320,7 @@ private struct TagDetailHostView: View {
 }
 
 private struct ContactMemberRow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let contact: ContactIdentitySummary
     let isSelected: Bool
     let showsCheckmark: Bool
@@ -287,10 +338,17 @@ private struct ContactMemberRow: View {
             }
             Spacer()
             if showsCheckmark {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                    .imageScale(.large)
-                    .accessibilityHidden(true)
+                ZStack {
+                    Image(systemName: "circle")
+                        .foregroundStyle(Color.secondary)
+                        .opacity(isSelected ? 0 : 1)
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                        .opacity(isSelected ? 1 : 0)
+                }
+                .imageScale(.large)
+                .animation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion), value: isSelected)
+                .accessibilityHidden(true)
             }
         }
         .contentShape(Rectangle())

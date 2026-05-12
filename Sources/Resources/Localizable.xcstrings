@@ -13425,18 +13425,34 @@
         }
       }
     },
-    "tagManagement.members.allContacts" : {
+    "tagManagement.members.available" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "All Contacts"
+            "value" : "Available Contacts"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "所有联系人"
+            "value" : "可添加联系人"
+          }
+        }
+      }
+    },
+    "tagManagement.members.current" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current Members"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前成员"
           }
         }
       }

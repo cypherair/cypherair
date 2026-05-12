@@ -37,12 +37,28 @@ final class TagDetailScreenModel {
         contactService.availableContactIdentities
     }
 
+    var savedMemberContacts: [ContactIdentitySummary] {
+        contacts.filter { $0.tagIds.contains(tagId) }
+    }
+
+    var savedAvailableContacts: [ContactIdentitySummary] {
+        contacts.filter { !$0.tagIds.contains(tagId) }
+    }
+
+    var savedMemberContactIds: [String] {
+        savedMemberContacts.map(\.contactId)
+    }
+
+    var savedAvailableContactIds: [String] {
+        savedAvailableContacts.map(\.contactId)
+    }
+
     var selectedTagMemberIds: Set<String> {
-        Set(contacts.filter { $0.tagIds.contains(tagId) }.map(\.contactId))
+        Set(savedMemberContactIds)
     }
 
     var visibleMemberContacts: [ContactIdentitySummary] {
-        contacts.filter { $0.tagIds.contains(tagId) }
+        savedMemberContacts
     }
 
     var memberCountText: String {

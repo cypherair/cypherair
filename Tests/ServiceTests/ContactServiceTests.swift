@@ -1896,6 +1896,56 @@ final class ContactServiceTests: XCTestCase {
     }
 
     @MainActor
+    func test_tagDetailScreenModelKeepsSavedGroupingUntilMembershipSave() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagDetailSavedGrouping")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let service = opened.service
+        let member = try engine.generateKey(
+            name: "Alpha Member",
+            email: "alpha-member@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let available = try engine.generateKey(
+            name: "Bravo Available",
+            email: "bravo-available@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try service.addContact(publicKeyData: member.publicKeyData)
+        _ = try service.addContact(publicKeyData: available.publicKeyData)
+        let memberContactId = try XCTUnwrap(service.contactId(forFingerprint: member.fingerprint))
+        let availableContactId = try XCTUnwrap(service.contactId(forFingerprint: available.fingerprint))
+        let tag = try service.addTag(named: "Stable Grouping", toContactId: memberContactId)
+        let model = TagDetailScreenModel(tagId: tag.tagId, contactService: service)
+
+        XCTAssertEqual(model.savedMemberContactIds, [memberContactId])
+        XCTAssertEqual(model.savedAvailableContactIds, [availableContactId])
+
+        model.beginMemberEditing()
+        model.toggleDraftMembership(contactId: availableContactId)
+
+        XCTAssertTrue(model.membershipDraftContactIds.contains(availableContactId))
+        XCTAssertEqual(model.savedMemberContactIds, [memberContactId])
+        XCTAssertEqual(model.savedAvailableContactIds, [availableContactId])
+
+        model.toggleDraftMembership(contactId: memberContactId)
+
+        XCTAssertFalse(model.membershipDraftContactIds.contains(memberContactId))
+        XCTAssertEqual(model.savedMemberContactIds, [memberContactId])
+        XCTAssertEqual(model.savedAvailableContactIds, [availableContactId])
+
+        model.saveMembership()
+
+        XCTAssertFalse(model.isEditingMembers)
+        XCTAssertEqual(model.savedMemberContactIds, [availableContactId])
+        XCTAssertEqual(model.savedAvailableContactIds, [memberContactId])
+        XCTAssertEqual(model.visibleMemberContacts.map(\.contactId), [availableContactId])
+    }
+
+    @MainActor
     func test_tagDetailScreenModelCancelMemberEditingConfirmsDiscardWhenDraftChanged() async throws {
         let opened = try await makeOpenedProtectedContactService(prefix: "ContactsTagDetailDiscard")
         defer {
