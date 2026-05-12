@@ -28,6 +28,7 @@ final class DecryptScreenModel {
     private let fileDecryptionAction: FileDecryptionAction
     private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     @ObservationIgnored private var decryptedFileArtifact: AppTemporaryArtifact?
+    private var fileImportRequestGate = FileImportRequestGate()
 
     private struct PendingTextModeImport {
         let fileURL: URL
@@ -206,6 +207,10 @@ final class DecryptScreenModel {
         decryptMode == .file && operation.isRunning && operation.progress != nil
     }
 
+    var fileImportRequestToken: FileImportRequestGate.Token? {
+        fileImportRequestGate.currentToken
+    }
+
     var signatureVerification: SignatureVerification? {
         detailedSignatureVerification?.legacyVerification
     }
@@ -237,6 +242,7 @@ final class DecryptScreenModel {
         filePhase1Result = nil
         importedCiphertext.clear()
         pendingTextModeImport = nil
+        fileImportRequestGate.invalidate()
         fileImportTarget = nil
     }
 
@@ -263,6 +269,7 @@ final class DecryptScreenModel {
         selectedFileURL = nil
         selectedFileName = nil
         showFileImporter = false
+        fileImportRequestGate.invalidate()
         showTextModeSuggestion = false
         exportController.finish()
         textInputSectionEpoch &+= 1
@@ -278,17 +285,38 @@ final class DecryptScreenModel {
     func requestTextCiphertextImport() {
         guard configuration.allowsTextFileImport else { return }
         fileImportTarget = .textCiphertextImport
+        fileImportRequestGate.begin()
         showFileImporter = true
     }
 
     func requestFileCiphertextImport() {
         guard configuration.allowsFileInput else { return }
         fileImportTarget = .fileCiphertextImport
+        fileImportRequestGate.begin()
         showFileImporter = true
     }
 
     func finishFileImportRequest() {
+        fileImportRequestGate.invalidate()
         fileImportTarget = nil
+    }
+
+    func handleFileImporterResult(
+        _ result: Result<[URL], Error>,
+        token: FileImportRequestGate.Token?
+    ) {
+        guard fileImportRequestGate.consumeIfCurrent(token) else {
+            return
+        }
+
+        defer {
+            finishFileImportRequest()
+        }
+
+        if case .success(let urls) = result,
+           let url = urls.first {
+            handleImportedFile(url)
+        }
     }
 
     func handleImportedFile(_ url: URL) {

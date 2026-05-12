@@ -365,7 +365,7 @@ final class DecryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_requestTextCiphertextImport_andHandleImportedFile_setsImportedState() {
+    func test_requestTextCiphertextImport_andHandleFileImporterResult_setsImportedState() throws {
         let inputURL = URL(fileURLWithPath: "/tmp/message.asc")
         let model = makeModel(
             textCiphertextFileImportAction: { url in
@@ -380,14 +380,34 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.fileImportTarget, .textCiphertextImport)
         XCTAssertTrue(model.showFileImporter)
 
-        model.handleImportedFile(inputURL)
-        model.finishFileImportRequest()
+        let token = try XCTUnwrap(model.fileImportRequestToken)
+        model.handleFileImporterResult(.success([inputURL]), token: token)
 
         XCTAssertEqual(model.ciphertextInput, "ARMORED")
         XCTAssertTrue(model.importedCiphertext.hasImportedFile)
         XCTAssertEqual(model.importedCiphertext.fileName, "message.asc")
+        XCTAssertNil(model.fileImportTarget)
         XCTAssertNil(model.phase1Result)
         XCTAssertNil(model.signatureVerification)
+    }
+
+    @MainActor
+    func test_handleFileImporterResult_afterContentClear_ignoresStaleTextSelection() throws {
+        let inputURL = URL(fileURLWithPath: "/tmp/message.asc")
+        let model = makeModel(
+            textCiphertextFileImportAction: { _ in
+                (Data("ARMORED".utf8), "ARMORED")
+            }
+        )
+
+        model.requestTextCiphertextImport()
+        let token = try XCTUnwrap(model.fileImportRequestToken)
+        model.clearTransientInput()
+        model.handleFileImporterResult(.success([inputURL]), token: token)
+
+        XCTAssertEqual(model.ciphertextInput, "")
+        XCTAssertFalse(model.importedCiphertext.hasImportedFile)
+        XCTAssertNil(model.fileImportTarget)
     }
 
     @MainActor

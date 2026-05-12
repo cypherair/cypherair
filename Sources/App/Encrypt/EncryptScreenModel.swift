@@ -60,6 +60,7 @@ final class EncryptScreenModel {
     @ObservationIgnored private var clipboardTask: Task<Void, Never>?
     private var pendingInitialRecipientFingerprints: Set<String> = []
     private var clipboardToken: UInt64 = 0
+    private var fileImportRequestGate = FileImportRequestGate()
 
     var encryptMode: EncryptView.EncryptMode = .text
     var plaintext = ""
@@ -235,6 +236,10 @@ final class EncryptScreenModel {
         encryptMode == .file && operation.isRunning && operation.progress != nil
     }
 
+    var fileImportRequestToken: FileImportRequestGate.Token? {
+        fileImportRequestGate.currentToken
+    }
+
     var resolvedEncryptToSelf: Bool? {
         encryptToSelf ?? protectedOrdinarySettings.encryptToSelf
     }
@@ -375,6 +380,7 @@ final class EncryptScreenModel {
 
     func requestFileImport() {
         guard configuration.allowsFileInput else { return }
+        fileImportRequestGate.begin()
         showFileImporter = true
     }
 
@@ -382,6 +388,19 @@ final class EncryptScreenModel {
         cleanupTemporaryEncryptedFile()
         selectedFileURL = url
         selectedFileName = url.lastPathComponent
+    }
+
+    func handleFileImporterResult(
+        _ result: Result<[URL], Error>,
+        token: FileImportRequestGate.Token?
+    ) {
+        guard fileImportRequestGate.consumeIfCurrent(token) else {
+            return
+        }
+
+        if case .success(let urls) = result, let url = urls.first {
+            handleImportedFile(url)
+        }
     }
 
     func requestEncrypt() {
@@ -630,6 +649,7 @@ final class EncryptScreenModel {
     }
 
     func handleDisappear() {
+        fileImportRequestGate.invalidate()
         cleanupTemporaryEncryptedFile()
     }
 
@@ -647,6 +667,7 @@ final class EncryptScreenModel {
     }
 
     func clearTransientInput() {
+        fileImportRequestGate.invalidate()
         plaintext = ""
         recipientSearchText = ""
         selectedRecipients.removeAll()

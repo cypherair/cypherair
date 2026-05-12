@@ -23,6 +23,7 @@ private struct EncryptScreenPresentations: ViewModifier {
         @Bindable var model = model
         let operation = model.operation
         let exportController = model.exportController
+        let fileImportRequestToken = model.fileImportRequestToken
 
         content
             .fileImporter(
@@ -30,9 +31,7 @@ private struct EncryptScreenPresentations: ViewModifier {
                 allowedContentTypes: [.data],
                 allowsMultipleSelection: false
             ) { result in
-                if case .success(let urls) = result, let url = urls.first {
-                    model.handleImportedFile(url)
-                }
+                model.handleFileImporterResult(result, token: fileImportRequestToken)
             }
             .alert(
                 String(localized: "error.title", defaultValue: "Error"),

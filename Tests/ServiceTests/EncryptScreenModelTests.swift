@@ -1031,6 +1031,20 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_handleFileImporterResult_afterContentClear_ignoresStaleSelection() throws {
+        let model = makeModel()
+        let fileURL = URL(fileURLWithPath: "/tmp/plaintext.txt")
+
+        model.requestFileImport()
+        let token = try XCTUnwrap(model.fileImportRequestToken)
+        model.clearTransientInput()
+        model.handleFileImporterResult(.success([fileURL]), token: token)
+
+        XCTAssertNil(model.selectedFileURL)
+        XCTAssertNil(model.selectedFileName)
+    }
+
+    @MainActor
     private func makeModel(
         contactService: ContactService? = nil,
         configuration: EncryptView.Configuration = .default,

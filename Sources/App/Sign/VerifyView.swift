@@ -63,6 +63,7 @@ private struct VerifyScreenHostView: View {
     var body: some View {
         @Bindable var model = model
         let operation = model.operation
+        let fileImportRequestToken = model.fileImportRequestToken
 
         Form {
             Section {
@@ -150,13 +151,7 @@ private struct VerifyScreenHostView: View {
             allowedContentTypes: model.allowedImportContentTypes,
             allowsMultipleSelection: false
         ) { result in
-            defer {
-                model.finishFileImportRequest()
-            }
-
-            if case .success(let urls) = result, let url = urls.first {
-                model.handleImportedFile(url)
-            }
+            model.handleFileImporterResult(result, token: fileImportRequestToken)
         }
         .onDisappear {
             model.handleDisappear()

@@ -282,6 +282,31 @@ final class AddContactScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_handleFileImporterResult_afterClearTransientInput_ignoresStaleSelection() throws {
+        let armoredPublicKey = "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+        let fileURL = URL(fileURLWithPath: "/tmp/contact.asc")
+        let model = makeModel(
+            loadFileAction: { _ in
+                LoadedPublicKeyFile(
+                    data: Data(armoredPublicKey.utf8),
+                    text: armoredPublicKey,
+                    fileName: fileURL.lastPathComponent
+                )
+            }
+        )
+
+        model.requestFileImport()
+        let token = try XCTUnwrap(model.fileImportRequestToken)
+        model.clearTransientInput()
+        model.handleFileImporterResult(.success([fileURL]), token: token)
+
+        XCTAssertEqual(model.armoredText, "")
+        XCTAssertNil(model.importedKeyData)
+        XCTAssertNil(model.importedFileName)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
     func test_clearTransientInput_clearsPastedAndImportedKeyState() {
         let model = makeModel()
         model.armoredText = "-----BEGIN PGP PUBLIC KEY BLOCK-----"

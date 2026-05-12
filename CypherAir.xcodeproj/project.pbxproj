@@ -62,6 +62,7 @@
 				App/Common/CypherMultilineTextInput.swift,
 				App/Common/DetailedSignatureSectionView.swift,
 				App/Common/FileExportController.swift,
+				App/Common/FileImportRequestGate.swift,
 				App/Common/FingerprintView.swift,
 				App/Common/OperationController.swift,
 				App/Common/OutputHandling.swift,

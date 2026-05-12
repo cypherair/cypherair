@@ -361,6 +361,30 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_handleFileImporterResult_afterClearTransientInput_ignoresStaleSignatureSelection() throws {
+        let contact = try makeContact(name: "Stale Signature Contact", email: "stale-signature@example.com")
+        var didLoadFile = false
+        let model = makeModel(
+            fingerprint: contact.fingerprint,
+            signatureFileImportAction: { _ in
+                didLoadFile = true
+                return (data: Data("signature".utf8), text: "signature")
+            }
+        )
+        let fileURL = URL(fileURLWithPath: "/tmp/signature.sig")
+
+        model.requestSignatureFileImport()
+        let token = try XCTUnwrap(model.fileImportRequestToken)
+        model.clearTransientInput()
+        model.handleFileImporterResult(.success([fileURL]), token: token)
+
+        XCTAssertFalse(didLoadFile)
+        XCTAssertEqual(model.signatureInput, "")
+        XCTAssertFalse(model.importedSignature.hasImportedFile)
+        XCTAssertNil(model.verification)
+    }
+
+    @MainActor
     func test_handleImportedFile_binaryImport_verifyUsesImportedRawData_notPreviousText() async throws {
         let contact = try makeContact(name: "Binary Verify Contact", email: "binary-verify@example.com")
         let importedBinary = Data([0xde, 0xad, 0xbe, 0xef])
@@ -1052,6 +1076,35 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_detailsHandleFileImporterResult_afterClearTransientInput_ignoresStaleSignatureSelection() throws {
+        let (contactId, key, _) = try makeContactContext(
+            name: "Details Stale File",
+            email: "details-stale-file@example.com"
+        )
+        var didLoadFile = false
+        let model = makeModel(
+            contactId: contactId,
+            keyId: key.keyId,
+            signatureFileImportAction: { _ in
+                didLoadFile = true
+                return (data: Data("signature".utf8), text: "signature")
+            }
+        )
+        let fileURL = URL(fileURLWithPath: "/tmp/signature.sig")
+
+        model.requestSignatureFileImport()
+        let token = try XCTUnwrap(model.fileImportRequestToken)
+        model.clearTransientInput()
+        model.handleFileImporterResult(.success([fileURL]), token: token)
+
+        XCTAssertFalse(didLoadFile)
+        XCTAssertEqual(model.signatureInput, "")
+        XCTAssertFalse(model.importedSignature.hasImportedFile)
+        XCTAssertNil(model.pendingArtifact)
+        XCTAssertNil(model.verification)
+    }
+
+    @MainActor
     func test_clearTransientInputDuringImportVerificationSuppressesLatePreview() async throws {
         let (contactId, key, _) = try makeContactContext(
             name: "Details Clear Verify",
@@ -1273,7 +1326,8 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         validateUserIdArtifactAction: ContactCertificationDetailsScreenModel.ValidateUserIdArtifactAction? = nil,
         validateDirectKeyArtifactAction: ContactCertificationDetailsScreenModel.ValidateDirectKeyArtifactAction? = nil,
         saveArtifactAction: ContactCertificationDetailsScreenModel.SaveArtifactAction? = nil,
-        exportArtifactAction: ContactCertificationDetailsScreenModel.ExportArtifactAction? = nil
+        exportArtifactAction: ContactCertificationDetailsScreenModel.ExportArtifactAction? = nil,
+        signatureFileImportAction: ContactCertificationDetailsScreenModel.SignatureFileImportAction? = nil
     ) -> ContactCertificationDetailsScreenModel {
         ContactCertificationDetailsScreenModel(
             contactId: contactId,
@@ -1288,7 +1342,8 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             validateUserIdArtifactAction: validateUserIdArtifactAction,
             validateDirectKeyArtifactAction: validateDirectKeyArtifactAction,
             saveArtifactAction: saveArtifactAction,
-            exportArtifactAction: exportArtifactAction
+            exportArtifactAction: exportArtifactAction,
+            signatureFileImportAction: signatureFileImportAction
         )
     }
 

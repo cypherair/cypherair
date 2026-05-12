@@ -116,6 +116,9 @@ private struct AddContactScreenHostView: View {
             .onAppear {
                 model.handleAppear()
             }
+            .onDisappear {
+                model.handleDisappear()
+            }
             .onChange(of: selectedPhotoItem) { _, newItem in
                 guard let newItem else {
                     return
@@ -148,6 +151,7 @@ private struct AddContactScreenHostView: View {
 
     private var formContent: some View {
         @Bindable var model = model
+        let fileImportRequestToken = model.fileImportRequestToken
 
         return Form {
             Section {
@@ -233,9 +237,7 @@ private struct AddContactScreenHostView: View {
             ],
             allowsMultipleSelection: false
         ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                model.loadFileContents(from: url)
-            }
+            model.handleFileImporterResult(result, token: fileImportRequestToken)
         }
     }
 

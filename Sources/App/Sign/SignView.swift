@@ -92,6 +92,7 @@ private struct SignScreenHostView: View {
         @Bindable var model = model
         let operation = model.operation
         let exportController = model.exportController
+        let fileImportRequestToken = model.fileImportRequestToken
 
         Form {
             Section {
@@ -240,9 +241,7 @@ private struct SignScreenHostView: View {
             allowedContentTypes: [.data],
             allowsMultipleSelection: false
         ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                model.handleImportedFile(url)
-            }
+            model.handleFileImporterResult(result, token: fileImportRequestToken)
         }
         .fileExporter(
             isPresented: Binding(
@@ -260,6 +259,9 @@ private struct SignScreenHostView: View {
         }
         .onAppear {
             model.syncSignerFromDefaultOnAppear()
+        }
+        .onDisappear {
+            model.handleDisappear()
         }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
             model.handleContentClearGenerationChange()

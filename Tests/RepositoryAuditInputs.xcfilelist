@@ -12,6 +12,7 @@ $(SRCROOT)/Sources/App/Common/CypherMultilineTextInput.swift
 $(SRCROOT)/Sources/App/Common/CypherTextInputs.swift
 $(SRCROOT)/Sources/App/Common/DetailedSignatureSectionView.swift
 $(SRCROOT)/Sources/App/Common/FileExportController.swift
+$(SRCROOT)/Sources/App/Common/FileImportRequestGate.swift
 $(SRCROOT)/Sources/App/Common/FingerprintView.swift
 $(SRCROOT)/Sources/App/Common/OperationController.swift
 $(SRCROOT)/Sources/App/Common/OutputHandling.swift

@@ -18,8 +18,11 @@ struct ImportKeyView: View {
     @State private var importedFileName: String?
     @State private var importTask: Task<Void, Never>?
     @State private var importToken: UInt64 = 0
+    @State private var fileImportRequestGate = FileImportRequestGate()
 
     var body: some View {
+        let fileImportRequestToken = fileImportRequestGate.currentToken
+
         Form {
             Section {
                 if let fileName = importedFileName, importedKeyData != nil {
@@ -46,7 +49,7 @@ struct ImportKeyView: View {
 
             Section {
                 Button {
-                    showFileImporter = true
+                    requestFileImport()
                 } label: {
                     Label(
                         String(localized: "import.fromFile", defaultValue: "Import from File"),
@@ -107,9 +110,7 @@ struct ImportKeyView: View {
             ],
             allowsMultipleSelection: false
         ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                loadFileContents(from: url)
-            }
+            handleFileImporterResult(result, token: fileImportRequestToken)
         }
         .onDisappear {
             cancelImportAndClearTransientInput()
@@ -125,6 +126,24 @@ struct ImportKeyView: View {
         #else
         return (120, 170, 240)
         #endif
+    }
+
+    private func requestFileImport() {
+        fileImportRequestGate.begin()
+        showFileImporter = true
+    }
+
+    private func handleFileImporterResult(
+        _ result: Result<[URL], Error>,
+        token: FileImportRequestGate.Token?
+    ) {
+        guard fileImportRequestGate.consumeIfCurrent(token) else {
+            return
+        }
+
+        if case .success(let urls) = result, let url = urls.first {
+            loadFileContents(from: url)
+        }
     }
 
     private func loadFileContents(from url: URL) {
@@ -212,6 +231,7 @@ struct ImportKeyView: View {
         armoredText = ""
         passphrase = ""
         showFileImporter = false
+        fileImportRequestGate.invalidate()
         clearImportedKeyData()
     }
 

@@ -64,6 +64,7 @@ private struct ContactCertificateSignaturesHostView: View {
     var body: some View {
         @Bindable var model = model
         let exportController = model.exportController
+        let fileImportRequestToken = model.fileImportRequestToken
 
         Group {
             if !model.contactsAvailability.isAvailable {
@@ -118,9 +119,7 @@ private struct ContactCertificateSignaturesHostView: View {
             allowedContentTypes: model.allowedImportContentTypes,
             allowsMultipleSelection: false
         ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                model.handleImportedFile(url)
-            }
+            model.handleFileImporterResult(result, token: fileImportRequestToken)
         }
         .fileExporter(
             isPresented: Binding(
