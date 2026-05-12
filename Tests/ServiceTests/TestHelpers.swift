@@ -72,8 +72,7 @@ enum TestHelpers {
             name: name,
             email: email,
             expirySeconds: nil,
-            profile: profile,
-            authMode: .standard
+            profile: profile
         )
     }
 

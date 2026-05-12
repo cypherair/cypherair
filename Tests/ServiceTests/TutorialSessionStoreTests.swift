@@ -75,8 +75,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
 
@@ -148,8 +147,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
 
@@ -171,8 +169,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
         XCTAssertTrue(store.isCompleted(.createDemoIdentity))
@@ -439,8 +436,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
 
@@ -504,8 +500,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
 
@@ -539,8 +534,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             name: "Alice Demo",
             email: "alice@demo.invalid",
             expirySeconds: nil,
-            profile: .advanced,
-            authMode: .standard
+            profile: .advanced
         )
         await store.noteAliceGenerated(alice)
 

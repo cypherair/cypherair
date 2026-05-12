@@ -21,6 +21,10 @@ final class KeyManagementService: @unchecked Sendable {
     private let selectiveRevocationService: SelectiveRevocationService
     private let mutationService: KeyMutationService
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
+    private let provisioningInvalidationGate: KeyProvisioningInvalidationGate
+    private let beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
+    private let postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
+    private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let traceStore: AuthLifecycleTraceStore?
     private var legacyMetadataMigrationCompletedInProcess = false
 
@@ -34,7 +38,15 @@ final class KeyManagementService: @unchecked Sendable {
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
-        metadataPersistence: (any KeyMetadataPersistence)? = nil
+        metadataPersistence: (any KeyMetadataPersistence)? = nil,
+        beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        afterImportOffMainActorCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        afterPermanentBundleStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) {
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
         let keyMetadataPersistence = metadataPersistence ?? metadataStore
@@ -48,17 +60,28 @@ final class KeyManagementService: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let effectivePrivateKeyControlStore = privateKeyControlStore
+        let provisioningInvalidationGate = KeyProvisioningInvalidationGate()
 
         self.engine = engine
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
         self.privateKeyControlStore = effectivePrivateKeyControlStore
+        self.provisioningInvalidationGate = provisioningInvalidationGate
+        self.beforeAuthModeReadCheckpoint = beforeAuthModeReadCheckpoint
+        self.postProvisioningCheckpoint = postProvisioningCheckpoint
+        self.relockInvalidationCheckpoint = relockInvalidationCheckpoint
         self.provisioningService = KeyProvisioningService(
             engine: engine,
             secureEnclave: secureEnclave,
             memoryInfo: memoryInfo,
             bundleStore: bundleStore,
-            catalogStore: catalogStore
+            catalogStore: catalogStore,
+            invalidationGate: provisioningInvalidationGate,
+            beforePermanentStorageCheckpoint: provisioningCheckpoint,
+            afterImportOffMainActorCheckpoint: afterImportOffMainActorCheckpoint,
+            afterPermanentBundleStoreCheckpoint: afterPermanentBundleStoreCheckpoint,
+            afterIdentityStoreCheckpoint: identityStoreCheckpoint,
+            commitDrainWaiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint
         )
         self.exportService = KeyExportService(
             engine: engine,
@@ -94,6 +117,7 @@ final class KeyManagementService: @unchecked Sendable {
             syncKeys()
             metadataLoadState = .loaded
         } catch {
+            catalogStore.clearInMemoryIdentities()
             keys = []
             metadataLoadState = .recoveryNeeded
             throw error
@@ -105,11 +129,13 @@ final class KeyManagementService: @unchecked Sendable {
     }
 
     func markKeyMetadataLocked() {
+        catalogStore.clearInMemoryIdentities()
         keys = []
         metadataLoadState = .locked
     }
 
     func markKeyMetadataRecoveryNeeded() {
+        catalogStore.clearInMemoryIdentities()
         keys = []
         metadataLoadState = .recoveryNeeded
     }
@@ -177,6 +203,8 @@ final class KeyManagementService: @unchecked Sendable {
     }
 
     func resetInMemoryStateAfterLocalDataReset() {
+        provisioningInvalidationGate.invalidate()
+        catalogStore.clearInMemoryIdentities()
         keys = []
         legacyMetadataMigrationCompletedInProcess = false
         legacyMetadataMigrationLoadWarning = nil
@@ -202,40 +230,45 @@ final class KeyManagementService: @unchecked Sendable {
         expirySeconds: UInt64?,
         profile: KeyProfile
     ) async throws -> PGPKeyIdentity {
+        let token = provisioningInvalidationGate.makeToken()
+        if let beforeAuthModeReadCheckpoint {
+            await beforeAuthModeReadCheckpoint()
+        }
+        try Task.checkCancellation()
+        try provisioningInvalidationGate.checkValid(token)
         let authMode = try privateKeyControlStore.requireUnlockedAuthMode()
-        return try await generateKey(
+        try Task.checkCancellation()
+        try provisioningInvalidationGate.checkValid(token)
+        return try await generateKeyWithValidatedAuthMode(
             name: name,
             email: email,
             expirySeconds: expirySeconds,
             profile: profile,
-            authMode: authMode
+            authMode: authMode,
+            token: token
         )
     }
 
-    /// Generate a new key pair with the specified profile.
-    /// The private key is immediately SE-wrapped and stored in Keychain.
-    ///
-    /// - Parameters:
-    ///   - name: User's name (required).
-    ///   - email: User's email (optional).
-    ///   - expirySeconds: Key validity duration in seconds (nil = default 2 years).
-    ///   - profile: Encryption profile (.universal or .advanced).
-    ///   - authMode: Current authentication mode for SE key access control.
-    /// - Returns: The newly created key identity.
-    func generateKey(
+    private func generateKeyWithValidatedAuthMode(
         name: String,
         email: String?,
         expirySeconds: UInt64?,
         profile: KeyProfile,
-        authMode: AuthenticationMode
+        authMode: AuthenticationMode,
+        token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
         let identity = try await provisioningService.generateKey(
             name: name,
             email: email,
             expirySeconds: expirySeconds,
             profile: profile,
-            authMode: authMode
+            authMode: authMode,
+            invalidationToken: token
         )
+        if let postProvisioningCheckpoint {
+            await postProvisioningCheckpoint()
+        }
+        try provisioningInvalidationGate.checkValid(token)
         syncKeys()
         return identity
     }
@@ -250,32 +283,39 @@ final class KeyManagementService: @unchecked Sendable {
         armoredData: Data,
         passphrase: String
     ) async throws -> PGPKeyIdentity {
+        let token = provisioningInvalidationGate.makeToken()
+        if let beforeAuthModeReadCheckpoint {
+            await beforeAuthModeReadCheckpoint()
+        }
+        try Task.checkCancellation()
+        try provisioningInvalidationGate.checkValid(token)
         let authMode = try privateKeyControlStore.requireUnlockedAuthMode()
-        return try await importKey(
+        try Task.checkCancellation()
+        try provisioningInvalidationGate.checkValid(token)
+        return try await importKeyWithValidatedAuthMode(
             armoredData: armoredData,
             passphrase: passphrase,
-            authMode: authMode
+            authMode: authMode,
+            token: token
         )
     }
 
-    /// Import a passphrase-protected secret key.
-    /// Validates Argon2id memory requirements before import.
-    ///
-    /// - Parameters:
-    ///   - armoredData: The ASCII-armored secret key data.
-    ///   - passphrase: The passphrase protecting the key.
-    ///   - authMode: Current authentication mode for SE key access control.
-    /// - Returns: The imported key identity.
-    func importKey(
+    private func importKeyWithValidatedAuthMode(
         armoredData: Data,
         passphrase: String,
-        authMode: AuthenticationMode
+        authMode: AuthenticationMode,
+        token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
         let identity = try await provisioningService.importKey(
             armoredData: armoredData,
             passphrase: passphrase,
-            authMode: authMode
+            authMode: authMode,
+            invalidationToken: token
         )
+        if let postProvisioningCheckpoint {
+            await postProvisioningCheckpoint()
+        }
+        try provisioningInvalidationGate.checkValid(token)
         syncKeys()
         return identity
     }
@@ -533,6 +573,11 @@ final class KeyManagementService: @unchecked Sendable {
 
 extension KeyManagementService: ProtectedDataRelockParticipant {
     func relockProtectedData() async throws {
+        provisioningInvalidationGate.invalidate()
+        if let relockInvalidationCheckpoint {
+            await relockInvalidationCheckpoint()
+        }
+        await provisioningService.waitForActiveProvisioningCommitsToFinish()
         markKeyMetadataLocked()
     }
 }
