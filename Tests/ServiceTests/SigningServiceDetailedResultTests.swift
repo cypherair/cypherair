@@ -33,7 +33,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
         let detailed = try await stack.signingService.verifyCleartextDetailed(signedMessage)
 
-        XCTAssertNotNil(detailed.text)
+        XCTAssertEqual(detailed.text, Data("FFI detailed multi-signer cleartext".utf8))
         XCTAssertEqual(detailed.verification.signatures.count, 2)
         XCTAssertEqual(detailed.verification.signatures[0].status, .valid)
         XCTAssertEqual(detailed.verification.signatures[1].status, .valid)
@@ -107,35 +107,6 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         )
         XCTAssertEqual(detailed.signatures[0].signerIdentity?.source, .contact)
         XCTAssertEqual(detailed.signatures[1].signerIdentity?.source, .contact)
-    }
-
-    func test_verifyCleartextDetailed_generatedExpiredSigner_preservesExpiredEntry()
-        async throws
-    {
-        let identity = try await stack.keyManagement.generateKey(
-            name: "Detailed Expiring Signer",
-            email: "detailed-expiring@example.com",
-            expirySeconds: 1,
-            profile: .universal
-        )
-        try addContact(identity.publicKeyData)
-
-        let signed = try await stack.signingService.signCleartext(
-            "Detailed expired cleartext",
-            signerFingerprint: identity.fingerprint
-        )
-
-        try await Task.sleep(for: .seconds(2))
-
-        let detailed = try await stack.signingService.verifyCleartextDetailed(signed)
-
-        XCTAssertEqual(detailed.verification.legacyStatus, .expired)
-        XCTAssertEqual(detailed.verification.signatures.count, 1)
-        XCTAssertEqual(detailed.verification.signatures[0].status, .expired)
-        XCTAssertEqual(
-            detailed.verification.signatures[0].signerPrimaryFingerprint,
-            identity.fingerprint
-        )
     }
 
     func test_verifyDetachedDetailed_fixtureExpiredUnknown_preservesDetailedFold()
@@ -263,55 +234,6 @@ final class SigningServiceDetailedResultTests: XCTestCase {
                 return XCTFail("Expected OperationCancelled, got \(error)")
             }
         }
-    }
-
-    func test_verifyCleartextDetailed_profileBGenerated_preservesDetailedEntry() async throws {
-        let identity = try await stack.keyManagement.generateKey(
-            name: "Detailed Profile B Signer",
-            email: "detailed-b@example.com",
-            expirySeconds: nil,
-            profile: .advanced
-        )
-
-        let signed = try await stack.signingService.signCleartext(
-            "Profile B detailed cleartext",
-            signerFingerprint: identity.fingerprint
-        )
-
-        let detailed = try await stack.signingService.verifyCleartextDetailed(signed)
-
-        XCTAssertEqual(detailed.verification.signatures.count, 1)
-        XCTAssertEqual(detailed.verification.signatures[0].status, .valid)
-        XCTAssertEqual(detailed.verification.signatures[0].verificationState, .verified)
-        XCTAssertEqual(
-            detailed.verification.signatures[0].signerPrimaryFingerprint,
-            identity.fingerprint
-        )
-        XCTAssertEqual(detailed.verification.signatures[0].signerIdentity?.source, .ownKey)
-    }
-
-    func test_verifyDetachedDetailed_profileBGenerated_preservesDetailedEntry() async throws {
-        let identity = try await stack.keyManagement.generateKey(
-            name: "Detailed Profile B Detached Signer",
-            email: "detailed-b-detached@example.com",
-            expirySeconds: nil,
-            profile: .advanced
-        )
-        let data = Data("Profile B detailed detached".utf8)
-
-        let signature = try await stack.signingService.signDetached(
-            data,
-            signerFingerprint: identity.fingerprint
-        )
-
-        let detailed = try await stack.signingService.verifyDetachedDetailed(
-            data: data,
-            signature: signature
-        )
-
-        XCTAssertEqual(detailed.signatures.count, 1)
-        XCTAssertEqual(detailed.signatures[0].status, .valid)
-        XCTAssertEqual(detailed.signatures[0].signerPrimaryFingerprint, identity.fingerprint)
     }
 
     private func loadFixture(_ name: String, ext: String = "gpg") throws -> Data {

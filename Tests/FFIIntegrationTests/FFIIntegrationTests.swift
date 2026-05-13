@@ -1703,7 +1703,7 @@ final class FFIIntegrationTests: XCTestCase {
             verificationKeys: [signerA, signerB]
         )
 
-        XCTAssertNotNil(detailed.content)
+        XCTAssertEqual(detailed.content, Data("FFI detailed multi-signer cleartext".utf8))
         XCTAssertEqual(detailed.signatures.count, 2)
         XCTAssertTrue(detailed.signatures.allSatisfy { $0.status == .valid })
         let observedFingerprints = Set(
@@ -1780,7 +1780,7 @@ final class FFIIntegrationTests: XCTestCase {
             verificationKeys: [signerA, signerB]
         )
 
-        XCTAssertFalse(detailed.plaintext.isEmpty)
+        XCTAssertEqual(detailed.plaintext, Data("FFI detailed encrypted payload".utf8))
         XCTAssertEqual(detailed.signatures.count, 2)
         XCTAssertTrue(detailed.signatures.allSatisfy { $0.status == .valid })
         let observedFingerprints = Set(
@@ -1815,7 +1815,10 @@ final class FFIIntegrationTests: XCTestCase {
             progress: nil
         )
 
-        XCTAssertFalse(try Data(contentsOf: detailedOutputURL).isEmpty)
+        XCTAssertEqual(
+            try Data(contentsOf: detailedOutputURL),
+            Data("FFI detailed encrypted payload".utf8)
+        )
         XCTAssertEqual(detailed.signatures.count, 2)
     }
 
