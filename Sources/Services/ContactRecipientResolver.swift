@@ -24,25 +24,4 @@ struct ContactRecipientResolver {
 
         return recipientKeys
     }
-
-    func legacyPublicKeysForRecipientFingerprints(
-        _ recipientFingerprints: [String],
-        contacts: [Contact]
-    ) throws -> [Data] {
-        let contactsByFingerprint = Dictionary(uniqueKeysWithValues: contacts.map { ($0.fingerprint, $0) })
-        let recipientKeys = recipientFingerprints.compactMap { fingerprint in
-            contactsByFingerprint[fingerprint]?.publicKeyData
-        }
-
-        guard recipientKeys.count == recipientFingerprints.count else {
-            throw CypherAirError.invalidKeyData(
-                reason: String(
-                    localized: "error.recipientNotFound",
-                    defaultValue: "One or more recipients could not be found in contacts."
-                )
-            )
-        }
-
-        return recipientKeys
-    }
 }

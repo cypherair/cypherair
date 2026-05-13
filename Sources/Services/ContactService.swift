@@ -802,14 +802,6 @@ final class ContactService: @unchecked Sendable {
         return contacts.first { $0.fingerprint == fingerprint }
     }
 
-    func legacyPublicKeysForRecipientFingerprints(_ recipientFingerprints: [String]) throws -> [Data] {
-        try requireContactsAvailable()
-        return try recipientResolver.legacyPublicKeysForRecipientFingerprints(
-            recipientFingerprints,
-            contacts: contacts
-        )
-    }
-
     func publicKeysForRecipientContactIDs(_ recipientContactIds: [String]) throws -> [Data] {
         try requireContactsAvailable()
         guard let runtimeSnapshot else {
