@@ -21,8 +21,8 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
 
         XCTAssertEqual(notices.first?.kind, .app)
         XCTAssertTrue(notices.contains { $0.id == "cypherair" })
-        XCTAssertTrue(notices.contains { $0.id == "sequoia-openpgp@2.2.0" })
-        XCTAssertTrue(notices.contains { $0.id == "sequoia-openpgp@2.2.0" && $0.isDirectDependency })
+        XCTAssertTrue(notices.contains { $0.id == "sequoia-openpgp@2.3.0" })
+        XCTAssertTrue(notices.contains { $0.id == "sequoia-openpgp@2.3.0" && $0.isDirectDependency })
     }
 
     func test_loadLicenseText_everyNoticeHasReadableText() throws {
@@ -99,7 +99,7 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         XCTAssertEqual(uniffi.licenseSourceKind, .repositoryArchive)
         XCTAssertTrue(uniffi.licenseSourceItems.contains("v0.31.1:LICENSE"))
 
-        let sequoia = try XCTUnwrap(notices.first { $0.id == "sequoia-openpgp@2.2.0" })
+        let sequoia = try XCTUnwrap(notices.first { $0.id == "sequoia-openpgp@2.3.0" })
         XCTAssertEqual(sequoia.licenseSourceKind, .cratePackage)
         XCTAssertTrue(sequoia.licenseSourceItems.contains("LICENSE.txt"))
     }
