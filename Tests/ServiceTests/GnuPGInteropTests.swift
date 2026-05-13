@@ -71,7 +71,7 @@ final class GnuPGInteropTests: XCTestCase {
         let secretKey = try loadGpgSecretKey()
         defer { var mutable = secretKey; mutable.resetBytes(in: 0..<mutable.count) }
 
-        let result = try engine.decrypt(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
+        let result = try engine.decryptDetailed(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
         defer { var plaintext = result.plaintext; plaintext.resetBytes(in: 0..<plaintext.count) }
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
@@ -83,7 +83,7 @@ final class GnuPGInteropTests: XCTestCase {
         let secretKey = try loadGpgSecretKey()
         defer { var mutable = secretKey; mutable.resetBytes(in: 0..<mutable.count) }
 
-        let result = try engine.decrypt(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
+        let result = try engine.decryptDetailed(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
         defer { var plaintext = result.plaintext; plaintext.resetBytes(in: 0..<plaintext.count) }
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
@@ -96,10 +96,10 @@ final class GnuPGInteropTests: XCTestCase {
         let signedMessage = try FixtureLoader.loadData("gpg_cleartext_signed", ext: "asc")
         let pubKey = try loadGpgPublicKey()
 
-        let result = try engine.verifyCleartext(signedMessage: signedMessage, verificationKeys: [pubKey])
+        let result = try engine.verifyCleartextDetailed(signedMessage: signedMessage, verificationKeys: [pubKey])
 
-        XCTAssertEqual(result.status, .valid, "GnuPG cleartext signature should be valid")
-        XCTAssertNotNil(result.signerFingerprint, "Signer fingerprint should be present")
+        XCTAssertEqual(result.legacyStatus, .valid, "GnuPG cleartext signature should be valid")
+        XCTAssertNotNil(result.legacySignerFingerprint, "Signer fingerprint should be present")
         XCTAssertNotNil(result.content, "Signed content should be extracted")
     }
 
@@ -109,9 +109,9 @@ final class GnuPGInteropTests: XCTestCase {
         let signature = try engine.dearmor(armored: signatureArmored)
         let pubKey = try loadGpgPublicKey()
 
-        let result = try engine.verifyDetached(data: plaintext, signature: signature, verificationKeys: [pubKey])
+        let result = try engine.verifyDetachedDetailed(data: plaintext, signature: signature, verificationKeys: [pubKey])
 
-        XCTAssertEqual(result.status, .valid, "GnuPG armored detached signature should be valid")
+        XCTAssertEqual(result.legacyStatus, .valid, "GnuPG armored detached signature should be valid")
     }
 
     func test_c3_5_verifyGnuPGDetachedSignature_binary_returnsValid() throws {
@@ -119,9 +119,9 @@ final class GnuPGInteropTests: XCTestCase {
         let signature = try FixtureLoader.loadData("gpg_detached_sig", ext: "sig")
         let pubKey = try loadGpgPublicKey()
 
-        let result = try engine.verifyDetached(data: plaintext, signature: signature, verificationKeys: [pubKey])
+        let result = try engine.verifyDetachedDetailed(data: plaintext, signature: signature, verificationKeys: [pubKey])
 
-        XCTAssertEqual(result.status, .valid, "GnuPG binary detached signature should be valid")
+        XCTAssertEqual(result.legacyStatus, .valid, "GnuPG binary detached signature should be valid")
     }
 
     // MARK: - C3.6 Tamper Detection
@@ -132,7 +132,7 @@ final class GnuPGInteropTests: XCTestCase {
         defer { var mutable = secretKey; mutable.resetBytes(in: 0..<mutable.count) }
 
         XCTAssertThrowsError(
-            try engine.decrypt(ciphertext: tamperedCiphertext, secretKeys: [secretKey], verificationKeys: []),
+            try engine.decryptDetailed(ciphertext: tamperedCiphertext, secretKeys: [secretKey], verificationKeys: []),
             "Decrypting tampered GnuPG ciphertext should throw an error"
         )
     }
@@ -160,7 +160,7 @@ final class GnuPGInteropTests: XCTestCase {
         binaryCiphertext[midpoint] ^= 0x01
 
         XCTAssertThrowsError(
-            try engine.decrypt(ciphertext: binaryCiphertext, secretKeys: [secretKey], verificationKeys: []),
+            try engine.decryptDetailed(ciphertext: binaryCiphertext, secretKeys: [secretKey], verificationKeys: []),
             "Decrypting tampered Sequoia ciphertext should throw an integrity error"
         )
     }
@@ -185,7 +185,7 @@ final class GnuPGInteropTests: XCTestCase {
         let ciphertext = try engine.dearmor(armored: ciphertextArmored)
 
         // Decrypt with GnuPG secret key
-        let result = try engine.decrypt(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
+        let result = try engine.decryptDetailed(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
         defer { var decrypted = result.plaintext; decrypted.resetBytes(in: 0..<decrypted.count) }
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
@@ -200,7 +200,7 @@ final class GnuPGInteropTests: XCTestCase {
         let secretKey = try loadGpgSecretKey()
         defer { var mutable = secretKey; mutable.resetBytes(in: 0..<mutable.count) }
 
-        let result = try engine.decrypt(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
+        let result = try engine.decryptDetailed(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
         defer { var plaintext = result.plaintext; plaintext.resetBytes(in: 0..<plaintext.count) }
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
@@ -215,7 +215,7 @@ final class GnuPGInteropTests: XCTestCase {
         let secretKey = try loadGpgSecretKey()
         defer { var mutable = secretKey; mutable.resetBytes(in: 0..<mutable.count) }
 
-        let result = try engine.decrypt(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
+        let result = try engine.decryptDetailed(ciphertext: ciphertext, secretKeys: [secretKey], verificationKeys: [])
         defer { var plaintext = result.plaintext; plaintext.resetBytes(in: 0..<plaintext.count) }
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
@@ -229,10 +229,10 @@ final class GnuPGInteropTests: XCTestCase {
         let signedMessage = try FixtureLoader.loadData("gpg_signed_compressed", ext: "asc")
         let pubKey = try loadGpgPublicKey()
 
-        let result = try engine.verifyCleartext(signedMessage: signedMessage, verificationKeys: [pubKey])
+        let result = try engine.verifyCleartextDetailed(signedMessage: signedMessage, verificationKeys: [pubKey])
 
-        XCTAssertEqual(result.status, .valid,
+        XCTAssertEqual(result.legacyStatus, .valid,
                        "GnuPG signed+compressed message should have a valid signature")
-        XCTAssertNotNil(result.signerFingerprint, "Signer fingerprint should be present")
+        XCTAssertNotNil(result.legacySignerFingerprint, "Signer fingerprint should be present")
     }
 }

@@ -210,7 +210,7 @@ final class DecryptionServiceTests: XCTestCase {
             profile: .universal, plaintext: plaintext
         )
 
-        let result = try await stack.decryptionService.decrypt(phase1: phase1)
+        let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
@@ -222,7 +222,7 @@ final class DecryptionServiceTests: XCTestCase {
             profile: .advanced, plaintext: plaintext
         )
 
-        let result = try await stack.decryptionService.decrypt(phase1: phase1)
+        let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
@@ -233,9 +233,9 @@ final class DecryptionServiceTests: XCTestCase {
             profile: .universal, sign: true
         )
 
-        let result = try await stack.decryptionService.decrypt(phase1: phase1)
+        let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
-        XCTAssertEqual(result.signature.status, .valid,
+        XCTAssertEqual(result.verification.legacyStatus, .valid,
                        "Signed message should verify with .valid status")
     }
 
@@ -244,7 +244,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         let unwrapCountBefore = stack.mockSE.unwrapCallCount
 
-        _ = try await stack.decryptionService.decrypt(phase1: phase1)
+        _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
         XCTAssertGreaterThan(stack.mockSE.unwrapCallCount, unwrapCountBefore,
                              "Phase 2 must trigger SE unwrap for authentication")
@@ -258,7 +258,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
 
         do {
-            _ = try await stack.decryptionService.decrypt(phase1: phase1)
+            _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
             XCTFail("Expected noMatchingKey error")
         } catch let error as CypherAirError {
             if case .noMatchingKey = error {
@@ -291,7 +291,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         // Phase 2 should fail — MDC integrity check (Profile A / SEIPDv1)
         do {
-            _ = try await stack.decryptionService.decrypt(phase1: phase1)
+            _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
             XCTFail("Expected decryption to fail on tampered ciphertext")
         } catch let error as CypherAirError {
             // Profile A (SEIPDv1): bit-flip may corrupt the encrypted payload
@@ -335,7 +335,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         // Phase 2 should fail — AEAD hard-fail (Profile B / SEIPDv2)
         do {
-            _ = try await stack.decryptionService.decrypt(phase1: phase1)
+            _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
             XCTFail("Expected AEAD hard-fail on tampered ciphertext")
         } catch let error as CypherAirError {
             // Profile B (SEIPDv2 AEAD): bit-flip may corrupt the AEAD payload
@@ -372,7 +372,7 @@ final class DecryptionServiceTests: XCTestCase {
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
 
         let verificationKeys = [identity.publicKeyData]
-        let result = try stack.engine.decrypt(
+        let result = try stack.engine.decryptDetailed(
             ciphertext: binaryCiphertext,
             secretKeys: [secretKey],
             verificationKeys: verificationKeys
@@ -391,7 +391,7 @@ final class DecryptionServiceTests: XCTestCase {
         var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
 
-        let result = try stack.engine.decrypt(
+        let result = try stack.engine.decryptDetailed(
             ciphertext: binaryCiphertext,
             secretKeys: [secretKey],
             verificationKeys: [identity.publicKeyData]
@@ -410,7 +410,7 @@ final class DecryptionServiceTests: XCTestCase {
         var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
 
-        let result = try stack.engine.decrypt(
+        let result = try stack.engine.decryptDetailed(
             ciphertext: binaryCiphertext,
             secretKeys: [secretKey],
             verificationKeys: [identity.publicKeyData]
@@ -428,11 +428,11 @@ final class DecryptionServiceTests: XCTestCase {
             profile: .universal, plaintext: plaintext, sign: true
         )
 
-        let result = try await stack.decryptionService.decrypt(phase1: phase1)
+        let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
-        XCTAssertEqual(result.signature.status, .valid)
+        XCTAssertEqual(result.verification.legacyStatus, .valid)
     }
 
     func test_decryptViaService_profileB_fullFlow() async throws {
@@ -441,11 +441,11 @@ final class DecryptionServiceTests: XCTestCase {
             profile: .advanced, plaintext: plaintext, sign: true
         )
 
-        let result = try await stack.decryptionService.decrypt(phase1: phase1)
+        let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
-        XCTAssertEqual(result.signature.status, .valid)
+        XCTAssertEqual(result.verification.legacyStatus, .valid)
     }
 
     // MARK: - End-to-End via decryptMessage() (Phase 1 + Phase 2)
@@ -463,11 +463,11 @@ final class DecryptionServiceTests: XCTestCase {
         )
 
         // decryptMessage exercises both Phase 1 (parseRecipients) and Phase 2 (decrypt)
-        let result = try await stack.decryptionService.decryptMessage(ciphertext: ciphertext)
+        let result = try await stack.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
-        XCTAssertEqual(result.signature.status, .valid)
+        XCTAssertEqual(result.verification.legacyStatus, .valid)
     }
 
     func test_decryptMessage_profileB_endToEnd() async throws {
@@ -482,11 +482,11 @@ final class DecryptionServiceTests: XCTestCase {
             encryptToSelf: false
         )
 
-        let result = try await stack.decryptionService.decryptMessage(ciphertext: ciphertext)
+        let result = try await stack.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
-        XCTAssertEqual(result.signature.status, .valid)
+        XCTAssertEqual(result.verification.legacyStatus, .valid)
     }
 
     func test_parseRecipients_profileA_matchesCorrectKey() async throws {
@@ -527,7 +527,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     // MARK: - Detailed Results
 
-    func test_decryptDetailed_validOwnKeySigner_matchesLegacyAndResolvesOwnKey() async throws {
+    func test_decryptDetailed_validOwnKeySigner_resolvesOwnKey() async throws {
         let sender = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
             profile: .universal,
@@ -560,9 +560,6 @@ final class DecryptionServiceTests: XCTestCase {
             unwrapBefore + 1,
             "Detailed decrypt should unwrap exactly once"
         )
-
-        let legacy = try await stack.decryptionService.decrypt(phase1: phase1)
-
         XCTAssertEqual(detailed.plaintext, plaintext)
         XCTAssertEqual(detailed.verification.signatures.count, 1)
         XCTAssertEqual(detailed.verification.signatures[0].status, .valid)
@@ -577,10 +574,6 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(
             detailed.verification.signatures[0].signerIdentity?.fingerprint,
             sender.fingerprint
-        )
-        assertLegacyVerificationEquivalent(
-            detailed.verification.legacyVerification,
-            legacy.signature
         )
     }
 
@@ -600,15 +593,10 @@ final class DecryptionServiceTests: XCTestCase {
 
         try await stack.contactService.relockProtectedData()
         let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
-        let legacy = try await stack.decryptionService.decrypt(phase1: phase1)
 
         XCTAssertEqual(detailed.plaintext, plaintext)
         XCTAssertEqual(detailed.verification.legacyStatus, .notSigned)
         XCTAssertTrue(detailed.verification.signatures.isEmpty)
-        assertLegacyVerificationEquivalent(
-            detailed.verification.legacyVerification,
-            legacy.signature
-        )
     }
 
     func test_decryptDetailed_fixtureMultiSigner_preservesEntriesAndContactResolution()
@@ -1205,7 +1193,7 @@ final class DecryptionServiceTests: XCTestCase {
         stack.mockSE.biometricsAvailable = false
 
         do {
-            _ = try await stack.decryptionService.decrypt(phase1: phase1)
+            _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
             XCTFail("Expected authentication error when biometrics unavailable in High Security mode")
         } catch {
             // The error propagates from MockSEError.authenticationFailed through
@@ -1253,7 +1241,7 @@ final class DecryptionServiceTests: XCTestCase {
             tampered[position] ^= 0x01
 
             do {
-                _ = try stack.engine.decrypt(
+                _ = try stack.engine.decryptDetailed(
                     ciphertext: tampered,
                     secretKeys: secretKeys,
                     verificationKeys: verificationKeys
@@ -1300,18 +1288,6 @@ final class DecryptionServiceTests: XCTestCase {
         let remaining = try FileManager.default.contentsOfDirectory(at: decryptedDir, includingPropertiesForKeys: nil)
             .filter { $0.lastPathComponent.hasPrefix("op-") }
         XCTAssertTrue(remaining.isEmpty, file: file, line: line)
-    }
-
-    private func assertLegacyVerificationEquivalent(
-        _ actual: SignatureVerification,
-        _ expected: SignatureVerification,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertEqual(actual.status, expected.status, file: file, line: line)
-        XCTAssertEqual(actual.signerFingerprint, expected.signerFingerprint, file: file, line: line)
-        XCTAssertEqual(actual.signerContact, expected.signerContact, file: file, line: line)
-        XCTAssertEqual(actual.signerIdentity, expected.signerIdentity, file: file, line: line)
     }
 
     private func assertDetailedEntriesMatchFFI(

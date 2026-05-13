@@ -16,6 +16,12 @@ final class PasswordMessageService {
         case passwordRejected
     }
 
+    enum DetailedDecryptOutcome {
+        case decrypted(plaintext: Data, verification: DetailedSignatureVerification)
+        case noSkesk
+        case passwordRejected
+    }
+
     private let engine: PgpEngine
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
@@ -61,6 +67,17 @@ final class PasswordMessageService {
     }
 
     func decryptMessage(ciphertext: Data, password: String) async throws -> DecryptOutcome {
+        switch try await decryptMessageDetailed(ciphertext: ciphertext, password: password) {
+        case .decrypted(let plaintext, let verification):
+            return .decrypted(plaintext: plaintext, signature: verification.legacyVerification)
+        case .noSkesk:
+            return .noSkesk
+        case .passwordRejected:
+            return .passwordRejected
+        }
+    }
+
+    func decryptMessageDetailed(ciphertext: Data, password: String) async throws -> DetailedDecryptOutcome {
         let context = verificationContext()
 
         let result: PasswordDecryptResult
@@ -93,7 +110,7 @@ final class PasswordMessageService {
                 ownKeys: keyManagement.keys,
                 contactsAvailability: context.contactsAvailability
             )
-            return .decrypted(plaintext: plaintext, signature: verification.legacyVerification)
+            return .decrypted(plaintext: plaintext, verification: verification)
 
         case .noSkesk:
             return .noSkesk

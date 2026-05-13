@@ -83,12 +83,12 @@ final class StreamingServiceTests: XCTestCase {
         XCTAssertEqual(phase1.matchedKey?.fingerprint, recipient.fingerprint)
 
         // Phase 2: Decrypt
-        let decryptedResult = try await stack.decryptionService.decryptFileStreaming(
+        let decryptedResult = try await stack.decryptionService.decryptFileStreamingDetailed(
             phase1: phase1,
             progress: nil
         )
         let outputURL = decryptedResult.artifact.fileURL
-        let sig = decryptedResult.signature
+        let sig = decryptedResult.verification
         defer { decryptedResult.artifact.cleanup() }
 
         let decrypted = try Data(contentsOf: outputURL)
@@ -96,8 +96,8 @@ final class StreamingServiceTests: XCTestCase {
         XCTAssertEqual(decrypted, plaintext)
         // Signature should be valid (known signer is a contact)
         XCTAssertTrue(
-            sig.status == .valid,
-            "Expected valid signature, got: \(sig.status)"
+            sig.legacyStatus == .valid,
+            "Expected valid signature, got: \(sig.legacyStatus)"
         )
     }
 
@@ -124,20 +124,20 @@ final class StreamingServiceTests: XCTestCase {
         let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedURL)
         XCTAssertEqual(phase1.matchedKey?.fingerprint, recipient.fingerprint)
 
-        let decryptedResult = try await stack.decryptionService.decryptFileStreaming(
+        let decryptedResult = try await stack.decryptionService.decryptFileStreamingDetailed(
             phase1: phase1,
             progress: nil
         )
         let outputURL = decryptedResult.artifact.fileURL
-        let sig = decryptedResult.signature
+        let sig = decryptedResult.verification
         defer { decryptedResult.artifact.cleanup() }
 
         let decrypted = try Data(contentsOf: outputURL)
         try assertCompleteFileProtection(at: outputURL)
         XCTAssertEqual(decrypted, plaintext)
         XCTAssertTrue(
-            sig.status == .valid,
-            "Expected valid signature, got: \(sig.status)"
+            sig.legacyStatus == .valid,
+            "Expected valid signature, got: \(sig.legacyStatus)"
         )
     }
 
@@ -186,8 +186,8 @@ final class StreamingServiceTests: XCTestCase {
         defer { encryptedArtifact.cleanup() }
         let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedArtifact.fileURL)
 
-        let first = try await stack.decryptionService.decryptFileStreaming(phase1: phase1, progress: nil)
-        let second = try await stack.decryptionService.decryptFileStreaming(phase1: phase1, progress: nil)
+        let first = try await stack.decryptionService.decryptFileStreamingDetailed(phase1: phase1, progress: nil)
+        let second = try await stack.decryptionService.decryptFileStreamingDetailed(phase1: phase1, progress: nil)
         defer {
             first.artifact.cleanup()
             second.artifact.cleanup()
@@ -213,7 +213,7 @@ final class StreamingServiceTests: XCTestCase {
         )
         defer { encryptedArtifact.cleanup() }
         let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedArtifact.fileURL)
-        let first = try await stack.decryptionService.decryptFileStreaming(phase1: phase1, progress: nil)
+        let first = try await stack.decryptionService.decryptFileStreamingDetailed(phase1: phase1, progress: nil)
         defer { first.artifact.cleanup() }
 
         var tampered = try Data(contentsOf: encryptedArtifact.fileURL)
@@ -221,7 +221,7 @@ final class StreamingServiceTests: XCTestCase {
         try tampered.write(to: encryptedArtifact.fileURL, options: .atomic)
 
         do {
-            _ = try await stack.decryptionService.decryptFileStreaming(phase1: phase1, progress: nil)
+            _ = try await stack.decryptionService.decryptFileStreamingDetailed(phase1: phase1, progress: nil)
             XCTFail("Expected tampered repeat decrypt to fail")
         } catch {
             XCTAssertTrue(FileManager.default.fileExists(atPath: first.artifact.fileURL.path))
@@ -246,14 +246,14 @@ final class StreamingServiceTests: XCTestCase {
         XCTAssertFalse(signature.isEmpty)
 
         // Verify
-        let verification = try await stack.signingService.verifyDetachedStreaming(
+        let verification = try await stack.signingService.verifyDetachedStreamingDetailed(
             fileURL: inputURL,
             signature: signature,
             progress: nil
         )
         XCTAssertTrue(
-            verification.status == .valid,
-            "Expected valid signature, got: \(verification.status)"
+            verification.legacyStatus == .valid,
+            "Expected valid signature, got: \(verification.legacyStatus)"
         )
     }
 
@@ -273,14 +273,14 @@ final class StreamingServiceTests: XCTestCase {
         )
         XCTAssertFalse(signature.isEmpty)
 
-        let verification = try await stack.signingService.verifyDetachedStreaming(
+        let verification = try await stack.signingService.verifyDetachedStreamingDetailed(
             fileURL: inputURL,
             signature: signature,
             progress: nil
         )
         XCTAssertTrue(
-            verification.status == .valid,
-            "Expected valid signature, got: \(verification.status)"
+            verification.legacyStatus == .valid,
+            "Expected valid signature, got: \(verification.legacyStatus)"
         )
     }
 
@@ -342,7 +342,7 @@ final class StreamingServiceTests: XCTestCase {
         progress.cancel()
 
         do {
-            _ = try await stack.signingService.verifyDetachedStreaming(
+            _ = try await stack.signingService.verifyDetachedStreamingDetailed(
                 fileURL: inputURL,
                 signature: signature,
                 progress: progress
@@ -435,7 +435,7 @@ final class StreamingServiceTests: XCTestCase {
         do {
             let phase1 = try await stack.decryptionService.parseRecipientsFromFile(fileURL: encryptedURL)
 
-            let decryptedResult = try await stack.decryptionService.decryptFileStreaming(
+            let decryptedResult = try await stack.decryptionService.decryptFileStreamingDetailed(
                 phase1: phase1,
                 progress: nil
             )

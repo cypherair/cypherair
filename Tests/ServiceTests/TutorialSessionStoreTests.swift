@@ -198,8 +198,11 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertFalse(store.isCompleted(.decryptAndVerify))
         XCTAssertEqual(store.session.artifacts.parseResult?.matchedKey?.fingerprint, store.session.artifacts.bobIdentity?.fingerprint)
 
-        let decryptResult = try await container.decryptionService.decrypt(phase1: phase1)
-        store.noteDecrypted(plaintext: decryptResult.plaintext, verification: decryptResult.signature)
+        let decryptResult = try await container.decryptionService.decryptDetailed(phase1: phase1)
+        store.noteDecrypted(
+            plaintext: decryptResult.plaintext,
+            verification: decryptResult.verification.legacyVerification
+        )
         XCTAssertTrue(store.isCompleted(.decryptAndVerify))
         XCTAssertEqual(store.session.artifacts.decryptedVerification?.status, .valid)
 

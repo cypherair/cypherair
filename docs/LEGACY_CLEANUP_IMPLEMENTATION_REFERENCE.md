@@ -215,11 +215,13 @@ Current-state facts:
   current user-facing verify/decrypt flows.
 - `SigningService` and `DecryptionService` legacy-returning facades internally
   call detailed engine APIs, then fold results back to `SignatureVerification`.
-- The main production code still directly calling simple engine
-  verification/decrypt APIs is `SelfTestService`.
+- `SelfTestService` now calls detailed engine decrypt/verify APIs for
+  production self-test diagnostics, so the app has no direct production call
+  sites for the simple engine verification/decrypt APIs.
 - `PasswordMessageService` is not a simple verification API, but it currently
-  folds a detailed password decrypt result into `SignatureVerification`; review
-  it with the other app-level legacy result surfaces.
+  exposes both the additive detailed decrypt outcome and the legacy folded
+  `SignatureVerification` outcome. Review the folded outcome with the other
+  app-level legacy result surfaces in PR 3C.
 - `SignatureVerification` may remain only as an internal presentation/status
   helper for detailed UI rendering. Do not treat it as a public compatibility
   contract to preserve.
@@ -232,17 +234,23 @@ Recommended PRs:
   semantics. Re-check production call sites for simple engine
   verification/decrypt APIs and record any app-level `SignatureVerification`
   result surfaces that must be deleted in PR 3C.
+  Status: completed in the first Phase 3 PR.
 - PR 3B, behavior test migration gates: rewrite valuable behavior coverage that
   still depends on simple or legacy-returning APIs to assert detailed results
   directly. This includes signing/decryption/streaming valid, tamper,
   unknown-signer, contact-resolution, expired-signer, and auth-boundary
-  scenarios.
+  scenarios. The first Phase 3 PR also added
+  `PasswordMessageService.decryptMessageDetailed(...)` as an additive prep step
+  so password-message tests can assert detailed results before PR 3C removes
+  folded surfaces.
+  Status: completed in the first Phase 3 PR.
 - PR 3C, legacy surface deletion: remove simple Rust/UniFFI verification and
   decrypt APIs, generated Swift engine methods for those APIs, legacy result
   records used only by the simple surface, Swift service facades that expose
   `SignatureVerification` as the primary result, app callbacks that carry only
-  folded verification, and tests whose only purpose is legacy bridge or folded
-  summary equivalence.
+  folded verification, the legacy password-message folded outcome, and tests
+  whose only purpose is legacy bridge or folded summary equivalence. This is the
+  next Phase 3 PR and is not included in the first Phase 3 PR.
 
 PR 3B must complete these explicit migration gates before PR 3C deletes the
 legacy surface:
@@ -263,8 +271,8 @@ legacy surface:
   `decryptDetailed(phase1:)` and prove authentication failure does not decrypt.
 - Legacy-only tests named around `matchesLegacyBridge`,
   `preserves...LegacyFields`, `legacyVerifyDetachedFile`, or direct detailed vs
-  legacy folded-summary equivalence are deletion candidates, not compatibility
-  coverage to retain.
+  legacy folded-summary equivalence were deleted or rewritten in the first
+  Phase 3 PR. Do not reintroduce them as compatibility coverage.
 
 Entry conditions:
 
