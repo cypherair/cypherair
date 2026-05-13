@@ -10,12 +10,6 @@ import Foundation
 @Observable
 final class PasswordMessageService {
 
-    enum DecryptOutcome {
-        case decrypted(plaintext: Data, signature: SignatureVerification)
-        case noSkesk
-        case passwordRejected
-    }
-
     enum DetailedDecryptOutcome {
         case decrypted(plaintext: Data, verification: DetailedSignatureVerification)
         case noSkesk
@@ -64,17 +58,6 @@ final class PasswordMessageService {
             signWithFingerprint: signWithFingerprint,
             binary: true
         )
-    }
-
-    func decryptMessage(ciphertext: Data, password: String) async throws -> DecryptOutcome {
-        switch try await decryptMessageDetailed(ciphertext: ciphertext, password: password) {
-        case .decrypted(let plaintext, let verification):
-            return .decrypted(plaintext: plaintext, signature: verification.legacyVerification)
-        case .noSkesk:
-            return .noSkesk
-        case .passwordRejected:
-            return .passwordRejected
-        }
     }
 
     func decryptMessageDetailed(ciphertext: Data, password: String) async throws -> DetailedDecryptOutcome {

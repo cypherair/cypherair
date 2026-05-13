@@ -24,11 +24,11 @@ fn test_verify_tampered_cleartext_returns_bad() {
         panic!("Could not find message text in cleartext-signed output");
     }
 
-    let result = verify::verify_cleartext(&tampered, &[key.public_key_data.clone()])
+    let result = verify::verify_cleartext_detailed(&tampered, &[key.public_key_data.clone()])
         .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
-        result.status,
+        result.legacy_status,
         SignatureStatus::Bad,
         "Tampered cleartext message must produce Bad signature status"
     );
@@ -49,11 +49,11 @@ fn test_verify_tampered_detached_returns_bad() {
     tampered_data[0] ^= 0x01;
 
     let result =
-        verify::verify_detached(&tampered_data, &signature, &[key.public_key_data.clone()])
+        verify::verify_detached_detailed(&tampered_data, &signature, &[key.public_key_data.clone()])
             .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
-        result.status,
+        result.legacy_status,
         SignatureStatus::Bad,
         "Tampered data with detached signature must produce Bad status"
     );
@@ -86,11 +86,11 @@ fn test_verify_cleartext_expired_signer_profile_a() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = verify::verify_cleartext(&cleartext_signed, &[signer.public_key_data.clone()])
+    let result = verify::verify_cleartext_detailed(&cleartext_signed, &[signer.public_key_data.clone()])
         .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
-        result.status,
+        result.legacy_status,
         SignatureStatus::Expired,
         "Cleartext verification with expired Profile A signer key must produce Expired status"
     );
@@ -103,11 +103,11 @@ fn test_verify_cleartext_expired_signer_profile_b() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = verify::verify_cleartext(&cleartext_signed, &[signer.public_key_data.clone()])
+    let result = verify::verify_cleartext_detailed(&cleartext_signed, &[signer.public_key_data.clone()])
         .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
-        result.status,
+        result.legacy_status,
         SignatureStatus::Expired,
         "Cleartext verification with expired Profile B signer key must produce Expired status"
     );
@@ -120,7 +120,7 @@ fn test_verify_detached_expired_signer_profile_a() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = verify::verify_detached(
+    let result = verify::verify_detached_detailed(
         b"Data for detached sig",
         &detached_sig,
         &[signer.public_key_data.clone()],
@@ -128,7 +128,7 @@ fn test_verify_detached_expired_signer_profile_a() {
     .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
-        result.status,
+        result.legacy_status,
         SignatureStatus::Expired,
         "Detached verification with expired Profile A signer key must produce Expired status"
     );
@@ -141,7 +141,7 @@ fn test_verify_detached_expired_signer_profile_b() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = verify::verify_detached(
+    let result = verify::verify_detached_detailed(
         b"Data for detached sig",
         &detached_sig,
         &[signer.public_key_data.clone()],
@@ -149,7 +149,7 @@ fn test_verify_detached_expired_signer_profile_b() {
     .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
-        result.status,
+        result.legacy_status,
         SignatureStatus::Expired,
         "Detached verification with expired Profile B signer key must produce Expired status"
     );
@@ -185,7 +185,7 @@ fn test_decrypt_expired_signer_profile_a() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = decrypt::decrypt(
+    let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[recipient.cert_data.clone()],
         &[signer.public_key_data.clone()],
@@ -193,8 +193,8 @@ fn test_decrypt_expired_signer_profile_a() {
     .expect("Decryption should succeed (content is still valid)");
 
     assert_eq!(
-        result.signature_status,
-        Some(SignatureStatus::Expired),
+        result.legacy_status,
+        SignatureStatus::Expired,
         "Decrypt with expired Profile A signer must produce Expired signature status"
     );
 }
@@ -228,7 +228,7 @@ fn test_decrypt_expired_signer_profile_b() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = decrypt::decrypt(
+    let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[recipient.cert_data.clone()],
         &[signer.public_key_data.clone()],
@@ -236,8 +236,8 @@ fn test_decrypt_expired_signer_profile_b() {
     .expect("Decryption should succeed (content is still valid)");
 
     assert_eq!(
-        result.signature_status,
-        Some(SignatureStatus::Expired),
+        result.legacy_status,
+        SignatureStatus::Expired,
         "Decrypt with expired Profile B signer must produce Expired signature status"
     );
 }
@@ -261,11 +261,11 @@ fn test_verify_tampered_cleartext_returns_bad_profile_b() {
         panic!("Could not find message text in cleartext-signed output");
     }
 
-    let result = verify::verify_cleartext(&tampered, &[key.public_key_data.clone()])
+    let result = verify::verify_cleartext_detailed(&tampered, &[key.public_key_data.clone()])
         .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
-        result.status,
+        result.legacy_status,
         SignatureStatus::Bad,
         "Tampered cleartext message must produce Bad signature status (Profile B)"
     );
@@ -287,11 +287,11 @@ fn test_verify_tampered_detached_returns_bad_profile_a() {
     tampered_data[0] ^= 0x01;
 
     let result =
-        verify::verify_detached(&tampered_data, &signature, &[key.public_key_data.clone()])
+        verify::verify_detached_detailed(&tampered_data, &signature, &[key.public_key_data.clone()])
             .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
-        result.status,
+        result.legacy_status,
         SignatureStatus::Bad,
         "Tampered data with detached signature must produce Bad status (Profile A)"
     );
@@ -322,10 +322,10 @@ fn test_sign_with_expired_key_not_accepted_as_valid() {
             Err(_) => {}
             Ok(signed) => {
                 let verify_result =
-                    verify::verify_cleartext(&signed, &[key.public_key_data.clone()])
+                    verify::verify_cleartext_detailed(&signed, &[key.public_key_data.clone()])
                         .expect("Verification should return a graded result");
                 assert_ne!(
-                    verify_result.status,
+                    verify_result.legacy_status,
                     SignatureStatus::Valid,
                     "Expired-key signature must not verify as Valid ({label})"
                 );
@@ -367,11 +367,11 @@ fn test_verify_signature_from_revoked_key() {
         .serialize(&mut revoked_pubkey)
         .expect("Serialize revoked cert should succeed");
 
-    let result = verify::verify_cleartext(&signed, &[revoked_pubkey]);
+    let result = verify::verify_cleartext_detailed(&signed, &[revoked_pubkey]);
     match result {
         Ok(vr) => {
             assert_ne!(
-                vr.status,
+                vr.legacy_status,
                 SignatureStatus::Valid,
                 "Signature from revoked key should not be reported as Valid"
             );

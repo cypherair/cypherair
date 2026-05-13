@@ -160,64 +160,6 @@ final class DecryptionService {
 
     // MARK: - Phase 2: Decrypt (Authentication Required)
 
-    /// Decrypt a message using the matched key from Phase 1.
-    /// This phase triggers device authentication (Face ID / Touch ID) via SE unwrap.
-    ///
-    /// SECURITY: This method must only be called after Phase 1 has identified the key.
-    /// The private key exists in memory only during the decrypt call and is zeroized immediately after.
-    ///
-    /// - Parameter phase1: The result from parseRecipients().
-    /// - Returns: Decrypted plaintext and signature verification result.
-    func decrypt(phase1: Phase1Result) async throws -> (plaintext: Data, signature: SignatureVerification) {
-        guard let matchedKey = phase1.matchedKey else {
-            throw CypherAirError.noMatchingKey
-        }
-
-        // SE unwrap triggers Face ID / Touch ID
-        var secretKey: Data
-        do {
-            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
-        } catch {
-            throw CypherAirError.from(error) { _ in .authenticationFailed }
-        }
-        defer {
-            // Note: passing secretKey into [secretKey] below may trigger a CoW copy.
-            // This defer zeros this variable's buffer; the array's copy is freed
-            // (but not zeroed) when the engine call returns. This is an inherent
-            // limitation of Swift value semantics. See EncryptionService for the
-            // detailed mitigation analysis.
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
-
-        let context = verificationContext()
-
-        // Decrypt via Rust engine — off main thread
-        let result: DecryptDetailedResult
-        do {
-            result = try await Self.performDecryptDetailed(
-                engine: engine,
-                ciphertext: phase1.ciphertext,
-                secretKeys: [secretKey],
-                verificationKeys: context.verificationKeys
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        let verification = DetailedSignatureVerification.from(
-            legacyStatus: result.legacyStatus,
-            legacySignerFingerprint: result.legacySignerFingerprint,
-            summaryState: result.summaryState,
-            summaryEntryIndex: result.summaryEntryIndex,
-            signatures: result.signatures,
-            contacts: context.contacts,
-            ownKeys: keyManagement.keys,
-            contactsAvailability: context.contactsAvailability
-        )
-
-        return (plaintext: result.plaintext, signature: verification.legacyVerification)
-    }
-
     /// Decrypt a message using the matched key from Phase 1 while preserving
     /// per-signature detailed verification results.
     ///
@@ -270,71 +212,6 @@ final class DecryptionService {
     }
 
     // MARK: - Phase 2: Streaming File Decrypt (Authentication Required)
-
-    /// Decrypt a file using streaming I/O (constant memory).
-    /// This phase triggers device authentication (Face ID / Touch ID) via SE unwrap.
-    ///
-    /// SECURITY: This method must only be called after Phase 1 has identified the key.
-    /// The private key exists in memory only during the decrypt call and is zeroized immediately after.
-    ///
-    /// - Parameters:
-    ///   - phase1: The result from parseRecipientsFromFile().
-    ///   - progress: Progress reporter for UI updates and cancellation.
-    /// - Returns: URL of the decrypted output file and signature verification result.
-    func decryptFileStreaming(
-        phase1: FilePhase1Result,
-        progress: FileProgressReporter?
-    ) async throws -> (artifact: AppTemporaryArtifact, signature: SignatureVerification) {
-        guard let matchedKey = phase1.matchedKey else {
-            throw CypherAirError.noMatchingKey
-        }
-
-        // SE unwrap triggers Face ID / Touch ID
-        var secretKey: Data
-        do {
-            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
-        } catch {
-            throw CypherAirError.from(error) { _ in .authenticationFailed }
-        }
-        defer {
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
-
-        let context = verificationContext()
-
-        let inputFilename = (phase1.inputPath as NSString).lastPathComponent
-        let outputArtifact = try temporaryArtifactStore.makeDecryptedArtifact(for: inputFilename)
-
-        // Decrypt via Rust engine (streaming) — off main thread
-        let fileResult: FileDecryptDetailedResult
-        do {
-            fileResult = try await Self.performDecryptFileDetailed(
-                engine: engine,
-                inputPath: phase1.inputPath,
-                outputPath: outputArtifact.fileURL.path,
-                secretKeys: [secretKey],
-                verificationKeys: context.verificationKeys,
-                progress: progress
-            )
-            try temporaryArtifactStore.applyAndVerifyCompleteProtection(to: outputArtifact.fileURL)
-        } catch {
-            outputArtifact.cleanup()
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        let verification = DetailedSignatureVerification.from(
-            legacyStatus: fileResult.legacyStatus,
-            legacySignerFingerprint: fileResult.legacySignerFingerprint,
-            summaryState: fileResult.summaryState,
-            summaryEntryIndex: fileResult.summaryEntryIndex,
-            signatures: fileResult.signatures,
-            contacts: context.contacts,
-            ownKeys: keyManagement.keys,
-            contactsAvailability: context.contactsAvailability
-        )
-
-        return (artifact: outputArtifact, signature: verification.legacyVerification)
-    }
 
     /// Decrypt a file using streaming I/O while preserving per-signature detailed
     /// verification results.
@@ -396,13 +273,6 @@ final class DecryptionService {
     }
 
     // MARK: - Convenience: Full Decrypt
-
-    /// Perform both Phase 1 and Phase 2 in sequence.
-    /// Phase 2 is only reached if Phase 1 finds a matching key.
-    func decryptMessage(ciphertext: Data) async throws -> (plaintext: Data, signature: SignatureVerification) {
-        let phase1 = try await parseRecipients(ciphertext: ciphertext)
-        return try await decrypt(phase1: phase1)
-    }
 
     /// Perform both Phase 1 and Phase 2 in sequence while preserving
     /// per-signature detailed verification results.

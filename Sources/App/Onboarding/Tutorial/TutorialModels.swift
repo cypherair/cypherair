@@ -119,7 +119,7 @@ struct TutorialArtifacts {
     var encryptedMessage: String?
     var parseResult: DecryptionService.Phase1Result?
     var decryptedMessage: String?
-    var decryptedVerification: SignatureVerification?
+    var decryptedVerification: DetailedSignatureVerification?
     var backupArmoredKey: String?
     var authMode: AuthenticationMode = .standard
 }

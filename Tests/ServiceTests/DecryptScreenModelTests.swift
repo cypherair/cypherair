@@ -359,7 +359,7 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.ciphertextInput, "NEW")
         XCTAssertFalse(model.importedCiphertext.hasImportedFile)
         XCTAssertNil(model.phase1Result)
-        XCTAssertNil(model.signatureVerification)
+        XCTAssertNil(model.detailedSignatureVerification)
         XCTAssertNil(model.decryptedText)
         XCTAssertEqual(model.textInputSectionEpoch, startingEpoch + 1)
     }
@@ -388,7 +388,7 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.importedCiphertext.fileName, "message.asc")
         XCTAssertNil(model.fileImportTarget)
         XCTAssertNil(model.phase1Result)
-        XCTAssertNil(model.signatureVerification)
+        XCTAssertNil(model.detailedSignatureVerification)
     }
 
     @MainActor
@@ -437,7 +437,6 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.importedCiphertext.fileName, "message.asc")
         XCTAssertFalse(model.showTextModeSuggestion)
         XCTAssertNil(model.detailedSignatureVerification)
-        XCTAssertNil(model.signatureVerification)
     }
 
     @MainActor
@@ -466,7 +465,6 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertFalse(model.showTextModeSuggestion)
         XCTAssertNil(model.filePhase1Result)
         XCTAssertNil(model.detailedSignatureVerification)
-        XCTAssertNil(model.signatureVerification)
     }
 
     @MainActor
@@ -491,9 +489,9 @@ final class DecryptScreenModelTests: XCTestCase {
         configuration.onParsed = { result in
             parsedFingerprint = result.matchedKey?.fingerprint
         }
-        configuration.onDecrypted = { plaintext, signature in
+        configuration.onDecrypted = { plaintext, verification in
             decryptedPlaintext = plaintext
-            decryptedStatus = signature.status
+            decryptedStatus = verification.legacyStatus
         }
 
         let model = makeModel(
@@ -525,7 +523,6 @@ final class DecryptScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(model.decryptedText, "decrypted-text")
-        XCTAssertEqual(model.signatureVerification?.status, .valid)
         XCTAssertEqual(model.detailedSignatureVerification?.legacyStatus, .valid)
         XCTAssertEqual(decryptedPlaintext, Data("decrypted-text".utf8))
         XCTAssertEqual(decryptedStatus, .valid)
@@ -599,7 +596,6 @@ final class DecryptScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(model.decryptedFileURL, outputURL)
-        XCTAssertEqual(model.signatureVerification?.status, .unknownSigner)
         XCTAssertEqual(model.detailedSignatureVerification?.legacyStatus, .unknownSigner)
 
         model.exportDecryptedFile()
@@ -711,7 +707,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
         XCTAssertNil(model.decryptedFileURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
-        XCTAssertNil(model.signatureVerification)
+        XCTAssertNil(model.detailedSignatureVerification)
         XCTAssertFalse(model.operation.isShowingError)
     }
 
@@ -743,7 +739,6 @@ final class DecryptScreenModelTests: XCTestCase {
 
         XCTAssertEqual(model.ciphertextInput, "")
         XCTAssertNil(model.decryptedText)
-        XCTAssertNil(model.signatureVerification)
         XCTAssertNil(model.detailedSignatureVerification)
         XCTAssertNil(model.phase1Result)
         XCTAssertNil(model.filePhase1Result)
@@ -796,7 +791,6 @@ final class DecryptScreenModelTests: XCTestCase {
         }
 
         XCTAssertNil(model.decryptedText)
-        XCTAssertNil(model.signatureVerification)
         XCTAssertNil(model.detailedSignatureVerification)
         XCTAssertNotNil(model.phase1Result)
     }
@@ -826,7 +820,6 @@ final class DecryptScreenModelTests: XCTestCase {
             model.operation.isRunning == false
         }
 
-        XCTAssertNil(model.signatureVerification)
         XCTAssertNil(model.detailedSignatureVerification)
         XCTAssertEqual(model.filePhase1Result?.inputPath, inputURL.path)
     }

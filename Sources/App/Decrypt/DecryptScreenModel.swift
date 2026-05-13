@@ -211,10 +211,6 @@ final class DecryptScreenModel {
         fileImportRequestGate.currentToken
     }
 
-    var signatureVerification: SignatureVerification? {
-        detailedSignatureVerification?.legacyVerification
-    }
-
     func handleAppear() {
         applyPrefilledCiphertextIfNeeded(from: configuration)
         applyInitialPhase1ResultIfPresent(from: configuration)
@@ -373,7 +369,7 @@ final class DecryptScreenModel {
                 self.decryptedText = text
             }
             self.replaceDetailedSignatureVerification(with: verification)
-            onDecrypted?(plaintext, verification.legacyVerification)
+            onDecrypted?(plaintext, verification)
             self.authLifecycleTraceStore?.record(
                 category: .operation,
                 name: "decrypt.text.finish",

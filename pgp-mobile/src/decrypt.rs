@@ -11,25 +11,6 @@ use zeroize::Zeroize;
 use crate::error::PgpError;
 use crate::signature_details::{DecryptDetailedResult, LegacyFoldMode, SignatureCollector};
 
-/// Result of a decryption operation.
-///
-/// SECURITY: `plaintext` contains sensitive decrypted content. The Swift caller must
-/// zeroize this data (via `resetBytes(in:)`) when it is no longer needed.
-///
-/// NOTE: A custom `Drop` impl cannot be added because `uniffi::Record` derives move
-/// fields out of the struct, which is incompatible with `Drop`. Zeroization on the
-/// error path is handled explicitly in `decrypt()` (line 143). On the success path,
-/// the Swift caller is responsible for zeroization after use.
-#[derive(uniffi::Record)]
-pub struct DecryptResult {
-    /// The decrypted plaintext. MUST be zeroized by the caller after use.
-    pub plaintext: Vec<u8>,
-    /// Signature verification result, if the message was signed.
-    pub signature_status: Option<SignatureStatus>,
-    /// Fingerprint of the signing key, if signed and key is known.
-    pub signer_fingerprint: Option<String>,
-}
-
 /// Signature verification status for decrypted messages.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum SignatureStatus {
@@ -195,30 +176,6 @@ pub fn match_recipients(
     }
 
     Ok(matched_fingerprints)
-}
-
-/// Decrypt a message using the provided secret keys.
-/// This is Phase 2 of the two-phase decryption protocol — requires authenticated key access.
-///
-/// Handles both SEIPDv1 (MDC) and SEIPDv2 (AEAD OCB/GCM).
-/// AEAD authentication failure → hard-fail (PgpError::AeadAuthenticationFailed).
-/// MDC verification failure → hard-fail (PgpError::IntegrityCheckFailed).
-///
-/// Parameters:
-/// - `ciphertext`: The encrypted message (binary or ASCII-armored).
-/// - `secret_keys`: One or more full certificates (with secret keys) in binary format.
-/// - `verification_keys`: Optional public keys for signature verification.
-pub fn decrypt<K: AsRef<[u8]>>(
-    ciphertext: &[u8],
-    secret_keys: &[K],
-    verification_keys: &[Vec<u8>],
-) -> Result<DecryptResult, PgpError> {
-    let detailed = decrypt_detailed(ciphertext, secret_keys, verification_keys)?;
-    Ok(DecryptResult {
-        plaintext: detailed.plaintext,
-        signature_status: Some(detailed.legacy_status),
-        signer_fingerprint: detailed.legacy_signer_fingerprint,
-    })
 }
 
 /// Decrypt a message and preserve detailed per-signature results.

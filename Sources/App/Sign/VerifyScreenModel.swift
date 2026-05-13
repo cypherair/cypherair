@@ -117,10 +117,6 @@ final class VerifyScreenModel {
         }
     }
 
-    var activeVerification: SignatureVerification? {
-        activeDetailedVerification?.legacyVerification
-    }
-
     var activeDetailedVerification: DetailedSignatureVerification? {
         switch verifyMode {
         case .cleartext:
@@ -128,14 +124,6 @@ final class VerifyScreenModel {
         case .detached:
             detachedDetailedVerification
         }
-    }
-
-    var cleartextVerification: SignatureVerification? {
-        cleartextDetailedVerification?.legacyVerification
-    }
-
-    var detachedVerification: SignatureVerification? {
-        detachedDetailedVerification?.legacyVerification
     }
 
     var verifyButtonDisabled: Bool {

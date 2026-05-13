@@ -104,7 +104,7 @@ fn test_c3_gpg_rsa_key_fixture_import() {
     let plaintext = b"RSA-4096 interop test";
     let ciphertext = encrypt::encrypt(plaintext, &[pubkey.clone()], None, None)
         .expect("Encrypt to RSA key should succeed");
-    let result = decrypt::decrypt(&ciphertext, &[secretkey], &[pubkey])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[secretkey], &[pubkey])
         .expect("Decrypt with RSA key should succeed");
     assert_eq!(result.plaintext, plaintext);
 }

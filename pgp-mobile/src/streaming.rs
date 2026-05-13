@@ -6,7 +6,7 @@
 //!
 //! SECURITY INVARIANTS:
 //! - All intermediate plaintext buffers are `Zeroizing<Vec<u8>>` (auto-zeroized on drop).
-//! - `decrypt_file` writes to a `.tmp` file first; on any error, `secure_delete_file`
+//! - `decrypt_file_detailed` writes to a `.tmp` file first; on any error, `secure_delete_file`
 //!   removes the temp file. Only on full success is the temp renamed to the final path.
 //!   This enforces the AEAD hard-fail requirement.
 //! - Cancellation via `ProgressReporter::on_progress() → false` returns
@@ -34,7 +34,7 @@ use crate::sign;
 use crate::signature_details::{
     state_from_legacy_status, FileDecryptDetailedResult, FileVerifyDetailedResult,
 };
-use crate::verify::{VerifyHelper, VerifyResult};
+use crate::verify::VerifyHelper;
 
 /// Buffer size for streaming copy operations.
 const STREAM_BUFFER_SIZE: usize = 64 * 1024; // 64 KB
@@ -258,18 +258,6 @@ fn secure_delete_file(path: &std::path::Path) {
     let _ = fs::remove_file(path);
 }
 
-// ── File Decrypt Result ────────────────────────────────────────────────
-
-/// Result of streaming file decryption.
-/// Contains signature verification info (plaintext is written to output file, not returned).
-#[derive(uniffi::Record)]
-pub struct FileDecryptResult {
-    /// Signature verification status, if the message was signed.
-    pub signature_status: Option<SignatureStatus>,
-    /// Fingerprint of the signing key, if signed and key is known.
-    pub signer_fingerprint: Option<String>,
-}
-
 // ── Streaming File Operations ──────────────────────────────────────────
 
 /// Encrypt a file using streaming I/O. Constant memory usage.
@@ -347,33 +335,12 @@ pub fn encrypt_file(
     Ok(())
 }
 
-/// Decrypt a file using streaming I/O. Phase 2 — requires authenticated key access.
+/// Decrypt a file using streaming I/O and preserve detailed per-signature results.
 ///
 /// SECURITY: Writes to a `.tmp` file first. If ANY error occurs (AEAD failure, MDC failure,
 /// cancellation, I/O error), the temp file is securely deleted. The output file is only
 /// created by renaming the temp file after full successful decryption + verification.
 /// This enforces the AEAD hard-fail requirement: no partial plaintext on auth failure.
-pub fn decrypt_file<K: AsRef<[u8]>>(
-    input_path: &str,
-    output_path: &str,
-    secret_keys: &[K],
-    verification_keys: &[Vec<u8>],
-    progress: Option<Arc<dyn ProgressReporter>>,
-) -> Result<FileDecryptResult, PgpError> {
-    let detailed = decrypt_file_detailed(
-        input_path,
-        output_path,
-        secret_keys,
-        verification_keys,
-        progress,
-    )?;
-    Ok(FileDecryptResult {
-        signature_status: Some(detailed.legacy_status),
-        signer_fingerprint: detailed.legacy_signer_fingerprint,
-    })
-}
-
-/// Decrypt a file using streaming I/O and preserve detailed per-signature results.
 pub fn decrypt_file_detailed<K: AsRef<[u8]>>(
     input_path: &str,
     output_path: &str,
@@ -551,73 +518,6 @@ pub fn sign_detached_file(
     })?;
 
     Ok(sink)
-}
-
-/// Verify a detached signature against a file using streaming I/O.
-/// The signature is small and passed in-memory; the data file is streamed.
-pub fn verify_detached_file(
-    data_path: &str,
-    signature: &[u8],
-    verification_keys: &[Vec<u8>],
-    progress: Option<Arc<dyn ProgressReporter>>,
-) -> Result<VerifyResult, PgpError> {
-    let policy = StandardPolicy::new();
-    let certs = parse_verification_certs(verification_keys)?;
-
-    let helper = VerifyHelper::new(&certs);
-
-    // Build the detached verifier from the signature bytes
-    let verifier_result = DetachedVerifierBuilder::from_bytes(signature)
-        .map_err(|e| PgpError::CorruptData {
-            reason: format!("Failed to parse signature: {e}"),
-        })?
-        .with_policy(&policy, None, helper);
-
-    // Graded result: if with_policy() fails, inspect the error before defaulting to Bad.
-    let mut verifier = match verifier_result {
-        Ok(v) => v,
-        Err(e) => {
-            let status = if is_expired_error(&e) {
-                SignatureStatus::Expired
-            } else {
-                SignatureStatus::Bad
-            };
-            return Ok(VerifyResult {
-                status,
-                signer_fingerprint: None,
-                content: None,
-            });
-        }
-    };
-
-    // Open data file with progress reporting
-    let data_file = File::open(data_path).map_err(|e| PgpError::FileIoError {
-        reason: format!("Cannot open data file '{}': {e}", data_path),
-    })?;
-    let total_bytes = data_file.metadata().map(|m| m.len()).unwrap_or(0);
-    let mut progress_reader = DetachedVerifyProgressReader::new(data_file, total_bytes, progress);
-
-    // Verify by streaming the data through the verifier
-    if let Err(error) = verifier.verify_reader(&mut progress_reader) {
-        if let Some(classified) = classify_detached_verify_reader_error(&error) {
-            return Err(classified);
-        }
-
-        let helper = verifier.into_helper();
-        return Ok(VerifyResult {
-            status: SignatureStatus::Bad,
-            signer_fingerprint: helper.collector.legacy_signer_fingerprint(),
-            content: None,
-        });
-    }
-
-    let helper = verifier.into_helper();
-
-    Ok(VerifyResult {
-        status: helper.collector.legacy_status(),
-        signer_fingerprint: helper.collector.legacy_signer_fingerprint(),
-        content: None,
-    })
 }
 
 /// Verify a detached signature against a file using streaming I/O and preserve details.

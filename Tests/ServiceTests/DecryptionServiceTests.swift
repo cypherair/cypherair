@@ -448,7 +448,7 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.legacyStatus, .valid)
     }
 
-    // MARK: - End-to-End via decryptMessage() (Phase 1 + Phase 2)
+    // MARK: - End-to-End via decryptMessageDetailed() (Phase 1 + Phase 2)
 
     func test_decryptMessage_profileA_endToEnd() async throws {
         let plaintext = "End-to-end Profile A 你好"
@@ -462,7 +462,7 @@ final class DecryptionServiceTests: XCTestCase {
             encryptToSelf: false
         )
 
-        // decryptMessage exercises both Phase 1 (parseRecipients) and Phase 2 (decrypt)
+        // decryptMessageDetailed exercises both Phase 1 (parseRecipients) and Phase 2.
         let result = try await stack.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)

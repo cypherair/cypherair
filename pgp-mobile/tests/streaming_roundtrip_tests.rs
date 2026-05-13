@@ -48,7 +48,7 @@ fn test_encrypt_decrypt_file_profile_a_roundtrip() {
     );
 
     // Decrypt
-    let result = streaming::decrypt_file(
+    let result = streaming::decrypt_file_detailed(
         encrypted_path.to_str().unwrap(),
         decrypted_path.to_str().unwrap(),
         &[key.cert_data.clone()],
@@ -66,8 +66,8 @@ fn test_encrypt_decrypt_file_profile_a_roundtrip() {
 
     // No signing key was used, so signature should be NotSigned
     assert_eq!(
-        result.signature_status,
-        Some(SignatureStatus::NotSigned),
+        result.legacy_status,
+        SignatureStatus::NotSigned,
         "Unsigned message should report NotSigned"
     );
 }
@@ -93,7 +93,7 @@ fn test_encrypt_decrypt_file_profile_b_roundtrip() {
     )
     .expect("Encrypt should succeed");
 
-    let result = streaming::decrypt_file(
+    let result = streaming::decrypt_file_detailed(
         encrypted_path.to_str().unwrap(),
         decrypted_path.to_str().unwrap(),
         &[key.cert_data.clone()],
@@ -104,7 +104,7 @@ fn test_encrypt_decrypt_file_profile_b_roundtrip() {
 
     let decrypted = fs::read(&decrypted_path).unwrap();
     assert_eq!(decrypted, plaintext);
-    assert_eq!(result.signature_status, Some(SignatureStatus::NotSigned));
+    assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
 }
 
 // ── Signed Encrypt/Decrypt Tests ───────────────────────────────────────
@@ -132,7 +132,7 @@ fn test_encrypt_decrypt_file_with_signature_profile_a() {
     .expect("Signed encrypt should succeed");
 
     // Decrypt with verification
-    let result = streaming::decrypt_file(
+    let result = streaming::decrypt_file_detailed(
         encrypted_path.to_str().unwrap(),
         decrypted_path.to_str().unwrap(),
         &[key.cert_data.clone()],
@@ -144,16 +144,16 @@ fn test_encrypt_decrypt_file_with_signature_profile_a() {
     let decrypted = fs::read(&decrypted_path).unwrap();
     assert_eq!(decrypted, plaintext);
     assert_eq!(
-        result.signature_status,
-        Some(SignatureStatus::Valid),
+        result.legacy_status,
+        SignatureStatus::Valid,
         "Signature should be valid"
     );
     assert!(
-        result.signer_fingerprint.is_some(),
+        result.legacy_signer_fingerprint.is_some(),
         "Signer fingerprint should be present"
     );
     assert_eq!(
-        result.signer_fingerprint.unwrap(),
+        result.legacy_signer_fingerprint.unwrap(),
         key.fingerprint,
         "Signer fingerprint should match"
     );
@@ -180,7 +180,7 @@ fn test_encrypt_decrypt_file_with_signature_profile_b() {
     )
     .expect("Signed encrypt should succeed");
 
-    let result = streaming::decrypt_file(
+    let result = streaming::decrypt_file_detailed(
         encrypted_path.to_str().unwrap(),
         decrypted_path.to_str().unwrap(),
         &[key.cert_data.clone()],
@@ -191,8 +191,8 @@ fn test_encrypt_decrypt_file_with_signature_profile_b() {
 
     let decrypted = fs::read(&decrypted_path).unwrap();
     assert_eq!(decrypted, plaintext);
-    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
-    assert_eq!(result.signer_fingerprint.unwrap(), key.fingerprint);
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.legacy_signer_fingerprint.unwrap(), key.fingerprint);
 }
 
 // ── Sign/Verify Detached File Tests ────────────────────────────────────
@@ -214,7 +214,7 @@ fn test_sign_verify_detached_file_profile_a() {
     assert!(!signature.is_empty(), "Signature should not be empty");
 
     // Verify
-    let result = streaming::verify_detached_file(
+    let result = streaming::verify_detached_file_detailed(
         data_path.to_str().unwrap(),
         &signature,
         &[key.public_key_data.clone()],
@@ -222,8 +222,8 @@ fn test_sign_verify_detached_file_profile_a() {
     )
     .expect("Verification should succeed");
 
-    assert_eq!(result.status, SignatureStatus::Valid);
-    assert_eq!(result.signer_fingerprint.unwrap(), key.fingerprint);
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.legacy_signer_fingerprint.unwrap(), key.fingerprint);
 }
 
 #[test]
@@ -239,7 +239,7 @@ fn test_sign_verify_detached_file_profile_b() {
         streaming::sign_detached_file(data_path.to_str().unwrap(), &key.cert_data, None)
             .expect("Signing should succeed");
 
-    let result = streaming::verify_detached_file(
+    let result = streaming::verify_detached_file_detailed(
         data_path.to_str().unwrap(),
         &signature,
         &[key.public_key_data.clone()],
@@ -247,8 +247,8 @@ fn test_sign_verify_detached_file_profile_b() {
     )
     .expect("Verification should succeed");
 
-    assert_eq!(result.status, SignatureStatus::Valid);
-    assert_eq!(result.signer_fingerprint.unwrap(), key.fingerprint);
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.legacy_signer_fingerprint.unwrap(), key.fingerprint);
 }
 
 // ── Match Recipients From File Test ────────────────────────────────────
@@ -328,7 +328,7 @@ fn test_encrypt_file_cross_profile() {
     assert!(!has_v2, "Cross-profile message should NOT use SEIPDv2");
 
     // Decrypt with Profile A recipient key
-    let result = streaming::decrypt_file(
+    let result = streaming::decrypt_file_detailed(
         encrypted_path.to_str().unwrap(),
         decrypted_path.to_str().unwrap(),
         &[recipient_a.cert_data.clone()],
@@ -339,5 +339,5 @@ fn test_encrypt_file_cross_profile() {
 
     let decrypted = fs::read(&decrypted_path).unwrap();
     assert_eq!(decrypted, plaintext);
-    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
 }

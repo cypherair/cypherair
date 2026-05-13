@@ -308,7 +308,7 @@ fn test_modify_expiry_profile_b_roundtrip_encrypt_decrypt() {
     let ciphertext = encrypt::encrypt(plaintext, &[result.public_key_data.clone()], None, None)
         .expect("Encryption should succeed with updated key");
 
-    let decrypted = decrypt::decrypt(&ciphertext, &[result.cert_data.clone()], &[])
+    let decrypted = decrypt::decrypt_detailed(&ciphertext, &[result.cert_data.clone()], &[])
         .expect("Decryption should succeed with updated key");
     assert_eq!(decrypted.plaintext, plaintext);
 }
