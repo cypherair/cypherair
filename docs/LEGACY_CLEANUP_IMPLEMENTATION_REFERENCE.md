@@ -118,6 +118,8 @@ Recommended PRs:
   check. As of the 2026-05-13 review, these helpers had no production callers.
   Do not remove `legacyPublicKeysForRecipientFingerprints(_:)` or the
   fingerprint recipient compatibility layer in this PR.
+  Status: completed in Phase 1A after a final caller check; only the no-caller
+  helpers were removed.
 - PR 1B, arm64e experiment script decision: either retain
   `scripts/experiments/*` as explicit historical diagnostics, archive it out of
   active script paths, or delete it after maintainers confirm the diagnostics are
@@ -134,6 +136,9 @@ Exit conditions:
 
 - No current call sites reference the removed Contacts helpers.
 - The historical script posture is explicit and no longer ambiguous.
+- Phase 1A leaves `legacyPublicKeysForRecipientFingerprints(_:)`,
+  `publicKeysForRecipientContactIDs(_:)`, and the broader fingerprint-recipient
+  compatibility layer in place for Phase 2.
 
 Validation:
 
