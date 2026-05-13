@@ -141,22 +141,10 @@ fn test_verify_cleartext_detailed_multi_signature_all_valid() {
         ],
     )
     .expect("detailed verification should succeed");
-    let legacy = verify::verify_cleartext(
-        &signed,
-        &[
-            signer_a.public_key_data.clone(),
-            signer_b.public_key_data.clone(),
-        ],
-    )
-    .expect("legacy verification should succeed");
 
-    assert_eq!(detailed.legacy_status, legacy.status);
+    assert_eq!(detailed.legacy_status, SignatureStatus::Valid);
     assert_eq!(detailed.summary_state, SignatureVerificationState::Verified);
     assert_eq!(detailed.summary_entry_index, Some(0));
-    assert_eq!(
-        detailed.legacy_signer_fingerprint,
-        legacy.signer_fingerprint
-    );
     assert_eq!(
         detailed.content.as_deref(),
         Some(&b"cleartext detailed"[..])
@@ -189,21 +177,19 @@ fn test_verify_cleartext_detailed_multi_signature_all_valid() {
 }
 
 #[test]
-fn test_verify_cleartext_detailed_expired_signer_matches_legacy_and_preserves_entries() {
+fn test_verify_cleartext_detailed_expired_signer_preserves_entries() {
     let signer = generate_key("Expiring Signer", KeyProfile::Universal, Some(1));
     let signed = sign_cleartext_multi(b"expired cleartext", &[&signer.cert_data]);
     std::thread::sleep(Duration::from_secs(2));
 
     let detailed = verify::verify_cleartext_detailed(&signed, &[signer.public_key_data.clone()])
         .expect("expired detailed verification should still grade");
-    let legacy = verify::verify_cleartext(&signed, &[signer.public_key_data])
-        .expect("expired legacy verification should still grade");
 
     assert_eq!(detailed.legacy_status, SignatureStatus::Expired);
     assert_eq!(detailed.summary_state, SignatureVerificationState::Expired);
     assert_eq!(
         detailed.legacy_signer_fingerprint,
-        legacy.signer_fingerprint
+        Some(signer.fingerprint)
     );
     assert!(!detailed.signatures.is_empty());
     assert!(detailed
@@ -267,7 +253,7 @@ fn test_verify_detached_detailed_known_plus_unknown_preserves_unknown_nil_finger
 }
 
 #[test]
-fn test_verify_detached_detailed_tampered_data_matches_legacy_bad() {
+fn test_verify_detached_detailed_tampered_data_reports_bad() {
     let signer = generate_key("Signer", KeyProfile::Universal, None);
     let data = b"detached tamper";
     let signature = sign_detached_multi(data, &[&signer.cert_data]);
@@ -278,20 +264,14 @@ fn test_verify_detached_detailed_tampered_data_matches_legacy_bad() {
     let detailed =
         verify::verify_detached_detailed(&tampered, &signature, &[signer.public_key_data.clone()])
             .expect("tampered detailed verification should grade");
-    let legacy = verify::verify_detached(&tampered, &signature, &[signer.public_key_data])
-        .expect("tampered legacy verification should grade");
 
     assert_eq!(detailed.legacy_status, SignatureStatus::Bad);
     assert_eq!(detailed.summary_state, SignatureVerificationState::Invalid);
-    assert_eq!(detailed.legacy_status, legacy.status);
-    assert_eq!(
-        detailed.legacy_signer_fingerprint,
-        legacy.signer_fingerprint
-    );
+    assert_eq!(detailed.legacy_signer_fingerprint, None);
 }
 
 #[test]
-fn test_verify_detached_file_detailed_matches_in_memory_and_legacy_fields() {
+fn test_verify_detached_file_detailed_matches_in_memory_and_preserves_unknown_entry() {
     let signer_a = generate_key("Signer A", KeyProfile::Universal, None);
     let signer_b = generate_key("Signer B", KeyProfile::Universal, None);
     let data = b"detached file detailed";
@@ -309,13 +289,6 @@ fn test_verify_detached_file_detailed_matches_in_memory_and_legacy_fields() {
     let in_memory_detailed =
         verify::verify_detached_detailed(data, &signature, &[signer_a.public_key_data.clone()])
             .expect("in-memory detailed verification should succeed");
-    let legacy = streaming::verify_detached_file(
-        input.path().to_str().unwrap(),
-        &signature,
-        &[signer_a.public_key_data],
-        None,
-    )
-    .expect("legacy file verification should succeed");
 
     assert_eq!(
         file_detailed.legacy_status,
@@ -334,11 +307,6 @@ fn test_verify_detached_file_detailed_matches_in_memory_and_legacy_fields() {
         in_memory_detailed.legacy_signer_fingerprint
     );
     assert_eq!(file_detailed.signatures, in_memory_detailed.signatures);
-    assert_eq!(file_detailed.legacy_status, legacy.status);
-    assert_eq!(
-        file_detailed.legacy_signer_fingerprint,
-        legacy.signer_fingerprint
-    );
     assert_eq!(file_detailed.signatures.len(), 2);
     assert!(file_detailed.signatures.iter().any(|entry| {
         entry.status == DetailedSignatureStatus::UnknownSigner
@@ -367,13 +335,6 @@ fn test_verify_detached_file_detailed_tampered_data_matches_in_memory_bad() {
     let in_memory_detailed =
         verify::verify_detached_detailed(&tampered, &signature, &[signer.public_key_data.clone()])
             .expect("in-memory detailed verification should grade");
-    let legacy = streaming::verify_detached_file(
-        input.path().to_str().unwrap(),
-        &signature,
-        &[signer.public_key_data],
-        None,
-    )
-    .expect("legacy file verification should grade");
 
     assert_eq!(file_detailed.legacy_status, SignatureStatus::Bad);
     assert_eq!(
@@ -389,15 +350,10 @@ fn test_verify_detached_file_detailed_tampered_data_matches_in_memory_bad() {
         in_memory_detailed.legacy_signer_fingerprint
     );
     assert_eq!(file_detailed.signatures, in_memory_detailed.signatures);
-    assert_eq!(file_detailed.legacy_status, legacy.status);
-    assert_eq!(
-        file_detailed.legacy_signer_fingerprint,
-        legacy.signer_fingerprint
-    );
 }
 
 #[test]
-fn test_decrypt_detailed_multi_signature_matches_legacy_and_preserves_entries() {
+fn test_decrypt_detailed_multi_signature_preserves_entries() {
     let signer_a = generate_key("Signer A", KeyProfile::Universal, None);
     let signer_b = generate_key("Signer B", KeyProfile::Universal, None);
     let recipient = generate_key("Recipient", KeyProfile::Universal, None);
@@ -417,19 +373,9 @@ fn test_decrypt_detailed_multi_signature_matches_legacy_and_preserves_entries() 
         ],
     )
     .expect("detailed decrypt should succeed");
-    let legacy = decrypt::decrypt(
-        &ciphertext,
-        &[recipient.cert_data],
-        &[signer_a.public_key_data, signer_b.public_key_data],
-    )
-    .expect("legacy decrypt should succeed");
 
-    assert_eq!(detailed.legacy_status, legacy.signature_status.unwrap());
+    assert_eq!(detailed.legacy_status, SignatureStatus::Valid);
     assert_eq!(detailed.summary_state, SignatureVerificationState::Verified);
-    assert_eq!(
-        detailed.legacy_signer_fingerprint,
-        legacy.signer_fingerprint
-    );
     assert_eq!(detailed.plaintext, plaintext);
     assert_eq!(detailed.signatures.len(), 2);
     assert_eq!(
@@ -440,6 +386,24 @@ fn test_decrypt_detailed_multi_signature_matches_legacy_and_preserves_entries() 
         detailed.signatures[1].status,
         DetailedSignatureStatus::Valid
     );
+    let observed_fingerprints: Vec<String> = detailed
+        .signatures
+        .iter()
+        .map(|entry| {
+            entry
+                .signer_primary_fingerprint
+                .clone()
+                .expect("valid entry should have fp")
+        })
+        .collect();
+    assert!(observed_fingerprints.contains(&signer_a.fingerprint));
+    assert!(observed_fingerprints.contains(&signer_b.fingerprint));
+    assert!(observed_fingerprints.contains(
+        detailed
+            .legacy_signer_fingerprint
+            .as_ref()
+            .expect("valid decrypt summary should have signer fp")
+    ));
 }
 
 #[test]

@@ -75,7 +75,7 @@ fn test_unicode_passphrase_export_import_profile_a() {
         let ciphertext = encrypt::encrypt(b"test", &[key.public_key_data.clone()], None, None)
             .expect("Encrypt should succeed");
 
-        let result = decrypt::decrypt(&ciphertext, &[imported.clone()], &[]);
+        let result = decrypt::decrypt_detailed(&ciphertext, &[imported.clone()], &[]);
         assert!(
             result.is_ok(),
             "Decrypt with imported key (passphrase '{passphrase}') should succeed"
@@ -197,7 +197,7 @@ fn test_export_import_decrypt_roundtrip_profile_a() {
 
     let imported = keys::import_secret_key(&exported, passphrase).expect("Import should succeed");
 
-    let result = decrypt::decrypt(&ciphertext, &[imported], &[])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[imported], &[])
         .expect("Decryption with imported key should succeed");
 
     assert_eq!(result.plaintext, plaintext);
@@ -465,7 +465,7 @@ fn test_modify_expiry_profile_a_roundtrip_encrypt_decrypt() {
     let ciphertext = encrypt::encrypt(plaintext, &[result.public_key_data.clone()], None, None)
         .expect("Encryption should succeed with updated key");
 
-    let decrypted = decrypt::decrypt(&ciphertext, &[result.cert_data.clone()], &[])
+    let decrypted = decrypt::decrypt_detailed(&ciphertext, &[result.cert_data.clone()], &[])
         .expect("Decryption should succeed with updated key");
     assert_eq!(decrypted.plaintext, plaintext);
 }

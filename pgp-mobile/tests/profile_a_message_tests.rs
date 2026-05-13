@@ -77,11 +77,11 @@ fn test_sign_verify_text_profile_a() {
     let signed = sign::sign_cleartext(text, &key.cert_data).expect("Signing should succeed");
 
     // Verify
-    let result = verify::verify_cleartext(&signed, &[key.public_key_data.clone()])
+    let result = verify::verify_cleartext_detailed(&signed, &[key.public_key_data.clone()])
         .expect("Verification should succeed");
 
-    assert_eq!(result.status, SignatureStatus::Valid);
-    assert_eq!(result.signer_fingerprint, Some(key.fingerprint.clone()));
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.legacy_signer_fingerprint, Some(key.fingerprint.clone()));
 }
 
 /// C2A.3: Encrypt + decrypt text (SEIPDv1).
@@ -98,7 +98,7 @@ fn test_encrypt_decrypt_text_profile_a() {
         .expect("Encryption should succeed");
 
     // Decrypt
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[])
         .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
@@ -125,7 +125,7 @@ fn test_encrypt_decrypt_signed_profile_a() {
     )
     .expect("Encryption should succeed");
 
-    let result = decrypt::decrypt(
+    let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[recipient.cert_data.clone()],
         &[sender.public_key_data.clone()],
@@ -133,8 +133,8 @@ fn test_encrypt_decrypt_signed_profile_a() {
     .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
-    assert_eq!(result.signer_fingerprint, Some(sender.fingerprint.clone()));
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.legacy_signer_fingerprint, Some(sender.fingerprint.clone()));
 }
 
 /// C2A.4: Encrypt-to-self — sender decrypts own ciphertext.
@@ -160,12 +160,12 @@ fn test_encrypt_to_self_profile_a() {
     .expect("Encryption should succeed");
 
     // Recipient can decrypt
-    let result_recipient = decrypt::decrypt(&ciphertext, &[recipient.cert_data.clone()], &[])
+    let result_recipient = decrypt::decrypt_detailed(&ciphertext, &[recipient.cert_data.clone()], &[])
         .expect("Recipient should decrypt");
     assert_eq!(result_recipient.plaintext, plaintext);
 
     // Sender can also decrypt (encrypt-to-self)
-    let result_sender = decrypt::decrypt(&ciphertext, &[sender.cert_data.clone()], &[])
+    let result_sender = decrypt::decrypt_detailed(&ciphertext, &[sender.cert_data.clone()], &[])
         .expect("Sender should decrypt own message");
     assert_eq!(result_sender.plaintext, plaintext);
 }
@@ -184,7 +184,7 @@ fn test_file_encrypt_decrypt_1mb_profile_a() {
         encrypt::encrypt_binary(&plaintext, &[key.public_key_data.clone()], None, None)
             .expect("Encryption should succeed");
 
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[])
         .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
@@ -203,7 +203,7 @@ fn test_file_encrypt_decrypt_10mb_profile_a() {
         encrypt::encrypt_binary(&plaintext, &[key.public_key_data.clone()], None, None)
             .expect("Encryption should succeed");
 
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[])
         .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext.len(), plaintext.len());
@@ -242,7 +242,7 @@ fn test_tamper_detection_profile_a() {
         let mut tampered = ciphertext.clone();
         tampered[*pos] ^= 0x01;
 
-        let result = decrypt::decrypt(&tampered, &[key.cert_data.clone()], &[]);
+        let result = decrypt::decrypt_detailed(&tampered, &[key.cert_data.clone()], &[]);
         match &result {
             Err(pgp_mobile::error::PgpError::IntegrityCheckFailed) => {
                 got_integrity_error = true;
@@ -274,10 +274,10 @@ fn test_detached_signature_profile_a() {
 
     let signature = sign::sign_detached(data, &key.cert_data).expect("Signing should succeed");
 
-    let result = verify::verify_detached(data, &signature, &[key.public_key_data.clone()])
+    let result = verify::verify_detached_detailed(data, &signature, &[key.public_key_data.clone()])
         .expect("Verification should succeed");
 
-    assert_eq!(result.status, SignatureStatus::Valid);
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
 }
 
 /// Armor round-trip: public key → armor → dearmor → identical.
@@ -355,7 +355,7 @@ fn test_decrypt_wrong_key_profile_a() {
         .expect("Encryption should succeed");
 
     // Bob tries to decrypt Alice's message
-    let result = decrypt::decrypt(&ciphertext, &[bob.cert_data.clone()], &[]);
+    let result = decrypt::decrypt_detailed(&ciphertext, &[bob.cert_data.clone()], &[]);
     // M1: Verify the specific error variant, not just that it failed
     match result {
         Err(PgpError::NoMatchingKey) => {} // expected
@@ -375,7 +375,7 @@ fn test_encrypt_decrypt_empty_plaintext_profile_a() {
     let ciphertext = encrypt::encrypt(plaintext, &[key.public_key_data.clone()], None, None)
         .expect("Encrypting empty plaintext should succeed");
 
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[])
         .expect("Decrypting empty plaintext should succeed");
 
     assert_eq!(
@@ -405,7 +405,7 @@ fn test_concurrent_encrypt_profile_a() {
         let ct = encrypt::encrypt(b"msg1", &[k1_pub], None, None)
             .expect("Concurrent encrypt 1 should succeed");
         let result =
-            decrypt::decrypt(&ct, &[k1_cert], &[]).expect("Concurrent decrypt 1 should succeed");
+            decrypt::decrypt_detailed(&ct, &[k1_cert], &[]).expect("Concurrent decrypt 1 should succeed");
         assert_eq!(result.plaintext, b"msg1");
     });
 
@@ -413,7 +413,7 @@ fn test_concurrent_encrypt_profile_a() {
         let ct = encrypt::encrypt(b"msg2", &[k2_pub], None, None)
             .expect("Concurrent encrypt 2 should succeed");
         let result =
-            decrypt::decrypt(&ct, &[k2_cert], &[]).expect("Concurrent decrypt 2 should succeed");
+            decrypt::decrypt_detailed(&ct, &[k2_cert], &[]).expect("Concurrent decrypt 2 should succeed");
         assert_eq!(result.plaintext, b"msg2");
     });
 

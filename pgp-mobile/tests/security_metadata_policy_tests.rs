@@ -88,7 +88,7 @@ fn test_encrypt_decrypt_unicode_plaintext_round_trip() {
             encrypt::encrypt(plaintext_bytes, &[key.public_key_data.clone()], None, None)
                 .unwrap_or_else(|e| panic!("Encryption should succeed ({label}): {e}"));
 
-        let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+        let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[])
             .unwrap_or_else(|e| panic!("Decryption should succeed ({label}): {e}"));
 
         assert_eq!(

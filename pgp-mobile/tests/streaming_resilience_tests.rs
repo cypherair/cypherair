@@ -87,7 +87,7 @@ fn test_decrypt_file_tampered_profile_a() {
     let ciphertext = common::tamper_at_ratio(&ciphertext, 1, 2);
     fs::write(&encrypted_path, &ciphertext).unwrap();
 
-    let result = streaming::decrypt_file(
+    let result = streaming::decrypt_file_detailed(
         encrypted_path.to_str().unwrap(),
         decrypted_path.to_str().unwrap(),
         &[key.cert_data.clone()],
@@ -137,7 +137,7 @@ fn test_decrypt_file_tampered_profile_b() {
     let ciphertext = common::tamper_at_ratio(&ciphertext, 1, 2);
     fs::write(&encrypted_path, &ciphertext).unwrap();
 
-    let result = streaming::decrypt_file(
+    let result = streaming::decrypt_file_detailed(
         encrypted_path.to_str().unwrap(),
         decrypted_path.to_str().unwrap(),
         &[key.cert_data.clone()],
@@ -176,7 +176,7 @@ fn test_streaming_decrypt_tampered_profile_b_returns_specific_error() {
     let ciphertext = common::tamper_at_ratio(&ciphertext, 3, 4);
     fs::write(&encrypted_path, &ciphertext).unwrap();
 
-    let result = streaming::decrypt_file(
+    let result = streaming::decrypt_file_detailed(
         encrypted_path.to_str().unwrap(),
         decrypted_path.to_str().unwrap(),
         &[key.cert_data.clone()],
@@ -220,7 +220,7 @@ fn test_streaming_decrypt_tampered_profile_a_returns_specific_error() {
     let ciphertext = common::tamper_at_ratio(&ciphertext, 3, 4);
     fs::write(&encrypted_path, &ciphertext).unwrap();
 
-    let result = streaming::decrypt_file(
+    let result = streaming::decrypt_file_detailed(
         encrypted_path.to_str().unwrap(),
         decrypted_path.to_str().unwrap(),
         &[key.cert_data.clone()],
@@ -252,7 +252,7 @@ fn test_verify_detached_file_cancellation_returns_operation_cancelled() {
         .expect("Signing should succeed");
     let reporter = Arc::new(TestProgressReporter::with_cancel_after(32 * 1024));
 
-    let result = streaming::verify_detached_file(
+    let result = streaming::verify_detached_file_detailed(
         data_path.to_str().unwrap(),
         &signature,
         &[key.public_key_data],

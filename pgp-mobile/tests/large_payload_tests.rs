@@ -20,7 +20,7 @@ fn test_file_encrypt_decrypt_50mb_profile_a() {
         encrypt::encrypt_binary(&plaintext, &[key.public_key_data.clone()], None, None)
             .expect("50 MB encryption should succeed");
 
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[])
         .expect("50 MB decryption should succeed");
 
     assert_eq!(
@@ -47,7 +47,7 @@ fn test_file_encrypt_decrypt_100mb_profile_a() {
         encrypt::encrypt_binary(&plaintext, &[key.public_key_data.clone()], None, None)
             .expect("100 MB encryption should succeed");
 
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[])
         .expect("100 MB decryption should succeed");
 
     assert_eq!(
@@ -70,7 +70,7 @@ fn test_file_encrypt_decrypt_50mb_profile_b() {
         encrypt::encrypt_binary(&plaintext, &[key.public_key_data.clone()], None, None)
             .expect("50 MB encryption should succeed");
 
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[])
         .expect("50 MB decryption should succeed");
 
     assert_eq!(
@@ -97,7 +97,7 @@ fn test_file_encrypt_decrypt_100mb_profile_b() {
         encrypt::encrypt_binary(&plaintext, &[key.public_key_data.clone()], None, None)
             .expect("100 MB encryption should succeed");
 
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[])
         .expect("100 MB decryption should succeed");
 
     assert_eq!(

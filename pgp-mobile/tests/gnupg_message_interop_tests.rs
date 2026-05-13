@@ -82,7 +82,7 @@ fn test_c3_2_app_encrypt_to_gpg_key() {
 
     // Decrypt with the GnuPG secret key (imported into Sequoia)
     // This simulates what gpg --decrypt would do
-    let result = decrypt::decrypt(&ciphertext, &[gpg_secretkey], &[gpg_pubkey])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[gpg_secretkey], &[gpg_pubkey])
         .expect("Should decrypt with GnuPG secret key");
 
     assert_eq!(result.plaintext, plaintext);
@@ -114,7 +114,7 @@ fn test_c3_2_app_encrypt_signed_to_gpg_key() {
     .expect("Sequoia should encrypt+sign to GnuPG key");
 
     // Decrypt with gpg secret key, verify with our public key
-    let result = decrypt::decrypt(
+    let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[gpg_secretkey],
         &[gpg_pubkey, sender.public_key_data],
@@ -123,8 +123,8 @@ fn test_c3_2_app_encrypt_signed_to_gpg_key() {
 
     assert_eq!(result.plaintext, plaintext);
     assert_eq!(
-        result.signature_status,
-        Some(decrypt::SignatureStatus::Valid)
+        result.legacy_status,
+        decrypt::SignatureStatus::Valid
     );
 }
 
@@ -144,10 +144,10 @@ fn test_c3_3_app_sign_profile_a() {
         .expect("Cleartext signing should succeed");
 
     // Verify (same path gpg --verify would take)
-    let result = verify::verify_cleartext(&signed, &[sender.public_key_data])
+    let result = verify::verify_cleartext_detailed(&signed, &[sender.public_key_data])
         .expect("Verification should succeed");
 
-    assert_eq!(result.status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
     assert!(result.content.is_some());
     // The content from cleartext verification should match the original plaintext
     let content = result.content.unwrap();
@@ -168,7 +168,7 @@ fn test_c3_4_decrypt_gpg_encrypted_message_armored() {
     let pubkey = load_fixture("gpg_pubkey.asc");
     let expected = expected_plaintext();
 
-    let result = decrypt::decrypt(&ciphertext, &[secretkey], &[pubkey])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[secretkey], &[pubkey])
         .expect("Should decrypt GnuPG-encrypted message");
 
     assert_eq!(result.plaintext, expected);
@@ -187,7 +187,7 @@ fn test_c3_4_decrypt_gpg_encrypted_message_binary() {
     assert!(has_v1, "GnuPG fixture must be SEIPDv1");
     assert!(!has_v2, "GnuPG fixture must NOT be SEIPDv2");
 
-    let result = decrypt::decrypt(&ciphertext, &[secretkey], &[pubkey])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[secretkey], &[pubkey])
         .expect("Should decrypt binary GnuPG-encrypted message");
 
     assert_eq!(result.plaintext, expected);
@@ -202,10 +202,10 @@ fn test_c3_5_verify_gpg_cleartext_signature() {
     let pubkey = load_fixture("gpg_pubkey.asc");
     let expected = expected_plaintext();
 
-    let result = verify::verify_cleartext(&signed, &[pubkey])
+    let result = verify::verify_cleartext_detailed(&signed, &[pubkey])
         .expect("Should verify GnuPG cleartext signature");
 
-    assert_eq!(result.status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
 
     // Verify content matches
     let content = result.content.expect("Should have content");
@@ -221,10 +221,10 @@ fn test_c3_5_verify_gpg_detached_signature_armored() {
     let pubkey = load_fixture("gpg_pubkey.asc");
     let data = expected_plaintext();
 
-    let result = verify::verify_detached(&data, &signature, &[pubkey])
+    let result = verify::verify_detached_detailed(&data, &signature, &[pubkey])
         .expect("Should verify GnuPG detached signature");
 
-    assert_eq!(result.status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
 }
 
 /// C3.5 (detached, binary): Verify a GnuPG detached signature in binary format.
@@ -234,10 +234,10 @@ fn test_c3_5_verify_gpg_detached_signature_binary() {
     let pubkey = load_fixture("gpg_pubkey.gpg");
     let data = expected_plaintext();
 
-    let result = verify::verify_detached(&data, &signature, &[pubkey])
+    let result = verify::verify_detached_detailed(&data, &signature, &[pubkey])
         .expect("Should verify binary GnuPG detached signature");
 
-    assert_eq!(result.status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
 }
 
 // ── C3.6: Tamper 1 bit → gpg fails ────────────────────────────────────────
@@ -249,7 +249,7 @@ fn test_c3_6_tampered_gpg_ciphertext_fails() {
     let secretkey = load_fixture("gpg_secretkey.asc");
     let pubkey = load_fixture("gpg_pubkey.gpg");
 
-    let result = decrypt::decrypt(&tampered, &[secretkey], &[pubkey]);
+    let result = decrypt::decrypt_detailed(&tampered, &[secretkey], &[pubkey]);
     assert!(
         result.is_err(),
         "Tampered ciphertext must not decrypt successfully"
@@ -280,7 +280,7 @@ fn test_c3_6_tampered_sequoia_ciphertext_for_gpg_key() {
     let mid = ciphertext.len() / 2;
     ciphertext[mid] ^= 0x01;
 
-    let result = decrypt::decrypt(&ciphertext, &[gpg_secretkey], &[gpg_pubkey]);
+    let result = decrypt::decrypt_detailed(&ciphertext, &[gpg_secretkey], &[gpg_pubkey]);
     assert!(
         result.is_err(),
         "Tampered Sequoia ciphertext must fail decryption"
@@ -316,7 +316,7 @@ fn test_c3_7_full_roundtrip_gpg_key() {
         .expect("Encrypt to gpg key should succeed");
 
     // Step 3: Decrypt with GnuPG secret key
-    let result = decrypt::decrypt(&ciphertext, &[gpg_secretkey], &[gpg_pubkey])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[gpg_secretkey], &[gpg_pubkey])
         .expect("Decrypt with gpg key should succeed");
 
     assert_eq!(result.plaintext, plaintext);
@@ -348,7 +348,7 @@ fn test_c3_7_full_roundtrip_signed() {
     .expect("Encrypt+sign should succeed");
 
     // Decrypt + verify
-    let result = decrypt::decrypt(
+    let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[gpg_secretkey],
         &[gpg_pubkey, signer.public_key_data],
@@ -357,8 +357,8 @@ fn test_c3_7_full_roundtrip_signed() {
 
     assert_eq!(result.plaintext, plaintext);
     assert_eq!(
-        result.signature_status,
-        Some(decrypt::SignatureStatus::Valid)
+        result.legacy_status,
+        decrypt::SignatureStatus::Valid
     );
 }
 
@@ -404,7 +404,7 @@ fn test_c3_8_profile_b_encryption_not_gnupg_compatible() {
         .expect("Encrypt should succeed");
 
     // Verify Sequoia can decrypt it (Profile B → Profile B works)
-    let result = decrypt::decrypt(&ciphertext, &[key_b.cert_data], &[key_b.public_key_data])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key_b.cert_data], &[key_b.public_key_data])
         .expect("Profile B self-decrypt should succeed");
     assert_eq!(result.plaintext, plaintext);
 
@@ -426,7 +426,7 @@ fn test_c2a_9_decrypt_deflate_compressed_message() {
     let pubkey = load_fixture("gpg_pubkey.asc");
     let expected = expected_plaintext();
 
-    let result = decrypt::decrypt(&ciphertext, &[secretkey], &[pubkey])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[secretkey], &[pubkey])
         .expect("Should decrypt DEFLATE-compressed GnuPG message");
 
     assert_eq!(
@@ -444,7 +444,7 @@ fn test_c2a_9_decrypt_zlib_compressed_message() {
     let pubkey = load_fixture("gpg_pubkey.asc");
     let expected = expected_plaintext();
 
-    let result = decrypt::decrypt(&ciphertext, &[secretkey], &[pubkey])
+    let result = decrypt::decrypt_detailed(&ciphertext, &[secretkey], &[pubkey])
         .expect("Should decrypt ZLIB-compressed GnuPG message");
 
     assert_eq!(
@@ -488,7 +488,7 @@ fn test_c2b_10_compressed_seipd2_verified_by_composition() {
     let pubkey = load_fixture("gpg_pubkey.asc");
     let expected = expected_plaintext();
 
-    let result = decrypt::decrypt(&deflate_ct, &[secretkey], &[pubkey])
+    let result = decrypt::decrypt_detailed(&deflate_ct, &[secretkey], &[pubkey])
         .expect("DEFLATE decompression must work");
     assert_eq!(result.plaintext, expected);
 
@@ -500,7 +500,7 @@ fn test_c2b_10_compressed_seipd2_verified_by_composition() {
     let plaintext = b"SEIPDv2 decrypt test for composition";
     let ct = encrypt::encrypt(plaintext, &[key_b.public_key_data.clone()], None, None)
         .expect("Profile B encrypt should succeed");
-    let result = decrypt::decrypt(&ct, &[key_b.cert_data], &[key_b.public_key_data])
+    let result = decrypt::decrypt_detailed(&ct, &[key_b.cert_data], &[key_b.public_key_data])
         .expect("Profile B decrypt should succeed");
     assert_eq!(result.plaintext, plaintext);
 
@@ -563,7 +563,7 @@ fn test_cross_impl_encrypt_to_self_with_gpg_recipient() {
     .expect("Encrypt should succeed");
 
     // GnuPG recipient can decrypt
-    let result1 = decrypt::decrypt(
+    let result1 = decrypt::decrypt_detailed(
         &ciphertext,
         &[gpg_secretkey],
         &[gpg_pubkey.clone(), sender.public_key_data.clone()],
@@ -572,7 +572,7 @@ fn test_cross_impl_encrypt_to_self_with_gpg_recipient() {
     assert_eq!(result1.plaintext, plaintext);
 
     // Sender can also decrypt (encrypt-to-self)
-    let result2 = decrypt::decrypt(
+    let result2 = decrypt::decrypt_detailed(
         &ciphertext,
         &[sender.cert_data],
         &[gpg_pubkey, sender.public_key_data],
@@ -620,7 +620,7 @@ fn test_profile_b_sender_to_gpg_v4_recipient_uses_seipdv1() {
     );
 
     // GnuPG v4 recipient decrypts successfully
-    let result = decrypt::decrypt(
+    let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[gpg_secretkey],
         &[gpg_pubkey, sender_b.public_key_data],
@@ -629,8 +629,8 @@ fn test_profile_b_sender_to_gpg_v4_recipient_uses_seipdv1() {
 
     assert_eq!(result.plaintext, plaintext);
     assert_eq!(
-        result.signature_status,
-        Some(decrypt::SignatureStatus::Valid)
+        result.legacy_status,
+        decrypt::SignatureStatus::Valid
     );
 }
 
@@ -647,10 +647,10 @@ fn test_verify_gpg_signed_compressed() {
 
     // gpg --sign produces a one-pass-signed message (not cleartext, not encrypted).
     // Verify via the VerifierBuilder path.
-    let result = verify::verify_cleartext(&signed, &[pubkey])
+    let result = verify::verify_cleartext_detailed(&signed, &[pubkey])
         .expect("Should verify signed+compressed message");
 
-    assert_eq!(result.status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
     let content = result.content.expect("Should have content");
     let content_str = String::from_utf8_lossy(&content);
     let expected_str = String::from_utf8_lossy(&expected);

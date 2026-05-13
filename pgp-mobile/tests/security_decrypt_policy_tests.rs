@@ -23,7 +23,7 @@ fn test_error_classification_tampered_profile_a() {
     .expect("Encrypt should succeed");
     let ciphertext = common::tamper_at_ratio(&ciphertext, 3, 4);
 
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[]);
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[]);
     match result {
         Ok(_) => panic!("Tampered ciphertext must never decrypt successfully"),
         Err(pgp_mobile::error::PgpError::IntegrityCheckFailed) => {}
@@ -51,7 +51,7 @@ fn test_error_classification_tampered_profile_b() {
     .expect("Encrypt should succeed");
     let ciphertext = common::tamper_at_ratio(&ciphertext, 3, 4);
 
-    let result = decrypt::decrypt(&ciphertext, &[key.cert_data.clone()], &[]);
+    let result = decrypt::decrypt_detailed(&ciphertext, &[key.cert_data.clone()], &[]);
     match result {
         Ok(_) => panic!("Tampered ciphertext must never decrypt successfully"),
         Err(pgp_mobile::error::PgpError::AeadAuthenticationFailed) => {}
@@ -81,7 +81,7 @@ fn test_decrypt_wrong_key_no_plaintext_leak() {
     )
     .expect("Encrypt should succeed");
 
-    let result = decrypt::decrypt(&ciphertext, &[bob.cert_data.clone()], &[]);
+    let result = decrypt::decrypt_detailed(&ciphertext, &[bob.cert_data.clone()], &[]);
     match result {
         Ok(_) => panic!("Wrong key must fail decryption"),
         Err(pgp_mobile::error::PgpError::NoMatchingKey) => {}
@@ -130,7 +130,7 @@ fn test_decrypt_legacy_seipd_no_mdc_rejected() {
 
     assert!(replaced, "Failed to locate SEIP packet header in ciphertext");
 
-    let result = decrypt::decrypt(&tampered, &[key.cert_data.clone()], &[]);
+    let result = decrypt::decrypt_detailed(&tampered, &[key.cert_data.clone()], &[]);
     assert!(
         result.is_err(),
         "Legacy SEIPD without MDC must be rejected"
@@ -177,7 +177,7 @@ fn test_decrypt_wrong_key_no_plaintext_leak_profile_b() {
     )
     .expect("Encrypt should succeed");
 
-    let result = decrypt::decrypt(&ciphertext, &[bob.cert_data.clone()], &[]);
+    let result = decrypt::decrypt_detailed(&ciphertext, &[bob.cert_data.clone()], &[]);
     match result {
         Ok(_) => panic!("Wrong key must fail decryption (Profile B)"),
         Err(pgp_mobile::error::PgpError::NoMatchingKey) => {}

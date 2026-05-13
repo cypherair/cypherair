@@ -35,7 +35,7 @@ fn test_profile_a_encrypts_to_profile_b() {
     .expect("Encryption should succeed");
 
     // Profile B recipient should decrypt
-    let result = decrypt::decrypt(
+    let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[recipient_b.cert_data.clone()],
         &[sender_a.public_key_data.clone()],
@@ -43,7 +43,7 @@ fn test_profile_a_encrypts_to_profile_b() {
     .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
 }
 
 /// C2X.2: Profile B encrypts to Profile A recipient (v4 key).
@@ -69,7 +69,7 @@ fn test_profile_b_encrypts_to_profile_a() {
     .expect("Encryption should succeed");
 
     // Profile A recipient should decrypt
-    let result = decrypt::decrypt(
+    let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[recipient_a.cert_data.clone()],
         &[sender_b.public_key_data.clone()],
@@ -77,7 +77,7 @@ fn test_profile_b_encrypts_to_profile_a() {
     .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
 }
 
 /// C2X.3: Profile B encrypts to mixed recipients (v4 + v6).
@@ -115,12 +115,12 @@ fn test_mixed_recipients_v4_and_v6() {
     .expect("Encryption should succeed");
 
     // v4 recipient decrypts
-    let result_a = decrypt::decrypt(&ciphertext, &[recipient_a.cert_data.clone()], &[])
+    let result_a = decrypt::decrypt_detailed(&ciphertext, &[recipient_a.cert_data.clone()], &[])
         .expect("v4 recipient should decrypt");
     assert_eq!(result_a.plaintext, plaintext);
 
     // v6 recipient decrypts
-    let result_b = decrypt::decrypt(&ciphertext, &[recipient_b.cert_data.clone()], &[])
+    let result_b = decrypt::decrypt_detailed(&ciphertext, &[recipient_b.cert_data.clone()], &[])
         .expect("v6 recipient should decrypt");
     assert_eq!(result_b.plaintext, plaintext);
 }
@@ -148,12 +148,12 @@ fn test_profile_b_encrypt_to_self_with_v4_recipient() {
     .expect("Encryption should succeed");
 
     // v4 recipient decrypts
-    let result_a = decrypt::decrypt(&ciphertext, &[recipient_a.cert_data.clone()], &[])
+    let result_a = decrypt::decrypt_detailed(&ciphertext, &[recipient_a.cert_data.clone()], &[])
         .expect("v4 recipient should decrypt");
     assert_eq!(result_a.plaintext, plaintext);
 
     // v6 sender decrypts (encrypt-to-self)
-    let result_b = decrypt::decrypt(&ciphertext, &[sender_b.cert_data.clone()], &[])
+    let result_b = decrypt::decrypt_detailed(&ciphertext, &[sender_b.cert_data.clone()], &[])
         .expect("v6 sender should decrypt own message");
     assert_eq!(result_b.plaintext, plaintext);
 }
@@ -174,16 +174,16 @@ fn test_cross_profile_signature_verification() {
     // Profile A signs, Profile B verifies
     let signed_a =
         sign::sign_cleartext(text, &key_a.cert_data).expect("Profile A signing should succeed");
-    let verify_a_by_b = verify::verify_cleartext(&signed_a, &[key_a.public_key_data.clone()])
+    let verify_a_by_b = verify::verify_cleartext_detailed(&signed_a, &[key_a.public_key_data.clone()])
         .expect("Profile B should verify Profile A signature");
-    assert_eq!(verify_a_by_b.status, SignatureStatus::Valid);
+    assert_eq!(verify_a_by_b.legacy_status, SignatureStatus::Valid);
 
     // Profile B signs, Profile A verifies
     let signed_b =
         sign::sign_cleartext(text, &key_b.cert_data).expect("Profile B signing should succeed");
-    let verify_b_by_a = verify::verify_cleartext(&signed_b, &[key_b.public_key_data.clone()])
+    let verify_b_by_a = verify::verify_cleartext_detailed(&signed_b, &[key_b.public_key_data.clone()])
         .expect("Profile A should verify Profile B signature");
-    assert_eq!(verify_b_by_a.status, SignatureStatus::Valid);
+    assert_eq!(verify_b_by_a.legacy_status, SignatureStatus::Valid);
 }
 
 /// Extended: Profile A sender signs encrypted message for Profile B recipient.
@@ -210,7 +210,7 @@ fn test_cross_profile_signed_encrypted_round_trip() {
     .expect("Encryption should succeed");
 
     // Decrypt and verify
-    let result = decrypt::decrypt(
+    let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[recipient_b.cert_data.clone()],
         &[sender_a.public_key_data.clone()],
@@ -218,9 +218,9 @@ fn test_cross_profile_signed_encrypted_round_trip() {
     .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
     assert_eq!(
-        result.signer_fingerprint,
+        result.legacy_signer_fingerprint,
         Some(sender_a.fingerprint.clone())
     );
 }
@@ -251,7 +251,7 @@ fn test_cross_profile_b_to_a_signed_encrypted_round_trip() {
     .expect("Encryption should succeed");
 
     // Recipient A decrypts and verifies sender B's signature
-    let result = decrypt::decrypt(
+    let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[recipient_a.cert_data.clone()],
         &[sender_b.public_key_data.clone()],
@@ -259,14 +259,14 @@ fn test_cross_profile_b_to_a_signed_encrypted_round_trip() {
     .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
+    assert_eq!(result.legacy_status, SignatureStatus::Valid);
     assert_eq!(
-        result.signer_fingerprint,
+        result.legacy_signer_fingerprint,
         Some(sender_b.fingerprint.clone())
     );
 
     // Sender B can also decrypt (encrypt-to-self)
-    let result_self = decrypt::decrypt(
+    let result_self = decrypt::decrypt_detailed(
         &ciphertext,
         &[sender_b.cert_data.clone()],
         &[sender_b.public_key_data.clone()],
@@ -274,7 +274,7 @@ fn test_cross_profile_b_to_a_signed_encrypted_round_trip() {
     .expect("Sender should decrypt via encrypt-to-self");
 
     assert_eq!(result_self.plaintext, plaintext);
-    assert_eq!(result_self.signature_status, Some(SignatureStatus::Valid));
+    assert_eq!(result_self.legacy_status, SignatureStatus::Valid);
 }
 
 /// Verify that encrypting to v4 recipient produces SEIPDv1.
@@ -436,12 +436,12 @@ fn test_profile_a_encrypt_to_self_with_v6_recipient() {
     .expect("Encryption should succeed");
 
     // v6 recipient decrypts
-    let result_b = decrypt::decrypt(&ciphertext, &[recipient_b.cert_data.clone()], &[])
+    let result_b = decrypt::decrypt_detailed(&ciphertext, &[recipient_b.cert_data.clone()], &[])
         .expect("v6 recipient should decrypt");
     assert_eq!(result_b.plaintext, plaintext);
 
     // v4 sender decrypts (encrypt-to-self)
-    let result_a = decrypt::decrypt(&ciphertext, &[sender_a.cert_data.clone()], &[])
+    let result_a = decrypt::decrypt_detailed(&ciphertext, &[sender_a.cert_data.clone()], &[])
         .expect("v4 sender should decrypt own message");
     assert_eq!(result_a.plaintext, plaintext);
 
