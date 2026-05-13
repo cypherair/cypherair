@@ -61,12 +61,6 @@ struct EncryptScreenHostView: View {
         .onChange(of: runtimeSyncKey) { _, _ in
             model.updateConfiguration(configuration)
         }
-        .onChange(of: model.contactsAvailability) { previousAvailability, currentAvailability in
-            model.handleContactsAvailabilityChange(
-                from: previousAvailability,
-                to: currentAvailability
-            )
-        }
         .onChange(of: protectedOrdinarySettings.state) { _, _ in
             model.refreshProtectedOrdinarySettings()
         }

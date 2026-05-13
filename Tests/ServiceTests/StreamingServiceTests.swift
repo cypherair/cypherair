@@ -35,6 +35,14 @@ final class StreamingServiceTests: XCTestCase {
         return identity
     }
 
+    private func contactId(for identity: PGPKeyIdentity) throws -> String {
+        try contactId(forFingerprint: identity.fingerprint)
+    }
+
+    private func contactId(forFingerprint fingerprint: String) throws -> String {
+        try XCTUnwrap(stack.contactService.contactId(forFingerprint: fingerprint))
+    }
+
     /// Write data to a temporary file and return its URL.
     /// Caller is responsible for cleanup.
     private func writeTempFile(_ data: Data, filename: String = "test-\(UUID().uuidString).bin") throws -> URL {
@@ -57,7 +65,7 @@ final class StreamingServiceTests: XCTestCase {
         // Encrypt
         let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: sender.fingerprint,
             encryptToSelf: false,
             progress: nil
@@ -105,7 +113,7 @@ final class StreamingServiceTests: XCTestCase {
 
         let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: sender.fingerprint,
             encryptToSelf: false,
             progress: nil
@@ -140,14 +148,14 @@ final class StreamingServiceTests: XCTestCase {
 
         let first = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
         )
         let second = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
@@ -170,7 +178,7 @@ final class StreamingServiceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: inputURL) }
         let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
@@ -198,7 +206,7 @@ final class StreamingServiceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: inputURL) }
         let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
@@ -293,7 +301,7 @@ final class StreamingServiceTests: XCTestCase {
         do {
             let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
                 inputURL: inputURL,
-                recipientFingerprints: [recipient.fingerprint],
+                recipientContactIds: [try contactId(for: recipient)],
                 signWithFingerprint: nil,
                 encryptToSelf: false,
                 progress: progress
@@ -378,7 +386,7 @@ final class StreamingServiceTests: XCTestCase {
         do {
             let encryptedArtifact = try await encService.encryptFileStreaming(
                 inputURL: inputURL,
-                recipientFingerprints: [recipient.fingerprint],
+                recipientContactIds: [try contactId(for: recipient)],
                 signWithFingerprint: nil,
                 encryptToSelf: false,
                 progress: nil
@@ -408,7 +416,7 @@ final class StreamingServiceTests: XCTestCase {
         // Encrypt
         let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
-            recipientFingerprints: [key.fingerprint],
+            recipientContactIds: [try contactId(for: key)],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
@@ -466,7 +474,7 @@ final class StreamingServiceTests: XCTestCase {
         // Encrypt to the external contact
         let encryptedArtifact = try await stack.encryptionService.encryptFileStreaming(
             inputURL: inputURL,
-            recipientFingerprints: [keyInfo.fingerprint],
+            recipientContactIds: [try contactId(forFingerprint: keyInfo.fingerprint)],
             signWithFingerprint: nil,
             encryptToSelf: false,
             progress: nil
@@ -505,7 +513,7 @@ final class StreamingServiceTests: XCTestCase {
         do {
             _ = try await stack.encryptionService.encryptFileStreaming(
                 inputURL: nonexistentURL,
-                recipientFingerprints: [identity.fingerprint],
+                recipientContactIds: [try contactId(for: identity)],
                 signWithFingerprint: nil,
                 encryptToSelf: false,
                 progress: nil

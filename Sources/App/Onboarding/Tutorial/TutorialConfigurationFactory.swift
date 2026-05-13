@@ -76,7 +76,6 @@ struct TutorialConfigurationFactory {
                 let resolvedContactId = bobContact.contactId
                     ?? store.container?.contactService.contactId(forFingerprint: bobContact.fingerprint)
                 configuration.initialRecipientContactIds = resolvedContactId.map { [$0] } ?? []
-                configuration.initialRecipientFingerprints = [bobContact.fingerprint]
             }
             configuration.initialSignerFingerprint = store.session.artifacts.aliceIdentity?.fingerprint
             configuration.onEncrypted = { [weak store] ciphertext in

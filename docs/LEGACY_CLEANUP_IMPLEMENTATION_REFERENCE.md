@@ -178,12 +178,16 @@ Recommended PRs:
   `EncryptView.Configuration.initialRecipientFingerprints` and tutorial
   preselection fallback only after tutorial sandbox, UI-test containers, and
   route-driven preselection can reliably provide contact identity IDs.
+  Status: completed with PR 2A/2B/2C in the first Phase 2 PR. The first PR
+  migrated service and tutorial tests to contact-ID recipients, removed route
+  and tutorial fingerprint preselection, and left PR 2D/2E compatibility
+  deletion for the second Phase 2 PR.
 
 Entry conditions:
 
 - Current UI and screen models already use contact-ID recipient selection.
-- Tests still using fingerprint recipients are classified as valuable behavior
-  coverage or compatibility-only coverage.
+- Recipient-fingerprint tests were classified as valuable behavior coverage and
+  migrated to contact-ID APIs in PR 2A/2B/2C.
 
 Exit conditions:
 
@@ -453,8 +457,7 @@ answer these questions in its description.
 Known surfaces that require this gate:
 
 - recipient-fingerprint encryption overloads
-- `EncryptView.Configuration.initialRecipientFingerprints` and route/tutorial
-  fingerprint preselection fallback
+- route/tutorial fingerprint preselection fallback (completed in PR 2F)
 - legacy `SignatureVerification` returning Swift facades
 - simple FFI APIs that expose detailed-fold compatibility
 - raw first-match User ID FFI exports

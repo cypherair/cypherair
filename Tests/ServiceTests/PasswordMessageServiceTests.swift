@@ -29,6 +29,10 @@ final class PasswordMessageServiceTests: XCTestCase {
         return identity
     }
 
+    private func contactId(for identity: PGPKeyIdentity) throws -> String {
+        try XCTUnwrap(stack.contactService.contactId(forFingerprint: identity.fingerprint))
+    }
+
     private func findTargetedTamper(
         ciphertext: Data,
         password: String,
@@ -154,7 +158,7 @@ final class PasswordMessageServiceTests: XCTestCase {
         let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient Only")
         let ciphertext = try await stack.encryptionService.encryptText(
             "recipient only",
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: false
         )

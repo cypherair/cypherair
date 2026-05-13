@@ -34,6 +34,10 @@ final class EncryptionServiceTests: XCTestCase {
         return identity
     }
 
+    private func contactId(for identity: PGPKeyIdentity) throws -> String {
+        try XCTUnwrap(stack.contactService.contactId(forFingerprint: identity.fingerprint))
+    }
+
     // MARK: - Text Encryption: Profile A
 
     func test_encryptText_profileA_producesNonEmptyCiphertext() async throws {
@@ -41,7 +45,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Hello, Profile A!",
-            recipientFingerprints: [identity.fingerprint],
+            recipientContactIds: [try contactId(for: identity)],
             signWithFingerprint: nil,
             encryptToSelf: false
         )
@@ -52,20 +56,6 @@ final class EncryptionServiceTests: XCTestCase {
         XCTAssertTrue(header?.hasPrefix("-----BEGIN PGP") == true)
     }
 
-    func test_encryptText_contactIdRecipient_producesNonEmptyCiphertext() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
-        let contactId = try XCTUnwrap(stack.contactService.contactId(forFingerprint: identity.fingerprint))
-
-        let ciphertext = try await stack.encryptionService.encryptText(
-            "Hello, contact ID recipient!",
-            recipientContactIds: [contactId],
-            signWithFingerprint: nil,
-            encryptToSelf: false
-        )
-
-        XCTAssertFalse(ciphertext.isEmpty)
-    }
-
     // MARK: - Text Encryption: Profile B
 
     func test_encryptText_profileB_producesNonEmptyCiphertext() async throws {
@@ -73,7 +63,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Hello, Profile B!",
-            recipientFingerprints: [identity.fingerprint],
+            recipientContactIds: [try contactId(for: identity)],
             signWithFingerprint: nil,
             encryptToSelf: false
         )
@@ -87,7 +77,7 @@ final class EncryptionServiceTests: XCTestCase {
         do {
             _ = try await stack.encryptionService.encryptText(
                 "test",
-                recipientFingerprints: [],
+                recipientContactIds: [],
                 signWithFingerprint: nil,
                 encryptToSelf: false
             )
@@ -109,14 +99,14 @@ final class EncryptionServiceTests: XCTestCase {
         do {
             _ = try await stack.encryptionService.encryptText(
                 "test",
-                recipientFingerprints: ["nonexistent-fingerprint"],
+                recipientContactIds: ["nonexistent-contact-id"],
                 signWithFingerprint: nil,
                 encryptToSelf: false
             )
             XCTFail("Expected error for unknown recipient")
         } catch let error as CypherAirError {
             if case .invalidKeyData = error {
-                // Expected — recipient fingerprint not found in contacts
+                // Expected — recipient contact ID not found in contacts
             } else {
                 XCTFail("Expected .invalidKeyData, got \(error)")
             }
@@ -132,7 +122,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Signed message",
-            recipientFingerprints: [identity.fingerprint],
+            recipientContactIds: [try contactId(for: identity)],
             signWithFingerprint: identity.fingerprint,
             encryptToSelf: false
         )
@@ -160,7 +150,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Encrypt to self test",
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: true
         )
@@ -185,7 +175,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "No self-encryption",
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: false
         )
@@ -220,7 +210,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Profile B encrypt to self test",
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: true
         )
@@ -245,7 +235,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Profile B no self-encryption",
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: false
         )
@@ -282,7 +272,7 @@ final class EncryptionServiceTests: XCTestCase {
         let fileData = Data(repeating: 0xAB, count: 1024)
         let ciphertext = try await stack.encryptionService.encryptFile(
             fileData,
-            recipientFingerprints: [identity.fingerprint],
+            recipientContactIds: [try contactId(for: identity)],
             signWithFingerprint: nil,
             encryptToSelf: false
         )
@@ -298,7 +288,7 @@ final class EncryptionServiceTests: XCTestCase {
             let fileData = Data(repeating: 0xFF, count: 100 * 1024 * 1024 + 1)
             _ = try await stack.encryptionService.encryptFile(
                 fileData,
-                recipientFingerprints: [identity.fingerprint],
+                recipientContactIds: [try contactId(for: identity)],
                 signWithFingerprint: nil,
                 encryptToSelf: false
             )
@@ -321,7 +311,7 @@ final class EncryptionServiceTests: XCTestCase {
         let fileData = Data(repeating: 0xCC, count: 100 * 1024 * 1024)
         let ciphertext = try await stack.encryptionService.encryptFile(
             fileData,
-            recipientFingerprints: [identity.fingerprint],
+            recipientContactIds: [try contactId(for: identity)],
             signWithFingerprint: nil,
             encryptToSelf: false
         )
@@ -336,7 +326,7 @@ final class EncryptionServiceTests: XCTestCase {
         let fileData = Data(repeating: 0xAB, count: 1024)
         let ciphertext = try await stack.encryptionService.encryptFile(
             fileData,
-            recipientFingerprints: [identity.fingerprint],
+            recipientContactIds: [try contactId(for: identity)],
             signWithFingerprint: nil,
             encryptToSelf: false
         )
@@ -352,7 +342,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Cross-profile message",
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: sender.fingerprint,
             encryptToSelf: false
         )
@@ -379,7 +369,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Mixed recipients message",
-            recipientFingerprints: [keyV4.fingerprint, keyV6.fingerprint],
+            recipientContactIds: [try contactId(for: keyV4), try contactId(for: keyV6)],
             signWithFingerprint: nil,
             encryptToSelf: false
         )
@@ -418,11 +408,14 @@ final class EncryptionServiceTests: XCTestCase {
         )
         try! stack.contactService.addContact(publicKeyData: recipientKey.publicKeyData)
         let info = try! PgpEngine().parseKeyInfo(keyData: recipientKey.publicKeyData)
+        guard let recipientContactId = stack.contactService.contactId(forFingerprint: info.fingerprint) else {
+            return XCTFail("Expected recipient contact ID")
+        }
 
         do {
             _ = try await stack.encryptionService.encryptText(
                 "test",
-                recipientFingerprints: [info.fingerprint],
+                recipientContactIds: [recipientContactId],
                 signWithFingerprint: nil,
                 encryptToSelf: true
             )
@@ -449,7 +442,7 @@ final class EncryptionServiceTests: XCTestCase {
         // Encrypt-to-self using the non-default key
         let ciphertext = try await stack.encryptionService.encryptText(
             "Specific key self-encrypt",
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: true,
             encryptToSelfFingerprint: specificKey.fingerprint
@@ -499,7 +492,7 @@ final class EncryptionServiceTests: XCTestCase {
         // Encrypt-to-self with nil fingerprint — should fall back to default key
         let ciphertext = try await stack.encryptionService.encryptText(
             "Default key fallback",
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: true,
             encryptToSelfFingerprint: nil
@@ -526,7 +519,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Profile B specific key",
-            recipientFingerprints: [recipient.fingerprint],
+            recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: true,
             encryptToSelfFingerprint: specificKey.fingerprint
@@ -575,7 +568,7 @@ final class EncryptionServiceTests: XCTestCase {
         do {
             _ = try await stack.encryptionService.encryptText(
                 "test",
-                recipientFingerprints: [identity.fingerprint, "nonexistent-fingerprint"],
+                recipientContactIds: [try contactId(for: identity), "nonexistent-contact-id"],
                 signWithFingerprint: nil,
                 encryptToSelf: false
             )
@@ -600,7 +593,7 @@ final class EncryptionServiceTests: XCTestCase {
             let fileData = Data(repeating: 0xFF, count: 100 * 1024 * 1024 + 1)
             _ = try await stack.encryptionService.encryptFile(
                 fileData,
-                recipientFingerprints: [identity.fingerprint],
+                recipientContactIds: [try contactId(for: identity)],
                 signWithFingerprint: nil,
                 encryptToSelf: false
             )
@@ -625,7 +618,7 @@ final class EncryptionServiceTests: XCTestCase {
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Multi-recipient message",
-            recipientFingerprints: [keyA.fingerprint, keyB.fingerprint],
+            recipientContactIds: [try contactId(for: keyA), try contactId(for: keyB)],
             signWithFingerprint: nil,
             encryptToSelf: false
         )

@@ -181,11 +181,12 @@ final class TutorialSessionStoreTests: XCTestCase {
             return XCTFail("Expected Bob contact to be added")
         }
         store.noteBobImported(contact)
+        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: contact.fingerprint))
         XCTAssertTrue(store.isCompleted(.addDemoContact))
 
         let ciphertext = try await container.encryptionService.encryptText(
             "Hello Bob from the guided tutorial",
-            recipientFingerprints: [contact.fingerprint],
+            recipientContactIds: [contactId],
             signWithFingerprint: alice.fingerprint,
             encryptToSelf: false
         )
@@ -510,6 +511,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             return XCTFail("Expected Bob contact to be added")
         }
         store.noteBobImported(contact)
+        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: contact.fingerprint))
 
         let inactiveKey = EncryptView.RuntimeSyncKey(
             configuration: store.configurationFactory.encryptConfiguration(isActiveModule: false)
@@ -519,8 +521,8 @@ final class TutorialSessionStoreTests: XCTestCase {
         )
 
         XCTAssertNotEqual(inactiveKey, activeKey)
-        XCTAssertTrue(inactiveKey.initialRecipientFingerprints.isEmpty)
-        XCTAssertEqual(activeKey.initialRecipientFingerprints, [contact.fingerprint])
+        XCTAssertTrue(inactiveKey.initialRecipientContactIds.isEmpty)
+        XCTAssertEqual(activeKey.initialRecipientContactIds, [contactId])
         XCTAssertFalse(inactiveKey.hasOnEncrypted)
         XCTAssertTrue(activeKey.hasOnEncrypted)
     }
@@ -544,10 +546,11 @@ final class TutorialSessionStoreTests: XCTestCase {
             return XCTFail("Expected Bob contact to be added")
         }
         store.noteBobImported(contact)
+        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: contact.fingerprint))
 
         let ciphertext = try await container.encryptionService.encryptText(
             "Hello Bob from the guided tutorial",
-            recipientFingerprints: [contact.fingerprint],
+            recipientContactIds: [contactId],
             signWithFingerprint: alice.fingerprint,
             encryptToSelf: false
         )
