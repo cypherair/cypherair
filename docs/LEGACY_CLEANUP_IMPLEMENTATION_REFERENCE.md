@@ -178,10 +178,10 @@ Recommended PRs:
   `EncryptView.Configuration.initialRecipientFingerprints` and tutorial
   preselection fallback only after tutorial sandbox, UI-test containers, and
   route-driven preselection can reliably provide contact identity IDs.
-  Status: completed with PR 2A/2B/2C in the first Phase 2 PR. The first PR
-  migrated service and tutorial tests to contact-ID recipients, removed route
-  and tutorial fingerprint preselection, and left PR 2D/2E compatibility
-  deletion for the second Phase 2 PR.
+  Status: completed across the two Phase 2 PRs. The first PR migrated service
+  and tutorial tests to contact-ID recipients and removed route/tutorial
+  fingerprint preselection. The second PR removed the `EncryptionService`
+  fingerprint overloads and the Contacts legacy fingerprint recipient resolver.
 
 Entry conditions:
 

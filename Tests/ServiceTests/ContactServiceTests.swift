@@ -1036,18 +1036,16 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertNil(contactService.contactId(forFingerprint: "missing-\(generated.fingerprint)"))
     }
 
-    func test_pr5ProductionRecipientResolutionUsesContactIdsOutsideCompatibilitySeams() throws {
+    func test_pr5ProductionRecipientResolutionUsesOnlyContactIds() throws {
         let sourcesRoot = try RepositoryAuditLoader.sourcesRootURL()
-        let allowedRelativePaths: Set<String> = [
-            "Services/ContactRecipientResolver.swift",
-            "Services/ContactService.swift",
-            "Services/EncryptionService.swift",
-        ]
+        let allowedRelativePaths: Set<String> = []
         let fingerprintRecipientParameterPattern = "recipient" + #"Fingerprints\s*:"#
+        let fingerprintResolverPattern = "public" + #"KeysForRecipientFingerprints\s*\("#
+        let legacyFingerprintResolverPattern = "legacy" + #"PublicKeysForRecipientFingerprints\s*\("#
         let forbiddenPatterns: [(label: String, regex: String)] = [
             ("fingerprint recipient parameter", fingerprintRecipientParameterPattern),
-            ("fingerprint recipient resolver", #"publicKeysForRecipientFingerprints\s*\("#),
-            ("legacy fingerprint recipient resolver", #"legacyPublicKeysForRecipientFingerprints\s*\("#),
+            ("fingerprint recipient resolver", fingerprintResolverPattern),
+            ("legacy fingerprint recipient resolver", legacyFingerprintResolverPattern),
         ]
         var violations: [String] = []
 
@@ -1256,7 +1254,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertNoThrow(try snapshot.validateContract())
     }
 
-    func test_pr5RecipientResolver_usesPreferredKeyAndLegacyExactFingerprintRows() throws {
+    func test_pr5RecipientResolver_usesPreferredKeyAndRejectsRemovedContactId() throws {
         var snapshot = ContactsDomainSnapshot.empty()
         let mutator = ContactSnapshotMutator(engine: engine)
         let resolver = ContactRecipientResolver()
@@ -1299,19 +1297,13 @@ final class ContactServiceTests: XCTestCase {
             try resolver.publicKeysForRecipientContactIDs([targetContactId], in: snapshot),
             [firstKey.publicKeyData]
         )
-        XCTAssertEqual(
-            try resolver.legacyPublicKeysForRecipientFingerprints(
-                [secondKey.fingerprint],
-                contacts: try ContactsDomainRepository().makeCompatibilityContacts(from: snapshot)
-            ),
-            [secondKey.publicKeyData]
-        )
         XCTAssertThrowsError(
-            try resolver.legacyPublicKeysForRecipientFingerprints(
-                [targetContactId],
-                contacts: try ContactsDomainRepository().makeCompatibilityContacts(from: snapshot)
-            )
-        )
+            try resolver.publicKeysForRecipientContactIDs([sourceContactId], in: snapshot)
+        ) { error in
+            guard case .invalidKeyData = error as? CypherAirError else {
+                return XCTFail("Expected invalidKeyData for removed contact ID, got \(error)")
+            }
+        }
     }
 
     func test_pr5SummaryProjector_recipientRowsUsePreferredKeyVerificationOnly() throws {
