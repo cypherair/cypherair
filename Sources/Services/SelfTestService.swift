@@ -208,7 +208,7 @@ final class SelfTestService {
     private static func runEncryptDecryptTest(
         engine: PgpEngine,
         generated: GeneratedKey
-    ) async throws -> DecryptResult {
+    ) async throws -> DecryptDetailedResult {
         let plaintext = Data("Self-test 自检 🔐".utf8)
         let ciphertext = try engine.encrypt(
             plaintext: plaintext,
@@ -216,13 +216,16 @@ final class SelfTestService {
             signingKey: generated.certData,
             encryptToSelf: nil
         )
-        let decrypted = try engine.decrypt(
+        let decrypted = try engine.decryptDetailed(
             ciphertext: ciphertext,
             secretKeys: [generated.certData],
             verificationKeys: [generated.publicKeyData]
         )
         guard decrypted.plaintext == plaintext else {
             throw CypherAirError.corruptData(reason: "Plaintext mismatch after round-trip")
+        }
+        guard decrypted.legacyStatus == .valid else {
+            throw CypherAirError.badSignature
         }
         return decrypted
     }
@@ -231,17 +234,17 @@ final class SelfTestService {
     private static func runSignVerifyTest(
         engine: PgpEngine,
         generated: GeneratedKey
-    ) async throws -> VerifyResult {
+    ) async throws -> VerifyDetailedResult {
         let text = Data("Signed message 签名消息".utf8)
         let signed = try engine.signCleartext(
             text: text,
             signerCert: generated.certData
         )
-        let verified = try engine.verifyCleartext(
+        let verified = try engine.verifyCleartextDetailed(
             signedMessage: signed,
             verificationKeys: [generated.publicKeyData]
         )
-        guard verified.status == .valid else {
+        guard verified.legacyStatus == .valid else {
             throw CypherAirError.badSignature
         }
         return verified
@@ -265,7 +268,7 @@ final class SelfTestService {
 
         let decryptSucceeded: Bool
         do {
-            _ = try engine.decrypt(
+            _ = try engine.decryptDetailed(
                 ciphertext: ciphertext,
                 secretKeys: [generated.certData],
                 verificationKeys: []
