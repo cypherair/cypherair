@@ -160,7 +160,8 @@ impl PgpEngine {
     fn generate_key(&self, user_id: String, profile: KeyProfile) -> Result<GeneratedKey, PgpError>;
     fn encrypt(&self, plaintext: Vec<u8>, recipients: Vec<Vec<u8>>, 
                signing_key: Option<Vec<u8>>, encrypt_to_self: Option<Vec<u8>>) -> Result<Vec<u8>, PgpError>;
-    fn decrypt(&self, ciphertext: Vec<u8>, secret_keys: Vec<Vec<u8>>) -> Result<DecryptResult, PgpError>;
+    fn decrypt_detailed(&self, ciphertext: Vec<u8>, secret_keys: Vec<Vec<u8>>,
+                        verification_keys: Vec<Vec<u8>>) -> Result<DecryptDetailedResult, PgpError>;
     fn export_secret_key(&self, key: Vec<u8>, passphrase: String, profile: KeyProfile) -> Result<Vec<u8>, PgpError>;
     // ...
 }
@@ -219,13 +220,13 @@ Bitwarden (UniFFI), Firefox iOS (UniFFI XCFramework), Signal (cbindgen), Delta C
 
 ### 2.8 Durable Rust / FFI Contract Rules
 
-- **API evolution is additive by default.** New semantics should land as parallel methods, result records, or enums instead of mutating legacy verify/decrypt record shapes in place.
+- **API evolution is additive during migration.** New semantics should first land as parallel methods, result records, or enums. Once migration gates pass, superseded surfaces can be deleted intentionally instead of kept as permanent compatibility APIs.
 - **Payload input classes must stay explicit.** Byte-oriented OpenPGP payload inputs are classified as `binary-only`, `armored-only`, or `dual-format`; new APIs must document which class they accept instead of relying on implicit parser behavior.
 - **Cryptographic selectors use bytes, not display strings.** Selector-bearing User ID operations use raw `userIdData + occurrenceIndex`, and cryptographically significant payloads stay as `Vec<u8>` / `Data`.
 - **Discovery helpers are part of the contract when needed.** If a downstream Swift service cannot safely discover required selectors or metadata from the current exported surface, the Rust / FFI boundary must grow a bounded helper rather than pushing string inference into Swift callers.
 - **Parse/setup failure stays distinct from cryptographic invalidity.** Parse, type, and precondition failures return `Err(PgpError)`. Successful parsing followed by crypto failure should stay in family-specific result or graded-status types.
 - **`PgpError` remains the cross-family fatal boundary.** UniFFI-visible error changes must preserve the Rust/Swift 1:1 mapping and should be reserved for fatal semantics that cannot be modeled as a family-local result.
-- **Signer fingerprint meaning must stay explicit.** Legacy verify/decrypt APIs return the signer certificate primary fingerprint, not the signing subkey fingerprint. New APIs must either preserve that meaning or add a separate explicit subkey field.
+- **Signer fingerprint meaning must stay explicit.** Detailed verify/decrypt summaries expose the signer certificate primary fingerprint, not the signing subkey fingerprint. New APIs must either preserve that meaning or add a separate explicit subkey field.
 - **Any UniFFI-visible surface change is a multi-layer change.** Regenerate bindings, update Swift service call sites, refresh `PgpMobile.xcframework`, and rerun Rust plus Swift / FFI validation together.
 - **Plaintext-bearing results still inherit Swift-side zeroization expectations.** When FFI results carry plaintext or signed content, the service and app layers must continue to zeroize temporary `Data` buffers after use.
 
@@ -237,7 +238,7 @@ Bitwarden (UniFFI), Firefox iOS (UniFFI XCFramework), Signal (cbindgen), Delta C
 | Revocation Construction | Key-level and selective revocation construction | `KeyManagementService` | `KeyDetailView`, `SelectiveRevocationView`, `SelectiveRevocationScreenModel` | Shipped; selective revocation remains export-on-demand and does not extend persisted key-level revocation state |
 | Password / SKESK Symmetric Messages | Additive password encrypt/decrypt methods and result types | `PasswordMessageService` | None | Service-only; no shipped app route or screen-model owner |
 | Certification And Binding Verification | Direct-key verify, User ID binding verify, and User ID certification generation | `CertificateSignatureService` | `ContactDetailView`, `ContactCertificateSignaturesView`, `ContactCertificateSignaturesScreenModel` | Shipped; workflow is crypto-only and does not mutate trust state automatically |
-| Richer Signature Results | Additive detailed verify/decrypt APIs | `SigningService` and `DecryptionService` | `VerifyView`, `VerifyScreenModel`, `DecryptView`, `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Shipped; current UI keeps the summary-first bridge while also rendering detailed entries |
+| Richer Signature Results | Detailed verify/decrypt APIs | `SigningService` and `DecryptionService` | `VerifyView`, `VerifyScreenModel`, `DecryptView`, `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Shipped; detailed results are the primary service/app surface, with `SignatureVerification` retained only as an internal presentation helper |
 
 All current app-surface workflows continue to call Swift service owners rather than `PgpEngine` directly.
 

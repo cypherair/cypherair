@@ -429,15 +429,15 @@ When changing certificate-signature verification or User ID certification behavi
 
 When changing the richer-signature-result family, validation must cover:
 
-- additive `verify_*_detailed`, `decrypt_detailed`, and file detailed APIs without changing legacy record shapes
+- detailed `verify_*_detailed`, `decrypt_detailed`, and detailed file APIs as
+  the primary verification/decrypt surface
 - collector preservation of every observed signature result in global parser order, including repeated signers
-- compatibility assertions proving `legacy_status` and `legacy_signer_fingerprint` exactly match the corresponding legacy API on the same input
 - mixed `valid + unknown`, `expired + bad`, and `expired + unknown` fold behavior
 - `UnknownSigner` detailed entries carrying no fingerprint
-- unsigned coverage only on detailed APIs that already support unsigned input (`decrypt_detailed` / `decrypt_file_detailed`)
+- unsigned coverage on detailed APIs that support unsigned input (`decrypt_detailed` / `decrypt_file_detailed`)
 - detached verify setup-failure and payload-failure paths, including `signatures = []` when no per-signature result was observed
 - `verify_detached_file_detailed` cancellation returning `OperationCancelled`
-- fixed multi-signer Swift FFI fixtures for UniFFI array/record mapping and legacy-compat comparisons
+- fixed multi-signer Swift FFI fixtures for UniFFI array/record mapping and exact fixture payload expectations
 - password-message regression coverage because password decrypt reuses the fixed-session-key decrypt path
 
 ## 3. Profile Test Matrix

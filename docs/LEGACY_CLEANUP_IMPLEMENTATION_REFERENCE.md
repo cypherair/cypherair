@@ -213,15 +213,15 @@ Current-state facts:
 
 - UI verify and decrypt screen models already call detailed service APIs for
   current user-facing verify/decrypt flows.
-- `SigningService` and `DecryptionService` legacy-returning facades internally
-  call detailed engine APIs, then fold results back to `SignatureVerification`.
+- `SigningService` and `DecryptionService` expose detailed verification/decrypt
+  service APIs as the primary app surface. Former legacy-returning facades were
+  removed in PR 3C.
 - `SelfTestService` now calls detailed engine decrypt/verify APIs for
   production self-test diagnostics, so the app has no direct production call
   sites for the simple engine verification/decrypt APIs.
 - `PasswordMessageService` is not a simple verification API, but it currently
-  exposes both the additive detailed decrypt outcome and the legacy folded
-  `SignatureVerification` outcome. Review the folded outcome with the other
-  app-level legacy result surfaces in PR 3C.
+  exposes only the detailed decrypt outcome at the Swift service boundary. The
+  former folded `SignatureVerification` outcome was removed with PR 3C.
 - `SignatureVerification` may remain only as an internal presentation/status
   helper for detailed UI rendering. Do not treat it as a public compatibility
   contract to preserve.
@@ -249,8 +249,8 @@ Recommended PRs:
   records used only by the simple surface, Swift service facades that expose
   `SignatureVerification` as the primary result, app callbacks that carry only
   folded verification, the legacy password-message folded outcome, and tests
-  whose only purpose is legacy bridge or folded summary equivalence. This is the
-  next Phase 3 PR and is not included in the first Phase 3 PR.
+  whose only purpose is legacy bridge or folded summary equivalence.
+  Status: completed in the PR 3C legacy surface deletion PR.
 
 PR 3B must complete these explicit migration gates before PR 3C deletes the
 legacy surface:
@@ -288,6 +288,12 @@ Exit conditions:
   `engine.verifyCleartext`, `engine.verifyDetached`, and
   `engine.verifyDetachedFile`, excluding unrelated password-decrypt and
   certificate-signature APIs.
+- Rust/UniFFI no longer exports simple `decrypt`, `decrypt_file`,
+  `verify_cleartext`, `verify_detached`, or `verify_detached_file` APIs, and
+  generated Swift bindings no longer expose their simple result records or
+  methods.
+- Swift service, callback, and tutorial artifact surfaces no longer use
+  `SignatureVerification` as the primary verification/decrypt result.
 - Valuable signing, decryption, streaming, GnuPG, Device MIE, password-message,
   self-test, and auth-boundary scenarios exist through detailed APIs.
 - No tests remain solely to preserve legacy folded-summary or bridge
@@ -523,10 +529,12 @@ Known surfaces that require this gate:
 - recipient-fingerprint encryption overloads
 - route/tutorial fingerprint preselection fallback (completed in PR 2F)
 - non-detailed `SignatureVerification` returning Swift service or callback APIs
+  (completed in PR 3C; `SignatureVerification` remains only as an internal
+  presentation helper)
 - simple Rust/UniFFI verification and decrypt APIs that expose folded
-  compatibility results
+  compatibility results (completed in PR 3C)
 - app-level password-message result surfaces that fold detailed decrypt results
-  into `SignatureVerification`
+  into `SignatureVerification` (completed in PR 3C)
 - raw first-match User ID FFI exports
 - Contacts legacy flat-runtime APIs, `.keyUpdateDetected`, and legacy contact ID
   projection
