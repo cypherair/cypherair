@@ -295,19 +295,9 @@ RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_dearmor(uint64_t ptr, RustBuffe
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_decode_qr_url(uint64_t ptr, RustBuffer url, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT
-#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT
-RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_decrypt(uint64_t ptr, RustBuffer ciphertext, RustBuffer secret_keys, RustBuffer verification_keys, RustCallStatus *_Nonnull out_status
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT_DETAILED
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_decrypt_detailed(uint64_t ptr, RustBuffer ciphertext, RustBuffer secret_keys, RustBuffer verification_keys, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT_FILE
-#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT_FILE
-RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file(uint64_t ptr, RustBuffer input_path, RustBuffer output_path, RustBuffer secret_keys, RustBuffer verification_keys, RustBuffer progress, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_DECRYPT_FILE_DETAILED
@@ -470,29 +460,14 @@ RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_sign_detached_file(uint64_t ptr
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_validate_public_certificate(uint64_t ptr, RustBuffer cert_data, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_CLEARTEXT
-#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_CLEARTEXT
-RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_verify_cleartext(uint64_t ptr, RustBuffer signed_message, RustBuffer verification_keys, RustCallStatus *_Nonnull out_status
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_CLEARTEXT_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_CLEARTEXT_DETAILED
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_verify_cleartext_detailed(uint64_t ptr, RustBuffer signed_message, RustBuffer verification_keys, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED
-#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED
-RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_verify_detached(uint64_t ptr, RustBuffer data, RustBuffer signature, RustBuffer verification_keys, RustCallStatus *_Nonnull out_status
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED_DETAILED
 RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_verify_detached_detailed(uint64_t ptr, RustBuffer data, RustBuffer signature, RustBuffer verification_keys, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED_FILE
-#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED_FILE
-RustBuffer uniffi_pgp_mobile_fn_method_pgpengine_verify_detached_file(uint64_t ptr, RustBuffer data_path, RustBuffer signature, RustBuffer verification_keys, RustBuffer progress, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_VERIFY_DETACHED_FILE_DETAILED
@@ -819,21 +794,9 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decode_qr_url(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT
-#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT
-uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decrypt(void
-    
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_DETAILED
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_FILE
-#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_FILE
-uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file(void
     
 );
 #endif
@@ -1029,33 +992,15 @@ uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_validate_public_certificate
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_CLEARTEXT
-#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_CLEARTEXT
-uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext(void
-    
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_CLEARTEXT_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_CLEARTEXT_DETAILED
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext_detailed(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED
-#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED
-uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached(void
-    
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED_DETAILED
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_detailed(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED_FILE
-#define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED_FILE
-uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file(void
     
 );
 #endif

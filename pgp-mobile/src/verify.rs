@@ -9,17 +9,6 @@ use crate::signature_details::{
     state_from_legacy_status, LegacyFoldMode, SignatureCollector, VerifyDetailedResult,
 };
 
-/// Result of signature verification.
-#[derive(uniffi::Record)]
-pub struct VerifyResult {
-    /// Signature verification status.
-    pub status: SignatureStatus,
-    /// Fingerprint of the signer key, if known.
-    pub signer_fingerprint: Option<String>,
-    /// The signed content (for cleartext-signed messages).
-    pub content: Option<Vec<u8>>,
-}
-
 fn empty_detailed_result(status: SignatureStatus) -> VerifyDetailedResult {
     VerifyDetailedResult {
         legacy_status: status.clone(),
@@ -29,20 +18,6 @@ fn empty_detailed_result(status: SignatureStatus) -> VerifyDetailedResult {
         signatures: Vec::new(),
         content: None,
     }
-}
-
-/// Verify a cleartext-signed message.
-/// Returns the message content and verification result.
-pub fn verify_cleartext(
-    signed_message: &[u8],
-    verification_keys: &[Vec<u8>],
-) -> Result<VerifyResult, PgpError> {
-    let detailed = verify_cleartext_detailed(signed_message, verification_keys)?;
-    Ok(VerifyResult {
-        status: detailed.legacy_status,
-        signer_fingerprint: detailed.legacy_signer_fingerprint,
-        content: detailed.content,
-    })
 }
 
 /// Verify a cleartext-signed message and preserve detailed per-signature results.
@@ -90,20 +65,6 @@ pub fn verify_cleartext_detailed(
         summary_entry_index,
         signatures,
         content: Some(content),
-    })
-}
-
-/// Verify a detached signature against data.
-pub fn verify_detached(
-    data: &[u8],
-    signature: &[u8],
-    verification_keys: &[Vec<u8>],
-) -> Result<VerifyResult, PgpError> {
-    let detailed = verify_detached_detailed(data, signature, verification_keys)?;
-    Ok(VerifyResult {
-        status: detailed.legacy_status,
-        signer_fingerprint: detailed.legacy_signer_fingerprint,
-        content: None,
     })
 }
 

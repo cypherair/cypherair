@@ -123,12 +123,6 @@ impl SignatureCollector {
         }
     }
 
-    pub(crate) fn legacy_status(&self) -> SignatureStatus {
-        self.legacy_status
-            .clone()
-            .unwrap_or(SignatureStatus::NotSigned)
-    }
-
     pub(crate) fn legacy_signer_fingerprint(&self) -> Option<String> {
         self.legacy_signer_fingerprint.clone()
     }
@@ -357,7 +351,13 @@ mod tests {
         collector.observe_synthetic(DetailedSignatureStatus::UnknownSigner, None);
         collector.observe_synthetic(DetailedSignatureStatus::Bad, Some("signer-b"));
 
-        assert_eq!(collector.legacy_status(), SignatureStatus::Valid);
+        assert_eq!(
+            collector
+                .legacy_status
+                .clone()
+                .unwrap_or(SignatureStatus::NotSigned),
+            SignatureStatus::Valid
+        );
         assert_eq!(
             collector.summary_state(),
             SignatureVerificationState::Verified
@@ -388,7 +388,13 @@ mod tests {
         collector.observe_synthetic(DetailedSignatureStatus::Expired, Some("expired-fp"));
         collector.observe_synthetic(DetailedSignatureStatus::Bad, Some("bad-fp"));
 
-        assert_eq!(collector.legacy_status(), SignatureStatus::Bad);
+        assert_eq!(
+            collector
+                .legacy_status
+                .clone()
+                .unwrap_or(SignatureStatus::NotSigned),
+            SignatureStatus::Bad
+        );
         assert_eq!(
             collector.summary_state(),
             SignatureVerificationState::Invalid
@@ -407,7 +413,13 @@ mod tests {
         collector.observe_synthetic(DetailedSignatureStatus::Expired, Some("expired-fp"));
         collector.observe_synthetic(DetailedSignatureStatus::UnknownSigner, None);
 
-        assert_eq!(collector.legacy_status(), SignatureStatus::UnknownSigner);
+        assert_eq!(
+            collector
+                .legacy_status
+                .clone()
+                .unwrap_or(SignatureStatus::NotSigned),
+            SignatureStatus::UnknownSigner
+        );
         assert_eq!(
             collector.summary_state(),
             SignatureVerificationState::SignerCertificateUnavailable
@@ -440,7 +452,13 @@ mod tests {
     #[test]
     fn no_observed_signatures_defaults_to_not_signed() {
         let collector = SignatureCollector::new(LegacyFoldMode::DecryptLike);
-        assert_eq!(collector.legacy_status(), SignatureStatus::NotSigned);
+        assert_eq!(
+            collector
+                .legacy_status
+                .clone()
+                .unwrap_or(SignatureStatus::NotSigned),
+            SignatureStatus::NotSigned
+        );
         assert_eq!(
             collector.summary_state(),
             SignatureVerificationState::NotSigned

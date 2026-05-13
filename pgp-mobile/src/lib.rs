@@ -25,7 +25,6 @@ use zeroize::Zeroizing;
 
 use crate::armor::ArmorKind;
 use crate::cert_signature::{CertificateSignatureResult, CertificationKind};
-use crate::decrypt::DecryptResult;
 use crate::error::PgpError;
 use crate::keys::{
     CertificateMergeResult, DiscoveredCertificateSelectors, GeneratedKey, KeyInfo, KeyProfile,
@@ -36,8 +35,6 @@ use crate::signature_details::{
     DecryptDetailedResult, FileDecryptDetailedResult, FileVerifyDetailedResult,
     VerifyDetailedResult,
 };
-use crate::streaming::FileDecryptResult;
-use crate::verify::VerifyResult;
 
 uniffi::setup_scaffolding!();
 
@@ -241,19 +238,6 @@ impl PgpEngine {
         decrypt::match_recipients(&ciphertext, &local_certs)
     }
 
-    /// Decrypt a message (Phase 2 — requires authenticated key access).
-    /// Handles both SEIPDv1 and SEIPDv2. AEAD/MDC failure → hard-fail.
-    pub fn decrypt(
-        &self,
-        ciphertext: Vec<u8>,
-        secret_keys: Vec<Vec<u8>>,
-        verification_keys: Vec<Vec<u8>>,
-    ) -> Result<DecryptResult, PgpError> {
-        let secret_keys: Vec<Zeroizing<Vec<u8>>> =
-            secret_keys.into_iter().map(Zeroizing::new).collect();
-        decrypt::decrypt(&ciphertext, &secret_keys, &verification_keys)
-    }
-
     /// Decrypt a message and preserve per-signature detailed results.
     pub fn decrypt_detailed(
         &self,
@@ -293,15 +277,6 @@ impl PgpEngine {
 
     // ── Verification ────────────────────────────────────────────────
 
-    /// Verify a cleartext-signed message.
-    pub fn verify_cleartext(
-        &self,
-        signed_message: Vec<u8>,
-        verification_keys: Vec<Vec<u8>>,
-    ) -> Result<VerifyResult, PgpError> {
-        verify::verify_cleartext(&signed_message, &verification_keys)
-    }
-
     /// Verify a cleartext-signed message and preserve per-signature detailed results.
     pub fn verify_cleartext_detailed(
         &self,
@@ -309,16 +284,6 @@ impl PgpEngine {
         verification_keys: Vec<Vec<u8>>,
     ) -> Result<VerifyDetailedResult, PgpError> {
         verify::verify_cleartext_detailed(&signed_message, &verification_keys)
-    }
-
-    /// Verify a detached signature.
-    pub fn verify_detached(
-        &self,
-        data: Vec<u8>,
-        signature: Vec<u8>,
-        verification_keys: Vec<Vec<u8>>,
-    ) -> Result<VerifyResult, PgpError> {
-        verify::verify_detached(&data, &signature, &verification_keys)
     }
 
     /// Verify a detached signature and preserve per-signature detailed results.
@@ -539,27 +504,6 @@ impl PgpEngine {
         )
     }
 
-    /// Decrypt a file using streaming I/O. Phase 2 — requires authenticated key access.
-    /// Handles both SEIPDv1 and SEIPDv2. AEAD/MDC failure → hard-fail (no partial output).
-    pub fn decrypt_file(
-        &self,
-        input_path: String,
-        output_path: String,
-        secret_keys: Vec<Vec<u8>>,
-        verification_keys: Vec<Vec<u8>>,
-        progress: Option<Arc<dyn streaming::ProgressReporter>>,
-    ) -> Result<FileDecryptResult, PgpError> {
-        let secret_keys: Vec<Zeroizing<Vec<u8>>> =
-            secret_keys.into_iter().map(Zeroizing::new).collect();
-        streaming::decrypt_file(
-            &input_path,
-            &output_path,
-            &secret_keys,
-            &verification_keys,
-            progress,
-        )
-    }
-
     /// Decrypt a file using streaming I/O and preserve per-signature detailed results.
     pub fn decrypt_file_detailed(
         &self,
@@ -590,17 +534,6 @@ impl PgpEngine {
     ) -> Result<Vec<u8>, PgpError> {
         let signer_cert = Zeroizing::new(signer_cert);
         streaming::sign_detached_file(&input_path, &signer_cert, progress)
-    }
-
-    /// Verify a detached signature against a file using streaming I/O.
-    pub fn verify_detached_file(
-        &self,
-        data_path: String,
-        signature: Vec<u8>,
-        verification_keys: Vec<Vec<u8>>,
-        progress: Option<Arc<dyn streaming::ProgressReporter>>,
-    ) -> Result<VerifyResult, PgpError> {
-        streaming::verify_detached_file(&data_path, &signature, &verification_keys, progress)
     }
 
     /// Verify a detached file signature using streaming I/O and preserve per-signature details.
