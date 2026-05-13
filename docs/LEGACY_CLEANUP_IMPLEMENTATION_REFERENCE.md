@@ -118,22 +118,33 @@ Recommended PRs:
   check. As of the 2026-05-13 review, these helpers had no production callers.
   Do not remove `legacyPublicKeysForRecipientFingerprints(_:)` or the
   fingerprint recipient compatibility layer in this PR.
-- PR 1B, arm64e experiment script decision: either retain
-  `scripts/experiments/*` as explicit historical diagnostics, archive it out of
-  active script paths, or delete it after maintainers confirm the diagnostics are
-  no longer useful. If script posture changes, update
+  Status: completed in Phase 1A after a final caller check; only the no-caller
+  helpers were removed.
+- PR 1B, arm64e experiment script deletion: delete the tracked
+  `scripts/experiments/*` diagnostics after maintainers confirm they are no
+  longer useful and archival migration is not required. Update
   [ARM64E_STATUS](ARM64E_STATUS.md) in the same PR.
+  Status: completed in Phase 1B by deleting the tracked experiment directory and
+  updating [ARM64E_STATUS](ARM64E_STATUS.md).
 
 Entry conditions:
 
 - Focused `rg` checks confirm the target helpers or scripts are not required by
   current production paths.
-- The PR scope is limited to Contacts helpers or script/docs cleanup, not both.
+- Keep Contacts helper cleanup and script/docs cleanup separated by PR unless a
+  maintainer explicitly chooses one PR with separate commits. The Phase 1
+  implementation used one PR with separate PR1A and PR1B commits.
 
 Exit conditions:
 
 - No current call sites reference the removed Contacts helpers.
-- The historical script posture is explicit and no longer ambiguous.
+- The historical script posture is explicit and no longer ambiguous: the
+  tracked `scripts/experiments/` directory has been deleted, and
+  `./build-xcframework.sh --release` remains the only app-side arm64e build
+  entrypoint.
+- Phase 1A leaves `legacyPublicKeysForRecipientFingerprints(_:)`,
+  `publicKeysForRecipientContactIDs(_:)`, and the broader fingerprint-recipient
+  compatibility layer in place for Phase 2.
 
 Validation:
 

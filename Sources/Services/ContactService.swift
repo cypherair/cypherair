@@ -802,39 +802,6 @@ final class ContactService: @unchecked Sendable {
         return contacts.first { $0.fingerprint == fingerprint }
     }
 
-    /// Find contacts whose fingerprints match the given key IDs.
-    /// Key IDs may be short (last 16 hex chars) or full fingerprints.
-    ///
-    /// WARNING: This method uses suffix/equality matching which does NOT work
-    /// for PKESK subkey IDs (which differ from primary fingerprints). For
-    /// matching ciphertext recipients against contacts, use PgpEngine.matchRecipients()
-    /// instead, which performs correct subkey-to-certificate resolution via Sequoia.
-    /// This method currently has zero callers and is retained for potential future use
-    /// with pre-resolved primary fingerprints only.
-    func availableContacts(matchingKeyIds keyIds: [String]) -> [Contact] {
-        guard contactsAvailability.isAvailable else {
-            return []
-        }
-
-        return contacts.filter { contact in
-            keyIds.contains { keyId in
-                contact.fingerprint.hasSuffix(keyId.lowercased()) ||
-                contact.fingerprint == keyId.lowercased()
-            }
-        }
-    }
-
-    /// Get public key data for a list of contacts.
-    func publicKeys(for selectedContacts: [Contact]) throws -> [Data] {
-        try requireContactsAvailable()
-        return selectedContacts.map { $0.publicKeyData }
-    }
-
-    @available(*, deprecated, message: "Use contact ID recipient APIs; this remains only for legacy compatibility.")
-    func publicKeysForRecipientFingerprints(_ recipientFingerprints: [String]) throws -> [Data] {
-        try legacyPublicKeysForRecipientFingerprints(recipientFingerprints)
-    }
-
     func legacyPublicKeysForRecipientFingerprints(_ recipientFingerprints: [String]) throws -> [Data] {
         try requireContactsAvailable()
         return try recipientResolver.legacyPublicKeysForRecipientFingerprints(
