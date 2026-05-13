@@ -21,8 +21,8 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
 
         XCTAssertEqual(notices.first?.kind, .app)
         XCTAssertTrue(notices.contains { $0.id == "cypherair" })
-        XCTAssertTrue(notices.contains { $0.id == "sequoia-openpgp@2.2.0" })
-        XCTAssertTrue(notices.contains { $0.id == "sequoia-openpgp@2.2.0" && $0.isDirectDependency })
+        XCTAssertTrue(notices.contains { $0.id == "sequoia-openpgp@2.3.0" })
+        XCTAssertTrue(notices.contains { $0.id == "sequoia-openpgp@2.3.0" && $0.isDirectDependency })
     }
 
     func test_loadLicenseText_everyNoticeHasReadableText() throws {
@@ -80,26 +80,25 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         XCTAssertEqual(thirdPartyNames, sortedNames)
     }
 
-    func test_manifest_excludesTestOnlyDependencies() throws {
+    func test_manifest_excludesTestOnlyAndNonAppleTargetDependencies() throws {
         let notices = try store.loadNotices()
         let ids = Set(notices.map(\.id))
 
         XCTAssertFalse(ids.contains("rand@0.8.5"))
+        XCTAssertFalse(ids.contains("r-efi@6.0.0"))
+        XCTAssertFalse(ids.contains { $0.hasPrefix("wasm-bindgen@") })
+        XCTAssertFalse(ids.contains { $0.hasPrefix("windows-sys@") })
         XCTAssertTrue(ids.contains("tempfile@3.27.0"))
     }
 
     func test_noticeSources_captureFallbackAndArchiveOrigins() throws {
         let notices = try store.loadNotices()
 
-        let rEfi = try XCTUnwrap(notices.first { $0.id == "r-efi@6.0.0" })
-        XCTAssertEqual(rEfi.licenseSourceKind, .spdxFallback)
-        XCTAssertTrue(rEfi.licenseSourceItems.contains { $0.contains("LGPL-2.1") })
-
         let uniffi = try XCTUnwrap(notices.first { $0.id == "uniffi@0.31.1" })
         XCTAssertEqual(uniffi.licenseSourceKind, .repositoryArchive)
         XCTAssertTrue(uniffi.licenseSourceItems.contains("v0.31.1:LICENSE"))
 
-        let sequoia = try XCTUnwrap(notices.first { $0.id == "sequoia-openpgp@2.2.0" })
+        let sequoia = try XCTUnwrap(notices.first { $0.id == "sequoia-openpgp@2.3.0" })
         XCTAssertEqual(sequoia.licenseSourceKind, .cratePackage)
         XCTAssertTrue(sequoia.licenseSourceItems.contains("LICENSE.txt"))
     }
