@@ -356,6 +356,13 @@ Goal: make migration and compatibility ownership explicit without deleting
 old-install protection. This phase is behavior-preserving extraction and
 isolation only.
 
+This phase also prepares the codebase for later large-file decomposition and
+current-path refactors. Several retained migration, recovery, and cleanup paths
+cannot be deleted yet, but keeping them embedded in primary service/store files
+makes those later refactors harder to review safely. Phase 5 isolates those
+retained responsibilities behind focused owners first, while preserving
+behavior.
+
 Recommended PRs:
 
 - PR 5A, Contacts migration boundary: isolate legacy runtime loading,
