@@ -181,11 +181,12 @@ final class TutorialSessionStoreTests: XCTestCase {
             return XCTFail("Expected Bob contact to be added")
         }
         store.noteBobImported(contact)
+        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: contact.fingerprint))
         XCTAssertTrue(store.isCompleted(.addDemoContact))
 
         let ciphertext = try await container.encryptionService.encryptText(
             "Hello Bob from the guided tutorial",
-            recipientFingerprints: [contact.fingerprint],
+            recipientContactIds: [contactId],
             signWithFingerprint: alice.fingerprint,
             encryptToSelf: false
         )
@@ -544,10 +545,11 @@ final class TutorialSessionStoreTests: XCTestCase {
             return XCTFail("Expected Bob contact to be added")
         }
         store.noteBobImported(contact)
+        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: contact.fingerprint))
 
         let ciphertext = try await container.encryptionService.encryptText(
             "Hello Bob from the guided tutorial",
-            recipientFingerprints: [contact.fingerprint],
+            recipientContactIds: [contactId],
             signWithFingerprint: alice.fingerprint,
             encryptToSelf: false
         )
