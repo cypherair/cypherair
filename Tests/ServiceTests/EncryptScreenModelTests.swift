@@ -94,7 +94,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
         var configuration = EncryptView.Configuration()
         configuration.prefilledPlaintext = "Prefilled message"
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        configuration.initialRecipientContactIds = [recipientContactId]
         configuration.signingPolicy = .initial(false)
         configuration.encryptToSelfPolicy = .initial(true)
 
@@ -148,7 +148,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
         var configuration = EncryptView.Configuration()
         configuration.prefilledPlaintext = "Prefilled message"
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        configuration.initialRecipientContactIds = [recipientContactId]
         configuration.initialSignerFingerprint = signerIdentity.fingerprint
         configuration.signingPolicy = .initial(false)
         configuration.encryptToSelfPolicy = .initial(true)
@@ -178,7 +178,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
         var activeConfiguration = EncryptView.Configuration()
         activeConfiguration.prefilledPlaintext = "Prefilled message"
-        activeConfiguration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        activeConfiguration.initialRecipientContactIds = [recipientContactId]
 
         model.updateConfiguration(activeConfiguration)
 
@@ -189,23 +189,6 @@ final class EncryptScreenModelTests: XCTestCase {
 
         XCTAssertEqual(model.plaintext, "User edited plaintext")
         XCTAssertTrue(model.selectedRecipients.isEmpty)
-    }
-
-    @MainActor
-    func test_initialRecipientContactIdsTakePrecedenceOverCompatibilityFingerprints() async throws {
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
-            service: stack.keyManagement,
-            name: "Recipient"
-        )
-        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
-        let model = makeModel()
-        var configuration = EncryptView.Configuration()
-        configuration.initialRecipientContactIds = [recipientContactId]
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
-
-        model.updateConfiguration(configuration)
-
-        XCTAssertEqual(model.selectedRecipients, [recipientContactId])
     }
 
     @MainActor
@@ -226,36 +209,7 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_handleAppear_ignoresStaleInitialRecipientFingerprints() async throws {
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
-            service: stack.keyManagement,
-            name: "Stale Recipient"
-        )
-
-        var configuration = EncryptView.Configuration()
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
-
-        let model = makeModel(configuration: configuration)
-        model.handleAppear()
-
-        XCTAssertTrue(model.selectedRecipients.isEmpty)
-    }
-
-    @MainActor
-    func test_updateConfiguration_clearsSelectionForStaleCompatibilityFingerprint() {
-        let model = makeModel()
-        model.selectedRecipients = ["manual-recipient"]
-
-        var configuration = EncryptView.Configuration()
-        configuration.initialRecipientFingerprints = ["stale-fingerprint"]
-
-        model.updateConfiguration(configuration)
-
-        XCTAssertTrue(model.selectedRecipients.isEmpty)
-    }
-
-    @MainActor
-    func test_contactsAvailabilityChange_restoresPendingCompatibilityFingerprint() async throws {
+    func test_handleAppear_preservesInitialContactIdsWhenContactsAreLocked() async throws {
         let recipientIdentity = try await TestHelpers.generateProfileBKey(
             service: stack.keyManagement,
             name: "Delayed Recipient"
@@ -264,82 +218,15 @@ final class EncryptScreenModelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: delayed.directory) }
 
         var configuration = EncryptView.Configuration()
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        configuration.initialRecipientContactIds = [delayed.contactId]
         let model = makeModel(
             contactService: delayed.service,
             configuration: configuration
         )
 
         model.handleAppear()
-
-        XCTAssertTrue(model.selectedRecipients.isEmpty)
-
-        let previousAvailability = delayed.service.contactsAvailability
-        let currentAvailability = try delayed.service.openLegacyCompatibilityForTests()
-        model.handleContactsAvailabilityChange(
-            from: previousAvailability,
-            to: currentAvailability
-        )
 
         XCTAssertEqual(model.selectedRecipients, [delayed.contactId])
-    }
-
-    @MainActor
-    func test_configurationDefaultClearsPendingCompatibilityFingerprintBeforeContactsBecomeAvailable() async throws {
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
-            service: stack.keyManagement,
-            name: "Cleared Delayed Recipient"
-        )
-        let delayed = try makeLockedLegacyContactServiceSeeded(with: recipientIdentity)
-        defer { try? FileManager.default.removeItem(at: delayed.directory) }
-
-        var configuration = EncryptView.Configuration()
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
-        let model = makeModel(
-            contactService: delayed.service,
-            configuration: configuration
-        )
-
-        model.handleAppear()
-        model.updateConfiguration(.default)
-
-        let previousAvailability = delayed.service.contactsAvailability
-        let currentAvailability = try delayed.service.openLegacyCompatibilityForTests()
-        model.handleContactsAvailabilityChange(
-            from: previousAvailability,
-            to: currentAvailability
-        )
-
-        XCTAssertTrue(model.selectedRecipients.isEmpty)
-    }
-
-    @MainActor
-    func test_delayedCompatibilityFingerprintResolutionAppendsToManualSelection() async throws {
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
-            service: stack.keyManagement,
-            name: "Union Delayed Recipient"
-        )
-        let delayed = try makeLockedLegacyContactServiceSeeded(with: recipientIdentity)
-        defer { try? FileManager.default.removeItem(at: delayed.directory) }
-
-        var configuration = EncryptView.Configuration()
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
-        let model = makeModel(
-            contactService: delayed.service,
-            configuration: configuration
-        )
-        model.selectedRecipients = ["manual-recipient"]
-
-        model.handleAppear()
-
-        let previousAvailability = delayed.service.contactsAvailability
-        let currentAvailability = try delayed.service.openLegacyCompatibilityForTests()
-        model.handleContactsAvailabilityChange(
-            from: previousAvailability,
-            to: currentAvailability
-        )
-
-        XCTAssertEqual(model.selectedRecipients, ["manual-recipient", delayed.contactId])
     }
 
     @MainActor
@@ -400,11 +287,14 @@ final class EncryptScreenModelTests: XCTestCase {
             publicKeyData: recipientIdentity.publicKeyData,
             verificationState: .unverified
         )
+        let recipientContactId = try XCTUnwrap(
+            stack.contactService.contactId(forFingerprint: recipientIdentity.fingerprint)
+        )
 
         var encryptCount = 0
         var callbackCiphertext: Data?
         var configuration = EncryptView.Configuration()
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        configuration.initialRecipientContactIds = [recipientContactId]
         configuration.onEncrypted = { callbackCiphertext = $0 }
 
         let model = makeModel(
@@ -754,13 +644,13 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Verified Recipient"
         )
-        try stack.contactService.addContact(publicKeyData: recipientIdentity.publicKeyData)
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
 
         var interceptedClipboard: String?
         var interceptedExportFilename: String?
         var callbackCiphertext: Data?
         var configuration = EncryptView.Configuration()
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        configuration.initialRecipientContactIds = [recipientContactId]
         configuration.outputInterceptionPolicy = OutputInterceptionPolicy(
             interceptClipboardCopy: { string, _, kind in
                 XCTAssertEqual(kind, .ciphertext)
@@ -853,7 +743,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Recipient"
         )
-        try stack.contactService.addContact(publicKeyData: recipientIdentity.publicKeyData)
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
 
         let inputURL = try makeTemporaryFile(
             named: "message.txt",
@@ -871,7 +761,7 @@ final class EncryptScreenModelTests: XCTestCase {
         var interceptedURL: URL?
         var interceptedFilename: String?
         var configuration = EncryptView.Configuration()
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        configuration.initialRecipientContactIds = [recipientContactId]
         configuration.outputInterceptionPolicy = OutputInterceptionPolicy(
             interceptFileExport: { url, filename, kind in
                 XCTAssertEqual(kind, .ciphertext)
@@ -912,7 +802,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Recipient"
         )
-        try stack.contactService.addContact(publicKeyData: recipientIdentity.publicKeyData)
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
 
         let gate = EncryptOperationGate()
         let inputURL = try makeTemporaryFile(
@@ -922,7 +812,7 @@ final class EncryptScreenModelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
         var configuration = EncryptView.Configuration()
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        configuration.initialRecipientContactIds = [recipientContactId]
 
         let model = makeModel(
             configuration: configuration,
@@ -969,7 +859,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Recipient"
         )
-        try stack.contactService.addContact(publicKeyData: recipientIdentity.publicKeyData)
+        let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
         let operation = OperationController()
         let inputURL = try makeTemporaryFile(
             named: "cancel-after-success.txt",
@@ -985,7 +875,7 @@ final class EncryptScreenModelTests: XCTestCase {
         }
 
         var configuration = EncryptView.Configuration()
-        configuration.initialRecipientFingerprints = [recipientIdentity.fingerprint]
+        configuration.initialRecipientContactIds = [recipientContactId]
         let model = makeModel(
             configuration: configuration,
             operation: operation,

@@ -1039,15 +1039,13 @@ final class ContactServiceTests: XCTestCase {
     func test_pr5ProductionRecipientResolutionUsesContactIdsOutsideCompatibilitySeams() throws {
         let sourcesRoot = try RepositoryAuditLoader.sourcesRootURL()
         let allowedRelativePaths: Set<String> = [
-            "App/Encrypt/EncryptScreenModel.swift",
-            "App/Encrypt/EncryptView.swift",
-            "App/Onboarding/Tutorial/TutorialConfigurationFactory.swift",
             "Services/ContactRecipientResolver.swift",
             "Services/ContactService.swift",
             "Services/EncryptionService.swift",
         ]
+        let fingerprintRecipientParameterPattern = "recipient" + #"Fingerprints\s*:"#
         let forbiddenPatterns: [(label: String, regex: String)] = [
-            ("fingerprint recipient parameter", #"recipientFingerprints\s*:"#),
+            ("fingerprint recipient parameter", fingerprintRecipientParameterPattern),
             ("fingerprint recipient resolver", #"publicKeysForRecipientFingerprints\s*\("#),
             ("legacy fingerprint recipient resolver", #"legacyPublicKeysForRecipientFingerprints\s*\("#),
         ]

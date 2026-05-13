@@ -36,7 +36,6 @@ struct EncryptView: View {
 
         var prefilledPlaintext: String?
         var initialRecipientContactIds: [String] = []
-        var initialRecipientFingerprints: [String] = []
         var initialSignerFingerprint: String?
         var signingPolicy: TogglePolicy = .initial(true)
         var encryptToSelfPolicy: TogglePolicy = .appDefault
@@ -54,7 +53,6 @@ struct EncryptView: View {
     struct RuntimeSyncKey: Equatable {
         let prefilledPlaintext: String?
         let initialRecipientContactIds: [String]
-        let initialRecipientFingerprints: [String]
         let initialSignerFingerprint: String?
         let signingPolicy: Configuration.TogglePolicy
         let encryptToSelfPolicy: Configuration.TogglePolicy
@@ -73,7 +71,6 @@ struct EncryptView: View {
             // participate in runtime host-to-model sync.
             prefilledPlaintext = configuration.prefilledPlaintext
             initialRecipientContactIds = configuration.initialRecipientContactIds
-            initialRecipientFingerprints = configuration.initialRecipientFingerprints
             initialSignerFingerprint = configuration.initialSignerFingerprint
             signingPolicy = configuration.signingPolicy
             encryptToSelfPolicy = configuration.encryptToSelfPolicy
