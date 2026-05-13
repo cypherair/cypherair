@@ -1,6 +1,6 @@
 # CypherAir Apple arm64e Status
 
-Snapshot date: 2026-05-12
+Snapshot date: 2026-05-13
 
 ## Repo Identity
 
@@ -18,6 +18,9 @@ Snapshot date: 2026-05-12
 - CypherAir's app-side Apple `arm64e` support is present on `main`.
 - `./build-xcframework.sh --release` is the official app-side build entrypoint.
   It delegates to `scripts/build_apple_arm64e_xcframework.sh`.
+- Historical experiment scripts under `scripts/experiments/` were removed during
+  Phase 1 legacy cleanup. The repo no longer carries a parallel experiment
+  build entrypoint or local arm64e repro helper scripts.
 - iOS, macOS, and visionOS device artifacts are packaged as dual
   `arm64` + `arm64e` slices because Apple distribution requires `arm64` whenever
   a shipped app bundle contains `arm64e`.
@@ -116,6 +119,8 @@ Snapshot date: 2026-05-12
 - `cypherair/cypherair`:
   - PR, nightly, edge, and stable workflows call the official arm64e
     `./build-xcframework.sh --release` path
+  - no active workflow or script path depends on the removed
+    `scripts/experiments/` diagnostics
   - ordinary Rust validation and release metadata use explicit `+stable`
     commands; arm64e never depends on a repo-wide rustup override
   - hosted Rust and XCFramework workflows deliberately avoid Cargo cache
