@@ -19,7 +19,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         super.tearDown()
     }
 
-    func test_verifyCleartextDetailed_fixtureMultiSigner_preservesEntriesAndLegacyBridge()
+    func test_verifyCleartextDetailed_fixtureMultiSigner_preservesDetailedEntries()
         async throws
     {
         let signerA = try loadFixture("ffi_detailed_signer_a")
@@ -32,9 +32,8 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         try addContact(signerB)
 
         let detailed = try await stack.signingService.verifyCleartextDetailed(signedMessage)
-        let legacy = try await stack.signingService.verifyCleartext(signedMessage)
 
-        XCTAssertEqual(detailed.text, legacy.text)
+        XCTAssertNotNil(detailed.text)
         XCTAssertEqual(detailed.verification.signatures.count, 2)
         XCTAssertEqual(detailed.verification.signatures[0].status, .valid)
         XCTAssertEqual(detailed.verification.signatures[1].status, .valid)
@@ -48,13 +47,9 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         )
         XCTAssertEqual(detailed.verification.signatures[0].signerIdentity?.source, .contact)
         XCTAssertEqual(detailed.verification.signatures[1].signerIdentity?.source, .contact)
-        assertLegacyVerificationEquivalent(
-            detailed.verification.legacyVerification,
-            legacy.verification
-        )
     }
 
-    func test_verifyDetachedDetailed_fixtureKnownPlusUnknown_preservesUnknownAndLegacyBridge()
+    func test_verifyDetachedDetailed_fixtureKnownPlusUnknown_preservesUnknownAndKnownEntries()
         async throws
     {
         let signerA = try loadFixture("ffi_detailed_signer_a")
@@ -65,10 +60,6 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         try addContact(signerA)
 
         let detailed = try await stack.signingService.verifyDetachedDetailed(
-            data: data,
-            signature: signature
-        )
-        let legacy = try await stack.signingService.verifyDetached(
             data: data,
             signature: signature
         )
@@ -86,10 +77,9 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             signerAInfo.fingerprint
         )
         XCTAssertEqual(detailed.signatures[1].signerIdentity?.source, .contact)
-        assertLegacyVerificationEquivalent(detailed.legacyVerification, legacy)
     }
 
-    func test_verifyDetachedDetailed_fixtureRepeatedSigner_preservesRepeatedEntriesAndLegacyBridge()
+    func test_verifyDetachedDetailed_fixtureRepeatedSigner_preservesRepeatedEntries()
         async throws
     {
         let signerA = try loadFixture("ffi_detailed_signer_a")
@@ -100,10 +90,6 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         try addContact(signerA)
 
         let detailed = try await stack.signingService.verifyDetachedDetailed(
-            data: data,
-            signature: signature
-        )
-        let legacy = try await stack.signingService.verifyDetached(
             data: data,
             signature: signature
         )
@@ -121,10 +107,9 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         )
         XCTAssertEqual(detailed.signatures[0].signerIdentity?.source, .contact)
         XCTAssertEqual(detailed.signatures[1].signerIdentity?.source, .contact)
-        assertLegacyVerificationEquivalent(detailed.legacyVerification, legacy)
     }
 
-    func test_verifyCleartextDetailed_generatedExpiredSigner_preservesExpiredAndLegacyBridge()
+    func test_verifyCleartextDetailed_generatedExpiredSigner_preservesExpiredEntry()
         async throws
     {
         let identity = try await stack.keyManagement.generateKey(
@@ -143,7 +128,6 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         try await Task.sleep(for: .seconds(2))
 
         let detailed = try await stack.signingService.verifyCleartextDetailed(signed)
-        let legacy = try await stack.signingService.verifyCleartext(signed)
 
         XCTAssertEqual(detailed.verification.legacyStatus, .expired)
         XCTAssertEqual(detailed.verification.signatures.count, 1)
@@ -152,13 +136,9 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             detailed.verification.signatures[0].signerPrimaryFingerprint,
             identity.fingerprint
         )
-        assertLegacyVerificationEquivalent(
-            detailed.verification.legacyVerification,
-            legacy.verification
-        )
     }
 
-    func test_verifyDetachedDetailed_fixtureExpiredUnknown_preservesVerifyFoldAndLegacyBridge()
+    func test_verifyDetachedDetailed_fixtureExpiredUnknown_preservesDetailedFold()
         async throws
     {
         let expiredSigner = try loadFixture("ffi_detailed_mixedfold_expired_signer")
@@ -169,10 +149,6 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         try addContact(expiredSigner)
 
         let detailed = try await stack.signingService.verifyDetachedDetailed(
-            data: data,
-            signature: signature
-        )
-        let legacy = try await stack.signingService.verifyDetached(
             data: data,
             signature: signature
         )
@@ -190,10 +166,9 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             expiredInfo.fingerprint
         )
         XCTAssertEqual(detailed.signatures[1].signerIdentity?.source, .contact)
-        assertLegacyVerificationEquivalent(detailed.legacyVerification, legacy)
     }
 
-    func test_verifyDetachedDetailed_fixtureExpiredBad_preservesVerifyFoldAndLegacyBridge()
+    func test_verifyDetachedDetailed_fixtureExpiredBad_preservesDetailedFold()
         async throws
     {
         let expiredSigner = try loadFixture("ffi_detailed_mixedfold_expired_signer")
@@ -209,10 +184,6 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             data: data,
             signature: signature
         )
-        let legacy = try await stack.signingService.verifyDetached(
-            data: data,
-            signature: signature
-        )
 
         XCTAssertEqual(detailed.legacyStatus, .expired)
         XCTAssertEqual(detailed.signatures.count, 2)
@@ -222,10 +193,9 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         XCTAssertEqual(detailed.signatures[1].status, .bad)
         XCTAssertNil(detailed.signatures[1].signerPrimaryFingerprint)
         XCTAssertNil(detailed.signatures[1].signerIdentity)
-        assertLegacyVerificationEquivalent(detailed.legacyVerification, legacy)
     }
 
-    func test_verifyDetachedStreamingDetailed_fixtureKnownPlusUnknown_matchesInMemoryAndLegacyBridge()
+    func test_verifyDetachedStreamingDetailed_fixtureKnownPlusUnknown_matchesInMemoryDetailed()
         async throws
     {
         let signerA = try loadFixture("ffi_detailed_signer_a")
@@ -248,16 +218,10 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             data: data,
             signature: signature
         )
-        let legacy = try await stack.signingService.verifyDetachedStreaming(
-            fileURL: fileURL,
-            signature: signature,
-            progress: nil
-        )
 
         XCTAssertEqual(detailed.signatures, inMemoryDetailed.signatures)
         XCTAssertEqual(detailed.legacyStatus, inMemoryDetailed.legacyStatus)
         XCTAssertEqual(detailed.legacySignerFingerprint, inMemoryDetailed.legacySignerFingerprint)
-        assertLegacyVerificationEquivalent(detailed.legacyVerification, legacy)
     }
 
     func test_verifyDetachedStreamingDetailed_cancellation_throwsOperationCancelled() async throws {
@@ -301,7 +265,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         }
     }
 
-    func test_verifyCleartextDetailed_profileBGenerated_matchesLegacyBridge() async throws {
+    func test_verifyCleartextDetailed_profileBGenerated_preservesDetailedEntry() async throws {
         let identity = try await stack.keyManagement.generateKey(
             name: "Detailed Profile B Signer",
             email: "detailed-b@example.com",
@@ -315,7 +279,6 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         )
 
         let detailed = try await stack.signingService.verifyCleartextDetailed(signed)
-        let legacy = try await stack.signingService.verifyCleartext(signed)
 
         XCTAssertEqual(detailed.verification.signatures.count, 1)
         XCTAssertEqual(detailed.verification.signatures[0].status, .valid)
@@ -325,13 +288,9 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             identity.fingerprint
         )
         XCTAssertEqual(detailed.verification.signatures[0].signerIdentity?.source, .ownKey)
-        assertLegacyVerificationEquivalent(
-            detailed.verification.legacyVerification,
-            legacy.verification
-        )
     }
 
-    func test_verifyDetachedDetailed_profileBGenerated_matchesLegacyBridge() async throws {
+    func test_verifyDetachedDetailed_profileBGenerated_preservesDetailedEntry() async throws {
         let identity = try await stack.keyManagement.generateKey(
             name: "Detailed Profile B Detached Signer",
             email: "detailed-b-detached@example.com",
@@ -349,15 +308,10 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             data: data,
             signature: signature
         )
-        let legacy = try await stack.signingService.verifyDetached(
-            data: data,
-            signature: signature
-        )
 
         XCTAssertEqual(detailed.signatures.count, 1)
         XCTAssertEqual(detailed.signatures[0].status, .valid)
         XCTAssertEqual(detailed.signatures[0].signerPrimaryFingerprint, identity.fingerprint)
-        assertLegacyVerificationEquivalent(detailed.legacyVerification, legacy)
     }
 
     private func loadFixture(_ name: String, ext: String = "gpg") throws -> Data {
@@ -375,15 +329,4 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         return url
     }
 
-    private func assertLegacyVerificationEquivalent(
-        _ actual: SignatureVerification,
-        _ expected: SignatureVerification,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertEqual(actual.status, expected.status, file: file, line: line)
-        XCTAssertEqual(actual.signerFingerprint, expected.signerFingerprint, file: file, line: line)
-        XCTAssertEqual(actual.signerContact, expected.signerContact, file: file, line: line)
-        XCTAssertEqual(actual.signerIdentity, expected.signerIdentity, file: file, line: line)
-    }
 }

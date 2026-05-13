@@ -77,17 +77,18 @@ final class PasswordMessageServiceTests: XCTestCase {
             signWithFingerprint: nil
         )
 
-        let outcome = try await stack.passwordMessageService.decryptMessage(
+        let outcome = try await stack.passwordMessageService.decryptMessageDetailed(
             ciphertext: ciphertext,
             password: "service-password-v1"
         )
 
-        guard case let .decrypted(plaintext, signature) = outcome else {
+        guard case let .decrypted(plaintext, verification) = outcome else {
             return XCTFail("Expected decrypted outcome")
         }
 
         XCTAssertEqual(String(data: plaintext, encoding: .utf8), "Service password message v1")
-        XCTAssertEqual(signature.status, .notSigned)
+        XCTAssertEqual(verification.legacyStatus, .notSigned)
+        XCTAssertTrue(verification.signatures.isEmpty)
     }
 
     func test_encryptText_seipdv2_withSignature_preservesSignature() async throws {
@@ -100,20 +101,20 @@ final class PasswordMessageServiceTests: XCTestCase {
             signWithFingerprint: signer.fingerprint
         )
 
-        let outcome = try await stack.passwordMessageService.decryptMessage(
+        let outcome = try await stack.passwordMessageService.decryptMessageDetailed(
             ciphertext: ciphertext,
             password: "service-password-v2"
         )
 
-        guard case let .decrypted(plaintext, signature) = outcome else {
+        guard case let .decrypted(plaintext, verification) = outcome else {
             return XCTFail("Expected decrypted outcome")
         }
 
         XCTAssertEqual(String(data: plaintext, encoding: .utf8), "Signed password service message")
-        XCTAssertEqual(signature.status, .valid)
-        XCTAssertEqual(signature.verificationState, .verified)
-        XCTAssertEqual(signature.signerFingerprint, signer.fingerprint)
-        XCTAssertEqual(signature.signerIdentity?.source, .contact)
+        XCTAssertEqual(verification.legacyStatus, .valid)
+        XCTAssertEqual(verification.summaryState, .verified)
+        XCTAssertEqual(verification.legacySignerFingerprint, signer.fingerprint)
+        XCTAssertEqual(verification.signatures.first?.signerIdentity?.source, .contact)
     }
 
     func test_decryptMessage_signedByUnknownSignerWithLockedContactsKeepsContextUnavailable()
@@ -135,12 +136,12 @@ final class PasswordMessageServiceTests: XCTestCase {
         )
 
         try await stack.contactService.relockProtectedData()
-        let outcome = try await stack.passwordMessageService.decryptMessage(
+        let outcome = try await stack.passwordMessageService.decryptMessageDetailed(
             ciphertext: ciphertext,
             password: "unknown-signer-password"
         )
 
-        guard case let .decrypted(plaintext, signature) = outcome else {
+        guard case let .decrypted(plaintext, verification) = outcome else {
             return XCTFail("Expected decrypted outcome")
         }
 
@@ -148,10 +149,10 @@ final class PasswordMessageServiceTests: XCTestCase {
             String(data: plaintext, encoding: .utf8),
             "Password message from unknown signer"
         )
-        XCTAssertEqual(signature.status, .unknownSigner)
-        XCTAssertEqual(signature.verificationState, .contactsContextUnavailable)
-        XCTAssertTrue(signature.requiresContactsContext)
-        XCTAssertEqual(signature.contactsUnavailableReason, .locked)
+        XCTAssertEqual(verification.legacyStatus, .unknownSigner)
+        XCTAssertEqual(verification.summaryState, .contactsContextUnavailable)
+        XCTAssertEqual(verification.contactsUnavailableReason, .locked)
+        XCTAssertEqual(verification.signatures.first?.verificationState, .contactsContextUnavailable)
     }
 
     func test_decryptMessage_noSkesk_returnsNoSkesk() async throws {
@@ -163,7 +164,7 @@ final class PasswordMessageServiceTests: XCTestCase {
             encryptToSelf: false
         )
 
-        let outcome = try await stack.passwordMessageService.decryptMessage(
+        let outcome = try await stack.passwordMessageService.decryptMessageDetailed(
             ciphertext: ciphertext,
             password: "irrelevant"
         )
@@ -181,7 +182,7 @@ final class PasswordMessageServiceTests: XCTestCase {
             signWithFingerprint: nil
         )
 
-        let outcome = try await stack.passwordMessageService.decryptMessage(
+        let outcome = try await stack.passwordMessageService.decryptMessageDetailed(
             ciphertext: ciphertext,
             password: "wrong-service-password"
         )
@@ -205,7 +206,7 @@ final class PasswordMessageServiceTests: XCTestCase {
         )
 
         do {
-            _ = try await stack.passwordMessageService.decryptMessage(
+            _ = try await stack.passwordMessageService.decryptMessageDetailed(
                 ciphertext: tampered,
                 password: "tamper-service-v1"
             )
@@ -233,7 +234,7 @@ final class PasswordMessageServiceTests: XCTestCase {
         )
 
         do {
-            _ = try await stack.passwordMessageService.decryptMessage(
+            _ = try await stack.passwordMessageService.decryptMessageDetailed(
                 ciphertext: tampered,
                 password: "tamper-service-v2"
             )

@@ -134,12 +134,12 @@ final class EncryptionServiceTests: XCTestCase {
         var secretKey = try await stack.keyManagement.unwrapPrivateKey(fingerprint: identity.fingerprint)
         defer { secretKey.resetBytes(in: 0..<secretKey.count) }
 
-        let result = try stack.engine.decrypt(
+        let result = try stack.engine.decryptDetailed(
             ciphertext: binary,
             secretKeys: [secretKey],
             verificationKeys: [identity.publicKeyData]
         )
-        XCTAssertEqual(result.signatureStatus, .valid)
+        XCTAssertEqual(result.legacyStatus, .valid)
     }
 
     // MARK: - Encrypt-to-Self
@@ -160,7 +160,7 @@ final class EncryptionServiceTests: XCTestCase {
         var senderSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
         defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
 
-        let result = try stack.engine.decrypt(
+        let result = try stack.engine.decryptDetailed(
             ciphertext: binary,
             secretKeys: [senderSecret],
             verificationKeys: []
@@ -186,7 +186,7 @@ final class EncryptionServiceTests: XCTestCase {
         defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
 
         XCTAssertThrowsError(
-            try stack.engine.decrypt(
+            try stack.engine.decryptDetailed(
                 ciphertext: binary,
                 secretKeys: [senderSecret],
                 verificationKeys: []
@@ -220,7 +220,7 @@ final class EncryptionServiceTests: XCTestCase {
         var senderSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: sender.fingerprint)
         defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
 
-        let result = try stack.engine.decrypt(
+        let result = try stack.engine.decryptDetailed(
             ciphertext: binary,
             secretKeys: [senderSecret],
             verificationKeys: []
@@ -246,7 +246,7 @@ final class EncryptionServiceTests: XCTestCase {
         defer { senderSecret.resetBytes(in: 0..<senderSecret.count) }
 
         XCTAssertThrowsError(
-            try stack.engine.decrypt(
+            try stack.engine.decryptDetailed(
                 ciphertext: binary,
                 secretKeys: [senderSecret],
                 verificationKeys: []
@@ -352,7 +352,7 @@ final class EncryptionServiceTests: XCTestCase {
         var recipientSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: recipient.fingerprint)
         defer { recipientSecret.resetBytes(in: 0..<recipientSecret.count) }
 
-        let result = try stack.engine.decrypt(
+        let result = try stack.engine.decryptDetailed(
             ciphertext: binary,
             secretKeys: [recipientSecret],
             verificationKeys: [sender.publicKeyData]
@@ -380,7 +380,7 @@ final class EncryptionServiceTests: XCTestCase {
         var secretV4 = try await stack.keyManagement.unwrapPrivateKey(fingerprint: keyV4.fingerprint)
         defer { secretV4.resetBytes(in: 0..<secretV4.count) }
 
-        let resultV4 = try stack.engine.decrypt(
+        let resultV4 = try stack.engine.decryptDetailed(
             ciphertext: binary,
             secretKeys: [secretV4],
             verificationKeys: []
@@ -391,7 +391,7 @@ final class EncryptionServiceTests: XCTestCase {
         var secretV6 = try await stack.keyManagement.unwrapPrivateKey(fingerprint: keyV6.fingerprint)
         defer { secretV6.resetBytes(in: 0..<secretV6.count) }
 
-        let resultV6 = try stack.engine.decrypt(
+        let resultV6 = try stack.engine.decryptDetailed(
             ciphertext: binary,
             secretKeys: [secretV6],
             verificationKeys: []
@@ -454,7 +454,7 @@ final class EncryptionServiceTests: XCTestCase {
         var specificSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: specificKey.fingerprint)
         defer { specificSecret.resetBytes(in: 0..<specificSecret.count) }
 
-        let result = try stack.engine.decrypt(
+        let result = try stack.engine.decryptDetailed(
             ciphertext: binary,
             secretKeys: [specificSecret],
             verificationKeys: []
@@ -466,7 +466,7 @@ final class EncryptionServiceTests: XCTestCase {
         defer { defaultSecret.resetBytes(in: 0..<defaultSecret.count) }
 
         XCTAssertThrowsError(
-            try stack.engine.decrypt(
+            try stack.engine.decryptDetailed(
                 ciphertext: binary,
                 secretKeys: [defaultSecret],
                 verificationKeys: []
@@ -504,7 +504,7 @@ final class EncryptionServiceTests: XCTestCase {
         var defaultSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)
         defer { defaultSecret.resetBytes(in: 0..<defaultSecret.count) }
 
-        let result = try stack.engine.decrypt(
+        let result = try stack.engine.decryptDetailed(
             ciphertext: binary,
             secretKeys: [defaultSecret],
             verificationKeys: []
@@ -531,7 +531,7 @@ final class EncryptionServiceTests: XCTestCase {
         var specificSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: specificKey.fingerprint)
         defer { specificSecret.resetBytes(in: 0..<specificSecret.count) }
 
-        let result = try stack.engine.decrypt(
+        let result = try stack.engine.decryptDetailed(
             ciphertext: binary,
             secretKeys: [specificSecret],
             verificationKeys: []
@@ -543,7 +543,7 @@ final class EncryptionServiceTests: XCTestCase {
         defer { defaultSecret.resetBytes(in: 0..<defaultSecret.count) }
 
         XCTAssertThrowsError(
-            try stack.engine.decrypt(
+            try stack.engine.decryptDetailed(
                 ciphertext: binary,
                 secretKeys: [defaultSecret],
                 verificationKeys: []
@@ -628,7 +628,7 @@ final class EncryptionServiceTests: XCTestCase {
         var secretA = try await stack.keyManagement.unwrapPrivateKey(fingerprint: keyA.fingerprint)
         defer { secretA.resetBytes(in: 0..<secretA.count) }
 
-        let resultA = try stack.engine.decrypt(
+        let resultA = try stack.engine.decryptDetailed(
             ciphertext: binary,
             secretKeys: [secretA],
             verificationKeys: []

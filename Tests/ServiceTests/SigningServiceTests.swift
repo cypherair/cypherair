@@ -96,10 +96,10 @@ final class SigningServiceTests: XCTestCase {
             signerFingerprint: identity.fingerprint
         )
 
-        let result = try await stack.signingService.verifyCleartext(signed)
-        XCTAssertEqual(result.verification.status, .valid,
+        let result = try await stack.signingService.verifyCleartextDetailed(signed)
+        XCTAssertEqual(result.verification.legacyStatus, .valid,
                        "Valid signature should verify as .valid")
-        XCTAssertEqual(result.verification.verificationState, .verified)
+        XCTAssertEqual(result.verification.summaryState, .verified)
     }
 
     func test_verifyCleartext_profileB_validSignature_returnsValid() async throws {
@@ -110,8 +110,8 @@ final class SigningServiceTests: XCTestCase {
             signerFingerprint: identity.fingerprint
         )
 
-        let result = try await stack.signingService.verifyCleartext(signed)
-        XCTAssertEqual(result.verification.status, .valid,
+        let result = try await stack.signingService.verifyCleartextDetailed(signed)
+        XCTAssertEqual(result.verification.legacyStatus, .valid,
                        "Valid Profile B signature should verify as .valid")
     }
 
@@ -129,10 +129,10 @@ final class SigningServiceTests: XCTestCase {
             signed = Data(tampered.utf8)
         }
 
-        let result = try await stack.signingService.verifyCleartext(signed)
-        XCTAssertEqual(result.verification.status, .bad,
+        let result = try await stack.signingService.verifyCleartextDetailed(signed)
+        XCTAssertEqual(result.verification.legacyStatus, .bad,
                        "Tampered message should verify as .bad")
-        XCTAssertEqual(result.verification.verificationState, .invalid)
+        XCTAssertEqual(result.verification.summaryState, .invalid)
     }
 
     func test_verifyCleartext_profileB_tamperedMessage_returnsBad() async throws {
@@ -149,8 +149,8 @@ final class SigningServiceTests: XCTestCase {
             signed = Data(tampered.utf8)
         }
 
-        let result = try await stack.signingService.verifyCleartext(signed)
-        XCTAssertEqual(result.verification.status, .bad,
+        let result = try await stack.signingService.verifyCleartextDetailed(signed)
+        XCTAssertEqual(result.verification.legacyStatus, .bad,
                        "Tampered Profile B message should verify as .bad")
     }
 
@@ -173,12 +173,12 @@ final class SigningServiceTests: XCTestCase {
 
         // Verify on the original stack — the signer is not known
         try await stack.contactService.relockProtectedData()
-        let result = try await stack.signingService.verifyCleartext(strangerSigned)
-        XCTAssertEqual(result.verification.status, .unknownSigner,
+        let result = try await stack.signingService.verifyCleartextDetailed(strangerSigned)
+        XCTAssertEqual(result.verification.legacyStatus, .unknownSigner,
                        "Unknown signer should be flagged")
-        XCTAssertEqual(result.verification.verificationState, .contactsContextUnavailable)
-        XCTAssertTrue(result.verification.requiresContactsContext)
+        XCTAssertEqual(result.verification.summaryState, .contactsContextUnavailable)
         XCTAssertEqual(result.verification.contactsUnavailableReason, .locked)
+        XCTAssertEqual(result.verification.signatures.first?.verificationState, .contactsContextUnavailable)
     }
 
     func test_verifyCleartext_profileB_unknownSigner_returnsUnknownSigner() async throws {
@@ -197,11 +197,10 @@ final class SigningServiceTests: XCTestCase {
         )
 
         try await stack.contactService.relockProtectedData()
-        let result = try await stack.signingService.verifyCleartext(strangerSigned)
-        XCTAssertEqual(result.verification.status, .unknownSigner,
+        let result = try await stack.signingService.verifyCleartextDetailed(strangerSigned)
+        XCTAssertEqual(result.verification.legacyStatus, .unknownSigner,
                        "Unknown Profile B signer should be flagged")
-        XCTAssertEqual(result.verification.verificationState, .contactsContextUnavailable)
-        XCTAssertTrue(result.verification.requiresContactsContext)
+        XCTAssertEqual(result.verification.summaryState, .contactsContextUnavailable)
     }
 
     // MARK: - Detached Verification
@@ -214,10 +213,11 @@ final class SigningServiceTests: XCTestCase {
             data, signerFingerprint: identity.fingerprint
         )
 
-        let result = try await stack.signingService.verifyDetached(
+        let result = try await stack.signingService.verifyDetachedDetailed(
             data: data, signature: signature
         )
-        XCTAssertEqual(result.status, .valid)
+        XCTAssertEqual(result.legacyStatus, .valid)
+        XCTAssertEqual(result.summaryState, .verified)
     }
 
     func test_verifyDetached_profileB_validSignature_returnsValid() async throws {
@@ -228,10 +228,10 @@ final class SigningServiceTests: XCTestCase {
             data, signerFingerprint: identity.fingerprint
         )
 
-        let result = try await stack.signingService.verifyDetached(
+        let result = try await stack.signingService.verifyDetachedDetailed(
             data: data, signature: signature
         )
-        XCTAssertEqual(result.status, .valid)
+        XCTAssertEqual(result.legacyStatus, .valid)
     }
 
     func test_verifyDetached_tamperedData_returnsBad() async throws {
@@ -243,10 +243,10 @@ final class SigningServiceTests: XCTestCase {
         )
 
         let tamperedData = Data("Tampered detached data".utf8)
-        let result = try await stack.signingService.verifyDetached(
+        let result = try await stack.signingService.verifyDetachedDetailed(
             data: tamperedData, signature: signature
         )
-        XCTAssertEqual(result.status, .bad,
+        XCTAssertEqual(result.legacyStatus, .bad,
                        "Tampered data should fail detached verification")
     }
 
@@ -259,10 +259,10 @@ final class SigningServiceTests: XCTestCase {
         )
 
         let tamperedData = Data("Tampered detached Profile B data".utf8)
-        let result = try await stack.signingService.verifyDetached(
+        let result = try await stack.signingService.verifyDetachedDetailed(
             data: tamperedData, signature: signature
         )
-        XCTAssertEqual(result.status, .bad,
+        XCTAssertEqual(result.legacyStatus, .bad,
                        "Tampered data should fail Profile B detached verification")
     }
 
@@ -290,12 +290,15 @@ final class SigningServiceTests: XCTestCase {
         // Verify the signature — the key is now expired.
         // Sequoia may return .valid (signature was created while key was valid)
         // or a warning/error depending on implementation. Either is acceptable.
-        let result = try await stack.signingService.verifyCleartext(signed)
+        let result = try await stack.signingService.verifyCleartextDetailed(signed)
 
         // The verification should complete without throwing.
         // We accept either .valid (sig made while key was valid) or a warning status.
-        XCTAssertNotNil(result.verification.status,
-                        "Verification should produce a result even with expired key")
+        XCTAssertNotEqual(
+            result.verification.legacyStatus,
+            .notSigned,
+            "Verification should produce a signed result even with expired key"
+        )
     }
 
     func test_verifyCleartext_profileB_expiredSignerKey_returnsExpiredOrWarning() async throws {
@@ -320,10 +323,13 @@ final class SigningServiceTests: XCTestCase {
         // Verify the signature — the key is now expired.
         // Sequoia may return .valid (signature was created while key was valid)
         // or a warning/error depending on implementation. Either is acceptable.
-        let result = try await stack.signingService.verifyCleartext(signed)
+        let result = try await stack.signingService.verifyCleartextDetailed(signed)
 
-        XCTAssertNotNil(result.verification.status,
-                        "Profile B verification should produce a result even with expired key")
+        XCTAssertNotEqual(
+            result.verification.legacyStatus,
+            .notSigned,
+            "Profile B verification should produce a signed result even with expired key"
+        )
     }
 
     // MARK: - Known Contact Resolution
@@ -336,10 +342,11 @@ final class SigningServiceTests: XCTestCase {
             signerFingerprint: identity.fingerprint
         )
 
-        let result = try await stack.signingService.verifyCleartext(signed)
-        XCTAssertEqual(result.verification.status, .valid)
+        let result = try await stack.signingService.verifyCleartextDetailed(signed)
+        XCTAssertEqual(result.verification.legacyStatus, .valid)
         // The signer's fingerprint should be resolved
-        XCTAssertNotNil(result.verification.signerFingerprint)
+        XCTAssertNotNil(result.verification.legacySignerFingerprint)
+        XCTAssertEqual(result.verification.signatures.first?.signerIdentity?.source, .contact)
     }
 
     func test_verifyCleartext_profileB_knownContact_resolvesSigner() async throws {
@@ -350,9 +357,10 @@ final class SigningServiceTests: XCTestCase {
             signerFingerprint: identity.fingerprint
         )
 
-        let result = try await stack.signingService.verifyCleartext(signed)
-        XCTAssertEqual(result.verification.status, .valid)
-        XCTAssertNotNil(result.verification.signerFingerprint)
+        let result = try await stack.signingService.verifyCleartextDetailed(signed)
+        XCTAssertEqual(result.verification.legacyStatus, .valid)
+        XCTAssertNotNil(result.verification.legacySignerFingerprint)
+        XCTAssertEqual(result.verification.signatures.first?.signerIdentity?.source, .contact)
     }
 
     // MARK: - H1: High Security Biometrics Blocking

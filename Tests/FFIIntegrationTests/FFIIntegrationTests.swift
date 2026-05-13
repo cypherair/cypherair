@@ -114,7 +114,7 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertFalse(ciphertext.isEmpty, "Ciphertext should not be empty")
         XCTAssertNotEqual(ciphertext, plaintext, "Ciphertext should differ from plaintext")
 
-        let result = try engine.decrypt(
+        let result = try engine.decryptDetailed(
             ciphertext: ciphertext,
             secretKeys: [generated.certData],
             verificationKeys: [generated.publicKeyData]
@@ -141,7 +141,7 @@ final class FFIIntegrationTests: XCTestCase {
             encryptToSelf: nil
         )
 
-        let result = try engine.decrypt(
+        let result = try engine.decryptDetailed(
             ciphertext: ciphertext,
             secretKeys: [generated.certData],
             verificationKeys: [generated.publicKeyData]
@@ -171,7 +171,7 @@ final class FFIIntegrationTests: XCTestCase {
             encryptToSelf: nil
         )
 
-        let result = try engine.decrypt(
+        let result = try engine.decryptDetailed(
             ciphertext: ciphertext,
             secretKeys: [generated.certData],
             verificationKeys: []
@@ -201,7 +201,7 @@ final class FFIIntegrationTests: XCTestCase {
             encryptToSelf: nil
         )
 
-        let result = try engine.decrypt(
+        let result = try engine.decryptDetailed(
             ciphertext: ciphertext,
             secretKeys: [generated.certData],
             verificationKeys: []
@@ -243,7 +243,7 @@ final class FFIIntegrationTests: XCTestCase {
                 encryptToSelf: nil
             )
 
-            let result = try engine.decrypt(
+            let result = try engine.decryptDetailed(
                 ciphertext: ciphertext,
                 secretKeys: [generated.certData],
                 verificationKeys: []
@@ -734,7 +734,7 @@ final class FFIIntegrationTests: XCTestCase {
         )
 
         XCTAssertThrowsError(
-            try engine.decrypt(
+            try engine.decryptDetailed(
                 ciphertext: ciphertext,
                 secretKeys: [keyB.certData],
                 verificationKeys: []
@@ -770,7 +770,7 @@ final class FFIIntegrationTests: XCTestCase {
         ciphertext[midpoint] ^= 0x01
 
         XCTAssertThrowsError(
-            try engine.decrypt(
+            try engine.decryptDetailed(
                 ciphertext: ciphertext,
                 secretKeys: [key.certData],
                 verificationKeys: []
@@ -809,7 +809,7 @@ final class FFIIntegrationTests: XCTestCase {
         ciphertext[midpoint] ^= 0x01
 
         XCTAssertThrowsError(
-            try engine.decrypt(
+            try engine.decryptDetailed(
                 ciphertext: ciphertext,
                 secretKeys: [key.certData],
                 verificationKeys: []
@@ -839,7 +839,7 @@ final class FFIIntegrationTests: XCTestCase {
         let garbage = Data("this is not valid PGP data at all".utf8)
 
         XCTAssertThrowsError(
-            try engine.decrypt(
+            try engine.decryptDetailed(
                 ciphertext: garbage,
                 secretKeys: [key.certData],
                 verificationKeys: []
@@ -949,13 +949,13 @@ final class FFIIntegrationTests: XCTestCase {
         )
         let tamperedData = Data(signedString.utf8)
 
-        let result = try engine.verifyCleartext(
+        let result = try engine.verifyCleartextDetailed(
             signedMessage: tamperedData,
             verificationKeys: [key.publicKeyData]
         )
 
         XCTAssertEqual(
-            result.status, .bad,
+            result.legacyStatus, .bad,
             "Tampered cleartext signature must produce Bad status"
         )
     }
@@ -975,13 +975,13 @@ final class FFIIntegrationTests: XCTestCase {
         )
 
         // Verify with a different key — signer is unknown
-        let result = try engine.verifyCleartext(
+        let result = try engine.verifyCleartextDetailed(
             signedMessage: signed,
             verificationKeys: [otherKey.publicKeyData]
         )
 
         XCTAssertEqual(
-            result.status, .unknownSigner,
+            result.legacyStatus, .unknownSigner,
             "Signer not in verification_keys must produce UnknownSigner status"
         )
     }
@@ -1320,14 +1320,14 @@ final class FFIIntegrationTests: XCTestCase {
         // Verify with tampered data
         let tamperedData = Data("tampered data for detached sig".utf8)
 
-        let result = try engine.verifyDetached(
+        let result = try engine.verifyDetachedDetailed(
             data: tamperedData,
             signature: signature,
             verificationKeys: [key.publicKeyData]
         )
 
         XCTAssertEqual(
-            result.status, .bad,
+            result.legacyStatus, .bad,
             "Detached signature on tampered data must produce Bad status"
         )
     }
@@ -1691,7 +1691,7 @@ final class FFIIntegrationTests: XCTestCase {
 
     // MARK: - C5.4B Detailed Signature Results
 
-    func test_detailedVerifyCleartext_fixtureMultiSigner_preservesEntriesAndLegacyFields() throws {
+    func test_detailedVerifyCleartext_fixtureMultiSigner_preservesEntries() throws {
         let signerA = try loadFixture("ffi_detailed_signer_a")
         let signerB = try loadFixture("ffi_detailed_signer_b")
         let signerAInfo = try engine.parseKeyInfo(keyData: signerA)
@@ -1702,14 +1702,8 @@ final class FFIIntegrationTests: XCTestCase {
             signedMessage: signedMessage,
             verificationKeys: [signerA, signerB]
         )
-        let legacy = try engine.verifyCleartext(
-            signedMessage: signedMessage,
-            verificationKeys: [signerA, signerB]
-        )
 
-        XCTAssertEqual(detailed.legacyStatus, legacy.status)
-        XCTAssertEqual(detailed.legacySignerFingerprint, legacy.signerFingerprint)
-        XCTAssertEqual(detailed.content, legacy.content)
+        XCTAssertNotNil(detailed.content)
         XCTAssertEqual(detailed.signatures.count, 2)
         XCTAssertTrue(detailed.signatures.allSatisfy { $0.status == .valid })
         let observedFingerprints = Set(
@@ -1736,14 +1730,7 @@ final class FFIIntegrationTests: XCTestCase {
             signature: signature,
             verificationKeys: [signerA]
         )
-        let legacy = try engine.verifyDetached(
-            data: data,
-            signature: signature,
-            verificationKeys: [signerA]
-        )
 
-        XCTAssertEqual(detailed.legacyStatus, legacy.status)
-        XCTAssertEqual(detailed.legacySignerFingerprint, legacy.signerFingerprint)
         XCTAssertEqual(detailed.signatures.count, 2)
         XCTAssertTrue(detailed.signatures.contains {
             $0.status == .valid && $0.signerPrimaryFingerprint == Optional(signerAInfo.fingerprint)
@@ -1779,7 +1766,7 @@ final class FFIIntegrationTests: XCTestCase {
         )
     }
 
-    func test_detailedDecrypt_fixtureMultiSigner_preservesEntriesAndLegacyFields() throws {
+    func test_detailedDecrypt_fixtureMultiSigner_preservesEntries() throws {
         let signerA = try loadFixture("ffi_detailed_signer_a")
         let signerB = try loadFixture("ffi_detailed_signer_b")
         let signerAInfo = try engine.parseKeyInfo(keyData: signerA)
@@ -1792,15 +1779,8 @@ final class FFIIntegrationTests: XCTestCase {
             secretKeys: [recipientSecret],
             verificationKeys: [signerA, signerB]
         )
-        let legacy = try engine.decrypt(
-            ciphertext: ciphertext,
-            secretKeys: [recipientSecret],
-            verificationKeys: [signerA, signerB]
-        )
 
-        XCTAssertEqual(legacy.signatureStatus, Optional(detailed.legacyStatus))
-        XCTAssertEqual(detailed.legacySignerFingerprint, legacy.signerFingerprint)
-        XCTAssertEqual(detailed.plaintext, legacy.plaintext)
+        XCTAssertFalse(detailed.plaintext.isEmpty)
         XCTAssertEqual(detailed.signatures.count, 2)
         XCTAssertTrue(detailed.signatures.allSatisfy { $0.status == .valid })
         let observedFingerprints = Set(
@@ -1816,7 +1796,7 @@ final class FFIIntegrationTests: XCTestCase {
         )
     }
 
-    func test_detailedDecryptFile_fixtureMultiSigner_preservesEntriesAndLegacyFields() throws {
+    func test_detailedDecryptFile_fixtureMultiSigner_preservesEntries() throws {
         let signerA = try loadFixture("ffi_detailed_signer_a")
         let signerB = try loadFixture("ffi_detailed_signer_b")
         let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
@@ -1825,9 +1805,7 @@ final class FFIIntegrationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
         let detailedOutputURL = makeTempOutputURL(filename: "ffi-detailed-out-\(UUID().uuidString).bin")
-        let legacyOutputURL = makeTempOutputURL(filename: "ffi-legacy-out-\(UUID().uuidString).bin")
         defer { try? FileManager.default.removeItem(at: detailedOutputURL) }
-        defer { try? FileManager.default.removeItem(at: legacyOutputURL) }
 
         let detailed = try engine.decryptFileDetailed(
             inputPath: inputURL.path,
@@ -1836,21 +1814,12 @@ final class FFIIntegrationTests: XCTestCase {
             verificationKeys: [signerA, signerB],
             progress: nil
         )
-        let legacy = try engine.decryptFile(
-            inputPath: inputURL.path,
-            outputPath: legacyOutputURL.path,
-            secretKeys: [recipientSecret],
-            verificationKeys: [signerA, signerB],
-            progress: nil
-        )
 
-        XCTAssertEqual(legacy.signatureStatus, Optional(detailed.legacyStatus))
-        XCTAssertEqual(detailed.legacySignerFingerprint, legacy.signerFingerprint)
-        XCTAssertEqual(try Data(contentsOf: detailedOutputURL), try Data(contentsOf: legacyOutputURL))
+        XCTAssertFalse(try Data(contentsOf: detailedOutputURL).isEmpty)
         XCTAssertEqual(detailed.signatures.count, 2)
     }
 
-    func test_detailedVerifyDetachedFile_fixtureKnownPlusUnknown_matchesInMemoryAndLegacyFields() throws {
+    func test_detailedVerifyDetachedFile_fixtureKnownPlusUnknown_matchesInMemoryDetailed() throws {
         let signerA = try loadFixture("ffi_detailed_signer_a")
         let data = try loadTextFixture("ffi_detailed_detached_data")
         let signature = try loadArmoredFixture("ffi_detailed_multisig_detached", ext: "sig")
@@ -1871,18 +1840,10 @@ final class FFIIntegrationTests: XCTestCase {
             signature: signature,
             verificationKeys: [signerA]
         )
-        let legacyFile = try engine.verifyDetachedFile(
-            dataPath: inputURL.path,
-            signature: signature,
-            verificationKeys: [signerA],
-            progress: nil
-        )
 
         XCTAssertEqual(fileDetailed.legacyStatus, inMemoryDetailed.legacyStatus)
         XCTAssertEqual(fileDetailed.legacySignerFingerprint, inMemoryDetailed.legacySignerFingerprint)
         XCTAssertEqual(fileDetailed.signatures, inMemoryDetailed.signatures)
-        XCTAssertEqual(fileDetailed.legacyStatus, legacyFile.status)
-        XCTAssertEqual(fileDetailed.legacySignerFingerprint, legacyFile.signerFingerprint)
         XCTAssertEqual(fileDetailed.signatures.count, 2)
         XCTAssertTrue(fileDetailed.signatures.contains {
             $0.status == .unknownSigner && $0.signerPrimaryFingerprint == nil
@@ -1901,33 +1862,6 @@ final class FFIIntegrationTests: XCTestCase {
 
         XCTAssertThrowsError(
             try engine.verifyDetachedFileDetailed(
-                dataPath: inputURL.path,
-                signature: signature,
-                verificationKeys: [signerA],
-                progress: progress
-            )
-        ) { error in
-            guard case .OperationCancelled = error as? PgpError else {
-                return XCTFail("Expected OperationCancelled, got \(error)")
-            }
-        }
-    }
-
-    func test_legacyVerifyDetachedFile_cancel_returnsOperationCancelled() throws {
-        let signerA = try loadFixture("ffi_detailed_signer_a")
-        let data = try loadTextFixture("ffi_detailed_detached_data")
-        let signature = try loadArmoredFixture("ffi_detailed_multisig_detached", ext: "sig")
-        let inputURL = try writeTempFile(
-            data,
-            filename: "ffi-legacy-detached-\(UUID().uuidString).txt"
-        )
-        defer { try? FileManager.default.removeItem(at: inputURL) }
-
-        let progress = FileProgressReporter()
-        progress.cancel()
-
-        XCTAssertThrowsError(
-            try engine.verifyDetachedFile(
                 dataPath: inputURL.path,
                 signature: signature,
                 verificationKeys: [signerA],
@@ -2127,7 +2061,7 @@ final class FFIIntegrationTests: XCTestCase {
                 let ct = preCiphertexts[i]
                 group.addTask { [engine] in
                     guard let engine else { throw ConcurrentTestError.engineDeallocated }
-                    let result = try engine.decrypt(
+                    let result = try engine.decryptDetailed(
                         ciphertext: ct,
                         secretKeys: [key.certData],
                         verificationKeys: []
@@ -2176,7 +2110,7 @@ final class FFIIntegrationTests: XCTestCase {
                 } else {
                     group.addTask { [engine] in
                         guard let engine else { throw ConcurrentTestError.engineDeallocated }
-                        let result = try engine.decrypt(
+                        let result = try engine.decryptDetailed(
                             ciphertext: preCiphertext,
                             secretKeys: [key.certData],
                             verificationKeys: []
@@ -2455,7 +2389,7 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertFalse(recipientKeyIDs.isEmpty)
 
         // Phase 2: decrypt with wrong key should fail
-        XCTAssertThrowsError(try engine.decrypt(ciphertext: ciphertext, secretKeys: [wrongKey.certData], verificationKeys: [])) { error in
+        XCTAssertThrowsError(try engine.decryptDetailed(ciphertext: ciphertext, secretKeys: [wrongKey.certData], verificationKeys: [])) { error in
             // Accept any PgpError — the key doesn't match
             XCTAssertTrue(error is PgpError, "Expected PgpError, got \(type(of: error))")
         }
@@ -2489,11 +2423,11 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(recipientKeyIDs.count, 2, "Phase 1 should find both recipients")
 
         // Phase 2: Alice can decrypt
-        let resultAlice = try engine.decrypt(ciphertext: ciphertext, secretKeys: [alice.certData], verificationKeys: [])
+        let resultAlice = try engine.decryptDetailed(ciphertext: ciphertext, secretKeys: [alice.certData], verificationKeys: [])
         XCTAssertEqual(String(data: resultAlice.plaintext, encoding: .utf8), plaintext)
 
         // Phase 2: Bob can decrypt
-        let resultBob = try engine.decrypt(ciphertext: ciphertext, secretKeys: [bob.certData], verificationKeys: [])
+        let resultBob = try engine.decryptDetailed(ciphertext: ciphertext, secretKeys: [bob.certData], verificationKeys: [])
         XCTAssertEqual(String(data: resultBob.plaintext, encoding: .utf8), plaintext)
     }
 
