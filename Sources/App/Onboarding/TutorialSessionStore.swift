@@ -332,7 +332,7 @@ final class TutorialSessionStore {
 
     func noteDecrypted(
         plaintext: Data,
-        verification: SignatureVerification
+        verification: DetailedSignatureVerification
     ) {
         session.artifacts.decryptedMessage = String(data: plaintext, encoding: .utf8)
         session.artifacts.decryptedVerification = verification

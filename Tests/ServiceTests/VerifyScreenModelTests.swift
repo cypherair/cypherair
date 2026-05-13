@@ -70,14 +70,12 @@ final class VerifyScreenModelTests: XCTestCase {
 
         XCTAssertTrue(model.importedCleartext.hasImportedFile)
         XCTAssertNil(model.filePickerTarget)
-        XCTAssertEqual(model.cleartextVerification?.status, .valid)
         XCTAssertEqual(model.cleartextDetailedVerification?.legacyStatus, .valid)
         XCTAssertEqual(model.cleartextOriginalText, "Original signed message")
 
         model.setSignedInput("Edited signed message")
 
         XCTAssertFalse(model.importedCleartext.hasImportedFile)
-        XCTAssertNil(model.cleartextVerification)
         XCTAssertNil(model.cleartextDetailedVerification)
         XCTAssertNil(model.cleartextOriginalText)
     }
@@ -132,14 +130,11 @@ final class VerifyScreenModelTests: XCTestCase {
         XCTAssertEqual(model.signatureFileName, signatureURL.lastPathComponent)
 
         model.verifyMode = .detached
-        XCTAssertEqual(model.activeVerification?.status, .bad)
         XCTAssertEqual(model.activeDetailedVerification?.legacyStatus, .bad)
 
         model.verifyMode = .cleartext
-        XCTAssertEqual(model.activeVerification?.status, .valid)
         XCTAssertEqual(model.activeDetailedVerification?.legacyStatus, .valid)
         XCTAssertEqual(model.cleartextOriginalText, "Cleartext content")
-        XCTAssertEqual(model.detachedVerification?.status, .bad)
         XCTAssertEqual(model.detachedDetailedVerification?.legacyStatus, .bad)
     }
 
@@ -152,10 +147,8 @@ final class VerifyScreenModelTests: XCTestCase {
 
         model.setSignedInput("Edited signed message")
 
-        XCTAssertNil(model.cleartextVerification)
         XCTAssertNil(model.cleartextDetailedVerification)
         XCTAssertNil(model.cleartextOriginalText)
-        XCTAssertEqual(model.detachedVerification?.status, .bad)
         XCTAssertEqual(model.detachedDetailedVerification?.legacyStatus, .bad)
     }
 
@@ -176,7 +169,6 @@ final class VerifyScreenModelTests: XCTestCase {
         model.finishFileImportRequest()
 
         XCTAssertEqual(model.originalFileName, originalURL.lastPathComponent)
-        XCTAssertNil(model.detachedVerification)
         XCTAssertNil(model.detachedDetailedVerification)
     }
 
@@ -202,9 +194,7 @@ final class VerifyScreenModelTests: XCTestCase {
         XCTAssertFalse(model.importedCleartext.hasImportedFile)
         XCTAssertNil(model.filePickerTarget)
         XCTAssertEqual(model.cleartextOriginalText, "Original")
-        XCTAssertEqual(model.cleartextVerification?.status, .valid)
         XCTAssertEqual(model.cleartextDetailedVerification?.legacyStatus, .valid)
-        XCTAssertEqual(model.detachedVerification?.status, .bad)
         XCTAssertEqual(model.detachedDetailedVerification?.legacyStatus, .bad)
         XCTAssertEqual(model.originalFileName, "original")
         XCTAssertEqual(model.signatureFileName, "original.sig")
@@ -245,7 +235,6 @@ final class VerifyScreenModelTests: XCTestCase {
             model.operation.isRunning == false
         }
 
-        XCTAssertNil(model.detachedVerification)
         XCTAssertNil(model.detachedDetailedVerification)
         XCTAssertNil(model.operation.progress)
         XCTAssertFalse(model.operation.isShowingError)
@@ -274,9 +263,7 @@ final class VerifyScreenModelTests: XCTestCase {
 
         XCTAssertEqual(model.signedInput, "")
         XCTAssertNil(model.cleartextOriginalText)
-        XCTAssertNil(model.cleartextVerification)
         XCTAssertNil(model.cleartextDetailedVerification)
-        XCTAssertNil(model.detachedVerification)
         XCTAssertNil(model.detachedDetailedVerification)
         XCTAssertFalse(model.importedCleartext.hasImportedFile)
         XCTAssertNil(model.originalFileURL)

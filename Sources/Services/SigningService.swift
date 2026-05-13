@@ -111,37 +111,6 @@ final class SigningService {
 
     // MARK: - Verification
 
-    /// Verify a cleartext-signed message.
-    ///
-    /// - Parameter signedMessage: The cleartext-signed message data.
-    /// - Returns: Verification result with signer info and the original text.
-    func verifyCleartext(_ signedMessage: Data) async throws -> (text: Data?, verification: SignatureVerification) {
-        let context = verificationContext()
-
-        let result: VerifyDetailedResult
-        do {
-            result = try await Self.performVerifyCleartextDetailed(
-                engine: engine, signedMessage: signedMessage,
-                verificationKeys: context.verificationKeys
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        let verification = DetailedSignatureVerification.from(
-            legacyStatus: result.legacyStatus,
-            legacySignerFingerprint: result.legacySignerFingerprint,
-            summaryState: result.summaryState,
-            summaryEntryIndex: result.summaryEntryIndex,
-            signatures: result.signatures,
-            contacts: context.contacts,
-            ownKeys: keyManagement.keys,
-            contactsAvailability: context.contactsAvailability
-        )
-
-        return (text: result.content, verification: verification.legacyVerification)
-    }
-
     /// Verify a cleartext-signed message while preserving per-signature detailed results.
     ///
     /// - Parameter signedMessage: The cleartext-signed message data.
@@ -177,37 +146,6 @@ final class SigningService {
         )
     }
 
-    /// Verify a detached signature against the original data.
-    ///
-    /// - Parameters:
-    ///   - data: The original data.
-    ///   - signature: The detached signature data.
-    /// - Returns: Verification result with signer info.
-    func verifyDetached(data: Data, signature: Data) async throws -> SignatureVerification {
-        let context = verificationContext()
-
-        let result: VerifyDetailedResult
-        do {
-            result = try await Self.performVerifyDetachedDetailed(
-                engine: engine, data: data, signature: signature,
-                verificationKeys: context.verificationKeys
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        return DetailedSignatureVerification.from(
-            legacyStatus: result.legacyStatus,
-            legacySignerFingerprint: result.legacySignerFingerprint,
-            summaryState: result.summaryState,
-            summaryEntryIndex: result.summaryEntryIndex,
-            signatures: result.signatures,
-            contacts: context.contacts,
-            ownKeys: keyManagement.keys,
-            contactsAvailability: context.contactsAvailability
-        ).legacyVerification
-    }
-
     /// Verify a detached signature against the original data while preserving
     /// per-signature detailed results.
     func verifyDetachedDetailed(
@@ -241,43 +179,6 @@ final class SigningService {
     }
 
     // MARK: - Streaming File Verification
-
-    /// Verify a detached signature against a file using streaming I/O.
-    ///
-    /// - Parameters:
-    ///   - fileURL: URL of the data file.
-    ///   - signature: The detached signature data.
-    ///   - progress: Progress reporter for UI updates and cancellation.
-    /// - Returns: Verification result with signer info.
-    func verifyDetachedStreaming(
-        fileURL: URL,
-        signature: Data,
-        progress: FileProgressReporter?
-    ) async throws -> SignatureVerification {
-        let context = verificationContext()
-
-        let result: FileVerifyDetailedResult
-        do {
-            result = try await Self.performVerifyDetachedFileDetailed(
-                engine: engine, dataPath: fileURL.path,
-                signature: signature, verificationKeys: context.verificationKeys,
-                progress: progress
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        return DetailedSignatureVerification.from(
-            legacyStatus: result.legacyStatus,
-            legacySignerFingerprint: result.legacySignerFingerprint,
-            summaryState: result.summaryState,
-            summaryEntryIndex: result.summaryEntryIndex,
-            signatures: result.signatures,
-            contacts: context.contacts,
-            ownKeys: keyManagement.keys,
-            contactsAvailability: context.contactsAvailability
-        ).legacyVerification
-    }
 
     /// Verify a detached signature against a file using streaming I/O while preserving
     /// per-signature detailed results.

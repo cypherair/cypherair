@@ -16,7 +16,7 @@ struct DecryptView: View {
         var fileRestrictionMessage: String?
         var outputInterceptionPolicy: OutputInterceptionPolicy = .passthrough
         var onParsed: (@MainActor (DecryptionService.Phase1Result) -> Void)?
-        var onDecrypted: (@MainActor (Data, SignatureVerification) -> Void)?
+        var onDecrypted: (@MainActor (Data, DetailedSignatureVerification) -> Void)?
 
         static let `default` = Configuration()
     }
