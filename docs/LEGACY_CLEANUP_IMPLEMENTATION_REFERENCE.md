@@ -203,49 +203,97 @@ Validation:
 - Add targeted macOS UI smoke coverage if tutorial route ownership or visible
   navigation behavior changes.
 
-### Phase 3: Detailed Verification API Adoption
+### Phase 3: Detailed Verification Cutover And Legacy Surface Deletion
 
-Goal: make detailed signature and decryption verification the default test and
-self-test surface before retiring legacy folded-summary compatibility.
+Goal: migrate valuable behavior coverage to detailed verification/decryption
+APIs, then delete the non-detailed legacy verification and decrypt surface. The
+target state is not to retain legacy compatibility tests for folded summaries.
+
+Current-state facts:
+
+- UI verify and decrypt screen models already call detailed service APIs for
+  current user-facing verify/decrypt flows.
+- `SigningService` and `DecryptionService` legacy-returning facades internally
+  call detailed engine APIs, then fold results back to `SignatureVerification`.
+- The main production code still directly calling simple engine
+  verification/decrypt APIs is `SelfTestService`.
+- `PasswordMessageService` is not a simple verification API, but it currently
+  folds a detailed password decrypt result into `SignatureVerification`; review
+  it with the other app-level legacy result surfaces.
+- `SignatureVerification` may remain only as an internal presentation/status
+  helper for detailed UI rendering. Do not treat it as a public compatibility
+  contract to preserve.
 
 Recommended PRs:
 
-- PR 3A, SelfTest detailed API adoption: move `SelfTestService` from simple
-  `engine.decrypt` and `engine.verifyCleartext` calls to detailed APIs while
-  preserving current self-test semantics.
-- PR 3B, signing verification tests: rewrite useful
-  `SigningServiceTests` and `SigningServiceDetailedResultTests` coverage to
-  assert detailed verification directly.
-- PR 3C, decryption and streaming verification tests: rewrite useful
-  `DecryptionServiceTests` and `StreamingServiceTests` folded-summary checks to
-  detailed verification assertions.
-- PR 3D, interop and device tests: rewrite valuable `GnuPGInteropTests`,
-  `DeviceMIETests`, and `FFIIntegrationTests` coverage to detailed APIs where
-  the test is not explicitly preserving compatibility behavior.
-- PR 3E, Swift facade decision: after tests migrate, decide whether legacy
-  `SignatureVerification` returning facades should be removed, retained with
-  explicit compatibility tests, or marked for a later public API cutoff.
+- PR 3A, production call-site closure: move `SelfTestService` from
+  `engine.decrypt` and `engine.verifyCleartext` to `engine.decryptDetailed` and
+  `engine.verifyCleartextDetailed`, preserving the same self-test pass/fail
+  semantics. Re-check production call sites for simple engine
+  verification/decrypt APIs and record any app-level `SignatureVerification`
+  result surfaces that must be deleted in PR 3C.
+- PR 3B, behavior test migration gates: rewrite valuable behavior coverage that
+  still depends on simple or legacy-returning APIs to assert detailed results
+  directly. This includes signing/decryption/streaming valid, tamper,
+  unknown-signer, contact-resolution, expired-signer, and auth-boundary
+  scenarios.
+- PR 3C, legacy surface deletion: remove simple Rust/UniFFI verification and
+  decrypt APIs, generated Swift engine methods for those APIs, legacy result
+  records used only by the simple surface, Swift service facades that expose
+  `SignatureVerification` as the primary result, app callbacks that carry only
+  folded verification, and tests whose only purpose is legacy bridge or folded
+  summary equivalence.
+
+PR 3B must complete these explicit migration gates before PR 3C deletes the
+legacy surface:
+
+- Device MIE coverage: Profile A/B full workflow, cross-profile format
+  selection, OpenSSL crypto paths, and 100x decrypt/verify cycles must assert
+  detailed decrypt/verify results.
+- GnuPG interoperability: encrypted armored/binary decrypt,
+  cleartext/detached verify, compressed decrypt, signed compressed verify, and
+  tamper rejection must use detailed APIs. GnuPG compatibility is current
+  behavior; it is not a reason to keep the simple verification/decrypt API
+  surface.
+- File streaming artifact cleanup: same-filename operation directories, failed
+  repeat preserving previous output, cancellation cleanup, and tampered-file
+  no-output cleanup must be covered through detailed streaming APIs.
+- High Security decrypt auth failure: the existing legacy
+  `decrypt(phase1:)` auth-failure coverage must move to
+  `decryptDetailed(phase1:)` and prove authentication failure does not decrypt.
+- Legacy-only tests named around `matchesLegacyBridge`,
+  `preserves...LegacyFields`, `legacyVerifyDetachedFile`, or direct detailed vs
+  legacy folded-summary equivalence are deletion candidates, not compatibility
+  coverage to retain.
 
 Entry conditions:
 
 - UI screen models already consume detailed verification for current user-facing
   verify/decrypt flows.
-- Simple API tests are separated into valuable behavior coverage and explicit
-  compatibility coverage.
+- The Phase 3 PR identifies tests as either valuable behavior coverage to move
+  to detailed APIs or legacy-only coverage to delete.
 
 Exit conditions:
 
-- Self-test and service tests no longer depend on simple APIs except where the
-  compatibility contract is explicitly retained.
-- Any remaining legacy folded-summary tests are named and scoped as
-  compatibility tests.
+- Focused `rg` checks find no production or test references to simple
+  verification/decrypt APIs such as `engine.decrypt`, `engine.decryptFile`,
+  `engine.verifyCleartext`, `engine.verifyDetached`, and
+  `engine.verifyDetachedFile`, excluding unrelated password-decrypt and
+  certificate-signature APIs.
+- Valuable signing, decryption, streaming, GnuPG, Device MIE, password-message,
+  self-test, and auth-boundary scenarios exist through detailed APIs.
+- No tests remain solely to preserve legacy folded-summary or bridge
+  equivalence behavior.
 
 Validation:
 
 - Swift unit tests for signing, decryption, streaming, password-message, and
-  self-test behavior.
-- Device MIE coverage when message integrity behavior or device-only security
-  expectations are affected.
+  self-test behavior after each relevant PR.
+- Device MIE coverage when device-only security expectations or MIE exercised
+  crypto paths are migrated.
+- Rust tests, regenerated UniFFI/XCFramework artifacts, and macOS unit tests
+  for PR 3C because removing Rust/UniFFI exports changes Swift-visible generated
+  bindings.
 
 ### Phase 4: Rust And UniFFI API Surface Cleanup
 
@@ -447,7 +495,8 @@ answer these questions in its description.
 - What current API replaces this surface?
 - Which production call sites were checked?
 - Which tests were migrated, removed, or retained as explicit compatibility
-  tests?
+  tests, if the cleanup family allows retained compatibility coverage? Phase 3
+  verification/decryption cleanup does not.
 - Does this affect generated UniFFI bindings?
 - Does this affect downstream callers or fixture compatibility?
 - If this removes migration, recovery, reset, or old-install protection, which
@@ -458,8 +507,11 @@ Known surfaces that require this gate:
 
 - recipient-fingerprint encryption overloads
 - route/tutorial fingerprint preselection fallback (completed in PR 2F)
-- legacy `SignatureVerification` returning Swift facades
-- simple FFI APIs that expose detailed-fold compatibility
+- non-detailed `SignatureVerification` returning Swift service or callback APIs
+- simple Rust/UniFFI verification and decrypt APIs that expose folded
+  compatibility results
+- app-level password-message result surfaces that fold detailed decrypt results
+  into `SignatureVerification`
 - raw first-match User ID FFI exports
 - Contacts legacy flat-runtime APIs, `.keyUpdateDetected`, and legacy contact ID
   projection
@@ -470,7 +522,7 @@ Known surfaces that require this gate:
 | --- | --- |
 | Contacts helpers and recipient cleanup | Focused Swift unit tests for Contacts and affected encryption/decryption service tests. Add macOS UI smoke tests if route or tutorial behavior changes. |
 | Swift service API cleanup | Service tests for the touched area, plus screen-model tests when UI-facing model behavior changes. |
-| Detailed verification adoption | Signing, verify, decryption, streaming, password-message, self-test, and interop tests as applicable. Device MIE tests when integrity behavior changes. |
+| Detailed verification cutover and legacy surface deletion | Signing, verify, decryption, streaming, password-message, self-test, GnuPG interop, and Device MIE tests as applicable; PR 3C also requires Rust tests, regenerated UniFFI/XCFramework artifacts, and macOS unit tests because generated bindings change. |
 | Rust and UniFFI API cleanup | `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`; run `./build-xcframework.sh --release` to refresh XCFramework/generated bindings and run macOS unit tests when Swift-visible behavior changes. |
 | ProtectedData, Keychain, authentication, and root-secret migration | `ProtectedDataFrameworkTests` plus affected settings, private-key control, key metadata, authentication, local reset, and device-binding tests. |
 | Temporary, tutorial, self-test, and reset cleanup | Startup cleanup, owner cleanup, reset cleanup, file-protection, and local data reset tests. |
