@@ -80,20 +80,19 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         XCTAssertEqual(thirdPartyNames, sortedNames)
     }
 
-    func test_manifest_excludesTestOnlyDependencies() throws {
+    func test_manifest_excludesTestOnlyAndNonAppleTargetDependencies() throws {
         let notices = try store.loadNotices()
         let ids = Set(notices.map(\.id))
 
         XCTAssertFalse(ids.contains("rand@0.8.5"))
+        XCTAssertFalse(ids.contains("r-efi@6.0.0"))
+        XCTAssertFalse(ids.contains { $0.hasPrefix("wasm-bindgen@") })
+        XCTAssertFalse(ids.contains { $0.hasPrefix("windows-sys@") })
         XCTAssertTrue(ids.contains("tempfile@3.27.0"))
     }
 
     func test_noticeSources_captureFallbackAndArchiveOrigins() throws {
         let notices = try store.loadNotices()
-
-        let rEfi = try XCTUnwrap(notices.first { $0.id == "r-efi@6.0.0" })
-        XCTAssertEqual(rEfi.licenseSourceKind, .spdxFallback)
-        XCTAssertTrue(rEfi.licenseSourceItems.contains { $0.contains("LGPL-2.1") })
 
         let uniffi = try XCTUnwrap(notices.first { $0.id == "uniffi@0.31.1" })
         XCTAssertEqual(uniffi.licenseSourceKind, .repositoryArchive)

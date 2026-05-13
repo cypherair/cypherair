@@ -29,6 +29,16 @@ APP_LICENSE_TEXT_PATHS = [
 APP_REPOSITORY_URL = "https://github.com/cypherair/cypherair"
 REGISTRY_LICENSE_PATTERN = re.compile(r"(?i)^(license|copying|unlicense|copyright)([.-].+)?$")
 LICENSE_FETCH_HEADERS = {"User-Agent": "CypherAir Open Source Notices"}
+APPLE_NOTICE_TARGETS = (
+    "aarch64-apple-ios",
+    "aarch64-apple-ios-sim",
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "aarch64-apple-visionos",
+    "aarch64-apple-visionos-sim",
+    "arm64e-apple-ios",
+    "arm64e-apple-darwin",
+)
 
 SPDX_FILE_HINTS = {
     "0BSD": ["LICENSE-0BSD", "COPYING-0BSD"],
@@ -69,17 +79,30 @@ def run(*args: str) -> str:
     return subprocess.check_output(args, cwd=ROOT, text=True)
 
 
-def load_metadata() -> dict:
+def load_metadata(target: str) -> dict:
     return json.loads(
-        run("cargo", "metadata", "--manifest-path", str(MANIFEST_PATH), "--format-version", "1")
+        run(
+            "cargo",
+            "metadata",
+            "--manifest-path",
+            str(MANIFEST_PATH),
+            "--format-version",
+            "1",
+            "--locked",
+            "--filter-platform",
+            target,
+        )
     )
 
 
-def reachable_packages(metadata: dict) -> list[PackageRecord]:
-    packages = {package["id"]: package for package in metadata["packages"]}
-    nodes = {node["id"]: node for node in metadata["resolve"]["nodes"]}
+def load_apple_metadata() -> list[dict]:
+    return [load_metadata(target) for target in APPLE_NOTICE_TARGETS]
+
+
+def reachable_package_ids(metadata: dict) -> set[str]:
+    packages = package_map(metadata)
+    nodes = node_map(metadata)
     root_id = next(package["id"] for package in metadata["packages"] if package["name"] == "pgp-mobile")
-    direct_dependency_names = direct_dependency_name_set(metadata)
 
     seen = {root_id}
     queue: deque[str] = deque([root_id])
@@ -98,8 +121,20 @@ def reachable_packages(metadata: dict) -> list[PackageRecord]:
             seen.add(dependency["pkg"])
             queue.append(dependency["pkg"])
 
-    openssl_src = next(package["id"] for package in metadata["packages"] if package["name"] == "openssl-src")
-    seen.add(openssl_src)
+    openssl_src_ids = [package["id"] for package in metadata["packages"] if package["name"] == "openssl-src"]
+    seen.update(openssl_src_ids)
+    return seen
+
+
+def reachable_packages(metadata_items: list[dict]) -> list[PackageRecord]:
+    packages: dict[str, dict] = {}
+    seen: set[str] = set()
+    direct_dependency_names: set[str] = set()
+
+    for metadata in metadata_items:
+        packages.update(package_map(metadata))
+        seen.update(reachable_package_ids(metadata))
+        direct_dependency_names.update(direct_dependency_name_set(metadata))
 
     records: list[PackageRecord] = []
     for package_id in sorted(seen):
@@ -120,6 +155,14 @@ def reachable_packages(metadata: dict) -> list[PackageRecord]:
 
     records.sort(key=lambda item: (item.name.lower(), item.version))
     return records
+
+
+def package_map(metadata: dict) -> dict[str, dict]:
+    return {package["id"]: package for package in metadata["packages"]}
+
+
+def node_map(metadata: dict) -> dict[str, dict]:
+    return {node["id"]: node for node in metadata["resolve"]["nodes"]}
 
 
 def normalize_url(url: str) -> str:
@@ -378,8 +421,8 @@ def app_version_string() -> str:
 
 
 def generate() -> None:
-    metadata = load_metadata()
-    packages = reachable_packages(metadata)
+    metadata_items = load_apple_metadata()
+    packages = reachable_packages(metadata_items)
     license_sources: dict[str, LicenseSource] = {}
 
     if RESOURCE_DIR.exists():

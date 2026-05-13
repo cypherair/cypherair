@@ -47,21 +47,6 @@
     ]
   },
   {
-    "id": "android_system_properties@0.1.5",
-    "displayName": "android_system_properties",
-    "version": "0.1.5",
-    "repositoryURL": "https://github.com/nical/android_system_properties",
-    "licenseName": "MIT/Apache-2.0",
-    "licenseFileResourceName": "android_system_properties-0.1.5.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
     "id": "anstyle@1.0.14",
     "displayName": "anstyle",
     "version": "1.0.14",
@@ -284,20 +269,6 @@
     ]
   },
   {
-    "id": "chrono@0.4.44",
-    "displayName": "chrono",
-    "version": "0.4.44",
-    "repositoryURL": "https://github.com/chronotope/chrono",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "chrono-0.4.44.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE.txt"
-    ]
-  },
-  {
     "id": "clap@4.6.1",
     "displayName": "clap",
     "version": "4.6.1",
@@ -334,21 +305,6 @@
     "repositoryURL": "https://github.com/clap-rs/clap",
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "clap_lex-1.1.0.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "core-foundation-sys@0.8.7",
-    "displayName": "core-foundation-sys",
-    "version": "0.8.7",
-    "repositoryURL": "https://github.com/servo/core-foundation-rs",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "core-foundation-sys-0.8.7.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -538,51 +494,6 @@
     ]
   },
   {
-    "id": "futures-core@0.3.32",
-    "displayName": "futures-core",
-    "version": "0.3.32",
-    "repositoryURL": "https://github.com/rust-lang/futures-rs",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "futures-core-0.3.32.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "futures-task@0.3.32",
-    "displayName": "futures-task",
-    "version": "0.3.32",
-    "repositoryURL": "https://github.com/rust-lang/futures-rs",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "futures-task-0.3.32.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "futures-util@0.3.32",
-    "displayName": "futures-util",
-    "version": "0.3.32",
-    "repositoryURL": "https://github.com/rust-lang/futures-rs",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "futures-util-0.3.32.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
     "id": "generic-array@0.14.7",
     "displayName": "generic-array",
     "version": "0.14.7",
@@ -608,21 +519,6 @@
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
       "LICENSE"
-    ]
-  },
-  {
-    "id": "getrandom@0.2.17",
-    "displayName": "getrandom",
-    "version": "0.2.17",
-    "repositoryURL": "https://github.com/rust-random/getrandom",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "getrandom-0.2.17.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
     ]
   },
   {
@@ -691,36 +587,6 @@
     "repositoryURL": "https://github.com/withoutboats/heck",
     "licenseName": "MIT OR Apache-2.0",
     "licenseFileResourceName": "heck-0.5.0.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "iana-time-zone@0.1.65",
-    "displayName": "iana-time-zone",
-    "version": "0.1.65",
-    "repositoryURL": "https://github.com/strawlab/iana-time-zone",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "iana-time-zone-0.1.65.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "iana-time-zone-haiku@0.1.2",
-    "displayName": "iana-time-zone-haiku",
-    "version": "0.1.2",
-    "repositoryURL": "https://github.com/strawlab/iana-time-zone",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "iana-time-zone-haiku-0.1.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -888,21 +754,6 @@
     ]
   },
   {
-    "id": "js-sys@0.3.98",
-    "displayName": "js-sys",
-    "version": "0.3.98",
-    "repositoryURL": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/js-sys",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "js-sys-0.3.98.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
     "id": "lalrpop-util@0.23.1",
     "displayName": "lalrpop-util",
     "version": "0.23.1",
@@ -930,21 +781,6 @@
     "licenseSourceItems": [
       "LICENSE-MIT",
       "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "linux-raw-sys@0.12.1",
-    "displayName": "linux-raw-sys",
-    "version": "0.12.1",
-    "repositoryURL": "https://github.com/sunfishcode/linux-raw-sys",
-    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
-    "licenseFileResourceName": "linux-raw-sys-0.12.1.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-APACHE",
-      "LICENSE-MIT"
     ]
   },
   {
@@ -1050,21 +886,6 @@
     ]
   },
   {
-    "id": "num-traits@0.2.19",
-    "displayName": "num-traits",
-    "version": "0.2.19",
-    "repositoryURL": "https://github.com/rust-num/num-traits",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "num-traits-0.2.19.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
     "id": "once_cell@1.21.4",
     "displayName": "once_cell",
     "version": "1.21.4",
@@ -1153,21 +974,6 @@
     ]
   },
   {
-    "id": "pin-project-lite@0.2.17",
-    "displayName": "pin-project-lite",
-    "version": "0.2.17",
-    "repositoryURL": "https://github.com/taiki-e/pin-project-lite",
-    "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "pin-project-lite-0.2.17.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-APACHE",
-      "LICENSE-MIT"
-    ]
-  },
-  {
     "id": "plain@0.2.3",
     "displayName": "plain",
     "version": "0.2.3",
@@ -1194,22 +1000,6 @@
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
       "LICENSE"
-    ]
-  },
-  {
-    "id": "r-efi@6.0.0",
-    "displayName": "r-efi",
-    "version": "6.0.0",
-    "repositoryURL": "https://github.com/r-efi/r-efi",
-    "licenseName": "MIT OR Apache-2.0 OR LGPL-2.1-or-later",
-    "licenseFileResourceName": "r-efi-6.0.0.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "spdxFallback",
-    "licenseSourceItems": [
-      "MIT: canonical text from LICENSE-MIT",
-      "Apache-2.0: canonical text from LICENSE-APACHE",
-      "LGPL-2.1-or-later: standard text from https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt"
     ]
   },
   {
@@ -1430,20 +1220,6 @@
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
       "COPYING"
-    ]
-  },
-  {
-    "id": "slab@0.4.12",
-    "displayName": "slab",
-    "version": "0.4.12",
-    "repositoryURL": "https://github.com/tokio-rs/slab",
-    "licenseName": "MIT",
-    "licenseFileResourceName": "slab-0.4.12.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE"
     ]
   },
   {
@@ -1668,22 +1444,6 @@
     ]
   },
   {
-    "id": "unicode-ident@1.0.24",
-    "displayName": "unicode-ident",
-    "version": "1.0.24",
-    "repositoryURL": "https://github.com/dtolnay/unicode-ident",
-    "licenseName": "(MIT OR Apache-2.0) AND Unicode-3.0",
-    "licenseFileResourceName": "unicode-ident-1.0.24.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE",
-      "LICENSE-UNICODE"
-    ]
-  },
-  {
     "id": "uniffi@0.31.1",
     "displayName": "uniffi",
     "version": "0.31.1",
@@ -1797,81 +1557,6 @@
     ]
   },
   {
-    "id": "wasi@0.11.1+wasi-snapshot-preview1",
-    "displayName": "wasi",
-    "version": "0.11.1+wasi-snapshot-preview1",
-    "repositoryURL": "https://github.com/bytecodealliance/wasi",
-    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
-    "licenseFileResourceName": "wasi-0.11.1-wasi-snapshot-preview1.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-APACHE",
-      "LICENSE-MIT"
-    ]
-  },
-  {
-    "id": "wasip2@1.0.3+wasi-0.2.9",
-    "displayName": "wasip2",
-    "version": "1.0.3+wasi-0.2.9",
-    "repositoryURL": "https://github.com/bytecodealliance/wasi-rs",
-    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
-    "licenseFileResourceName": "wasip2-1.0.3-wasi-0.2.9.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-APACHE",
-      "LICENSE-MIT"
-    ]
-  },
-  {
-    "id": "wasip3@0.4.0+wasi-0.3.0-rc-2026-01-06",
-    "displayName": "wasip3",
-    "version": "0.4.0+wasi-0.3.0-rc-2026-01-06",
-    "repositoryURL": "https://github.com/bytecodealliance/wasi-rs",
-    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
-    "licenseFileResourceName": "wasip3-0.4.0-wasi-0.3.0-rc-2026-01-06.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "repositoryArchive",
-    "licenseSourceItems": [
-      "wasip3-0.4.0:LICENSE-APACHE",
-      "wasip3-0.4.0:LICENSE-MIT"
-    ]
-  },
-  {
-    "id": "wasm-bindgen@0.2.121",
-    "displayName": "wasm-bindgen",
-    "version": "0.2.121",
-    "repositoryURL": "https://github.com/wasm-bindgen/wasm-bindgen",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "wasm-bindgen-0.2.121.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
-    "id": "wasm-bindgen-shared@0.2.121",
-    "displayName": "wasm-bindgen-shared",
-    "version": "0.2.121",
-    "repositoryURL": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/shared",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "wasm-bindgen-shared-0.2.121.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE"
-    ]
-  },
-  {
     "id": "weedle2@5.0.0",
     "displayName": "weedle2",
     "version": "5.0.0",
@@ -1883,81 +1568,6 @@
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
       "LICENSE.md"
-    ]
-  },
-  {
-    "id": "windows-core@0.62.2",
-    "displayName": "windows-core",
-    "version": "0.62.2",
-    "repositoryURL": "https://github.com/microsoft/windows-rs",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "windows-core-0.62.2.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE-2.0"
-    ]
-  },
-  {
-    "id": "windows-link@0.2.1",
-    "displayName": "windows-link",
-    "version": "0.2.1",
-    "repositoryURL": "https://github.com/microsoft/windows-rs",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "windows-link-0.2.1.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE-2.0"
-    ]
-  },
-  {
-    "id": "windows-result@0.4.1",
-    "displayName": "windows-result",
-    "version": "0.4.1",
-    "repositoryURL": "https://github.com/microsoft/windows-rs",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "windows-result-0.4.1.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE-2.0"
-    ]
-  },
-  {
-    "id": "windows-strings@0.5.1",
-    "displayName": "windows-strings",
-    "version": "0.5.1",
-    "repositoryURL": "https://github.com/microsoft/windows-rs",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "windows-strings-0.5.1.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE-2.0"
-    ]
-  },
-  {
-    "id": "windows-sys@0.61.2",
-    "displayName": "windows-sys",
-    "version": "0.61.2",
-    "repositoryURL": "https://github.com/microsoft/windows-rs",
-    "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "windows-sys-0.61.2.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-MIT",
-      "LICENSE-APACHE-2.0"
     ]
   },
   {
@@ -1985,36 +1595,6 @@
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
-      "LICENSE-MIT"
-    ]
-  },
-  {
-    "id": "wit-bindgen@0.51.0",
-    "displayName": "wit-bindgen",
-    "version": "0.51.0",
-    "repositoryURL": "https://github.com/bytecodealliance/wit-bindgen",
-    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
-    "licenseFileResourceName": "wit-bindgen-0.51.0.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-APACHE",
-      "LICENSE-MIT"
-    ]
-  },
-  {
-    "id": "wit-bindgen@0.57.1",
-    "displayName": "wit-bindgen",
-    "version": "0.57.1",
-    "repositoryURL": "https://github.com/bytecodealliance/wit-bindgen",
-    "licenseName": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
-    "licenseFileResourceName": "wit-bindgen-0.57.1.txt",
-    "kind": "thirdParty",
-    "isDirectDependency": false,
-    "licenseSourceKind": "cratePackage",
-    "licenseSourceItems": [
-      "LICENSE-APACHE",
       "LICENSE-MIT"
     ]
   },
