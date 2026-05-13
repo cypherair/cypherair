@@ -202,75 +202,6 @@ final class EncryptionService {
         return outputArtifact
     }
 
-    // MARK: - Legacy Fingerprint Recipient Compatibility
-
-    /// Compatibility-only path for callers that still carry recipient fingerprints.
-    /// New production UI should pass contact identity IDs instead.
-    func encryptText(
-        _ plaintext: String,
-        recipientFingerprints: [String],
-        signWithFingerprint: String?,
-        encryptToSelf: Bool,
-        encryptToSelfFingerprint: String? = nil
-    ) async throws -> Data {
-        let plaintextData = Data(plaintext.utf8)
-        return try await legacyEncrypt(
-            plaintext: plaintextData,
-            recipientFingerprints: recipientFingerprints,
-            signWithFingerprint: signWithFingerprint,
-            encryptToSelf: encryptToSelf,
-            encryptToSelfFingerprint: encryptToSelfFingerprint,
-            binary: false
-        )
-    }
-
-    /// Compatibility-only path for callers that still carry recipient fingerprints.
-    /// New production UI should pass contact identity IDs instead.
-    func encryptFile(
-        _ fileData: Data,
-        recipientFingerprints: [String],
-        signWithFingerprint: String?,
-        encryptToSelf: Bool,
-        encryptToSelfFingerprint: String? = nil
-    ) async throws -> Data {
-        let maxSize = 100 * 1024 * 1024
-        guard fileData.count <= maxSize else {
-            throw CypherAirError.fileTooLarge(sizeMB: (fileData.count + 1024 * 1024 - 1) / (1024 * 1024))
-        }
-
-        return try await legacyEncrypt(
-            plaintext: fileData,
-            recipientFingerprints: recipientFingerprints,
-            signWithFingerprint: signWithFingerprint,
-            encryptToSelf: encryptToSelf,
-            encryptToSelfFingerprint: encryptToSelfFingerprint,
-            binary: true
-        )
-    }
-
-    /// Compatibility-only path for callers that still carry recipient fingerprints.
-    /// New production UI should pass contact identity IDs instead.
-    func encryptFileStreaming(
-        inputURL: URL,
-        recipientFingerprints: [String],
-        signWithFingerprint: String?,
-        encryptToSelf: Bool,
-        encryptToSelfFingerprint: String? = nil,
-        progress: FileProgressReporter?
-    ) async throws -> AppTemporaryArtifact {
-        guard !recipientFingerprints.isEmpty else {
-            throw CypherAirError.noRecipientsSelected
-        }
-        return try await encryptFileStreaming(
-            inputURL: inputURL,
-            recipientKeys: try contactService.legacyPublicKeysForRecipientFingerprints(recipientFingerprints),
-            signWithFingerprint: signWithFingerprint,
-            encryptToSelf: encryptToSelf,
-            encryptToSelfFingerprint: encryptToSelfFingerprint,
-            progress: progress
-        )
-    }
-
     // MARK: - Private
 
     private func encrypt(
@@ -288,28 +219,6 @@ final class EncryptionService {
         return try await encrypt(
             plaintext: plaintext,
             recipientKeys: try contactService.publicKeysForRecipientContactIDs(recipientContactIds),
-            signWithFingerprint: signWithFingerprint,
-            encryptToSelf: encryptToSelf,
-            encryptToSelfFingerprint: encryptToSelfFingerprint,
-            binary: binary
-        )
-    }
-
-    private func legacyEncrypt(
-        plaintext: Data,
-        recipientFingerprints: [String],
-        signWithFingerprint: String?,
-        encryptToSelf: Bool,
-        encryptToSelfFingerprint: String? = nil,
-        binary: Bool
-    ) async throws -> Data {
-        guard !recipientFingerprints.isEmpty else {
-            throw CypherAirError.noRecipientsSelected
-        }
-
-        return try await encrypt(
-            plaintext: plaintext,
-            recipientKeys: try contactService.legacyPublicKeysForRecipientFingerprints(recipientFingerprints),
             signWithFingerprint: signWithFingerprint,
             encryptToSelf: encryptToSelf,
             encryptToSelfFingerprint: encryptToSelfFingerprint,
