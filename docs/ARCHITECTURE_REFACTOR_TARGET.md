@@ -42,7 +42,7 @@ graph TB
 Dependency rules:
 
 - UI reads ScreenModel state, sends user actions to ScreenModels, and renders app-owned models or presentation values.
-- UI does not directly orchestrate service workflows, call Security APIs, or call generated UniFFI APIs.
+- UI does not directly orchestrate service workflows, call Security APIs, call generated UniFFI APIs, or pattern-match generated errors.
 - Presentation extensions depend only on app-owned models and presentation frameworks needed to render labels, icons, colors, and accessibility text.
 - ScreenModels depend on Services and app-owned models, not on generated UniFFI types or Security internals.
 - Services own business workflows and may coordinate Security and FFI adapters, but expose app-owned models and app-owned errors upward.
@@ -83,7 +83,7 @@ ScreenModels own user-driven workflow state for a screen or route. They coordina
 
 ScreenModels expose UI-consumable state and actions. They should accept Services and small injected seams in initializers, but they should not pull dependencies directly from SwiftUI environment values. They should not call `PgpEngine`, Keychain, Secure Enclave, ProtectedData stores, or migration sources directly.
 
-ScreenModel public APIs should speak app-owned models, request models, result models, and `CypherAirError`. Generated FFI types should not appear in ScreenModel stored properties, action signatures, or view-facing result state.
+ScreenModel public APIs should speak app-owned models, request models, result models, and `CypherAirError`. Generated FFI types and generated errors such as `PgpError` should not appear in ScreenModel stored properties, action signatures, cancellation checks, or view-facing result state.
 
 ### Service
 
@@ -127,7 +127,7 @@ The FFI adapter / mapper boundary contains generated UniFFI interaction. It owns
 - all direct `PgpEngine` calls in normal app workflows
 - mapping generated records into app-owned models
 - mapping app-owned request models into generated selector/input records
-- generated-error normalization, including `PgpError -> CypherAirError`
+- generated-error normalization, including `PgpError -> CypherAirError` and generated cancellation and ignore policy
 - off-main execution wrappers around CPU-heavy or file-based engine calls
 - generated progress-protocol bridging, cancellation propagation, and result cleanup
 - conversion of generated signature, key-info, certificate-selector, decrypt, verify, merge, revocation, and password-message results into app-owned values
@@ -161,6 +161,7 @@ Target public contract rules:
 
 - Services and ScreenModels return app-owned result types and throw app-owned errors.
 - Generated FFI types do not appear in UI-facing configuration, ScreenModel properties, ScreenModel action closures, or app-owned persisted models.
+- UI and ScreenModels do not catch or pattern-match generated errors; they consume app-owned error and cancellation results.
 - `CypherAirError` remains the shared app error vocabulary, but generated-error mapping belongs to FFI adapter / mapper code.
 - Selector-bearing models remain app-owned. The adapter converts them to generated selector inputs only at the FFI call site.
 - Signature and verification models remain app-owned. The adapter converts generated signature statuses and detailed result entries into app-owned verification states before Services return.
@@ -199,6 +200,7 @@ The refactor can be considered aligned with this target when these checks hold f
 - UI route views own rendering and lifecycle only; workflow state and service calls are in ScreenModels.
 - Presentation extensions contain display policy only and do not call Services, Security, FFI adapters, stores, or repositories.
 - ScreenModel public APIs and stored state do not expose generated UniFFI types.
+- Production Views and ScreenModels do not reference `PgpError`.
 - Service public APIs return app-owned models and app-owned errors.
 - Generated FFI records, generated selectors, generated progress protocols, and `PgpError` mapping are contained in FFI adapter / mapper code.
 - Core Models do not import SwiftUI for `Color`, icons, or view-specific display policy.

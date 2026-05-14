@@ -49,6 +49,8 @@ Models should not directly own:
 `CypherAirError` may remain in the Models layer as an app-owned error model. However,
 mappings such as `PgpError -> CypherAirError` should move toward the FFI Adapter /
 Mapper boundary so Models do not directly depend on UniFFI types.
+Generated error interpretation, including cancellation checks, should also be
+normalized at that boundary rather than repeated in UI or ScreenModel code.
 
 ## Establish an FFI Adapter / Mapper Boundary
 
