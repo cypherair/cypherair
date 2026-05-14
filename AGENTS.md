@@ -2,41 +2,15 @@
 
 This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding agents can quickly understand the project, constraints, sensitive boundaries, and required validation steps before making changes.
 
-## Apple arm64e Mainline Context
+## Apple arm64e Status
 
-- Primary local main path: `/Users/tianren/coding/cypherair-main`
-- Remote repository: `cypherair/cypherair`
-- Main branch: `main`
-- Apple `arm64e` app support landed on `main` through PR #222, merge commit
-  `98e9e9fcdcc3760538b2b0e260a5daf52dc67c0e`.
-- `./build-xcframework.sh --release` is the official app-side entrypoint. It
-  packages iOS/macOS/visionOS device libraries as `arm64` + `arm64e`, keeps
-  simulator libraries on `arm64`, and writes `PgpMobile.arm64e-build-manifest.json`.
-- Normal `arm64` Rust slices use official Rust stable. `arm64e` slices use
-  nightly Cargo with explicit `RUSTC=<stage1>/bin/rustc` from the CypherAir
-  patched Rust stage1.
-- The former experiment worktree may remain locally for post-merge comparison
-  and diagnostics, but `main` is now the app-side source of truth.
-- Detailed arm64e status belongs in [docs/ARM64E_STATUS.md](docs/ARM64E_STATUS.md).
-  Keep that file current whenever the Rust stage1 pin, OpenSSL carry chain,
-  release manifest shape, or app-side readiness changes.
+`docs/ARM64E_STATUS.md` is the source of truth for Apple `arm64e` support status, related fork paths and branch posture, Rust stage1 toolchain provenance, OpenSSL carry chain, release manifest shape, and app-side readiness.
 
-## Related Forks
-
-- Rust fork: `/Users/tianren/coding/rust` (`cypherair/rust`, stage1 carry
-  branch `carry/cypherair-arm64e-toolchain`, integration branch
-  `integration/arm64e-upstream-prs`, upstream-prep branch
-  `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`)
-- OpenSSL glue fork: `/Users/tianren/coding/openssl-src-rs` (`cypherair/openssl-src-rs`, carry branch `carry/apple-arm64e-openssl-fork`; CypherAir tracks this branch in `pgp-mobile/Cargo.toml`)
-- OpenSSL target-definition fork: `/Users/tianren/coding/openssl` (`cypherair/openssl`, carry branch `carry/apple-arm64e-targets`, prep branch `prep/apple-arm64e-targets`)
-- Related but currently unconfirmed arm64e role: `/Users/tianren/coding/rust-openssl` (`cypherair/rust-openssl`)
+Keep that file current whenever the Rust stage1 pin, OpenSSL carry chain, release manifest shape, related fork posture, or app-side arm64e readiness changes.
 
 ## Documentation Scope
 
-- Update permanent documentation in the current `main` worktree.
-- The post-merge `arm64e` migration checklist is archived at
-  [docs/archive/ARM64E_MAIN_MIGRATION.md](docs/archive/ARM64E_MAIN_MIGRATION.md);
-  current-state docs outrank archived material.
+- Treat archived docs as historical references; current-state docs take precedence.
 
 ## Project Overview
 
@@ -234,7 +208,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 
 ### GitHub Actions Note
 
-The repository workflows target `macos-26`, but GitHub-hosted runner images may temporarily lag the project's minimum deployment target. At the moment, hosted Swift CI can still fail before tests start because the runner image reports **macOS 26.3** while the project targets **macOS 26.4**. Local `xcodebuild test ... -destination 'platform=macOS'` remains the source of truth for that runner-image mismatch until the hosted image catches up or a self-hosted runner is used.
+For current GitHub Actions lanes, hosted runner limitations, and the local-vs-hosted validation contract, see `docs/TESTING.md`.
 
 ## Agent Checklist
 
