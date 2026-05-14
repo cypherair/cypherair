@@ -50,25 +50,9 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - name: Select Xcode 26.5
-        run: |
-          set -euo pipefail
-
-          if [ -n "${XCODE_26_DEVELOPER_DIR:-}" ] && [ -d "${XCODE_26_DEVELOPER_DIR}" ]; then
-            SELECTED_DEVELOPER_DIR="${XCODE_26_DEVELOPER_DIR}"
-          elif [ -d "/Applications/Xcode_26.5.app/Contents/Developer" ]; then
-            SELECTED_DEVELOPER_DIR="/Applications/Xcode_26.5.app/Contents/Developer"
-          else
-            echo "::error::Xcode 26.5 was not found on this runner."
-            exit 1
-          fi
-
-          echo "DEVELOPER_DIR=${SELECTED_DEVELOPER_DIR}" >> "$GITHUB_ENV"
-          export DEVELOPER_DIR="${SELECTED_DEVELOPER_DIR}"
-
-          echo "Using DEVELOPER_DIR=${DEVELOPER_DIR}"
-          xcode-select -p
-          xcodebuild -version
+      - name: Check Xcode 26.5 platform probe readiness
+        id: platform_preflight
+        run: bash scripts/ci_xcode_platform_preflight.sh preflight
       - name: Install Rust stable toolchain
         run: |
           rustup set profile minimal
@@ -195,6 +179,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: ./build-xcframework.sh --release
       - name: Probe iOS build
+        if: steps.platform_preflight.outputs.ready == 'true'
         run: |
           xcodebuild build \
             -scheme CypherAir \
@@ -202,12 +187,17 @@ jobs:
             -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO
       - name: Probe visionOS build
+        if: steps.platform_preflight.outputs.ready == 'true'
         run: |
           xcodebuild build \
             -scheme CypherAir \
             -project CypherAir.xcodeproj \
             -destination 'generic/platform=visionOS' \
             CODE_SIGNING_ALLOWED=NO
+      - name: Skip Apple platform probes
+        if: steps.platform_preflight.outputs.ready != 'true'
+        run: |
+          echo "::warning::Apple platform probes skipped: ${{ steps.platform_preflight.outputs.skip_reason }}"
       - name: Package release assets
         run: |
           set -euo pipefail
